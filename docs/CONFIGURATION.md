@@ -21,6 +21,8 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
+| `REGISTRATION_ENABLED` | `true` | Local email/password self-registration; set `false` on SSO-/OIDC-only instances (#462) |
+| `GUEST_CHAT_ENABLED` | `true` | Anonymous guest trial chat; set `false` on SSO-/OIDC-only instances so unauthenticated visitors go to the login page (#1517) |
 
 ---
 
@@ -213,10 +215,91 @@ group in the `BCONFIG` table.
 | `MULTITASK / PARALLEL_ENABLED` | `false` | Execute independent media nodes concurrently (subprocess offload) |
 | `MULTITASK / MAX_PARALLEL` | `3` | Concurrency cap for parallel media nodes |
 | `MULTITASK / NODE_TIMEOUT` | `120` | Per-node subprocess timeout (seconds) |
+| `MULTITASK / EMAIL_SEARCH_ENABLED` | `true` (seeded)² | `email_search` DAG node: live read-only search over the user's IMAP accounts and Microsoft 365 connections |
 | `CLASSIFIER / FAST_PATH_ENABLED` | `false` | Skip the AI sorter for trivial chat messages (heuristic) |
 
 ¹ Existing installations are grandfathered to `0` by migration so behavior
 doesn't change on upgrade — enable it per user or globally when ready.
+
+² Seeded `1` insert-if-missing by `MultitaskConfigSeeder` (runs in `app:seed`
+on container start); an operator's explicit `0` row survives every deploy.
+The built-in code default stays `false` when no row exists. The capability is
+only offered to the planner when the user has a connected mail source.
+
+## Saved Tasks (BCONFIG)
+
+Pin a Task Prompt and run it on demand or on a schedule. Configured via
+**BCONFIG**, not environment variables. Admins manage the master switch in
+**Settings → Routing → Saved Tasks**. Resolution is per-user row → global row
+(`BOWNERID=0`) → built-in code default (`false`). The seeder inserts a global
+`1` for new and local-dev installs (insert-if-missing).
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `SAVEDTASKS / ENABLED` | `true` (new / local-dev installs); code default `false` | Master switch: Saved Task APIs, AI Instructions chrome, and the Connections page. Widget chat never runs Saved Tasks. When the flag is off, `app:saved-tasks:tick` is a no-op. |
+
+---
+
+## Microsoft 365 connector (BCONFIG)
+
+Lets a user connect their Microsoft 365 account (currently delegated
+`Mail.Read`) from **Channels → Connections**. The app registration is
+**operator-owned and install-wide**: rows live under `BOWNERID=0` only, so a
+user can never point the consent flow at an app registration the operator does
+not control. Admins manage it in **Settings → Inbound Channels → Microsoft 365
+(Graph)**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `M365 / ENABLED` | `false` | Offer Microsoft 365 as a connection. The connect action stays hidden until client ID **and** secret are also set. |
+| `M365 / CLIENT_ID` | — | Application (client) ID of the Azure app registration. |
+| `M365 / CLIENT_SECRET` | — | Client secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `M365 / TENANT` | `common` | `common`, `organizations`, or a single tenant GUID. |
+| `M365 / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/m365/callback` | Override only when a proxy changes the public URL. Must match Azure exactly. |
+
+**Azure app registration** — register a *Web* platform (not SPA) with the
+redirect URI above, add the delegated permissions `offline_access`, `openid`,
+`email`, `profile`, `User.Read`, `Mail.Read`, and create a client secret.
+`offline_access` is not optional: without it Microsoft issues no refresh token
+and every scheduled run stops working after an hour.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the scope list as copyable values, so nobody has to
+read this file to set the connector up.
+
+Tokens are stored per user as one encrypted JSON blob in the credential vault
+(`BCREDENTIALS`), never in `BCONNECTIONS`, and are refreshed automatically —
+including from cron, with no user session. When Microsoft finally rejects the
+grant (consent revoked, refresh token expired), the connection flips to
+`reauth_required` instead of failing silently.
+
+---
+
+## Dropbox connector (BCONFIG)
+
+Lets a user connect their Dropbox account as a file destination
+(`save_to_folder`, channel `dropbox`) from **Channels → Connections**. Same
+model as Microsoft 365: the Dropbox app is **operator-owned and install-wide**
+(`BOWNERID=0`), tokens live per user in the encrypted credential vault, and a
+rejected refresh flips the connection to `reauth_required`. Admins manage it
+in **Settings → Inbound Channels → Dropbox**; no restart is required.
+
+| Group / Key | Default | Description |
+|-------------|---------|-------------|
+| `DROPBOX / ENABLED` | `false` | Offer Dropbox as a connection. The connect action stays hidden until app key **and** secret are also set. |
+| `DROPBOX / APP_KEY` | — | App key from the Dropbox App Console. |
+| `DROPBOX / APP_SECRET` | — | App secret, **stored AES-encrypted** (`APP_SECRET` derived) and masked in every API response. |
+| `DROPBOX / REDIRECT_URI` | `APP_URL` + `/api/v1/connections/dropbox/callback` | Override only when a proxy changes the public URL. Must match the App Console exactly. |
+
+**Dropbox app** — create a *Scoped access* / *Full Dropbox* app at
+[dropbox.com/developers/apps](https://www.dropbox.com/developers/apps), enable
+the permissions `account_info.read` and `files.content.write`, and register
+the redirect URI above. The consent flow requests
+`token_access_type=offline` — without it Dropbox issues no refresh token and
+every scheduled run stops working after four hours.
+
+The same steps are shown inside the admin UI above the fields, with the
+resolved redirect URI and the permission list as copyable values.
 
 ---
 

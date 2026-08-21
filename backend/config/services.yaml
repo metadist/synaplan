@@ -122,9 +122,35 @@ parameters:
     env(IAP_STORE_PRICE_BUSINESS): '129.99'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(WHATSAPP_ENABLED): 'false'
     env(CLOUDFLARE_ACCOUNT_ID): ''
     env(CLOUDFLARE_API_TOKEN): ''
     env(EMBEDDING_FALLBACK_PROVIDER): ''
+
+    # Container-safe defaults for the remaining strictly-bound env vars.
+    # Compose passes these through .env/env_file, but bare images (Kubernetes,
+    # plain docker run) ship no .env, so a missing var used to crash service
+    # instantiation (e.g. /api/v1/messages/stream 500ing on WHATSAPP_ENABLED).
+    # Values mirror backend/.env.example.
+    env(TIKA_TIMEOUT_MS): '30000'
+    env(TIKA_RETRIES): '2'
+    env(TIKA_RETRY_BACKOFF_MS): '1000'
+    env(TIKA_MIN_LENGTH): '10'
+    env(TIKA_MIN_ENTROPY): '3.0'
+    env(RASTERIZE_DPI): '150'
+    env(RASTERIZE_PAGE_CAP): '10'
+    env(RASTERIZE_TIMEOUT_MS): '30000'
+    env(WHISPER_ENABLED): 'true'
+    env(WHISPER_DEFAULT_MODEL): 'base'
+    env(WHISPER_BINARY): '/usr/local/bin/whisper'
+    env(WHISPER_MODELS_PATH): '%kernel.project_dir%/var/whisper'
+    env(FFMPEG_BINARY): '/usr/bin/ffmpeg'
+    env(BRAVE_SEARCH_ENABLED): 'true'
+    env(BRAVE_SEARCH_API_URL): 'https://api.search.brave.com/res/v1'
+    env(BRAVE_SEARCH_COUNT): '10'
+    env(BRAVE_SEARCH_COUNTRY): 'us'
+    env(BRAVE_SEARCH_SEARCH_LANG): 'en'
+    env(STRIPE_AUTOMATIC_TAX): 'false'
 
     # Piper TTS Service default (localhost for native; Docker Compose overrides via env)
     env(SYNAPLAN_TTS_URL): ''
@@ -173,6 +199,16 @@ services:
             tags: ['app.multitask.runner']
         App\Realtime\Authorizer\ChannelAuthorizerInterface:
             tags: ['app.realtime.authorizer']
+        App\Service\Destination\DestinationProvider:
+            tags: ['app.destination.provider']
+        App\Service\OAuth\OAuthProviderSource:
+            tags: ['app.oauth.provider_source']
+        App\Service\Connection\ConnectionTester:
+            tags: ['app.connection.tester']
+        # Free provider catalog lookups for model outage detection — collected
+        # by ModelListProbeRegistry. Never inference, always metadata.
+        App\AI\Health\Probe\ModelListProbeInterface:
+            tags: ['app.model_list_probe']
 
     App\:
         resource: '../src/'
@@ -199,6 +235,12 @@ services:
     # email_me DAG node: resolves upstream file descriptors to absolute paths
     # under the shared uploads dir before attaching them to the result mail.
     App\Service\Multitask\Execution\Runner\EmailMeRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    # calendar_event DAG node: the stored .ics lives under the shared uploads
+    # dir; the runner needs the absolute path for a calendar-channel delivery.
+    App\Service\Multitask\Execution\Runner\CalendarEventRunner:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
@@ -402,6 +444,17 @@ services:
         tags:
             - { name: 'app.ai.embedding' }
 
+    # Model health: the account-scoped Cloudflare catalog needs the same
+    # credentials as the provider itself.
+    App\AI\Health\Probe\CloudflareModelListProbe:
+        arguments:
+            $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
+            $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
+
+    App\AI\Health\Probe\ModelListProbeRegistry:
+        arguments:
+            $probes: !tagged_iterator app.model_list_probe
+
     # Generic "OpenAI Compatible" provider (LocalAI, vLLM, LiteLLM, Ollama /v1,
     # …). Endpoints are configured at runtime and stored encrypted in BCONFIG
     # via OpenAiCompatibleEndpointRegistry — there are no env credentials.
@@ -581,6 +634,11 @@ services:
     App\Service\MediaGenerationServiceInterface:
         alias: App\Service\MediaGenerationService
 
+    # Model availability detection talks to provider listing endpoints; the
+    # interface keeps the diff logic testable without credentials or network.
+    App\AI\Service\ProviderModelInventoryInterface:
+        alias: App\AI\Service\ProviderModelInventory
+
     App\Service\Media\GeneratedFileRegistrar:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -642,6 +700,39 @@ services:
     App\Service\EncryptionService:
         arguments:
             $secretKey: '%env(APP_SECRET)%'
+
+    App\Service\Credential\CredentialVaultInterface: '@App\Service\Credential\AesCredentialVault'
+
+    App\Service\Destination\DestinationRegistry:
+        arguments:
+            $providers: !tagged_iterator app.destination.provider
+
+    # Outbound OAuth2 (connector plan 07 F3). The app registration itself lives
+    # in BCONFIG so an operator can set it in the Admin UI without a restart;
+    # only APP_URL (for the default redirect URI) comes from the environment.
+    App\Service\OAuth\OAuthProviderRegistry:
+        arguments:
+            $sources: !tagged_iterator app.oauth.provider_source
+
+    App\Service\Connection\ConnectionService:
+        arguments:
+            $testers: !tagged_iterator app.connection.tester
+
+    App\Service\Microsoft\MicrosoftOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\MicrosoftConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
+    App\Service\Dropbox\DropboxOAuthConfig:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\DropboxConnectionController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
 
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:
@@ -791,6 +882,12 @@ services:
 
     # Native OAuth handoff token (signed, short-lived) for the mobile deep-link flow
     App\Service\NativeAuthHandoffService:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
+    # Read-only media credential for <img>/<audio>/<video>, which cannot send
+    # an Authorization header. Derives its own signing key from APP_SECRET.
+    App\Service\Media\MediaAccessTokenService:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 

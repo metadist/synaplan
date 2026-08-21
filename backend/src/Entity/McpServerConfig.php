@@ -55,6 +55,14 @@ class McpServerConfig
     #[ORM\Column(name: 'BENABLED', type: 'boolean', options: ['default' => true])]
     private bool $enabled = true;
 
+    /**
+     * Owner's explicit opt-in for MUTATING tool calls on this server
+     * (`mcp_action`). OFF = the server is read-only (`mcp_fetch`), which is
+     * the safe default for every new connection.
+     */
+    #[ORM\Column(name: 'BALLOWWRITE', type: 'boolean', options: ['default' => false])]
+    private bool $allowWrite = false;
+
     #[ORM\Column(name: 'BCREATED', type: 'string', length: 20)]
     private string $created;
 
@@ -159,6 +167,19 @@ class McpServerConfig
     public function setEnabled(bool $enabled): self
     {
         $this->enabled = $enabled;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function allowsWrite(): bool
+    {
+        return $this->allowWrite;
+    }
+
+    public function setAllowWrite(bool $allowWrite): self
+    {
+        $this->allowWrite = $allowWrite;
         $this->touch();
 
         return $this;

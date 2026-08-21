@@ -227,6 +227,12 @@ export function parseContentWithThinking(
           content: part.content,
           language: part.language,
         })
+      } else if (part.type === 'json') {
+        parts.push({
+          type: 'json',
+          content: part.content,
+          language: part.language ?? 'json',
+        })
       } else if (part.type === 'text' && part.content.trim()) {
         parts.push({
           type: 'text',
@@ -296,6 +302,7 @@ export interface ApiLoadedMessageRow {
       capability: string
       kind: string
       state: string
+      depends_on?: string[]
       text?: string
       url?: string
       type?: string
@@ -444,6 +451,9 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         capability: c.capability,
         kind,
         state,
+        dependsOn: Array.isArray(c.depends_on)
+          ? c.depends_on.filter((id): id is string => typeof id === 'string')
+          : [],
         text: c.text ?? '',
         url: cardUrl,
         mediaType: c.type,

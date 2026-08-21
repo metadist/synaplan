@@ -9,14 +9,77 @@
         <div class="flex-1 min-w-0">
           <h2 class="text-2xl font-semibold txt-primary mb-1">{{ $t('mcpServers.title') }}</h2>
           <p class="txt-secondary text-sm leading-relaxed">{{ $t('mcpServers.description') }}</p>
-          <p
-            v-if="!clientEnabled"
-            class="text-sm mt-3 px-3 py-2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            data-testid="mcp-client-disabled-hint"
-          >
-            {{ $t('mcpServers.clientDisabledHint') }}
-          </p>
         </div>
+      </div>
+
+      <div
+        class="mt-5 rounded-xl px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3 border"
+        :class="
+          clientEnabled
+            ? 'bg-[var(--status-success-muted)] border-[var(--status-success)]'
+            : 'bg-[var(--status-warning-muted)] border-[var(--status-warning)]'
+        "
+        data-testid="mcp-client-status"
+      >
+        <div class="flex items-start gap-3 flex-1 min-w-0">
+          <Icon
+            :icon="clientEnabled ? 'heroicons:check-circle' : 'heroicons:exclamation-triangle'"
+            class="w-6 h-6 shrink-0 mt-0.5"
+            :class="clientEnabled ? 'text-[var(--status-success)]' : 'text-[var(--status-warning)]'"
+            aria-hidden="true"
+          />
+          <div class="min-w-0">
+            <p class="text-sm font-semibold txt-primary">
+              {{ clientEnabled ? $t('mcpServers.clientOnTitle') : $t('mcpServers.clientOffTitle') }}
+            </p>
+            <p class="text-sm txt-secondary mt-0.5 leading-relaxed">
+              {{
+                clientEnabled
+                  ? $t('mcpServers.clientOnText')
+                  : isAdmin
+                    ? $t('mcpServers.clientOffAdminText')
+                    : $t('mcpServers.clientOffUserText')
+              }}
+              <RouterLink
+                v-if="isAdmin"
+                :to="{ path: '/admin/config', query: { tab: 'channels', section: 'mcp' } }"
+                class="text-[var(--brand)] hover:underline ml-1"
+                data-testid="link-mcp-system-config"
+              >
+                {{ $t('mcpServers.clientAdminLink') }}
+              </RouterLink>
+            </p>
+          </div>
+        </div>
+        <button
+          v-if="isAdmin && !clientEnabled"
+          type="button"
+          class="btn-primary px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shrink-0 disabled:opacity-50"
+          :disabled="togglingClient"
+          data-testid="btn-mcp-enable-client"
+          @click="setClientEnabled(true)"
+        >
+          {{ togglingClient ? $t('common.saving') : $t('mcpServers.clientEnable') }}
+        </button>
+        <label v-else-if="isAdmin" class="inline-flex items-center gap-3 cursor-pointer shrink-0">
+          <span class="text-sm txt-secondary">{{ $t('mcpServers.clientToggle') }}</span>
+          <span class="relative inline-flex">
+            <input
+              type="checkbox"
+              class="sr-only peer"
+              :checked="clientEnabled"
+              :disabled="togglingClient"
+              data-testid="toggle-mcp-client"
+              @change="setClientEnabled(!clientEnabled)"
+            />
+            <span
+              class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 transition-colors"
+            ></span>
+            <span
+              class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
+            ></span>
+          </span>
+        </label>
       </div>
     </div>
 
@@ -34,9 +97,20 @@
         </button>
       </div>
 
-      <p v-if="!loading && servers.length === 0" class="txt-secondary text-sm">
-        {{ $t('mcpServers.empty') }}
-      </p>
+      <div
+        v-if="!loading && servers.length === 0 && !editorOpen"
+        class="space-y-4"
+        data-testid="mcp-empty"
+      >
+        <div>
+          <p class="txt-primary text-sm font-medium">{{ $t('mcpServers.empty') }}</p>
+          <p class="txt-secondary text-sm mt-1 leading-relaxed">{{ $t('mcpServers.emptyHint') }}</p>
+        </div>
+        <McpTemplatePicker
+          :model-value="activeTemplate"
+          @update:model-value="startCreateFromTemplate"
+        />
+      </div>
 
       <ul v-else class="divide-y divide-light-border/20 dark:divide-dark-border/20">
         <li
@@ -58,6 +132,13 @@
             "
           >
             {{ server.enabled ? $t('mcpServers.enabled') : $t('mcpServers.disabled') }}
+          </span>
+          <span
+            v-if="server.allow_write"
+            class="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            :data-testid="`mcp-write-badge-${server.id}`"
+          >
+            {{ $t('mcpServers.writeBadge') }}
           </span>
           <div class="flex items-center gap-2">
             <button
@@ -182,6 +263,10 @@
       </h3>
       <p class="txt-secondary text-sm mb-5">{{ $t('mcpServers.formHint') }}</p>
 
+      <div v-if="!editingId" class="mb-6">
+        <McpTemplatePicker :model-value="activeTemplate" @update:model-value="applyTemplate" />
+      </div>
+
       <div class="space-y-4">
         <label class="block">
           <span class="text-sm font-medium txt-primary">{{ $t('mcpServers.nameLabel') }}</span>
@@ -233,6 +318,20 @@
           <input v-model="form.enabled" type="checkbox" class="accent-[var(--brand)]" />
           {{ $t('mcpServers.enabledLabel') }}
         </label>
+        <div>
+          <label class="inline-flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="form.allowWrite"
+              type="checkbox"
+              class="accent-[var(--brand)]"
+              data-testid="input-mcp-allow-write"
+            />
+            {{ $t('mcpServers.allowWriteLabel') }}
+          </label>
+          <p class="text-xs txt-secondary mt-1 leading-relaxed">
+            {{ $t('mcpServers.allowWriteHint') }}
+          </p>
+        </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mt-6">
@@ -264,6 +363,13 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import { updateConfigValue } from '@/services/api/adminConfigApi'
+import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
+import {
+  MCP_CUSTOM_TEMPLATE,
+  findMcpServerTemplate,
+  type McpServerTemplate,
+} from '@/config/mcpServerTemplates'
 import { mcpServersApi, type McpServer, type McpTool } from '@/services/api/mcpServersApi'
 import { promptsApi, type PromptMetadata, type TaskPrompt } from '@/services/api/promptsApi'
 import { useAuthStore } from '@/stores/auth'
@@ -277,6 +383,7 @@ const isAdmin = computed(() => authStore.isAdmin)
 const loading = ref(true)
 const saving = ref(false)
 const clientEnabled = ref(false)
+const togglingClient = ref(false)
 const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
@@ -296,7 +403,63 @@ const showNotUsedWarning = computed(
 const editorOpen = ref(false)
 const editingId = ref<number | null>(null)
 const editingHasToken = ref(false)
-const form = reactive({ name: '', url: '', authHeader: '', authToken: '', enabled: true })
+const form = reactive({
+  name: '',
+  url: '',
+  authHeader: '',
+  authToken: '',
+  enabled: true,
+  allowWrite: false,
+})
+
+const activeTemplate = ref(MCP_CUSTOM_TEMPLATE)
+
+/**
+ * Prefill only the fields a template owns. A name the user already typed is
+ * kept unless it is still the previous template's default.
+ */
+const applyTemplate = (key: string) => {
+  const previous = findMcpServerTemplate(activeTemplate.value)
+  const next = findMcpServerTemplate(key)
+  if (!form.name.trim() || form.name === previous.name) {
+    form.name = next.name
+  }
+  form.authHeader = next.authHeader
+  form.allowWrite = next.allowWrite
+  activeTemplate.value = key
+}
+
+const resetForm = (template: McpServerTemplate = findMcpServerTemplate(MCP_CUSTOM_TEMPLATE)) => {
+  Object.assign(form, {
+    name: template.name,
+    url: '',
+    authHeader: template.authHeader,
+    authToken: '',
+    enabled: true,
+    allowWrite: template.allowWrite,
+  })
+  activeTemplate.value = template.key
+}
+
+const setClientEnabled = async (enabled: boolean) => {
+  if (!isAdmin.value) return
+  togglingClient.value = true
+  const previous = clientEnabled.value
+  clientEnabled.value = enabled
+  try {
+    const result = await updateConfigValue('MCP_CLIENT_ENABLED', enabled ? 'true' : 'false')
+    if (!result.success) {
+      throw new Error(result.error || t('mcpServers.clientUpdateFailed'))
+    }
+    success(enabled ? t('mcpServers.clientEnabledNotice') : t('mcpServers.clientDisabledNotice'))
+    await load()
+  } catch (err) {
+    clientEnabled.value = previous
+    error(err instanceof Error && err.message ? err.message : t('mcpServers.clientUpdateFailed'))
+  } finally {
+    togglingClient.value = false
+  }
+}
 
 const load = async () => {
   loading.value = true
@@ -369,25 +532,33 @@ const toggleTopicMcp = async (prompt: TaskPrompt) => {
 const startCreate = () => {
   editingId.value = null
   editingHasToken.value = false
-  Object.assign(form, { name: '', url: '', authHeader: '', authToken: '', enabled: true })
+  resetForm()
   editorOpen.value = true
+}
+
+const startCreateFromTemplate = (key: string) => {
+  startCreate()
+  applyTemplate(key)
 }
 
 const startEdit = (server: McpServer) => {
   editingId.value = server.id ?? null
   editingHasToken.value = server.has_auth_token ?? false
+  activeTemplate.value = MCP_CUSTOM_TEMPLATE
   Object.assign(form, {
     name: server.name ?? '',
     url: server.url ?? '',
     authHeader: server.auth_header ?? '',
     authToken: '',
     enabled: server.enabled ?? true,
+    allowWrite: server.allow_write ?? false,
   })
   editorOpen.value = true
 }
 
 const closeEditor = () => {
   editorOpen.value = false
+  resetForm()
 }
 
 const save = async () => {
@@ -398,6 +569,7 @@ const save = async () => {
       url: form.url.trim(),
       auth_header: form.authHeader.trim(),
       enabled: form.enabled,
+      allow_write: form.allowWrite,
       // Only send the secret when the user actually typed one — absent keeps
       // the stored value.
       ...(form.authToken !== '' ? { auth_token: form.authToken } : {}),
@@ -408,7 +580,7 @@ const save = async () => {
       await mcpServersApi.create(payload)
     }
     success(t('mcpServers.saved'))
-    editorOpen.value = false
+    closeEditor()
     await load()
   } catch (err) {
     error(err instanceof Error && err.message ? err.message : t('mcpServers.saveFailed'))

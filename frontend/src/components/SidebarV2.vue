@@ -12,7 +12,12 @@
     <div
       class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
     >
-      <img :src="logoIconSrc" alt="synaplan" class="h-7 w-auto" />
+      <img
+        :src="iconSrc"
+        :alt="configStore.branding.name"
+        class="h-7 w-auto"
+        data-testid="img-sidebar-brand"
+      />
     </div>
 
     <!-- New Chat Button -->
@@ -177,6 +182,7 @@
               </p>
             </div>
             <router-link
+              v-if="configStore.auth.registrationEnabled"
               to="/register"
               class="dropdown-item font-medium"
               style="color: var(--brand)"
@@ -240,15 +246,6 @@
                 <span>{{ $t('nav.statistics') }}</span>
               </button>
               <button
-                role="menuitem"
-                class="dropdown-item"
-                data-testid="btn-sidebar-v2-preferences"
-                @click="handleNavigate('/settings')"
-              >
-                <Cog6ToothIcon class="w-4 h-4" />
-                <span>{{ $t('nav.preferences') }}</span>
-              </button>
-              <button
                 v-if="
                   !authStore.isAdmin &&
                   configStore.billing.enabled &&
@@ -264,28 +261,46 @@
                 <span>{{ $t('nav.subscription') }}</span>
               </button>
             </div>
-            <!--
-              Logout is intentionally hidden while impersonating: clicking
-              it would clear the admin's session entirely (cookies + stash)
-              instead of just ending the impersonation, which is almost
-              never what the operator means. The "Exit" button on the
-              floating impersonation pill is the correct action here.
-            -->
-            <div
-              v-if="!isImpersonating"
-              class="border-t border-light-border/10 dark:border-dark-border/10"
-            >
-              <button
-                role="menuitem"
-                class="dropdown-item text-red-500 dark:text-red-400"
-                data-testid="btn-sidebar-v2-logout"
-                @click="handleLogout"
-              >
-                <ArrowRightOnRectangleIcon class="w-4 h-4" />
-                <span>{{ $t('settings.logout') }}</span>
-              </button>
-            </div>
           </template>
+
+          <!--
+            Preferences holds the language and the theme, both stored on the
+            device rather than on the account, so it stays outside the
+            guest/authenticated split and is offered to everyone.
+          -->
+          <div class="border-t border-light-border/10 dark:border-dark-border/10">
+            <button
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-preferences"
+              @click="handleNavigate('/settings')"
+            >
+              <Cog6ToothIcon class="w-4 h-4" />
+              <span>{{ $t('nav.preferences') }}</span>
+            </button>
+          </div>
+
+          <!--
+            Logout is intentionally hidden while impersonating: clicking
+            it would clear the admin's session entirely (cookies + stash)
+            instead of just ending the impersonation, which is almost
+            never what the operator means. The "Exit" button on the
+            floating impersonation pill is the correct action here.
+          -->
+          <div
+            v-if="!isGuestMode && !isImpersonating"
+            class="border-t border-light-border/10 dark:border-dark-border/10"
+          >
+            <button
+              role="menuitem"
+              class="dropdown-item text-red-500 dark:text-red-400"
+              data-testid="btn-sidebar-v2-logout"
+              @click="handleLogout"
+            >
+              <ArrowRightOnRectangleIcon class="w-4 h-4" />
+              <span>{{ $t('settings.logout') }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
@@ -667,6 +682,7 @@ import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
 import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useUpdatesStore } from '../stores/updates'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
@@ -690,7 +706,8 @@ const updatesStore = useUpdatesStore()
 const dialog = useDialog()
 const { logout, isImpersonating } = useAuth()
 const { navItems, isItemActive, isGuestMode, loadFeatureStatus } = useNavItems()
-const { theme } = useTheme()
+const { isDark } = useTheme()
+const { iconSrc } = useBrandLogo(isDark)
 const route = useRoute()
 const router = useRouter()
 const isMemoriesDialogOpen = ref(false)
@@ -780,17 +797,6 @@ const handleEscape = (event: KeyboardEvent) => {
     closeFlyout()
   }
 }
-
-const isDark = computed(() => {
-  if (theme.value === 'dark') return true
-  if (theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoIconSrc = computed(
-  () =>
-    `${import.meta.env.BASE_URL}${isDark.value ? 'single_bird-light.svg' : 'single_bird-dark.svg'}`
-)
 
 const initials = computed(() => {
   const email = authStore.user?.email || 'G'

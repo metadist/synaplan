@@ -502,6 +502,98 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertSame("# Heading\n\ntext", file_get_contents($path));
     }
 
+    /**
+     * Phase M step M0: a `{{TOC}}` directive must yield a REAL, updatable Word
+     * table of contents — a `TOC` field instruction plus headings rendered as
+     * outline-level styles — asserted by unpacking the OOXML, not by eyeballing.
+     */
+    public function testDocxTocDirectiveRendersAnUpdatableTocField(): void
+    {
+        $path = $this->tmpDir.'/toc.docx';
+        $content = <<<'MD'
+            # Marketing Plan
+
+            {{TOC}}
+
+            ## Goals
+
+            Grow **brand awareness** in the DACH region.
+
+            ### Quarterly targets
+
+            - Q1: launch
+            - Q2: scale
+
+            ## Budget
+
+            | Item | Cost |
+            | ---- | ---- |
+            | Ads  | 1000 |
+            MD;
+
+        $this->service->write($content, 'docx', $path);
+
+        $documentXml = $this->readDocxDocument($path);
+
+        // The dynamic field Word/LibreOffice re-computes on update.
+        $this->assertStringContainsString('TOC \o 1-3 \h \z \u', $documentXml);
+        // Static entries with hyperlink anchors so the TOC works before the
+        // first field update too.
+        $this->assertStringContainsString('_Toc', $documentXml);
+        // Headings are real outline-styled titles, not plain paragraphs.
+        $this->assertStringContainsString('Heading1', $documentXml);
+        $this->assertStringContainsString('Heading2', $documentXml);
+        // The registered styles use Word's BUILT-IN heading names — that is
+        // what the TOC field's \o switch collects when the user refreshes it.
+        $stylesXml = $this->readDocxEntry($path, 'word/styles.xml');
+        $this->assertStringContainsString('w:val="heading 1"', $stylesXml);
+        $this->assertStringContainsString('w:val="heading 2"', $stylesXml);
+        // Body content survives the TOC-mode rendering path.
+        $this->assertStringContainsString('brand awareness', $documentXml);
+        $this->assertStringContainsString('Quarterly targets', $documentXml);
+        $this->assertStringContainsString('Ads', $documentXml, 'tables must survive TOC mode');
+        // The directive itself never reaches the reader.
+        $this->assertStringNotContainsString('{{TOC}}', $documentXml);
+    }
+
+    public function testDocxTocMarkerWithoutHeadingsIsDroppedNotRendered(): void
+    {
+        $path = $this->tmpDir.'/toc_no_headings.docx';
+        $this->service->write("{{TOC}}\n\nJust a paragraph without any headings.", 'docx', $path);
+
+        $documentXml = $this->readDocxDocument($path);
+        $this->assertStringNotContainsString('TOC \o', $documentXml, 'an empty TOC field would be malformed OOXML');
+        $this->assertStringNotContainsString('{{TOC}}', $documentXml);
+        $this->assertStringContainsString('Just a paragraph', $documentXml);
+    }
+
+    public function testTocMarkerNeverReachesTextFormats(): void
+    {
+        $path = $this->tmpDir.'/toc.md';
+        $this->service->write("# Heading\n\n{{TOC}}\n\ntext", 'md', $path);
+
+        $this->assertSame("# Heading\n\ntext", file_get_contents($path));
+    }
+
+    public function testTocMarkerNeverReachesPptxSlides(): void
+    {
+        $path = $this->tmpDir.'/toc.pptx';
+        $this->service->write("# Cover\n\n{{TOC}}\n\n## Agenda\n\n- one", 'pptx', $path);
+
+        $this->assertStringNotContainsString('{{TOC}}', $this->readPptxSlide($path, 1));
+    }
+
+    private function readDocxEntry(string $path, string $entry): string
+    {
+        $zip = new \ZipArchive();
+        $this->assertTrue(true === $zip->open($path), 'DOCX must be a valid OOXML zip');
+        $xml = $zip->getFromName($entry);
+        $zip->close();
+        $this->assertNotFalse($xml, 'DOCX must contain '.$entry);
+
+        return (string) $xml;
+    }
+
     private function readPptxSlide(string $path, int $number): string
     {
         $zip = new \ZipArchive();

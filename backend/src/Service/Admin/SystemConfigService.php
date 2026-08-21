@@ -10,11 +10,16 @@ use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\Dropbox\DropboxOAuthConfig;
+use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Mcp\McpClientConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
+use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
@@ -31,7 +36,7 @@ final readonly class SystemConfigService
     private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}> */
     private array $schema;
 
     public function __construct(
@@ -40,6 +45,7 @@ final readonly class SystemConfigService
         private readonly ConfigRepository $configRepository,
         private readonly string $defaultTtsUrl,
         private readonly ProviderKeyStore $providerKeyStore,
+        private readonly EncryptionService $encryption,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -47,7 +53,7 @@ final readonly class SystemConfigService
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>}
      */
     public function getSchema(): array
     {
@@ -102,6 +108,13 @@ final readonly class SystemConfigService
                 'sections' => [
                     'whatsapp' => ['label' => 'WhatsApp Business API', 'fields' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN']],
                     'gmail' => ['label' => 'Smart Mail (Gmail IMAP)', 'fields' => ['GMAIL_USERNAME', 'GMAIL_PASSWORD']],
+                    'm365' => ['label' => 'Microsoft 365 (Graph)', 'fields' => [
+                        'M365_ENABLED', 'M365_CLIENT_ID', 'M365_CLIENT_SECRET', 'M365_TENANT', 'M365_REDIRECT_URI',
+                    ]],
+                    'dropbox' => ['label' => 'Dropbox', 'fields' => [
+                        'DROPBOX_ENABLED', 'DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REDIRECT_URI',
+                    ]],
+                    'mcp' => ['label' => 'MCP servers', 'fields' => ['MCP_CLIENT_ENABLED']],
                 ],
             ],
             'processing' => [
@@ -118,6 +131,7 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
+                    'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
                     'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
                         'CONVERSATION_SUMMARY_ENABLED',
                         'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
@@ -198,6 +212,19 @@ final readonly class SystemConfigService
                     $field['dbKey'] ?? $key,
                 );
                 $isSet = null !== $rawValue && '' !== $rawValue;
+
+                // A database-backed secret (e.g. an OAuth client secret) is
+                // stored encrypted and must be masked here for the same reason
+                // an env secret is: this response reaches the admin UI.
+                if ($field['sensitive']) {
+                    $values[$key] = [
+                        'value' => $isSet ? self::MASK : $field['default'],
+                        'isSet' => $isSet,
+                        'isMasked' => $isSet,
+                    ];
+                    continue;
+                }
+
                 $values[$key] = [
                     'value' => $rawValue ?? $field['default'],
                     'isSet' => $isSet,
@@ -356,7 +383,7 @@ final readonly class SystemConfigService
     /**
      * Save a database-backed configuration value with validation.
      *
-     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string} $field
+     * @param array{type: string, default: string, dbGroup?: string, dbKey?: string, encrypted?: bool} $field
      *
      * @return array{success: bool, requiresRestart: bool, message?: string}
      */
@@ -396,8 +423,14 @@ final readonly class SystemConfigService
         $group = $field['dbGroup'] ?? self::DB_GROUP;
         $setting = $field['dbKey'] ?? $key;
 
+        // Encrypted fields hold a real credential; clearing one means storing
+        // an empty row, not an empty ciphertext nobody can distinguish.
+        $stored = ($field['encrypted'] ?? false) && '' !== $value
+            ? $this->encryption->encrypt($value)
+            : $value;
+
         try {
-            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $value);
+            $this->configRepository->setValue(self::DB_OWNER_ID, $group, $setting, $stored);
             $this->logChange($key, $value);
 
             $this->applyConfigSideEffects($group, $setting, $value, $actingUserId);
@@ -425,6 +458,52 @@ final readonly class SystemConfigService
         // Version20260706130000, but hand-set overrides can still exist). Drop
         // the acting admin's own override so the value they just set actually
         // applies to their own account immediately.
+        if (SavedTaskConfig::CONFIG_GROUP === $group
+            && SavedTaskConfig::KEY_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    SavedTaskConfig::CONFIG_GROUP,
+                    SavedTaskConfig::KEY_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user saved-tasks override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user saved-tasks override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
+        if (McpClientConfig::CONFIG_GROUP === $group
+            && McpClientConfig::KEY_CLIENT_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    McpClientConfig::CONFIG_GROUP,
+                    McpClientConfig::KEY_CLIENT_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user MCP client override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user MCP client override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
         if (MultitaskRoutingConfig::CONFIG_GROUP === $group
             && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
             && null !== $actingUserId && $actingUserId > 0
@@ -806,7 +885,7 @@ final readonly class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>
      */
     private function buildSchema(): array
     {
@@ -822,6 +901,128 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // Outbound MCP client master switch (BCONFIG group MCP / CLIENT_ENABLED).
+            // Also toggled from Channels → MCP Servers. Seeded ON for new installs;
+            // an explicit 0 row is the operator kill switch.
+            'MCP_CLIENT_ENABLED' => [
+                'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Channels → MCP Servers.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => McpClientConfig::CONFIG_GROUP,
+                'dbKey' => McpClientConfig::KEY_CLIENT_ENABLED,
+            ],
+            // === Microsoft 365 app registration (database-backed) ===
+            // BCONFIG group M365 (ownerId=0), read by MicrosoftOAuthConfig.
+            // Operator-owned and install-wide: Synaplan Cloud runs a
+            // multi-tenant registration, self-hosters register their own
+            // (connector plan 07 §S3). Users never see these values — they only
+            // click "Connect Microsoft 365" and consent.
+            'M365_ENABLED' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Microsoft 365 as a connection. Requires a client ID and client secret from an Azure app registration; the "Connect Microsoft 365" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_ENABLED,
+            ],
+            'M365_CLIENT_ID' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Application (client) ID of the Azure app registration. Azure portal → App registrations → your app → Overview.',
+                'default' => '',
+                'placeholder' => '11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_ID,
+            ],
+            'M365_CLIENT_SECRET' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'Client secret from Azure portal → your app → Certificates & secrets → New client secret. Copy the "Value" column, NOT the "Secret ID". Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: 8Qm~aB1cD2eF3gH4iJ5kL6mN7oP8qR9sT0uV1wX2',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_CLIENT_SECRET,
+            ],
+            'M365_TENANT' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Which accounts may sign in: "common" (work, school and personal accounts), "organizations" (work and school only), or a single tenant GUID to allow only your own organisation. Self-hosters normally use their own tenant GUID (Azure portal → your app → Overview → Directory (tenant) ID).',
+                'default' => MicrosoftOAuthConfig::DEFAULT_TENANT,
+                'placeholder' => 'common — or 11111111-2222-3333-4444-555555555555',
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_TENANT,
+            ],
+            'M365_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'm365', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.MicrosoftOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in Azure character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.MicrosoftOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => MicrosoftOAuthConfig::CONFIG_GROUP,
+                'dbKey' => MicrosoftOAuthConfig::KEY_REDIRECT_URI,
+            ],
+            // === Dropbox app (database-backed) ===
+            // BCONFIG group DROPBOX (ownerId=0), read by DropboxOAuthConfig.
+            // Operator-owned and install-wide, exactly like the M365 block
+            // above (connector plan 07 C13). Users never see these values —
+            // they only click "Connect Dropbox" and consent.
+            'DROPBOX_ENABLED' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Offer Dropbox as a connection. Requires an app key and app secret from a Dropbox app; the "Connect Dropbox" action stays hidden until all three are set.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_ENABLED,
+            ],
+            'DROPBOX_APP_KEY' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'App key of the Dropbox app. Dropbox App Console (dropbox.com/developers/apps) → your app → Settings.',
+                'default' => '',
+                'placeholder' => 'a1b2c3d4e5f6g7h',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_KEY,
+            ],
+            'DROPBOX_APP_SECRET' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'password',
+                'sensitive' => true,
+                'encrypted' => true,
+                'description' => 'App secret from the Dropbox App Console → your app → Settings → App secret (click "Show"). Stored encrypted and never shown again; leave the field untouched to keep the current one.',
+                'default' => '',
+                'placeholder' => 'Example: z9y8x7w6v5u4t3s',
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_APP_SECRET,
+            ],
+            'DROPBOX_REDIRECT_URI' => [
+                'tab' => 'channels', 'section' => 'dropbox', 'type' => 'text',
+                'sensitive' => false,
+                'description' => 'Only needed when a proxy changes the public URL. Leave empty to use APP_URL + '.DropboxOAuthConfig::CALLBACK_PATH.'. Whatever is used here must be registered in the Dropbox App Console character for character.',
+                'default' => '',
+                'placeholder' => 'https://your-synaplan-host'.DropboxOAuthConfig::CALLBACK_PATH,
+                'source' => 'database',
+                'dbGroup' => DropboxOAuthConfig::CONFIG_GROUP,
+                'dbKey' => DropboxOAuthConfig::KEY_REDIRECT_URI,
+            ],
+            'SAVEDTASKS_ENABLED' => [
+                'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow users to pin a Task Prompt as a Saved Task and run it on demand or on a schedule. When OFF, AI Instructions stay unchanged and no Saved Task APIs or UI are exposed. Per-user BCONFIG row overrides the global row; code default is OFF when no row exists.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
+                'dbKey' => SavedTaskConfig::KEY_ENABLED,
             ],
             // === Routing — rolling conversation summary (database-backed) ===
             // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows
@@ -1188,7 +1389,7 @@ final readonly class SystemConfigService
             ],
             'HUGGINGFACE_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
-                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi K2 models through HF Inference',
+                'sensitive' => true, 'description' => 'HuggingFace API token — routes the Kimi models through HF Inference',
                 'default' => '', 'source' => 'database',
             ],
             'GOOGLE_VERTEX_ACCESS_TOKEN' => [

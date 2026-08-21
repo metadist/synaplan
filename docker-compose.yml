@@ -134,6 +134,8 @@ services:
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
+      # Local Docker Nextcloud (http://nextcloud) — ignored unless APP_ENV=dev.
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       # APP_SECRET loaded from backend/.env (env_file above)
       APP_URL: http://localhost:8000
       PLUGINS_DIR: /plugins
@@ -287,6 +289,7 @@ services:
       # overrides both to prod for production.
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: "0"
+      DAV_ALLOW_INSECURE_LOCAL: "1"
       APP_URL: http://backend
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -544,7 +547,7 @@ services:
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
   ollama:
-    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    image: ollama/ollama:latest@sha256:9d30908e41144b1f1da89b9d8e33c07e4aeb43ff41a8660241b1686e2cc330ad
     container_name: synaplan-ollama
     ports:
       - "11435:11434"

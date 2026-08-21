@@ -12,7 +12,7 @@
            floats over the top-right of the message area. The mobile instance
            lives in MainLayout (fixed top-right, mirroring the menu button). -->
       <div
-        v-if="authStore.isAuthenticated"
+        v-if="authStore.isAuthenticated && !needsProviderSetup"
         class="hidden md:block absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
@@ -37,11 +37,19 @@
         </div>
       </Transition>
 
-      <!-- First-run: no usable AI provider yet — admins get a wizard CTA -->
-      <ProviderSetupBanner />
-      <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+      <!-- First-run: no usable AI provider — replace the chat, do not let
+           the user send messages that can only fail with HTTP 500. -->
+      <div
+        v-if="needsProviderSetup"
+        class="flex-1 min-h-0 flex flex-col"
+        data-testid="state-provider-setup"
+      >
+        <LocalAiDownloadCard class="mx-auto max-w-4xl w-full px-4 pt-4" />
+        <ProviderSetupBanner />
+      </div>
 
       <div
+        v-else
         ref="chatContainer"
         class="flex-1 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
         :class="{ 'flex flex-col items-center': isEmptyLanding }"
@@ -98,34 +106,46 @@
               </div>
               <h2 class="text-xl font-semibold txt-primary mb-2">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredTitle')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedTitle')
-                      : $t('guest.errorTitle')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledTitle')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredTitle')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedTitle')
+                        : $t('guest.errorTitle')
                 }}
               </h2>
               <p class="txt-secondary mb-4">
                 {{
-                  guestStore.sessionExpired
-                    ? $t('guest.expiredDescription')
-                    : guestStore.rateLimited
-                      ? $t('guest.rateLimitedDescription')
-                      : $t('guest.errorDescription')
+                  guestStore.guestChatDisabled
+                    ? $t('guest.disabledDescription')
+                    : guestStore.sessionExpired
+                      ? $t('guest.expiredDescription')
+                      : guestStore.rateLimited
+                        ? $t('guest.rateLimitedDescription')
+                        : $t('guest.errorDescription')
                 }}
               </p>
               <div class="flex gap-3 justify-center">
+                <!-- Retrying a disabled trial can never succeed. -->
                 <button
+                  v-if="!guestStore.guestChatDisabled"
                   class="px-4 py-2 rounded-lg btn-brand text-sm font-medium"
                   @click="guestStore.retryInit()"
                 >
                   {{ $t('guest.retry') }}
                 </button>
+                <!-- Sign-in fallback: /register is unreachable when
+                     registration is disabled (#462 route guard). -->
                 <router-link
-                  :to="{ name: 'register' }"
+                  :to="{ name: configStore.auth.registrationEnabled ? 'register' : 'login' }"
                   class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
                 >
-                  {{ $t('guest.createAccount') }}
+                  {{
+                    configStore.auth.registrationEnabled
+                      ? $t('guest.createAccount')
+                      : $t('auth.signIn')
+                  }}
                 </router-link>
               </div>
             </div>
@@ -196,6 +216,7 @@
               :error-data="message.errorData"
               :truncated="message.truncated"
               :task-plan="message.taskPlan"
+              :schedule-source="userTextBefore(message.id)"
               :media-job="message.mediaJob"
               :was-multitask="message.wasMultitask"
               :usage="message.usage"
@@ -222,13 +243,14 @@
       <!-- Usage taximeter: desktop rail + mobile ring. Gated by the admin
            master switch and authenticated (non-guest/widget) web usage; the
            two share one store and differ only by CSS breakpoint. -->
-      <template v-if="usageTaximeterStore.active">
+      <template v-if="usageTaximeterStore.active && !needsProviderSetup">
         <ConsumptionBar />
         <ConsumptionRing />
       </template>
 
       <!-- Contextual Promo Tips -->
       <PromoTipBanner
+        v-if="!needsProviderSetup"
         :tip="promoTips.currentTip.value"
         :expanded="promoTips.isExpanded.value"
         @toggle="promoTips.toggleExpand()"
@@ -249,6 +271,7 @@
            means the "+" menu and its dropdowns always open upward with room and
            are never clipped by the chat container's overflow (issue #1285). -->
       <ChatInput
+        v-if="!needsProviderSetup"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -450,7 +473,7 @@ import {
   type Message,
   type Part,
 } from '@/stores/history'
-import { useChatsStore, isDefaultChatTitle } from '@/stores/chats'
+import { useChatsStore } from '@/stores/chats'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -644,6 +667,13 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
+// Runtime-config first-run signal: the default chat model has no usable
+// provider. Replace the composer with a tombstone so a fresh install cannot
+// produce the cryptic HTTP 500 the old banner still allowed.
+const needsProviderSetup = computed(
+  () => authStore.isAuthenticated && configStore.setup.chatReady === false
+)
+
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
   featureGateOpen.value = true
@@ -824,6 +854,17 @@ onMounted(async () => {
 
   // Load chats first
   await chatsStore.loadChats()
+
+  // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
+  // opens the task's chat so the user sees the run's result. Without this
+  // the query was silently ignored and the view reopened the LAST ACTIVE
+  // chat — for a task saved from a chat turn that was the original prompt
+  // with the old output.
+  const requestedChatId = Number(route.query.chat)
+  if (Number.isInteger(requestedChatId) && requestedChatId > 0) {
+    chatsStore.setActiveChat(requestedChatId)
+    router.replace({ query: { ...route.query, chat: undefined } })
+  }
 
   // If no active chat, create one
   if (!chatsStore.activeChatId) {
@@ -1067,32 +1108,18 @@ watch(
   }
 )
 
-async function generateChatTitleFromFirstMessage(firstMessage: string) {
-  const chat = chatsStore.activeChat
-  if (!chat) return
-
-  if (chat.title && !isDefaultChatTitle(chat.title)) return
-
-  // Only generate for user messages from this chat
-  const userMessages = historyStore.messages.filter((m) => m.role === 'user')
-  if (userMessages.length !== 1) return
-
-  // Generate title from first message (take first 50 chars). Strip a leading
-  // tool-command prefix ("/pic ", "/vid ", "/search ") first — `firstMessage`
-  // is the raw content sent to the backend, which keeps the prefix for
-  // pic/vid routing (see handleSendMessage), so without this the sidebar
-  // title showed e.g. "/pic Haus" instead of just "Haus".
-  let title = firstMessage.trim()
-  const commandMatch = title.match(/^\/(search|pic|vid)\s+(.*)$/)
-  if (commandMatch) {
-    title = commandMatch[2].trim()
+const userTextBefore = (messageId: string | number): string => {
+  const list = historyStore.messages
+  const idx = list.findIndex((row) => row.id === messageId)
+  for (let i = idx - 1; i >= 0; i--) {
+    if (list[i].role !== 'user') continue
+    return list[i].parts
+      .filter((part) => part.type === 'text' && typeof part.content === 'string')
+      .map((part) => part.content)
+      .join('\n')
+      .trim()
   }
-  if (title.length > 50) {
-    title = title.substring(0, 47) + '...'
-  }
-
-  // Update chat title
-  await chatsStore.updateChatTitle(chat.id, title)
+  return ''
 }
 
 const groupedMessages = computed(() => {
@@ -1518,7 +1545,9 @@ function renderStreamingContent(content: string, msgId: string): void {
   parsed.parts.forEach((part) => {
     if (part.type === 'text') {
       desired.push({ type: 'text', content: part.content })
-    } else if (part.type === 'code' || part.type === 'json') {
+    } else if (part.type === 'json') {
+      desired.push({ type: 'json', content: part.content, language: part.language ?? 'json' })
+    } else if (part.type === 'code') {
       desired.push({ type: 'code', content: part.content, language: part.language })
     } else if (part.type === 'links' && part.links) {
       desired.push({
@@ -1543,7 +1572,12 @@ function renderStreamingContent(content: string, msgId: string): void {
   // / audio) are pushed by separate SSE events and not part of `desired`;
   // we keep them appended after the structural section.
   const existingStructural = message.parts.filter(
-    (p) => p.type === 'thinking' || p.type === 'text' || p.type === 'code' || p.type === 'links'
+    (p) =>
+      p.type === 'thinking' ||
+      p.type === 'text' ||
+      p.type === 'code' ||
+      p.type === 'json' ||
+      p.type === 'links'
   )
   const existingMedia = extractMediaParts(message.parts)
 
@@ -1569,6 +1603,7 @@ function renderStreamingContent(content: string, msgId: string): void {
           }
           break
         case 'code':
+        case 'json':
           if (have.content !== want.content) have.content = want.content
           if (have.language !== want.language) have.language = want.language
           if (have.filename !== want.filename) have.filename = want.filename
@@ -1604,7 +1639,7 @@ const handleContinueResponse = async (message: Message) => {
   for (const p of message.parts) {
     if (p.type === 'thinking' && p.content) {
       fullContent += `<think>${p.content}</think>\n`
-    } else if (p.type === 'text' && p.content) {
+    } else if ((p.type === 'text' || p.type === 'json') && p.content) {
       fullContent += p.content
     }
   }
@@ -1758,6 +1793,10 @@ const handleSendMessage = async (
     quotedMessageId?: number
   }
 ) => {
+  if (needsProviderSetup.value) {
+    return
+  }
+
   // Plugin slash-commands (e.g. "/fastbill show overdue") are handled by the
   // owning plugin, not the AI pipeline. Intercept before any other processing.
   const pluginRoute = matchPluginChatCommand(content)
@@ -3162,6 +3201,13 @@ const streamAIResponse = async (
             if (message) {
               applyMediaJobToMessage(message, data.mediaJob ?? data.media_job)
 
+              // Multitask: the DAG finished — freeze the task cards so the plan
+              // renders as final and the schedule clock appears immediately
+              // (canSchedule requires !plan.active), without a page reload.
+              if (message.taskPlan) {
+                message.taskPlan.active = false
+              }
+
               // Mark as truncated so the Continue button appears
               if (data.truncated) {
                 message.truncated = true
@@ -3338,8 +3384,13 @@ const streamAIResponse = async (
             // bump, no reconcile against a stored message, no memory-
             // extraction poll (extraction is skipped server-side).
             if (!incognito && chatId) {
-              // Generate chat title from first message
-              generateChatTitleFromFirstMessage(userMessage)
+              // The server names the chat after the first exchange (#1500) and
+              // sends the title on the turn that produced it. Until then the
+              // sidebar shows the first-message preview, so there is nothing to
+              // do when the field is absent.
+              if (data.chatTitle) {
+                chatsStore.applyChatTitle(chatId, data.chatTitle)
+              }
 
               // Bump chat activity so the sidebar reflects the assistant message
               // landing without waiting for a full reload.
@@ -3412,6 +3463,10 @@ const streamAIResponse = async (
             {
               const message = historyStore.messages.find((m) => m.id === messageId)
               if (message) {
+                // Multitask: stop the cards from animating on a failed turn.
+                if (message.taskPlan) {
+                  message.taskPlan.active = false
+                }
                 if (data.messageId) {
                   message.backendMessageId = data.messageId
                 }
@@ -3958,12 +4013,11 @@ const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => 
 // and signal the backend so the provider poll aborts and stops billing.
 const handleTaskCancel = async (nodeId: string) => {
   // Resolve the CURRENT turn's task-plan message via the streaming flag, mirroring
-  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …) and
-  // taskPlan.active is only cleared on local teardown (not on a normal/error
-  // completion), so finding the FIRST active plan can match a stale earlier turn and
-  // cancel the wrong card / send the wrong trackId. The streaming message is the
-  // unambiguous active turn; fall back to the active-plan lookup only if none is
-  // currently streaming.
+  // finishStreamingTurnLocally(). Node ids repeat across turns ("n1", "n2", …), so
+  // finding the FIRST active plan could match a stale earlier turn and cancel the
+  // wrong card / send the wrong trackId. The streaming message is the unambiguous
+  // active turn; fall back to the active-plan lookup only if none is currently
+  // streaming.
   const message =
     historyStore.messages.find((m) => m.isStreaming && m.taskPlan?.active) ??
     historyStore.messages.find((m) => m.taskPlan?.active)

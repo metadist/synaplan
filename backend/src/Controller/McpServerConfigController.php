@@ -62,6 +62,7 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -104,6 +105,7 @@ final class McpServerConfigController extends AbstractController
                     new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                     new OA\Property(property: 'auth_token', type: 'string', example: 'Bearer sk-…'),
                     new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                    new OA\Property(property: 'allow_write', type: 'boolean', example: false, description: 'Allow the AI to call mutating tools (create/update) on this server'),
                 ]
             )
         ),
@@ -124,6 +126,7 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -180,6 +183,7 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
+                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -406,6 +410,9 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('enabled', $data)) {
             $server->setEnabled((bool) $data['enabled']);
         }
+        if (array_key_exists('allow_write', $data)) {
+            $server->setAllowWrite((bool) $data['allow_write']);
+        }
     }
 
     /**
@@ -420,6 +427,7 @@ final class McpServerConfigController extends AbstractController
             'auth_header' => $server->getAuthHeader(),
             'has_auth_token' => $server->hasAuthToken(),
             'enabled' => $server->isEnabled(),
+            'allow_write' => $server->allowsWrite(),
             'created' => $server->getCreated(),
             'updated' => $server->getUpdated(),
         ];

@@ -253,6 +253,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $modelId = null;
         $provider = null;
         $modelName = null;
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
         if (isset($classification['model_id']) && $classification['model_id']) {
             $modelId = (int) $classification['model_id'];
@@ -274,7 +275,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
         } else {
-            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
@@ -282,6 +282,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'effective_user_id' => $effectiveUserId,
             ]);
         }
+
+        $modelId = $this->degradeToUsableModel($modelId, $effectiveUserId, $message);
 
         if ($modelId) {
             $provider = $this->modelConfigService->getProviderForModel($modelId);
@@ -310,7 +312,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
                 // Prefer the account's configured image model (PIC2TEXT); only
                 // fall back to the global catalog pick when none is usable.
-                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
                 $visionModel = $this->resolveVisionFallbackModel($effectiveUserId);
 
                 if ($visionModel) {
@@ -817,6 +818,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $modelId = null;
         $provider = null;
         $modelName = null;
+        $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
 
         // 1. Check if user explicitly selected a model (e.g., via "Again" function)
         if (isset($classification['model_id']) && $classification['model_id']) {
@@ -845,7 +847,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
         // 4. Fall back to user's default model from DB
         else {
-            $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
             $modelId = $this->modelConfigService->getDefaultModel('CHAT', $effectiveUserId);
             $this->logger->info('ChatHandler: Using DB default model', [
                 'model_id' => $modelId,
@@ -853,6 +854,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'effective_user_id' => $effectiveUserId,
             ]);
         }
+
+        $modelId = $this->degradeToUsableModel($modelId, $effectiveUserId, $message);
 
         // Check if message has images and current model supports vision
         $hasImages = $this->hasAttachedImages($message);
@@ -870,7 +873,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
                 // Prefer the account's configured image model (PIC2TEXT); only
                 // fall back to the global catalog pick when none is usable.
-                $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
                 $visionModel = $this->resolveVisionFallbackModel($effectiveUserId);
 
                 if ($visionModel) {
@@ -1786,6 +1788,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Swap a model that can no longer serve for the account default.
+     *
+     * The three branches above the DB default all read a BID that was stored
+     * elsewhere and earlier — a widget's `aiModelId`, a prompt's `aiModel`, the
+     * model an older message was answered with when "Again" replays it. None of
+     * them is revalidated when a model is retired, and because they outrank the
+     * default, repointing DEFAULTMODEL in a migration does not save them: the
+     * request still reaches the provider as a dead model id and dies there.
+     */
+    private function degradeToUsableModel(?int $modelId, ?int $effectiveUserId, Message $message): ?int
+    {
+        $usableModelId = $this->modelConfigService->resolveUsableModelId($modelId, 'CHAT', $effectiveUserId);
+
+        if ($usableModelId !== $modelId) {
+            $this->logger->warning('ChatHandler: Configured model is no longer usable, falling back to default', [
+                'configured_model_id' => $modelId,
+                'model_id' => $usableModelId,
+                'user_id' => $message->getUserId(),
+                'effective_user_id' => $effectiveUserId,
+            ]);
+        }
+
+        return $usableModelId;
+    }
+
+    /**
      * Check if a file is an image that can be sent to vision models.
      */
     private function isVisionSupportedImage(string $path): bool
@@ -2307,6 +2335,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             // exact current content instead of re-deriving it.
             $file->setFileText($content);
             $file->setStatus('generated');
+            // Issue #1190 parity with StreamController::storeGeneratedFile:
+            // mark provenance so the artefact shows in the Generated gallery
+            // (/files/generated filters BSOURCE) instead of posing as an upload.
+            $file->setSource('generated');
+            $file->setOriginKind('document');
             $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);

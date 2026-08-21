@@ -42,6 +42,9 @@ enum Capability: string
     /** Pull data from one of the user's connected external MCP servers (McpClient, read-only v1). */
     case McpFetch = 'mcp_fetch';
 
+    /** Perform a WRITE action (create/update) on a connected external MCP server that opted in to writes (McpClient). */
+    case McpAction = 'mcp_action';
+
     /** Live read-only IMAP search over the user's connected mailboxes (InboundEmailHandler accounts). */
     case EmailSearch = 'email_search';
 
@@ -66,6 +69,9 @@ enum Capability: string
     /** Mail the assembled results to the account owner as one multi-MIME email (InternalEmailService, no model). */
     case EmailMe = 'email_me';
 
+    /** Put generated files into a connected WebDAV/Nextcloud folder (FileSendService / WebDavDestinationProvider). */
+    case SaveToFolder = 'save_to_folder';
+
     /** Final assembly of text + N file attachments into one OUT message (ResultAssembler, no model). */
     case ComposeReply = 'compose_reply';
 
@@ -86,13 +92,14 @@ enum Capability: string
         return match ($this) {
             self::ExtractText => 'extract',
             self::Chat, self::Summarize, self::Translate, self::RagQuery, self::FileAnalysis => 'text',
-            self::WebSearch, self::UrlFetch, self::McpFetch, self::EmailSearch => 'search',
+            self::WebSearch, self::UrlFetch, self::McpFetch, self::McpAction, self::EmailSearch => 'search',
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',
             self::DocumentGeneration => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
+            self::SaveToFolder => 'folder',
             self::ComposeReply => 'hidden',
         };
     }

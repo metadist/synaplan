@@ -647,3 +647,18 @@ describe('messageMapper (issue #1070)', () => {
     })
   })
 })
+
+describe('parseContentWithThinking JSON results', () => {
+  it('maps a standalone chat-list payload to a json part on reload', async () => {
+    const { parseContentWithThinking } = await import('@/utils/messageMapper')
+    const content = JSON.stringify({
+      total: 1,
+      chats: [{ id: 9, title: 'Knowledge Base One', source: 'web', message_count: 3 }],
+    })
+
+    const parts = parseContentWithThinking(content, 'assistant')
+
+    expect(parts.some((p) => p.type === 'json')).toBe(true)
+    expect(parts.find((p) => p.type === 'json')?.content).toContain('Knowledge Base One')
+  })
+})

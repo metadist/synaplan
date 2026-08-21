@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Şimdi değil",
+    "iosApp": {
+      "title": "Synaplan artık iPhone'da",
+      "body": "Uygulama sohbetlerinizi, belgelerinizi ve asistanlarınızı cebinize taşır. Aynı hesap, aynı veriler — yolda sorunuzu sesli olarak söyleyin ve her sohbete kaldığınız yerden devam edin.",
+      "action": "App Store'dan indirin"
+    }
+  },
   "updates": {
     "runningVersion": "Sürüm {version}",
     "badge": {
@@ -105,6 +113,7 @@
     "profile": "Profil",
     "admin": "Yönetici Paneli",
     "adminFeatures": "Özellik Durumu",
+    "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
     "adminSetup": "AI Sağlayıcı Kurulumu",
     "subscription": "Abonelik",
@@ -121,7 +130,70 @@
     "accountDeletion": "Hesap Silme",
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
-    "aiAgents": "Yapay zeka ajanları"
+    "aiAgents": "Yapay zeka ajanları",
+    "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler"
+  },
+  "adminModelStatus": {
+    "title": "Model Durumu",
+    "subtitle": "Hangi AI modelleri şu anda çalışıyor, hangileri çalışmıyor.",
+    "loading": "Model durumu yükleniyor…",
+    "loadFailed": "Model durumu yüklenemedi.",
+    "never": "hiç",
+    "noMatches": "Seçili filtrelere uyan model yok.",
+    "freeHint": "Kontrol ücretsizdir: sağlayıcılara yalnızca hangi modelleri yayınladıkları sorulur. Bunun için hiçbir zaman bir AI modeli çalıştırılmaz.",
+    "states": {
+      "online": "Çevrimiçi",
+      "degraded": "Sorunlu",
+      "offline": "Çevrimdışı",
+      "unconfigured": "Kurulmamış",
+      "unknown": "Bilinmiyor"
+    },
+    "sources": {
+      "probe": "sağlayıcının model listesi",
+      "traffic": "gerçek kullanım"
+    },
+    "summary": {
+      "allGood": "Tüm modeller yanıt veriyor",
+      "problems": "{count} model ilgi bekliyor",
+      "lastCheck": "Son kontrol",
+      "monitoringOff": "Otomatik kontrol kapalı, bu nedenle bu sayfa yalnızca bilinen son durumu gösterir."
+    },
+    "filters": {
+      "onlyProblems": "Yalnızca sorunları göster",
+      "capability": "Görev",
+      "allCapabilities": "Tüm görevler"
+    },
+    "provider": {
+      "affected": "{count} etkilendi"
+    },
+    "model": {
+      "lastSuccess": "Son çalıştığı zaman",
+      "errorRate": "Son {total} çağrının %{percent} kadarı başarısız oldu",
+      "source": "Dayanak",
+      "autoDisabled": "Otomatik olarak kapatıldı",
+      "switchedOff": "Kapalı",
+      "exempt": "Otomatik kapatmadan muaf"
+    },
+    "actions": {
+      "refresh": "Şimdi kontrol et",
+      "refreshProvider": "Bu sağlayıcıyı kontrol et",
+      "refreshProviderAria": "{provider} sağlayıcısını şimdi kontrol et",
+      "resetCounters": "Hata geçmişini temizle",
+      "exempt": "Otomasyondan muaf tut",
+      "unexempt": "Otomasyona tekrar izin ver"
+    },
+    "confirmResetTitle": "Hata geçmişi temizlensin mi?",
+    "confirmResetMessage": "Bundan sonra \"{name}\" yalnızca yeni kullanıma göre değerlendirilir. Modelin kaldırıldığını zaten tespit eden bir kontrol geri alınmaz.",
+    "messages": {
+      "refreshed": "{count} model kontrol edildi.",
+      "refreshFailed": "Kontrol tamamlanamadı.",
+      "exempted": "Bu model artık otomatik kapatmadan muaf.",
+      "unexempted": "Otomatik kapatma bu model için tekrar geçerli.",
+      "exemptFailed": "Muafiyet değiştirilemedi.",
+      "countersReset": "Hata geçmişi temizlendi.",
+      "countersResetFailed": "Hata geçmişi temizlenemedi."
+    }
   },
   "addinConnect": {
     "title": "Synaplan'a bağlan",
@@ -186,6 +258,10 @@
     "ttsGenerating": "Sesli yanıt ekleniyor…",
     "audioUnavailable": "Ses yüklenemedi",
     "audioUnavailableDescription": "Dosya şu anda sunucuda mevcut değil. Lütfen daha sonra tekrar deneyin veya indirin.",
+    "imageUnavailable": "Görsel yüklenemedi",
+    "imageUnavailableDescription": "Görsel şu anda kullanılamıyor. Lütfen tekrar deneyin.",
+    "videoUnavailable": "Video yüklenemedi",
+    "videoUnavailableDescription": "Video şu anda kullanılamıyor. Lütfen tekrar deneyin.",
     "rename": "Sohbeti Yeniden Adlandır",
     "enterNewName": "Bu sohbet için yeni bir başlık girin:",
     "namePlaceholder": "Sohbet başlığı...",
@@ -505,6 +581,40 @@
         "title": "Yapılandırma Güncellendi — Yeniden Başlatma Gerekli",
         "message": "Değişiklikleriniz .env dosyasına kaydedildi. Değişikliklerin etkili olması için Docker konteynerlerinizi yeniden başlatmanız gerekiyor.",
         "copyCommand": "Komutu Kopyala"
+      },
+      "m365": {
+        "title": "Bu alanlar işe yaramadan önce: Azure’da bir uygulama kaydet",
+        "intro": "Microsoft 365 oturum açma, Azure’da bir uygulama kaydı gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında herkes kendi hesabını bağlayabilir.",
+        "portalLink": "Azure portalı → Uygulama kayıtları",
+        "step1": "{portal} bağlantısını aç ve “Yeni kayıt” seçeneğini seç. Ad serbesttir, örneğin “Synaplan”.",
+        "step2": "“Yeniden yönlendirme URI’si” altında platform türü olarak Web (SPA değil) seç ve tam olarak şu adresi yapıştır:",
+        "step3": "“API izinleri” → “İzin ekle” → “Microsoft Graph” → “Temsilci izinleri” yolunu izle ve şu izinlerin tümünü ekle:",
+        "step3Note": "offline_access isteğe bağlı değildir: onsuz Microsoft yenileme belirteci vermez ve zamanlanmış her çalışma bir saat sonra durur.",
+        "step4": "“Sertifikalar ve gizli diziler” → “Yeni istemci gizli dizisi” yolunu izle ve Değer sütununu kopyala — Gizli Dizi Kimliğini değil. Yalnızca bu bir kez gösterilir.",
+        "step5": "İstemci kimliğini ve gizli diziyi aşağıdaki alanlara yapıştır, kiracıyı ayarla ve M365_ENABLED seçeneğini aç. Kullanıcılar sonra kendi hesaplarını Kanallar → Bağlantılar altından bağlar.",
+        "ready": "Hazır — kullanıcılar Microsoft 365 hesaplarını Kanallar → Bağlantılar altından bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve M365_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala."
+      },
+      "dropbox": {
+        "title": "Bu alanlar çalışmadan önce: Dropbox App Console’da bir uygulama oluştur",
+        "intro": "Dropbox bağlantısı bir Dropbox uygulaması gerektirir. Bunu bir kez yaparsın, yaklaşık beş dakika sürer ve sonrasında her kullanıcı kendi hesabını bağlayabilir.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "{console} sayfasını aç ve “Create app”i seç. “Scoped access” ve “Full Dropbox” seçeneklerini seç. İsim fark etmez, örneğin “Synaplan”.",
+        "step2": "“Permissions” sekmesinde şu iki izni etkinleştir ve “Submit”e tıkla:",
+        "step3": "“Settings” sekmesinde “OAuth 2 → Redirect URIs” altına tam olarak bu adresi ekle:",
+        "step4": "Yine “Settings” sekmesinde App key ve App secret değerlerini kopyala (“Show”a tıkla).",
+        "step5": "App key ve secret’ı aşağıdaki alanlara yapıştır ve DROPBOX_ENABLED seçeneğini aç. Kullanıcılar hesaplarını Kanallar → Bağlantılar altında bağlar.",
+        "ready": "Hazır — kullanıcılar Dropbox hesaplarını Kanallar → Bağlantılar altında bağlayabilir.",
+        "notReady": "Henüz etkin değil. Aşağıdaki alanları doldur ve DROPBOX_ENABLED seçeneğini aç.",
+        "copyFailed": "Kopyalanamadı. Metni seçip elle kopyala.",
+        "resetTitle": "Tüm Dropbox bağlantılarını sıfırla",
+        "resetDescription": "Bu kurulumdaki tüm kullanıcıların Dropbox bağlantısını, kayıtlı token'lar dahil kaldırır. Dropbox uygulaması veya izinleri değiştirildikten sonra kullanışlıdır — ardından herkes hesabını yeniden bağlayabilir.",
+        "resetButton": "Bağlantıları sıfırla",
+        "resetConfirmTitle": "Tüm Dropbox bağlantıları sıfırlansın mı?",
+        "resetConfirmMessage": "Tüm kullanıcıların Dropbox bağlantısı kaldırılacak ve her kullanıcının Dropbox hesabını yeniden bağlaması gerekecek. Bu işlem geri alınamaz.",
+        "resetDone": "Kaldırılacak Dropbox bağlantısı yok | 1 Dropbox bağlantısı kaldırıldı | {count} Dropbox bağlantısı kaldırıldı",
+        "resetFailed": "Sıfırlama başarısız oldu. Lütfen tekrar deneyin."
       }
     }
   },
@@ -523,6 +633,8 @@
     "toolsDocSummary": "Özetleyici",
     "toolsMailHandler": "E-posta Otomasyonu",
     "mcpServers": "MCP Sunucuları",
+    "connections": "Bağlantılar",
+    "savedTasks": "Kayıtlı görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -544,6 +656,7 @@
     "admin": "Yönetici",
     "adminDashboard": "Kontrol Paneli",
     "adminFeatureStatus": "Özellik Durumu",
+    "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
     "adminProviderSetup": "AI Sağlayıcıları",
     "profile": "Profil",
@@ -553,6 +666,34 @@
     "aiAgents": "Yapay zeka ajanları"
   },
   "guest": {
+    "disabledTitle": "Misafir sohbeti kullanılamıyor",
+    "disabledDescription": "Bu sunucu anonim deneme sunmuyor. Sohbete başlamak için giriş yap.",
+    "banner": {
+      "title": "Synaplan'ı misafir olarak kullanıyorsun",
+      "subtitle": "Hafızalar, sohbet geçmişi ve dahası için kaydol",
+      "remaining": "{count} mesaj kaldı",
+      "signUp": "Ücretsiz kaydol"
+    },
+    "limitModal": {
+      "title": "Misafir sınırına ulaştın",
+      "subtitle": "Yapay zeka ile sohbete devam etmek için ücretsiz bir hesap oluştur",
+      "features": {
+        "memories": "Tercihlerini hatırlayan bir yapay zeka",
+        "history": "Kalıcı sohbet geçmişi",
+        "files": "Dosya yükleme ve belge analizi",
+        "models": "Birden fazla yapay zeka modeli arasından seç"
+      },
+      "registerButton": "Ücretsiz hesap oluştur",
+      "loginButton": "Zaten hesabın var mı? Giriş yap"
+    },
+    "errorTitle": "Deneme şu anda kullanılamıyor",
+    "errorDescription": "Misafir oturumun başlatılamadı. Lütfen tekrar dene ya da ücretsiz bir hesap oluştur.",
+    "expiredTitle": "Oturumun sona erdi",
+    "expiredDescription": "Misafir oturumları 24 saat sürer ve bu deneme sohbeti geri getirilemez. Yeni bir deneme başlat ya da bundan sonraki sohbetlerinin kaydedilmesi için ücretsiz bir hesap oluştur.",
+    "rateLimitedTitle": "Çok fazla oturum",
+    "rateLimitedDescription": "Oturum sınırına ulaştın. Lütfen daha sonra tekrar dene ya da ücretsiz bir hesap oluştur.",
+    "retry": "Tekrar dene",
+    "createAccount": "Hesap oluştur",
     "featureGate": {
       "title": "Bu özellik bir hesap gerektirir",
       "subtitle": "Tüm özellikleri açmak için ücretsiz bir hesap oluşturun",
@@ -975,10 +1116,12 @@
     }
   },
   "setupBanner": {
-    "title": "Bağlı AI sağlayıcısı yok",
-    "adminText": "Sohbet için bir AI sağlayıcısı gerekiyor. Bir dakikada bağlayın — ücretsiz seçenekler mevcut.",
-    "userText": "Sohbet henüz hazır değil. Lütfen yöneticinizden bir AI sağlayıcısı bağlamasını isteyin.",
-    "cta": "AI sağlayıcısını kur"
+    "adminTitle": "AI sağlayıcısı yapılandırılmamış",
+    "userTitle": "Sohbet henüz hazır değil",
+    "adminText": "Bir AI sağlayıcısı bağlanmadan sohbet başlayamaz. Kurulum sayfasını açıp bir anahtar ekleyin — Groq yaklaşık bir dakikada çalışan ücretsiz bir seçenek sunar.",
+    "userText": "Bir yöneticinin hâlâ bir AI sağlayıcısı bağlaması gerekiyor. Bunun nasıl yapılacağı belgelerde anlatılır.",
+    "cta": "AI sağlayıcı kurulumunu aç",
+    "docsCta": "Belgeleri aç"
   },
   "localAiDownload": {
     "waitingTitle": "Yerel AI başlatılıyor",
@@ -1529,6 +1672,31 @@
       "API anahtarları, widget'lar ve kimlik bilgileri"
     ],
     "retention": "Silme işlemi kalıcıdır ve anında geçerli olur. Artık veri içeren yedekler 30 gün içinde döngüden çıkarılır. Yasal olarak saklamakla yükümlü olduğumuz veriler (ör. faturalar) yalnızca yasanın gerektirdiği süre boyunca tutulur.",
+    "partialTitle": "Hesabını silmeden tek tek verileri sil",
+    "partialIntro": "Veri silmek için hesabından vazgeçmen gerekmez. Giriş yaptığında aşağıdakileri kendin silebilirsin; işlem anında geçerli olur.",
+    "partialItems": [
+      {
+        "name": "Sohbetler ve konuşmalar",
+        "how": "Geçmiş'i aç, bir konuşmanın yanındaki ⋯ menüsünden Sil'i seç. Birkaçını birden kaldırmak için İstatistikler → Tüm Sohbetler'i aç, seç ve „Seçilenleri sil“e dokun."
+      },
+      {
+        "name": "Yüklenen dosyalar ve belgeler",
+        "how": "Kaynaklar → Gözat'ı aç ve bir dosyadaki çöp kutusu simgesini kullan ya da birkaçını seçip seçimi sil. Bir klasörü silmek içindeki dosyaları da siler."
+      },
+      {
+        "name": "Yapay zekâ ile üretilen görseller ve medya",
+        "how": "Kaynaklar → Üretilen'i aç ve ilgili ögedeki çöp kutusu simgesini kullan."
+      },
+      {
+        "name": "Anılar",
+        "how": "Anılar'ı aç ve tek tek kayıtları sil ya da birkaçını seçip birlikte sil."
+      },
+      {
+        "name": "Bağlantılar, sohbet widget'ları ve API anahtarları",
+        "how": "Kanallar'ı aç ve artık ihtiyacın olmayan bağlantıyı, widget'ı veya anahtarı kaldır."
+      }
+    ],
+    "partialRetention": "Sildiğin ögeler hesabından anında kaybolur. Artık kopya içeren yedekler 30 gün içinde döngüden çıkarılır. Hesabındaki diğer her şey olduğu gibi kalır.",
     "noAccessTitle": "Giriş yapamıyor musun?",
     "noAccessDesc": "Hesabına artık erişemiyorsan, web sitemiz üzerinden bizimle iletişime geç; silme talebini işleme alalım.",
     "visitWebsite": "Web sitesini ziyaret et",
@@ -1576,6 +1744,9 @@
   },
   "taskPlan": {
     "title": "Görev planı",
+    "showSteps": "Adımları göster",
+    "hideSteps": "Adımları gizle",
+    "scheduleThis": "Bunu daha sonra bir zamanlamayla tekrarla",
     "download": "İndir",
     "failedBody": "Bu adım tamamlanamadı.",
     "cancelledBody": "Bu adımı durdurdunuz.",
@@ -1599,7 +1770,8 @@
       "document": "Belge",
       "search": "Web araması",
       "extract": "Metin çıkarma",
-      "email": "E-posta"
+      "email": "E-posta",
+      "folder": "Klasör"
     },
     "capability": {
       "extract_text": "Metin çıkarılıyor",
@@ -1617,7 +1789,8 @@
       "text2sound": "Ses",
       "document_generation": "Belge",
       "calendar_event": "Takvim daveti",
-      "email_me": "E-posta gönderimi"
+      "email_me": "E-posta gönderimi",
+      "save_to_folder": "Klasöre kaydet"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -1720,7 +1893,32 @@
     },
     "cancelledByUser": "⚠️ Kullanıcı tarafından iptal edildi",
     "truncated": "Bu yanıt, model token sınırına ulaştığı için kesildi.",
-    "continueButton": "Yanıtı sürdür"
+    "continueButton": "Yanıtı sürdür",
+    "jsonViewer": {
+      "title": "Sonuç",
+      "itemCount": "{count} öğe",
+      "chats": "{count} sohbet",
+      "items": "{count} öğe",
+      "results": "{count} sonuç",
+      "records": "{count} kayıt",
+      "messages": "{count} mesaj",
+      "files": "{count} dosya",
+      "documents": "{count} belge",
+      "users": "{count} kullanıcı",
+      "entries": "{count} girdi",
+      "data": "{count} öğe",
+      "empty": "Gösterilecek bir şey yok",
+      "showJson": "JSON'u göster",
+      "hideJson": "JSON'u gizle",
+      "showMore": "{count} tane daha göster",
+      "showLess": "Daha az göster",
+      "shownOf": "{total} kaydın {shown} tanesi gösteriliyor",
+      "truncatedHint": "Sonuç çok uzun olduğu için kesildi — son kayıt eksik olabilir.",
+      "messagesCount": "{count} mesaj",
+      "idLabel": "ID {id}",
+      "expand": "Genişlet",
+      "collapse": "Daralt"
+    }
   },
   "paywall": {
     "title": {
@@ -1730,7 +1928,7 @@
       "reminder": "{brand}'dan daha fazlasını elde edin"
     },
     "subtitle": {
-      "guest_limit": "Kendi geçmişin, hafızaların ve dosyalarınla sohbete devam etmek için bir plan seç.",
+      "guest_limit": "Sohbete devam etmek için bir plan seç. Hesap açtığında bundan sonrası için kendi geçmişin, hafızaların ve dosyaların olur.",
       "free_limit": "Ücretsiz kotan tükendi. Sınır olmadan sohbete devam etmek için bir plan seç.",
       "quota_exhausted": "Hemen devam etmek için üst bir plana geç ya da kotanın gelecek ay sıfırlanmasını bekle.",
       "reminder": "Bir plan sana daha fazla mesaj, daha güçlü AI modelleri ve daha fazla depolama verir."
@@ -2209,7 +2407,15 @@
     },
     "generated": {
       "title": "Üretilen",
-      "subtitle": "Sohbetlerinizde oluşturulan görseller, video ve ses.",
+      "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",
+      "kinds": {
+        "all": "Tümü",
+        "image": "Görseller",
+        "video": "Videolar",
+        "audio": "Ses",
+        "document": "Belgeler",
+        "calendar": "Takvim"
+      },
       "openInChat": "Sohbette aç",
       "download": "İndir",
       "autoGroup": "Klasörü yapay zekâ seçsin",
@@ -2248,6 +2454,227 @@
     "deletionNote": "Bir dosyayı sildiğinizde, vektörleri de etkin vektör deposundan kaldırılır."
   },
   "config": {
+    "savedTasks": {
+      "saveAsTask": "Görev olarak kaydet",
+      "comingSoonTitle": "Kayıtlı görev",
+      "comingSoonBody": "Bu, talimatı bir zamanlamayla veya bir kanaldan çalıştırmanı sağlayacak. Sonraki bir güncellemede gelecek.",
+      "emptyHint": "Kayıtlı bir görev bu talimatı sen başlattığında çalıştırır; ileride bir zamanlamayla da çalışır.",
+      "title": "Kayıtlı görev",
+      "on": "Açık",
+      "off": "Kapalı",
+      "runNow": "Şimdi çalıştır",
+      "runStarted": "Görev kendi sohbetinde çalışıyor.",
+      "runFailed": "Çalıştırma tamamlanamadı.",
+      "updateFailed": "Kayıtlı görev güncellenemedi.",
+      "runsFailed": "Çalıştırmalar yüklenemedi.",
+      "scheduleSaved": "Zamanlama kaydedildi.",
+      "resumed": "Görev yeniden çalışacak.",
+      "resume": "Devam et",
+      "showResults": "Sonuçları göster",
+      "viewRuns": "Geçmiş",
+      "hideRuns": "Geçmişi gizle",
+      "runsRetention": "Eski çalıştırmalar otomatik olarak silinir.",
+      "runsEmpty": "Henüz çalıştırma yok.",
+      "runStatus": {
+        "queued": "Bekliyor",
+        "running": "Çalışıyor",
+        "completed": "Tamamlandı",
+        "failed": "Başarısız",
+        "cancelled": "İptal edildi"
+      },
+      "runTrigger": {
+        "manual": "senin tarafından başlatıldı",
+        "schedule": "zamanlanmış",
+        "chat": "sohbetten",
+        "inbound_email": "gelen e-posta"
+      },
+      "advancedSteps": "Gelişmiş adımlar",
+      "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
+      "autoPauseTitle": "Otomatik olarak duraklatıldı",
+      "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
+      "createFailed": "Görev olarak kaydedilemedi.",
+      "created": "Görev olarak kaydedildi. Şimdi çalıştırabilirsin.",
+      "overviewTitle": "Kayıtlı görevler",
+      "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
+      "overviewLoading": "Kayıtlı görevler yükleniyor…",
+      "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
+      "loadFailed": "Kayıtlı görevler yüklenemedi.",
+      "scheduleThis": "Bunu daha sonra tekrar çalıştır",
+      "scheduleThisHint": "Bu göreve bir ad ver. Zamanlamayı sonraki ekranda seçersin.",
+      "scheduledFromChat": "Kaydedildi. Ne zaman çalışacağını seç.",
+      "state": {
+        "off": "Çalışmıyor",
+        "neverRun": "Kaydedildi — henüz çalışmadı",
+        "scheduled": "Zamanlandı — ilk çalıştırma {when}",
+        "running": "Şu anda çalışıyor",
+        "lastRun": "Son çalıştırma: {when}",
+        "autoPaused": "Otomatik olarak duraklatıldı"
+      },
+      "schedule": {
+        "off": "Zamanlama yok",
+        "hourly": "Her saat",
+        "daily": "Her gün",
+        "weekdays": "Her iş günü"
+      },
+      "summary": {
+        "simple": "Ne zaman çalışır: {when}.",
+        "template": "Ne zaman çalışır: {when}. Okuduğu: {reads}. Ürettiği: {saves}.",
+        "when": {
+          "manual": "sen başlatınca",
+          "interval": "her {minutes} dakikada bir",
+          "daily": "her gün {at} ({tz})",
+          "weekly": "hafta içi her gün {at} ({tz})",
+          "schedule": "zamanlamaya göre",
+          "inboundEmail": "yeni e-posta gelince",
+          "chat": "eşleşen bir sohbet mesajı gelince"
+        },
+        "reads": {
+          "instruction": "bu talimat",
+          "mailbox": "bağlı posta kutusu"
+        },
+        "saves": {
+          "email": "sana bir e-posta",
+          "folder": "bağlı klasörde bir dosya",
+          "calendar": "bir takvim girişi",
+          "reply": "sohbette bir yanıt"
+        }
+      }
+    },
+    "connections": {
+      "title": "Bağlantılar",
+      "subtitle": "Synaplan’ın senin adına okuyabileceği ve yazabileceği dış sistemler.",
+      "empty": "Henüz hiçbir şey bağlı değil. Başlamak için aşağıdaki seçeneklerden birini seç; yaklaşık bir dakika sürer.",
+      "loading": "Bağlantılar yükleniyor…",
+      "loadFailed": "Bağlantılar yüklenemedi.",
+      "test": "Bağlantıyı test et",
+      "testOk": "Bağlantı iyi görünüyor.",
+      "testFailed": "Bağlantı testi başarısız oldu.",
+      "status": {
+        "connected": "Bağlı",
+        "error": "Hata",
+        "reauth_required": "Yeniden bağlanma gerekli",
+        "never_tested": "Hiç test edilmedi",
+        "disconnected": "Bağlantı kesildi"
+      },
+      "types": {
+        "mailbox": "Posta kutusu",
+        "mcp": "Bağlı sistem",
+        "webdav": "Klasör",
+        "webhook": "Bildirim adresi",
+        "caldav": "Takvim",
+        "generic": "Bağlantı",
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
+      },
+      "failure": {
+        "unauthorized": "{connection} oturum açmayı reddetti. Devam etmek için yeniden bağla.",
+        "not_found": "{target} klasörü {connection} içinde artık yok.",
+        "quota_exceeded": "{connection} dolu.",
+        "too_large": "Dosya, {connection} kabul ettiğinden daha büyük.",
+        "unreachable": "{connection} ulaşılabilir değil. Synaplan bir sonraki çalışmada yeniden deneyecek.",
+        "conflict": "Bu adda bir dosya zaten var; {newName} olarak kaydedildi.",
+        "rate_limited": "Kullanım sınırına ulaşıldı, bu çalışma atlandı.",
+        "unsupported": "Bu dosya türü {connection} hedefine aktarılamaz."
+      },
+      "explainer": "Bir sistemi burada bir kez bağla. Kaydedilmiş görevler ve yapay zekâ sonrasında onu kullanabilir; örneğin en son Outlook postalarını okuyabilir. Parolan hiçbir zaman saklanmaz: Microsoft 365 oturum açmanı ister ve Synaplan’a istediğin an geri alabileceğin bir belirteç verir.",
+      "yourConnections": "Bağlantıların",
+      "addTitle": "Bağlantı ekle",
+      "addSubtitle": "Her seçeneğin ne yaptığı ve seni nereye götürdüğü.",
+      "lastChecked": "{when} tarihinde kontrol edildi",
+      "reauthHint": "Microsoft kayıtlı oturumu artık kabul etmiyor. Zamanlanmış görevlerin yeniden çalışması için yeniden bağlan.",
+      "reconnect": "Yeniden bağlan",
+      "testing": "Test ediliyor…",
+      "testOkAccount": "Bağlantı çalışıyor — {account} olarak oturum açıldı.",
+      "manage": "Yönet",
+      "editName": "Ad",
+      "keepPassword": "Mevcut uygulama parolasını korumak için boş bırak.",
+      "updated": "Bağlantı güncellendi.",
+      "updateFailed": "Bağlantı güncellenemedi.",
+      "deleteTitle": "Bu bağlantı kaldırılsın mı?",
+      "deleteMessage": "Synaplan bundan sonra {name} kullanmaz. Orada duran dosyalar silinmez.",
+      "deleteConfirm": "Kaldır",
+      "deleted": "{name} kaldırıldı.",
+      "deleteFailed": "Bağlantı kaldırılamadı.",
+      "channelHint": "Sohbette bu kanala {channel} deyin",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Synaplan’ın Outlook postalarını okuyabilmesi için iş veya kişisel Microsoft hesabınla oturum aç. Yalnızca okuma yapar ve istediğin an bağlantıyı kesebilirsin.",
+          "connect": "Microsoft 365’i bağla",
+          "connectAnother": "Başka bir hesap bağla",
+          "connectedAs": "{account} olarak bağlandı.",
+          "connecting": "Microsoft açılıyor…",
+          "connected": "Microsoft 365 bağlandı.",
+          "startFailed": "Microsoft oturum açma sayfası açılamadı. Lütfen tekrar dene.",
+          "unavailable": "Henüz kullanılamıyor — Microsoft 365’in bu kurulum için bir kez ayarlanması gerekiyor.",
+          "adminLink": "Sistem ayarlarında yapılandır.",
+          "askAdmin": "Etkinleştirmesi için bir yöneticiye başvur.",
+          "errors": {
+            "access_denied": "Microsoft oturum açmayı iptal ettin, bu yüzden hiçbir şey bağlanmadı.",
+            "missing_code": "Microsoft eksik bir yanıt gönderdi. Lütfen bağlantıyı yeniden başlat.",
+            "exchange_failed": "Microsoft oturumu kabul etti ancak belirteç alınamadı. Sistem ayarlarındaki istemci parolasını kontrol edip tekrar dene.",
+            "invalid_state": "Oturum açma çok uzun sürdü veya başka bir sekmede başlatıldı. Lütfen tekrar dene.",
+            "unknown": "Microsoft 365 bağlanamadı. Lütfen tekrar dene."
+          },
+          "hosting": "Postaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Microsoft’ta kalır."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Synaplan’ın oluşturulan dosyaları bir Dropbox klasörüne kaydedebilmesi için Dropbox hesabınla oturum aç — örneğin “bir belge oluştur ve Dropbox’ıma koy”. İstediğin an bağlantıyı kesebilirsin.",
+          "connect": "Dropbox’ı bağla",
+          "connectAnother": "Başka bir hesap bağla",
+          "connectedAs": "{account} olarak bağlandı.",
+          "connecting": "Dropbox açılıyor…",
+          "connected": "Dropbox bağlandı.",
+          "startFailed": "Dropbox oturum açma sayfası açılamadı. Lütfen tekrar dene.",
+          "unavailable": "Henüz kullanılamıyor — Dropbox’ın bu kurulum için bir kez ayarlanması gerekiyor.",
+          "adminLink": "Sistem ayarlarında yapılandır.",
+          "askAdmin": "Etkinleştirmesi için bir yöneticiye başvur.",
+          "errors": {
+            "access_denied": "Dropbox oturum açmayı iptal ettin, bu yüzden hiçbir şey bağlanmadı.",
+            "missing_code": "Dropbox eksik bir yanıt gönderdi. Lütfen bağlantıyı yeniden başlat.",
+            "exchange_failed": "Dropbox oturum açmayı kabul etti ancak belirteç alınamadı. Sistem ayarlarındaki uygulama gizli anahtarını kontrol edip tekrar dene.",
+            "invalid_state": "Oturum açma çok uzun sürdü veya başka bir sekmede başlatıldı. Lütfen tekrar dene.",
+            "unknown": "Dropbox bağlanamadı. Lütfen tekrar dene."
+          },
+          "hosting": "Dosyaların, merkezi ABD’de bulunan bir bulut sağlayıcısı olan Dropbox’ta kalır."
+        },
+        "mailbox": {
+          "name": "Posta kutusu (IMAP)",
+          "description": "Kullanıcı adı ve parolayla çalışan her IMAP posta kutusu — örneğin uygulama parolası olan bir Gmail hesabı veya kendi posta sunucun.",
+          "action": "Posta kutusu kur"
+        },
+        "mcp": {
+          "name": "Bağlı sistem (MCP)",
+          "description": "Yapay zekâya harici bir MCP sunucusundan araçlar ver; örneğin bir talep sistemi veya kendi servisin.",
+          "action": "Sistem ekle"
+        },
+        "dav": {
+          "name": "Nextcloud klasörü ve takvimi (WebDAV)",
+          "description": "Görev sonuçlarını bulut klasörüne kaydeder ve toplantıları takvimine ekler. Nextcloud, ownCloud ve tüm WebDAV sunucularıyla çalışır.",
+          "hosting": "Seçtiğin bir sunucuya bağlanır — dosyaların kendi bulutunda kalır.",
+          "action": "Bağlan",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Başka bir WebDAV adresi"
+          },
+          "serverUrl": "Sunucu adresi",
+          "davUrl": "WebDAV adresi (tam URL)",
+          "username": "Kullanıcı adı",
+          "appPassword": "Uygulama parolası",
+          "appPasswordHint": "Nextcloud'da Ayarlar → Güvenlik → Cihazlar ve oturumlar altında oluştur. Hesap parolan asla saklanmaz.",
+          "localHttpHint": "Bu geliştirme kurulumunda http://nextcloud gibi yerel bir adres de kullanabilirsiniz.",
+          "folder": "Sonuçlar için klasör",
+          "withCalendar": "Bir takvimi de bağla:",
+          "connect": "Bağlan",
+          "connecting": "Bağlanıyor…",
+          "created": "{name} bağlandı.",
+          "createFailed": "Bağlantı oluşturulamadı. Adresi kontrol edip yeniden dene.",
+          "folderName": "{host} klasörü ({user})",
+          "calendarName": "{host} takvimi ({calendar})"
+        }
+      }
+    },
     "aiModels": {
       "title": "AI Modelleri",
       "description": "AI modellerinizi yapılandırın ve yönetin",
@@ -3512,14 +3939,25 @@
   },
   "mcpServers": {
     "title": "MCP Sunucuları",
-    "description": "Asistanın yanıt verirken kendi sistemlerinizden (CRM, wiki, dahili API'ler) veri çekebilmesi için harici MCP sunucularını bağlayın. Burada keşfedilen araçlar görev planlayıcısına sunulur.",
-    "clientDisabledHint": "Giden MCP istemcisi şu anda platform yapılandırmasında devre dışı. Bağlantılar hazırlanabilir, ancak etkinleştirilene kadar çağrı yapılmaz.",
+    "description": "MCP uyumlu herhangi bir araç sunucusunu bağlayın — bir CRM, wiki, talep sistemi, otomasyon platformu veya kendi barındırdığınız bir hizmet. Keşfedilen araçlar görev planlayıcısına sunulur.",
+    "clientOnTitle": "MCP çağrıları açık",
+    "clientOnText": "Asistan, MCP veri kaynaklarına izin veren her görevde bağlı sunucuları kullanabilir.",
+    "clientOffTitle": "MCP çağrıları kapalı",
+    "clientOffAdminText": "Kayıtlı sunucular burada kalır, ancak siz bu kurulum için bunu açana kadar asistan onları çağırmaz.",
+    "clientOffUserText": "Bir yöneticinin bunu bu kurulum için açması gerekir. Kayıtlı sunucular o zamana kadar burada kalır.",
+    "clientAdminLink": "Sistem Yapılandırmasında aç",
+    "clientEnable": "MCP çağrılarını aç",
+    "clientToggle": "MCP çağrılarına izin ver",
+    "clientEnabledNotice": "Asistan artık bağlı MCP sunucularını çağırabilir",
+    "clientDisabledNotice": "MCP çağrıları kapalı — kayıtlı sunucular yerinde kalır",
+    "clientUpdateFailed": "MCP ayarı güncellenemedi",
     "listTitle": "Bağlı sunucular",
     "add": "Sunucu ekle",
     "addTitle": "Yeni sunucu bağla",
     "editTitle": "Sunucuyu düzenle",
     "formHint": "URL, herkese açık bir HTTPS MCP uç noktası (Streamable HTTP) olmalıdır. Kimlik doğrulama değeri şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
     "empty": "Henüz bağlı MCP sunucusu yok.",
+    "emptyHint": "Boş bir formla başlayın veya adı ve varsayılanları doldurmak için bilinen bir sistem seçin. Bu seçimi istediğiniz zaman değiştirebilir veya temizleyebilirsiniz.",
     "nameLabel": "Ad",
     "urlLabel": "Sunucu URL'si",
     "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
@@ -3549,7 +3987,40 @@
     "usageDisabled": "Bu görev için MCP veri kaynakları devre dışı bırakıldı",
     "usageUpdateFailed": "Görev güncellenemedi",
     "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
-    "usageAdvancedLink": "AI Talimatları"
+    "usageAdvancedLink": "AI Talimatları",
+    "templatesLabel": "Şununla başla",
+    "templatesHint": "Özel, her MCP sunucusu için varsayılan seçenektir. Bir şablon yalnızca formu doldurur — temizlemek için seçili karta yeniden tıklayın.",
+    "templatesClear": "Seçili — temizlemek için yeniden tıklayın",
+    "templates": {
+      "custom": {
+        "name": "Özel sunucu",
+        "summary": "Herhangi bir MCP uç noktası",
+        "hint": "Herhangi bir Streamable HTTP MCP sunucusunun HTTPS URL'sini ve gerekirse bir erişim token'ını yapıştırın. CRM, wiki, talepler, otomasyon — MCP konuşuyorsa burada çalışır."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Talepler ve sorunlar",
+        "hint": "Jira uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken talepleri listeleyebilir ve bir prompt ile yenilerini oluşturabilirsiniz."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki sayfaları",
+        "hint": "Confluence uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken sayfalarda arama yapabilir, özetler alabilir ve bir prompt ile yeni sayfalar oluşturabilirsiniz."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Depolar, issue'lar, pull request'ler",
+        "hint": "GitHub uyumlu bir MCP sunucusu bağlayın ve endpoint URL'sini ile bir kişisel erişim token'ını girin. Issue'lar, pull request'ler ve depo araması için kullanışlıdır."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Otomasyon iş akışları",
+        "hint": "Asistanın otomasyon iş akışlarınızı incelemesi veya tetiklemesi için bir n8n MCP sunucusu bağlayın. n8n örneğinizdeki MCP uç noktası URL'sini ve erişim token'ını yapıştırın."
+      }
+    },
+    "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
+    "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
+    "writeBadge": "Yazma izinli"
   },
   "messagesGateway": {
     "title": "Yapay zeka ajanları",

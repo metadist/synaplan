@@ -8,6 +8,7 @@ use App\Entity\GuestSession;
 use App\Entity\User;
 use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -28,12 +29,17 @@ class GuestSessionServiceTest extends TestCase
         ?UserRepository $userRepo = null,
         ?LoggerInterface $logger = null,
         ?int $maxSessionsPerIp = null,
+        bool $guestChatEnabled = true,
     ): GuestSessionService {
+        $guestChatConfig = $this->createStub(GuestChatConfig::class);
+        $guestChatConfig->method('isEnabled')->willReturn($guestChatEnabled);
+
         $args = [
             $em ?? $this->createStub(EntityManagerInterface::class),
             $sessionRepo ?? $this->createStub(GuestSessionRepository::class),
             $userRepo ?? $this->createStub(UserRepository::class),
             $logger ?? $this->createStub(LoggerInterface::class),
+            $guestChatConfig,
         ];
 
         if (null !== $maxSessionsPerIp) {
@@ -41,6 +47,16 @@ class GuestSessionServiceTest extends TestCase
         }
 
         return new GuestSessionService(...$args);
+    }
+
+    public function testGetSessionResolvesNothingWhileGuestChatIsDisabled(): void
+    {
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('findBySessionId')->willReturn(new GuestSession());
+
+        $service = $this->createService(sessionRepo: $sessionRepo, guestChatEnabled: false);
+
+        self::assertNull($service->getSession('any-id'));
     }
 
     public function testCreateSessionWithCloudflareHeaders(): void

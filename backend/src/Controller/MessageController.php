@@ -462,6 +462,7 @@ class MessageController extends AbstractController
                                                     new OA\Property(property: 'capability', type: 'string'),
                                                     new OA\Property(property: 'kind', type: 'string'),
                                                     new OA\Property(property: 'state', type: 'string'),
+                                                    new OA\Property(property: 'depends_on', type: 'array', items: new OA\Items(type: 'string'), description: 'Upstream step ids this step waited on (empty for roots)'),
                                                     new OA\Property(property: 'text', type: 'string', nullable: true),
                                                     new OA\Property(property: 'url', type: 'string', nullable: true),
                                                     new OA\Property(property: 'type', type: 'string', nullable: true),

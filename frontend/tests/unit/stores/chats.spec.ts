@@ -159,6 +159,42 @@ describe('Chats Store', () => {
     })
   })
 
+  describe('applyChatTitle', () => {
+    const untitled = () => ({
+      id: 1,
+      title: 'New Chat',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      messageCount: 2,
+    })
+
+    it('shows the title the server generated for the chat', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      store.applyChatTitle(1, 'Invoice import problem')
+
+      expect(store.chats[0].title).toBe('Invoice import problem')
+    })
+
+    it('does not PATCH — the server already persisted the title', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      store.applyChatTitle(1, 'Invoice import problem')
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+    })
+
+    it('ignores a title for a chat that is not in the list', () => {
+      const store = useChatsStore()
+      store.chats = [untitled()]
+
+      expect(() => store.applyChatTitle(999, 'Somewhere else')).not.toThrow()
+      expect(store.chats[0].title).toBe('New Chat')
+    })
+  })
+
   describe('bumpChatActivity', () => {
     it('updates updatedAt to a fresh ISO timestamp so the chat sorts to the top', () => {
       const store = useChatsStore()

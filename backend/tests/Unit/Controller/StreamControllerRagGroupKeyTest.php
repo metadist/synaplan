@@ -8,10 +8,12 @@ use App\AI\Service\AiFacade;
 use App\Controller\StreamController;
 use App\Repository\FileRepository;
 use App\Service\BillingService;
+use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
@@ -63,6 +65,7 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(WidgetService::class),
             $this->createMock(WidgetSessionService::class),
             $this->createMock(GuestSessionService::class),
+            $this->createStub(GuestChatConfig::class),
             $this->createMock(RateLimitService::class),
             '/tmp/upload',
             $this->createMock(UserUploadPathBuilder::class),
@@ -70,6 +73,7 @@ final class StreamControllerRagGroupKeyTest extends TestCase
             $this->createMock(MessageForwardingService::class),
             $this->createMock(MemoryExtractionDispatcher::class),
             $this->createMock(ConversationSummaryRefreshDispatcher::class),
+            $this->createStub(ChatTitleService::class),
             $this->createMock(DocumentGeneratorService::class),
             $this->createMock(DocumentImageReferenceResolver::class),
             $this->createMock(MediaCancellationStore::class),

@@ -11,13 +11,14 @@ use App\Service\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class StorageQuotaServiceTest extends TestCase
 {
-    private FileRepository $fileRepository;
-    private ConfigRepository $configRepository;
+    private FileRepository&MockObject $fileRepository;
+    private ConfigRepository&MockObject $configRepository;
     private EntityManagerInterface $em;
     private LoggerInterface $logger;
     private StorageQuotaService $service;
@@ -104,6 +105,51 @@ class StorageQuotaServiceTest extends TestCase
 
         // Default: 100 MB
         $this->assertEquals(100 * 1024 * 1024, $limit);
+    }
+
+    public function testGetStorageLimitIsUnlimitedForAdmin(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $this->configRepository->expects($this->never())->method('findOneBy');
+
+        $this->assertTrue($this->service->isUnlimited($user));
+        $this->assertSame(StorageQuotaService::UNLIMITED_BYTES, $this->service->getStorageLimit($user));
+    }
+
+    public function testCheckStorageLimitDoesNotThrowForAdmin(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $this->fileRepository->expects($this->never())->method('createQueryBuilder');
+
+        $this->service->checkStorageLimit($user, 200 * 1024 * 1024);
+    }
+
+    public function testGetStorageStatsMarksAdminAsUnlimited(): void
+    {
+        $user = $this->createUser('ADMIN');
+
+        $qb = $this->createMock(QueryBuilder::class);
+        $qb->method('select')->willReturnSelf();
+        $qb->method('where')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+
+        $query = $this->createMock(Query::class);
+        $query->method('getSingleScalarResult')->willReturn(150 * 1024 * 1024);
+
+        $qb->method('getQuery')->willReturn($query);
+
+        $this->fileRepository
+            ->method('createQueryBuilder')
+            ->willReturn($qb);
+
+        $stats = $this->service->getStorageStats($user);
+
+        $this->assertTrue($stats['unlimited']);
+        $this->assertSame(0.0, $stats['percentage']);
+        $this->assertSame(StorageQuotaService::UNLIMITED_BYTES, $stats['limit']);
+        $this->assertSame(150 * 1024 * 1024, $stats['usage']);
     }
 
     public function testGetStorageUsageReturnsZeroWhenNoFiles(): void

@@ -19,12 +19,14 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
+use App\Service\GuestChatConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
+use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -63,6 +65,8 @@ class ConfigController extends AbstractController
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
         private RegistrationConfig $registrationConfig,
+        private GuestChatConfig $guestChatConfig,
+        private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
@@ -134,6 +138,7 @@ class ConfigController extends AbstractController
                     description: 'Authentication surface flags. Lets the frontend hide sign-up affordances when the operator runs an SSO-/OIDC-only instance.',
                     properties: [
                         new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
+                        new OA\Property(property: 'guestChatEnabled', type: 'boolean', example: true, description: 'When false, the anonymous guest trial chat is disabled (set GUEST_CHAT_ENABLED=false, e.g. for OIDC-only deployments): the frontend sends unauthenticated visitors to /login and every /api/v1/guest endpoint is refused server-side.'),
                     ]
                 ),
                 new OA\Property(
@@ -150,6 +155,7 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
+                        new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
                     ]
                 ),
                 new OA\Property(
@@ -421,6 +427,7 @@ class ConfigController extends AbstractController
         $features = [
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
+            'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration
@@ -492,11 +499,12 @@ class ConfigController extends AbstractController
             $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
 
             // First-run signal: can a plain chat message work right now for
-            // THIS user? The frontend shows a "connect an AI provider" banner
-            // (admins get a wizard CTA) while this is false — e.g. a fresh
-            // install whose default chat model points at a provider without a
-            // key. Evaluated per user so a working per-user model override is
-            // honoured, exactly like the chat pipeline resolves it.
+            // THIS user? The frontend replaces chat with a setup tombstone
+            // (admins go to /admin/setup; others to the public docs) while
+            // this is false — e.g. a fresh install whose default chat model
+            // points at a provider without a key. Evaluated per user so a
+            // working per-user model override is honoured, exactly like the
+            // chat pipeline resolves it.
             $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
         }
 
@@ -552,6 +560,10 @@ class ConfigController extends AbstractController
                 // Default ON; operators set REGISTRATION_ENABLED=false for
                 // SSO-/OIDC-only instances so no local sign-up is offered.
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
+                // Default ON; operators set GUEST_CHAT_ENABLED=false so
+                // unauthenticated visitors are sent to /login instead of the
+                // anonymous guest trial (issue #1517).
+                'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),
@@ -730,9 +742,9 @@ class ConfigController extends AbstractController
                             type: 'array',
                             items: new OA\Items(
                                 properties: [
-                                    new OA\Property(property: 'id', type: 'integer', example: 53),
+                                    new OA\Property(property: 'id', type: 'integer', example: 324),
                                     new OA\Property(property: 'service', type: 'string', example: 'Groq'),
-                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen3 32B (Reasoning)'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
                                 ]

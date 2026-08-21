@@ -5,7 +5,7 @@
   >
     <div class="w-full max-w-md">
       <div class="text-center mb-8">
-        <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+        <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
         <h1 class="text-3xl font-bold txt-primary mb-2">Reset Password</h1>
         <p class="txt-secondary">Enter your new password</p>
       </div>
@@ -110,9 +110,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 import { usePasswordValidation } from '../composables/usePasswordValidation'
 import { authApi } from '@/services/api'
 import { getApiErrorMessage } from '@/utils/errorMessage'
@@ -121,16 +123,8 @@ import Button from '../components/Button.vue'
 const router = useRouter()
 const route = useRoute()
 const themeStore = useTheme()
-
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const config = useConfigStore()
+const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const password = ref('')
 const confirmPassword = ref('')

@@ -22,6 +22,7 @@
     </ErrorBoundary>
     <NotificationContainer />
     <Dialog />
+    <AnnouncementModal />
     <CookieConsent @consent="handleCookieConsent" />
     <BiometricLockScreen />
     <ForceUpdateScreen />
@@ -39,6 +40,7 @@ import { brandName } from '@/router'
 import NotificationContainer from '@/components/NotificationContainer.vue'
 import Dialog from '@/components/Dialog.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import AnnouncementModal from '@/components/AnnouncementModal.vue'
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import BiometricLockScreen from '@/components/BiometricLockScreen.vue'

@@ -46,6 +46,25 @@ class ModelRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every row this install currently offers, regardless of capability.
+     *
+     * Used by the model-availability check, which must judge what the running
+     * database serves rather than what the catalog declares — an install can
+     * hold active rows the catalog dropped long ago.
+     *
+     * @return Model[] Array of active models sorted by service, then id
+     */
+    public function findAllActive(): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.active = 1')
+            ->orderBy('m.service', 'ASC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Get model by service and provider ID.
      *
      * @param string $service    Service name (e.g., 'Ollama', 'OpenAI')
@@ -174,5 +193,72 @@ class ModelRepository extends ServiceEntityRepository
         $models = $this->findByTag($tag, $activeOnly);
 
         return array_filter($models, fn (Model $model) => $model->hasFeature($feature));
+    }
+
+    /**
+     * Resolve the catalog row behind a live provider call.
+     *
+     * Service names are compared case-insensitively: BSERVICE stores them in
+     * CamelCase ('OpenAI', 'Groq') while providers report themselves lowercase
+     * from getName(). The tag is part of the lookup because one provider model
+     * id can back several rows — Groq's Qwen backs both the chat and the vision
+     * entry, and a vision outage must not be charged to the chat row.
+     */
+    public function findIdByServiceProviderIdAndTag(string $service, string $providerId, string $tag): ?int
+    {
+        $result = $this->createQueryBuilder('m')
+            ->select('m.id')
+            ->where('LOWER(m.service) = :service')
+            ->andWhere('LOWER(m.providerId) = :providerId')
+            ->andWhere('m.tag = :tag')
+            ->setParameter('service', mb_strtolower($service))
+            ->setParameter('providerId', mb_strtolower($providerId))
+            ->setParameter('tag', $tag)
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return null === $result ? null : (int) $result['id'];
+    }
+
+    /**
+     * Every model of one service, keyed by the lowercased provider model id.
+     *
+     * Feeds the catalog diff: one query per provider instead of one per model.
+     *
+     * @return array<string, list<Model>>
+     */
+    public function findByServiceIndexedByProviderId(string $service): array
+    {
+        $models = $this->createQueryBuilder('m')
+            ->where('LOWER(m.service) = :service')
+            ->setParameter('service', mb_strtolower($service))
+            ->getQuery()
+            ->getResult();
+
+        $indexed = [];
+        foreach ($models as $model) {
+            /* @var Model $model */
+            $indexed[mb_strtolower($model->getProviderId())][] = $model;
+        }
+
+        return $indexed;
+    }
+
+    /**
+     * All distinct service names present in the catalog, as stored.
+     *
+     * @return list<string>
+     */
+    public function findAllServices(): array
+    {
+        $results = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.service')
+            ->orderBy('m.service', 'ASC')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map(static fn (array $row): string => (string) $row['service'], $results);
     }
 }

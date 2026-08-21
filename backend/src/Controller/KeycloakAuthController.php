@@ -202,24 +202,13 @@ class KeycloakAuthController extends AbstractController
                 );
             }
 
-            // Fetch user info from Keycloak
-            $userInfoResponse = $this->httpClient->request('GET', $discovery['userinfo_endpoint'], [
-                'headers' => [
-                    'Authorization' => 'Bearer '.$accessToken,
-                ],
-            ]);
+            // Resolve the user from the access token using the same validation
+            // the refresh path applies, so an audience misconfiguration is
+            // rejected here rather than five minutes into the session (#1520).
+            $userInfo = $this->oidcTokenService->resolveLoginClaims($accessToken, 'keycloak');
 
-            $userInfo = $userInfoResponse->toArray();
-
-            // Merge JWT claims into userInfo — the userinfo endpoint often omits
-            // role claims that the access token JWT contains.
-            $tokenClaims = $this->decodeJwtPayload($accessToken);
-            if ($tokenClaims) {
-                foreach ($tokenClaims as $key => $value) {
-                    if (!isset($userInfo[$key])) {
-                        $userInfo[$key] = $value;
-                    }
-                }
+            if (null === $userInfo) {
+                return $this->oauthLoginResponder->error('keycloak', 'Failed to authenticate with Keycloak', $native);
             }
 
             $this->logger->info('Keycloak user info retrieved', [
@@ -365,28 +354,5 @@ class KeycloakAuthController extends AbstractController
     private function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-    }
-
-    /**
-     * Decode the payload of a JWT without signature verification.
-     * Safe here because the token was received directly from the OIDC token endpoint.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function decodeJwtPayload(string $jwt): ?array
-    {
-        $parts = explode('.', $jwt);
-        if (3 !== count($parts)) {
-            return null;
-        }
-
-        $payload = base64_decode(strtr($parts[1], '-_', '+/'), true);
-        if (false === $payload) {
-            return null;
-        }
-
-        $decoded = json_decode($payload, true);
-
-        return is_array($decoded) ? $decoded : null;
     }
 }

@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Später",
+    "iosApp": {
+      "title": "Synaplan gibt es jetzt fürs iPhone",
+      "body": "Die App bringt deine Chats, Dokumente und Assistenten aufs Handy. Gleicher Zugang, gleiche Daten — unterwegs sprichst du deine Frage einfach ein und setzt jedes Gespräch dort fort, wo du aufgehört hast.",
+      "action": "Im App Store laden"
+    }
+  },
   "updates": {
     "runningVersion": "Version {version}",
     "badge": {
@@ -107,6 +115,7 @@
     "profile": "Profil",
     "admin": "Admin-Panel",
     "adminFeatures": "Feature-Status",
+    "adminModelStatus": "Modell-Status",
     "adminConfig": "Systemkonfiguration",
     "adminSetup": "KI-Anbieter einrichten",
     "subscription": "Abonnement",
@@ -122,7 +131,70 @@
     "accountDeletion": "Konto löschen",
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
-    "aiAgents": "KI-Agenten"
+    "aiAgents": "KI-Agenten",
+    "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben"
+  },
+  "adminModelStatus": {
+    "title": "Modell-Status",
+    "subtitle": "Welche KI-Modelle gerade funktionieren und welche nicht.",
+    "loading": "Modell-Status wird geladen…",
+    "loadFailed": "Der Modell-Status konnte nicht geladen werden.",
+    "never": "nie",
+    "noMatches": "Keine Modelle passen zu den gewählten Filtern.",
+    "freeHint": "Die Prüfung ist kostenlos: Es wird nur abgefragt, welche Modelle ein Anbieter veröffentlicht. Dafür wird nie ein KI-Modell ausgeführt.",
+    "states": {
+      "online": "Online",
+      "degraded": "Gestört",
+      "offline": "Offline",
+      "unconfigured": "Nicht eingerichtet",
+      "unknown": "Unbekannt"
+    },
+    "sources": {
+      "probe": "Modell-Liste des Anbieters",
+      "traffic": "echte Nutzung"
+    },
+    "summary": {
+      "allGood": "Alle Modelle antworten",
+      "problems": "{count} Modell(e) brauchen Aufmerksamkeit",
+      "lastCheck": "Zuletzt geprüft",
+      "monitoringOff": "Die automatische Prüfung ist ausgeschaltet, diese Seite zeigt daher nur den zuletzt bekannten Stand."
+    },
+    "filters": {
+      "onlyProblems": "Nur Probleme anzeigen",
+      "capability": "Aufgabe",
+      "allCapabilities": "Alle Aufgaben"
+    },
+    "provider": {
+      "affected": "{count} betroffen"
+    },
+    "model": {
+      "lastSuccess": "Zuletzt funktioniert",
+      "errorRate": "{percent} % der letzten {total} Aufrufe sind fehlgeschlagen",
+      "source": "Grundlage",
+      "autoDisabled": "Automatisch abgeschaltet",
+      "switchedOff": "Abgeschaltet",
+      "exempt": "Von automatischer Abschaltung ausgenommen"
+    },
+    "actions": {
+      "refresh": "Jetzt prüfen",
+      "refreshProvider": "Diesen Anbieter prüfen",
+      "refreshProviderAria": "{provider} jetzt prüfen",
+      "resetCounters": "Fehlerverlauf löschen",
+      "exempt": "Von Automatik ausnehmen",
+      "unexempt": "Automatik wieder erlauben"
+    },
+    "confirmResetTitle": "Fehlerverlauf löschen?",
+    "confirmResetMessage": "„{name}“ wird danach nur noch nach neuer Nutzung bewertet. Eine Prüfung, die das Modell bereits als eingestellt erkannt hat, bleibt bestehen.",
+    "messages": {
+      "refreshed": "{count} Modell(e) geprüft.",
+      "refreshFailed": "Die Prüfung konnte nicht abgeschlossen werden.",
+      "exempted": "Dieses Modell ist jetzt von der automatischen Abschaltung ausgenommen.",
+      "unexempted": "Die automatische Abschaltung gilt für dieses Modell wieder.",
+      "exemptFailed": "Die Ausnahme konnte nicht geändert werden.",
+      "countersReset": "Fehlerverlauf gelöscht.",
+      "countersResetFailed": "Der Fehlerverlauf konnte nicht gelöscht werden."
+    }
   },
   "addinConnect": {
     "title": "Mit Synaplan verbinden",
@@ -186,6 +258,10 @@
     "ttsGenerating": "Sprachantwort wird erstellt…",
     "audioUnavailable": "Audio konnte nicht geladen werden",
     "audioUnavailableDescription": "Die Datei ist auf dem Server nicht verfügbar. Versuche es später erneut oder lade sie herunter.",
+    "imageUnavailable": "Bild konnte nicht geladen werden",
+    "imageUnavailableDescription": "Das Bild ist derzeit nicht verfügbar. Versuche es bitte erneut.",
+    "videoUnavailable": "Video konnte nicht geladen werden",
+    "videoUnavailableDescription": "Das Video ist derzeit nicht verfügbar. Versuche es bitte erneut.",
     "rename": "Chat umbenennen",
     "enterNewName": "Gib einen neuen Titel für diesen Chat ein:",
     "renameNote": "Diese Änderung gilt nur für deine Ansicht. Der Widget-Nutzer sieht diesen Titel nicht.",
@@ -511,6 +587,40 @@
         "title": "Konfiguration aktualisiert — Neustart erforderlich",
         "message": "Ihre Änderungen wurden in der .env-Datei gespeichert. Damit die Änderungen wirksam werden, müssen Sie Ihre Docker-Container neu starten.",
         "copyCommand": "Befehl kopieren"
+      },
+      "m365": {
+        "title": "Damit diese Felder wirken: App in Azure registrieren",
+        "intro": "Die Microsoft-365-Anmeldung braucht eine App-Registrierung in Azure. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jede Person ihr eigenes Konto verbinden.",
+        "portalLink": "Azure-Portal → App-Registrierungen",
+        "step1": "Öffne {portal} und wähle „Neue Registrierung“. Der Name ist frei, zum Beispiel „Synaplan“.",
+        "step2": "Wähle unter „Umleitungs-URI“ den Plattformtyp Web (nicht SPA) und füge genau diese Adresse ein:",
+        "step3": "Gehe zu „API-Berechtigungen“ → „Berechtigung hinzufügen“ → „Microsoft Graph“ → „Delegierte Berechtigungen“ und füge alle diese hinzu:",
+        "step3Note": "offline_access ist Pflicht: Ohne diese Berechtigung stellt Microsoft kein Refresh-Token aus, und jeder geplante Lauf hört nach einer Stunde auf zu funktionieren.",
+        "step4": "Gehe zu „Zertifikate & Geheimnisse“ → „Neuer Geheimer Clientschlüssel“ und kopiere die Spalte Wert – nicht die Geheimnis-ID. Sie wird nur dieses eine Mal angezeigt.",
+        "step5": "Trage Client-ID und Secret unten ein, setze den Mandanten und schalte M365_ENABLED ein. Danach verbinden die Nutzer ihr eigenes Konto unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Microsoft-365-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte M365_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell."
+      },
+      "dropbox": {
+        "title": "Bevor diese Felder funktionieren: eine App in der Dropbox App Console anlegen",
+        "intro": "Die Dropbox-Verbindung braucht eine Dropbox-App. Das machst du einmal, es dauert etwa fünf Minuten, und danach kann jeder Nutzer sein eigenes Konto verbinden.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Öffne die {console} und wähle „Create app“. Wähle „Scoped access“ und „Full Dropbox“. Der Name ist egal, zum Beispiel „Synaplan“.",
+        "step2": "Aktiviere im Tab „Permissions“ diese beiden Berechtigungen und klicke auf „Submit“:",
+        "step3": "Füge im Tab „Settings“ unter „OAuth 2 → Redirect URIs“ genau diese Adresse hinzu:",
+        "step4": "Kopiere ebenfalls im Tab „Settings“ den App key und das App secret (auf „Show“ klicken).",
+        "step5": "Trage App key und Secret in die Felder unten ein und schalte DROPBOX_ENABLED ein. Nutzer verbinden ihr Konto dann unter Kanäle → Verbindungen.",
+        "ready": "Fertig eingerichtet – Nutzer können ihr Dropbox-Konto unter Kanäle → Verbindungen verbinden.",
+        "notReady": "Noch nicht aktiv. Fülle die Felder unten aus und schalte DROPBOX_ENABLED ein.",
+        "copyFailed": "Kopieren nicht möglich. Markiere den Text und kopiere ihn manuell.",
+        "resetTitle": "Alle Dropbox-Verbindungen zurücksetzen",
+        "resetDescription": "Entfernt die Dropbox-Verbindung aller Benutzer dieser Installation, einschließlich der gespeicherten Tokens. Sinnvoll, nachdem die Dropbox-App oder ihre Berechtigungen geändert wurden — danach kann sich jeder frisch neu verbinden.",
+        "resetButton": "Verbindungen zurücksetzen",
+        "resetConfirmTitle": "Alle Dropbox-Verbindungen zurücksetzen?",
+        "resetConfirmMessage": "Die Dropbox-Verbindung aller Benutzer wird entfernt, und jeder Benutzer muss sein Dropbox-Konto neu verbinden. Das kann nicht rückgängig gemacht werden.",
+        "resetDone": "Keine Dropbox-Verbindungen zu entfernen | 1 Dropbox-Verbindung entfernt | {count} Dropbox-Verbindungen entfernt",
+        "resetFailed": "Das Zurücksetzen ist fehlgeschlagen. Bitte erneut versuchen."
       }
     }
   },
@@ -530,6 +640,8 @@
     "toolsDocSummary": "Zusammenfasser",
     "toolsMailHandler": "E-Mail-Automatisierung",
     "mcpServers": "MCP-Server",
+    "connections": "Verbindungen",
+    "savedTasks": "Gespeicherte Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -552,6 +664,7 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature-Status",
+    "adminModelStatus": "Modell-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "adminProviderSetup": "KI-Anbieter",
     "more": "Mehr",
@@ -943,6 +1056,31 @@
       "API-Schlüssel, Widgets und Zugangsdaten"
     ],
     "retention": "Die Löschung ist endgültig und wirkt sofort. Backups mit verbliebenen Daten werden innerhalb von 30 Tagen rotiert. Gesetzlich aufbewahrungspflichtige Daten (z. B. Rechnungen) werden nur so lange aufbewahrt, wie es das Gesetz verlangt.",
+    "partialTitle": "Einzelne Daten löschen, ohne das Konto aufzugeben",
+    "partialIntro": "Du musst nicht dein ganzes Konto löschen, um Daten zu entfernen. Angemeldet kannst du Folgendes jederzeit selbst löschen – es wirkt sofort.",
+    "partialItems": [
+      {
+        "name": "Chats und Unterhaltungen",
+        "how": "Öffne den Verlauf, nutze das ⋯-Menü neben einer Unterhaltung und wähle Löschen. Mehrere auf einmal entfernst du unter Statistiken → Alle Chats: auswählen und „Ausgewählte löschen“."
+      },
+      {
+        "name": "Hochgeladene Dateien und Dokumente",
+        "how": "Öffne Quellen → Durchsuchen und nutze das Papierkorb-Symbol an einer Datei, oder wähle mehrere aus und lösche die Auswahl. Beim Löschen eines Ordners werden die enthaltenen Dateien mitgelöscht."
+      },
+      {
+        "name": "KI-generierte Bilder und Medien",
+        "how": "Öffne Quellen → Erzeugt und nutze das Papierkorb-Symbol am jeweiligen Eintrag."
+      },
+      {
+        "name": "Erinnerungen",
+        "how": "Öffne Erinnerungen und lösche einzelne Einträge oder mehrere gemeinsam."
+      },
+      {
+        "name": "Verbindungen, Chat-Widgets und API-Schlüssel",
+        "how": "Öffne Kanäle und entferne dort die Verbindung, das Widget oder den Schlüssel, den du nicht mehr brauchst."
+      }
+    ],
+    "partialRetention": "Gelöschte Inhalte verschwinden sofort aus deinem Konto. Backups mit verbliebenen Kopien werden innerhalb von 30 Tagen rotiert. Alles andere in deinem Konto bleibt unberührt.",
     "noAccessTitle": "Keine Anmeldung möglich?",
     "noAccessDesc": "Wenn du keinen Zugriff mehr auf dein Konto hast, kontaktiere uns über unsere Website und wir bearbeiten deine Löschanfrage.",
     "visitWebsite": "Website besuchen",
@@ -1143,6 +1281,9 @@
   },
   "taskPlan": {
     "title": "Aufgabenplan",
+    "showSteps": "Schritte anzeigen",
+    "hideSteps": "Schritte ausblenden",
+    "scheduleThis": "Das später nach Zeitplan wiederholen",
     "download": "Herunterladen",
     "failedBody": "Dieser Schritt konnte nicht abgeschlossen werden.",
     "cancelledBody": "Du hast diesen Schritt gestoppt.",
@@ -1166,7 +1307,8 @@
       "document": "Dokument",
       "search": "Websuche",
       "extract": "Textextraktion",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "folder": "Ordner"
     },
     "capability": {
       "extract_text": "Text wird extrahiert",
@@ -1184,7 +1326,8 @@
       "text2sound": "Audio",
       "document_generation": "Dokument",
       "calendar_event": "Kalendereinladung",
-      "email_me": "E-Mail-Versand"
+      "email_me": "E-Mail-Versand",
+      "save_to_folder": "Im Ordner speichern"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",
@@ -1296,7 +1439,32 @@
     },
     "cancelledByUser": "⚠️ Vom Benutzer abgebrochen",
     "truncated": "Diese Antwort wurde abgeschnitten, weil das Modell sein Token-Limit erreicht hat.",
-    "continueButton": "Antwort fortsetzen"
+    "continueButton": "Antwort fortsetzen",
+    "jsonViewer": {
+      "title": "Ergebnis",
+      "itemCount": "{count} Einträge",
+      "chats": "{count} Chats",
+      "items": "{count} Einträge",
+      "results": "{count} Ergebnisse",
+      "records": "{count} Datensätze",
+      "messages": "{count} Nachrichten",
+      "files": "{count} Dateien",
+      "documents": "{count} Dokumente",
+      "users": "{count} Benutzer",
+      "entries": "{count} Einträge",
+      "data": "{count} Einträge",
+      "empty": "Nichts anzuzeigen",
+      "showJson": "JSON anzeigen",
+      "hideJson": "JSON ausblenden",
+      "showMore": "{count} weitere anzeigen",
+      "showLess": "Weniger anzeigen",
+      "shownOf": "{shown} von {total} werden angezeigt",
+      "truncatedHint": "Das Ergebnis war zu lang und wurde abgeschnitten — der letzte Eintrag fehlt möglicherweise.",
+      "messagesCount": "{count} Nachrichten",
+      "idLabel": "ID {id}",
+      "expand": "Aufklappen",
+      "collapse": "Zuklappen"
+    }
   },
   "plugins": {
     "title": "Plugins",
@@ -1718,6 +1886,227 @@
       "expandAll": "Alle ausklappen",
       "collapseAll": "Alle einklappen"
     },
+    "savedTasks": {
+      "saveAsTask": "Als Aufgabe speichern",
+      "comingSoonTitle": "Gespeicherte Aufgabe",
+      "comingSoonBody": "Damit kannst du diese Anweisung nach einem Zeitplan oder über einen Kanal ausführen. Folgt in einem späteren Update.",
+      "emptyHint": "Eine gespeicherte Aufgabe führt diese Anweisung aus, wenn du sie startest — später auch nach Zeitplan.",
+      "title": "Gespeicherte Aufgabe",
+      "on": "An",
+      "off": "Aus",
+      "runNow": "Jetzt ausführen",
+      "runStarted": "Die Aufgabe läuft in einem eigenen Gespräch.",
+      "runFailed": "Die Ausführung konnte nicht abgeschlossen werden.",
+      "updateFailed": "Die gespeicherte Aufgabe konnte nicht aktualisiert werden.",
+      "runsFailed": "Ausführungen konnten nicht geladen werden.",
+      "scheduleSaved": "Zeitplan gespeichert.",
+      "resumed": "Die Aufgabe läuft wieder.",
+      "resume": "Fortsetzen",
+      "showResults": "Ergebnisse anzeigen",
+      "viewRuns": "Verlauf",
+      "hideRuns": "Verlauf ausblenden",
+      "runsRetention": "Ältere Ausführungen werden automatisch entfernt.",
+      "runsEmpty": "Noch keine Ausführungen.",
+      "runStatus": {
+        "queued": "Wartet",
+        "running": "Läuft",
+        "completed": "Abgeschlossen",
+        "failed": "Fehlgeschlagen",
+        "cancelled": "Abgebrochen"
+      },
+      "runTrigger": {
+        "manual": "von dir gestartet",
+        "schedule": "per Zeitplan",
+        "chat": "aus dem Chat",
+        "inbound_email": "eingehende E-Mail"
+      },
+      "advancedSteps": "Erweiterte Schritte",
+      "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
+      "autoPauseTitle": "Automatisch pausiert",
+      "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
+      "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
+      "created": "Als Aufgabe gespeichert. Du kannst sie jetzt ausführen.",
+      "overviewTitle": "Gespeicherte Aufgaben",
+      "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
+      "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
+      "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
+      "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
+      "scheduleThis": "Später erneut ausführen",
+      "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
+      "scheduledFromChat": "Gespeichert. Lege fest, wann sie laufen soll.",
+      "state": {
+        "off": "Läuft nicht",
+        "neverRun": "Gespeichert — noch nicht ausgeführt",
+        "scheduled": "Geplant — erste Ausführung {when}",
+        "running": "Läuft gerade",
+        "lastRun": "Letzte Ausführung: {when}",
+        "autoPaused": "Automatisch pausiert"
+      },
+      "schedule": {
+        "off": "Kein Zeitplan",
+        "hourly": "Jede Stunde",
+        "daily": "Jeden Tag",
+        "weekdays": "Jeden Werktag"
+      },
+      "summary": {
+        "simple": "Läuft {when}.",
+        "template": "Läuft {when}. Liest {reads} und liefert {saves}.",
+        "when": {
+          "manual": "wenn du sie startest",
+          "interval": "alle {minutes} Minuten",
+          "daily": "täglich um {at} ({tz})",
+          "weekly": "an Werktagen um {at} ({tz})",
+          "schedule": "nach Zeitplan",
+          "inboundEmail": "wenn neue E-Mails eintreffen",
+          "chat": "wenn eine passende Chat-Nachricht eintrifft"
+        },
+        "reads": {
+          "instruction": "diese Anweisung",
+          "mailbox": "das verbundene Postfach"
+        },
+        "saves": {
+          "email": "eine E-Mail an dich",
+          "folder": "eine Datei im verbundenen Ordner",
+          "calendar": "einen Kalendereintrag",
+          "reply": "eine Antwort im Chat"
+        }
+      }
+    },
+    "connections": {
+      "title": "Verbindungen",
+      "subtitle": "Die externen Systeme, aus denen Synaplan für dich lesen und in die es schreiben darf.",
+      "empty": "Noch nichts verbunden. Wähle unten eine Option – das dauert etwa eine Minute.",
+      "loading": "Verbindungen werden geladen…",
+      "loadFailed": "Verbindungen konnten nicht geladen werden.",
+      "test": "Verbindung testen",
+      "testOk": "Die Verbindung sieht gut aus.",
+      "testFailed": "Der Verbindungstest ist fehlgeschlagen.",
+      "status": {
+        "connected": "Verbunden",
+        "error": "Fehler",
+        "reauth_required": "Neu verbinden erforderlich",
+        "never_tested": "Noch nicht getestet",
+        "disconnected": "Getrennt"
+      },
+      "types": {
+        "mailbox": "Postfach",
+        "mcp": "Verbundenes System",
+        "webdav": "Ordner",
+        "webhook": "Aufruf-Adresse",
+        "caldav": "Kalender",
+        "generic": "Verbindung",
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
+      },
+      "failure": {
+        "unauthorized": "{connection} hat die Anmeldung abgelehnt. Verbinde es erneut, um fortzufahren.",
+        "not_found": "Der Ordner {target} existiert in {connection} nicht mehr.",
+        "quota_exceeded": "{connection} hat keinen Speicherplatz mehr.",
+        "too_large": "Die Datei ist größer, als {connection} akzeptiert.",
+        "unreachable": "{connection} war nicht erreichbar. Synaplan versucht es beim nächsten Lauf erneut.",
+        "conflict": "Eine Datei mit diesem Namen existiert bereits; gespeichert als {newName}.",
+        "rate_limited": "Dein Nutzungslimit wurde erreicht, daher wurde dieser Lauf übersprungen.",
+        "unsupported": "Dieser Dateityp kann nicht an {connection} übergeben werden."
+      },
+      "explainer": "Richte ein System hier einmal ein. Gespeicherte Aufgaben und die KI können es danach nutzen – zum Beispiel, um deine neuesten Outlook-Mails zu lesen. Dein Passwort wird nie gespeichert: Microsoft 365 fragt dich nach der Anmeldung und gibt Synaplan ein Token, das du jederzeit zurückziehen kannst.",
+      "yourConnections": "Deine Verbindungen",
+      "addTitle": "Verbindung hinzufügen",
+      "addSubtitle": "Was die einzelnen Optionen tun und wohin sie dich führen.",
+      "lastChecked": "geprüft {when}",
+      "reauthHint": "Microsoft akzeptiert die gespeicherte Anmeldung nicht mehr. Verbinde neu, damit geplante Aufgaben wieder laufen.",
+      "reconnect": "Neu verbinden",
+      "testing": "Wird getestet…",
+      "testOkAccount": "Verbindung funktioniert – angemeldet als {account}.",
+      "manage": "Verwalten",
+      "editName": "Bezeichnung",
+      "keepPassword": "Leer lassen, um das aktuelle App-Passwort zu behalten.",
+      "updated": "Verbindung aktualisiert.",
+      "updateFailed": "Die Verbindung konnte nicht aktualisiert werden.",
+      "deleteTitle": "Diese Verbindung entfernen?",
+      "deleteMessage": "Synaplan verwendet {name} danach nicht mehr. Dateien, die schon dort liegen, bleiben erhalten.",
+      "deleteConfirm": "Entfernen",
+      "deleted": "{name} wurde entfernt.",
+      "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
+      "channelHint": "Im Chat heißt dieser Kanal {channel}",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Melde dich mit deinem geschäftlichen oder privaten Microsoft-Konto an, damit Synaplan deine Outlook-Mails lesen kann. Nur lesend, und du kannst die Verbindung jederzeit trennen.",
+          "connect": "Microsoft 365 verbinden",
+          "connectAnother": "Weiteres Konto verbinden",
+          "connectedAs": "Verbunden als {account}.",
+          "connecting": "Microsoft wird geöffnet…",
+          "connected": "Microsoft 365 ist verbunden.",
+          "startFailed": "Die Microsoft-Anmeldeseite konnte nicht geöffnet werden. Bitte versuche es erneut.",
+          "unavailable": "Noch nicht verfügbar – Microsoft 365 muss für diese Installation einmalig eingerichtet werden.",
+          "adminLink": "In den Systemeinstellungen einrichten.",
+          "askAdmin": "Bitte eine Administratorin oder einen Administrator, es zu aktivieren.",
+          "errors": {
+            "access_denied": "Du hast die Microsoft-Anmeldung abgebrochen, es wurde nichts verbunden.",
+            "missing_code": "Microsoft hat eine unvollständige Antwort geschickt. Bitte starte die Verbindung erneut.",
+            "exchange_failed": "Microsoft hat die Anmeldung akzeptiert, aber das Token konnte nicht abgeholt werden. Prüfe den Client Secret in den Systemeinstellungen und versuche es erneut.",
+            "invalid_state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es erneut.",
+            "unknown": "Microsoft 365 konnte nicht verbunden werden. Bitte versuche es erneut."
+          },
+          "hosting": "Deine Mails bleiben bei Microsoft, einem Cloud-Anbieter mit Sitz in den USA."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Melde dich mit deinem Dropbox-Konto an, damit Synaplan erzeugte Dateien in einem Dropbox-Ordner ablegen kann – zum Beispiel „erstelle ein Dokument und lege es in meine Dropbox“. Du kannst die Verbindung jederzeit trennen.",
+          "connect": "Dropbox verbinden",
+          "connectAnother": "Weiteres Konto verbinden",
+          "connectedAs": "Verbunden als {account}.",
+          "connecting": "Dropbox wird geöffnet…",
+          "connected": "Dropbox ist verbunden.",
+          "startFailed": "Die Dropbox-Anmeldeseite konnte nicht geöffnet werden. Bitte versuche es erneut.",
+          "unavailable": "Noch nicht verfügbar – Dropbox muss für diese Installation einmalig eingerichtet werden.",
+          "adminLink": "In den Systemeinstellungen einrichten.",
+          "askAdmin": "Bitte einen Administrator, es zu aktivieren.",
+          "errors": {
+            "access_denied": "Du hast die Dropbox-Anmeldung abgebrochen, es wurde nichts verbunden.",
+            "missing_code": "Dropbox hat eine unvollständige Antwort gesendet. Bitte starte die Verbindung erneut.",
+            "exchange_failed": "Dropbox hat die Anmeldung akzeptiert, aber das Token konnte nicht abgeholt werden. Prüfe das App-Secret in den Systemeinstellungen und versuche es erneut.",
+            "invalid_state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Tab gestartet. Bitte versuche es erneut.",
+            "unknown": "Dropbox konnte nicht verbunden werden. Bitte versuche es erneut."
+          },
+          "hosting": "Deine Dateien bleiben bei Dropbox, einem Cloud-Anbieter mit Sitz in den USA."
+        },
+        "mailbox": {
+          "name": "Postfach (IMAP)",
+          "description": "Jedes Postfach mit IMAP, per Benutzername und Passwort – zum Beispiel ein Gmail-Konto mit App-Passwort oder dein eigener Mailserver.",
+          "action": "Postfach einrichten"
+        },
+        "mcp": {
+          "name": "Verbundenes System (MCP)",
+          "description": "Gib der KI Werkzeuge von einem externen MCP-Server, etwa einem Ticketsystem oder deinem eigenen Dienst.",
+          "action": "System hinzufügen"
+        },
+        "dav": {
+          "name": "Nextcloud-Ordner & -Kalender (WebDAV)",
+          "description": "Speichert Aufgaben-Ergebnisse in deinem Cloud-Ordner und trägt Termine in deinen Kalender ein. Funktioniert mit Nextcloud, ownCloud und jedem WebDAV-Server.",
+          "hosting": "Verbindet sich mit einem Server deiner Wahl — deine Dateien bleiben in deiner eigenen Cloud.",
+          "action": "Verbinden",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Andere WebDAV-Adresse"
+          },
+          "serverUrl": "Server-Adresse",
+          "davUrl": "WebDAV-Adresse (vollständige URL)",
+          "username": "Benutzername",
+          "appPassword": "App-Passwort",
+          "appPasswordHint": "Erstelle eines in Nextcloud unter Einstellungen → Sicherheit → Geräte & Sitzungen. Dein Konto-Passwort wird nie gespeichert.",
+          "localHttpHint": "Auf dieser Entwicklungsinstallation kannst du auch eine lokale Adresse wie http://nextcloud verwenden.",
+          "folder": "Ordner für Ergebnisse",
+          "withCalendar": "Auch einen Kalender verbinden:",
+          "connect": "Verbinden",
+          "connecting": "Verbinde…",
+          "created": "{name} ist verbunden.",
+          "createFailed": "Die Verbindung konnte nicht erstellt werden. Prüfe die Adresse und versuche es erneut.",
+          "folderName": "{host}-Ordner ({user})",
+          "calendarName": "{host}-Kalender ({calendar})"
+        }
+      }
+    },
     "routing": {
       "title": "Routing",
       "flowBody": "Wenn eine Nachricht eintrifft, liest der Planer sie und zerlegt sie in eine kleine Reihe von Aufgaben (zum Beispiel: ein Bild erzeugen und es dann als Audio zusammenfassen). Jede Aufgabe wird von der passenden Fähigkeit bearbeitet und die Ergebnisse werden zu einer Antwort zusammengeführt.",
@@ -2134,7 +2523,7 @@
       "reminder": "Hol mehr aus {brand} heraus"
     },
     "subtitle": {
-      "guest_limit": "Wähle einen Tarif und chatte weiter – mit eigenem Verlauf, Erinnerungen und Dateien.",
+      "guest_limit": "Wähle einen Tarif und chatte weiter. Mit einem Account bekommst du ab dann eigenen Verlauf, Erinnerungen und Dateien.",
       "free_limit": "Dein Gratis-Kontingent ist verbraucht. Wähle einen Tarif und chatte ohne Limit weiter.",
       "quota_exhausted": "Wechsle in einen größeren Tarif und mach sofort weiter, oder warte bis dein Kontingent nächsten Monat zurückgesetzt wird.",
       "reminder": "Mit einem Tarif bekommst du mehr Nachrichten, stärkere KI-Modelle und mehr Speicher."
@@ -2348,10 +2737,12 @@
     }
   },
   "setupBanner": {
-    "title": "Kein KI-Anbieter verbunden",
-    "adminText": "Der Chat braucht einen KI-Anbieter. Verbinde einen in einer Minute — kostenlose Optionen verfügbar.",
-    "userText": "Der Chat ist noch nicht bereit. Bitte deinen Administrator, einen KI-Anbieter zu verbinden.",
-    "cta": "KI-Anbieter einrichten"
+    "adminTitle": "Kein KI-Anbieter eingerichtet",
+    "userTitle": "Der Chat ist noch nicht bereit",
+    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert.",
+    "userText": "Ein Administrator muss noch einen KI-Anbieter verbinden. In der Dokumentation steht, wie das geht.",
+    "cta": "KI-Anbieter einrichten",
+    "docsCta": "Dokumentation öffnen"
   },
   "localAiDownload": {
     "waitingTitle": "Lokale KI startet",
@@ -2692,7 +3083,15 @@
     },
     "generated": {
       "title": "Erzeugt",
-      "subtitle": "Bilder, Video und Audio aus deinen Chats.",
+      "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",
+      "kinds": {
+        "all": "Alle",
+        "image": "Bilder",
+        "video": "Videos",
+        "audio": "Audio",
+        "document": "Dokumente",
+        "calendar": "Kalender"
+      },
       "openInChat": "Im Chat öffnen",
       "download": "Herunterladen",
       "autoGroup": "KI wählt einen Ordner",
@@ -4311,8 +4710,10 @@
     },
     "errorTitle": "Testmodus derzeit nicht verfügbar",
     "errorDescription": "Deine Gastsitzung konnte nicht gestartet werden. Bitte versuche es erneut oder erstelle einen kostenlosen Account.",
+    "disabledTitle": "Gast-Chat nicht verfügbar",
+    "disabledDescription": "Diese Instanz bietet keinen anonymen Testzugang. Bitte melde dich an, um zu chatten.",
     "expiredTitle": "Deine Sitzung ist abgelaufen",
-    "expiredDescription": "Gastsitzungen sind 24 Stunden gültig. Starte einen neuen Test oder erstelle einen kostenlosen Account, um deinen Chatverlauf zu behalten.",
+    "expiredDescription": "Gastsitzungen sind 24 Stunden gültig, und dieses Testgespräch lässt sich nicht wiederherstellen. Starte einen neuen Test oder erstelle einen kostenlosen Account, damit deine Chats ab dann gespeichert werden.",
     "rateLimitedTitle": "Zu viele Sitzungen",
     "rateLimitedDescription": "Du hast das Sitzungslimit erreicht. Bitte versuche es später erneut oder erstelle einen kostenlosen Account.",
     "retry": "Erneut versuchen",
@@ -4457,14 +4858,25 @@
   },
   "mcpServers": {
     "title": "MCP-Server",
-    "description": "Verbinde externe MCP-Server, damit der Assistent beim Antworten Daten aus deinen eigenen Systemen (CRM, Wiki, interne APIs) abrufen kann. Die hier entdeckten Tools stehen dem Task-Planner zur Verfügung.",
-    "clientDisabledHint": "Der ausgehende MCP-Client ist derzeit in der Plattformkonfiguration deaktiviert. Verbindungen können vorbereitet werden, es werden aber keine Aufrufe ausgeführt, bis er aktiviert ist.",
+    "description": "Verbinde jeden MCP-fähigen Tool-Server — ein CRM, Wiki, Ticketsystem, eine Automatisierungsplattform oder einen Dienst, den du selbst hostest. Die entdeckten Tools stehen dem Task-Planner zur Verfügung.",
+    "clientOnTitle": "MCP-Aufrufe sind an",
+    "clientOnText": "Der Assistent kann verbundene Server in jeder Aufgabe nutzen, die MCP-Datenquellen erlaubt.",
+    "clientOffTitle": "MCP-Aufrufe sind aus",
+    "clientOffAdminText": "Gespeicherte Server bleiben erhalten, aber der Assistent ruft sie nicht auf, bis du das für diese Installation einschaltest.",
+    "clientOffUserText": "Ein Administrator muss das für diese Installation einschalten. Gespeicherte Server bleiben bis dahin erhalten.",
+    "clientAdminLink": "In der Systemkonfiguration öffnen",
+    "clientEnable": "MCP-Aufrufe einschalten",
+    "clientToggle": "MCP-Aufrufe erlauben",
+    "clientEnabledNotice": "Der Assistent kann verbundene MCP-Server jetzt aufrufen",
+    "clientDisabledNotice": "MCP-Aufrufe sind aus — gespeicherte Server bleiben erhalten",
+    "clientUpdateFailed": "Die MCP-Einstellung konnte nicht aktualisiert werden",
     "listTitle": "Verbundene Server",
     "add": "Server hinzufügen",
     "addTitle": "Neuen Server verbinden",
     "editTitle": "Server bearbeiten",
     "formHint": "Die URL muss ein öffentlicher HTTPS-MCP-Endpunkt (Streamable HTTP) sein. Der Auth-Wert wird verschlüsselt gespeichert und nie wieder angezeigt.",
     "empty": "Noch keine MCP-Server verbunden.",
+    "emptyHint": "Starte mit einem leeren Formular oder wähle ein bekanntes System, um Name und Vorgaben vorauszufüllen. Die Wahl kannst du jederzeit ändern oder wieder aufheben.",
     "nameLabel": "Name",
     "urlLabel": "Server-URL",
     "authHeaderLabel": "Auth-Header-Name (optional)",
@@ -4494,7 +4906,40 @@
     "usageDisabled": "MCP-Datenquellen für diese Aufgabe deaktiviert",
     "usageUpdateFailed": "Aufgabe konnte nicht aktualisiert werden",
     "usageAdvancedHint": "Weitere Optionen pro Aufgabe (Server-Einschränkungen, Anweisungen, Modelle):",
-    "usageAdvancedLink": "KI-Anweisungen"
+    "usageAdvancedLink": "KI-Anweisungen",
+    "templatesLabel": "Starten mit",
+    "templatesHint": "Benutzerdefiniert ist die Vorgabe für jeden MCP-Server. Eine Vorlage füllt nur das Formular voraus — klicke die ausgewählte Karte erneut, um sie zu löschen.",
+    "templatesClear": "Ausgewählt — erneut klicken zum Aufheben",
+    "templates": {
+      "custom": {
+        "name": "Eigener Server",
+        "summary": "Beliebiger MCP-Endpunkt",
+        "hint": "Füge die HTTPS-URL eines beliebigen Streamable-HTTP-MCP-Servers ein und bei Bedarf ein Zugriffstoken. CRM, Wiki, Tickets, Automatisierung — spricht es MCP, funktioniert es hier."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Tickets und Vorgänge",
+        "hint": "Verbinde einen Jira-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Tickets auflisten und neue per Prompt anlegen."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki-Seiten",
+        "hint": "Verbinde einen Confluence-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Seiten durchsuchen, Zusammenfassungen holen und neue Seiten per Prompt anlegen."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Repos, Issues, Pull Requests",
+        "hint": "Verbinde einen GitHub-fähigen MCP-Server und trage dessen Endpunkt-URL und ein persönliches Zugriffstoken ein. Nützlich für Issues, Pull Requests und die Repository-Suche."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Automatisierungs-Workflows",
+        "hint": "Verbinde einen n8n-MCP-Server, damit der Assistent deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
+      }
+    },
+    "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
+    "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
+    "writeBadge": "Schreiben erlaubt"
   },
   "messagesGateway": {
     "title": "KI-Agenten",

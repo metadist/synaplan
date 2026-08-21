@@ -30,7 +30,7 @@
     <div class="w-full max-w-md" data-testid="section-card">
       <div class="text-center mb-8" data-testid="section-header">
         <router-link to="/login" class="inline-block">
-          <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+          <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
         </router-link>
         <h1 class="text-3xl font-bold txt-primary mb-2">{{ $t('auth.forgotPassword') }}</h1>
         <p class="txt-secondary">{{ $t('auth.forgotPasswordDesc') }}</p>
@@ -154,22 +154,15 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon, ArrowLeftIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '@/composables/useTheme'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
 import Button from '@/components/Button.vue'
 
 const { locale, t } = useI18n()
 const themeStore = useTheme()
-
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoSrc = computed(() => {
-  const baseUrl = import.meta.env.BASE_URL || '/'
-  return `${baseUrl}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-})
+const config = useConfigStore()
+const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const emailPlaceholder = computed(() => {
   // Combine prefix and suffix with @ to avoid vue-i18n interpreting @ as linked message syntax

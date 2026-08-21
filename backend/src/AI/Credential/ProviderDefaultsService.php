@@ -35,15 +35,32 @@ final readonly class ProviderDefaultsService
      * @var array<string, array<string, string>>
      */
     private const PROVIDER_DEFAULTS = [
+        // gpt-oss-120b for every text tier, main and fast alike. Groq classes it
+        // as a **Production** model, while `qwen/qwen3.6-27b` — the previous
+        // MAIN pick — is **Preview**, which Groq documents as "should not be
+        // used in production environments as they may be discontinued at short
+        // notice". A recommended default is precisely the binding an operator
+        // does not watch, so it should not sit on a model that can vanish. It is
+        // also the cheaper and (per the catalog's own quality score) stronger
+        // row: $0.15/$0.60 vs $0.60/$3.00 per 1M tokens, quality 10 vs 9.
         'groq' => [
-            'CHAT' => 'groq:llama-3.3-70b-versatile:chat',
-            'TOOLS' => 'groq:llama-3.3-70b-versatile:chat',
-            'ANALYZE' => 'groq:llama-3.3-70b-versatile:chat',
+            'CHAT' => 'groq:openai/gpt-oss-120b:chat',
+            'TOOLS' => 'groq:openai/gpt-oss-120b:chat',
+            'ANALYZE' => 'groq:openai/gpt-oss-120b:chat',
             'SORT' => 'groq:openai/gpt-oss-120b:chat',
             'PLAN' => 'groq:openai/gpt-oss-120b:chat',
             'SUMMARIZE' => 'groq:openai/gpt-oss-120b:chat',
             'MEM' => 'groq:openai/gpt-oss-120b:mem',
-            'PIC2TEXT' => 'groq:meta-llama/llama-4-scout-17b-16e-instruct:pic2text',
+            // The one unavoidable Preview binding: qwen3.6-27b is the only
+            // Groq model that accepts images at all (the gpt-oss rows are
+            // text-only). Leaving PIC2TEXT unbound would be worse — it would
+            // fall through to whatever the install had, which on a Groq-only
+            // setup is nothing.
+            'PIC2TEXT' => 'groq:qwen/qwen3.6-27b:pic2text',
+            // whisper-large-v3, not the cheaper -turbo ($0.111 vs $0.04 per
+            // hour): Synaplan ships four UI locales and large-v3 is the more
+            // accurate multilingual transcriber. Turbo stays selectable for
+            // operators who would rather have the cheaper run.
             'SOUND2TEXT' => 'groq:whisper-large-v3:sound2text',
         ],
         'openai' => [
@@ -113,7 +130,12 @@ final readonly class ProviderDefaultsService
             'PLAN' => 'xai:grok-4.5:chat',
             'SUMMARIZE' => 'xai:grok-4.5:chat',
             'PIC2TEXT' => 'xai:grok-4.5:pic2text',
-            'SOUND2TEXT' => 'xai:grok-stt:sound2text',
+            // No SOUND2TEXT recommendation: xAI retired grok-stt and offers no
+            // replacement, and there is no cross-provider substitute to
+            // recommend here — a key the operator may not hold cannot be a
+            // default. Without the entry the capability keeps whatever it was
+            // bound to instead of being rebound to a dead model on every
+            // container start by `app:provider:apply-defaults --auto` (#1514).
         ],
         // Local Ollama — last resort when a chat-capable model is already present.
         // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.

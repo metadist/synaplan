@@ -32,7 +32,7 @@ class ModelEnableCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->once())->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile']]);
+        $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 1 model(s)', $this->commandTester->getDisplay());
@@ -43,7 +43,7 @@ class ModelEnableCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->exactly(2))->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile', 'ollama:bge-m3']]);
+        $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat', 'ollama:bge-m3']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 2 model(s)', $this->commandTester->getDisplay());
@@ -77,7 +77,7 @@ class ModelEnableCommandTest extends TestCase
         // @phpstan-ignore-next-line
         $this->connection->expects($this->once())->method('executeStatement');
 
-        $this->commandTester->execute(['models' => ['groq:llama-3.3-70b-versatile', 'fake:nope']]);
+        $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat', 'fake:nope']]);
 
         $this->assertSame(Command::FAILURE, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();

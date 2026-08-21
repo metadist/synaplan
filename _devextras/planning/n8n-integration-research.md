@@ -5,6 +5,11 @@
 > where (and how) an integration makes sense, ordered from "works today, zero
 > code" to "needs a small backend feature".
 >
+> **Product decision (2026-08-14):** Saved Tasks / authored DAGs will **interface
+> with n8n, not embed it.** See
+> [`saved-task-workflows/00_master_plan.md`](./saved-task-workflows/00_master_plan.md)
+> §4 and Sprint 4. This research remains the connector map for that interface.
+>
 > **Scope of the codebase reviewed:** `backend/src/Controller/*`,
 > `backend/src/Mcp/McpServerFactory.php`, `backend/src/Security/*`,
 > `backend/config/packages/security.yaml`, `docs/OPENAI_COMPATIBLE_API.md`.

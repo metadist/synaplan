@@ -44,6 +44,10 @@ x-app-environment: &app-environment
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
   BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE: "${BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE:-false}"
+  # Auth-surface switches (issues #462 / #1517). Empty keeps the default
+  # (enabled); SSO-/OIDC-only deployments set both to "false".
+  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
+  GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   DB_HOST: db
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"
@@ -277,7 +281,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
+    image: ollama/ollama:latest@sha256:9d30908e41144b1f1da89b9d8e33c07e4aeb43ff41a8660241b1686e2cc330ad
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

@@ -108,4 +108,64 @@ class JwtValidatorTest extends TestCase
 
         $this->assertNull($result);
     }
+
+    /**
+     * Claim validation is reached only after a successful signature check, so
+     * exercise it directly rather than minting a signed token per case.
+     *
+     * @param array<string, mixed> $claims
+     *
+     * @return array<string, mixed> the context of the last warning logged
+     */
+    private function validateClaims(array $claims, string $expectedAudience): array
+    {
+        $context = [];
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(
+            function (string $message, array $ctx = []) use (&$context): void {
+                $context = $ctx;
+            }
+        );
+
+        $validator = new JwtValidator(
+            $this->createMock(HttpClientInterface::class),
+            new ArrayAdapter(),
+            $logger
+        );
+
+        $method = new \ReflectionMethod($validator, 'validateClaims');
+        $passed = $method->invoke($validator, $claims, 'https://idp.example.com', $expectedAudience);
+
+        $this->assertFalse($passed, 'These cases are all audience mismatches');
+
+        return $context;
+    }
+
+    /**
+     * Keycloak issues aud=account when the client has no hardcoded audience
+     * mapper. That is the usual cause of the mismatch and cost real log-diving
+     * to find (#1520), so the warning has to name it.
+     */
+    public function testAudienceMismatchOnAccountNamesTheMissingAudienceMapper(): void
+    {
+        $context = $this->validateClaims(
+            ['iss' => 'https://idp.example.com', 'aud' => 'account'],
+            'synaplan-app'
+        );
+
+        $this->assertArrayHasKey('hint', $context);
+        $this->assertStringContainsString('audience mapper', $context['hint']);
+        $this->assertStringContainsString('synaplan-app', $context['hint']);
+    }
+
+    public function testUnrelatedAudienceMismatchGetsNoMisleadingHint(): void
+    {
+        $context = $this->validateClaims(
+            ['iss' => 'https://idp.example.com', 'aud' => 'some-other-client'],
+            'synaplan-app'
+        );
+
+        $this->assertArrayNotHasKey('hint', $context);
+        $this->assertSame('synaplan-app', $context['expected']);
+    }
 }

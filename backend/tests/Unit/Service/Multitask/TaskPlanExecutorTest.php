@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\Entity\Message;
+use App\Repository\ConfigRepository;
+use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRepository;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\ClassificationPlanMapper;
@@ -16,6 +19,9 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanResult;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
+use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
+use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
+use App\Service\SavedTask\SavedTaskConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -478,6 +484,125 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame('document', $result['metadata']['file']['type']);
     }
 
+    public function testSavedTaskRunPlansAndRunsTheDag(): void
+    {
+        // Regression: Saved Task runs (source=saved_task) pin their prompt and
+        // skip the sorter, but the stored instruction is a full user turn.
+        // Before the fix the source check rejected them, so "make an image of a
+        // cat and save it to Nextcloud" reran as a plain chat answer — nothing
+        // was generated, nothing was saved.
+        $multiNode = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'inputs' => ['prompt' => 'a cat']],
+                ['id' => 'n2', 'capability' => 'save_to_folder', 'depends_on' => ['n1'], 'inputs' => ['attachments' => ['$n1.file']], 'params' => ['channel' => 'nextcloud']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['attachments' => ['$n1.file']]],
+            ],
+        ]);
+        $this->planner->expects(self::once())->method('plan')
+            ->willReturn(new TaskPlanResult($multiNode, fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Bild gespeichert.',
+            'files' => [['path' => '/api/v1/files/uploads/cat.png', 'type' => 'image']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done', 'n3' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'saved-123', 'language' => 'en', 'source' => 'saved_task'],
+        );
+
+        self::assertSame('Bild gespeichert.', $result['content']);
+        self::assertSame('image', $result['metadata']['file']['type']);
+    }
+
+    public function testSavedTaskSingleStepInstructionDelegatesToLegacyRouter(): void
+    {
+        // A simple stored instruction ("summarize the news") yields a
+        // single-node plan → the proven legacy router answers, no DAG.
+        $this->planner->expects(self::once())->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->dagExecutor->expects(self::never())->method('execute');
+        $this->router->expects(self::once())->method('route')->willReturn(['content' => 'router answer']);
+
+        $result = $this->executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'saved-123', 'language' => 'en', 'source' => 'saved_task'],
+        );
+
+        self::assertSame('router answer', $result['content']);
+    }
+
+    public function testSavedTaskRunExecutesItsAuthoredStepsRegardlessOfTriggerType(): void
+    {
+        // A task with authored "Advanced steps" must run EXACTLY those steps on
+        // every run — manual, schedule, or inbound email. The chat-trigger-only
+        // lookup used for chat turns would miss it and hand the instruction to
+        // the free-form planner, which may plan different steps.
+        $prompt = $this->createMock(\App\Entity\Prompt::class);
+        $prompt->method('getId')->willReturn(4);
+
+        $task = new \App\Entity\SavedTask(9, 4, 'Wochenreport');
+        $task->setTrigger(\App\Entity\SavedTask::TRIGGER_SCHEDULE, ['kind' => 'interval', 'every_minutes' => 60]);
+        $task->setGraph([
+            'version' => 1,
+            'trigger' => ['type' => 'schedule'],
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'image_generation', 'params' => ['prompt' => 'a cat']],
+                ['id' => 'n2', 'capability' => 'save_to_folder', 'depends_on' => ['n1'], 'params' => ['channel' => 'nextcloud']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'params' => []],
+            ],
+        ]);
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('true');
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->expects(self::once())->method('findByTopicAndUser')->with('saved-4', 9)->willReturn($prompt);
+
+        $savedTasks = $this->createMock(SavedTaskRepository::class);
+        $savedTasks->expects(self::once())->method('findEnabledGraphTaskForPrompt')->with(4, 9)->willReturn($task);
+        $savedTasks->expects(self::never())->method('findEnabledChatTaskForPrompt');
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($configRepo),
+            $savedTasks,
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        // The pinned graph is used verbatim: no planner round-trip, DAG runs.
+        $this->planner->expects(self::never())->method('plan');
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Report gespeichert.',
+            'files' => [['path' => '/api/v1/files/uploads/cat.png', 'type' => 'image']],
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done', 'n3' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'saved-4', 'language' => 'en', 'source' => 'saved_task'],
+        );
+
+        self::assertSame('Report gespeichert.', $result['content']);
+        self::assertSame('image', $result['metadata']['file']['type']);
+    }
+
     public function testSorterVoteOfASingleStepSkipsThePlanner(): void
     {
         // The whole point of the vote: on a one-step turn the planner
@@ -591,6 +716,46 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertNotContains('planning', $statuses);
+    }
+
+    public function testAnonymousMessageSkipsSavedTaskLookupInsteadOfFatalling(): void
+    {
+        // Regression: WhatsApp senders without an account have no effective
+        // user id. The Saved-Task short-circuit must bail out instead of
+        // passing null into PromptRepository::findByTopicAndUser(int) — that
+        // TypeError 500'd every inbound WhatsApp webhook.
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->expects(self::never())->method('findByTopicAndUser');
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(null);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($this->createMock(ConfigRepository::class)),
+            $this->createMock(SavedTaskRepository::class),
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->planner->method('plan')
+            ->willReturn(new TaskPlanResult(TaskPlan::singleChatPlan('en'), fallback: false, modelId: 76));
+        $this->router->expects(self::once())->method('routeStream')->willReturn(['content' => 'router answer']);
+
+        $result = $executor->executeStream(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'multi_step' => true],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'router answer'], $result);
     }
 
     public function testPlannerCallIsRecordedAsItsOwnPerfPhase(): void

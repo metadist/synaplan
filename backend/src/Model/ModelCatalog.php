@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  * To target a specific variant, append the tag: "service:providerId:tag"
  *
  * Usage:
- *   ModelCatalog::find('groq:llama-3.3-70b-versatile')  → [model]
+ *   ModelCatalog::find('groq:openai/gpt-oss-20b')        → [model]
  *   ModelCatalog::find('openai:gpt-4o')                  → [chat, pic2text]
  *   ModelCatalog::find('openai:gpt-4o:chat')             → [chat only]
  */
@@ -55,6 +55,243 @@ class ModelCatalog
     public const FINGERPRINT_KEY = '__catalog_fingerprint';
 
     /**
+     * Every model this catalog has ever retired, keyed by its BID.
+     *
+     * A provider shutdown used to mean writing a migration by hand, and three of
+     * the five such migrations existed only to clean up rows that an earlier
+     * release had dropped from the catalog without deactivating them — left
+     * active, selectable and billable in every existing install (#1515). This
+     * registry replaces that: adding an entry here is the whole retirement, and
+     * ModelRetirementSeeder applies it on the next deploy, repeatedly and
+     * safely.
+     *
+     * Entries are permanent. They are what lets the codebase answer "is this
+     * stored BID dead, and what replaced it?" long after the row itself stopped
+     * being interesting, and what lets ModelCatalogRetirementTest fail a release
+     * that drops a model without recording one.
+     *
+     * Fields:
+     *   providerId — the upstream API model id the BID stood for. Required, and
+     *                always known: it comes from the catalog entry being
+     *                removed. Used as a guard so a BID an operator repurposed
+     *                for a different model is never marked dead.
+     *   retiredOn  — the date the retirement shipped (YYYY-MM-DD).
+     *   successor  — catalog key ("service:providerId:tag") of the replacement,
+     *                or null when the provider offers none. Null is a
+     *                deliberate statement, not a missing value: it means an
+     *                implicit binding must report unavailability rather than be
+     *                repointed.
+     *   reason     — why it went away, for the operator reading the log.
+     *
+     * @var array<int, array{providerId: string, retiredOn: string, successor: string|null, reason: string}>
+     */
+    private const RETIREMENTS = [
+        // --- 2026-04-29 (Version20260429120000) ---
+        193 => [
+            'providerId' => 'gpt-5.3',
+            'retiredOn' => '2026-04-29',
+            'successor' => 'openai:gpt-5.4:chat',
+            'reason' => 'Superseded by GPT-5.4.',
+        ],
+        194 => [
+            'providerId' => 'gpt-5.3',
+            'retiredOn' => '2026-04-29',
+            'successor' => 'openai:gpt-5.4:pic2text',
+            'reason' => 'Superseded by GPT-5.4.',
+        ],
+
+        // --- 2026-05-08 (Version20260508120000) ---
+        92 => [
+            'providerId' => 'claude-3-haiku-20240307',
+            'retiredOn' => '2026-05-08',
+            'successor' => 'anthropic:claude-haiku-4-5-20251001:chat',
+            'reason' => 'Superseded by Claude Haiku 4.5.',
+        ],
+
+        // --- 2026-07-27 (Version20260727120000) ---
+        112 => [
+            'providerId' => 'claude-sonnet-4-5-20250929',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:chat',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        109 => [
+            'providerId' => 'claude-sonnet-4-5-20250929',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:pic2text',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        161 => [
+            'providerId' => 'claude-sonnet-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:chat',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        163 => [
+            'providerId' => 'claude-sonnet-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-sonnet-5:pic2text',
+            'reason' => 'Superseded by Claude Sonnet 5.',
+        ],
+        160 => [
+            'providerId' => 'claude-opus-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        164 => [
+            'providerId' => 'claude-opus-4-6',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        165 => [
+            'providerId' => 'claude-opus-4-7',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        166 => [
+            'providerId' => 'claude-opus-4-7',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        // Left the catalog in earlier releases but stayed active in existing
+        // installs until this migration — the failure mode this registry exists
+        // to make impossible.
+        69 => [
+            'providerId' => 'claude-opus-4-1-20250805',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        93 => [
+            'providerId' => 'claude-opus-4-1-20250805',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:pic2text',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+        121 => [
+            'providerId' => 'claude-opus-4-5',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'anthropic:claude-opus-4-8:chat',
+            'reason' => 'Superseded by Claude Opus 4.8.',
+        ],
+
+        // --- 2026-07-27 (Version20260727180000) ---
+        30 => [
+            'providerId' => 'gpt-4.1',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        49 => [
+            'providerId' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
+            'retiredOn' => '2026-07-27',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+
+        // --- 2026-07-28 (Version20260728120000) ---
+        70 => [
+            'providerId' => 'gpt-5',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        106 => [
+            'providerId' => 'gpt-5.2-2025-12-11',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.6-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra.',
+        ],
+        150 => [
+            'providerId' => 'gpt-5-mini',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'openai:gpt-5.4-mini:chat',
+            'reason' => 'Superseded by GPT-5.4 mini.',
+        ],
+        125 => [
+            'providerId' => 'deepseek-ai/DeepSeek-R1',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'huggingface:moonshotai/kimi-k2.6-deepinfra:chat',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        128 => [
+            'providerId' => 'Qwen/Qwen2.5-Coder-32B-Instruct',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'huggingface:moonshotai/kimi-k2.7-code-deepinfra:chat',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        126 => [
+            'providerId' => 'stabilityai/stable-diffusion-xl-base-1.0',
+            'retiredOn' => '2026-07-28',
+            'successor' => 'thehive:sdxl:text2pic',
+            'reason' => 'Dropped from the HuggingFace inference catalog.',
+        ],
+        129 => [
+            'providerId' => 'intfloat/multilingual-e5-large',
+            'retiredOn' => '2026-07-28',
+            // An embedding model has no drop-in successor: a different model
+            // means a different vector space, so re-embedding is a decision for
+            // the operator, never an automatic substitution.
+            'successor' => null,
+            'reason' => 'Dropped from the HuggingFace inference catalog; a replacement embedding model requires re-indexing.',
+        ],
+
+        // --- 2026-08-19 (Version20260819080000) ---
+        // The chat rows point at gpt-oss-120b rather than qwen3.6-27b even
+        // though the retiring migration repointed live bindings at the latter:
+        // qwen3.6-27b is Preview on Groq ("may be discontinued at short
+        // notice"), and a successor is exactly the pointer that must outlive
+        // the model it replaces.
+        9 => [
+            'providerId' => 'llama-3.3-70b-versatile',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+        17 => [
+            'providerId' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+            'retiredOn' => '2026-08-19',
+            // Stays on the Preview row: Groq has no other model that takes
+            // images, so there is nothing more durable to point at.
+            'successor' => 'groq:qwen/qwen3.6-27b:pic2text',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+        53 => [
+            'providerId' => 'qwen/qwen3-32b',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-120b:chat',
+            'reason' => 'Superseded by Qwen 3.6 27B.',
+        ],
+        236 => [
+            'providerId' => 'llama-3.1-8b-instant',
+            'retiredOn' => '2026-08-19',
+            'successor' => 'groq:openai/gpt-oss-20b:chat',
+            'reason' => 'Removed from the Groq production catalog.',
+        ],
+
+        // --- 2026-08-20 (Version20260820120000) ---
+        320 => [
+            'providerId' => 'grok-tts',
+            'retiredOn' => '2026-08-20',
+            // xAI retired both speech endpoints without a replacement, and
+            // there is no cross-provider substitute we may pick on the
+            // operator's behalf — that would need an API key they may not hold.
+            'successor' => null,
+            'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+        ],
+        321 => [
+            'providerId' => 'grok-stt',
+            'retiredOn' => '2026-08-20',
+            'successor' => null,
+            'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+        ],
+    ];
+
+    /**
      * Number of decimals used to normalise float fields before fingerprinting.
      * Catalog prices are authored with at most 4 decimals (e.g. 0.092); 6 leaves
      * comfortable headroom and shields the hash from float-string round-trips
@@ -87,6 +324,7 @@ class ModelCatalog
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
         'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
+        'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
     ];
 
     /**
@@ -298,6 +536,47 @@ class ModelCatalog
     }
 
     /**
+     * Every recorded retirement, keyed by the retired BID.
+     *
+     * @return array<int, array{providerId: string, retiredOn: string, successor: string|null, reason: string}>
+     */
+    public static function retirements(): array
+    {
+        return self::RETIREMENTS;
+    }
+
+    /**
+     * The retirement record for a BID, or null when the model is not retired.
+     *
+     * @return array{providerId: string, retiredOn: string, successor: string|null, reason: string}|null
+     */
+    public static function retirement(int $bid): ?array
+    {
+        return self::RETIREMENTS[$bid] ?? null;
+    }
+
+    public static function isRetired(int $bid): bool
+    {
+        return isset(self::RETIREMENTS[$bid]);
+    }
+
+    /**
+     * The BID that replaces a retired model.
+     *
+     * Null covers three different situations that all mean "do not substitute":
+     * the model is not retired, the retirement deliberately records no successor
+     * (an embedding model, or a provider that shipped no replacement), or the
+     * recorded successor key no longer resolves to exactly one catalog entry
+     * because it was itself retired later.
+     */
+    public static function successorBid(int $bid): ?int
+    {
+        $successor = self::RETIREMENTS[$bid]['successor'] ?? null;
+
+        return null === $successor ? null : self::findBidByKey($successor);
+    }
+
+    /**
      * Compute the lookup key for a model: "service:providerId" (lowercased, colons in providerId replaced with dashes).
      */
     private static function modelKey(array $model): string
@@ -419,51 +698,67 @@ class ModelCatalog
             ],
         ],
         // ==================== GROQ MODELS ====================
+        // Retired 2026-08 (Groq shutdowns, https://console.groq.com/docs/deprecations):
+        //   - BID 9   llama-3.3-70b-versatile                    (chat)     → 324
+        //   - BID 17  meta-llama/llama-4-scout-17b-16e-instruct  (pic2text) → 325
+        //   - BID 53  qwen/qwen3-32b                             (chat)     → 324
+        //   - BID 236 llama-3.1-8b-instant                       (chat)     → 75
+        // Deactivated in existing installs by Version20260819080000; the BIDs
+        // must never be reused (BMESSAGES rows reference them).
         [
-            'id' => 9,
+            // Snapshot 2026-08-19 (https://console.groq.com/docs/model/qwen/qwen3.6-27b).
+            'id' => 324,
             'service' => 'Groq',
-            'name' => 'Llama 3.3 70b versatile',
+            'name' => 'Qwen 3.6 27B',
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'llama-3.3-70b-versatile',
-            'priceIn' => 0.59,
+            'providerId' => 'qwen/qwen3.6-27b',
+            'priceIn' => 0.60,
             'inUnit' => 'per1M',
-            'priceOut' => 0.79,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 9,
-            'rating' => 1,
+            'rating' => 5,
             'json' => [
-                'description' => 'Fast API service via groq',
-                'max_tokens' => 32768,
+                'description' => 'Groq Qwen 3.6 27B - flagship-level reasoning and agentic coding in a compact dense model (~500 t/s). Successor to Llama 3.3 70B and Qwen3 32B on Groq. Supports tool use and JSON mode; reasoning is hidden from the output.',
+                'max_tokens' => 16384,
                 'params' => [
-                    'model' => 'llama-3.3-70b-versatile',
+                    'model' => 'qwen/qwen3.6-27b',
                     'reasoning_format' => 'hidden',
-                    'messages' => [],
                 ],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
+                // groq_tier: Groq's own lifecycle class. "preview" carries an
+                // explicit "may be discontinued at short notice" warning, which
+                // is why this row is selectable but is not a recommended text
+                // default (see ProviderDefaultsService).
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'quantization' => 'TruePoint Numerics', 'groq_tier' => 'preview'],
             ],
         ],
         [
-            'id' => 17,
+            // Vision variant of the row above (same upstream model id). Groq's
+            // recommended replacement for the retired Llama 4 Scout.
+            'id' => 325,
             'service' => 'Groq',
-            'name' => 'Llama 4 Scout Vision',
+            'name' => 'Qwen 3.6 27B Vision',
             'tag' => 'pic2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'meta-llama/llama-4-scout-17b-16e-instruct',
-            'priceIn' => 0.11,
+            'providerId' => 'qwen/qwen3.6-27b',
+            'priceIn' => 0.60,
             'inUnit' => 'per1M',
-            'priceOut' => 0.34,
+            'priceOut' => 3.00,
             'outUnit' => 'per1M',
             'quality' => 8,
             'rating' => 0,
             'json' => [
-                'description' => 'Groq Llama 4 Scout vision model - 128K context, up to 5 images, supports tool use and JSON mode',
+                'description' => 'Groq Qwen 3.6 27B vision - 131K context, up to 3 images (20 MB each), supports tool use and JSON mode. Replaces Llama 4 Scout.',
                 'params' => [
-                    'model' => 'meta-llama/llama-4-scout-17b-16e-instruct',
+                    'model' => 'qwen/qwen3.6-27b',
                     'max_completion_tokens' => 1024,
                 ],
+                // Preview on Groq, and still the recommended PIC2TEXT default:
+                // it is the only Groq model that accepts image input at all.
+                'meta' => ['groq_tier' => 'preview'],
             ],
         ],
         [
@@ -519,28 +814,6 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 53,
-            'service' => 'Groq',
-            'name' => 'Qwen3 32B (Reasoning)',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'qwen/qwen3-32b',
-            'priceIn' => 0.29,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.59,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 5,
-            'json' => [
-                'description' => 'Groq Qwen3 32B mit Reasoning - 32B-Parameter Reasoning-Modell von Qwen. Zeigt Denkprozess mit <think> Tags. Optimiert für logisches Denken und Problemlösung. Sehr schnell durch Groq Hardware.',
-                'max_tokens' => 32768,
-                'params' => ['model' => 'qwen/qwen3-32b'],
-                'features' => ['reasoning'],
-                'meta' => ['context_window' => '131072', 'max_output' => '32768', 'reasoning_format' => 'raw'],
-            ],
-        ],
-        [
             'id' => 75,
             'service' => 'Groq',
             'name' => 'gpt-oss-20b',
@@ -580,34 +853,6 @@ class ModelCatalog
                 'max_tokens' => 16384,
                 'params' => ['model' => 'openai/gpt-oss-120b'],
                 'meta' => ['context_window' => '131072', 'max_output' => '16384', 'license' => 'Apache-2.0', 'quantization' => 'TruePoint Numerics'],
-            ],
-        ],
-        [
-            // Snapshot 2026-05-27 (https://console.groq.com/docs/models).
-            'id' => 236,
-            'service' => 'Groq',
-            'name' => 'Llama 3.1 8B Instant',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'llama-3.1-8b-instant',
-            'priceIn' => 0.05,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.08,
-            'outUnit' => 'per1M',
-            'quality' => 7,
-            'rating' => 1,
-            'json' => [
-                'description' => 'Groq Llama 3.1 8B Instant - fastest production-grade chat model on Groq (~560 t/s). 131K context, best for high-throughput / low-cost routing.',
-                'max_tokens' => 32768,
-                'params' => [
-                    'model' => 'llama-3.1-8b-instant',
-                    'reasoning_format' => 'hidden',
-                    'messages' => [],
-                ],
-                // max_output mirrors max_tokens (32768) — the model accepts
-                // 131K context in total but caps generated output at 32K.
-                'meta' => ['context_window' => '131072', 'max_output' => '32768'],
             ],
         ],
         // Phase 2d: dedicated MEM-tagged models for backgrounded memory
@@ -2333,6 +2578,56 @@ class ModelCatalog
                 'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
             ],
         ],
+        [
+            // Snapshot 2026-08-20 (https://huggingface.co/moonshotai/Kimi-K3).
+            // Text/image in, text out only — no text2pic variant is possible.
+            // BIDs 326/327 were taken by Grok 4.6 on the same day.
+            'id' => 328,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3:deepinfra',
+            'priceIn' => 2.85,
+            'inUnit' => 'per1M',
+            'priceOut' => 14.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                // Pinned to DeepInfra via HF router (:deepinfra suffix) for a
+                // deterministic billed price (see PRICING_MAINTENANCE.md).
+                // DeepInfra 2026-08-20: $2.85/$14.25 per 1M, cache-read $0.285;
+                // serves the native MXFP4 weights.
+                'description' => 'Kimi K3 via HuggingFace - 2.8T parameter MoE (104B active) flagship with native vision, always-on thinking, and a 1M-token context window. Pinned to DeepInfra.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'moonshotai/Kimi-K3:deepinfra'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['context_window' => '1048576', 'max_output' => '32768', 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
+        [
+            'id' => 329,
+            'service' => 'HuggingFace',
+            'name' => 'Kimi K3 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'moonshotai/Kimi-K3:deepinfra',
+            'priceIn' => 2.85,
+            'inUnit' => 'per1M',
+            'priceOut' => 14.25,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Kimi K3 via HuggingFace for image analysis and vision tasks. Native multimodal (MoonViT-V2) with strong document and chart reading. Pinned to DeepInfra.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'moonshotai/Kimi-K3:deepinfra'],
+                'meta' => ['supports_images' => true, 'routed_via' => 'huggingface', 'forced_thinking' => true],
+            ],
+        ],
         // ==================== THEHIVE MODELS ====================
         [
             'id' => 130,
@@ -3006,11 +3301,69 @@ class ModelCatalog
             ],
         ],
         // ==================== xAI (GROK) ====================
-        // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing.
+        // Snapshot 2026-07-29 from https://docs.x.ai/developers/pricing;
+        // Grok 4.6 rows added from the 2026-08-20 snapshot.
         // Chat rows are covered by the LiteLLM sync (keys `xai/<providerId>`);
         // the Grok Imagine rows are not and must be verified manually.
         // Above 200K prompt tokens xAI bills the whole request at 2x — encoded
         // in self::CONTEXT_PRICING, not here.
+        [
+            'id' => 326,
+            'service' => 'xAI',
+            'name' => 'Grok 4.6',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.6',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.6 - flagship model for code, agentic tasks and knowledge work with a 500K context window. Reasoning is always on and its depth is not configurable.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'grok-4.6'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
+                // Official docs price: $0.50/1M — unlike grok-4.5, this matches
+                // what LiteLLM reports, so no sync-drift caveat applies here.
+                'cache_read_price_per_1M' => 0.50,
+                // No reasoning_effort_default: xAI accepts that parameter for
+                // grok-4.3 only, so XaiProvider never sends it for this model.
+                'meta' => [
+                    'context_window' => '500000',
+                    'max_output' => '32768',
+                    'regions' => 'us-east-1, us-west-2',
+                ],
+            ],
+        ],
+        [
+            'id' => 327,
+            'service' => 'xAI',
+            'name' => 'Grok 4.6 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'grok-4.6',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 6.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'xAI Grok 4.6 image understanding - describe images and extract text (OCR-style) via the chat endpoint. Max 20 MiB per image, JPEG/PNG only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'grok-4.6'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => [
+                    'supports_images' => true,
+                    'max_image_bytes' => '20971520',
+                ],
+            ],
+        ],
         [
             'id' => 313,
             'service' => 'xAI',
@@ -3203,8 +3556,11 @@ class ModelCatalog
             'service' => 'xAI',
             'name' => 'Grok TTS',
             'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: xAI no longer serves this model (GET /v1/models/grok-tts
+            // answers 404). Deactivated, never deleted — BMESSAGES rows
+            // reference the BID (#1514, see Version20260820120000).
+            'selectable' => 0,
+            'active' => 0,
             // POST /v1/tts takes no `model` field — the endpoint selects the
             // model. This is xAI's documentation name, kept so the row has a
             // stable provider key.
@@ -3239,8 +3595,11 @@ class ModelCatalog
             'service' => 'xAI',
             'name' => 'Grok STT',
             'tag' => 'sound2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: xAI no longer serves this model (GET /v1/models/grok-stt
+            // answers 404). Deactivated, never deleted — BMESSAGES rows
+            // reference the BID (#1514, see Version20260820120000).
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'grok-stt',
             // REST transcription is $0.10 per hour of audio. (The streaming
             // WebSocket variant costs $0.20/hour and is not implemented, so no

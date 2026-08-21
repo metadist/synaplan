@@ -30,7 +30,7 @@
     <div class="w-full max-w-md" data-testid="section-card">
       <div class="text-center mb-8" data-testid="section-header">
         <router-link to="/login" class="inline-block">
-          <img :src="logoSrc" alt="synaplan" class="h-12 mx-auto mb-6" />
+          <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
         </router-link>
       </div>
 
@@ -77,21 +77,15 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { SunIcon, MoonIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useTheme } from '../composables/useTheme'
+import { useBrandLogo } from '@/composables/useBrandLogo'
+import { useConfigStore } from '@/stores/config'
 import Button from '../components/Button.vue'
 
 const router = useRouter()
 const { locale } = useI18n()
 const themeStore = useTheme()
-
-const isDark = computed(() => {
-  if (themeStore.theme.value === 'dark') return true
-  if (themeStore.theme.value === 'light') return false
-  return matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-const logoSrc = computed(
-  () => `${import.meta.env.BASE_URL}${isDark.value ? 'synaplan-light.svg' : 'synaplan-dark.svg'}`
-)
+const config = useConfigStore()
+const { logoSrc } = useBrandLogo(themeStore.isDark)
 
 const countdown = ref(5)
 let countdownInterval: number | null = null

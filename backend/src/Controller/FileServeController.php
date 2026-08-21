@@ -5,9 +5,11 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
+use App\Service\Media\MediaAccessTokenService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
@@ -23,6 +25,7 @@ class FileServeController extends AbstractController
 {
     public function __construct(
         private MessageRepository $messageRepository,
+        private MediaAccessTokenService $mediaAccessTokenService,
         private string $uploadDir,
         private LoggerInterface $logger,
     ) {
@@ -39,8 +42,16 @@ class FileServeController extends AbstractController
     #[Route('/{path}', name: 'serve_file', requirements: ['path' => '.+'], methods: ['GET'])]
     public function serve(
         string $path,
+        Request $request,
         #[CurrentUser] ?User $user,
     ): Response {
+        // This route lives in the `main` firewall, which has neither a Bearer
+        // nor a query-token authenticator, so a cross-origin client (the native
+        // shell) can only identify itself with a read-only media token in the
+        // query string. It stands in for the owner of a media read and nothing
+        // else — see MediaAccessTokenService.
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
         // 1. Find message by file path WITH metadata (EAGER load)
         $message = $this->messageRepository->createQueryBuilder('m')
             ->leftJoin('m.metadata', 'meta')

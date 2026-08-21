@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Not now",
+    "iosApp": {
+      "title": "Synaplan is now on iPhone",
+      "body": "The app puts your chats, documents and assistants in your pocket. Same account, same data — you can dictate a question on the way and pick up any conversation where you left it.",
+      "action": "Get it on the App Store"
+    }
+  },
   "updates": {
     "runningVersion": "Version {version}",
     "badge": {
@@ -107,6 +115,7 @@
     "profile": "Profile",
     "admin": "Admin Panel",
     "adminFeatures": "Feature Status",
+    "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
     "adminSetup": "AI Provider Setup",
     "subscription": "Subscription",
@@ -122,7 +131,70 @@
     "accountDeletion": "Account Deletion",
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
-    "aiAgents": "AI Agents"
+    "aiAgents": "AI Agents",
+    "connections": "Connections",
+    "savedTasks": "Saved Tasks"
+  },
+  "adminModelStatus": {
+    "title": "Model Status",
+    "subtitle": "Which AI models are currently working, and which are not.",
+    "loading": "Loading model status…",
+    "loadFailed": "The model status could not be loaded.",
+    "never": "never",
+    "noMatches": "No models match the current filters.",
+    "freeHint": "Checking is free: providers are only asked which models they publish. No AI model is ever run for this.",
+    "states": {
+      "online": "Online",
+      "degraded": "Impaired",
+      "offline": "Offline",
+      "unconfigured": "Not set up",
+      "unknown": "Unknown"
+    },
+    "sources": {
+      "probe": "provider model list",
+      "traffic": "real usage"
+    },
+    "summary": {
+      "allGood": "All models are answering",
+      "problems": "{count} model(s) need attention",
+      "lastCheck": "Last checked",
+      "monitoringOff": "Automatic checking is switched off, so this page only shows the last known state."
+    },
+    "filters": {
+      "onlyProblems": "Only show problems",
+      "capability": "Task",
+      "allCapabilities": "All tasks"
+    },
+    "provider": {
+      "affected": "{count} affected"
+    },
+    "model": {
+      "lastSuccess": "Last worked",
+      "errorRate": "{percent}% of the last {total} calls failed",
+      "source": "Based on",
+      "autoDisabled": "Switched off automatically",
+      "switchedOff": "Switched off",
+      "exempt": "Exempt from automatic switch-off"
+    },
+    "actions": {
+      "refresh": "Check now",
+      "refreshProvider": "Check this provider",
+      "refreshProviderAria": "Check {provider} now",
+      "resetCounters": "Clear error history",
+      "exempt": "Exempt from automation",
+      "unexempt": "Allow automation again"
+    },
+    "confirmResetTitle": "Clear error history?",
+    "confirmResetMessage": "\"{name}\" will then be judged on new usage only. A check that already found this model retired is not undone.",
+    "messages": {
+      "refreshed": "Checked {count} model(s).",
+      "refreshFailed": "The check could not be completed.",
+      "exempted": "This model is now exempt from automatic switch-off.",
+      "unexempted": "Automatic switch-off applies to this model again.",
+      "exemptFailed": "The exemption could not be changed.",
+      "countersReset": "Error history cleared.",
+      "countersResetFailed": "The error history could not be cleared."
+    }
   },
   "addinConnect": {
     "title": "Connect to Synaplan",
@@ -191,6 +263,10 @@
     "ttsGenerating": "Adding spoken answer…",
     "audioUnavailable": "Audio could not be loaded",
     "audioUnavailableDescription": "The file is currently unavailable on the server. Please try again later or download it.",
+    "imageUnavailable": "Image could not be loaded",
+    "imageUnavailableDescription": "The image is currently unavailable. Please try again.",
+    "videoUnavailable": "Video could not be loaded",
+    "videoUnavailableDescription": "The video is currently unavailable. Please try again.",
     "rename": "Rename Chat",
     "enterNewName": "Enter a new title for this chat:",
     "renameNote": "This change only affects your view. The widget user won't see this title.",
@@ -516,6 +592,40 @@
         "title": "Configuration Updated — Restart Required",
         "message": "Your changes have been saved to the .env file. For the changes to take effect, you need to restart your Docker containers.",
         "copyCommand": "Copy Command"
+      },
+      "m365": {
+        "title": "Before these fields work: register an app in Azure",
+        "intro": "Microsoft 365 sign-in needs an app registration in Azure. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "portalLink": "Azure portal → App registrations",
+        "step1": "Open {portal} and choose “New registration”. Any name works, for example “Synaplan”.",
+        "step2": "Under “Redirect URI”, pick the platform type Web (not SPA) and paste this address exactly:",
+        "step3": "Go to “API permissions” → “Add a permission” → “Microsoft Graph” → “Delegated permissions” and add all of these:",
+        "step3Note": "offline_access is not optional: without it Microsoft issues no refresh token and every scheduled run stops working after an hour.",
+        "step4": "Go to “Certificates & secrets” → “New client secret” and copy the Value column — not the Secret ID. It is shown only this once.",
+        "step5": "Paste the client ID and the secret into the fields below, set the tenant, and switch M365_ENABLED on. Users then connect their own account under Channels → Connections.",
+        "ready": "Ready — users can connect their Microsoft 365 account under Channels → Connections.",
+        "notReady": "Not active yet. Fill in the fields below and switch M365_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually."
+      },
+      "dropbox": {
+        "title": "Before these fields work: create an app in the Dropbox App Console",
+        "intro": "The Dropbox connection needs a Dropbox app. You do this once, it takes about five minutes, and afterwards every user can connect their own account.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Open the {console} and choose “Create app”. Pick “Scoped access” and “Full Dropbox”. Any name works, for example “Synaplan”.",
+        "step2": "On the “Permissions” tab, enable both of these and click “Submit”:",
+        "step3": "On the “Settings” tab, under “OAuth 2 → Redirect URIs”, add this address exactly:",
+        "step4": "Still on the “Settings” tab, copy the App key and the App secret (click “Show”).",
+        "step5": "Paste the app key and the secret into the fields below and switch DROPBOX_ENABLED on. Users then connect their own account under Channels → Connections.",
+        "ready": "Ready — users can connect their Dropbox account under Channels → Connections.",
+        "notReady": "Not active yet. Fill in the fields below and switch DROPBOX_ENABLED on.",
+        "copyFailed": "Could not copy. Select the text and copy it manually.",
+        "resetTitle": "Reset all Dropbox connections",
+        "resetDescription": "Removes every user's Dropbox connection on this installation, including the stored tokens. Use this after changing the Dropbox app or its permissions — everyone can then connect their account again freshly.",
+        "resetButton": "Reset connections",
+        "resetConfirmTitle": "Reset all Dropbox connections?",
+        "resetConfirmMessage": "Every user's Dropbox connection will be removed, and each user has to connect their Dropbox account again. This cannot be undone.",
+        "resetDone": "No Dropbox connections to remove | 1 Dropbox connection removed | {count} Dropbox connections removed",
+        "resetFailed": "The reset failed. Please try again."
       }
     }
   },
@@ -535,6 +645,8 @@
     "toolsDocSummary": "Summarizer",
     "toolsMailHandler": "Email Automation",
     "mcpServers": "MCP Servers",
+    "connections": "Connections",
+    "savedTasks": "Saved Tasks",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -556,6 +668,7 @@
     "admin": "Admin",
     "adminDashboard": "Dashboard",
     "adminFeatureStatus": "Feature Status",
+    "adminModelStatus": "Model Status",
     "adminSystemConfig": "System Config",
     "adminProviderSetup": "AI Providers",
     "more": "More",
@@ -1145,7 +1258,15 @@
     },
     "generated": {
       "title": "Generated",
-      "subtitle": "Images, video and audio created in your chats.",
+      "subtitle": "Images, videos, audio, documents and calendar invites created in your chats and tasks.",
+      "kinds": {
+        "all": "All",
+        "image": "Images",
+        "video": "Videos",
+        "audio": "Audio",
+        "document": "Documents",
+        "calendar": "Calendar"
+      },
       "openInChat": "Open in chat",
       "download": "Download",
       "autoGroup": "Let AI choose a folder",
@@ -1679,6 +1800,227 @@
       "expandAll": "Expand all",
       "collapseAll": "Collapse all"
     },
+    "savedTasks": {
+      "saveAsTask": "Save as task",
+      "comingSoonTitle": "Saved Task",
+      "comingSoonBody": "This will let you run this instruction on a schedule or from a channel. Coming in a later update.",
+      "emptyHint": "A Saved Task runs this instruction when you ask, or later on a schedule.",
+      "title": "Saved Task",
+      "on": "On",
+      "off": "Off",
+      "runNow": "Run now",
+      "runStarted": "The task is running in its own conversation.",
+      "runFailed": "The run could not finish.",
+      "updateFailed": "Could not update this Saved Task.",
+      "runsFailed": "Could not load runs.",
+      "scheduleSaved": "Schedule saved.",
+      "resumed": "The task will run again.",
+      "resume": "Resume",
+      "showResults": "Show results",
+      "viewRuns": "Run history",
+      "hideRuns": "Hide history",
+      "runsRetention": "Older runs are removed automatically.",
+      "runsEmpty": "No runs yet.",
+      "runStatus": {
+        "queued": "Waiting",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "runTrigger": {
+        "manual": "started by you",
+        "schedule": "scheduled run",
+        "chat": "from chat",
+        "inbound_email": "incoming email"
+      },
+      "advancedSteps": "Advanced steps",
+      "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
+      "autoPauseTitle": "Paused automatically",
+      "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
+      "createFailed": "Could not save this as a task.",
+      "created": "Saved as a task. You can run it now.",
+      "overviewTitle": "Saved Tasks",
+      "overviewSubtitle": "Instructions that run when you ask, or later on a schedule.",
+      "overviewLoading": "Loading saved tasks…",
+      "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
+      "loadFailed": "Could not load saved tasks.",
+      "scheduleThis": "Run this again later",
+      "scheduleThisHint": "Name this task. You can set the schedule on the next screen.",
+      "scheduledFromChat": "Saved. Set when it should run.",
+      "state": {
+        "off": "Not running",
+        "neverRun": "Saved — not run yet",
+        "scheduled": "Scheduled — first run {when}",
+        "running": "Running now",
+        "lastRun": "Last run: {when}",
+        "autoPaused": "Paused automatically"
+      },
+      "schedule": {
+        "off": "No schedule",
+        "hourly": "Every hour",
+        "daily": "Every day",
+        "weekdays": "Every weekday"
+      },
+      "summary": {
+        "simple": "Runs {when}.",
+        "template": "Runs {when}. Reads {reads} and delivers {saves}.",
+        "when": {
+          "manual": "when you start it",
+          "interval": "every {minutes} minutes",
+          "daily": "every day at {at} ({tz})",
+          "weekly": "every weekday at {at} ({tz})",
+          "schedule": "on a schedule",
+          "inboundEmail": "when new mail arrives",
+          "chat": "when a matching chat message arrives"
+        },
+        "reads": {
+          "instruction": "this instruction",
+          "mailbox": "the connected mailbox"
+        },
+        "saves": {
+          "email": "an email to you",
+          "folder": "a file in the connected folder",
+          "calendar": "a calendar entry",
+          "reply": "a reply in the chat"
+        }
+      }
+    },
+    "connections": {
+      "title": "Connections",
+      "subtitle": "The outside systems Synaplan may read from and write to on your behalf.",
+      "empty": "Nothing connected yet. Pick one of the options below to get started — it takes about a minute.",
+      "loading": "Loading connections…",
+      "loadFailed": "Could not load connections.",
+      "test": "Test connection",
+      "testOk": "Connection looks good.",
+      "testFailed": "The connection test failed.",
+      "status": {
+        "connected": "Connected",
+        "error": "Error",
+        "reauth_required": "Reconnect needed",
+        "never_tested": "Never tested",
+        "disconnected": "Disconnected"
+      },
+      "types": {
+        "mailbox": "Mailbox",
+        "mcp": "Connected system",
+        "webdav": "Folder",
+        "webhook": "Webhook",
+        "caldav": "Calendar",
+        "generic": "Connection",
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
+      },
+      "failure": {
+        "unauthorized": "{connection} rejected the login. Reconnect it to continue.",
+        "not_found": "The folder {target} no longer exists in {connection}.",
+        "quota_exceeded": "{connection} is out of space.",
+        "too_large": "The file is larger than {connection} accepts.",
+        "unreachable": "{connection} could not be reached. Synaplan will try again at the next run.",
+        "conflict": "A file with that name already exists; saved as {newName} instead.",
+        "rate_limited": "Your usage limit was reached, so this run was skipped.",
+        "unsupported": "This file type cannot be delivered to {connection}."
+      },
+      "explainer": "Connect a system once here. Saved tasks and the AI can then use it — for example to read your latest Outlook mail. Your password is never stored: Microsoft 365 asks you to sign in and gives Synaplan a token you can revoke at any time.",
+      "yourConnections": "Your connections",
+      "addTitle": "Add a connection",
+      "addSubtitle": "What each option does, and where it takes you.",
+      "lastChecked": "checked {when}",
+      "reauthHint": "Microsoft no longer accepts the saved sign-in. Reconnect to let scheduled tasks run again.",
+      "reconnect": "Reconnect",
+      "testing": "Testing…",
+      "testOkAccount": "Connection works — signed in as {account}.",
+      "manage": "Manage",
+      "editName": "Name",
+      "keepPassword": "Leave empty to keep the current app password.",
+      "updated": "Connection updated.",
+      "updateFailed": "The connection could not be updated.",
+      "deleteTitle": "Remove this connection?",
+      "deleteMessage": "Synaplan will no longer use {name}. Files already saved there stay where they are.",
+      "deleteConfirm": "Remove",
+      "deleted": "{name} was removed.",
+      "deleteFailed": "The connection could not be removed.",
+      "channelHint": "In chat, ask for {channel}",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Sign in with your Microsoft work or personal account so Synaplan can read your Outlook mail. Read-only, and you can disconnect at any time.",
+          "connect": "Connect Microsoft 365",
+          "connectAnother": "Connect another account",
+          "connectedAs": "Connected as {account}.",
+          "connecting": "Opening Microsoft…",
+          "connected": "Microsoft 365 is connected.",
+          "startFailed": "Could not open the Microsoft sign-in page. Please try again.",
+          "unavailable": "Not available yet — Microsoft 365 has to be set up once for this installation.",
+          "adminLink": "Set it up in system settings.",
+          "askAdmin": "Ask an administrator to enable it.",
+          "errors": {
+            "access_denied": "You cancelled the Microsoft sign-in, so nothing was connected.",
+            "missing_code": "Microsoft sent an incomplete answer. Please start the connection again.",
+            "exchange_failed": "Microsoft accepted the sign-in but the token could not be collected. Check the client secret in system settings, then try again.",
+            "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "unknown": "Microsoft 365 could not be connected. Please try again."
+          },
+          "hosting": "Your mail stays with Microsoft, a cloud provider based in the USA."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Sign in with your Dropbox account so Synaplan can save generated files into a Dropbox folder — for example \"create a document and put it into my Dropbox\". You can disconnect at any time.",
+          "connect": "Connect Dropbox",
+          "connectAnother": "Connect another account",
+          "connectedAs": "Connected as {account}.",
+          "connecting": "Opening Dropbox…",
+          "connected": "Dropbox is connected.",
+          "startFailed": "Could not open the Dropbox sign-in page. Please try again.",
+          "unavailable": "Not available yet — Dropbox has to be set up once for this installation.",
+          "adminLink": "Set it up in system settings.",
+          "askAdmin": "Ask an administrator to enable it.",
+          "errors": {
+            "access_denied": "You cancelled the Dropbox sign-in, so nothing was connected.",
+            "missing_code": "Dropbox sent an incomplete answer. Please start the connection again.",
+            "exchange_failed": "Dropbox accepted the sign-in but the token could not be collected. Check the app secret in system settings, then try again.",
+            "invalid_state": "The sign-in took too long or was started in another tab. Please try again.",
+            "unknown": "Dropbox could not be connected. Please try again."
+          },
+          "hosting": "Your files stay with Dropbox, a cloud provider based in the USA."
+        },
+        "mailbox": {
+          "name": "Mailbox (IMAP)",
+          "description": "Any mailbox that speaks IMAP, with user name and password — for example a Gmail account with an app password, or your own mail server.",
+          "action": "Set up mailbox"
+        },
+        "mcp": {
+          "name": "Connected system (MCP)",
+          "description": "Give the AI tools from an external MCP server, such as a ticket system or your own service.",
+          "action": "Add system"
+        },
+        "dav": {
+          "name": "Nextcloud folder & calendar (WebDAV)",
+          "description": "Save task results into your cloud folder and put meetings into your calendar. Works with Nextcloud, ownCloud and any WebDAV server.",
+          "hosting": "Connects to a server you choose — your files stay on your own cloud.",
+          "action": "Connect",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Other WebDAV address"
+          },
+          "serverUrl": "Server address",
+          "davUrl": "WebDAV address (full URL)",
+          "username": "Username",
+          "appPassword": "App password",
+          "appPasswordHint": "Create one in Nextcloud under Settings → Security → Devices & sessions. Your account password is never stored.",
+          "localHttpHint": "On this development install you can also use a local address such as http://nextcloud.",
+          "folder": "Folder for results",
+          "withCalendar": "Also connect a calendar:",
+          "connect": "Connect",
+          "connecting": "Connecting…",
+          "created": "{name} is connected.",
+          "createFailed": "The connection could not be created. Check the address and try again.",
+          "folderName": "{host} folder ({user})",
+          "calendarName": "{host} calendar ({calendar})"
+        }
+      }
+    },
     "routing": {
       "title": "Routing",
       "flowBody": "When a message arrives, the planner reads it and turns it into a small set of tasks (for example: generate an image, then summarize it as audio). Each task is handled by the right capability and the results are combined into one reply.",
@@ -2115,7 +2457,7 @@
       "reminder": "Get more out of {brand}"
     },
     "subtitle": {
-      "guest_limit": "Pick a plan to keep chatting — with your own history, memories and files.",
+      "guest_limit": "Pick a plan to keep chatting. An account gives you your own history, memories and files from here on.",
       "free_limit": "Your free allowance is spent. Pick a plan to keep chatting without limits.",
       "quota_exhausted": "Move up a plan to keep going right away, or wait for your allowance to reset next month.",
       "reminder": "A plan gives you more messages, stronger AI models and more storage."
@@ -2329,10 +2671,12 @@
     }
   },
   "setupBanner": {
-    "title": "No AI provider connected",
-    "adminText": "Chat needs an AI provider. Connect one in a minute — free options available.",
-    "userText": "Chat is not ready yet. Please ask your administrator to connect an AI provider.",
-    "cta": "Set up AI provider"
+    "adminTitle": "No AI provider configured",
+    "userTitle": "Chat is not ready yet",
+    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute.",
+    "userText": "An administrator still needs to connect an AI provider. You can read how that works in the documentation.",
+    "cta": "Open AI provider setup",
+    "docsCta": "Open documentation"
   },
   "localAiDownload": {
     "waitingTitle": "Local AI is starting",
@@ -3592,6 +3936,31 @@
       "API keys, widgets and credentials"
     ],
     "retention": "Deletion is permanent and takes effect immediately. Backups containing residual data are rotated out within 30 days. Data we are legally required to retain (e.g. invoices) is kept only as long as the law requires.",
+    "partialTitle": "Delete individual data without deleting your account",
+    "partialIntro": "You do not have to give up your account to remove data. While signed in you can delete any of the following yourself, and it takes effect immediately.",
+    "partialItems": [
+      {
+        "name": "Chats and conversations",
+        "how": "Open History, use the ⋯ menu next to a conversation and choose Delete. To remove several at once, open Statistics → All Chats, select them and choose Delete selected."
+      },
+      {
+        "name": "Uploaded files and documents",
+        "how": "Open Sources → Browse and use the delete icon on a file, or select several and choose Delete selected. Deleting a folder also deletes the files inside it."
+      },
+      {
+        "name": "AI-generated images and media",
+        "how": "Open Sources → Generated and use the delete icon on the item."
+      },
+      {
+        "name": "Memories",
+        "how": "Open Memories and delete individual entries, or select several and delete them together."
+      },
+      {
+        "name": "Connections, chat widgets and API keys",
+        "how": "Open Channels and remove the connection, widget or key you no longer need."
+      }
+    ],
+    "partialRetention": "Deleted items disappear from your account immediately. Backups containing residual copies are rotated out within 30 days. Everything else in your account stays untouched.",
     "noAccessTitle": "Can't sign in?",
     "noAccessDesc": "If you no longer have access to your account, contact us through our website and we will process your deletion request.",
     "visitWebsite": "Visit website",
@@ -3639,6 +4008,9 @@
   },
   "taskPlan": {
     "title": "Task plan",
+    "showSteps": "Show steps",
+    "hideSteps": "Hide steps",
+    "scheduleThis": "Run this again on a schedule",
     "download": "Download",
     "failedBody": "This step couldn't be completed.",
     "cancelledBody": "You stopped this step.",
@@ -3662,7 +4034,8 @@
       "document": "Document",
       "search": "Web search",
       "extract": "Text extraction",
-      "email": "Email"
+      "email": "Email",
+      "folder": "Folder"
     },
     "capability": {
       "extract_text": "Extracting text",
@@ -3680,7 +4053,8 @@
       "text2sound": "Audio",
       "document_generation": "Document",
       "calendar_event": "Calendar invite",
-      "email_me": "Email result"
+      "email_me": "Email result",
+      "save_to_folder": "Save to folder"
     },
     "copyText": "Copy content",
     "copied": "Copied to clipboard",
@@ -3792,7 +4166,32 @@
     },
     "cancelledByUser": "⚠️ Cancelled by user",
     "truncated": "This response was cut short because the model reached its token limit.",
-    "continueButton": "Continue response"
+    "continueButton": "Continue response",
+    "jsonViewer": {
+      "title": "Result",
+      "itemCount": "{count} items",
+      "chats": "{count} chats",
+      "items": "{count} items",
+      "results": "{count} results",
+      "records": "{count} records",
+      "messages": "{count} messages",
+      "files": "{count} files",
+      "documents": "{count} documents",
+      "users": "{count} users",
+      "entries": "{count} entries",
+      "data": "{count} items",
+      "empty": "Nothing to show",
+      "showJson": "Show JSON",
+      "hideJson": "Hide JSON",
+      "showMore": "Show {count} more",
+      "showLess": "Show less",
+      "shownOf": "Showing {shown} of {total}",
+      "truncatedHint": "The result was too long and was cut off — the last entry may be missing.",
+      "messagesCount": "{count} messages",
+      "idLabel": "ID {id}",
+      "expand": "Expand",
+      "collapse": "Collapse"
+    }
   },
   "aiProvider": {
     "error": {
@@ -4377,8 +4776,10 @@
     },
     "errorTitle": "Trial currently unavailable",
     "errorDescription": "We couldn't start your guest session. Please try again or create a free account.",
+    "disabledTitle": "Guest chat is not available",
+    "disabledDescription": "This instance does not offer an anonymous trial. Please sign in to start chatting.",
     "expiredTitle": "Your session has expired",
-    "expiredDescription": "Guest sessions last 24 hours. Start a new trial or create a free account to keep your chat history.",
+    "expiredDescription": "Guest sessions last 24 hours, and this trial conversation can't be restored. Start a new trial, or create a free account so your chats are saved from now on.",
     "rateLimitedTitle": "Too many sessions",
     "rateLimitedDescription": "You've reached the session limit. Please try again later or create a free account.",
     "retry": "Try again",
@@ -4523,14 +4924,25 @@
   },
   "mcpServers": {
     "title": "MCP Servers",
-    "description": "Connect external MCP servers so the assistant can pull data from your own systems (CRM, wiki, internal APIs) while answering. Tools discovered here become available to the task planner.",
-    "clientDisabledHint": "The outbound MCP client is currently disabled by the platform configuration. Connections can be prepared, but no calls will be made until it is enabled.",
+    "description": "Connect any MCP-compatible tool server — a CRM, wiki, ticket system, automation platform, or a service you host yourself. Discovered tools become available to the task planner.",
+    "clientOnTitle": "MCP calls are on",
+    "clientOnText": "The assistant can use connected servers in any task that allows MCP data sources.",
+    "clientOffTitle": "MCP calls are off",
+    "clientOffAdminText": "Saved servers stay here, but the assistant will not call them until you turn this on for the installation.",
+    "clientOffUserText": "An administrator needs to turn this on for the installation. Saved servers stay here until then.",
+    "clientAdminLink": "Open in System Configuration",
+    "clientEnable": "Turn on MCP calls",
+    "clientToggle": "Allow MCP calls",
+    "clientEnabledNotice": "The assistant can now call connected MCP servers",
+    "clientDisabledNotice": "MCP calls are off — saved servers stay in place",
+    "clientUpdateFailed": "Could not update the MCP setting",
     "listTitle": "Connected servers",
     "add": "Add server",
     "addTitle": "Connect a new server",
     "editTitle": "Edit server",
     "formHint": "The URL must be a public HTTPS MCP endpoint (Streamable HTTP). The auth value is stored encrypted and never shown again.",
     "empty": "No MCP servers connected yet.",
+    "emptyHint": "Start from a blank form, or pick a known system to prefill the name and defaults. You can change or clear that choice at any time.",
     "nameLabel": "Name",
     "urlLabel": "Server URL",
     "authHeaderLabel": "Auth header name (optional)",
@@ -4560,7 +4972,40 @@
     "usageDisabled": "MCP data sources disabled for this task",
     "usageUpdateFailed": "Could not update the task",
     "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
-    "usageAdvancedLink": "AI Instructions"
+    "usageAdvancedLink": "AI Instructions",
+    "templatesLabel": "Start from",
+    "templatesHint": "Custom is the default for any MCP server. A template only prefills the form — click the selected card again to clear it.",
+    "templatesClear": "Selected — click again to clear",
+    "templates": {
+      "custom": {
+        "name": "Custom server",
+        "summary": "Any MCP endpoint",
+        "hint": "Paste the HTTPS URL of any Streamable HTTP MCP server and, if needed, an access token. CRM, wiki, tickets, automation — if it speaks MCP, it works here."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Tickets and issues",
+        "hint": "Connect a Jira-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can list tickets and create new ones from a prompt."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki pages",
+        "hint": "Connect a Confluence-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can search pages, get summaries, and create new pages from a prompt."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Repos, issues, pull requests",
+        "hint": "Connect a GitHub-capable MCP server and paste its endpoint URL and a personal access token. Useful for issues, pull requests, and repository search."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Automation workflows",
+        "hint": "Connect an n8n MCP server so the assistant can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
+      }
+    },
+    "allowWriteLabel": "Allow write actions (create/update)",
+    "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
+    "writeBadge": "Writes allowed"
   },
   "messagesGateway": {
     "title": "AI Agents",

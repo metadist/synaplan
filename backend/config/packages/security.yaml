@@ -119,11 +119,24 @@ security:
         - { path: ^/api/v1/auth/apple/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/apple/native, roles: PUBLIC_ACCESS }
 
+        # Outbound connector consent: the provider redirects the browser here
+        # cross-site, where the SameSite=Strict auth cookie is not sent. The
+        # HMAC-signed OAuth state identifies the user instead; /start (which
+        # mints that state) stays authenticated.
+        - { path: ^/api/v1/connections/m365/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 
         # Public file uploads endpoint (controller handles auth internally)
         - { path: ^/api/v1/files/uploads/, roles: PUBLIC_ACCESS }
+
+        # File download for <img>/<video>/<audio>. Those elements cannot send
+        # an Authorization header, so the native shell identifies the owner
+        # with a read-only media_token query param. The controller still
+        # rejects unauthenticated requests (cookie, Bearer, or media token).
+        - { path: ^/api/v1/files/\d+/download$, methods: [GET, HEAD], roles: PUBLIC_ACCESS }
 
         # Plugin assets (static JS/CSS files, served without auth for ES module loading)
         - { path: ^/api/v1/user/[^/]+/plugins/[^/]+/assets/, roles: PUBLIC_ACCESS }

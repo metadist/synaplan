@@ -1,4 +1,12 @@
 {
+  "announcements": {
+    "later": "Ahora no",
+    "iosApp": {
+      "title": "Synaplan ya está en el iPhone",
+      "body": "La app lleva tus chats, documentos y asistentes al móvil. La misma cuenta y los mismos datos: dicta tu pregunta mientras vas de camino y retoma cualquier conversación donde la dejaste.",
+      "action": "Descargar en el App Store"
+    }
+  },
   "updates": {
     "runningVersion": "Versión {version}",
     "badge": {
@@ -105,6 +113,7 @@
     "profile": "Perfil",
     "admin": "Panel de administración",
     "adminFeatures": "Estado de funciones",
+    "adminModelStatus": "Estado de modelos",
     "adminConfig": "Configuración del Sistema",
     "adminSetup": "Configuración de Proveedores de IA",
     "subscription": "Suscripción",
@@ -121,7 +130,70 @@
     "accountDeletion": "Eliminación de cuenta",
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
-    "aiAgents": "Agentes de IA"
+    "aiAgents": "Agentes de IA",
+    "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas"
+  },
+  "adminModelStatus": {
+    "title": "Estado de modelos",
+    "subtitle": "Qué modelos de IA funcionan ahora mismo y cuáles no.",
+    "loading": "Cargando el estado de los modelos…",
+    "loadFailed": "No se pudo cargar el estado de los modelos.",
+    "never": "nunca",
+    "noMatches": "Ningún modelo coincide con los filtros seleccionados.",
+    "freeHint": "La comprobación es gratuita: solo se pregunta qué modelos publica cada proveedor. Nunca se ejecuta un modelo de IA para esto.",
+    "states": {
+      "online": "En línea",
+      "degraded": "Con fallos",
+      "offline": "Fuera de servicio",
+      "unconfigured": "Sin configurar",
+      "unknown": "Desconocido"
+    },
+    "sources": {
+      "probe": "lista de modelos del proveedor",
+      "traffic": "uso real"
+    },
+    "summary": {
+      "allGood": "Todos los modelos responden",
+      "problems": "{count} modelo(s) requieren atención",
+      "lastCheck": "Última comprobación",
+      "monitoringOff": "La comprobación automática está desactivada, por lo que esta página solo muestra el último estado conocido."
+    },
+    "filters": {
+      "onlyProblems": "Mostrar solo problemas",
+      "capability": "Tarea",
+      "allCapabilities": "Todas las tareas"
+    },
+    "provider": {
+      "affected": "{count} afectados"
+    },
+    "model": {
+      "lastSuccess": "Última vez que funcionó",
+      "errorRate": "Falló el {percent} % de las últimas {total} llamadas",
+      "source": "Basado en",
+      "autoDisabled": "Desactivado automáticamente",
+      "switchedOff": "Desactivado",
+      "exempt": "Exento de la desactivación automática"
+    },
+    "actions": {
+      "refresh": "Comprobar ahora",
+      "refreshProvider": "Comprobar este proveedor",
+      "refreshProviderAria": "Comprobar {provider} ahora",
+      "resetCounters": "Borrar historial de errores",
+      "exempt": "Eximir de la automatización",
+      "unexempt": "Permitir la automatización de nuevo"
+    },
+    "confirmResetTitle": "¿Borrar el historial de errores?",
+    "confirmResetMessage": "Después, \"{name}\" se evaluará solo con el uso nuevo. Una comprobación que ya haya detectado que el modelo está retirado no se deshace.",
+    "messages": {
+      "refreshed": "Se comprobaron {count} modelo(s).",
+      "refreshFailed": "No se pudo completar la comprobación.",
+      "exempted": "Este modelo queda exento de la desactivación automática.",
+      "unexempted": "La desactivación automática vuelve a aplicarse a este modelo.",
+      "exemptFailed": "No se pudo cambiar la exención.",
+      "countersReset": "Historial de errores borrado.",
+      "countersResetFailed": "No se pudo borrar el historial de errores."
+    }
   },
   "addinConnect": {
     "title": "Conectar a Synaplan",
@@ -186,6 +258,10 @@
     "ttsGenerating": "Añadiendo respuesta hablada…",
     "audioUnavailable": "El audio no se pudo cargar",
     "audioUnavailableDescription": "El archivo no está disponible en el servidor por el momento. Inténtalo de nuevo más tarde o descárgalo.",
+    "imageUnavailable": "No se pudo cargar la imagen",
+    "imageUnavailableDescription": "La imagen no está disponible por el momento. Inténtalo de nuevo.",
+    "videoUnavailable": "No se pudo cargar el vídeo",
+    "videoUnavailableDescription": "El vídeo no está disponible por el momento. Inténtalo de nuevo.",
     "rename": "Renombrar Chat",
     "enterNewName": "Ingresa un nuevo título para este chat:",
     "namePlaceholder": "Título del chat...",
@@ -505,6 +581,40 @@
         "title": "Configuración Actualizada — Reinicio Requerido",
         "message": "Sus cambios se han guardado en el archivo .env. Para que los cambios surtan efecto, debe reiniciar sus contenedores Docker.",
         "copyCommand": "Copiar Comando"
+      },
+      "m365": {
+        "title": "Antes de que estos campos sirvan: registra una aplicación en Azure",
+        "intro": "El inicio de sesión de Microsoft 365 necesita un registro de aplicación en Azure. Se hace una sola vez, lleva unos cinco minutos y después cada persona podrá conectar su propia cuenta.",
+        "portalLink": "Portal de Azure → Registros de aplicaciones",
+        "step1": "Abre {portal} y elige «Nuevo registro». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En «URI de redirección», elige el tipo de plataforma Web (no SPA) y pega exactamente esta dirección:",
+        "step3": "Ve a «Permisos de API» → «Agregar un permiso» → «Microsoft Graph» → «Permisos delegados» y añade todos estos:",
+        "step3Note": "offline_access no es opcional: sin él Microsoft no emite un token de actualización y toda ejecución programada deja de funcionar al cabo de una hora.",
+        "step4": "Ve a «Certificados y secretos» → «Nuevo secreto de cliente» y copia la columna Valor, no el Id. de secreto. Solo se muestra esta vez.",
+        "step5": "Pega el ID de cliente y el secreto en los campos de abajo, indica el inquilino y activa M365_ENABLED. Después, cada persona conecta su cuenta en Canales → Conexiones.",
+        "ready": "Listo: ya se puede conectar una cuenta de Microsoft 365 en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa M365_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente."
+      },
+      "dropbox": {
+        "title": "Antes de que estos campos funcionen: crea una aplicación en la Dropbox App Console",
+        "intro": "La conexión con Dropbox necesita una aplicación de Dropbox. Se hace una sola vez, tarda unos cinco minutos y después cada usuario puede conectar su propia cuenta.",
+        "consoleLink": "Dropbox App Console",
+        "step1": "Abre la {console} y elige «Create app». Selecciona «Scoped access» y «Full Dropbox». El nombre da igual, por ejemplo «Synaplan».",
+        "step2": "En la pestaña «Permissions», activa estos dos permisos y haz clic en «Submit»:",
+        "step3": "En la pestaña «Settings», en «OAuth 2 → Redirect URIs», añade exactamente esta dirección:",
+        "step4": "También en la pestaña «Settings», copia el App key y el App secret (haz clic en «Show»).",
+        "step5": "Pega la clave y el secreto en los campos de abajo y activa DROPBOX_ENABLED. Después, los usuarios conectan su cuenta en Canales → Conexiones.",
+        "ready": "Listo: los usuarios pueden conectar su cuenta de Dropbox en Canales → Conexiones.",
+        "notReady": "Todavía no está activo. Rellena los campos de abajo y activa DROPBOX_ENABLED.",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
+        "resetTitle": "Restablecer todas las conexiones de Dropbox",
+        "resetDescription": "Elimina la conexión de Dropbox de todos los usuarios de esta instalación, incluidos los tokens guardados. Útil después de cambiar la app de Dropbox o sus permisos: después, todos pueden volver a conectar su cuenta desde cero.",
+        "resetButton": "Restablecer conexiones",
+        "resetConfirmTitle": "¿Restablecer todas las conexiones de Dropbox?",
+        "resetConfirmMessage": "Se eliminará la conexión de Dropbox de todos los usuarios y cada uno tendrá que volver a conectar su cuenta de Dropbox. Esto no se puede deshacer.",
+        "resetDone": "No hay conexiones de Dropbox que eliminar | 1 conexión de Dropbox eliminada | {count} conexiones de Dropbox eliminadas",
+        "resetFailed": "El restablecimiento ha fallado. Inténtalo de nuevo."
       }
     }
   },
@@ -523,6 +633,8 @@
     "toolsDocSummary": "Resumidor",
     "toolsMailHandler": "Automatización de correo",
     "mcpServers": "Servidores MCP",
+    "connections": "Conexiones",
+    "savedTasks": "Tareas guardadas",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -544,6 +656,7 @@
     "admin": "Admin",
     "adminDashboard": "Panel",
     "adminFeatureStatus": "Estado de Funciones",
+    "adminModelStatus": "Estado de Modelos",
     "adminSystemConfig": "Configuración del Sistema",
     "adminProviderSetup": "Proveedores de IA",
     "profile": "Perfil",
@@ -553,6 +666,34 @@
     "aiAgents": "Agentes de IA"
   },
   "guest": {
+    "disabledTitle": "El chat de invitados no está disponible",
+    "disabledDescription": "Esta instancia no ofrece una prueba anónima. Inicia sesión para empezar a chatear.",
+    "banner": {
+      "title": "Estás usando Synaplan como invitado",
+      "subtitle": "Regístrate para tener memorias, historial de chats y más",
+      "remaining": "Quedan {count} mensajes",
+      "signUp": "Regístrate gratis"
+    },
+    "limitModal": {
+      "title": "Has alcanzado el límite de invitado",
+      "subtitle": "Crea una cuenta gratuita para seguir chateando con la IA",
+      "features": {
+        "memories": "Una IA que recuerda tus preferencias",
+        "history": "Historial de chats permanente",
+        "files": "Subida de archivos y análisis de documentos",
+        "models": "Elige entre varios modelos de IA"
+      },
+      "registerButton": "Crear cuenta gratuita",
+      "loginButton": "¿Ya tienes una cuenta? Inicia sesión"
+    },
+    "errorTitle": "La prueba no está disponible ahora mismo",
+    "errorDescription": "No hemos podido iniciar tu sesión de invitado. Inténtalo de nuevo o crea una cuenta gratuita.",
+    "expiredTitle": "Tu sesión ha caducado",
+    "expiredDescription": "Las sesiones de invitado duran 24 horas y esta conversación de prueba no se puede recuperar. Empieza una nueva prueba o crea una cuenta gratuita para que tus chats se guarden a partir de ahora.",
+    "rateLimitedTitle": "Demasiadas sesiones",
+    "rateLimitedDescription": "Has alcanzado el límite de sesiones. Inténtalo más tarde o crea una cuenta gratuita.",
+    "retry": "Inténtalo de nuevo",
+    "createAccount": "Crear cuenta",
     "featureGate": {
       "title": "Esta función requiere una cuenta",
       "subtitle": "Crea una cuenta gratuita para desbloquear todas las funciones",
@@ -975,10 +1116,12 @@
     }
   },
   "setupBanner": {
-    "title": "Ningún proveedor de IA conectado",
-    "adminText": "El chat necesita un proveedor de IA. Conecta uno en un minuto — hay opciones gratuitas.",
-    "userText": "El chat aún no está listo. Pide a tu administrador que conecte un proveedor de IA.",
-    "cta": "Configurar proveedor de IA"
+    "adminTitle": "Ningún proveedor de IA configurado",
+    "userTitle": "El chat aún no está listo",
+    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto.",
+    "userText": "Un administrador todavía tiene que conectar un proveedor de IA. En la documentación se explica cómo se hace.",
+    "cta": "Abrir configuración de IA",
+    "docsCta": "Abrir documentación"
   },
   "localAiDownload": {
     "waitingTitle": "La IA local se está iniciando",
@@ -1529,6 +1672,31 @@
       "Claves de API, widgets y credenciales"
     ],
     "retention": "La eliminación es permanente y surte efecto de inmediato. Las copias de seguridad con datos residuales se rotan en un plazo de 30 días. Los datos que estamos legalmente obligados a conservar (p. ej. facturas) se mantienen solo durante el tiempo que exige la ley.",
+    "partialTitle": "Eliminar datos concretos sin borrar tu cuenta",
+    "partialIntro": "No necesitas renunciar a tu cuenta para eliminar datos. Con la sesión iniciada puedes borrar tú mismo lo siguiente, y surte efecto de inmediato.",
+    "partialItems": [
+      {
+        "name": "Chats y conversaciones",
+        "how": "Abre Historial, usa el menú ⋯ junto a una conversación y elige Eliminar. Para quitar varias a la vez, abre Estadísticas → Todos los Chats, selecciónalas y elige «Eliminar seleccionados»."
+      },
+      {
+        "name": "Archivos y documentos subidos",
+        "how": "Abre Fuentes → Explorar y usa el icono de papelera en un archivo, o selecciona varios y elimina la selección. Al eliminar una carpeta también se eliminan los archivos que contiene."
+      },
+      {
+        "name": "Imágenes y medios generados por IA",
+        "how": "Abre Fuentes → Generados y usa el icono de papelera en el elemento."
+      },
+      {
+        "name": "Recuerdos",
+        "how": "Abre Recuerdos y elimina entradas concretas, o selecciona varias y bórralas juntas."
+      },
+      {
+        "name": "Conexiones, widgets de chat y claves de API",
+        "how": "Abre Canales y elimina la conexión, el widget o la clave que ya no necesites."
+      }
+    ],
+    "partialRetention": "Lo que eliminas desaparece de tu cuenta de inmediato. Las copias de seguridad con copias residuales se rotan en un plazo de 30 días. Todo lo demás de tu cuenta permanece intacto.",
     "noAccessTitle": "¿No puedes iniciar sesión?",
     "noAccessDesc": "Si ya no tienes acceso a tu cuenta, contáctanos a través de nuestro sitio web y procesaremos tu solicitud de eliminación.",
     "visitWebsite": "Visitar el sitio web",
@@ -1576,6 +1744,9 @@
   },
   "taskPlan": {
     "title": "Plan de tareas",
+    "showSteps": "Mostrar pasos",
+    "hideSteps": "Ocultar pasos",
+    "scheduleThis": "Repetir esto más tarde según un horario",
     "download": "Descargar",
     "failedBody": "Este paso no se pudo completar.",
     "cancelledBody": "Has detenido este paso.",
@@ -1599,7 +1770,8 @@
       "document": "Documento",
       "search": "Búsqueda web",
       "extract": "Extracción de texto",
-      "email": "Correo"
+      "email": "Correo",
+      "folder": "Carpeta"
     },
     "capability": {
       "extract_text": "Extrayendo texto",
@@ -1617,7 +1789,8 @@
       "text2sound": "Audio",
       "document_generation": "Documento",
       "calendar_event": "Invitación de calendario",
-      "email_me": "Envío por correo"
+      "email_me": "Envío por correo",
+      "save_to_folder": "Guardar en carpeta"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -1720,7 +1893,32 @@
     },
     "cancelledByUser": "⚠️ Cancelado por el usuario",
     "truncated": "Esta respuesta fue cortada porque el modelo alcanzó su límite de tokens.",
-    "continueButton": "Continuar respuesta"
+    "continueButton": "Continuar respuesta",
+    "jsonViewer": {
+      "title": "Resultado",
+      "itemCount": "{count} elementos",
+      "chats": "{count} chats",
+      "items": "{count} elementos",
+      "results": "{count} resultados",
+      "records": "{count} registros",
+      "messages": "{count} mensajes",
+      "files": "{count} archivos",
+      "documents": "{count} documentos",
+      "users": "{count} usuarios",
+      "entries": "{count} entradas",
+      "data": "{count} elementos",
+      "empty": "Nada que mostrar",
+      "showJson": "Mostrar JSON",
+      "hideJson": "Ocultar JSON",
+      "showMore": "Mostrar {count} más",
+      "showLess": "Mostrar menos",
+      "shownOf": "Mostrando {shown} de {total}",
+      "truncatedHint": "El resultado era demasiado largo y se cortó — puede faltar la última entrada.",
+      "messagesCount": "{count} mensajes",
+      "idLabel": "ID {id}",
+      "expand": "Expandir",
+      "collapse": "Contraer"
+    }
   },
   "paywall": {
     "title": {
@@ -1730,7 +1928,7 @@
       "reminder": "Saca más partido a {brand}"
     },
     "subtitle": {
-      "guest_limit": "Elige un plan para seguir chateando, con tu propio historial, memorias y archivos.",
+      "guest_limit": "Elige un plan para seguir chateando. Con una cuenta tendrás, a partir de ahora, tu propio historial, memorias y archivos.",
       "free_limit": "Tu cuota gratuita está agotada. Elige un plan para seguir chateando sin límites.",
       "quota_exhausted": "Cambia a un plan superior para continuar ahora mismo, o espera a que tu cuota se reinicie el mes que viene.",
       "reminder": "Un plan te da más mensajes, modelos de IA más potentes y más almacenamiento."
@@ -2208,7 +2406,15 @@
     },
     "generated": {
       "title": "Generados",
-      "subtitle": "Imágenes, vídeo y audio creados en tus chats.",
+      "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",
+      "kinds": {
+        "all": "Todos",
+        "image": "Imágenes",
+        "video": "Vídeos",
+        "audio": "Audio",
+        "document": "Documentos",
+        "calendar": "Calendario"
+      },
       "openInChat": "Abrir en el chat",
       "download": "Descargar",
       "autoGroup": "Dejar que la IA elija una carpeta",
@@ -2247,6 +2453,227 @@
     "deletionNote": "Cuando eliminas un archivo, sus vectores también se eliminan del almacén vectorial activo."
   },
   "config": {
+    "savedTasks": {
+      "saveAsTask": "Guardar como tarea",
+      "comingSoonTitle": "Tarea guardada",
+      "comingSoonBody": "Esto te permitirá ejecutar esta instrucción según un horario o desde un canal. Llegará en una actualización posterior.",
+      "emptyHint": "Una tarea guardada ejecuta esta instrucción cuando la inicias y, más adelante, también según un horario.",
+      "title": "Tarea guardada",
+      "on": "Activada",
+      "off": "Desactivada",
+      "runNow": "Ejecutar ahora",
+      "runStarted": "La tarea se está ejecutando en su propia conversación.",
+      "runFailed": "La ejecución no pudo terminar.",
+      "updateFailed": "No se pudo actualizar esta tarea guardada.",
+      "runsFailed": "No se pudieron cargar las ejecuciones.",
+      "scheduleSaved": "Programación guardada.",
+      "resumed": "La tarea volverá a ejecutarse.",
+      "resume": "Reanudar",
+      "showResults": "Ver resultados",
+      "viewRuns": "Historial",
+      "hideRuns": "Ocultar historial",
+      "runsRetention": "Las ejecuciones antiguas se eliminan automáticamente.",
+      "runsEmpty": "Aún no hay ejecuciones.",
+      "runStatus": {
+        "queued": "En espera",
+        "running": "En curso",
+        "completed": "Completada",
+        "failed": "Fallida",
+        "cancelled": "Cancelada"
+      },
+      "runTrigger": {
+        "manual": "iniciada por ti",
+        "schedule": "programada",
+        "chat": "desde el chat",
+        "inbound_email": "correo entrante"
+      },
+      "advancedSteps": "Pasos avanzados",
+      "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
+      "autoPauseTitle": "Pausada automáticamente",
+      "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
+      "createFailed": "No se pudo guardar como tarea.",
+      "created": "Guardada como tarea. Ya puedes ejecutarla.",
+      "overviewTitle": "Tareas guardadas",
+      "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
+      "overviewLoading": "Cargando tareas guardadas…",
+      "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
+      "loadFailed": "No se pudieron cargar las tareas guardadas.",
+      "scheduleThis": "Volver a ejecutar esto más tarde",
+      "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
+      "scheduledFromChat": "Guardada. Elige cuándo debe ejecutarse.",
+      "state": {
+        "off": "No se está ejecutando",
+        "neverRun": "Guardada — aún no se ha ejecutado",
+        "scheduled": "Programada — primera ejecución {when}",
+        "running": "Ejecutándose ahora",
+        "lastRun": "Última ejecución: {when}",
+        "autoPaused": "Pausada automáticamente"
+      },
+      "schedule": {
+        "off": "Sin programación",
+        "hourly": "Cada hora",
+        "daily": "Cada día",
+        "weekdays": "Cada día laborable"
+      },
+      "summary": {
+        "simple": "Se ejecuta {when}.",
+        "template": "Se ejecuta {when}. Lee {reads} y entrega {saves}.",
+        "when": {
+          "manual": "cuando la inicias",
+          "interval": "cada {minutes} minutos",
+          "daily": "cada día a las {at} ({tz})",
+          "weekly": "los días laborables a las {at} ({tz})",
+          "schedule": "según un horario",
+          "inboundEmail": "cuando llega correo nuevo",
+          "chat": "cuando llega un mensaje de chat coincidente"
+        },
+        "reads": {
+          "instruction": "esta instrucción",
+          "mailbox": "el buzón conectado"
+        },
+        "saves": {
+          "email": "un correo para ti",
+          "folder": "un archivo en la carpeta conectada",
+          "calendar": "una entrada de calendario",
+          "reply": "una respuesta en el chat"
+        }
+      }
+    },
+    "connections": {
+      "title": "Conexiones",
+      "subtitle": "Los sistemas externos de los que Synaplan puede leer y en los que puede escribir en tu nombre.",
+      "empty": "Todavía no hay nada conectado. Elige una de las opciones de abajo para empezar; tarda aproximadamente un minuto.",
+      "loading": "Cargando conexiones…",
+      "loadFailed": "No se pudieron cargar las conexiones.",
+      "test": "Probar conexión",
+      "testOk": "La conexión parece correcta.",
+      "testFailed": "La prueba de conexión falló.",
+      "status": {
+        "connected": "Conectada",
+        "error": "Con error",
+        "reauth_required": "Es necesario reconectar",
+        "never_tested": "Nunca probada",
+        "disconnected": "Desconectada"
+      },
+      "types": {
+        "mailbox": "Buzón",
+        "mcp": "Sistema conectado",
+        "webdav": "Carpeta",
+        "webhook": "Dirección de aviso",
+        "caldav": "Calendario",
+        "generic": "Conexión",
+        "m365": "Microsoft 365",
+        "dropbox": "Dropbox"
+      },
+      "failure": {
+        "unauthorized": "{connection} rechazó el inicio de sesión. Vuelve a conectarlo para continuar.",
+        "not_found": "La carpeta {target} ya no existe en {connection}.",
+        "quota_exceeded": "{connection} no tiene espacio.",
+        "too_large": "El archivo es más grande de lo que {connection} acepta.",
+        "unreachable": "No se pudo alcanzar {connection}. Synaplan lo intentará de nuevo en la próxima ejecución.",
+        "conflict": "Ya existe un archivo con ese nombre; se guardó como {newName}.",
+        "rate_limited": "Se alcanzó tu límite de uso, así que se omitió esta ejecución.",
+        "unsupported": "Este tipo de archivo no se puede entregar a {connection}."
+      },
+      "explainer": "Configura un sistema aquí una sola vez. Después, las tareas guardadas y la IA podrán usarlo, por ejemplo para leer tus últimos correos de Outlook. Tu contraseña nunca se guarda: Microsoft 365 te pide iniciar sesión y le da a Synaplan un token que puedes revocar cuando quieras.",
+      "yourConnections": "Tus conexiones",
+      "addTitle": "Añadir una conexión",
+      "addSubtitle": "Qué hace cada opción y adónde te lleva.",
+      "lastChecked": "comprobada {when}",
+      "reauthHint": "Microsoft ya no acepta el inicio de sesión guardado. Vuelve a conectar para que las tareas programadas funcionen de nuevo.",
+      "reconnect": "Reconectar",
+      "testing": "Probando…",
+      "testOkAccount": "La conexión funciona: sesión iniciada como {account}.",
+      "manage": "Gestionar",
+      "editName": "Nombre",
+      "keepPassword": "Déjalo vacío para conservar la contraseña de aplicación actual.",
+      "updated": "Conexión actualizada.",
+      "updateFailed": "No se pudo actualizar la conexión.",
+      "deleteTitle": "¿Quitar esta conexión?",
+      "deleteMessage": "Synaplan dejará de usar {name}. Los archivos que ya estén allí no se borran.",
+      "deleteConfirm": "Quitar",
+      "deleted": "Se quitó {name}.",
+      "deleteFailed": "No se pudo quitar la conexión.",
+      "channelHint": "En el chat, usa el nombre {channel}",
+      "providers": {
+        "m365": {
+          "name": "Microsoft 365",
+          "description": "Inicia sesión con tu cuenta de Microsoft (de trabajo o personal) para que Synaplan pueda leer tu correo de Outlook. Solo lectura, y puedes desconectarla cuando quieras.",
+          "connect": "Conectar Microsoft 365",
+          "connectAnother": "Conectar otra cuenta",
+          "connectedAs": "Conectado como {account}.",
+          "connecting": "Abriendo Microsoft…",
+          "connected": "Microsoft 365 está conectado.",
+          "startFailed": "No se pudo abrir la página de inicio de sesión de Microsoft. Inténtalo de nuevo.",
+          "unavailable": "Todavía no disponible: Microsoft 365 debe configurarse una vez para esta instalación.",
+          "adminLink": "Configúralo en los ajustes del sistema.",
+          "askAdmin": "Pide a una persona administradora que lo active.",
+          "errors": {
+            "access_denied": "Cancelaste el inicio de sesión de Microsoft, así que no se conectó nada.",
+            "missing_code": "Microsoft envió una respuesta incompleta. Vuelve a iniciar la conexión.",
+            "exchange_failed": "Microsoft aceptó el inicio de sesión, pero no se pudo obtener el token. Revisa el secreto de cliente en los ajustes del sistema e inténtalo de nuevo.",
+            "invalid_state": "El inicio de sesión tardó demasiado o se empezó en otra pestaña. Inténtalo de nuevo.",
+            "unknown": "No se pudo conectar Microsoft 365. Inténtalo de nuevo."
+          },
+          "hosting": "Tu correo permanece en Microsoft, un proveedor de nube con sede en EE. UU."
+        },
+        "dropbox": {
+          "name": "Dropbox",
+          "description": "Inicia sesión con tu cuenta de Dropbox para que Synaplan pueda guardar los archivos generados en una carpeta de Dropbox; por ejemplo, «crea un documento y guárdalo en mi Dropbox». Puedes desconectarla cuando quieras.",
+          "connect": "Conectar Dropbox",
+          "connectAnother": "Conectar otra cuenta",
+          "connectedAs": "Conectado como {account}.",
+          "connecting": "Abriendo Dropbox…",
+          "connected": "Dropbox está conectado.",
+          "startFailed": "No se pudo abrir la página de inicio de sesión de Dropbox. Inténtalo de nuevo.",
+          "unavailable": "Aún no disponible: Dropbox debe configurarse una vez para esta instalación.",
+          "adminLink": "Configúralo en los ajustes del sistema.",
+          "askAdmin": "Pide a un administrador que lo active.",
+          "errors": {
+            "access_denied": "Cancelaste el inicio de sesión de Dropbox, así que no se conectó nada.",
+            "missing_code": "Dropbox envió una respuesta incompleta. Inicia la conexión de nuevo.",
+            "exchange_failed": "Dropbox aceptó el inicio de sesión pero no se pudo obtener el token. Comprueba el secreto de la aplicación en los ajustes del sistema e inténtalo de nuevo.",
+            "invalid_state": "El inicio de sesión tardó demasiado o se inició en otra pestaña. Inténtalo de nuevo.",
+            "unknown": "No se pudo conectar Dropbox. Inténtalo de nuevo."
+          },
+          "hosting": "Tus archivos permanecen en Dropbox, un proveedor de nube con sede en EE. UU."
+        },
+        "mailbox": {
+          "name": "Buzón (IMAP)",
+          "description": "Cualquier buzón compatible con IMAP, con usuario y contraseña: por ejemplo una cuenta de Gmail con contraseña de aplicación o tu propio servidor de correo.",
+          "action": "Configurar buzón"
+        },
+        "mcp": {
+          "name": "Sistema conectado (MCP)",
+          "description": "Dale a la IA herramientas de un servidor MCP externo, como un sistema de tickets o tu propio servicio.",
+          "action": "Añadir sistema"
+        },
+        "dav": {
+          "name": "Carpeta y calendario de Nextcloud (WebDAV)",
+          "description": "Guarda los resultados de tus tareas en tu carpeta en la nube y añade reuniones a tu calendario. Funciona con Nextcloud, ownCloud y cualquier servidor WebDAV.",
+          "hosting": "Se conecta a un servidor que tú eliges: tus archivos permanecen en tu propia nube.",
+          "action": "Conectar",
+          "kind": {
+            "nextcloud": "Nextcloud / ownCloud",
+            "webdav": "Otra dirección WebDAV"
+          },
+          "serverUrl": "Dirección del servidor",
+          "davUrl": "Dirección WebDAV (URL completa)",
+          "username": "Nombre de usuario",
+          "appPassword": "Contraseña de aplicación",
+          "appPasswordHint": "Créala en Nextcloud en Ajustes → Seguridad → Dispositivos y sesiones. Tu contraseña de la cuenta nunca se guarda.",
+          "localHttpHint": "En esta instalación de desarrollo también puedes usar una dirección local como http://nextcloud.",
+          "folder": "Carpeta para los resultados",
+          "withCalendar": "Conectar también un calendario:",
+          "connect": "Conectar",
+          "connecting": "Conectando…",
+          "created": "{name} está conectado.",
+          "createFailed": "No se pudo crear la conexión. Comprueba la dirección e inténtalo de nuevo.",
+          "folderName": "Carpeta de {host} ({user})",
+          "calendarName": "Calendario de {host} ({calendar})"
+        }
+      }
+    },
     "aiModels": {
       "title": "Modelos de IA",
       "description": "Configura y administra tus modelos de IA",
@@ -3511,14 +3938,25 @@
   },
   "mcpServers": {
     "title": "Servidores MCP",
-    "description": "Conecta servidores MCP externos para que el asistente pueda obtener datos de tus propios sistemas (CRM, wiki, APIs internas) al responder. Las herramientas descubiertas aquí quedan disponibles para el planificador de tareas.",
-    "clientDisabledHint": "El cliente MCP saliente está desactivado en la configuración de la plataforma. Puedes preparar conexiones, pero no se harán llamadas hasta que se active.",
+    "description": "Conecta cualquier servidor de herramientas compatible con MCP: un CRM, una wiki, un sistema de tickets, una plataforma de automatización o un servicio que alojes tú. Las herramientas descubiertas quedan disponibles para el planificador de tareas.",
+    "clientOnTitle": "Las llamadas MCP están activadas",
+    "clientOnText": "El asistente puede usar los servidores conectados en cualquier tarea que permita fuentes de datos MCP.",
+    "clientOffTitle": "Las llamadas MCP están desactivadas",
+    "clientOffAdminText": "Los servidores guardados se quedan aquí, pero el asistente no los llamará hasta que lo actives para esta instalación.",
+    "clientOffUserText": "Un administrador tiene que activarlo para esta instalación. Los servidores guardados se quedan aquí hasta entonces.",
+    "clientAdminLink": "Abrir en Configuración del sistema",
+    "clientEnable": "Activar las llamadas MCP",
+    "clientToggle": "Permitir llamadas MCP",
+    "clientEnabledNotice": "El asistente ya puede llamar a los servidores MCP conectados",
+    "clientDisabledNotice": "Las llamadas MCP están desactivadas — los servidores guardados se quedan",
+    "clientUpdateFailed": "No se pudo actualizar el ajuste de MCP",
     "listTitle": "Servidores conectados",
     "add": "Añadir servidor",
     "addTitle": "Conectar un servidor nuevo",
     "editTitle": "Editar servidor",
     "formHint": "La URL debe ser un endpoint MCP HTTPS público (Streamable HTTP). El valor de autenticación se guarda cifrado y no se vuelve a mostrar.",
     "empty": "Aún no hay servidores MCP conectados.",
+    "emptyHint": "Empieza con un formulario en blanco o elige un sistema conocido para rellenar el nombre y los valores por defecto. Puedes cambiar o borrar esa elección en cualquier momento.",
     "nameLabel": "Nombre",
     "urlLabel": "URL del servidor",
     "authHeaderLabel": "Nombre de la cabecera de autenticación (opcional)",
@@ -3548,7 +3986,40 @@
     "usageDisabled": "Fuentes de datos MCP desactivadas para esta tarea",
     "usageUpdateFailed": "No se pudo actualizar la tarea",
     "usageAdvancedHint": "Más opciones por tarea (restricciones de servidores, instrucciones, modelos):",
-    "usageAdvancedLink": "Instrucciones de IA"
+    "usageAdvancedLink": "Instrucciones de IA",
+    "templatesLabel": "Empezar desde",
+    "templatesHint": "Personalizado es la opción por defecto para cualquier servidor MCP. Una plantilla solo rellena el formulario: vuelve a hacer clic en la tarjeta seleccionada para borrarla.",
+    "templatesClear": "Seleccionada — clic de nuevo para quitar",
+    "templates": {
+      "custom": {
+        "name": "Servidor personalizado",
+        "summary": "Cualquier endpoint MCP",
+        "hint": "Pega la URL HTTPS de cualquier servidor MCP Streamable HTTP y, si hace falta, un token de acceso. CRM, wiki, tickets, automatización: si habla MCP, funciona aquí."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Tickets e incidencias",
+        "hint": "Conecta un servidor MCP compatible con Jira (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes listar tickets y crear otros nuevos con un prompt."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Páginas wiki",
+        "hint": "Conecta un servidor MCP compatible con Confluence (por ejemplo, un servicio MCP de Atlassian autoalojado) e introduce su URL de endpoint y token de acceso. Con las acciones de escritura activadas puedes buscar páginas, obtener resúmenes y crear páginas nuevas con un prompt."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Repos, issues, pull requests",
+        "hint": "Conecta un servidor MCP compatible con GitHub e introduce su URL de endpoint y un token de acceso personal. Útil para issues, pull requests y la búsqueda en repositorios."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Flujos de automatización",
+        "hint": "Conecta un servidor MCP de n8n para que el asistente pueda inspeccionar o disparar tus flujos de automatización. Pega la URL del endpoint MCP y el token de acceso de tu instancia n8n."
+      }
+    },
+    "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
+    "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
+    "writeBadge": "Escritura permitida"
   },
   "messagesGateway": {
     "title": "Agentes de IA",

@@ -237,6 +237,18 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.mcpServers' },
     },
     {
+      path: '/channels/connections',
+      name: 'channels-connections',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.connections' },
+    },
+    {
+      path: '/channels/tasks',
+      name: 'channels-saved-tasks',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks' },
+    },
+    {
       path: '/channels/agents',
       name: 'channels-agents',
       component: () => import('@/views/ConfigView.vue'),
@@ -397,10 +409,13 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
     },
     {
+      // Language and theme are stored on the device, not on the account, so a
+      // guest can reach this page. The account block inside it hides itself
+      // when nobody is signed in.
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.settings' },
+      meta: { requiresAuth: false, titleKey: 'pageTitles.settings' },
     },
     {
       path: '/testv',
@@ -434,6 +449,12 @@ const router = createRouter({
       name: 'admin-features',
       component: () => import('@/views/FeatureStatusView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminFeatures' },
+    },
+    {
+      path: '/admin/model-status',
+      name: 'admin-model-status',
+      component: () => import('@/views/ModelStatusView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminModelStatus' },
     },
     {
       path: '/admin/config',
@@ -637,7 +658,12 @@ router.beforeEach(async (to, from, next) => {
   } catch (err) {
     console.error('Auth initialization failed:', err)
     // If auth check times out, allow navigation to public routes only
-    if (to.meta.public || to.meta.requiresAuth === false) {
+    // (guest-allowed routes count as protected while the trial is disabled)
+    if (
+      to.meta.public ||
+      (to.meta.requiresAuth === false &&
+        !(to.meta.allowGuest === true && !useConfigStore().auth.guestChatEnabled))
+    ) {
       next()
       return
     }
@@ -657,7 +683,9 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const { isAuthenticated, isAdmin, user } = useAuth()
-  const requiresAuth = to.meta.requiresAuth !== false // Default to true
+  const guestChatEnabled = useConfigStore().auth.guestChatEnabled
+  const guestTrialOff = to.meta.allowGuest === true && !guestChatEnabled
+  const requiresAuth = to.meta.requiresAuth !== false || guestTrialOff // Default to true
   const requiresAdminAccess = to.meta.requiresAdmin === true
   const isPublicRoute = to.meta.public === true
 
@@ -693,11 +721,13 @@ router.beforeEach(async (to, from, next) => {
       return
     }
 
-    // Guest users: redirect to chat with feature-gate modal instead of login
+    // Guest users: redirect to chat with feature-gate modal instead of login.
+    // Skipped when the guest trial is disabled - chat itself requires auth
+    // then, so this redirect would loop; the stored key is also stale.
     const guestStore = useGuestStore()
     const hasStoredGuestSession =
       !guestStore.initialized && !!localStorage.getItem(GUEST_STORAGE_KEY)
-    if (guestStore.isGuestMode || hasStoredGuestSession) {
+    if (guestChatEnabled && (guestStore.isGuestMode || hasStoredGuestSession)) {
       const featureKey = mapPathToFeatureKey(to.path)
       next({ name: 'chat', query: { restricted: featureKey } })
       return

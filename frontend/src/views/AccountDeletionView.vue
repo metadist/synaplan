@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    class="h-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative overflow-x-hidden overflow-y-auto scroll-thin"
     data-testid="page-account-deletion"
   >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -101,6 +101,26 @@
           <p class="mt-3 text-xs txt-secondary">{{ $t('accountDeletion.retention') }}</p>
         </section>
 
+        <section class="mb-8" data-testid="section-partial-deletion">
+          <h2 class="text-lg font-semibold txt-primary mb-3">
+            {{ $t('accountDeletion.partialTitle') }}
+          </h2>
+          <p class="text-sm txt-secondary mb-4">{{ $t('accountDeletion.partialIntro') }}</p>
+          <ul class="space-y-3 text-sm">
+            <li v-for="(item, index) in partialItems" :key="index" class="flex items-start gap-2">
+              <Icon
+                icon="mdi:trash-can-outline"
+                class="w-4 h-4 flex-shrink-0 mt-0.5 text-[var(--brand)]"
+              />
+              <span>
+                <span class="txt-primary font-medium">{{ item.name }}</span>
+                <span class="txt-secondary"> — {{ item.how }}</span>
+              </span>
+            </li>
+          </ul>
+          <p class="mt-3 text-xs txt-secondary">{{ $t('accountDeletion.partialRetention') }}</p>
+        </section>
+
         <section class="surface-chip rounded-lg p-4">
           <h2 class="text-base font-semibold txt-primary mb-2">
             {{ $t('accountDeletion.noAccessTitle') }}
@@ -169,6 +189,15 @@ const steps = computed(() =>
 )
 const dataItems = computed(() =>
   (tm('accountDeletion.dataItems') as string[]).map((_, i) => t(`accountDeletion.dataItems.${i}`))
+)
+
+// Google Play requires the deletion link to also describe how users remove
+// individual data without closing the account, so the page carries both.
+const partialItems = computed(() =>
+  (tm('accountDeletion.partialItems') as unknown[]).map((_, i) => ({
+    name: t(`accountDeletion.partialItems.${i}.name`),
+    how: t(`accountDeletion.partialItems.${i}.how`),
+  }))
 )
 
 const cycleLanguage = () => {

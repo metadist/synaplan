@@ -8,6 +8,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\MediaAccessTokenService;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -177,6 +178,109 @@ class StaticUploadControllerTest extends WebTestCase
     }
 
     /**
+     * A media element cannot send an Authorization header, so an owner may
+     * also identify itself with the read-only media token in the query string.
+     */
+    public function testServesPrivateFileToOwnerWithMediaToken(): void
+    {
+        $relativePath = $this->createUploadOnDisk('whatsapp_'.bin2hex(random_bytes(4)).'.ogg', 'token-bytes');
+        $file = $this->persistFile($relativePath, 'audio', 'audio/ogg');
+        $message = $this->persistMessage();
+        $message->addFile($file);
+        $this->em->flush();
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request(
+            'GET',
+            '/api/v1/files/uploads/'.$relativePath.'?'.MediaAccessTokenService::QUERY_PARAM.'='.urlencode($this->mediaToken()),
+        );
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $this->assertStringContainsString(
+            'private',
+            (string) $this->client->getResponse()->headers->get('Cache-Control'),
+        );
+    }
+
+    public function testRejectsAnInvalidMediaToken(): void
+    {
+        $relativePath = $this->createUploadOnDisk('whatsapp_'.bin2hex(random_bytes(4)).'.ogg', 'token-bytes');
+        $file = $this->persistFile($relativePath, 'audio', 'audio/ogg');
+        $message = $this->persistMessage();
+        $message->addFile($file);
+        $this->em->flush();
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request(
+            'GET',
+            '/api/v1/files/uploads/'.$relativePath.'?'.MediaAccessTokenService::QUERY_PARAM.'=not-a-token',
+        );
+
+        $this->assertSame(Response::HTTP_UNAUTHORIZED, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * `ai_i2vsrc_*` is handed to image-to-video providers, which fetch it with
+     * no credential. It must stay anonymously readable.
+     */
+    public function testServesImageToVideoSourceAnonymously(): void
+    {
+        $relativePath = $this->createUploadOnDisk('ai_i2vsrc_1_'.bin2hex(random_bytes(4)).'.jpg', 'i2v-source');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $this->assertStringContainsString(
+            'public',
+            (string) $this->client->getResponse()->headers->get('Cache-Control'),
+        );
+    }
+
+    /**
+     * The `ai_` bypass is narrowed to the one prefix that needs it. Any other
+     * `ai_*` name must go through the ownership check, which has no database
+     * row for it and therefore 404s.
+     */
+    public function testDoesNotServeArbitraryAiPrefixedFilesAnonymously(): void
+    {
+        $relativePath = $this->createUploadOnDisk('ai_'.bin2hex(random_bytes(4)).'.png', 'not-published');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * `generated_*` had no producer left in the codebase, so the bypass no
+     * longer honours it.
+     */
+    public function testDoesNotServeLegacyGeneratedPrefixAnonymously(): void
+    {
+        $relativePath = $this->createUploadOnDisk('generated_'.bin2hex(random_bytes(4)).'.png', 'legacy');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * Meta's WhatsApp servers fetch the TTS `link` we hand them, so this
+     * prefix has to stay anonymously readable.
+     */
+    public function testServesTtsAudioAnonymously(): void
+    {
+        $relativePath = $this->createUploadOnDisk('tts_'.bin2hex(random_bytes(4)).'.mp3', 'spoken');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
      * Unknown paths must still return 404 — the new fallback must not
      * accidentally widen the surface to anything on disk.
      */
@@ -191,6 +295,13 @@ class StaticUploadControllerTest extends WebTestCase
         );
 
         $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    private function mediaToken(): string
+    {
+        $service = $this->client->getContainer()->get(MediaAccessTokenService::class);
+
+        return $service->generate($this->user);
     }
 
     private function createUploadOnDisk(string $filename, string $contents): string

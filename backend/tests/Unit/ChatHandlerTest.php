@@ -67,6 +67,12 @@ class ChatHandlerTest extends TestCase
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
 
+        // Every resolved model is revalidated before it reaches the provider.
+        // Unless a test says otherwise, the model it picked still works.
+        $this->modelConfigService
+            ->method('resolveUsableModelId')
+            ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
+
         $this->handler = new ChatHandler(
             $this->aiFacade,
             $this->promptRepository,

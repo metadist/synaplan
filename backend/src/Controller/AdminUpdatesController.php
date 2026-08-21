@@ -24,6 +24,10 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * BCONFIG, so it works offline; `POST /check` is the manual "check now" button
  * and is the only endpoint that may perform an outbound request.
  *
+ * `POST /check` deliberately bypasses the manifest cache: it exists so an
+ * operator who sees a wrong "latest release" can correct it immediately, and a
+ * button that answers from a cache up to six hours old cannot do that.
+ *
  * SECURITY: all endpoints require ROLE_ADMIN (class-level IsGranted).
  */
 #[Route('/api/v1/admin/updates')]
@@ -164,7 +168,7 @@ final class AdminUpdatesController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/updates/check',
         summary: 'Check for a newer release now',
-        description: 'Fetches the release manifest, stores the outcome and returns the refreshed status. A network failure is reported through lastError, not as an HTTP error. Does nothing when the master switch is off (admin only).',
+        description: 'Fetches the release manifest, stores the outcome and returns the refreshed status. Always re-downloads the manifest instead of answering from the cache, so a stale stored version can be corrected on demand. A network failure is reported through lastError, not as an HTTP error. Does nothing when the master switch is off (admin only).',
         security: [['Bearer' => []]],
         tags: ['Admin Updates']
     )]
@@ -221,7 +225,7 @@ final class AdminUpdatesController extends AbstractController
     #[OA\Response(response: 403, description: 'Admin access required')]
     public function check(): JsonResponse
     {
-        $status = $this->updateStatusService->refresh();
+        $status = $this->updateStatusService->refresh(force: true);
 
         return $this->json($this->payload($status));
     }

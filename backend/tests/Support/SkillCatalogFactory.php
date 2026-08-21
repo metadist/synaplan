@@ -12,8 +12,10 @@ use App\Service\Multitask\Execution\Runner\EmailMeRunner;
 use App\Service\Multitask\Execution\Runner\EmailSearchRunner;
 use App\Service\Multitask\Execution\Runner\ExtractTextRunner;
 use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
+use App\Service\Multitask\Execution\Runner\McpActionRunner;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
+use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\UrlFetchRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
@@ -42,6 +44,7 @@ final class SkillCatalogFactory
         WebSearchRunner::class,
         UrlFetchRunner::class,
         McpFetchRunner::class,
+        McpActionRunner::class,
         EmailSearchRunner::class,
         FileAnalysisRunner::class,
         MediaGenerationRunner::class,
@@ -49,6 +52,7 @@ final class SkillCatalogFactory
         DocumentGenerationRunner::class,
         CalendarEventRunner::class,
         EmailMeRunner::class,
+        SaveToFolderRunner::class,
         ComposeReplyRunner::class,
     ];
 

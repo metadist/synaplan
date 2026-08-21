@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
 use App\Service\Message\MessageApiFormatter;
@@ -33,6 +34,7 @@ class GuestChatController extends AbstractController
 {
     public function __construct(
         private GuestSessionService $guestSessionService,
+        private GuestChatConfig $guestChatConfig,
         private EntityManagerInterface $em,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
@@ -41,6 +43,24 @@ class GuestChatController extends AbstractController
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
+    }
+
+    /**
+     * Server-side gate for GUEST_CHAT_ENABLED=false (issue #1517): every guest
+     * endpoint refuses so disabling the trial is not merely cosmetic. Applied
+     * uniformly (not just to session creation) so a stale client with a stored
+     * session cannot keep using it after the operator turns the trial off.
+     */
+    private function denyWhenDisabled(): ?JsonResponse
+    {
+        if ($this->guestChatConfig->isEnabled()) {
+            return null;
+        }
+
+        return $this->json([
+            'error' => 'Guest chat is disabled on this instance.',
+            'code' => GuestChatConfig::DISABLED_CODE,
+        ], Response::HTTP_FORBIDDEN);
     }
 
     /**
@@ -76,8 +96,13 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     public function createSession(Request $request): JsonResponse
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $clientSessionId = $data['sessionId'] ?? null;
 
@@ -144,9 +169,14 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     #[OA\Response(response: 404, description: 'Session not found or expired')]
     public function getSessionStatus(string $sessionId): JsonResponse
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         if (!Uuid::isValid($sessionId)) {
             return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
         }
@@ -196,8 +226,13 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     public function createChat(Request $request): JsonResponse
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $sessionId = $data['sessionId'] ?? null;
 
@@ -306,10 +341,15 @@ class GuestChatController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Missing or invalid sessionId/trackId')]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     #[OA\Response(response: 404, description: 'Session not found, or no turn with this trackId in this session')]
     #[OA\Response(response: 410, description: 'Session expired')]
     public function stopStream(Request $request): JsonResponse
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         $data = json_decode($request->getContent(), true) ?? [];
         $sessionId = $data['sessionId'] ?? null;
         $trackId = isset($data['trackId']) && is_scalar($data['trackId']) ? trim((string) $data['trackId']) : '';
@@ -381,9 +421,14 @@ class GuestChatController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false)')]
     #[OA\Response(response: 404, description: 'Session not found or has no chat')]
     public function getMessages(string $sessionId): JsonResponse
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         if (!Uuid::isValid($sessionId)) {
             return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
         }
@@ -445,11 +490,15 @@ class GuestChatController extends AbstractController
     #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 200, description: 'File content')]
-    #[OA\Response(response: 403, description: 'File not associated with this session')]
+    #[OA\Response(response: 403, description: 'Guest chat is disabled on this instance (GUEST_CHAT_ENABLED=false), or file not associated with this session')]
     #[OA\Response(response: 404, description: 'Session or file not found')]
     #[OA\Response(response: 410, description: 'Session expired')]
     public function downloadFile(string $sessionId, int $fileId): Response
     {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+
         if (!Uuid::isValid($sessionId)) {
             return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
         }

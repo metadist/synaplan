@@ -13,11 +13,11 @@ class ModelCatalogTest extends TestCase
 {
     public function testFindByServiceAndProviderId(): void
     {
-        $results = ModelCatalog::find('groq:llama-3.3-70b-versatile');
+        $results = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');
 
         $this->assertNotEmpty($results);
         $this->assertSame('Groq', $results[0]['service']);
-        $this->assertSame('llama-3.3-70b-versatile', $results[0]['providerId']);
+        $this->assertSame('qwen/qwen3.6-27b', $results[0]['providerId']);
     }
 
     /**
@@ -35,9 +35,9 @@ class ModelCatalogTest extends TestCase
 
     public function testFindIsCaseInsensitive(): void
     {
-        $lower = ModelCatalog::find('groq:llama-3.3-70b-versatile');
-        $upper = ModelCatalog::find('GROQ:LLAMA-3.3-70B-VERSATILE');
-        $mixed = ModelCatalog::find('Groq:Llama-3.3-70b-Versatile');
+        $lower = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');
+        $upper = ModelCatalog::find('GROQ:QWEN/QWEN3.6-27B:CHAT');
+        $mixed = ModelCatalog::find('Groq:Qwen/Qwen3.6-27b:Chat');
 
         $this->assertSame($lower, $upper);
         $this->assertSame($lower, $mixed);
@@ -111,7 +111,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertCallsExecuteStatement(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -128,7 +128,7 @@ class ModelCatalogTest extends TestCase
     public function testRemoveCallsDeleteById(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -142,7 +142,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertSqlDoesNotOverwriteOperatorOwnedFields(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
@@ -307,6 +307,62 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * xAI Grok 4.6 — flagship chat + vision rows added 2026-08-20. Both talk to
+     * the same upstream model id, carry the official $2/$6 per-1M pricing with a
+     * $0.50/1M cache-read rate, and share the >200k long-context 2x tier via
+     * CONTEXT_PRICING (keyed by providerId, so one entry covers both rows).
+     */
+    public function testGrok46ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $grok46 = ModelCatalog::find('xai:grok-4.6');
+
+        $this->assertCount(2, $grok46, 'Expected grok-4.6 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($grok46, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('xai:grok-4.6:pic2text'));
+
+        foreach ($grok46 as $variant) {
+            $this->assertSame('xAI', $variant['service']);
+            $this->assertSame('grok-4.6', $variant['providerId']);
+            $this->assertSame('grok-4.6', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(6.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.50, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+
+        $tier = ModelCatalog::contextPricing('grok-4.6');
+        $this->assertNotNull($tier);
+        $this->assertSame(200000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(12.0, $tier['price_out_above'], 1e-9);
+    }
+
+    /**
+     * Kimi K3 via the HF router — like every Kimi row, pinned to DeepInfra
+     * (`:deepinfra` suffix) so the billed price is deterministic and matches
+     * the catalog rate (DeepInfra snapshot 2026-08-20). K3 outputs text only,
+     * so exactly chat + pic2text variants exist — no text2pic.
+     */
+    public function testKimiK3ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $k3 = ModelCatalog::find('huggingface:moonshotai/Kimi-K3-deepinfra');
+
+        $this->assertCount(2, $k3, 'Expected Kimi K3 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($k3, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('huggingface:moonshotai/Kimi-K3-deepinfra:pic2text'));
+
+        foreach ($k3 as $variant) {
+            $this->assertSame('HuggingFace', $variant['service']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['providerId']);
+            $this->assertSame('moonshotai/Kimi-K3:deepinfra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.85, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(14.25, (float) $variant['priceOut'], 1e-9);
+            $this->assertTrue($variant['json']['meta']['forced_thinking'] ?? false, 'K3 always thinks — the provider relies on this flag');
+        }
+    }
+
+    /**
      * The pre-4.8 Claude generations were retired in favour of Opus 4.8 and the
      * 5-series (deactivated in existing installs by Version20260727120000). Their
      * BIDs must never come back: BMESSAGES rows still reference them, and the
@@ -350,6 +406,52 @@ class ModelCatalogTest extends TestCase
         $ids = array_column(ModelCatalog::all(), 'id');
         $this->assertNotContains(30, $ids);
         $this->assertNotContains(49, $ids);
+    }
+
+    /**
+     * Groq shut down llama-3.3-70b-versatile, llama-3.1-8b-instant (08/16/26),
+     * llama-4-scout and qwen3-32b (07/17/26); Version20260819080000 deactivates
+     * them in existing installs. Re-adding one — under its old BID or its
+     * upstream model id — would resurrect a model whose API requests now fail.
+     */
+    public function testShutDownGroqModelsAreAbsentFromCatalog(): void
+    {
+        $providerIds = array_column(ModelCatalog::all(), 'providerId');
+        $ids = array_column(ModelCatalog::all(), 'id');
+
+        $retired = [
+            9 => 'llama-3.3-70b-versatile',
+            17 => 'meta-llama/llama-4-scout-17b-16e-instruct',
+            53 => 'qwen/qwen3-32b',
+            236 => 'llama-3.1-8b-instant',
+        ];
+        foreach ($retired as $retiredBid => $retiredProviderId) {
+            $this->assertNotContains($retiredProviderId, $providerIds, sprintf('%s was shut down by Groq and must not be re-added.', $retiredProviderId));
+            $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
+        }
+    }
+
+    /**
+     * Groq Qwen 3.6 27B — the replacement for the retired Llama 3.3 70B /
+     * Qwen3 32B (chat) and Llama 4 Scout (vision) rows. Both variants must talk
+     * to the same upstream model id and carry the official Groq pricing.
+     */
+    public function testGroqQwen36ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwen = ModelCatalog::find('groq:qwen/qwen3.6-27b');
+
+        $this->assertCount(2, $qwen, 'Expected Qwen 3.6 27B chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($qwen, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('groq:qwen/qwen3.6-27b:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('groq:qwen/qwen3.6-27b:pic2text'));
+
+        foreach ($qwen as $variant) {
+            $this->assertSame('Groq', $variant['service']);
+            $this->assertSame('qwen/qwen3.6-27b', $variant['providerId']);
+            $this->assertSame('qwen/qwen3.6-27b', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(0.60, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(3.00, (float) $variant['priceOut'], 1e-9);
+        }
     }
 
     /**
@@ -425,14 +527,14 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIsDeterministic(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         $this->assertSame(ModelCatalog::fingerprint($model), ModelCatalog::fingerprint($model));
     }
 
     public function testFingerprintIgnoresOperatorOwnedFields(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $toggled = array_merge($model, [
@@ -446,7 +548,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintIgnoresEmbeddedFingerprintKey(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expected = ModelCatalog::fingerprint($model);
 
         $stamped = $model;
@@ -457,7 +559,7 @@ class ModelCatalogTest extends TestCase
 
     public function testFingerprintChangesWhenCatalogValueChanges(): void
     {
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $model['priceIn'] = 0.99;
@@ -537,7 +639,7 @@ class ModelCatalogTest extends TestCase
         // Doctrine DBAL hands floats back as native floats; the identity should
         // survive a string round-trip equivalent to what (float) $row['BPRICEIN']
         // produces after JSON encode/decode in the actual seed flow.
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $original = ModelCatalog::fingerprint($model);
 
         $roundTripped = $model;
@@ -552,7 +654,7 @@ class ModelCatalogTest extends TestCase
     public function testUpsertEmbedsFingerprintInJsonPayload(): void
     {
         $connection = $this->createMock(Connection::class);
-        $model = ModelCatalog::find('groq:llama-3.3-70b-versatile')[0];
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
         $expectedFingerprint = ModelCatalog::fingerprint($model);
 
         // @phpstan-ignore-next-line

@@ -47,6 +47,7 @@ The chat bubble for an async video shows `Auftrag läuft noch / Job still runnin
 4. **Re-arm a stuck job** without waiting for the reaper:
    `docker compose exec -T backend php bin/console app:media:advance-jobs <job_id>` (or `--all` for every active job).
 5. **The reaper backstop** (`app:media:reap-jobs`) drives every stale / past-deadline job to `timed_out` with a localized error so no bubble hangs forever. Run it from cron (every minute) or manually.
+6. **Saved Task schedules** (`app:saved-tasks:tick`) claim due tasks with a compare-and-set and a cross-node Redis lock (`saved-tasks-tick`). The local `docker-compose.yml` has no scheduler service — fire a due task with `docker compose exec -T backend php bin/console app:saved-tasks:tick`. The Docker scheduler role (self-host / prod image) runs it every cycle after the media reaper. It is a no-op while `SAVEDTASKS / ENABLED` is globally off. Production host-cron (`cron-saved-tasks.sh` in `synaplan-platform`) is a separate PR. Overview UI: **Channels → Saved Tasks**.
 
 ### Redis (cache, sessions, locks, messenger, realtime)
 

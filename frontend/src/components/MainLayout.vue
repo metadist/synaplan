@@ -102,6 +102,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
+import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
@@ -113,6 +114,7 @@ const route = useRoute()
 const router = useRouter()
 const sidebarStore = useSidebarStore()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 
 // Signed-out users get a prominent login shortcut in the top bar. Hidden while
 // the drawer is open so it never overlaps the sliding content / close button.
@@ -120,7 +122,11 @@ const showLoginButton = computed(() => !authStore.isAuthenticated && !sidebarSto
 
 // Incognito toggle (mobile, top-right): signed-in users on the chat route only.
 const showIncognitoToggle = computed(
-  () => authStore.isAuthenticated && route.name === 'chat' && !sidebarStore.mobileDrawerOpen
+  () =>
+    authStore.isAuthenticated &&
+    route.name === 'chat' &&
+    !sidebarStore.mobileDrawerOpen &&
+    configStore.setup.chatReady !== false
 )
 
 const goToLogin = () => {

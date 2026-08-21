@@ -38,6 +38,7 @@ export type PartType =
   | 'video'
   | 'audio'
   | 'code'
+  | 'json'
   | 'links'
   | 'docs'
   | 'screenshot'
@@ -208,6 +209,7 @@ export const TASK_CARD_KINDS = [
   'search',
   'extract',
   'email',
+  'folder',
 ] as const
 export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
 
@@ -235,6 +237,8 @@ export interface TaskCard {
   capability: string
   kind: TaskCardKind
   state: TaskCardState
+  /** Upstream step ids this step waited on (empty/undefined for roots). */
+  dependsOn?: string[]
   text?: string
   url?: string
   mediaType?: string

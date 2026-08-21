@@ -19,6 +19,13 @@ use Psr\Log\LoggerInterface;
  */
 class GroqProvider implements ChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
 {
+    /**
+     * Fallback vision model when the caller passed none. Qwen 3.6 27B replaced
+     * the retired Llama 4 Scout (shut down 2026-07-17); normal flows resolve the
+     * model from the catalog and never hit this constant.
+     */
+    private const DEFAULT_VISION_MODEL = 'qwen/qwen3.6-27b';
+
     private ?OpenAI\Client $client = null;
 
     /** Key the cached client was built with (rebuild on key change). */
@@ -299,8 +306,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         }
 
         try {
-            // Groq supports llama-4-scout vision model
-            $model = $options['model'] ?? 'meta-llama/llama-4-scout-17b-16e-instruct';
+            $model = $options['model'] ?? self::DEFAULT_VISION_MODEL;
 
             // Build full path
             $fullPath = $this->uploadDir.'/'.ltrim($imageUrl, '/');
@@ -365,7 +371,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         }
 
         try {
-            $model = 'meta-llama/llama-4-scout-17b-16e-instruct';
+            $model = self::DEFAULT_VISION_MODEL;
 
             // Build full paths
             $fullPath1 = $this->uploadDir.'/'.ltrim($imageUrl1, '/');

@@ -71,16 +71,24 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
     private const DEFAULT_IMAGE_EDIT_GUIDANCE_SCALE = 7.5;
 
     /**
-     * Kimi K2.7-Code enforces thinking mode and rejects requests that deviate from
-     * these sampling parameters with an API error. They are applied after all other
-     * options so that caller-supplied values are safely overridden.
+     * Kimi's always-thinking models (K2.7-Code, K3) require these sampling
+     * parameters: K2.7-Code rejects deviating requests with an API error, and
+     * Moonshot documents temperature=1.0 / top_p=0.95 as the settings all K3
+     * results are produced with. They are applied after all other options so
+     * that caller-supplied values are safely overridden.
      *
      * @see https://huggingface.co/moonshotai/Kimi-K2.7-Code
+     * @see https://huggingface.co/moonshotai/Kimi-K3
      */
-    private const KIMI_K2_7_FORCED_SAMPLING = [
+    private const KIMI_FORCED_THINKING_SAMPLING = [
         'temperature' => 1.0,
         'top_p' => 0.95,
     ];
+
+    /**
+     * Model-string fragments of Kimi models that force thinking mode.
+     */
+    private const KIMI_FORCED_THINKING_MODELS = ['Kimi-K2.7', 'Kimi-K3'];
 
     /**
      * Optional chat parameters that are forwarded as-is to the OpenAI-compatible
@@ -99,6 +107,9 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
         'response_format',
         'tools',
         'tool_choice',
+        // Thinking models (Kimi K3) accept a top-level reasoning_effort
+        // ("low" | "high" | "max"); the HF router forwards it to the partner.
+        'reasoning_effort',
     ];
 
     /**
@@ -729,10 +740,13 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
             }
         }
 
-        // K2.7-Code forces thinking mode with fixed sampling params; override any user-provided values.
-        if (str_contains($model, 'Kimi-K2.7')) {
-            foreach (self::KIMI_K2_7_FORCED_SAMPLING as $key => $value) {
-                $body[$key] = $value;
+        // Always-thinking Kimi models need fixed sampling params; override any user-provided values.
+        foreach (self::KIMI_FORCED_THINKING_MODELS as $fragment) {
+            if (str_contains($model, $fragment)) {
+                foreach (self::KIMI_FORCED_THINKING_SAMPLING as $key => $value) {
+                    $body[$key] = $value;
+                }
+                break;
             }
         }
 
@@ -807,6 +821,14 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 $choice = $json['choices'][0] ?? [];
                 if (isset($choice['finish_reason'])) {
                     $finishReason = (string) $choice['finish_reason'];
+                }
+
+                // Thinking models (Kimi K3, K2.7-Code) stream their reasoning as
+                // separate deltas; surface them per the ChatProviderInterface
+                // contract instead of leaving the caller staring at a silent stream.
+                $reasoning = $choice['delta']['reasoning_content'] ?? '';
+                if ('' !== $reasoning) {
+                    $callback(['type' => 'reasoning', 'content' => (string) $reasoning]);
                 }
 
                 $delta = $choice['delta']['content'] ?? '';

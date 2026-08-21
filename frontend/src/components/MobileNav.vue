@@ -2,8 +2,10 @@
   <!--
     Mobile push-drawer content (§4.3): primary navigation on phones. Rendered
     underneath the sliding content by MainLayout. A single scroll column holds
-    the primary buttons, the expandable "More" section and the paginated chat
-    history (infinite scroll). Hidden on md+ (desktop uses the SidebarV2 rail).
+    the primary buttons (New chat, History, Sources, More), the expandable
+    "More" section and the paginated chat history (infinite scroll). History
+    jumps to the list below so the control sits in the same place as the
+    desktop rail. Hidden on md+ (desktop uses the SidebarV2 rail).
   -->
   <div class="v2-drawer-nav flex flex-col h-full" data-testid="nav-mobile-drawer-content">
     <!-- Clearance for the fixed toggle button + safe area -->
@@ -31,6 +33,16 @@
           />
           <PlusIcon v-else class="w-5 h-5" aria-hidden="true" />
           <span class="flex-1 text-left">{{ $t('chat.newChat') }}</span>
+        </button>
+
+        <button
+          class="v2-drawer-item"
+          :class="historyActive && 'v2-drawer-item--active'"
+          data-testid="btn-mobile-nav-history"
+          @click="handleHistoryClick"
+        >
+          <ClockIcon class="w-5 h-5" aria-hidden="true" />
+          <span class="flex-1 text-left">{{ $t('nav.history') }}</span>
         </button>
 
         <button
@@ -131,6 +143,7 @@
 
                 <template v-if="isGuestMode">
                   <router-link
+                    v-if="configStore.auth.registrationEnabled"
                     to="/register"
                     class="v2-drawer-account font-medium"
                     style="color: var(--brand)"
@@ -206,16 +219,6 @@
                     <span>{{ $t('nav.statistics') }}</span>
                   </button>
                   <button
-                    class="v2-drawer-account"
-                    :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
-                    data-testid="btn-mobile-more-preferences"
-                    @click="handleNavigate('/settings')"
-                  >
-                    <Cog6ToothIcon class="w-5 h-5" />
-                    <span>{{ $t('nav.preferences') }}</span>
-                  </button>
-                  <button
                     v-if="
                       !authStore.isAdmin &&
                       configStore.billing.enabled &&
@@ -247,16 +250,33 @@
                     <RocketLaunchIcon class="w-5 h-5" />
                     <span>{{ $t('nav.upgrade') }}</span>
                   </button>
-                  <button
-                    v-if="!isImpersonating"
-                    class="v2-drawer-account text-red-500 dark:text-red-400"
-                    data-testid="btn-mobile-more-logout"
-                    @click="handleLogout"
-                  >
-                    <ArrowRightOnRectangleIcon class="w-5 h-5" />
-                    <span>{{ $t('settings.logout') }}</span>
-                  </button>
                 </template>
+
+                <!--
+                  Preferences holds the language and the theme, both stored on
+                  the device rather than on the account, so it stays outside the
+                  guest/authenticated split and is offered to everyone.
+                -->
+                <button
+                  class="v2-drawer-account"
+                  :class="isPathActive('/settings') ? 'v2-drawer-account--active' : 'txt-primary'"
+                  :data-nav-active="isPathActive('/settings') ? 'true' : undefined"
+                  data-testid="btn-mobile-more-preferences"
+                  @click="handleNavigate('/settings')"
+                >
+                  <Cog6ToothIcon class="w-5 h-5" />
+                  <span>{{ $t('nav.preferences') }}</span>
+                </button>
+
+                <button
+                  v-if="!isGuestMode && !isImpersonating"
+                  class="v2-drawer-account text-red-500 dark:text-red-400"
+                  data-testid="btn-mobile-more-logout"
+                  @click="handleLogout"
+                >
+                  <ArrowRightOnRectangleIcon class="w-5 h-5" />
+                  <span>{{ $t('settings.logout') }}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -264,7 +284,12 @@
       </nav>
 
       <!-- Chat history (paginated, infinite scroll) -->
-      <div class="mt-4 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]">
+      <div
+        id="section-mobile-history"
+        ref="historySection"
+        class="mt-4 pt-3 border-t border-black/[0.06] dark:border-white/[0.06]"
+        data-testid="section-mobile-history"
+      >
         <p
           class="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider txt-secondary opacity-70"
         >
@@ -430,6 +455,7 @@ import {
   Bars3Icon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
+  ClockIcon,
   Cog6ToothIcon,
   CreditCardIcon,
   FolderIcon,
@@ -485,6 +511,7 @@ const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
 
 const scrollContainer = ref<HTMLElement | null>(null)
+const historySection = ref<HTMLElement | null>(null)
 const historySentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 
@@ -497,6 +524,7 @@ const moreSections = computed(() =>
 )
 
 const filesActive = computed(() => route.path.startsWith('/files'))
+const historyActive = computed(() => route.path === '/' || route.path.startsWith('/chat'))
 const moreActive = computed(() => moreSections.value.some((item) => isItemActive(item)))
 
 // Account-block entries live inside the "More" panel but outside navItems, so
@@ -528,6 +556,16 @@ const handleNewChat = async () => {
       isCreatingChat.value = false
     }, 300)
   }
+}
+
+const handleHistoryClick = () => {
+  triggerHapticImpact('light')
+  // Collapse "More" so the history list sits directly under the primary
+  // buttons — the same place the desktop History rail item opens its sheet.
+  moreExpanded.value = false
+  nextTick(() => {
+    historySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 const handleFilesClick = () => {

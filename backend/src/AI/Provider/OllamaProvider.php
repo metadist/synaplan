@@ -428,8 +428,14 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
     /**
      * Get list of available models from Ollama.
+     *
+     * Public because the health monitor reports which models are actually
+     * pulled: a reachable Ollama holding nothing is the most common reason a
+     * self-hosted chat fails, and it is invisible to isAvailable().
+     * Returns an empty array both when nothing is pulled and when the call
+     * fails, so callers that need to tell those apart check isAvailable() too.
      */
-    protected function getAvailableModels(): array
+    public function getAvailableModels(): array
     {
         try {
             $models = $this->client->models()->list();

@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\AI\Health\ModelHealthAlert;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
@@ -18,12 +19,15 @@ final readonly class DiscordNotificationService
     // Discord embed colors
     private const COLOR_SUCCESS = 0x00FF00; // Green
     private const COLOR_ERROR = 0xFF0000;   // Red
+    private const COLOR_WARNING = 0xFFA500; // Orange
 
     // Truncation limits (Discord API: field value max 1024, total embed max 6000)
     // @see https://discord.com/developers/docs/resources/channel#embed-object-embed-limits
     private const MAX_USER_MESSAGE = 200;  // Truncate user message preview
     private const MAX_RESPONSE = 300;      // Truncate response preview
     private const MAX_ERROR = 450;         // Truncate error (leaves room for code block formatting)
+    private const MAX_FIELD_VALUE = 1024;  // Hard Discord limit for a single field value
+    private const MAX_DRIFT_ENTRIES = 15;  // Model-availability findings listed before "… and N more"
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -711,6 +715,142 @@ final readonly class DiscordNotificationService
             footer: 'Synaplan Embedding · throttled to 1/hour per provider pair',
             mentionEveryone: true,
         );
+    }
+
+    /**
+     * Notify that we still offer models a provider no longer lists.
+     *
+     * Deliberately not an `@everyone` incident: the finding is advisory and the
+     * models are still installed and selectable, so there is nothing to ack at
+     * 3am. It is a standing reminder that a retirement migration is due before
+     * users start seeing provider errors.
+     *
+     * @param list<string> $missingModels      human-readable lines, most urgent first
+     * @param list<string> $uncheckedProviders providers that could not be verified
+     */
+    public function notifyModelAvailabilityDrift(array $missingModels, array $uncheckedProviders): void
+    {
+        if (!$this->isEnabled() || [] === $missingModels) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => sprintf('Missing upstream (%d)', count($missingModels)),
+                'value' => $this->bulletList($missingModels, self::MAX_DRIFT_ENTRIES),
+                'inline' => false,
+            ],
+            [
+                'name' => 'Action required',
+                'value' => 'Confirm on the provider deprecation page, then retire via migration (deactivate, never delete) — docs/PRICING_MAINTENANCE.md.',
+                'inline' => false,
+            ],
+        ];
+
+        if ([] !== $uncheckedProviders) {
+            $fields[] = [
+                'name' => 'Not verified',
+                'value' => $this->truncate(implode(', ', $uncheckedProviders), self::MAX_ERROR),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ Discontinued AI models detected',
+            color: self::COLOR_WARNING,
+            fields: $fields,
+            footer: 'Synaplan model availability check · daily',
+        );
+    }
+
+    /**
+     * Report AI models that stopped working, or that started working again.
+     *
+     * Distinct from {@see self::notifyModelAvailabilityDrift()} on purpose: that
+     * one is a maintenance reminder that our catalog drifted from the provider's,
+     * this one is an incident about models failing right now — including the
+     * account-specific failures a catalog comparison cannot see.
+     *
+     * One message per provider rather than per model — see
+     * {@see ModelHealthAlert}. `@everyone` is reserved for the
+     * credential case: a rejected key or an empty balance takes out every model
+     * behind that provider and only an operator can fix it, whereas a provider
+     * retiring a single model can wait for office hours.
+     */
+    public function notifyModelHealth(ModelHealthAlert $alert, bool $resolved = false): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '🏢 Provider',
+                'value' => $alert->name(),
+                'inline' => true,
+            ],
+            [
+                'name' => '🔢 Models',
+                'value' => (string) $alert->modelCount(),
+                'inline' => true,
+            ],
+            [
+                'name' => '🧠 Affected',
+                'value' => $this->truncate($alert->previewNames(), self::MAX_RESPONSE),
+                'inline' => false,
+            ],
+            [
+                'name' => $resolved ? 'Recovered after' : '⚠️ Reason',
+                'value' => '```'.$this->truncate($alert->reason, self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        if (!$resolved) {
+            $fields[] = [
+                'name' => 'Action required',
+                'value' => $alert->actionRequired(),
+                'inline' => false,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: $resolved
+                ? '✅ [RESOLVED] '.$alert->name().' models available again'
+                : '🚨 [INCIDENT] '.$alert->headline(),
+            color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Model Health · one alert per provider',
+            mentionEveryone: !$resolved && ModelHealthAlert::KIND_CREDENTIAL === $alert->kind,
+        );
+    }
+
+    /**
+     * Render lines as a Discord field value, capped at both the entry count and
+     * the API's 1024-character field limit.
+     *
+     * @param list<string> $lines
+     */
+    private function bulletList(array $lines, int $maxEntries): string
+    {
+        $shown = array_slice($lines, 0, $maxEntries);
+        $value = '';
+        $rendered = 0;
+        foreach ($shown as $line) {
+            $candidate = $value.'• '.$line."\n";
+            if (mb_strlen($candidate) > self::MAX_FIELD_VALUE - 40) {
+                break;
+            }
+            $value = $candidate;
+            ++$rendered;
+        }
+
+        $omitted = count($lines) - $rendered;
+        if ($omitted > 0) {
+            $value .= sprintf('… and %d more', $omitted);
+        }
+
+        return '' === $value ? '(none)' : $value;
     }
 
     /**

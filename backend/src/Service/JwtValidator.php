@@ -24,7 +24,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Validates JWT signatures using JWKS from OIDC providers (Keycloak, etc.).
  *
- * Note: Not marked as 'final' to allow mocking in tests.
+ * Tests double this class through dg/bypass-finals (registered as a PHPUnit
+ * bootstrap extension), so `final` does not stand in the way of mocking.
  */
 final readonly class JwtValidator
 {
@@ -168,10 +169,23 @@ final readonly class JwtValidator
 
             $audiences = is_array($claims['aud']) ? $claims['aud'] : [$claims['aud']];
             if (!in_array($expectedAudience, $audiences, true)) {
-                $this->logger->warning('JWT audience mismatch', [
+                $context = [
                     'expected' => $expectedAudience,
                     'actual' => $claims['aud'],
-                ]);
+                ];
+
+                // Keycloak falls back to aud=account when the client has no
+                // hardcoded audience mapper. That is by far the most common
+                // cause of this mismatch and is invisible from the token
+                // alone, so name it here instead of leaving it to log-diving.
+                if (in_array('account', $audiences, true)) {
+                    $context['hint'] = sprintf(
+                        'Token carries aud=account: the OIDC client is most likely missing a hardcoded audience mapper for "%s" (see _docker/keycloak/setup.sh).',
+                        $expectedAudience,
+                    );
+                }
+
+                $this->logger->warning('JWT audience mismatch', $context);
 
                 return false;
             }

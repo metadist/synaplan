@@ -93,6 +93,47 @@ Provider billing-mechanics cheat-sheet (verified 2026-07-13):
 
 Catalog now set to DeepInfra rates. Note K2.7 was previously $0.95/$4.00 (ABOVE DeepInfra) → we had been overcharging customers; K2.5/K2.6 were below → we had been losing money.
 
+### Kimi K3 (BIDs 328/329) — snapshot 2026-08-20
+
+Same DeepInfra pin. HF partners serving K3 on 08-20: DeepInfra, Together, Fireworks, Featherless, Baseten.
+
+| Provider | K3 | Notes |
+| -------- | -- | ----- |
+| **DeepInfra (PINNED)** | $2.85 / $14.25 | cache-read $0.285, native MXFP4 |
+| Together / Fireworks / Novita | $3.00 / $15.00 | Moonshot first-party list price |
+
+## Discontinuation detection — `app:models:check-availability`
+
+Providers retire models without telling us, and until now we found out when a user hit a provider error. This command finds it first.
+
+```bash
+docker compose exec -T backend php bin/console app:models:check-availability --fail-on-drift; echo $?
+```
+
+It runs in **two stages, and the second one is the point**: the provider's model list is only a cheap pre-filter, then every model missing from that list is confirmed individually via `GET {listUrl}/{modelId}`. Only a model the provider itself answers `404`/`400` for is reported. Judging by list membership alone is wrong in both directions, verified against the live APIs on 2026-08-19:
+
+- **False alarm** — Gemini serves `imagen-4.0-generate-001` through `:predict` and leaves it out of `models.list`, but answers `200` when asked directly. A list-only check reports all three Imagen rows as dead.
+- **Blind spot** — xAI's `grok-tts` is also absent from `/v1/models`, and there it really is gone (`404`). Any heuristic that excused the Imagen case (per-capability coverage, tag families) hid this one.
+
+What it deliberately does **not** do: change anything. No `BACTIVE=0`, no default repointing. A model also disappears from a listing through a rename, a region gate or an account tier, and an unattended deactivation on a false positive takes a working model away from every user of the install. Retirement stays a reviewed, human decision — now a reviewed registry entry rather than a reviewed migration (see [Retiring a model](#retiring-a-model)).
+
+Reporting rules that keep it trustworthy:
+
+- Providers with no key, no listing endpoint (HuggingFace validates via `whoami-v2`; Ollama et al. are per-install) or an unreachable API are **unchecked** — never read as "serves nothing".
+- A probe that answers `401`/`429`/`5xx` leaves the model **unconfirmed**: shown in the console, excluded from the alert and the exit code.
+- Findings carry both scopes independently: `database` (this install's active `BMODELS` rows) and `catalog` (what new installs still get). An operator who cleaned up locally must still learn that fresh installs keep receiving the dead model.
+- A finding on a `ProviderDefaultsService` recommendation is marked and sorted first — `app:provider:apply-defaults --auto` assigns those unattended at container start.
+
+Exit codes match `app:sync-model-prices`: `0` clean, `1` the command broke, `2` confirmed findings (only with `--fail-on-drift`). The scheduler role runs it daily with `--notify`, which posts to Discord when `DISCORD_WEBHOOK_URL` is set. Installs without cloud keys make no outbound request at all.
+
+### First run against live APIs (2026-08-19)
+
+Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b-versatile` (BID 9), `llama-3.1-8b-instant` (236), `qwen/qwen3-32b` (53) and `meta-llama/llama-4-scout-17b-16e-instruct` (17 — the Groq `PIC2TEXT` default), xAI dropped `grok-stt` (321 — the xAI `SOUND2TEXT` default) and `grok-tts` (320). Groq's current list is 13 models; `whisper-large-v3` and `openai/gpt-oss-*` are unaffected.
+
+The four Groq rows were retired in `Version20260819080000` (#1513), which also added Groq Qwen 3.6 27B (324/325) as their successor. Re-running the check after that migration reports Groq at `7/7 matched`: the retired rows are out of the active set and the freshly added successor BIDs produce no false positive.
+
+The two xAI rows were retired in `Version20260820120000` (#1514). Because the catalog has no xAI replacement for either capability, this is the **no-successor** variant of the policy: the rows are deactivated and their `DEFAULTMODEL` bindings are **deleted** instead of repointed, which hands the capability back to the normal resolution chain rather than binding the install to a provider whose key the operator may not hold. The xAI `SOUND2TEXT` recommendation was dropped from `ProviderDefaultsService` in the same change — without that, `app:provider:apply-defaults --auto` writes the dead binding back on the next container start.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
@@ -133,12 +174,13 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
-### xAI / Grok (verified 2026-07-29)
+### xAI / Grok (verified 2026-07-29; Grok 4.6 rows added 2026-08-20)
 
 OpenAI-compatible chat/vision at `https://api.x.ai/v1`, plus the Grok Imagine media endpoints and the voice endpoints (`/v1/tts`, `/v1/stt` — note: NOT OpenAI's `/v1/audio/*`). Catalog stores **USD per 1M tokens** for the token rows; cache-read rates live in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (cache) | Long context (> 200k) | Context |
 | --- | ----- | -------------- | ---------------- | --------------------- | ------- |
+| 326 / 327 | `grok-4.6` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.50) | $4.00 / $12.00 | 500k |
 | 313 / 315 | `grok-4.5` (chat + vision) | $2.00 / $6.00 | $2.00 / $6.00 (cache $0.30) | $4.00 / $12.00 | 500k |
 | 316 | `grok-imagine-image` | — / $0.02 per image | $0.02 (1k and 2k identical) | n/a | n/a |
 | 317 | `grok-imagine-video` | — / $0.07 per second | 480p $0.05 · 720p $0.07 | n/a | 1–15 s |
@@ -153,15 +195,15 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 
 **Known deviations and limits — read before "fixing" a number:**
 
-- **LiteLLM reports a $0.50/1M cache-read price for `xai/grok-4.5`; the official xAI docs say $0.30.** We follow the official value. The sync only rewrites `cache_read_price_per_1M` when the input/output price itself drifts, so our value stays put — do not "correct" it toward LiteLLM.
-- **Cached tokens are not doubled in the long-context tier.** `CONTEXT_PRICING` overrides only `price_in`/`price_out`, so above 200k prompt tokens cache reads are billed at $0.30 instead of xAI's $0.60 — a small undercharge. Extending `CONTEXT_PRICING` with a `cache_price_above` key would be a small follow-up.
+- **LiteLLM reports a $0.50/1M cache-read price for `xai/grok-4.5`; the official xAI docs say $0.30.** We follow the official value. The sync only rewrites `cache_read_price_per_1M` when the input/output price itself drifts, so our value stays put — do not "correct" it toward LiteLLM. (`grok-4.6` is different: there the official cache-read price really is $0.50, so catalog and LiteLLM agree.)
+- **Cached tokens are not doubled in the long-context tier.** `CONTEXT_PRICING` overrides only `price_in`/`price_out`, so above 200k prompt tokens cache reads are billed at the base rate ($0.30 on `grok-4.5` instead of xAI's $0.60, $0.50 on `grok-4.6` instead of $1.00) — a small undercharge. Extending `CONTEXT_PRICING` with a `cache_price_above` key would be a small follow-up.
 - **No pic2pic / image editing and no video editing or extension.** xAI bills input media separately ($0.002 per input image, $0.01 per input video second) and the `per_image` cost path pins `inputQuantity` to 0, so those inputs could not be attributed. `XaiProvider::editImage()` and `createVariations()` therefore throw. As long as only `text2pic` and `text2vid` are offered, billing is exact.
 - **Read the Imagine table in the rendered page, never the "View as Markdown" export.** The markdown/plain-text view flattens the multi-row Imagine table and keeps only the FIRST resolution row, so `grok-imagine-video` looks like a flat `$0.050 / sec` and the 720p rate silently disappears. The `.../models/grok-imagine-video` page shows the same collapsed number. Trusting that export once already produced a 40% undercharge on the default 720p render. The rendered [pricing page](https://docs.x.ai/developers/pricing) is the only reliable source for media rows.
 - **1080p is not a `grok-imagine-video` resolution.** Only `grok-imagine-video-1.5` (BID 319) offers it, which is why BID 317 caps `allowed_resolutions` at 480p/720p. `XaiProvider::resolutionFromOptions()` additionally intersects the request with the keys of `resolution_prices`, so a row that prices only 480p/720p can never render an unpriced tier even if its `allowed_resolutions` are missing. A row without `resolution_prices` bills every tier at `priceOut`, so there the requested resolution is honoured as-is.
 - **Images are billed from `default_resolution`, not from the request.** The image path never passes a resolution into `calculateMediaCost()`, so `resolveResolution()` falls back to the catalog's `default_resolution` — and `XaiProvider::generateImage()` sends that same value to xAI. Changing `default_resolution` on BID 318 therefore moves the request AND the price together; changing only `priceOut` would desync them.
 - **`grok-imagine-video-1.5` is image-to-video only.** It carries `features: ['image2video']` + `requires_reference_image`, so `MediaGenerationHandler` explains the missing reference image instead of leaking a provider 400. It is reachable through the IMG2VID default-model slot, which shares the `text2vid` BTAG. Because `XaiProvider` implements `SupportsInlineReferenceImage`, the handler passes the local upload path and the provider inlines it as a data URI — so image-to-video works on xAI without an internet-reachable `APP_URL`, unlike Higgsfield and Veo.
 - **No refund on cancel.** xAI has no cancel endpoint for deferred video renders, so `cancelVideoOperation()` only stops our polling; the render completes upstream and stays billable.
-- **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. `grok-4.5`'s reasoning depth — and therefore its output token volume — is not controllable, so a Thinking toggle cannot reduce its cost.
+- **`reasoning_effort` is a grok-4.3-only parameter**, and grok-4.3 is not in the catalog. xAI documents the knob for that model alone (`none` / `low` (default) / `medium` / `high`), so `XaiProvider::REASONING_EFFORT_MODELS` gates it. The reasoning depth of `grok-4.5` and `grok-4.6` — and therefore their output token volume — is not controllable, so a Thinking toggle cannot reduce their cost.
 - **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
 - **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
 - **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
@@ -313,7 +355,47 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 
 `ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
 
-> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` without a companion migration stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Always pair a catalog removal with a deactivation migration.
+> **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` on its own stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Since #1515 the second half is a data entry rather than a migration; see [Retiring a model](#retiring-a-model) below.
+
+## Retiring a model
+
+Every retirement above needed its own hand-written migration, and three of them existed *only* to clean up models an earlier release had dropped from the catalog while leaving them live in every install. #1515 replaced that with a registry: `ModelCatalog::RETIREMENTS`, applied by `ModelRetirementSeeder` on every deploy.
+
+**The whole procedure is now:**
+
+1. Add the entry to `ModelCatalog::RETIREMENTS`, keyed by the retired BID:
+
+```php
+321 => [
+    'providerId' => 'grok-stt',                  // guard: the row is skipped if the BID now holds something else
+    'retiredOn' => '2026-08-20',                 // ships as BMODELS.BRETIREDON
+    'successor' => null,                         // catalog key, or null for "no replacement" on purpose
+    'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
+],
+```
+
+2. Set `active` and `selectable` to `0` on the catalog row if you are keeping it, or remove the row entirely. Either is fine — the registry is what carries the retirement.
+3. Run `make -C backend test`. No migration, no SQL.
+
+**What the seeder does**, idempotently and on every container start, for each entry whose row exists and still matches `providerId`: stamps `BRETIREDON` and `BSUCCESSORID`, and forces `BACTIVE = BSELECTABLE = BISDEFAULT = 0`. A re-run writes nothing. A BID an operator repurposed is skipped with a warning. Rows are never deleted — `BMESSAGES` has FKs into `BMODELS` and **BIDs must never be reused**.
+
+The health monitor (`app:model:health-check`) skips every row that carries `BRETIREDON`. A recorded retirement is expected to be missing, so it is not probed and it must not raise the hourly incident mail. Operator-disabled rows without a date stay in the check.
+
+**Why a separate seeder from `ModelSeeder`:** that one treats `BACTIVE`/`BSELECTABLE`/`BISDEFAULT` as operator-owned and never overwrites them, which is right for a live model and wrong for a dead one. A retirement outranks an operator preference — "please keep offering this" on a model the provider switched off only produces a failing request. Keeping the override in its own seeder makes it explicit instead of punching a hole in `ModelSeeder`'s preservation rules.
+
+**`successor: null` is a statement, not a gap.** It means no substitution may be made — an embedding model (a different model is a different vector space; see the `VECTORIZE` warning above) or a provider that shipped no replacement at all. Do not fill it with another provider's model to avoid the null: that assumes an API key the operator may not hold.
+
+**The guard that makes this stick:** `ModelCatalogRetirementTest` snapshots every BID the catalog has ever shipped (`tests/Unit/Model/__snapshots__/model_bids.json`). Drop a model without a retirement entry and it fails, naming the BID. Adding models is expected — re-record and review that the diff is additions only:
+
+```bash
+docker compose exec -T -e UPDATE_MODEL_BID_SNAPSHOT=1 backend \
+  ./vendor/bin/phpunit tests/Unit/Model/ModelCatalogRetirementTest.php
+git diff backend/tests/Unit/Model/__snapshots__/
+```
+
+It also enforces that a recorded successor resolves to exactly one live catalog entry and is not itself retired, so a chain of retirements can never repoint an install at another dead model.
+
+**Still open (follows separately, #1515):** consuming `BSUCCESSORID` at resolution time and surfacing retirement state in the admin UI. Until then, `DEFAULTMODEL` bindings that point at a retired BID are handled as before — repointed or deleted by the migration that accompanied that retirement — and a stale binding degrades through `ModelConfigService`'s logged fallback, since it treats a deactivated row as unusable.
 
 ## Related issues
 

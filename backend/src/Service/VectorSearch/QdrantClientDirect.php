@@ -184,8 +184,8 @@ final class QdrantClientDirect implements QdrantClientInterface
             // Ask for up to 2x the requested limit so dedup below doesn't
             // short-change the caller when legacy+UUID pairs sit above the
             // score threshold for the same logical point.
-            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/search", [
-                'vector' => $queryVector,
+            $response = $this->qdrantRequest('POST', "/collections/{$collection}/points/query", [
+                'query' => $queryVector,
                 'filter' => ['must' => $must],
                 'limit' => $limit * 2,
                 'score_threshold' => $minScore,
@@ -198,7 +198,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             // logical point (one integer-keyed, one UUID-keyed), so the
             // same `_point_id` can appear twice in one response.
             $bestByLogical = [];
-            foreach ($response['result'] ?? [] as $hit) {
+            foreach ($response['result']['points'] ?? [] as $hit) {
                 $logical = $hit['payload']['_point_id'] ?? (string) $hit['id'];
                 if (!isset($bestByLogical[$logical]) || $hit['score'] > $bestByLogical[$logical]['score']) {
                     $bestByLogical[$logical] = [
@@ -498,8 +498,8 @@ final class QdrantClientDirect implements QdrantClientInterface
                 $must[] = ['key' => 'group_key', 'match' => ['value' => $groupKey]];
             }
 
-            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/search", [
-                'vector' => $vector,
+            $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/query", [
+                'query' => $vector,
                 'filter' => ['must' => $must],
                 'limit' => $limit,
                 'score_threshold' => $minScore,
@@ -507,7 +507,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             ]);
 
             $results = [];
-            foreach ($response['result'] ?? [] as $hit) {
+            foreach ($response['result']['points'] ?? [] as $hit) {
                 $results[] = [
                     'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
                     'score' => $hit['score'],

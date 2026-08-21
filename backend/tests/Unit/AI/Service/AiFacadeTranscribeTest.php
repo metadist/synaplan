@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
+use App\AI\Health\ModelHealthRecorder;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
@@ -67,6 +68,7 @@ class AiFacadeTranscribeTest extends TestCase
             $this->createMock(CacheItemPoolInterface::class),
             $this->createMock(HiggsfieldCredentialResolver::class),
             $this->transcriptionUsageRecorder,
+            $this->createMock(ModelHealthRecorder::class),
             '/tmp'
         );
     }

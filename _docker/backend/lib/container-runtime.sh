@@ -340,9 +340,12 @@ run_scheduler_role() {
     local tick_seconds="${SYNAPLAN_SCHEDULER_TICK_SECONDS:-60}"
     local hourly_seconds="${SYNAPLAN_SCHEDULER_HOURLY_SECONDS:-3600}"
     local daily_seconds="${SYNAPLAN_SCHEDULER_DAILY_SECONDS:-86400}"
+    local health_seconds="${SYNAPLAN_SCHEDULER_MODEL_HEALTH_SECONDS:-900}"
+    local health_jitter="${SYNAPLAN_SCHEDULER_MODEL_HEALTH_JITTER:-120}"
     local now
     local next_hourly=0
     local next_daily=0
+    local next_health=0
     local cycles=0
     local max_cycles="${SYNAPLAN_SCHEDULER_MAX_CYCLES:-0}"
 
@@ -352,13 +355,17 @@ run_scheduler_role() {
     mkdir -p "$SYNAPLAN_RUNTIME_DIR"
     trap stop_scheduler TERM INT
 
-    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, update check every ${daily_seconds}s)."
+    runtime_log "Starting scheduler (media reaper every ${tick_seconds}s, ephemeral-file reaper every ${hourly_seconds}s, model health check every ${health_seconds}s, update + model-availability check every ${daily_seconds}s)."
     while [ "$_scheduler_stopping" -eq 0 ]; do
         now="$(date +%s)"
         printf '%s\n' "$now" > "${SYNAPLAN_RUNTIME_DIR}/scheduler.heartbeat"
 
         if ! run_scheduler_command bin/console --env="$env" app:media:reap-jobs --no-interaction; then
             runtime_log "Media reaper failed; it will be retried on the next tick." >&2
+        fi
+
+        if ! run_scheduler_command bin/console --env="$env" app:saved-tasks:tick --no-interaction; then
+            runtime_log "Saved Tasks tick failed; it will be retried on the next tick." >&2
         fi
 
         if [ "$now" -ge "$next_hourly" ]; then
@@ -376,7 +383,32 @@ run_scheduler_role() {
             if ! run_scheduler_command bin/console --env="$env" app:updates:check --no-interaction; then
                 runtime_log "Update check failed; it will be retried on the next daily interval." >&2
             fi
+
+            # Discontinued-model detection. Read-only and reports only: it asks
+            # the providers the operator already configured a key for which
+            # models they still serve, and never changes a row. Installs without
+            # cloud keys make no outbound request at all.
+            if ! run_scheduler_command bin/console --env="$env" app:models:check-availability --notify --no-interaction; then
+                runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
+            fi
+
             next_daily=$((now + daily_seconds))
+        fi
+
+        # Runtime health of the models this install actually uses. Distinct from
+        # the daily availability check above: that one reports catalog drift for
+        # a human to act on, this one reacts within minutes to a provider that
+        # started failing, which is why it runs on a much shorter interval.
+        # Every provider is asked once through its free "list your models"
+        # endpoint — no inference, so this costs nothing to run on a schedule.
+        # The jitter keeps a fleet of installs from hitting the same provider
+        # APIs on the same minute. A failure just means one provider was
+        # unreachable and is retried on the next interval.
+        if [ "$now" -ge "$next_health" ]; then
+            if ! run_scheduler_command bin/console --env="$env" app:model:health-check --jitter="$health_jitter" --no-interaction; then
+                runtime_log "Model health check failed; it will be retried on the next interval." >&2
+            fi
+            next_health=$((now + health_seconds))
         fi
 
         cycles=$((cycles + 1))

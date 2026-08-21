@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
@@ -16,6 +17,7 @@ use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Media\MediaCancellationStore;
@@ -80,6 +82,7 @@ class StreamController extends AbstractController
         private WidgetService $widgetService,
         private WidgetSessionService $widgetSessionService,
         private GuestSessionService $guestSessionService,
+        private GuestChatConfig $guestChatConfig,
         private RateLimitService $rateLimitService,
         private string $uploadDir,
         private UserUploadPathBuilder $userUploadPathBuilder,
@@ -87,6 +90,7 @@ class StreamController extends AbstractController
         private MessageForwardingService $messageForwardingService,
         private MemoryExtractionDispatcher $memoryExtractionDispatcher,
         private ConversationSummaryRefreshDispatcher $conversationSummaryRefreshDispatcher,
+        private ChatTitleService $chatTitleService,
         private DocumentGeneratorService $documentGenerator,
         private DocumentImageReferenceResolver $documentImageReferenceResolver,
         private MediaCancellationStore $cancellationStore,
@@ -464,6 +468,16 @@ class StreamController extends AbstractController
                 // Guest Mode: Check for guest session parameter (query or POST body)
                 $guestSessionId = $params->get('guestSession');
                 if ($guestSessionId) {
+                    if (!$this->guestChatConfig->isEnabled()) {
+                        // Distinguish "trial disabled" from "session expired" so
+                        // clients do not offer a new-trial/sign-up flow that the
+                        // instance cannot serve (issue #1517).
+                        return $this->json([
+                            'error' => 'Guest chat is disabled on this instance.',
+                            'code' => GuestChatConfig::DISABLED_CODE,
+                        ], Response::HTTP_FORBIDDEN);
+                    }
+
                     $guestSession = $this->guestSessionService->getSession($guestSessionId);
                     if ($guestSession && !$guestSession->isExpired()) {
                         if (!$this->guestSessionService->checkLimit($guestSession)) {
@@ -1891,6 +1905,20 @@ class StreamController extends AbstractController
                     $this->messageForwardingService->forwardIfNeeded($chat, $finalText);
                 }
 
+                // Name the conversation once its first exchange is stored, so
+                // the sidebar stops filling with "Hi" and "New Chat" (#1500).
+                // Runs at most once per chat: titleWebChatIfNeeded() returns
+                // null as soon as a title exists, including one the user typed.
+                // Widget sessions title themselves on their own trigger, and
+                // incognito turns persist nothing to name.
+                $generatedChatTitle = null;
+                if (!$isWidgetMode && !$isGuestMode && !$incognito && $chat) {
+                    $generatedChatTitle = $this->chatTitleService->titleWebChatIfNeeded(
+                        $chat,
+                        (int) $user->getId(),
+                    );
+                }
+
                 $recordedChatUsage = $this->rateLimitService->recordUsage($user, 'MESSAGES', [
                     'provider' => $response['metadata']['provider'] ?? 'unknown',
                     'model' => $response['metadata']['model'] ?? 'unknown',
@@ -2031,6 +2059,12 @@ class StreamController extends AbstractController
                     'searchResults' => $searchResults,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
                 ];
+
+                // Only present on the turn that named the chat, so the sidebar
+                // can pick the title up without refetching the chat list.
+                if (null !== $generatedChatTitle) {
+                    $completeData['chatTitle'] = $generatedChatTitle;
+                }
 
                 // Usage taximeter: per-message usage (switch-independent) and,
                 // only when the display is enabled for authenticated web users,
@@ -3000,11 +3034,26 @@ class StreamController extends AbstractController
      * it as an error would add a second outgoing message for the same tracking
      * id, so the chat showed two cancellation cards for one Stop click.
      *
+     * The `cancelled` marker is the intended signal. The message match is a
+     * safety net for any path that still reports a cancel as a plain failure:
+     * one leaked result would otherwise persist a second card carrying raw
+     * English text (#1501), which no translation layer can repair afterwards.
+     *
      * @param array<string, mixed> $result
      */
     private function isCancelledResult(array $result): bool
     {
-        return true !== ($result['success'] ?? false) && true === ($result['cancelled'] ?? false);
+        if (true === ($result['success'] ?? false)) {
+            return false;
+        }
+
+        if (true === ($result['cancelled'] ?? false)) {
+            return true;
+        }
+
+        $error = $result['error'] ?? null;
+
+        return \is_string($error) && 1 === preg_match('/cancell?ed by user/i', $error);
     }
 
     /**
@@ -3324,6 +3373,9 @@ class StreamController extends AbstractController
             // from uploads (default 'web_upload') and can be regenerated from
             // BFILETEXT on download when the on-disk binary goes missing.
             $file->setSource('generated');
+            // Kind powers the Generated gallery's type filter (BORIGINKIND);
+            // everything this path writes is a document format (docx/xlsx/…).
+            $file->setOriginKind('document');
             $file->setEphemeral($ephemeral);
 
             $this->em->persist($file);

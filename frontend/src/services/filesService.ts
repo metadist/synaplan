@@ -930,6 +930,7 @@ export interface StorageStats {
   remaining_formatted: string
   max_file_size: number
   max_file_size_formatted: string
+  unlimited?: boolean
 }
 
 export interface StorageStatsResponse {

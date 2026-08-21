@@ -80,7 +80,13 @@ final class ResultAssembler
         $allFailed = 0 === $successCount && 0 === $inProgressCount;
         $replyResult = $context->getResult($plan->replyNode);
 
-        if (null !== $replyResult && $replyResult->isSuccessful()) {
+        // A reply node that SUCCEEDED but produced neither text nor files (e.g.
+        // an authored compose_reply without wired inputs) must not yield a
+        // blank answer — recover from the other nodes like on a failure.
+        $replyHasOutput = null !== $replyResult && $replyResult->isSuccessful()
+            && ('' !== ($replyResult->text ?? '') || [] !== $replyResult->files);
+
+        if ($replyHasOutput) {
             $content = $replyResult->text ?? '';
             $files = $replyResult->files;
             $metadata = $replyResult->metadata;
@@ -194,6 +200,7 @@ final class ResultAssembler
                 'capability' => $node->capability->value,
                 'kind' => $node->capability->uiKind(),
                 'state' => $nodeStatus,
+                'depends_on' => $node->dependsOn,
             ];
             if (null !== $nodeResult) {
                 if ('search' === $node->capability->uiKind()) {

@@ -194,7 +194,7 @@
                   class="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-white/[0.06] flex items-center justify-center"
                 >
                   <img
-                    v-if="isImageFile(file.file_type)"
+                    v-if="isImageFile(file.file_type) && getDownloadUrl(file.id)"
                     :src="getDownloadUrl(file.id)"
                     :alt="file.filename"
                     class="w-full h-full object-cover"
@@ -208,7 +208,10 @@
                   />
                   <Icon
                     :icon="getFileIcon(file.file_type)"
-                    :class="['w-6 h-6 txt-secondary', isImageFile(file.file_type) ? 'hidden' : '']"
+                    :class="[
+                      'w-6 h-6 txt-secondary',
+                      isImageFile(file.file_type) && getDownloadUrl(file.id) ? 'hidden' : '',
+                    ]"
                   />
                 </div>
 
@@ -363,6 +366,7 @@ import filesService, {
   UploadFailedError,
 } from '@/services/filesService'
 import { getApiBaseUrl } from '@/services/api/httpClient'
+import { useMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import FileContentModal from './FileContentModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -822,8 +826,12 @@ const isImageFile = (fileType: string): boolean => {
   return type.includes('image') || /jpg|jpeg|png|gif|webp/.test(type)
 }
 
+// Used for the bare <img> thumbnail: a no-op on web, on native it appends a
+// read-only media token because <img> can't send auth headers
+// (MOBILE-APP SEAM, see mediaAuth.ts).
+const { mediaSrc } = useMediaSrc()
 const getDownloadUrl = (fileId: number): string => {
-  return `${getApiBaseUrl()}/api/v1/files/${fileId}/download`
+  return mediaSrc(`${getApiBaseUrl()}/api/v1/files/${fileId}/download`)
 }
 
 const getFileIcon = (fileType: string): string => {

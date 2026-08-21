@@ -80,15 +80,18 @@ final class SkillCatalogTest extends TestCase
     public function testFlagGatedCapabilityVisibilityFollowsTheRolloutDefaults(): void
     {
         // Built-in defaults (no BCONFIG rows): url_fetch is ON after the
-        // plan-09 S6 rollout; mcp_fetch and email_search are DYNAMIC blocks
-        // (requiresDynamicNote) that additionally need a per-user sub-catalog /
-        // availability note — without one they stay invisible regardless of
-        // their flags, so exactly two capability lines are missing.
+        // plan-09 S6 rollout; mcp_fetch, mcp_action and email_search are
+        // DYNAMIC blocks (requiresDynamicNote) that additionally need a
+        // per-user sub-catalog / availability note — without one they stay
+        // invisible regardless of their flags, so those three plus
+        // save_to_folder (also dynamic) are missing.
         $default = SkillCatalogFactory::real()->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $default);
         self::assertStringNotContainsString('"mcp_fetch"', $default);
+        self::assertStringNotContainsString('"mcp_action"', $default);
         self::assertStringNotContainsString('"email_search"', $default);
-        self::assertCount(count(Capability::cases()) - 2, explode("\n", $default));
+        self::assertStringNotContainsString('"save_to_folder"', $default);
+        self::assertCount(count(Capability::cases()) - 4, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.
