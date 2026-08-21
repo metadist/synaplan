@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\OutboundChannelMedia;
 use App\Service\Message\MessageProcessor;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -414,6 +415,7 @@ final class WhatsAppService
         string $mediaUrl,
         string $phoneNumberId,
         ?string $caption = null,
+        ?string $filename = null,
     ): array {
         if (!$this->isAvailable()) {
             throw new \RuntimeException('WhatsApp service is not available');
@@ -438,9 +440,14 @@ final class WhatsAppService
             'link' => $mediaUrl,
         ];
 
-        // WhatsApp API requires 'filename' for document type
+        // WhatsApp API requires 'filename' for document type. Prefer the
+        // original display name so a published `{userId}_document_{ts}.docx`
+        // copy still arrives as "notes.docx" rather than the fetchable alias.
         if ('document' === $mediaType) {
-            $mediaPayload['filename'] = basename(parse_url($mediaUrl, PHP_URL_PATH)) ?: 'document';
+            $fromUrl = basename((string) parse_url($mediaUrl, PHP_URL_PATH));
+            $mediaPayload['filename'] = (null !== $filename && '' !== $filename)
+                ? $filename
+                : ($fromUrl ?: 'document');
         }
 
         // Convert caption markdown to WhatsApp format if present
@@ -488,6 +495,56 @@ final class WhatsAppService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Build the URL Meta should fetch, rewriting generated documents (and any
+     * other file whose basename is not already anonymously fetchable) to a
+     * copy whose name matches {@see OutboundChannelMedia} so
+     * StaticUploadController will serve it without auth.
+     *
+     * @return array{0: string, 1: string} [absolute URL, original display filename]
+     */
+    private function mediaLinkForMeta(string $mediaPath, string $mediaType, int $userId): array
+    {
+        $displayFilename = basename(OutboundChannelMedia::relativeUploadPath($mediaPath));
+        if ('' === $displayFilename) {
+            $displayFilename = $mediaType;
+        }
+
+        $originalUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
+
+        if (OutboundChannelMedia::isAnonymouslyFetchable($displayFilename)) {
+            return [$originalUrl, $displayFilename];
+        }
+
+        $relative = OutboundChannelMedia::relativeUploadPath($mediaPath);
+        if ('' === $relative || str_contains($relative, '..')) {
+            return [$originalUrl, $displayFilename];
+        }
+
+        $absoluteSource = rtrim($this->uploadsDir, '/').'/'.$relative;
+        $published = OutboundChannelMedia::publishCopy(
+            $absoluteSource,
+            $this->uploadsDir,
+            $userId,
+            $mediaType,
+            $this->userUploadPathBuilder,
+        );
+
+        if (null === $published) {
+            $this->logger->warning('WhatsApp: Could not publish media for anonymous Meta fetch', [
+                'media_path' => $mediaPath,
+                'media_type' => $mediaType,
+            ]);
+
+            return [$originalUrl, $displayFilename];
+        }
+
+        return [
+            rtrim($this->appUrl, '/').'/api/v1/files/uploads/'.$published,
+            $displayFilename,
+        ];
     }
 
     /**
@@ -889,7 +946,7 @@ final class WhatsAppService
             $mediaPath = $fileData['path'] ?? null;
 
             if ($mediaPath && !empty($this->appUrl) && in_array($generatedMediaType, ['audio', 'video', 'image', 'document'], true)) {
-                $mediaUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
+                [$mediaUrl, $displayFilename] = $this->mediaLinkForMeta($mediaPath, $generatedMediaType, (int) $effectiveUserId);
 
                 $this->logger->info('WhatsApp: Sending AI-generated media response', [
                     'to' => $dto->from,
@@ -899,14 +956,18 @@ final class WhatsAppService
 
                 // The response text must never be lost: WhatsApp captions only
                 // exist on image/video/document and cap at 1024 chars — audio
-                // has no caption at all. Short text rides as the caption
-                // (kept clean of the sources block, issue #652); otherwise the
-                // FULL text (incl. sources) goes out as its own message BEFORE
-                // the media, mirroring how the web chat shows text + media.
+                // has no caption at all. Short text rides as the caption on
+                // image/video (kept clean of the sources block, issue #652).
+                // Documents are excluded: Meta accepts sendMedia() then fetches
+                // the link asynchronously. A 401 on that fetch drops the whole
+                // message — caption included — which is exactly how a successful
+                // Dropbox DAG left the user with no WhatsApp reply. Confirmation
+                // therefore goes out as its own message BEFORE the document,
+                // the same way audio already works.
                 $caption = null;
                 $textSentSeparately = false;
                 $textMessageId = '';
-                $canUseCaption = in_array($generatedMediaType, ['image', 'video', 'document'], true)
+                $canUseCaption = in_array($generatedMediaType, ['image', 'video'], true)
                     && !empty($responseText)
                     && mb_strlen($responseText) <= 1024;
 
@@ -924,7 +985,7 @@ final class WhatsAppService
                     }
                 }
 
-                $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption);
+                $sendResult = $this->sendMedia($dto->from, $generatedMediaType, $mediaUrl, $dto->phoneNumberId, $caption, $displayFilename);
                 if ($sendResult['success']) {
                     // Documents have no dedicated media quota — the MESSAGES
                     // usage recorded above already covers the turn.
@@ -1035,7 +1096,7 @@ final class WhatsAppService
                     if (!is_string($path) || '' === $path || !in_array($type, ['audio', 'video', 'image', 'document'], true)) {
                         continue;
                     }
-                    $url = rtrim($this->appUrl, '/').'/'.ltrim($path, '/');
+                    [$url, $extraFilename] = $this->mediaLinkForMeta($path, $type, (int) $effectiveUserId);
                     $this->logger->info('WhatsApp: Sending additional multi-task media', [
                         'to' => $dto->from,
                         'media_type' => $type,
@@ -1043,7 +1104,7 @@ final class WhatsAppService
                     ]);
 
                     try {
-                        $extraResult = $this->sendMedia($dto->from, $type, $url, $dto->phoneNumberId, null);
+                        $extraResult = $this->sendMedia($dto->from, $type, $url, $dto->phoneNumberId, null, $extraFilename);
                         if (empty($extraResult['success'])) {
                             $this->logger->warning('WhatsApp: Failed to send additional multi-task media', [
                                 'to' => $dto->from,

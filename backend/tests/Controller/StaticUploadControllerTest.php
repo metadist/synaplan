@@ -281,6 +281,23 @@ class StaticUploadControllerTest extends WebTestCase
     }
 
     /**
+     * DAG documents published via OutboundChannelMedia::publishCopy use
+     * `{userId}_document_{timestamp}.docx` so Meta can fetch them without auth.
+     */
+    public function testServesPublishedDocumentCopyAnonymously(): void
+    {
+        $relativePath = $this->createUploadOnDisk(
+            $this->user->getId().'_document_'.time().random_int(100, 999).'.docx',
+            'docx-bytes',
+        );
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
      * Unknown paths must still return 404 — the new fallback must not
      * accidentally widen the surface to anything on disk.
      */

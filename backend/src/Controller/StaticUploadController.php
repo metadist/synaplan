@@ -8,6 +8,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
 use App\Service\Media\MediaAccessTokenService;
+use App\Service\Media\OutboundChannelMedia;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -90,18 +91,18 @@ class StaticUploadController extends AbstractController
         // because third parties fetch these URLs anonymously and cannot be
         // given a credential:
         //
-        // - `tts_*` and `{messageId}_{provider}_{timestamp}.{ext}`: Meta's
-        //   WhatsApp servers fetch the `link` we hand them
+        // - `tts_*` and `{id}_{kind}_{timestamp}.{ext}`: Meta's WhatsApp
+        //   servers fetch the `link` we hand them
         //   (`WhatsAppService::sendMedia`), and the public widget/guest chat
-        //   renders them in anonymous browsers.
+        //   renders them in anonymous browsers. DAG documents are copied
+        //   into this shape via `OutboundChannelMedia::publishCopy`.
         // - `ai_i2vsrc_*`: `MediaGenerationHandler::publishInputImageForRemoteFetch`
         //   hands the URL to image-to-video providers, which fetch it directly.
         //
         // Do not widen this list. Anything reachable only from our own
         // authenticated UI must go through the ownership check below.
-        $isRemoteFetchedSource = str_starts_with($filename, 'ai_i2vsrc_');
-        $isOutboundChannelMedia = str_starts_with($filename, 'tts_')
-            || 1 === preg_match('/^\d+_[a-z]+_\d+\.[a-z0-9]+$/i', $filename);
+        $isRemoteFetchedSource = OutboundChannelMedia::isRemoteFetchedSource($filename);
+        $isOutboundChannelMedia = OutboundChannelMedia::isOutboundChannelMedia($filename);
 
         if ($isRemoteFetchedSource || $isOutboundChannelMedia) {
             // Security rests on the path being unguessable (user-specific
