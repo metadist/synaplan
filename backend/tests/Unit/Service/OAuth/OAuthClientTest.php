@@ -173,6 +173,31 @@ final class OAuthClientTest extends TestCase
         }
     }
 
+    public function testPublicClientOmitsAnEmptySecret(): void
+    {
+        $captured = [];
+        $client = $this->client([
+            new MockResponse(json_encode(['access_token' => 'at', 'expires_in' => 3600]), ['http_code' => 200]),
+        ], $captured);
+
+        $public = new OAuthProviderConfig(
+            provider: 'mcp',
+            authorizeUrl: 'https://mcp.notion.com/authorize',
+            tokenUrl: 'https://mcp.notion.com/token',
+            clientId: 'public-id',
+            clientSecret: '',
+            redirectUri: 'https://app.example/callback',
+            scopes: ['default'],
+            includeScopeInTokenRequests: false,
+        );
+
+        $client->exchangeCode($public, 'the-code', 'the-verifier');
+
+        parse_str($captured[0]['options']['body'], $body);
+        self::assertArrayNotHasKey('client_secret', $body);
+        self::assertSame('public-id', $body['client_id']);
+    }
+
     public function testRefreshWithoutAStoredTokenAsksForConsent(): void
     {
         $this->expectException(OAuthReauthRequiredException::class);

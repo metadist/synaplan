@@ -54,6 +54,7 @@ final class McpServerConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'client_enabled', type: 'boolean', example: false),
+                        new OA\Property(property: 'oauth_connectors_enabled', type: 'boolean', example: false),
                         new OA\Property(property: 'servers', type: 'array', items: new OA\Items(
                             properties: [
                                 new OA\Property(property: 'id', type: 'integer', example: 1),
@@ -61,6 +62,8 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'url', type: 'string', example: 'https://crm.example.com/mcp'),
                                 new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                                 new OA\Property(property: 'has_auth_token', type: 'boolean', example: true),
+                                new OA\Property(property: 'auth_mode', type: 'string', example: 'bearer', enum: ['none', 'bearer', 'oauth']),
+                                new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'connected', enum: ['not_connected', 'connected', 'reauth_required']),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
                                 new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
@@ -83,6 +86,7 @@ final class McpServerConfigController extends AbstractController
         return $this->json([
             'success' => true,
             'client_enabled' => $this->clientConfig->isClientEnabled($user->getId()),
+            'oauth_connectors_enabled' => $this->clientConfig->isOAuthConnectorsEnabled(),
             'servers' => array_map(
                 fn (McpServerConfig $s): array => $this->serialize($s),
                 $this->repository->findByUser($user->getId()),
@@ -106,6 +110,7 @@ final class McpServerConfigController extends AbstractController
                     new OA\Property(property: 'auth_token', type: 'string', example: 'Bearer sk-…'),
                     new OA\Property(property: 'enabled', type: 'boolean', example: true),
                     new OA\Property(property: 'allow_write', type: 'boolean', example: false, description: 'Allow the AI to call mutating tools (create/update) on this server'),
+                    new OA\Property(property: 'auth_mode', type: 'string', example: 'oauth', enum: ['none', 'bearer', 'oauth']),
                 ]
             )
         ),
@@ -347,7 +352,12 @@ final class McpServerConfigController extends AbstractController
         try {
             $tools = $this->toolRegistry->refresh($server);
         } catch (McpClientException $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()]);
+            $message = $e->getMessage();
+            if ($server->isOAuth() && (401 === $e->httpStatus || str_contains($message, 'not signed in'))) {
+                $message = 'Sign in to this server first, then test the connection again. '.$message;
+            }
+
+            return $this->json(['success' => false, 'error' => $message]);
         }
 
         return $this->json(['success' => true, 'tools' => $this->publicTools($tools)]);
@@ -385,6 +395,16 @@ final class McpServerConfigController extends AbstractController
             }
         }
 
+        if (array_key_exists('auth_mode', $data)) {
+            $mode = $data['auth_mode'] ?? null;
+            if (!is_string($mode) || !in_array($mode, McpServerConfig::AUTH_MODES, true)) {
+                return 'auth_mode must be none, bearer, or oauth';
+            }
+            if (McpServerConfig::AUTH_MODE_OAUTH === $mode && !$this->clientConfig->isOAuthConnectorsEnabled()) {
+                return 'Connecting with a sign-in is disabled by an administrator';
+            }
+        }
+
         return null;
     }
 
@@ -413,6 +433,9 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('allow_write', $data)) {
             $server->setAllowWrite((bool) $data['allow_write']);
         }
+        if (array_key_exists('auth_mode', $data) && is_string($data['auth_mode'])) {
+            $server->setAuthMode($data['auth_mode']);
+        }
     }
 
     /**
@@ -420,12 +443,19 @@ final class McpServerConfigController extends AbstractController
      */
     private function serialize(McpServerConfig $server): array
     {
+        $oauthStatus = null;
+        if ($server->isOAuth()) {
+            $oauthStatus = $server->getDecryptedOAuthState($this->encryptionService)->status;
+        }
+
         return [
             'id' => $server->getId(),
             'name' => $server->getName(),
             'url' => $server->getUrl(),
             'auth_header' => $server->getAuthHeader(),
             'has_auth_token' => $server->hasAuthToken(),
+            'auth_mode' => $server->getAuthMode(),
+            'oauth_status' => $oauthStatus,
             'enabled' => $server->isEnabled(),
             'allow_write' => $server->allowsWrite(),
             'created' => $server->getCreated(),

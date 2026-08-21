@@ -125,6 +125,7 @@ security:
         # mints that state) stays authenticated.
         - { path: ^/api/v1/connections/m365/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/mcp-servers/oauth/callback, roles: PUBLIC_ACCESS }
 
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }

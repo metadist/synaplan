@@ -734,6 +734,18 @@ services:
         arguments:
             $frontendUrl: '%env(FRONTEND_URL)%'
 
+    App\Service\Mcp\McpOAuthConsentService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Service\Mcp\McpOAuthTokenProvider:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Controller\McpOAuthController:
+        arguments:
+            $frontendUrl: '%env(FRONTEND_URL)%'
+
     # Social Login Controllers (Google & GitHub OAuth)
     App\Controller\GoogleAuthController:
         arguments:

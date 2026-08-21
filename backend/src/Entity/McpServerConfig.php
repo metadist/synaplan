@@ -6,6 +6,7 @@ namespace App\Entity;
 
 use App\Repository\McpServerConfigRepository;
 use App\Service\EncryptionService;
+use App\Service\Mcp\McpOAuthState;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
@@ -26,6 +27,12 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_mcp_user')]
 class McpServerConfig
 {
+    public const AUTH_MODE_NONE = 'none';
+    public const AUTH_MODE_BEARER = 'bearer';
+    public const AUTH_MODE_OAUTH = 'oauth';
+
+    public const AUTH_MODES = [self::AUTH_MODE_NONE, self::AUTH_MODE_BEARER, self::AUTH_MODE_OAUTH];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -62,6 +69,17 @@ class McpServerConfig
      */
     #[ORM\Column(name: 'BALLOWWRITE', type: 'boolean', options: ['default' => false])]
     private bool $allowWrite = false;
+
+    /**
+     * How this server authenticates: `none`, `bearer` (static header, default)
+     * or `oauth` (RFC 9728 discovery + PKCE consent).
+     */
+    #[ORM\Column(name: 'BAUTHMODE', length: 16, options: ['default' => self::AUTH_MODE_BEARER])]
+    private string $authMode = self::AUTH_MODE_BEARER;
+
+    /** Encrypted OAuth state JSON (AES-256-CBC via EncryptionService). */
+    #[ORM\Column(name: 'BOAUTH', type: 'text')]
+    private string $oauth = '';
 
     #[ORM\Column(name: 'BCREATED', type: 'string', length: 20)]
     private string $created;
@@ -180,6 +198,60 @@ class McpServerConfig
     public function setAllowWrite(bool $allowWrite): self
     {
         $this->allowWrite = $allowWrite;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getAuthMode(): string
+    {
+        return $this->authMode;
+    }
+
+    public function setAuthMode(string $authMode): self
+    {
+        $this->authMode = $authMode;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function isOAuth(): bool
+    {
+        return self::AUTH_MODE_OAUTH === $this->authMode;
+    }
+
+    public function getDecryptedOAuthState(EncryptionService $encryptionService): McpOAuthState
+    {
+        if ('' === $this->oauth) {
+            return new McpOAuthState();
+        }
+
+        $json = $encryptionService->decrypt($this->oauth);
+        if ('' === $json) {
+            return new McpOAuthState();
+        }
+
+        try {
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return new McpOAuthState();
+        }
+
+        return is_array($decoded) ? McpOAuthState::fromArray($decoded) : new McpOAuthState();
+    }
+
+    public function setDecryptedOAuthState(McpOAuthState $state, EncryptionService $encryptionService): self
+    {
+        $this->oauth = $encryptionService->encrypt(json_encode($state->toArray(), JSON_THROW_ON_ERROR));
+        $this->touch();
+
+        return $this;
+    }
+
+    public function clearOAuthState(): self
+    {
+        $this->oauth = '';
         $this->touch();
 
         return $this;

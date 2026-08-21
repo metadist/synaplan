@@ -39,6 +39,7 @@ final readonly class McpClient
         private EncryptionService $encryptionService,
         private McpClientConfig $config,
         private LoggerInterface $logger,
+        private ?McpOAuthTokenProvider $oauthTokens = null,
     ) {
     }
 
@@ -114,16 +115,27 @@ final readonly class McpClient
             throw new McpClientException('MCP server URL is not allowed (private or invalid target)');
         }
 
-        $headers = [
-            'Content-Type' => 'application/json',
-            'Accept' => 'application/json, text/event-stream',
-            'MCP-Protocol-Version' => self::PROTOCOL_VERSION,
-        ];
+        try {
+            return $this->runSession($server, $url, $operation);
+        } catch (McpClientException $e) {
+            if (401 !== $e->httpStatus || !$server->isOAuth() || null === $this->oauthTokens) {
+                throw $e;
+            }
 
-        $authHeader = trim($server->getAuthHeader());
-        if ('' !== $authHeader && $server->hasAuthToken()) {
-            $headers[$authHeader] = $server->getDecryptedAuthToken($this->encryptionService);
+            $this->oauthTokens->accessToken($server, forceRefresh: true);
+
+            return $this->runSession($server, $url, $operation);
         }
+    }
+
+    /**
+     * @param callable(string, array<string, string>): array<string, mixed> $operation
+     *
+     * @return array<string, mixed>
+     */
+    private function runSession(McpServerConfig $server, string $url, callable $operation): array
+    {
+        $headers = $this->requestHeaders($server);
 
         // 1. initialize — negotiates the session; the server may hand back a
         //    session id header every subsequent request must carry.
@@ -166,6 +178,38 @@ final readonly class McpClient
                 }
             }
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function requestHeaders(McpServerConfig $server): array
+    {
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json, text/event-stream',
+            'MCP-Protocol-Version' => self::PROTOCOL_VERSION,
+        ];
+
+        if ($server->isOAuth()) {
+            if (null === $this->oauthTokens) {
+                throw new McpClientException('OAuth sign-in is not available');
+            }
+            $headers['Authorization'] = 'Bearer '.$this->oauthTokens->accessToken($server);
+
+            return $headers;
+        }
+
+        if (McpServerConfig::AUTH_MODE_NONE === $server->getAuthMode()) {
+            return $headers;
+        }
+
+        $authHeader = trim($server->getAuthHeader());
+        if ('' !== $authHeader && $server->hasAuthToken()) {
+            $headers[$authHeader] = $server->getDecryptedAuthToken($this->encryptionService);
+        }
+
+        return $headers;
     }
 
     /**
@@ -220,7 +264,7 @@ final readonly class McpClient
         }
 
         if ($status >= 400) {
-            throw new McpClientException(sprintf('MCP server answered HTTP %d', $status));
+            throw new McpClientException($this->httpErrorMessage($status, $body), httpStatus: $status);
         }
         if ('' === trim($body)) {
             // Notifications legitimately return 202/empty bodies.
@@ -270,5 +314,26 @@ final readonly class McpClient
         }
 
         return $last;
+    }
+
+    private function httpErrorMessage(int $status, string $body): string
+    {
+        $excerpt = '';
+        $decoded = json_decode($body, true);
+        if (is_array($decoded)) {
+            $err = is_string($decoded['error'] ?? null) ? $decoded['error'] : '';
+            $desc = is_string($decoded['error_description'] ?? null) ? $decoded['error_description'] : '';
+            if ('' === $desc && is_string($decoded['message'] ?? null)) {
+                $desc = $decoded['message'];
+            }
+            $excerpt = trim('' !== $err && '' !== $desc ? $err.': '.$desc : ($err.$desc));
+        }
+        if ('' === $excerpt && '' !== trim($body)) {
+            $excerpt = mb_substr(preg_replace('/\s+/', ' ', trim($body)) ?? trim($body), 0, 180);
+        }
+
+        return '' !== $excerpt
+            ? sprintf('MCP server answered HTTP %d (%s)', $status, $excerpt)
+            : sprintf('MCP server answered HTTP %d', $status);
     }
 }

@@ -57,7 +57,15 @@ vi.mock('@/services/api/mcpServersApi', () => ({
     remove: vi.fn(),
     test: vi.fn(),
     tools: vi.fn(),
+    startOAuth: vi.fn(),
+    disconnectOAuth: vi.fn(),
   },
+}))
+
+vi.mock('vue-router', () => ({
+  RouterLink: { template: '<a><slot /></a>' },
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ replace: vi.fn() }),
 }))
 
 vi.mock('@/services/api/promptsApi', () => ({
@@ -97,7 +105,11 @@ describe('McpServersConfiguration — task usage panel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authState.isAdmin = false
-    mockList.mockResolvedValue({ clientEnabled: true, servers: [mockServer] })
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [mockServer],
+    })
     mockGetPrompts.mockResolvedValue([defaultPrompt()])
     mockUpdateConfigValue.mockResolvedValue({ success: true })
   })
@@ -122,7 +134,11 @@ describe('McpServersConfiguration — task usage panel', () => {
   })
 
   it('hides the whole panel when no servers are connected', async () => {
-    mockList.mockResolvedValue({ clientEnabled: true, servers: [] })
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [],
+    })
 
     const wrapper = mount(McpServersConfiguration, mountOptions)
     await flushPromises()
@@ -197,7 +213,11 @@ describe('McpServersConfiguration — platform MCP switch', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authState.isAdmin = true
-    mockList.mockResolvedValue({ clientEnabled: false, servers: [] })
+    mockList.mockResolvedValue({
+      clientEnabled: false,
+      oauthConnectorsEnabled: false,
+      servers: [],
+    })
     mockGetPrompts.mockResolvedValue([])
     mockUpdateConfigValue.mockResolvedValue({ success: true })
   })
@@ -211,7 +231,11 @@ describe('McpServersConfiguration — platform MCP switch', () => {
     const enable = wrapper.find('[data-testid="btn-mcp-enable-client"]')
     expect(enable.exists()).toBe(true)
 
-    mockList.mockResolvedValue({ clientEnabled: true, servers: [] })
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [],
+    })
     await enable.trigger('click')
     await flushPromises()
 
@@ -236,7 +260,11 @@ describe('McpServersConfiguration — add-server templates', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     authState.isAdmin = false
-    mockList.mockResolvedValue({ clientEnabled: true, servers: [] })
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: false,
+      servers: [],
+    })
     mockGetPrompts.mockResolvedValue([])
   })
 
@@ -290,5 +318,82 @@ describe('McpServersConfiguration — add-server templates', () => {
     expect(wrapper.find('[data-testid="btn-mcp-template-jira"]').attributes('aria-checked')).toBe(
       'false'
     )
+  })
+
+  it('hides Notion and Higgsfield until OAuth connectors are enabled', async () => {
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="btn-mcp-template-notion"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-mcp-template-higgsfield"]').exists()).toBe(false)
+  })
+
+  it('prefills and locks the Notion URL when OAuth connectors are on', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [],
+    })
+
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="btn-mcp-template-notion"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="btn-mcp-template-notion"]').trigger('click')
+    await flushPromises()
+
+    const url = wrapper.find('[data-testid="input-mcp-url"]').element as HTMLInputElement
+    expect(url.value).toBe('https://mcp.notion.com/mcp')
+    expect(url.readOnly).toBe(true)
+    expect(wrapper.find('[data-testid="input-mcp-auth-token"]').exists()).toBe(false)
+  })
+})
+
+describe('McpServersConfiguration — OAuth status chips', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    authState.isAdmin = false
+    mockGetPrompts.mockResolvedValue([])
+  })
+
+  it('shows Connect for a saved OAuth server that is not signed in', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [
+        {
+          ...mockServer,
+          auth_mode: 'oauth',
+          oauth_status: 'not_connected',
+          has_auth_token: false,
+        },
+      ],
+    })
+
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="mcp-oauth-status-3"]').text()).toContain('Not connected')
+    expect(wrapper.find('[data-testid="btn-mcp-oauth-3"]').text()).toContain('Connect')
+  })
+
+  it('shows Reconnect when the grant needs a new sign-in', async () => {
+    mockList.mockResolvedValue({
+      clientEnabled: true,
+      oauthConnectorsEnabled: true,
+      servers: [
+        {
+          ...mockServer,
+          auth_mode: 'oauth',
+          oauth_status: 'reauth_required',
+        },
+      ],
+    })
+
+    const wrapper = mount(McpServersConfiguration, mountOptions)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="mcp-oauth-status-3"]').text()).toContain('Action needed')
+    expect(wrapper.find('[data-testid="btn-mcp-oauth-3"]').text()).toContain('Reconnect')
   })
 })

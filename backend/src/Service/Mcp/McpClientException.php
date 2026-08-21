@@ -10,6 +10,14 @@ namespace App\Service\Mcp;
  * it into a graceful degradation (a failed node / a 4xx API response) — it
  * must never escape as a 500.
  */
-final class McpClientException extends \RuntimeException
+class McpClientException extends \RuntimeException
 {
+    public function __construct(
+        string $message,
+        int $code = 0,
+        ?\Throwable $previous = null,
+        public readonly ?int $httpStatus = null,
+    ) {
+        parent::__construct($message, $code, $previous);
+    }
 }

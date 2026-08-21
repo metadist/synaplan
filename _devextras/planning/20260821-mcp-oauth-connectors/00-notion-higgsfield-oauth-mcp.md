@@ -1,6 +1,6 @@
 # MCP OAuth Connectors — Notion MCP + Higgsfield MCP
 
-**Date:** 2026-08-21 · **Status:** Plan (Step 0 verified live) · **Priority:** P1
+**Date:** 2026-08-21 · **Status:** Implemented on `feat/mcp-update` · **Priority:** P1
 **Related:** `release4.0/08_mcp-data-nodes-and-skill-registry.md`,
 `release4.0/09_external-data-nodes.md`, the outbound client in
 `backend/src/Service/Mcp/`, the connections OAuth stack in
