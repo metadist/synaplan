@@ -50,10 +50,25 @@ fi
 #
 # Duplicate keys are the case worth spelling out, because a lenient parser
 # keeps the last one without complaining. This loader refuses instead.
-if python3 -c 'import yaml' 2>/dev/null; then
-    python3 - "$COMPOSE_FILE" <<'PARSE' || exit 1
+#
+# A missing interpreter or PyYAML fails the suite rather than skipping the
+# check. A guard that quietly turns itself off in an environment nobody
+# inspected is the same silence this test exists to end.
+command -v python3 > /dev/null || {
+    echo "python3 is required to parse compose.yaml in this suite" >&2
+    exit 1
+}
+python3 - "$COMPOSE_FILE" <<'PARSE' || exit 1
 import sys
-import yaml
+
+try:
+    import yaml
+except ImportError:
+    sys.exit(
+        'PyYAML is required to parse compose.yaml. Install it with '
+        '"python3 -m pip install pyyaml", or "apt-get install python3-yaml" '
+        'on Debian and Ubuntu.'
+    )
 
 
 class StrictLoader(yaml.SafeLoader):
@@ -91,9 +106,6 @@ with open(sys.argv[1], encoding='utf-8') as handle:
     except yaml.YAMLError as error:
         sys.exit('compose.yaml is not valid YAML: %s' % error)
 PARSE
-else
-    echo "compose.yaml parse test skipped; PyYAML is not importable for python3." >&2
-fi
 
 # The same defect in the file operators actually copy. A repeated key is legal
 # in a .env, which is what makes it worse than in compose.yaml: the last
