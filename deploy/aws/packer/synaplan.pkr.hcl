@@ -90,8 +90,12 @@ source "amazon-ebs" "synaplan" {
     most_recent = true
   }
 
+  # Both ASCII only. EC2 rejects anything beyond it in the description, and it
+  # does so in ModifyImageAttribute, which runs after the image and its
+  # snapshots already exist: an em dash here failed a ten-minute build at its
+  # very last call. test-firstboot.sh guards the two lines.
   ami_name        = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}-{{timestamp}}"
-  ami_description = "Synaplan ${var.synaplan_version} — AI knowledge management, all-in-one on a single instance"
+  ami_description = "Synaplan ${var.synaplan_version} - AI knowledge management, all-in-one on a single instance"
 
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
