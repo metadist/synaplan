@@ -971,7 +971,10 @@ class FileController extends AbstractController
         summary: 'Get storage quota statistics',
         tags: ['Files'],
         responses: [
-            new OA\Response(response: 200, description: 'Storage statistics'),
+            new OA\Response(
+                response: 200,
+                description: 'Storage statistics. Admins and open-source mode have unlimited storage (unlimited=true).',
+            ),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]

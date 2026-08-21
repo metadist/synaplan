@@ -4906,14 +4906,25 @@
   },
   "mcpServers": {
     "title": "MCP Servers",
-    "description": "Connect external MCP servers so the assistant can pull data from your own systems (CRM, wiki, internal APIs) while answering. Tools discovered here become available to the task planner.",
-    "clientDisabledHint": "The outbound MCP client is currently disabled by the platform configuration. Connections can be prepared, but no calls will be made until it is enabled.",
+    "description": "Connect any MCP-compatible tool server — a CRM, wiki, ticket system, automation platform, or a service you host yourself. Discovered tools become available to the task planner.",
+    "clientOnTitle": "MCP calls are on",
+    "clientOnText": "The assistant can use connected servers in any task that allows MCP data sources.",
+    "clientOffTitle": "MCP calls are off",
+    "clientOffAdminText": "Saved servers stay here, but the assistant will not call them until you turn this on for the installation.",
+    "clientOffUserText": "An administrator needs to turn this on for the installation. Saved servers stay here until then.",
+    "clientAdminLink": "Open in System Configuration",
+    "clientEnable": "Turn on MCP calls",
+    "clientToggle": "Allow MCP calls",
+    "clientEnabledNotice": "The assistant can now call connected MCP servers",
+    "clientDisabledNotice": "MCP calls are off — saved servers stay in place",
+    "clientUpdateFailed": "Could not update the MCP setting",
     "listTitle": "Connected servers",
     "add": "Add server",
     "addTitle": "Connect a new server",
     "editTitle": "Edit server",
     "formHint": "The URL must be a public HTTPS MCP endpoint (Streamable HTTP). The auth value is stored encrypted and never shown again.",
     "empty": "No MCP servers connected yet.",
+    "emptyHint": "Start from a blank form, or pick a known system to prefill the name and defaults. You can change or clear that choice at any time.",
     "nameLabel": "Name",
     "urlLabel": "Server URL",
     "authHeaderLabel": "Auth header name (optional)",
@@ -4944,11 +4955,38 @@
     "usageUpdateFailed": "Could not update the task",
     "usageAdvancedHint": "More options per task (server restrictions, instructions, models):",
     "usageAdvancedLink": "AI Instructions",
-    "presetsLabel": "Quick start",
-    "presetJiraHint": "Connect a Jira-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can list your tickets and create new tickets straight from a prompt.",
-    "presetConfluenceHint": "Connect a Confluence-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can search pages, get summaries, and create new Confluence pages straight from a prompt.",
+    "templatesLabel": "Start from",
+    "templatesHint": "Custom is the default for any MCP server. A template only prefills the form — click the selected card again to clear it.",
+    "templatesClear": "Selected — click again to clear",
+    "templates": {
+      "custom": {
+        "name": "Custom server",
+        "summary": "Any MCP endpoint",
+        "hint": "Paste the HTTPS URL of any Streamable HTTP MCP server and, if needed, an access token. CRM, wiki, tickets, automation — if it speaks MCP, it works here."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Tickets and issues",
+        "hint": "Connect a Jira-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can list tickets and create new ones from a prompt."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki pages",
+        "hint": "Connect a Confluence-capable MCP server (for example a self-hosted Atlassian MCP service) and paste its endpoint URL and access token. With write actions enabled, you can search pages, get summaries, and create new pages from a prompt."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Repos, issues, pull requests",
+        "hint": "Connect a GitHub-capable MCP server and paste its endpoint URL and a personal access token. Useful for issues, pull requests, and repository search."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Automation workflows",
+        "hint": "Connect an n8n MCP server so the assistant can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
+      }
+    },
     "allowWriteLabel": "Allow write actions (create/update)",
-    "allowWriteHint": "When enabled, the AI assistant may create or update content in this system when you ask for it — for example a new Confluence page or a Jira ticket. Delete actions are never allowed.",
+    "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"
   },
   "messagesGateway": {

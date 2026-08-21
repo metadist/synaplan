@@ -141,6 +141,27 @@ final class SystemConfigServiceTest extends TestCase
         $this->service->setValue('MULTITASK_ROUTING_ENABLED', 'true');
     }
 
+    public function testMcpClientWritesToTheMcpGroupRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, 'MCP', 'CLIENT_ENABLED', 'true');
+
+        $result = $this->service->setValue('MCP_CLIENT_ENABLED', 'true', 7);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testEnablingMcpClientClearsActingAdminPerUserOverride(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(7, 'MCP', 'CLIENT_ENABLED');
+
+        $this->service->setValue('MCP_CLIENT_ENABLED', 'true', 7);
+    }
+
     /**
      * Reads must also resolve through the dbGroup/dbKey override so the admin
      * UI reflects the actual MultitaskRoutingConfig row.

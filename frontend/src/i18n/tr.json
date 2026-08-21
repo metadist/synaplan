@@ -3921,14 +3921,25 @@
   },
   "mcpServers": {
     "title": "MCP Sunucuları",
-    "description": "Asistanın yanıt verirken kendi sistemlerinizden (CRM, wiki, dahili API'ler) veri çekebilmesi için harici MCP sunucularını bağlayın. Burada keşfedilen araçlar görev planlayıcısına sunulur.",
-    "clientDisabledHint": "Giden MCP istemcisi şu anda platform yapılandırmasında devre dışı. Bağlantılar hazırlanabilir, ancak etkinleştirilene kadar çağrı yapılmaz.",
+    "description": "MCP uyumlu herhangi bir araç sunucusunu bağlayın — bir CRM, wiki, talep sistemi, otomasyon platformu veya kendi barındırdığınız bir hizmet. Keşfedilen araçlar görev planlayıcısına sunulur.",
+    "clientOnTitle": "MCP çağrıları açık",
+    "clientOnText": "Asistan, MCP veri kaynaklarına izin veren her görevde bağlı sunucuları kullanabilir.",
+    "clientOffTitle": "MCP çağrıları kapalı",
+    "clientOffAdminText": "Kayıtlı sunucular burada kalır, ancak siz bu kurulum için bunu açana kadar asistan onları çağırmaz.",
+    "clientOffUserText": "Bir yöneticinin bunu bu kurulum için açması gerekir. Kayıtlı sunucular o zamana kadar burada kalır.",
+    "clientAdminLink": "Sistem Yapılandırmasında aç",
+    "clientEnable": "MCP çağrılarını aç",
+    "clientToggle": "MCP çağrılarına izin ver",
+    "clientEnabledNotice": "Asistan artık bağlı MCP sunucularını çağırabilir",
+    "clientDisabledNotice": "MCP çağrıları kapalı — kayıtlı sunucular yerinde kalır",
+    "clientUpdateFailed": "MCP ayarı güncellenemedi",
     "listTitle": "Bağlı sunucular",
     "add": "Sunucu ekle",
     "addTitle": "Yeni sunucu bağla",
     "editTitle": "Sunucuyu düzenle",
     "formHint": "URL, herkese açık bir HTTPS MCP uç noktası (Streamable HTTP) olmalıdır. Kimlik doğrulama değeri şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
     "empty": "Henüz bağlı MCP sunucusu yok.",
+    "emptyHint": "Boş bir formla başlayın veya adı ve varsayılanları doldurmak için bilinen bir sistem seçin. Bu seçimi istediğiniz zaman değiştirebilir veya temizleyebilirsiniz.",
     "nameLabel": "Ad",
     "urlLabel": "Sunucu URL'si",
     "authHeaderLabel": "Kimlik doğrulama başlığı adı (isteğe bağlı)",
@@ -3959,11 +3970,38 @@
     "usageUpdateFailed": "Görev güncellenemedi",
     "usageAdvancedHint": "Görev başına daha fazla seçenek (sunucu kısıtlamaları, talimatlar, modeller):",
     "usageAdvancedLink": "AI Talimatları",
-    "presetsLabel": "Hızlı başlangıç",
-    "presetJiraHint": "Jira uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken biletlerinizi listeleyebilir ve bir prompt ile yeni biletler oluşturabilirsiniz.",
-    "presetConfluenceHint": "Confluence uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken sayfalarda arama yapabilir, özetler alabilir ve bir prompt ile yeni Confluence sayfaları oluşturabilirsiniz.",
+    "templatesLabel": "Şununla başla",
+    "templatesHint": "Özel, her MCP sunucusu için varsayılan seçenektir. Bir şablon yalnızca formu doldurur — temizlemek için seçili karta yeniden tıklayın.",
+    "templatesClear": "Seçili — temizlemek için yeniden tıklayın",
+    "templates": {
+      "custom": {
+        "name": "Özel sunucu",
+        "summary": "Herhangi bir MCP uç noktası",
+        "hint": "Herhangi bir Streamable HTTP MCP sunucusunun HTTPS URL'sini ve gerekirse bir erişim token'ını yapıştırın. CRM, wiki, talepler, otomasyon — MCP konuşuyorsa burada çalışır."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Talepler ve sorunlar",
+        "hint": "Jira uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken talepleri listeleyebilir ve bir prompt ile yenilerini oluşturabilirsiniz."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki sayfaları",
+        "hint": "Confluence uyumlu bir MCP sunucusu bağlayın (örneğin kendi barındırdığınız bir Atlassian MCP servisi) ve endpoint URL'sini ile erişim token'ını girin. Yazma eylemleri etkinken sayfalarda arama yapabilir, özetler alabilir ve bir prompt ile yeni sayfalar oluşturabilirsiniz."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Depolar, issue'lar, pull request'ler",
+        "hint": "GitHub uyumlu bir MCP sunucusu bağlayın ve endpoint URL'sini ile bir kişisel erişim token'ını girin. Issue'lar, pull request'ler ve depo araması için kullanışlıdır."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Otomasyon iş akışları",
+        "hint": "Asistanın otomasyon iş akışlarınızı incelemesi veya tetiklemesi için bir n8n MCP sunucusu bağlayın. n8n örneğinizdeki MCP uç noktası URL'sini ve erişim token'ını yapıştırın."
+      }
+    },
     "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
-    "allowWriteHint": "Etkinleştirildiğinde, AI asistanı siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir — örneğin yeni bir Confluence sayfası veya bir Jira bileti. Silme eylemlerine asla izin verilmez.",
+    "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
   },
   "messagesGateway": {

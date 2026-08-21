@@ -4840,14 +4840,25 @@
   },
   "mcpServers": {
     "title": "MCP-Server",
-    "description": "Verbinde externe MCP-Server, damit der Assistent beim Antworten Daten aus deinen eigenen Systemen (CRM, Wiki, interne APIs) abrufen kann. Die hier entdeckten Tools stehen dem Task-Planner zur Verfügung.",
-    "clientDisabledHint": "Der ausgehende MCP-Client ist derzeit in der Plattformkonfiguration deaktiviert. Verbindungen können vorbereitet werden, es werden aber keine Aufrufe ausgeführt, bis er aktiviert ist.",
+    "description": "Verbinde jeden MCP-fähigen Tool-Server — ein CRM, Wiki, Ticketsystem, eine Automatisierungsplattform oder einen Dienst, den du selbst hostest. Die entdeckten Tools stehen dem Task-Planner zur Verfügung.",
+    "clientOnTitle": "MCP-Aufrufe sind an",
+    "clientOnText": "Der Assistent kann verbundene Server in jeder Aufgabe nutzen, die MCP-Datenquellen erlaubt.",
+    "clientOffTitle": "MCP-Aufrufe sind aus",
+    "clientOffAdminText": "Gespeicherte Server bleiben erhalten, aber der Assistent ruft sie nicht auf, bis du das für diese Installation einschaltest.",
+    "clientOffUserText": "Ein Administrator muss das für diese Installation einschalten. Gespeicherte Server bleiben bis dahin erhalten.",
+    "clientAdminLink": "In der Systemkonfiguration öffnen",
+    "clientEnable": "MCP-Aufrufe einschalten",
+    "clientToggle": "MCP-Aufrufe erlauben",
+    "clientEnabledNotice": "Der Assistent kann verbundene MCP-Server jetzt aufrufen",
+    "clientDisabledNotice": "MCP-Aufrufe sind aus — gespeicherte Server bleiben erhalten",
+    "clientUpdateFailed": "Die MCP-Einstellung konnte nicht aktualisiert werden",
     "listTitle": "Verbundene Server",
     "add": "Server hinzufügen",
     "addTitle": "Neuen Server verbinden",
     "editTitle": "Server bearbeiten",
     "formHint": "Die URL muss ein öffentlicher HTTPS-MCP-Endpunkt (Streamable HTTP) sein. Der Auth-Wert wird verschlüsselt gespeichert und nie wieder angezeigt.",
     "empty": "Noch keine MCP-Server verbunden.",
+    "emptyHint": "Starte mit einem leeren Formular oder wähle ein bekanntes System, um Name und Vorgaben vorauszufüllen. Die Wahl kannst du jederzeit ändern oder wieder aufheben.",
     "nameLabel": "Name",
     "urlLabel": "Server-URL",
     "authHeaderLabel": "Auth-Header-Name (optional)",
@@ -4878,11 +4889,38 @@
     "usageUpdateFailed": "Aufgabe konnte nicht aktualisiert werden",
     "usageAdvancedHint": "Weitere Optionen pro Aufgabe (Server-Einschränkungen, Anweisungen, Modelle):",
     "usageAdvancedLink": "KI-Anweisungen",
-    "presetsLabel": "Schnellstart",
-    "presetJiraHint": "Verbinde einen Jira-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du deine Tickets auflisten und neue Tickets direkt per Prompt anlegen.",
-    "presetConfluenceHint": "Verbinde einen Confluence-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Seiten durchsuchen, Zusammenfassungen erhalten und neue Confluence-Seiten direkt per Prompt anlegen.",
+    "templatesLabel": "Starten mit",
+    "templatesHint": "Benutzerdefiniert ist die Vorgabe für jeden MCP-Server. Eine Vorlage füllt nur das Formular voraus — klicke die ausgewählte Karte erneut, um sie zu löschen.",
+    "templatesClear": "Ausgewählt — erneut klicken zum Aufheben",
+    "templates": {
+      "custom": {
+        "name": "Eigener Server",
+        "summary": "Beliebiger MCP-Endpunkt",
+        "hint": "Füge die HTTPS-URL eines beliebigen Streamable-HTTP-MCP-Servers ein und bei Bedarf ein Zugriffstoken. CRM, Wiki, Tickets, Automatisierung — spricht es MCP, funktioniert es hier."
+      },
+      "jira": {
+        "name": "Jira",
+        "summary": "Tickets und Vorgänge",
+        "hint": "Verbinde einen Jira-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Tickets auflisten und neue per Prompt anlegen."
+      },
+      "confluence": {
+        "name": "Confluence",
+        "summary": "Wiki-Seiten",
+        "hint": "Verbinde einen Confluence-fähigen MCP-Server (z. B. einen selbst gehosteten Atlassian-MCP-Dienst) und trage dessen Endpunkt-URL und Zugriffstoken ein. Mit aktivierten Schreibaktionen kannst du Seiten durchsuchen, Zusammenfassungen holen und neue Seiten per Prompt anlegen."
+      },
+      "github": {
+        "name": "GitHub",
+        "summary": "Repos, Issues, Pull Requests",
+        "hint": "Verbinde einen GitHub-fähigen MCP-Server und trage dessen Endpunkt-URL und ein persönliches Zugriffstoken ein. Nützlich für Issues, Pull Requests und die Repository-Suche."
+      },
+      "n8n": {
+        "name": "n8n",
+        "summary": "Automatisierungs-Workflows",
+        "hint": "Verbinde einen n8n-MCP-Server, damit der Assistent deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
+      }
+    },
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
-    "allowWriteHint": "Wenn aktiviert, darf der KI-Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren — zum Beispiel eine neue Confluence-Seite oder ein Jira-Ticket. Löschaktionen sind niemals erlaubt.",
+    "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"
   },
   "messagesGateway": {

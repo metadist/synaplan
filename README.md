@@ -22,7 +22,7 @@
 - **Hundreds of models, one platform.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama — swap providers per task in the UI, without touching a config file. No vendor lock-in, ever.
 - **DAG task routing that saves tokens.** An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply) and routes every step to the model that fits it — a cheap fast model for extraction, a strong one only where reasoning is needed. Live task cards stream while the graph executes, and every answer shows what it cost.
 - **Sovereign by design.** Run on-prem, in the EU cloud, or fully air-gapped: chat, RAG knowledge search, document processing, transcription and speech run with zero internet connection. No training on your data, no forced telemetry — proven in production up to 5,000-workplace offline deployments.
-- **Everywhere you work.** Web app, [iPhone app](https://apps.apple.com/app/id6784278288?ct=github-readme), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus your files where they live, with [Nextcloud](https://github.com/metadist/synaplan-nextcloud) and [OpenCloud](https://github.com/metadist/synaplan-opencloud) integrations.
+- **Everywhere you work.** Web app, [iPhone app](https://apps.apple.com/app/id6784278288?ct=github-readme), [Outlook add-in](https://github.com/metadist/Synamail), embeddable chat widget, WhatsApp, email — plus the tools you already run: Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira and Confluence, and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
 - **Extensible without forking.** A non-invasive plugin system, an OpenAPI-documented REST API, an MCP server *and* client, and an Anthropic-compatible endpoint for Claude Code and friends.
 
 ---
@@ -37,20 +37,36 @@ docker compose up -d
 
 1. **Open <http://localhost:5173>.** The UI is ready in about two minutes.
 2. **Log in** as `admin@synaplan.com` / `admin123`.
-3. **Open Admin → AI Providers and paste one API key.** Free tier: [Groq](https://console.groq.com).
+3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat is replaced by a first-run setup screen. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
-That third step is the whole setup. **You never touch a config file to connect an AI provider.**
+That is the whole local-hosting onboarding. After chat works, open **Channels → Connections** to hook up Outlook, Nextcloud, Dropbox, a calendar, or Jira / Confluence — then you can say *"summarize the latest mail from X"* or *"create a picture and put it in nextcloud"*.
 
 ### Key management, the short version
 
-- **Paste it in the UI.** **Admin → AI Providers** (`/admin/setup`) lists every provider with a *Connected* badge and a free-tier hint.
+- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Open AI provider setup** button. The same wizard lives at **Admin → AI Providers** (`/admin/setup`) later.
 - **Tested before it's saved.** The key is validated against the live provider API, so a typo fails immediately instead of at your first chat.
 - **Encrypted at rest.** It lives encrypted in your own database, not in a plaintext file on disk.
 - **Active instantly.** No restart and no rebuild — the next message already uses it.
 - **Defaults repair themselves.** If the default chat model points at a provider you have no key for, Synaplan repoints it to one that works, so chat is never dead on a fresh install.
+- **Local-model progress is visible.** A download card in the setup wizard (and in `docker compose logs -f backend`) shows how far the optional Ollama pull has got; cloud chat works while it runs.
 - **`.env` still works.** Keys already in `backend/.env` are imported into the encrypted store on first use, and a key you later save in the UI wins permanently.
 
-**No cloud key at all?** Start with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes; `docker compose logs -f backend` shows progress.
+**No cloud key at all?** Start with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes.
+
+### Host it on your own server
+
+The commands above start the **development** stack (source build, Vite, MailHog, phpMyAdmin). For a production install on a Linux box, use the published image and the `deploy/` contract — secrets can be generated for you, and you set the first administrator before the stack starts:
+
+```bash
+cp deploy/selfhost.env.example deploy/.env
+# Set SYNAPLAN_VERSION, public URL, and BOOTSTRAP_ADMIN_* (or leave both admin vars empty and sign up later)
+deploy/scripts/prepare.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml pull
+deploy/scripts/validate-release.sh
+docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+After login, the **same first-run provider screen** applies. Full walkthrough: [Installation](docs/INSTALLATION.md) · [deploy/README.md](deploy/README.md).
 
 ---
 
@@ -122,7 +138,9 @@ Click any screenshot to see it full size.
 
 ## One AI, everywhere you work
 
-The same assistant, the same knowledge base, the same model policy — on every channel your team already uses.
+The same assistant, the same knowledge base, the same model policy — on every channel your team already uses. Connect a system once under **Channels**; the planner can then read from it and deliver results into it.
+
+### Conversation surfaces
 
 | Surface | What it does | Get it |
 |---------|--------------|--------|
@@ -130,10 +148,25 @@ The same assistant, the same knowledge base, the same model policy — on every 
 | **iPhone app** | Chat, documents and voice on iOS — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) |
 | **Outlook add-in** | Bring Synaplan into Outlook (Web, new & classic, Mac) — find and process mail without sending it anywhere | [metadist/Synamail](https://github.com/metadist/Synamail) |
 | **Chat widget** | Embed your assistant on any website with one snippet — cross-origin ready, human takeover included | [Widget guide](https://docs.synaplan.com/index.php/widget) |
-| **Nextcloud** | Use documents from your Nextcloud as AI knowledge — the sovereign file store stays in charge | [metadist/synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) |
-| **OpenCloud** | Same for OpenCloud — AI answers grounded in your existing file shares | [metadist/synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) |
 | **WhatsApp & Email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
 | **MCP & Claude Code** | Your RAG and memories as MCP tools; Anthropic-compatible `POST /v1/messages` endpoint | [MCP guide](https://docs.synaplan.com/index.php/mcp) · [guide](docs/ANTHROPIC_COMPATIBLE_API.md) |
+
+### Connected systems
+
+Set these up under **Channels → Connections** (or **Channels → MCP servers** / **Channels → Email**). In chat, use the channel word shown as a pill on the Connections page — for example *nextcloud*, *dropbox*, *outlook*.
+
+| Channel | What it unlocks | Setup |
+|---------|-----------------|-------|
+| **Microsoft 365** | Live Outlook mail search, calendar events (`outlook`), send from your own mailbox | **Channels → Connections** — OAuth, no password stored |
+| **Dropbox** | Save generated files into a Dropbox folder (`dropbox`) | **Channels → Connections** — OAuth |
+| **Nextcloud / ownCloud / WebDAV** | File results into a folder you own (`nextcloud` / `folder`) | **Channels → Connections** — app password, never your account password |
+| **CalDAV calendar** | Put generated meetings into a calendar you own (`calendar`) | Same Nextcloud preset can create folder + calendar in one step |
+| **IMAP mailbox** | Live search of any IMAP inbox, merged with Microsoft 365 results | **Channels → Email** |
+| **Jira & Confluence** | Search and summarize; create tickets or pages when you allow writes | **Channels → MCP servers** — Atlassian quick-start presets |
+| **Saved Tasks** | Pin a plan and run it on demand or on a schedule (hourly / daily / weekdays) | **Channels → Saved Tasks** |
+| **Nextcloud / OpenCloud apps** | Use files from those clouds as AI knowledge — the file store stays in charge | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) · [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) |
+
+Details and channel words: [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
 
 ---
 
@@ -153,8 +186,9 @@ The same assistant, the same knowledge base, the same model policy — on every 
 
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
-| **Standard** | `docker compose up -d` | ~9 GB | Full features, local embeddings (local chat model optional, +~14 GB) |
-| **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Cloud AI only (Groq/OpenAI) |
+| **Standard** | `docker compose up -d` | ~9 GB | Local try-out: full features, local embeddings (local chat model optional, +~14 GB) |
+| **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Fastest first boot — cloud AI only (Groq/OpenAI) |
+| **Production** | `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 
 The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
 
@@ -198,14 +232,16 @@ docker compose -f docker-compose-minimal.yml up -d
 - **iPhone App** — Chat, documents and voice input on iOS, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
 - **WhatsApp** — Meta Business API integration
-- **Email** — AI-powered email responses
+- **Email** — AI-powered email responses, plus live mailbox search (IMAP and Microsoft 365)
+- **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
+- **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule (**Channels → Saved Tasks**)
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output)
 - **Documents** — PDF, Word, Excel, images with OCR
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
 - **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
-- **MCP Client** *(early access)* — Connect *your* MCP servers (CRM, wiki, n8n, …) under **Channels → MCP Servers**; the multi-task planner pulls live data from them via `mcp_fetch` DAG nodes — read-only, SSRF-guarded, per-topic opt-in. Enabled by seeded `BCONFIG` flags (`MCP.CLIENT_ENABLED`, `MULTITASK.MCP_FETCH_ENABLED` — `app:seed` sets them ON on deploy; an explicit `0` row is the operator kill switch). See [docs/MULTITASK_DATA_NODES.md](docs/MULTITASK_DATA_NODES.md)
+- **MCP Client** *(early access)* — Connect *your* MCP servers (Jira, Confluence, CRM, wiki, n8n, …) under **Channels → MCP Servers**. The planner pulls live data via `mcp_fetch` and, when you enable **allow write actions** on that server, can create tickets or pages via `mcp_action` — destructive tools stay refused. SSRF-guarded, per-topic opt-in. Seeded `BCONFIG` flags (`MCP.CLIENT_ENABLED`, `MULTITASK.MCP_FETCH_ENABLED`, `MULTITASK.MCP_ACTION_ENABLED`) turn this on; an explicit `0` row is the operator kill switch. See [docs/MULTITASK_DATA_NODES.md](docs/MULTITASK_DATA_NODES.md)
 - **Claude Code & Anthropic-compatible API** — Point Claude Code or any Anthropic-protocol client at your instance (`POST /v1/messages`); configure under **Channels → AI Agents** ([guide](docs/ANTHROPIC_COMPATIBLE_API.md))
 
 ---
@@ -296,8 +332,9 @@ In-repo guides (for developers working on this codebase):
 
 | Guide | Description |
 |-------|-------------|
-| [Installation](docs/INSTALLATION.md) | Detailed setup instructions |
+| [Installation](docs/INSTALLATION.md) | Local development stack and production self-hosting (`deploy/`) |
 | [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
+| [Connections](docs/CONNECTIONS.md) | Microsoft 365, Dropbox, Nextcloud / WebDAV, CalDAV, Jira / Confluence |
 | [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
 | [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
@@ -330,6 +367,7 @@ synaplan/
 ├── backend/        # Symfony PHP API
 ├── frontend/       # Vue.js SPA
 ├── docs/           # Documentation
+├── deploy/         # Production self-host compose + lifecycle scripts
 ├── _docker/        # Docker configs
 └── plugins/        # Plugin system
 ```

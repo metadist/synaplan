@@ -14,6 +14,7 @@ use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
 use App\Service\MarketingNews\MarketingNewsConfig;
+use App\Service\Mcp\McpClientConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
@@ -113,6 +114,7 @@ final readonly class SystemConfigService
                     'dropbox' => ['label' => 'Dropbox', 'fields' => [
                         'DROPBOX_ENABLED', 'DROPBOX_APP_KEY', 'DROPBOX_APP_SECRET', 'DROPBOX_REDIRECT_URI',
                     ]],
+                    'mcp' => ['label' => 'MCP servers', 'fields' => ['MCP_CLIENT_ENABLED']],
                 ],
             ],
             'processing' => [
@@ -473,6 +475,29 @@ final readonly class SystemConfigService
                 ]);
             } catch (\Throwable $sideEffect) {
                 $this->logger->error('SystemConfigService: failed clearing per-user saved-tasks override', [
+                    'userId' => $actingUserId,
+                    'error' => $sideEffect->getMessage(),
+                ]);
+            }
+        }
+
+        if (McpClientConfig::CONFIG_GROUP === $group
+            && McpClientConfig::KEY_CLIENT_ENABLED === $key
+            && null !== $actingUserId && $actingUserId > 0
+        ) {
+            try {
+                $removed = $this->configRepository->deleteValue(
+                    $actingUserId,
+                    McpClientConfig::CONFIG_GROUP,
+                    McpClientConfig::KEY_CLIENT_ENABLED,
+                );
+                $this->logger->info('SystemConfigService: cleared admin per-user MCP client override', [
+                    'userId' => $actingUserId,
+                    'removed' => $removed,
+                    'globalValue' => $value,
+                ]);
+            } catch (\Throwable $sideEffect) {
+                $this->logger->error('SystemConfigService: failed clearing per-user MCP client override', [
                     'userId' => $actingUserId,
                     'error' => $sideEffect->getMessage(),
                 ]);
@@ -876,6 +901,18 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
                 'dbKey' => MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
+            ],
+            // Outbound MCP client master switch (BCONFIG group MCP / CLIENT_ENABLED).
+            // Also toggled from Channels → MCP Servers. Seeded ON for new installs;
+            // an explicit 0 row is the operator kill switch.
+            'MCP_CLIENT_ENABLED' => [
+                'tab' => 'channels', 'section' => 'mcp', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow the assistant to call connected MCP servers (Jira, Confluence, CRM, and any other MCP endpoint). When off, saved connections stay in place but no calls are made. You can also turn this on from Channels → MCP Servers.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => McpClientConfig::CONFIG_GROUP,
+                'dbKey' => McpClientConfig::KEY_CLIENT_ENABLED,
             ],
             // === Microsoft 365 app registration (database-backed) ===
             // BCONFIG group M365 (ownerId=0), read by MicrosoftOAuthConfig.
