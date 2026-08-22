@@ -348,6 +348,41 @@ Supported formats: mp3, wav, ogg, m4a, opus, flac, webm, aac, wma
 
 ---
 
+## Text-to-Speech (optional Piper)
+
+Speech **output** is a separate companion: [synaplan-tts](https://github.com/metadist/synaplan-tts)
+(`ghcr.io/metadist/synaplan-tts`). The published image ships four voices that
+match the UI locales — English, German, Spanish, Turkish. It is not started
+with the default stack.
+
+```bash
+docker compose --profile tts up -d
+```
+
+```bash
+# backend/.env — only needed if TTS is not on localhost:10200
+SYNAPLAN_TTS_URL=http://host.docker.internal:10200
+```
+
+**Frontend language selects the voice.** `ChatView` sends the active vue-i18n
+locale with the chat request and later with each `/api/v1/tts/stream` call.
+`PiperProvider` maps `en` / `de` / `es` / `tr` to the baked voices
+(`en_US-lessac-medium`, `de_DE-thorsten-medium`, `es_ES-davefx-medium`,
+`tr_TR-dfki-medium`). If the backend detects a different reply language
+(`meta.language`), that short code wins over the UI locale. An explicit
+`voice=` query still overrides both. There is no separate voice dropdown.
+
+Add further Piper models by mounting `.onnx` + `.onnx.json` files into
+`EXTRA_VOICES_DIR` (`/voices-extra` on the container). Do not remount over
+`/voices` — that hides the four baked models. Details:
+[Adding more voices](https://github.com/metadist/synaplan-tts#adding-more-voices).
+
+Prefer a cloud voice? Set `ELEVENLABS_API_KEY` instead (or use Gemini / Mistral /
+xAI TTS models from the catalog). Whisper above is **input** only and does not
+need this service.
+
+---
+
 ## WhatsApp Integration
 
 ```bash

@@ -1043,7 +1043,7 @@
     "statusReadyTitle": "Tu IA está lista",
     "statusReadyText": "El modelo de chat predeterminado tiene un proveedor funcional. Puedes añadir más proveedores abajo en cualquier momento.",
     "statusNotReadyTitle": "Aún no hay un proveedor de IA conectado",
-    "statusNotReadyText": "El chat no funcionará hasta que conectes un proveedor. Añade una clave API abajo — Groq ofrece una clave gratuita que funciona en menos de un minuto.",
+    "statusNotReadyText": "El chat no funcionará hasta que conectes un proveedor. Añade una clave API abajo — Groq ofrece una clave gratuita que funciona en menos de un minuto — o conecta un Ollama local, que no necesita ninguna clave.",
     "cloudProviders": "Proveedores en la nube",
     "cloudProvidersHint": "Pega una clave API: se prueba en vivo y se guarda cifrada. Las claves de tu archivo .env se detectan automáticamente.",
     "recommended": "Recomendado",
@@ -1073,6 +1073,11 @@
     "removed": "Clave de {provider} eliminada",
     "removedEnvStillSet": "Clave de {provider} eliminada de la base de datos: {envVar} sigue definida en el entorno, así que {provider} continúa conectado con ese valor",
     "loadFailed": "No se pudo cargar el estado de los proveedores",
+    "ownService": {
+      "title": "Añadir tu propio servicio",
+      "description": "¿Falta un proveedor en la lista? Añádelo en la pestaña Editar modelos de la configuración de modelos IA.",
+      "cta": "Añadir tu propio servicio"
+    },
     "localAi": {
       "title": "IA local (Ollama) — sin clave",
       "description": "La instalación estándar incluye modelos de IA locales que se ejecutan completamente en tu hardware. La descarga de modelos puede tardar en el primer arranque; los proveedores en la nube de arriba están disponibles al instante."
@@ -1122,7 +1127,7 @@
   "setupBanner": {
     "adminTitle": "Ningún proveedor de IA configurado",
     "userTitle": "El chat aún no está listo",
-    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto.",
+    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto — o conecta un Ollama local, que no necesita ninguna clave.",
     "userText": "Un administrador todavía tiene que conectar un proveedor de IA. En la documentación se explica cómo se hace.",
     "cta": "Abrir configuración de IA",
     "docsCta": "Abrir documentación"
@@ -1184,6 +1189,11 @@
   "auth": {
     "login": "Iniciar Sesión",
     "register": "Registrarse",
+    "demoHint": {
+      "title": "Instalación de demostración nueva",
+      "text": "Usa la cuenta de administrador para conectar un proveedor de IA y terminar la configuración.",
+      "cta": "Continuar como administrador"
+    },
     "email": "Correo Electrónico",
     "emailPlaceholderPrefix": "tu",
     "emailPlaceholderSuffix": "correo.com",

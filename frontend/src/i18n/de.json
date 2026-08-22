@@ -2664,7 +2664,7 @@
     "statusReadyTitle": "Deine KI ist bereit",
     "statusReadyText": "Das Standard-Chat-Modell hat einen funktionierenden Anbieter. Du kannst unten jederzeit weitere Anbieter hinzufügen.",
     "statusNotReadyTitle": "Noch kein KI-Anbieter verbunden",
-    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert.",
+    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert — oder verbinde ein lokales Ollama, das ganz ohne Schlüssel auskommt.",
     "cloudProviders": "Cloud-Anbieter",
     "cloudProvidersHint": "API-Schlüssel einfügen — er wird live getestet und verschlüsselt gespeichert. Schlüssel aus deiner .env-Datei werden automatisch übernommen.",
     "recommended": "Empfohlen",
@@ -2694,6 +2694,11 @@
     "removed": "{provider}-Schlüssel entfernt",
     "removedEnvStillSet": "Gespeicherter {provider}-Schlüssel entfernt — {envVar} ist in der Umgebung weiterhin gesetzt, {provider} bleibt damit verbunden",
     "loadFailed": "Anbieter-Status konnte nicht geladen werden",
+    "ownService": {
+      "title": "Eigenen Dienst hinzufügen",
+      "description": "Dein Anbieter fehlt in der Liste? Füge ihn im Tab „Modelle bearbeiten“ der KI-Modell-Konfiguration hinzu.",
+      "cta": "Eigenen Dienst hinzufügen"
+    },
     "localAi": {
       "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
       "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
@@ -2743,7 +2748,7 @@
   "setupBanner": {
     "adminTitle": "Kein KI-Anbieter eingerichtet",
     "userTitle": "Der Chat ist noch nicht bereit",
-    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert.",
+    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert — oder verbinde ein lokales Ollama, das ganz ohne Schlüssel auskommt.",
     "userText": "Ein Administrator muss noch einen KI-Anbieter verbinden. In der Dokumentation steht, wie das geht.",
     "cta": "KI-Anbieter einrichten",
     "docsCta": "Dokumentation öffnen"
@@ -4156,6 +4161,11 @@
     "register": "Registrieren",
     "welcomeBack": "Willkommen zurück",
     "loginSubtitle": "Melde dich an, um fortzufahren",
+    "demoHint": {
+      "title": "Frische Demo-Installation",
+      "text": "Melde dich als Administrator an, um einen KI-Anbieter zu verbinden und die Einrichtung abzuschließen.",
+      "cta": "Als Administrator fortfahren"
+    },
     "getStarted": "Loslegen",
     "registerSubtitle": "Erstelle dein kostenloses Konto",
     "email": "E-Mail",

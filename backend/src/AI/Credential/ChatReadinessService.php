@@ -90,13 +90,18 @@ final class ChatReadinessService
     }
 
     /**
-     * Whether a plain chat message can be answered right now: the provider
+     * Whether a real AI provider can answer chat right now: the provider
      * behind the effective default chat model must be usable. Pass the user id
      * so a per-user model override is honoured — the chat pipeline resolves
      * the model per user, and readiness must measure the same thing, or a user
      * whose chat works fine is shown a "no AI provider connected" banner.
      * Falls back to "any chat-capable provider is usable" only when the
      * binding does not resolve.
+     *
+     * The built-in TestProvider never counts. It is always "available" in
+     * dev/test and is what a fresh install actually answers with, but it is
+     * canned demo text — treating it as ready made the setup page claim
+     * "Your AI is ready" with no key behind the default chat model.
      *
      * @param array<string, bool>|null $availability defaults to the cached snapshot
      */
@@ -105,7 +110,9 @@ final class ChatReadinessService
         $availability ??= $this->providerAvailability();
         $defaultChatService ??= $this->defaultChatService($userId);
 
-        if (null !== $defaultChatService && isset($availability[$defaultChatService])) {
+        // TestProvider is an internal fixture, not a connected AI. Skip it so
+        // a fresh install (default chat falls through to 'test') is not ready.
+        if (null !== $defaultChatService && 'test' !== $defaultChatService && isset($availability[$defaultChatService])) {
             return $availability[$defaultChatService];
         }
 

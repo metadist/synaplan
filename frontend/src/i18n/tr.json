@@ -1043,7 +1043,7 @@
     "statusReadyTitle": "AI'nız hazır",
     "statusReadyText": "Varsayılan sohbet modelinin çalışan bir sağlayıcısı var. Aşağıdan istediğiniz zaman başka sağlayıcılar ekleyebilirsiniz.",
     "statusNotReadyTitle": "Henüz bağlı bir AI sağlayıcısı yok",
-    "statusNotReadyText": "Bir sağlayıcı bağlanana kadar sohbet çalışmaz. Aşağıya bir API anahtarı ekleyin — Groq, bir dakikadan kısa sürede çalışan ücretsiz bir anahtar sunuyor.",
+    "statusNotReadyText": "Bir sağlayıcı bağlanana kadar sohbet çalışmaz. Aşağıya bir API anahtarı ekleyin — Groq, bir dakikadan kısa sürede çalışan ücretsiz bir anahtar sunuyor — veya hiç anahtar gerektirmeyen yerel bir Ollama bağlayın.",
     "cloudProviders": "Bulut sağlayıcıları",
     "cloudProvidersHint": "Bir API anahtarı yapıştırın; canlı olarak test edilir ve şifrelenmiş saklanır. .env dosyanızdaki anahtarlar otomatik olarak alınır.",
     "recommended": "Önerilen",
@@ -1073,6 +1073,11 @@
     "removed": "{provider} anahtarı kaldırıldı",
     "removedEnvStillSet": "Kayıtlı {provider} anahtarı kaldırıldı — {envVar} ortamda hâlâ tanımlı, bu nedenle {provider} bu değerle bağlı kalır",
     "loadFailed": "Sağlayıcı durumu yüklenemedi",
+    "ownService": {
+      "title": "Kendi hizmetini ekle",
+      "description": "Listede olmayan bir sağlayıcı mı var? Onu AI Model Yapılandırması'ndaki Modelleri düzenle sekmesine ekle.",
+      "cta": "Kendi hizmetini ekle"
+    },
     "localAi": {
       "title": "Yerel AI (Ollama) — anahtar gerekmez",
       "description": "Standart kurulum, tamamen kendi donanımınızda çalışan yerel AI modelleri içerir. İlk başlatmada model indirme biraz sürebilir; yukarıdaki bulut sağlayıcıları anında kullanılabilir."
@@ -1122,7 +1127,7 @@
   "setupBanner": {
     "adminTitle": "AI sağlayıcısı yapılandırılmamış",
     "userTitle": "Sohbet henüz hazır değil",
-    "adminText": "Bir AI sağlayıcısı bağlanmadan sohbet başlayamaz. Kurulum sayfasını açıp bir anahtar ekleyin — Groq yaklaşık bir dakikada çalışan ücretsiz bir seçenek sunar.",
+    "adminText": "Bir AI sağlayıcısı bağlanmadan sohbet başlayamaz. Kurulum sayfasını açıp bir anahtar ekleyin — Groq yaklaşık bir dakikada çalışan ücretsiz bir seçenek sunar — veya hiç anahtar gerektirmeyen yerel bir Ollama bağlayın.",
     "userText": "Bir yöneticinin hâlâ bir AI sağlayıcısı bağlaması gerekiyor. Bunun nasıl yapılacağı belgelerde anlatılır.",
     "cta": "AI sağlayıcı kurulumunu aç",
     "docsCta": "Belgeleri aç"
@@ -1184,6 +1189,11 @@
   "auth": {
     "login": "Giriş Yap",
     "register": "Kayıt Ol",
+    "demoHint": {
+      "title": "Yeni demo kurulum",
+      "text": "Bir AI sağlayıcısı bağlamak ve kurulumu bitirmek için yönetici hesabını kullan.",
+      "cta": "Yönetici olarak devam et"
+    },
     "email": "E-posta",
     "emailPlaceholderPrefix": "sizin",
     "emailPlaceholderSuffix": "email.com",

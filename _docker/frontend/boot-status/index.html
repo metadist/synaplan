@@ -1,0 +1,455 @@
+<!doctype html>
+<!--
+  Synaplan boot / onboarding page (dev stack).
+
+  Served by server.mjs on port 5173 while the real app is still starting.
+  Everything is inlined (no external assets) because it must work before
+  npm ci has ever run. When Vite takes over the port, the polling script
+  below detects the handover and reloads straight into the app.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synaplan is starting…</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #5b6b82;
+    --border: #e3e8f2;
+    --brand: #2563eb;
+    --brand-soft: #eaf0fe;
+    --ok: #16a34a;
+    --ok-soft: #e8f7ee;
+    --warn: #b45309;
+    --warn-soft: #fdf3e3;
+    --track: #e8edf6;
+    --shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220;
+      --card: #121b2e;
+      --text: #e6ecf7;
+      --muted: #94a3b8;
+      --border: #223049;
+      --brand: #5b8bf7;
+      --brand-soft: #1a2540;
+      --ok: #34c168;
+      --ok-soft: #12301f;
+      --warn: #e0a95c;
+      --warn-soft: #33270f;
+      --track: #1c2740;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px 56px; }
+  header.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 10px; flex: none;
+    background: linear-gradient(135deg, var(--brand), #7c3aed);
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 20px;
+  }
+  .brand-name { font-size: 20px; font-weight: 700; letter-spacing: .2px; }
+  .brand-sub { font-size: 13px; color: var(--muted); }
+
+  h1 { font-size: clamp(24px, 4vw, 32px); margin: 0 0 6px; }
+  .lead { color: var(--muted); margin: 0 0 24px; max-width: 640px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow); padding: 22px;
+  }
+  .progress-card { margin-bottom: 18px; }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .progress-label { font-weight: 600; }
+  .progress-meta { color: var(--muted); font-size: 13px; }
+  .bar { height: 10px; background: var(--track); border-radius: 99px; margin: 12px 0 8px; overflow: hidden; }
+  .bar > i {
+    display: block; height: 100%; width: 2%;
+    background: linear-gradient(90deg, var(--brand), #7c3aed);
+    border-radius: 99px; transition: width .8s ease;
+    background-size: 200% 100%; animation: shimmer 2.2s linear infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
+  .hint { color: var(--muted); font-size: 13px; margin: 0; }
+
+  .steps { margin: 18px 0; padding: 8px 22px; }
+  .step { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .step:last-child { border-bottom: none; }
+  .badge {
+    width: 30px; height: 30px; border-radius: 99px; flex: none; margin-top: 2px;
+    display: grid; place-items: center; font-size: 13px; font-weight: 700;
+    background: var(--track); color: var(--muted);
+  }
+  .step.active .badge { background: var(--brand-soft); color: var(--brand); }
+  .step.done .badge { background: var(--ok-soft); color: var(--ok); }
+  .step.warn .badge { background: var(--warn-soft); color: var(--warn); }
+  .step-title { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px;
+    background: var(--track); color: var(--muted); text-transform: uppercase; letter-spacing: .4px;
+  }
+  .step-detail { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .step.done .step-detail { color: var(--ok); }
+  .mini-bar { height: 6px; background: var(--track); border-radius: 99px; margin-top: 8px; max-width: 340px; overflow: hidden; display: none; }
+  .mini-bar > i { display: block; height: 100%; width: 0; background: var(--brand); border-radius: 99px; transition: width .8s ease; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 99px; flex: none;
+    border: 2px solid var(--brand-soft); border-top-color: var(--brand);
+    animation: spin 1s linear infinite; display: inline-block; vertical-align: -2px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+  .info h3 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .info p, .info ul { margin: 0; color: var(--muted); font-size: 14px; }
+  .info ul { padding-left: 18px; }
+  .info li { margin: 4px 0; }
+  .kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px; background: var(--track); border: 1px solid var(--border);
+    padding: 1px 6px; border-radius: 6px; color: var(--text); white-space: nowrap;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .ready-banner {
+    display: none; margin-bottom: 18px; padding: 16px 20px; border-radius: 14px;
+    background: var(--ok-soft); border: 1px solid var(--ok); color: var(--ok);
+    font-weight: 600;
+  }
+  footer { margin-top: 28px; color: var(--muted); font-size: 13px; display: flex; gap: 16px; flex-wrap: wrap; }
+  @media (max-width: 480px) {
+    .wrap { padding: 20px 14px 40px; }
+    .card, .steps { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div class="logo">S</div>
+    <div>
+      <div class="brand-name">Synaplan</div>
+      <div class="brand-sub">Your private AI workspace</div>
+    </div>
+  </header>
+
+  <h1 id="headline">Synaplan is getting ready…</h1>
+  <p class="lead" id="lead">
+    Everything runs on your machine, so the very first start has to download and
+    prepare a few things. You can watch each step below — this page switches to
+    the app automatically the moment it is ready.
+  </p>
+
+  <div class="ready-banner" id="readyBanner">
+    Everything is ready — taking you to Synaplan…
+  </div>
+
+  <div class="card progress-card">
+    <div class="progress-top">
+      <span class="progress-label" id="progressLabel">Starting up</span>
+      <span class="progress-meta">
+        <span id="percent">0%</span> · elapsed <span id="elapsed">0:00</span>
+      </span>
+    </div>
+    <div class="bar"><i id="barFill"></i></div>
+    <p class="hint" id="hint">
+      First start: usually 5–15 minutes (Docker images, dependencies, database setup).
+      Every later start: well under a minute.
+    </p>
+    <p class="hint" id="lostBanner" style="display:none; color: var(--warn); font-weight: 600;">
+      Lost the connection to the installation. If you stopped Docker, this page is stale —
+      close it. Otherwise check <span class="kbd">docker compose ps</span> and
+      <span class="kbd">docker compose logs -f frontend</span>, then reload this page.
+    </p>
+  </div>
+
+  <div class="card steps">
+    <div class="step" id="step-db">
+      <div class="badge">1</div>
+      <div>
+        <div class="step-title">Database</div>
+        <div class="step-detail" id="detail-db">Starting MariaDB…</div>
+      </div>
+    </div>
+    <div class="step" id="step-backend">
+      <div class="badge">2</div>
+      <div>
+        <div class="step-title">Backend engine</div>
+        <div class="step-detail" id="detail-backend">Waiting for the backend container…</div>
+      </div>
+    </div>
+    <div class="step" id="step-ai" style="display:none">
+      <div class="badge">3</div>
+      <div style="flex:1">
+        <div class="step-title">Local AI model <span class="tag">background</span></div>
+        <div class="step-detail" id="detail-ai">Waiting for the AI engine…</div>
+        <div class="mini-bar" id="aiBar"><i id="aiBarFill"></i></div>
+      </div>
+    </div>
+    <div class="step" id="step-frontend">
+      <div class="badge" id="badge-frontend">4</div>
+      <div>
+        <div class="step-title">App interface</div>
+        <div class="step-detail" id="detail-frontend">Preparing the user interface…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card info">
+      <h3>Your login</h3>
+      <p>
+        Administrator account for this installation:<br>
+        <span class="kbd">admin@synaplan.com</span><br>
+        <span class="kbd">admin123</span>
+      </p>
+      <p style="margin-top:8px">You can change the password later under <b>Account</b>.</p>
+    </div>
+    <div class="card info">
+      <h3>Connect an AI provider (2 min)</h3>
+      <p>
+        Synaplan talks to the AI of your choice. After you log in, a setup
+        screen guides you: paste one API key (free keys:
+        <a href="https://console.groq.com" target="_blank" rel="noopener">console.groq.com</a>)
+        — or use a local <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>
+        with a capable model, no key needed. Either way chat works instantly — no
+        restart, no config files. Keys are validated live and stored encrypted
+        in your own database.
+      </p>
+    </div>
+    <div class="card info">
+      <h3>Good to know</h3>
+      <ul>
+        <li>A small local AI model (~1&nbsp;GB) downloads in the background for document search — chat does not wait for it.</li>
+        <li>Until a provider key is set, chat replies come from a built-in demo responder so you can try the interface.</li>
+        <li>Dev tools: <a href="http://localhost:8025" target="_blank" rel="noopener">email viewer</a> ·
+            <a href="http://localhost:8082" target="_blank" rel="noopener">database browser</a> ·
+            <a href="http://localhost:8000/api/doc" target="_blank" rel="noopener">API docs</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <a href="https://docs.synaplan.com" target="_blank" rel="noopener">Documentation</a>
+    <a href="https://github.com/metadist/synaplan" target="_blank" rel="noopener">GitHub</a>
+    <span id="stuckHint" style="display:none">
+      Taking much longer than expected? Run <span class="kbd">docker compose logs -f</span> to inspect the stack.
+    </span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict'
+
+  const $ = (id) => document.getElementById(id)
+  const pageStart = Date.now()
+  const POLL_MS = 2500
+  let handover = false
+
+  // ---- helpers -------------------------------------------------------------
+
+  const setStep = (id, state, detail, withSpinner) => {
+    const el = $('step-' + id)
+    if (!el) return
+    el.classList.remove('active', 'done', 'warn')
+    if (state) el.classList.add(state)
+    const badge = el.querySelector('.badge')
+    if (state === 'done') badge.textContent = '✓'
+    const detailEl = $('detail-' + id)
+    if (detail !== undefined && detailEl) {
+      detailEl.replaceChildren()
+      if (withSpinner) {
+        const spinner = document.createElement('span')
+        spinner.className = 'spinner'
+        detailEl.append(spinner, ' ')
+      }
+      detailEl.append(document.createTextNode(detail))
+    }
+  }
+
+  const fmtElapsed = (ms) => {
+    const s = Math.floor(ms / 1000)
+    const m = Math.floor(s / 60)
+    return m + ':' + String(s % 60).padStart(2, '0')
+  }
+
+  setInterval(() => {
+    $('elapsed').textContent = fmtElapsed(Date.now() - pageStart)
+    if (Date.now() - pageStart > 25 * 60 * 1000) $('stuckHint').style.display = 'inline'
+  }, 1000)
+
+  // ---- phase mappings ------------------------------------------------------
+
+  // Backend entrypoint milestones (written to backend var/boot-status.json).
+  const BACKEND_PHASES = {
+    'initializing':        { p: 10, text: 'Backend container is up — initializing…' },
+    'dependencies':        { p: 20, text: 'Installing backend components (first run only)…' },
+    'waiting-for-database':{ p: 35, text: 'Connecting to the database…' },
+    'migrating':           { p: 50, text: 'Setting up the database structure…' },
+    'seeding':             { p: 70, text: 'Loading starter data (models, prompts, demo users)…' },
+    'warming-up':          { p: 85, text: 'Warming up caches…' },
+    'web-starting':        { p: 95, text: 'Starting the web server…' },
+  }
+
+  // This container's own phases (written by the frontend entrypoint).
+  const FRONTEND_PHASES = {
+    'init':                   { p: 10, text: 'Preparing the user interface…' },
+    '10-npm-install.sh':      { p: 35, text: 'Installing interface packages (npm) — a few minutes on first run…' },
+    '20-generate-schemas.sh': { p: 70, text: 'Syncing with the backend API…' },
+    'starting-app':           { p: 92, text: 'Starting the app — one moment…' },
+  }
+
+  // ---- handover to the real app -------------------------------------------
+
+  // All page fetches carry an explicit timeout: on some setups (Windows
+  // localhost relay to WSL/Docker) a connection to a gone server is accepted
+  // and then stalls, which would hang fetch() for minutes and freeze the
+  // whole poll loop in "getting ready" forever.
+  const FETCH_TIMEOUT_MS = 4000
+
+  const probeApp = async () => {
+    try {
+      const res = await fetch('/', { cache: 'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+      if (res.ok && res.headers.get('x-synaplan-boot') !== '1') {
+        handover = true
+        $('readyBanner').style.display = 'block'
+        $('headline').textContent = 'Ready!'
+        $('barFill').style.width = '100%'
+        $('percent').textContent = '100%'
+        setTimeout(() => location.reload(), 400)
+      }
+    } catch { /* status server already gone, Vite not bound yet — retry */ }
+  }
+
+  // ---- render one status snapshot -----------------------------------------
+
+  const render = (s) => {
+    let backendPct = 0
+    let frontendPct = 10
+
+    // Step 1: database
+    if (!s.db) {
+      $('step-db').style.display = 'none'
+    } else if (s.db.reachable) {
+      setStep('db', 'done', 'Running')
+    } else {
+      setStep('db', 'active', 'Starting MariaDB…', true)
+    }
+
+    // Step 2: backend
+    if (s.backend.healthy) {
+      setStep('backend', 'done', 'Running — API is answering')
+      backendPct = 100
+    } else {
+      const phase = s.backend.boot && BACKEND_PHASES[s.backend.boot.phase]
+      if (phase) {
+        setStep('backend', 'active', phase.text, true)
+        backendPct = phase.p
+      } else {
+        setStep('backend', 'active',
+          'Preparing the backend (first run builds a Docker image — the longest step)…', true)
+        backendPct = 5
+      }
+    }
+
+    // Step 3: local AI (informational, does not block readiness)
+    if (s.localAi) {
+      $('step-ai').style.display = 'flex'
+      const d = s.localAi.download
+      const bar = $('aiBar')
+      if (d && d.status === 'downloading' && d.currentModel) {
+        const pct = typeof d.percent === 'number' ? d.percent : 0
+        setStep('ai', 'active', 'Downloading ' + d.currentModel + ' — ' + pct + '%', true)
+        bar.style.display = 'block'
+        $('aiBarFill').style.width = pct + '%'
+      } else if (d && d.status === 'ready') {
+        setStep('ai', 'done', 'Local AI models ready')
+        bar.style.display = 'none'
+      } else if (d && d.status === 'error') {
+        setStep('ai', 'warn', (d.message || 'Model download failed') +
+          ' — chat still works with a cloud provider key')
+        bar.style.display = 'none'
+      } else if (d && d.status === 'idle') {
+        setStep('ai', 'done', 'Local AI engine ready (models download when first used)')
+        bar.style.display = 'none'
+      } else if (s.localAi.reachable) {
+        setStep('ai', 'active', 'AI engine is up — preparing model download…', true)
+      } else {
+        setStep('ai', 'active', 'Waiting for the AI engine…', true)
+      }
+    }
+
+    // Step 4: frontend (this container)
+    const fPhase = s.frontend && (FRONTEND_PHASES[s.frontend.detail] || FRONTEND_PHASES[s.frontend.phase])
+    if (fPhase) {
+      setStep('frontend', 'active', fPhase.text, true)
+      frontendPct = fPhase.p
+    } else {
+      setStep('frontend', 'active', 'Preparing the user interface…', true)
+    }
+
+    // Overall progress: db 10% + backend 55% + frontend 35% (local AI excluded
+    // on purpose — the app is usable before the model download finishes).
+    const overall = Math.min(99, Math.round(
+      (s.db && s.db.reachable ? 10 : 2) +
+      backendPct * 0.55 +
+      frontendPct * 0.35
+    ))
+    $('barFill').style.width = overall + '%'
+    $('percent').textContent = overall + '%'
+    $('progressLabel').textContent =
+      overall < 30 ? 'Warming up the engines'
+      : overall < 60 ? 'Setting things up'
+      : overall < 90 ? 'Almost there'
+      : 'Final touches'
+
+    if (s.frontend && s.frontend.phase === 'starting-app') probeApp()
+  }
+
+  // ---- poll loop -----------------------------------------------------------
+
+  // During the normal Vite handover the status feed fails for only a few
+  // seconds before the app answers. If BOTH the feed and the app probe keep
+  // failing, the installation is gone (Docker stopped, container removed) --
+  // say so instead of pretending progress forever.
+  let failedPolls = 0
+
+  const tick = async () => {
+    if (handover) return
+    try {
+      const res = await fetch('/boot-status.json', { cache: 'no-store', signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
+      if (!res.ok) throw new Error('bad status')
+      render(await res.json())
+      failedPolls = 0
+      $('lostBanner').style.display = 'none'
+    } catch {
+      // Status server is gone: either Vite is taking over (normal) or the
+      // container restarted (the page will reconnect either way).
+      await probeApp()
+      if (!handover && ++failedPolls >= 5) {
+        $('lostBanner').style.display = 'block'
+        $('progressLabel').textContent = 'Connection lost'
+      }
+    }
+    if (!handover) setTimeout(tick, POLL_MS)
+  }
+  tick()
+})()
+</script>
+</body>
+</html>

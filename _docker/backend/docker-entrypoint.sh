@@ -40,6 +40,26 @@ case "$SYNAPLAN_ROLE" in
         ;;
 esac
 
+# Boot milestones for the dev onboarding page (mirrors the ollama-download.json
+# pattern below). The dev stack's boot-status server reads this file through a
+# read-only bind mount of backend/var and shows the user WHICH boot step is
+# running instead of a silent multi-minute wait. Only the web role writes it —
+# worker/scheduler share the same var/ directory and must not fight over it.
+# Every write is best-effort: a failure here must never break the boot.
+BOOT_STATUS_FILE="${BOOT_STATUS_FILE:-/var/www/backend/var/boot-status.json}"
+write_boot_status() {
+    # $1 phase  $2 human-readable message (optional)
+    [ "$SYNAPLAN_ROLE" = "web" ] || return 0
+    mkdir -p "$(dirname "$BOOT_STATUS_FILE")" 2>/dev/null || return 0
+    printf '{"phase":"%s","message":"%s","updatedAt":"%s"}\n' \
+        "$1" "${2:-}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > "${BOOT_STATUS_FILE}.tmp" 2>/dev/null \
+        && mv "${BOOT_STATUS_FILE}.tmp" "$BOOT_STATUS_FILE" 2>/dev/null \
+        || true
+}
+
+write_boot_status "initializing" "Backend container started"
+
 # Test mode: disable the PHP 8.4 tracing JIT and re-stat .php files.
 #
 # The base image (synaplan-base-php >= 1.0.0) ships production-tuned OPcache
@@ -158,6 +178,7 @@ fi
 
 # Run additional startup scripts from docker-entrypoint.d (if any)
 # Useful for dev environments to mount custom initialization scripts
+write_boot_status "dependencies" "Installing backend dependencies"
 if [ -d "/docker-entrypoint.d" ]; then
     # Check if directory has any files (avoid empty glob expansion)
     if compgen -G "/docker-entrypoint.d/*" > /dev/null; then
@@ -245,6 +266,7 @@ case "$SYNAPLAN_ROLE" in
 esac
 
 # Wait for database to be ready
+write_boot_status "waiting-for-database" "Waiting for the database"
 wait_for_database 0 2
 
 # Run database migrations.
@@ -253,6 +275,7 @@ wait_for_database 0 2
 # production and in the bash-level tests under _docker/backend/tests/.
 # See lib/migrations-bootstrap.sh for the full self-healing contract.
 echo "🔄 Running database migrations..."
+write_boot_status "migrating" "Setting up the database structure"
 
 # Locate the bootstrap library regardless of how the entrypoint was invoked.
 #   - Production image: `$(dirname "$0")` resolves to /usr/local/bin, where
@@ -318,6 +341,7 @@ fi
 # re-populate models/prompts/config/rate-limits afterwards.
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
+write_boot_status "seeding" "Loading starter data"
 if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     # If marker exists but DB is empty (e.g. tmpfs wipe, or marker on host volume after down/up), remove stale marker so we load fixtures
     if [ -f "$FIXTURES_MARKER" ]; then
@@ -528,6 +552,7 @@ fi
 
 # Clear and warmup cache
 echo "🧹 Clearing cache..."
+write_boot_status "warming-up" "Warming up caches"
 php bin/console cache:clear
 echo "✅ Cache ready!"
 
@@ -539,4 +564,5 @@ echo "   🌐 API: ${APP_URL}/api"
 echo "   📚 Swagger: ${APP_URL}/api/doc"
 echo ""
 
+write_boot_status "web-starting" "Starting the web server"
 exec frankenphp run --config /etc/caddy/Caddyfile

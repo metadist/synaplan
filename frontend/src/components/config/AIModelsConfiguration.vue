@@ -472,7 +472,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowPathIcon,
   ChevronDownIcon,
@@ -518,10 +518,41 @@ type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
+const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
+
+function parseModelsTab(raw: unknown): ModelsTabId | null {
+  if (typeof raw !== 'string') return null
+  return (MODELS_TABS as readonly string[]).includes(raw) ? (raw as ModelsTabId) : null
+}
+
+function canOpenModelsTab(tab: ModelsTabId): boolean {
+  if (tab === 'edit' || tab === 'runs') return authStore.isAdmin
+  return true
+}
+
+function applyTabFromQuery(): void {
+  const tab = parseModelsTab(route.query.tab)
+  if (!tab || !canOpenModelsTab(tab)) return
+  activeTab.value = tab
+}
+
+function syncTabToUrl(tab: ModelsTabId): void {
+  const query = { ...route.query }
+  if (tab === 'choice') {
+    delete query.tab
+  } else {
+    query.tab = tab
+  }
+  const current = typeof route.query.tab === 'string' ? route.query.tab : undefined
+  const next = typeof query.tab === 'string' ? query.tab : undefined
+  if (current === next) return
+  void router.replace({ query })
+}
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const items: TabNavItem[] = [
@@ -558,7 +589,10 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 })
 
 function onModelsTabChange(id: string) {
-  activeTab.value = id as ModelsTabId
+  const tab = id as ModelsTabId
+  if (!canOpenModelsTab(tab)) return
+  activeTab.value = tab
+  syncTabToUrl(tab)
 }
 
 function onAdminModelCreated() {
@@ -687,6 +721,8 @@ onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
+  applyTabFromQuery()
+
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
@@ -722,6 +758,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('keydown', handleKeydown)
 })
+
+watch(
+  () => route.query.tab,
+  () => {
+    applyTabFromQuery()
+  }
+)
 
 // Watch for route changes to handle highlight parameter
 watch(

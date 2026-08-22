@@ -117,19 +117,19 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 
         // Image generation keywords
         if (preg_match('/(bild|image|picture|foto|photo|draw|zeichne|erstelle.*bild)/i', $userMessage)) {
-            return "Here's your generated image!\n\n[IMAGE:https://picsum.photos/800/600]\n\nI've created a beautiful image for you using the TestProvider.";
+            return "Here's a **sample image** — in demo mode a placeholder stands in for real AI image generation.\n\n[IMAGE:https://picsum.photos/800/600]\n\n".$this->demoSetupFooter();
         }
 
         // Video generation keywords
         if (preg_match('/(video|film|movie|clip|animation)/i', $userMessage)) {
-            return "Here's your generated video!\n\n[VIDEO:https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4]\n\nI've created a short video for you using the TestProvider.";
+            return "Here's a **sample video** — in demo mode a placeholder stands in for real AI video generation.\n\n[VIDEO:https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4]\n\n".$this->demoSetupFooter();
         }
 
         // Different responses based on content
         $responses = [
-            'hello' => "Hello! I'm the TestProvider. I can generate mock texts, images, and videos for you. Try asking me to create an image or video!",
-            'how are you' => "I'm doing great! As a TestProvider, I'm always ready to help you test the system.",
-            'what can you do' => "I can:\n\n• Generate mock text responses\n• Create mock images (try: 'create an image')\n• Generate mock videos (try: 'make a video')\n• Help you test the chat system!",
+            'hello' => "Hello! **You're in demo mode** — no AI provider is connected yet, so replies are canned. You can still try the interface: ask for an image or a video to see how answers look.\n\n".$this->demoSetupFooter(),
+            'how are you' => "All systems are running fine — but **you're in demo mode**, so this reply is canned, not real AI.\n\n".$this->demoSetupFooter(),
+            'what can you do' => "Once an AI provider is connected, Synaplan answers questions, searches your documents, generates images, audio and video, and works via chat widgets, WhatsApp and email.\n\n**Right now you're in demo mode** — replies are canned until a provider is connected.\n\n".$this->demoSetupFooter(),
             // Support for smoke test prompts
             'smoke test' => 'success',
             'answer with "success"' => 'success',
@@ -142,10 +142,33 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
             }
         }
 
-        // Default response with context
-        $contextInfo = count($messages) > 1 ? ' (Message #'.count($messages).' in conversation)' : '';
+        // Default response with context.
+        //
+        // This text is the FIRST thing a fresh install answers when no real AI
+        // provider key is configured yet (TestProvider is the dev fallback in
+        // ModelConfigService::getDefaultModel). It must onboard the user with
+        // an ACTION, not instructions: the [[SETUP_CTA]] marker below is
+        // rendered as a button that signs the guest in as the seeded admin
+        // and opens /admin/setup.
+        $contextInfo = count($messages) > 1 ? ' (message #'.count($messages).' in this conversation)' : '';
 
-        return "TestProvider response: I received your message '{$userMessage}'{$contextInfo}. This is a mock response to test the system. Try asking me to create an image or video!";
+        return "**You're in demo mode** — no AI provider is connected yet, so this is a canned reply to your message '{$userMessage}'{$contextInfo}.\n\n"
+            .$this->demoSetupFooter();
+    }
+
+    /**
+     * Shared call-to-action for every user-facing demo reply.
+     *
+     * `[[SETUP_CTA]]` is a marker, not a markdown link: MessageText.vue
+     * turns it into a button that signs the guest in as the seeded admin
+     * and opens /admin/setup. Markdown links must not appear here — the
+     * chat renderer turns `[label](url)` into broken chips, and a raw
+     * /admin/setup href is useless to a guest (the typical first-run user).
+     */
+    private function demoSetupFooter(): string
+    {
+        return "[[SETUP_CTA]]\n\n"
+            .'A free Groq key or a local Ollama model — no key needed.';
     }
 
     /**

@@ -42,7 +42,10 @@
       <span v-if="provider.configured && provider.source === 'db' && provider.origin === 'env'">
         ({{ $t('adminSetup.sourceDbFromEnv') }})
       </span>
-      <span v-if="isDefaultChat" class="inline-flex items-center gap-1 txt-brand font-medium">
+      <span
+        v-if="isDefaultChat && provider.configured"
+        class="inline-flex items-center gap-1 txt-brand font-medium"
+      >
         <Icon icon="mdi:star" class="w-3.5 h-3.5" />
         {{ $t('adminSetup.currentDefault') }}
       </span>
@@ -65,7 +68,7 @@
           @keydown.enter="save"
         />
         <button
-          class="btn-primary whitespace-nowrap"
+          class="btn-primary whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium"
           :disabled="saving || keyInput.trim() === ''"
           :data-testid="`provider-key-save-${provider.name}`"
           @click="save"
