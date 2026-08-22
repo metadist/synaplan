@@ -2,13 +2,11 @@
   <MainLayout data-testid="view-admin-setup">
     <div class="container mx-auto px-6 py-8 max-w-5xl overflow-x-hidden">
       <!-- Header -->
-      <div class="mb-6">
-        <div class="flex items-center gap-3 mb-2">
-          <Icon icon="mdi:rocket-launch-outline" class="w-8 h-8 text-[var(--brand)]" />
-          <h1 class="text-3xl font-bold txt-primary">{{ $t('adminSetup.title') }}</h1>
-        </div>
-        <p class="txt-secondary">{{ $t('adminSetup.description') }}</p>
-      </div>
+      <PageHeader
+        :title="$t('adminSetup.title')"
+        :subtitle="$t('adminSetup.description')"
+        icon="mdi:rocket-launch-outline"
+      />
 
       <LocalAiDownloadCard class="mb-6" />
 
@@ -100,6 +98,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'

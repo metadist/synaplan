@@ -2,10 +2,12 @@
   <MainLayout data-testid="page-profile">
     <div class="h-full overflow-y-auto scroll-thin">
       <div class="max-w-4xl mx-auto p-4 md:p-8">
-        <div class="mb-8" data-testid="section-header">
-          <h1 class="text-3xl font-bold txt-primary mb-2">{{ $t('profile.title') }}</h1>
-          <p class="txt-secondary">{{ $t('profile.subtitle') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('profile.title')"
+          :subtitle="$t('profile.subtitle')"
+          icon="heroicons:user-circle"
+          data-testid="section-header"
+        />
 
         <form
           class="space-y-6"
@@ -630,6 +632,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import { countries, languages, timezones, type UserProfile } from '@/mocks/profile'
 import { useNotification } from '@/composables/useNotification'

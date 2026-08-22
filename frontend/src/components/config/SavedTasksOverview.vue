@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import PageHeader from '@/components/PageHeader.vue'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 
@@ -35,12 +36,12 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6" data-testid="page-saved-tasks">
-    <div class="surface-card p-6">
-      <h2 class="text-2xl font-semibold txt-primary">
-        {{ $t('config.savedTasks.overviewTitle') }}
-      </h2>
-      <p class="txt-secondary text-sm mt-1">{{ $t('config.savedTasks.overviewSubtitle') }}</p>
-    </div>
+    <PageHeader
+      :title="$t('config.savedTasks.overviewTitle')"
+      :subtitle="$t('config.savedTasks.overviewSubtitle')"
+      icon="heroicons:clock"
+      data-testid="section-header"
+    />
 
     <p v-if="loading" class="txt-secondary text-sm px-1">
       {{ $t('config.savedTasks.overviewLoading') }}

@@ -3,45 +3,41 @@
     <div class="min-h-screen bg-chat p-2 md:p-4 lg:p-8 relative overflow-x-hidden">
       <div class="max-w-7xl mx-auto h-full flex flex-col">
         <!-- Header -->
-        <div
-          class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 md:mb-6"
-        >
-          <h1 class="text-2xl md:text-3xl font-bold txt-primary">
-            {{ $t('pageTitles.memories') }}
-          </h1>
-
-          <!-- View Toggle -->
-          <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
-            <button
-              class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
-              :class="viewMode === 'list' ? 'nav-item--active' : ''"
-              @click="viewMode = 'list'"
-            >
-              <Icon icon="mdi:format-list-bulleted" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
-              <span class="hidden sm:inline">{{ $t('memories.listView.title') }}</span>
-              <span class="sm:hidden">Liste</span>
-            </button>
-            <button
-              class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
-              :class="viewMode === 'graph' ? 'nav-item--active' : ''"
-              @click="viewMode = 'graph'"
-            >
-              <Icon icon="mdi:graph" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
-              <span class="hidden sm:inline">{{ $t('memories.graphView.title') }}</span>
-              <span class="sm:hidden">2D</span>
-            </button>
-            <button
-              v-if="is3dSupported"
-              class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
-              :class="viewMode === 'graph3d' ? 'nav-item--active' : ''"
-              @click="viewMode = 'graph3d'"
-            >
-              <Icon icon="mdi:cube-outline" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
-              <span class="hidden sm:inline">{{ $t('memories.graph3dView.title') }}</span>
-              <span class="sm:hidden">3D</span>
-            </button>
-          </div>
-        </div>
+        <PageHeader :title="$t('pageTitles.memories')" icon="heroicons:light-bulb">
+          <template #actions>
+            <!-- View Toggle -->
+            <div class="flex items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto">
+              <button
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                :class="viewMode === 'list' ? 'nav-item--active' : ''"
+                @click="viewMode = 'list'"
+              >
+                <Icon icon="mdi:format-list-bulleted" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
+                <span class="hidden sm:inline">{{ $t('memories.listView.title') }}</span>
+                <span class="sm:hidden">Liste</span>
+              </button>
+              <button
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                :class="viewMode === 'graph' ? 'nav-item--active' : ''"
+                @click="viewMode = 'graph'"
+              >
+                <Icon icon="mdi:graph" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
+                <span class="hidden sm:inline">{{ $t('memories.graphView.title') }}</span>
+                <span class="sm:hidden">2D</span>
+              </button>
+              <button
+                v-if="is3dSupported"
+                class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
+                :class="viewMode === 'graph3d' ? 'nav-item--active' : ''"
+                @click="viewMode = 'graph3d'"
+              >
+                <Icon icon="mdi:cube-outline" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
+                <span class="hidden sm:inline">{{ $t('memories.graph3dView.title') }}</span>
+                <span class="sm:hidden">3D</span>
+              </button>
+            </div>
+          </template>
+        </PageHeader>
 
         <!-- Views -->
         <div
@@ -219,6 +215,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import MemoryListView from '@/components/MemoryListView.vue'
 import MemoryGraphView from '@/components/MemoryGraphView.vue'
 import MemoryGraph3DView from '@/components/MemoryGraph3DView.vue'

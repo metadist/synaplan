@@ -8,6 +8,7 @@ import { connectionsApi, type ConnectionItem } from '@/services/api/connectionsA
 import { dropboxApi } from '@/services/api/dropboxApi'
 import { m365Api } from '@/services/api/m365Api'
 import { useAuthStore } from '@/stores/auth'
+import PageHeader from '@/components/PageHeader.vue'
 import ConnectionStatusPill from '@/components/config/ConnectionStatusPill.vue'
 import DavConnectionForm from '@/components/config/DavConnectionForm.vue'
 import RegistryConnectionRow from '@/components/config/RegistryConnectionRow.vue'
@@ -150,11 +151,16 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6" data-testid="page-connections">
-    <div class="surface-card p-6">
-      <h2 class="text-2xl font-semibold txt-primary">{{ $t('config.connections.title') }}</h2>
-      <p class="txt-secondary text-sm mt-1">{{ $t('config.connections.subtitle') }}</p>
-      <p class="txt-secondary text-sm mt-2">{{ $t('config.connections.explainer') }}</p>
-    </div>
+    <PageHeader
+      :title="$t('config.connections.title')"
+      icon="heroicons:link"
+      data-testid="section-header"
+    >
+      <template #subtitle>
+        {{ $t('config.connections.subtitle') }}
+        {{ $t('config.connections.explainer') }}
+      </template>
+    </PageHeader>
 
     <!-- What the user already has -->
     <section>

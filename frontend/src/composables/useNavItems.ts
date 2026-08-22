@@ -24,6 +24,33 @@ export interface NavChild {
   group?: string
 }
 
+export interface NavChildGroup {
+  group: string | null
+  items: NavChild[]
+}
+
+/**
+ * Splits a children list into consecutive sections by their `group` label so
+ * both nav surfaces (desktop flyout, mobile drawer) render identical grouped
+ * sub-menus. Ungrouped children form a header-less leading section.
+ */
+export function groupNavChildren(children: NavChild[] | undefined): NavChildGroup[] {
+  if (!children || children.length === 0) return []
+  if (!children.some((c) => c.group)) return [{ group: null, items: children }]
+
+  const groups: NavChildGroup[] = []
+  let currentGroup: string | null = null
+  for (const child of children) {
+    const group = child.group ?? null
+    if (group !== currentGroup || groups.length === 0) {
+      currentGroup = group
+      groups.push({ group, items: [] })
+    }
+    groups[groups.length - 1].items.push(child)
+  }
+  return groups
+}
+
 export interface NavItem {
   /** Stable identifier used for data-testid — never derived from the route path */
   key: string
@@ -110,20 +137,40 @@ export function useNavItems() {
 
     // Channels + AI Setup are always present (Q6: easy mode shows them locked;
     // guests see them gate-locked). Canonical §4.6 URLs.
+    //
+    // Channels = where messages come in and go out. Grouped sub-menu:
+    // Standard Inbound, Your Widgets, Connections (Configure + MCP), API.
     const channelsChildren: NavChild[] = [
       { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
       { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
-      { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
-      { key: 'mcp-servers', path: '/channels/mcp', label: t('nav.mcpServers') },
       ...(isSavedTasksEnabled()
         ? [
-            { key: 'connections', path: '/channels/connections', label: t('nav.connections') },
-            { key: 'saved-tasks', path: '/channels/tasks', label: t('nav.savedTasks') },
+            {
+              key: 'connections',
+              path: '/channels/connections',
+              label: t('nav.configConnections'),
+              group: t('nav.connections'),
+            },
           ]
         : []),
-      { key: 'ai-agents', path: '/channels/agents', label: t('nav.aiAgents') },
-      { key: 'api-keys', path: '/channels/api', label: t('nav.configApiKeys') },
-      { key: 'api-docs', path: '/channels/api/docs', label: t('pageTitles.configApiDocs') },
+      {
+        key: 'mcp-servers',
+        path: '/channels/mcp',
+        label: t('nav.mcpServers'),
+        group: t('nav.connections'),
+      },
+      {
+        key: 'api-keys',
+        path: '/channels/api',
+        label: t('nav.configApiKeys'),
+        group: t('nav.groupApi'),
+      },
+      {
+        key: 'api-docs',
+        path: '/channels/api/docs',
+        label: t('pageTitles.configApiDocs'),
+        group: t('nav.groupApi'),
+      },
     ]
 
     items.push({
@@ -137,12 +184,19 @@ export function useNavItems() {
       children: isGuestMode.value ? undefined : channelsChildren,
     })
 
+    // AI Setup & Tools = how the AI behaves plus the automation tools that
+    // run on top of it (recurring tasks, agents, summarizer, email handler).
     const aiSetupChildren: NavChild[] = [
       { key: 'ai-models', path: '/ai/models', label: t('nav.configAiModels') },
       { key: 'task-prompts', path: '/ai/instructions', label: t('nav.configTaskPrompts') },
       { key: 'sorting-prompt', path: '/ai/routing', label: t('nav.configSortingPrompt') },
+      ...(isSavedTasksEnabled()
+        ? [{ key: 'saved-tasks', path: '/channels/tasks', label: t('nav.savedTasks') }]
+        : []),
+      { key: 'ai-agents', path: '/channels/agents', label: t('nav.aiAgents') },
       // Transitional home (Q3): retires into the in-chat Tools dropdown later.
       { key: 'doc-summary', path: '/ai/summarizer', label: t('nav.toolsDocSummary') },
+      { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
     ]
 
     items.push({
@@ -232,7 +286,13 @@ export function useNavItems() {
       return route.path.startsWith('/files')
     }
     if (item.children && item.children.length > 0) {
-      return item.children.some((child) => route.path.startsWith(child.path))
+      // The section-overview child shares the section's own path (e.g. the
+      // Channels "Standard Inbound" child lives at /channels). It must match
+      // exactly, otherwise it would claim every /channels/* page — including
+      // the ones that now belong to AI Setup & Tools (tasks, agents, email).
+      return item.children.some((child) =>
+        child.path === item.path ? route.path === child.path : route.path.startsWith(child.path)
+      )
     }
     return route.path.startsWith(item.path)
   }

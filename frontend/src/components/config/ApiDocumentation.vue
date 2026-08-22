@@ -1,5 +1,17 @@
 <template>
   <div class="space-y-6" data-testid="page-api-documentation">
+    <PageHeader
+      :title="apiSpec?.info?.title || $t('channels.apiDocumentation.title')"
+      :subtitle="apiSpec?.info?.description || ''"
+      icon="heroicons:book-open"
+      data-testid="section-header"
+    >
+      <template v-if="apiSpec" #actions>
+        <span class="txt-secondary text-sm">{{ $t('channels.apiDocumentation.version') }}</span>
+        <span class="pill pill--active">{{ apiSpec.info?.version || 'dev' }}</span>
+      </template>
+    </PageHeader>
+
     <div v-if="loading" class="surface-card p-8 text-center">
       <p class="txt-secondary">{{ $t('channels.apiDocumentation.loading') }}</p>
     </div>
@@ -9,18 +21,6 @@
     </div>
 
     <div v-else-if="apiSpec" class="space-y-6">
-      <!-- API Info -->
-      <div class="surface-card p-6">
-        <h2 class="text-xl font-semibold txt-primary mb-2">
-          {{ apiSpec.info?.title || $t('channels.apiDocumentation.title') }}
-        </h2>
-        <p class="txt-secondary mb-4">{{ apiSpec.info?.description || '' }}</p>
-        <div class="flex items-center gap-4 text-sm">
-          <span class="txt-secondary">{{ $t('channels.apiDocumentation.version') }}</span>
-          <span class="pill pill--active">{{ apiSpec.info?.version || 'dev' }}</span>
-        </div>
-      </div>
-
       <!-- Endpoints by Tag -->
       <div v-for="tag in filteredTags" :key="tag" class="space-y-4">
         <h3 class="text-lg font-semibold txt-primary flex items-center gap-2">
@@ -243,6 +243,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CommandLineIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 
 const { t } = useI18n()
 

@@ -1,58 +1,43 @@
 <template>
   <div class="space-y-6" data-testid="page-summary-configuration">
-    <!-- Hero Header with Presets -->
-    <div class="relative overflow-hidden surface-card rounded-2xl" data-testid="section-header">
-      <div
-        class="absolute inset-0 bg-gradient-to-br from-[var(--brand)]/5 via-transparent to-purple-500/5"
-      ></div>
-      <div
-        class="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
-      ></div>
-      <div class="relative px-8 py-8">
-        <div class="flex items-center gap-5 mb-6">
-          <div
-            class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--brand)] to-purple-500 flex items-center justify-center shadow-lg shadow-[var(--brand)]/20 shrink-0"
-          >
-            <SparklesIcon class="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h1 class="text-2xl font-bold txt-primary">{{ $t('summary.title') }}</h1>
-            <p class="text-sm txt-secondary mt-1">{{ $t('summary.description') }}</p>
-          </div>
-        </div>
+    <!-- Header -->
+    <PageHeader
+      :title="$t('summary.title')"
+      :subtitle="$t('summary.description')"
+      icon="heroicons:sparkles"
+      data-testid="section-header"
+    />
 
-        <!-- Inline Presets -->
-        <div
-          class="grid grid-cols-1 md:grid-cols-3 gap-3"
-          data-help="presets"
-          data-testid="section-presets"
-        >
-          <button
-            v-for="preset in presets"
-            :key="preset.id"
-            class="group p-4 rounded-xl border border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:shadow-md hover:shadow-[var(--brand)]/5 bg-white/50 dark:bg-white/[0.03] backdrop-blur-sm transition-all duration-200 text-left"
-            data-testid="btn-preset"
-            @click="applyPreset(preset.id)"
-          >
-            <div class="flex items-start gap-3">
-              <component
-                :is="preset.icon"
-                class="w-5 h-5 txt-secondary group-hover:text-[var(--brand)] transition-colors shrink-0 mt-0.5"
-              />
-              <div>
-                <h4
-                  class="text-sm font-semibold txt-primary group-hover:text-[var(--brand)] transition-colors"
-                >
-                  {{ $t(`summary.presets.${preset.id}.title`) }}
-                </h4>
-                <p class="text-xs txt-secondary mt-0.5">
-                  {{ $t(`summary.presets.${preset.id}.desc`) }}
-                </p>
-              </div>
-            </div>
-          </button>
+    <!-- Inline Presets -->
+    <div
+      class="grid grid-cols-1 md:grid-cols-3 gap-3"
+      data-help="presets"
+      data-testid="section-presets"
+    >
+      <button
+        v-for="preset in presets"
+        :key="preset.id"
+        class="group p-4 rounded-xl border border-light-border/20 dark:border-dark-border/15 hover:border-[var(--brand)]/40 hover:shadow-md hover:shadow-[var(--brand)]/5 bg-white/50 dark:bg-white/[0.03] backdrop-blur-sm transition-all duration-200 text-left"
+        data-testid="btn-preset"
+        @click="applyPreset(preset.id)"
+      >
+        <div class="flex items-start gap-3">
+          <component
+            :is="preset.icon"
+            class="w-5 h-5 txt-secondary group-hover:text-[var(--brand)] transition-colors shrink-0 mt-0.5"
+          />
+          <div>
+            <h4
+              class="text-sm font-semibold txt-primary group-hover:text-[var(--brand)] transition-colors"
+            >
+              {{ $t(`summary.presets.${preset.id}.title`) }}
+            </h4>
+            <p class="text-xs txt-secondary mt-0.5">
+              {{ $t(`summary.presets.${preset.id}.desc`) }}
+            </p>
+          </div>
         </div>
-      </div>
+      </button>
     </div>
 
     <div class="surface-card p-6 space-y-6" data-testid="section-configuration">
@@ -390,6 +375,7 @@ import {
   DocumentDuplicateIcon,
   ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import type { SummaryConfig, FocusArea } from '@/mocks/summaries'
 import { summaryTypes, summaryLengths, outputLanguages, focusAreaOptions } from '@/mocks/summaries'
 import { useI18n } from 'vue-i18n'

@@ -60,8 +60,10 @@
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <!-- Two-line clamp instead of truncate: "AI Setup & Tools" (and its
+             translations) would otherwise be cut off on the 72px rail. -->
         <span
-          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full truncate px-0.5"
+          class="v2-rail-label text-[10px] font-medium leading-tight max-w-full px-0.5 text-center line-clamp-2 break-words"
         >
           {{ item.label }}
         </span>
@@ -246,6 +248,15 @@
                 <span>{{ $t('nav.statistics') }}</span>
               </button>
               <button
+                role="menuitem"
+                class="dropdown-item"
+                data-testid="btn-sidebar-v2-feedback"
+                @click="handleNavigate('/feedbacks')"
+              >
+                <Icon icon="mdi:comment-quote-outline" class="w-4 h-4" />
+                <span>{{ $t('pageTitles.feedback') }}</span>
+              </button>
+              <button
                 v-if="
                   !authStore.isAdmin &&
                   configStore.billing.enabled &&
@@ -322,8 +333,10 @@
         data-testid="overlay-sidebar-v2-nav"
         @click="closeFlyout"
       >
+        <!-- w-64: wide enough for the longest child labels in all four
+             locales (e.g. de "Vordefinierte Anweisungen") without truncation. -->
         <div
-          class="fixed w-56 dropdown-panel origin-top-left overflow-hidden"
+          class="fixed w-64 dropdown-panel origin-top-left overflow-hidden"
           :style="navDropdownStyle"
           data-testid="dropdown-sidebar-v2-nav"
           @click.stop
@@ -680,7 +693,7 @@ import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, type NavChild, type NavItem } from '../composables/useNavItems'
+import { useNavItems, groupNavChildren, type NavItem } from '../composables/useNavItems'
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
@@ -829,24 +842,7 @@ watch(
   { immediate: true }
 )
 
-const groupedChildren = computed(() => {
-  if (!activeFlyoutItem.value?.children) return []
-  const children = activeFlyoutItem.value.children
-  const hasGroups = children.some((c) => c.group)
-  if (!hasGroups) return [{ group: null, items: children }]
-
-  const groups: Array<{ group: string | null; items: NavChild[] }> = []
-  let currentGroup: string | null = null
-  for (const child of children) {
-    const g = child.group ?? null
-    if (g !== currentGroup) {
-      currentGroup = g
-      groups.push({ group: g, items: [] })
-    }
-    groups[groups.length - 1].items.push(child)
-  }
-  return groups
-})
+const groupedChildren = computed(() => groupNavChildren(activeFlyoutItem.value?.children))
 
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return

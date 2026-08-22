@@ -1,19 +1,16 @@
 <template>
   <div class="space-y-6" data-testid="page-config-mcp-servers">
-    <!-- Header -->
-    <div class="surface-card p-6" data-testid="section-mcp-overview">
-      <div class="flex items-start gap-3">
-        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
-          <Icon icon="heroicons:server-stack" class="w-6 h-6 text-[var(--brand)]" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold txt-primary mb-1">{{ $t('mcpServers.title') }}</h2>
-          <p class="txt-secondary text-sm leading-relaxed">{{ $t('mcpServers.description') }}</p>
-        </div>
-      </div>
+    <PageHeader
+      :title="$t('mcpServers.title')"
+      :subtitle="$t('mcpServers.description')"
+      icon="heroicons:server-stack"
+      data-testid="section-header"
+    />
 
+    <!-- Client status -->
+    <div class="surface-card p-6" data-testid="section-mcp-overview">
       <div
-        class="mt-5 rounded-xl px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3 border"
+        class="rounded-xl px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3 border"
         :class="
           clientEnabled
             ? 'bg-[var(--status-success-muted)] border-[var(--status-success)]'
@@ -409,6 +406,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { updateConfigValue } from '@/services/api/adminConfigApi'

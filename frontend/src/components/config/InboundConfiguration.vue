@@ -1,13 +1,11 @@
 <template>
   <div class="space-y-6" data-testid="page-config-inbound">
-    <div class="mb-8" data-testid="section-header">
-      <h1 class="text-2xl font-semibold txt-primary mb-2">
-        {{ $t('channels.title') }}
-      </h1>
-      <p class="txt-secondary">
-        {{ $t('channels.description') }}
-      </p>
-    </div>
+    <PageHeader
+      :title="$t('channels.title')"
+      :subtitle="$t('channels.description')"
+      icon="heroicons:inbox-arrow-down"
+      data-testid="section-header"
+    />
 
     <div class="surface-card p-6" data-testid="section-whatsapp">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
@@ -138,6 +136,7 @@ import {
   CommandLineIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
 import {

@@ -1,27 +1,14 @@
 <template>
   <MainLayout>
-    <div class="h-full flex flex-col bg-chat" data-testid="page-widgets">
-      <!-- Header -->
-      <div
-        class="px-4 lg:px-6 py-4 lg:py-5 border-b border-light-border/30 dark:border-dark-border/20 bg-chat"
-        data-testid="section-header"
-      >
-        <div class="max-w-7xl mx-auto">
-          <div
-            class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 lg:gap-4"
-          >
-            <div>
-              <h1
-                class="text-xl lg:text-2xl font-semibold txt-primary flex items-center gap-2 lg:gap-3"
-              >
-                <Icon
-                  icon="heroicons:chat-bubble-left-right"
-                  class="w-6 h-6 lg:w-7 lg:h-7 txt-brand"
-                />
-                {{ $t('widgets.title') }}
-              </h1>
-              <p class="txt-secondary mt-1 text-xs lg:text-sm">{{ $t('widgets.subtitle') }}</p>
-            </div>
+    <div class="min-h-screen bg-chat p-4 md:p-8" data-testid="page-widgets">
+      <div class="max-w-7xl mx-auto">
+        <PageHeader
+          :title="$t('widgets.title')"
+          :subtitle="$t('widgets.subtitle')"
+          icon="heroicons:chat-bubble-left-right"
+          data-testid="section-header"
+        >
+          <template #actions>
             <button
               class="btn-primary px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center text-sm lg:text-base"
               data-testid="btn-create-widget"
@@ -30,16 +17,11 @@
               <Icon icon="heroicons:plus" class="w-4 h-4 lg:w-5 lg:h-5" />
               {{ $t('widgets.createNew') }}
             </button>
-          </div>
-        </div>
-      </div>
+          </template>
+        </PageHeader>
 
-      <!-- Content Area -->
-      <div
-        class="flex-1 overflow-y-auto px-4 lg:px-6 py-4 lg:py-6 scroll-thin"
-        data-testid="section-widgets-content"
-      >
-        <div class="max-w-7xl mx-auto">
+        <!-- Content Area -->
+        <div data-testid="section-widgets-content">
           <!-- Loading State -->
           <div
             v-if="loading"
@@ -407,6 +389,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import * as widgetsApi from '@/services/api/widgetsApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'

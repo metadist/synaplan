@@ -1,28 +1,17 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
-    <TabNav
-      :model-value="activeTab"
-      :tabs="tabNavItems"
-      :aria-label="$t('config.aiModels.title')"
-      mobile-trigger-testid="tab-ai-models-mobile-trigger"
-      mobile-menu-testid="tab-ai-models-mobile-menu"
-      @update:model-value="onModelsTabChange"
-    />
-
-    <div
-      v-show="activeTab === 'choice'"
-      class="surface-card p-6 relative"
-      :class="openDropdown ? 'z-20' : 'z-0'"
-      data-testid="section-default-config"
+    <PageHeader
+      :title="$t('config.aiModels.title')"
+      :subtitle="$t('config.aiModels.description')"
+      icon="heroicons:cpu-chip"
+      data-testid="section-header"
     >
-      <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2 min-w-0">
-          <CpuChipIcon class="w-6 h-6 flex-shrink-0 text-[var(--brand)]" />
-          {{ $t('config.aiModels.defaultConfigTitle') }}
-        </h2>
+      <template #actions>
+        <!-- Reset applies to the default-model choices, so it only shows on that tab. -->
         <button
+          v-if="activeTab === 'choice'"
           type="button"
-          class="self-start sm:self-auto flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
@@ -30,7 +19,27 @@
           <ArrowPathIcon :class="['w-4 h-4', resetting && 'animate-spin']" />
           {{ $t('config.aiModels.resetDefaults') }}
         </button>
-      </div>
+      </template>
+      <TabNav
+        :model-value="activeTab"
+        :tabs="tabNavItems"
+        :aria-label="$t('config.aiModels.title')"
+        mobile-trigger-testid="tab-ai-models-mobile-trigger"
+        mobile-menu-testid="tab-ai-models-mobile-menu"
+        @update:model-value="onModelsTabChange"
+      />
+    </PageHeader>
+
+    <div
+      v-show="activeTab === 'choice'"
+      class="surface-card p-6 relative"
+      :class="openDropdown ? 'z-20' : 'z-0'"
+      data-testid="section-default-config"
+    >
+      <h3 class="text-lg font-semibold txt-primary mb-6 flex items-center gap-2 min-w-0">
+        <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+        {{ $t('config.aiModels.defaultConfigTitle') }}
+      </h3>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -475,6 +484,7 @@ import {
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'

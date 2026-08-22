@@ -1,20 +1,21 @@
 <template>
   <div class="space-y-6" data-testid="comp-mail-handler-config">
-    <div class="flex items-center justify-between mb-8" data-testid="section-header">
-      <div>
-        <h1 class="text-2xl font-semibold txt-primary mb-2">
-          {{ handlerId ? $t('mail.editHandler') : $t('mail.createHandler') }}
-        </h1>
-      </div>
-      <button
-        class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
-        :aria-label="$t('widget.closeEditor')"
-        data-testid="btn-close"
-        @click="$emit('cancel')"
-      >
-        <XMarkIcon class="w-5 h-5" />
-      </button>
-    </div>
+    <PageHeader
+      :title="handlerId ? $t('mail.editHandler') : $t('mail.createHandler')"
+      icon="heroicons:envelope"
+      data-testid="section-header"
+    >
+      <template #actions>
+        <button
+          class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+          :aria-label="$t('widget.closeEditor')"
+          data-testid="btn-close"
+          @click="$emit('cancel')"
+        >
+          <XMarkIcon class="w-5 h-5" />
+        </button>
+      </template>
+    </PageHeader>
 
     <!-- Handler Name & Status -->
     <div class="surface-card p-6" data-testid="section-handler-name">
@@ -751,6 +752,7 @@ import {
   PaperAirplaneIcon,
   FunnelIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import type {
   MailConfig,
   Department,

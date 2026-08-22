@@ -2,16 +2,14 @@
   <MainLayout>
     <div class="flex flex-col h-full overflow-y-auto bg-chat scroll-thin" data-testid="page-tools">
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div class="mb-8" data-testid="section-header">
-          <h1 class="text-3xl font-semibold txt-primary mb-2">
-            {{
-              plugin?.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Plugin'
-            }}
-          </h1>
-          <p class="txt-secondary">
-            {{ plugin?.description || 'Loading plugin...' }}
-          </p>
-        </div>
+        <PageHeader
+          :title="
+            plugin?.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Plugin'
+          "
+          :subtitle="plugin?.description || 'Loading plugin...'"
+          icon="heroicons:puzzle-piece"
+          data-testid="section-header"
+        />
 
         <div class="surface-card min-h-[600px] p-6 rounded-xl relative">
           <div v-if="loading" class="flex items-center justify-center h-64">
@@ -37,6 +35,7 @@ import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const route = useRoute()
 const { t } = useI18n()
