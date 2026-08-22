@@ -83,6 +83,27 @@ if grep -E '^[[:space:]]*ln\b' "$AWS_SCRIPTS_DIR/provision.sh" | grep -q '/usr/l
 fi
 
 # --------------------------------------------------------------------------
+# Caddy must be able to write the access log
+# --------------------------------------------------------------------------
+
+# The packaged unit runs as user caddy, often with ProtectSystem=strict. A
+# chown of /var/log/caddy on the host is not enough: the namespace still has
+# /var read-only unless LogsDirectory=caddy is set. The 4.2.4 verification
+# brought the whole stack up and then died on
+# "open /var/log/caddy/synaplan.log: permission denied".
+grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/provision.sh" ||
+    fail "provision.sh does not set LogsDirectory=caddy; Caddy cannot write /var/log/caddy/synaplan.log under ProtectSystem=strict"
+grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
+    fail "configure-tls.sh does not set LogsDirectory=caddy; a later synaplan-tls would drop the writable log directory"
+
+# The wait used to probe only firstboot and synaplan. Both were active
+# (oneshot RemainAfterExit) while Caddy was failed, so the probe sat out
+# fifty minutes next to a stack that had been healthy for 45 of them.
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+grep -Fq 'systemctl is-failed caddy.service' "$repo_root/.github/workflows/aws-ami.yml" ||
+    fail "the AMI verification wait does not probe caddy.service; a failed TLS terminator would again cost fifty minutes next to a healthy stack"
+
+# --------------------------------------------------------------------------
 # The XFS label firstboot writes on a blank data volume
 # --------------------------------------------------------------------------
 

@@ -164,8 +164,8 @@ install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan.service" /etc/systemd/syst
 # verification window. Bake the self-signed site now so 443 is the listener
 # even if firstboot is still running, and do not start Caddy until firstboot
 # has at least had its chance to write the real file.
-install -d -m 0755 /etc/caddy /var/log/caddy
-chown caddy:caddy /var/log/caddy
+install -d -m 0755 /etc/caddy
+install -d -o caddy -g caddy -m 0750 /var/log/caddy
 install -m 0644 "$APP_DIR/deploy/aws/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 install -d -m 0755 /etc/systemd/system/caddy.service.d
@@ -173,6 +173,15 @@ cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
 [Unit]
 After=synaplan-firstboot.service
 Requires=synaplan-firstboot.service
+
+[Service]
+# The Caddyfile writes /var/log/caddy/synaplan.log. The packaged unit runs as
+# user caddy and typically ProtectSystem=strict, which makes /var read-only
+# unless LogsDirectory is set — the 4.2.4 verification died on
+# "open /var/log/caddy/synaplan.log: permission denied" with a healthy stack
+# behind it. systemd then creates the directory owned by caddy and adds it
+# to the writable paths. test-firstboot.sh enforces the directive.
+LogsDirectory=caddy
 EOF
 
 systemctl daemon-reload
