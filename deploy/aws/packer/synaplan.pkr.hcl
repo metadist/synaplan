@@ -136,7 +136,7 @@ build {
 
   # The file provisioner does not create parent directories.
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/synaplan/deploy"]
+    inline = ["mkdir -p /tmp/synaplan/deploy /tmp/synaplan/_docker"]
   }
 
   # The portable deployment contract, unmodified. The AWS adapter calls these
@@ -154,6 +154,15 @@ build {
   provisioner "file" {
     source      = "${local.repo_root}/deploy/aws"
     destination = "/tmp/synaplan/deploy"
+  }
+
+  # compose.yaml bind-mounts ../_docker/centrifugo/config.json relative to
+  # deploy/, which on the instance is /opt/synaplan/_docker/.... Without this
+  # file Docker creates a directory at the mount point, Centrifugo never
+  # becomes healthy, and synaplan.service waits out its 30-minute start budget.
+  provisioner "file" {
+    source      = "${local.repo_root}/_docker/centrifugo"
+    destination = "/tmp/synaplan/_docker/centrifugo"
   }
 
   provisioner "shell" {

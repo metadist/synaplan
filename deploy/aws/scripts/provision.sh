@@ -113,6 +113,17 @@ rsync -a --delete \
     "$STAGE_DIR/deploy/" "$APP_DIR/deploy/"
 chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/aws/scripts"/*.sh
 
+# compose.yaml bind-mounts ../_docker/centrifugo/config.json from deploy/, so
+# the file has to live at $APP_DIR/_docker on the instance. Packer stages it
+# next to deploy/; a missing copy is a first boot that waits 30 minutes for a
+# healthcheck that can never pass.
+install -d -m 0755 "$APP_DIR/_docker"
+rsync -a "$STAGE_DIR/_docker/" "$APP_DIR/_docker/"
+[[ -f "$APP_DIR/_docker/centrifugo/config.json" ]] || {
+    printf 'The Centrifugo config did not land in the image; refusing to bake an AMI whose stack cannot start\n' >&2
+    exit 1
+}
+
 # Persistent state lives on a separate EBS volume so an instance can be replaced
 # without losing anything. The application tree keeps the paths lib.sh expects
 # and reaches the volume through symlinks.
@@ -147,6 +158,23 @@ chmod 0644 "$APP_DIR/ami-release"
 log "Installing the systemd units"
 install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan-firstboot.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan.service" /etc/systemd/system/
+
+# The packaged Caddyfile listens on :80 only. Firstboot replaces it, but a
+# failed firstboot used to leave Caddy serving that default for the whole
+# verification window. Bake the self-signed site now so 443 is the listener
+# even if firstboot is still running, and do not start Caddy until firstboot
+# has at least had its chance to write the real file.
+install -d -m 0755 /etc/caddy /var/log/caddy
+chown caddy:caddy /var/log/caddy
+install -m 0644 "$APP_DIR/deploy/aws/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+install -d -m 0755 /etc/systemd/system/caddy.service.d
+cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
+[Unit]
+After=synaplan-firstboot.service
+Requires=synaplan-firstboot.service
+EOF
+
 systemctl daemon-reload
 systemctl enable docker amazon-ssm-agent synaplan-firstboot.service synaplan.service caddy.service
 

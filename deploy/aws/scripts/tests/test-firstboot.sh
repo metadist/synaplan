@@ -83,6 +83,87 @@ if grep -E '^[[:space:]]*ln\b' "$AWS_SCRIPTS_DIR/provision.sh" | grep -q '/usr/l
 fi
 
 # --------------------------------------------------------------------------
+# The XFS label firstboot writes on a blank data volume
+# --------------------------------------------------------------------------
+
+# mkfs.xfs -L rejects anything longer than 12 characters. The verification of
+# 4.2.4 died seven seconds into firstboot on DATA_LABEL=synaplan-data (13).
+data_label="$(sed -n 's/^DATA_LABEL=//p' "$FIRSTBOOT" | head -n1)"
+[[ -n "$data_label" ]] || fail "firstboot.sh no longer defines DATA_LABEL on its own line; update this test"
+if (( ${#data_label} > 12 )); then
+    fail "DATA_LABEL is ${#data_label} characters ($data_label); XFS labels are at most 12, and mkfs.xfs -L will refuse to format the data volume"
+fi
+
+# --------------------------------------------------------------------------
+# Bind mounts the AMI has to ship, because compose.yaml asks for them
+# --------------------------------------------------------------------------
+
+# deploy/compose.yaml is the stack the instance runs. A bind mount whose source
+# is not ./data (created at first boot) is a file the AMI must contain, or
+# Docker creates a directory at the mount point and the service never becomes
+# healthy. Centrifugo's config is ../_docker/centrifugo/config.json relative to
+# deploy/ — without it, compose up waits until synaplan.service's 30-minute
+# TimeoutStartSec.
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+packer_file="$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl"
+# Bind specs look like `- ./data/uploads:...` or `- ../_docker/centrifugo/config.json:...`.
+# A YAML parser would be nicer, but this suite has to run in the lint job, which
+# has bash and a checkout and nothing else.
+while IFS= read -r spec; do
+    [[ -n "$spec" ]] || continue
+    source_path="${spec%%:*}"
+    source_path="${source_path#- }"
+    source_path="${source_path#"${source_path%%[![:space:]]*}"}"
+    case "$source_path" in
+        ./data/*) continue ;;
+        /*) continue ;;
+        -*) continue ;;
+    esac
+    [[ "$source_path" == .* ]] || continue
+    resolved="$(cd "$DEPLOY_ROOT" && python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$source_path")"
+    [[ -e "$resolved" ]] || fail "compose.yaml bind-mounts $source_path, which does not exist in the repository"
+    case "$resolved" in
+        "$repo_root/deploy"/*|"$repo_root/_docker"/*) ;;
+        *)
+            fail "compose.yaml bind-mounts $source_path ($resolved), which the AMI does not copy — only deploy/ and _docker/ ship"
+            ;;
+    esac
+    case "$resolved" in
+        "$repo_root/_docker"/*)
+            grep -Fq '_docker/centrifugo' "$packer_file" ||
+                fail "compose.yaml bind-mounts $source_path from _docker/, but the Packer template does not copy _docker/centrifugo into the image"
+            grep -Fq '_docker/' "$AWS_SCRIPTS_DIR/provision.sh" ||
+                fail "compose.yaml bind-mounts $source_path from _docker/, but provision.sh does not install it under /opt/synaplan/_docker"
+            ;;
+    esac
+done < <(grep -E '^[[:space:]]+-[[:space:]]+\.\./' "$DEPLOY_ROOT/compose.yaml" | sed 's/^[[:space:]]*-[[:space:]]*//')
+
+# After mkfs the label is not yet in udev; mounting by LABEL= is how a successful
+# format still fails firstboot. The device we just formatted has to be the mount
+# source, and LABEL= belongs only in fstab for later boots.
+if ! awk '
+    /mkfs\.xfs/ { seen = 1 }
+    seen && /mount "\$device"/ { found = 1 }
+    END { exit !found }
+' "$FIRSTBOOT"; then
+    fail "firstboot.sh formats the data volume but does not mount the device it formatted — mounting by LABEL= races udev and fails the boot"
+fi
+if awk '
+    /mkfs\.xfs/ { seen = 1 }
+    seen && /mount "\$DATA_MOUNT"/ { found = 1 }
+    /Mounted the data volume/ { seen = 0 }
+    END { exit !found }
+' "$FIRSTBOOT"; then
+    fail "firstboot.sh still mounts the data volume by mountpoint right after mkfs; that is a LABEL= lookup and udev has not learned the label yet"
+fi
+
+# NVMe partitions are named nvme0n1p1, not nvme0n11. Stripping trailing digits
+# does not yield the parent disk, so the root disk would look like a blank data
+# volume. PKNAME is the parent lsblk already reports.
+grep -Fq PKNAME "$FIRSTBOOT" ||
+    fail "firstboot.sh no longer uses lsblk PKNAME to find the root disk; NVMe partition names would make the root disk look like a data volume"
+
+# --------------------------------------------------------------------------
 # The instance, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 

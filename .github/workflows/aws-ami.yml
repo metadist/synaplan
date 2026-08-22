@@ -290,12 +290,20 @@ jobs:
       # is still within the budget the units grant it, which is exactly what the
       # previous 15 minutes did. So: the full budget, plus five minutes for
       # Caddy and the first request.
+      #
+      # That budget is only for a boot that is still going. A unit that has
+      # already failed will never make /api/health answer, and waiting out the
+      # rest of the fifty minutes is how three verification runs each cost an
+      # hour. After a minute and a half Session Manager is up; from then on,
+      # a failed firstboot or stack aborts this wait immediately.
       - name: Wait for the web interface
         env:
           WEB_URL: ${{ steps.stack.outputs.WebUrl }}
+          INSTANCE_ID: ${{ steps.stack.outputs.InstanceId }}
         run: |
           set -euo pipefail
           deadline=$((SECONDS + 3000))
+          last_unit_check=0
           while [ "$SECONDS" -lt "$deadline" ]; do
             # -k: without a domain the instance serves the self-signed
             # certificate, which is the configuration under test.
@@ -303,6 +311,43 @@ jobs:
               echo "The instance answers on ${WEB_URL}/api/health after $((SECONDS / 60)) minutes."
               exit 0
             fi
+
+            if [ "$SECONDS" -ge 90 ] && [ $((SECONDS - last_unit_check)) -ge 60 ]; then
+              last_unit_check=$SECONDS
+              ping_status="$(aws ssm describe-instance-information \
+                --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+                --query 'InstanceInformationList[0].PingStatus' \
+                --output text 2>/dev/null || true)"
+              if [ "$ping_status" = Online ]; then
+                command_id="$(aws ssm send-command \
+                  --instance-ids "$INSTANCE_ID" \
+                  --document-name AWS-RunShellScript \
+                  --comment "Synaplan verification unit probe" \
+                  --parameters 'commands=["systemctl is-failed synaplan-firstboot.service; systemctl is-failed synaplan.service"]' \
+                  --query Command.CommandId --output text 2>/dev/null || true)"
+                if [ -n "${command_id:-}" ] && [ "$command_id" != None ]; then
+                  for _ in $(seq 1 12); do
+                    sleep 5
+                    probe_status="$(aws ssm get-command-invocation \
+                      --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+                      --query Status --output text 2>/dev/null || echo Pending)"
+                    case "$probe_status" in
+                      Success|Failed|Cancelled|TimedOut) break ;;
+                    esac
+                  done
+                  units="$(aws ssm get-command-invocation \
+                    --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+                    --query StandardOutputContent --output text 2>/dev/null || true)"
+                  echo "Unit probe after $((SECONDS / 60)) minutes:"
+                  printf '%s\n' "$units"
+                  if printf '%s\n' "$units" | grep -qx failed; then
+                    echo "::error::A boot unit has already failed; /api/health will not appear. See the unit probe above."
+                    exit 1
+                  fi
+                fi
+              fi
+            fi
+
             echo "No answer yet, $((SECONDS / 60)) minutes elapsed."
             sleep 20
           done
