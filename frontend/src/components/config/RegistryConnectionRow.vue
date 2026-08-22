@@ -192,7 +192,7 @@ const onDelete = async () => {
         aria-hidden="true"
       />
       <p class="text-sm txt-primary leading-relaxed min-w-0">
-        <i18n-t keypath="config.connections.channelHint" tag="span">
+        <i18n-t keypath="config.connections.channelHint" tag="span" scope="global">
           <template #channel>
             <span class="pill mx-0.5 font-mono">{{ promptName }}</span>
           </template>
