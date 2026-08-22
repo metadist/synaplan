@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-12 relative overflow-hidden"
+    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative overflow-hidden"
     :class="isNativeApp() ? 'items-start' : 'items-center'"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
@@ -64,7 +64,7 @@
 
     <div class="w-full max-w-sm auth-card-enter relative z-10" data-testid="section-card">
       <div
-        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8"
+        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-6 sm:p-8"
         :class="
           isDark
             ? 'ring-1 ring-white/[0.04] shadow-black/30'
@@ -74,8 +74,8 @@
           backgroundColor: isDark ? 'rgba(15, 15, 16, 0.8)' : 'rgba(255, 255, 255, 0.95)',
         }"
       >
-        <div class="text-center mb-8" data-testid="section-header">
-          <div class="auth-accent-enter mb-5">
+        <div class="text-center mb-[18px] sm:mb-8" data-testid="section-header">
+          <div class="auth-accent-enter mb-4 sm:mb-5">
             <div class="w-10 h-[3px] bg-brand rounded-full mx-auto"></div>
           </div>
           <h1 class="text-2xl font-bold txt-primary auth-title-enter">
@@ -364,7 +364,7 @@
 
             <p
               v-if="config.auth.registrationEnabled"
-              class="mt-6 text-center text-sm txt-secondary"
+              class="mt-[21px] -mb-[3px] sm:mt-6 sm:mb-0 text-center text-sm txt-secondary"
             >
               {{ $t('auth.noAccount') }}
               <router-link
@@ -380,7 +380,7 @@
       </div>
 
       <!-- Footer -->
-      <div class="mt-8 flex justify-center">
+      <div class="mt-6 sm:mt-8 flex justify-center">
         <a
           :href="config.branding.homepageUrl"
           target="_blank"
