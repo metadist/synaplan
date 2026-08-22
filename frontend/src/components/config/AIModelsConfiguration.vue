@@ -6,10 +6,11 @@
       icon="heroicons:cpu-chip"
       data-testid="section-header"
     >
-      <template #actions>
-        <!-- Reset applies to the default-model choices, so it only shows on that tab. -->
+      <!-- Reset applies to the default-model choices, so it only shows on that tab.
+           v-if on the template keeps PageHeader's actions wrapper (and its flex gap)
+           from rendering empty on the other tabs. -->
+      <template v-if="activeTab === 'choice'" #actions>
         <button
-          v-if="activeTab === 'choice'"
           type="button"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"

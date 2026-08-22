@@ -4,9 +4,11 @@
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
         <PageHeader
           :title="
-            plugin?.name ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1) : 'Plugin'
+            plugin?.name
+              ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
+              : $t('plugins.fallbackTitle')
           "
-          :subtitle="plugin?.description || 'Loading plugin...'"
+          :subtitle="plugin?.description || $t('plugins.loading')"
           icon="heroicons:puzzle-piece"
           data-testid="section-header"
         />

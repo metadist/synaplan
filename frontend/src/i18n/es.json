@@ -838,6 +838,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Funcionalidad extendida para tu flujo de trabajo",
+    "fallbackTitle": "Plugin",
+    "loading": "Cargando plugin…",
     "notFound": "Plugin no encontrado o no habilitado para tu cuenta",
     "commandEmpty": "El plugin devolvió una respuesta vacía.",
     "commandError": "El comando del plugin falló. Inténtalo de nuevo."
@@ -3469,6 +3471,7 @@
     },
     "listView": {
       "title": "Vista de lista",
+      "shortTitle": "Lista",
       "source": "Fuente",
       "allMemories": "Todos los recuerdos",
       "categories": "Categorías",
@@ -3478,10 +3481,12 @@
       "sortByDate": "Ordenar por fecha"
     },
     "graphView": {
-      "title": "Vista neuronal"
+      "title": "Vista neuronal",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "Visualización 3D"
+      "title": "Visualización 3D",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Categorías",

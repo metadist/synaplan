@@ -15,6 +15,10 @@ import { Icon } from '@iconify/vue'
  * - `icon` takes an Iconify name; heroicon components go into the #icon slot.
  * - Action buttons / filter pills belong in #actions (top-right, wraps under
  *   the title on small screens).
+ * - Conditional actions: put the v-if on the <template #actions> itself
+ *   (`<template v-if="cond" #actions>`), not on the content inside — otherwise
+ *   $slots.actions stays truthy and an empty wrapper adds phantom flex-gap
+ *   spacing on mobile.
  * - Tab bars (TabNav) go into the default slot so they always sit between the
  *   header and the content cards.
  */

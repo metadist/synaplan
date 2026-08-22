@@ -1471,6 +1471,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Erweiterte Funktionen für Ihren Workflow",
+    "fallbackTitle": "Plugin",
+    "loading": "Plugin wird geladen…",
     "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
     "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
@@ -4291,6 +4293,7 @@
     },
     "listView": {
       "title": "Listenansicht",
+      "shortTitle": "Liste",
       "source": "Quelle",
       "allMemories": "Alle Erinnerungen",
       "categories": "Kategorien",
@@ -4300,10 +4303,12 @@
       "sortByDate": "Nach Datum sortieren"
     },
     "graphView": {
-      "title": "Netzwerk-Ansicht"
+      "title": "Netzwerk-Ansicht",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D-Visualisierung"
+      "title": "3D-Visualisierung",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Kategorien",

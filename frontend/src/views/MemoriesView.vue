@@ -14,7 +14,7 @@
               >
                 <Icon icon="mdi:format-list-bulleted" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
                 <span class="hidden sm:inline">{{ $t('memories.listView.title') }}</span>
-                <span class="sm:hidden">Liste</span>
+                <span class="sm:hidden">{{ $t('memories.listView.shortTitle') }}</span>
               </button>
               <button
                 class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-md transition-colors text-sm nav-item"
@@ -23,7 +23,7 @@
               >
                 <Icon icon="mdi:graph" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
                 <span class="hidden sm:inline">{{ $t('memories.graphView.title') }}</span>
-                <span class="sm:hidden">2D</span>
+                <span class="sm:hidden">{{ $t('memories.graphView.shortTitle') }}</span>
               </button>
               <button
                 v-if="is3dSupported"
@@ -33,7 +33,7 @@
               >
                 <Icon icon="mdi:cube-outline" class="w-4 h-4 md:w-5 md:h-5 inline mr-1" />
                 <span class="hidden sm:inline">{{ $t('memories.graph3dView.title') }}</span>
-                <span class="sm:hidden">3D</span>
+                <span class="sm:hidden">{{ $t('memories.graph3dView.shortTitle') }}</span>
               </button>
             </div>
           </template>

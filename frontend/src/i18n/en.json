@@ -806,6 +806,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Extended functionality for your workflow",
+    "fallbackTitle": "Plugin",
+    "loading": "Loading plugin…",
     "notFound": "Plugin not found or not enabled for your account",
     "commandEmpty": "The plugin returned an empty response.",
     "commandError": "The plugin command failed. Please try again."
@@ -4357,6 +4359,7 @@
     },
     "listView": {
       "title": "List View",
+      "shortTitle": "List",
       "source": "Source",
       "allMemories": "All Memories",
       "categories": "Categories",
@@ -4366,10 +4369,12 @@
       "sortByDate": "Sort by Date"
     },
     "graphView": {
-      "title": "Neural View"
+      "title": "Neural View",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D Visualization"
+      "title": "3D Visualization",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Categories",

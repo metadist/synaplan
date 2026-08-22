@@ -6,9 +6,10 @@
       :subtitle="$t('mail.savedHandlersDesc')"
       icon="heroicons:envelope"
     >
-      <template #actions>
+      <!-- v-if on the template keeps PageHeader's actions wrapper from rendering
+           empty (with its flex gap) when there are no handlers yet. -->
+      <template v-if="handlers.length > 0" #actions>
         <button
-          v-if="handlers.length > 0"
           class="btn-primary px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-lg shadow-[var(--brand)]/20 hover:shadow-xl hover:shadow-[var(--brand)]/30 transition-all shrink-0"
           data-testid="btn-create-handler"
           @click="$emit('create')"

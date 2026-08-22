@@ -838,6 +838,8 @@
   "plugins": {
     "title": "Eklentiler",
     "description": "İş akışınız için genişletilmiş işlevsellik",
+    "fallbackTitle": "Eklenti",
+    "loading": "Eklenti yükleniyor…",
     "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş",
     "commandEmpty": "Eklenti boş bir yanıt döndürdü.",
     "commandError": "Eklenti komutu başarısız oldu. Lütfen tekrar deneyin."
@@ -3470,6 +3472,7 @@
     },
     "listView": {
       "title": "Liste Görünümü",
+      "shortTitle": "Liste",
       "source": "Kaynak",
       "allMemories": "Tüm Anılar",
       "categories": "Kategoriler",
@@ -3479,10 +3482,12 @@
       "sortByDate": "Tarihe Göre Sırala"
     },
     "graphView": {
-      "title": "Nöral Görünüm"
+      "title": "Nöral Görünüm",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D Görselleştirme"
+      "title": "3D Görselleştirme",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Kategoriler",
