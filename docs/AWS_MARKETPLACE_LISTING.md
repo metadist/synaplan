@@ -126,7 +126,11 @@ meant to verify has already been built.
   must never be. Store its ARN as the repository secret
   `AWS_AMI_BUILD_ROLE_ARN`. Until that secret exists,
   [`aws-ami.yml`](../.github/workflows/aws-ami.yml) skips itself with a notice,
-  so releases stay green in the meantime.
+  so releases stay green in the meantime. The role trusts the workflow's
+  `ami-build` GitHub environment rather than a branch, so a deployment fix can
+  be built and verified from its pull request branch before it is merged; to
+  require a human approval per build, add a required-reviewers protection rule
+  to that environment in the repository settings.
 
 ## Submission sequence
 

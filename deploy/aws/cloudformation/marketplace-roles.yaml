@@ -26,8 +26,8 @@ Parameters:
     ConstraintDescription: Must be owner/repository.
     Description: >-
       Only workflow runs of this repository may assume the build role. The trust
-      policy below narrows it further, to the branches and tags that build a
-      release.
+      policy below narrows it further, to the ami-build environment that the
+      release workflow's jobs declare.
 
   CreateOidcProvider:
     Type: String
@@ -71,10 +71,23 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               # Without a subject condition, ANY repository on GitHub could
-              # assume this role. Release tags and manual runs on the default
-              # branch are the only things that build an AMI.
+              # assume this role. The jobs in aws-ami.yml that assume it all
+              # declare `environment: ami-build`, which puts the environment —
+              # not the ref — into the token's subject. That is what lets a fix
+              # be built and verified from a pull request branch BEFORE it is
+              # merged, instead of merging blind and testing on main. Forks
+              # stay excluded either way: their subject names the fork, not
+              # this repository. To gate builds on a human approval, add a
+              # required-reviewers protection rule to the ami-build environment
+              # in the repository settings; the trust policy needs no change
+              # for that.
+              #
+              # The two ref entries keep an older revision of the workflow
+              # (before it declared the environment) able to release; they can
+              # be removed once no such revision is expected to run again.
               StringLike:
                 token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubRepository}:environment:ami-build'
                   - !Sub 'repo:${GitHubRepository}:ref:refs/tags/v*'
                   - !Sub 'repo:${GitHubRepository}:ref:refs/heads/main'
       Policies:
