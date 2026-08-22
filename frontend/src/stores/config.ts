@@ -296,6 +296,14 @@ const config = {
     get chatReady(): boolean {
       return getConfigSync().setup?.chatReady ?? true
     },
+    /**
+     * Public first-run signal: the login page may show the seeded
+     * administrator. Always false in production, and false once that
+     * password has been changed.
+     */
+    get demoLoginHint(): boolean {
+      return getConfigSync().setup?.demoLoginHint === true
+    },
   },
 
   /**

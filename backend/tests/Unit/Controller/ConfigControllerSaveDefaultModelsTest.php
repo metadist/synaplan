@@ -13,6 +13,8 @@ use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Repository\UserRepository;
+use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
@@ -39,6 +41,7 @@ use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Regression coverage for the #891 inconsistency: the AI Models Config
@@ -95,6 +98,11 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(GuestChatConfig::class),
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(ChatReadinessService::class),
+            new DemoLoginHint(
+                $this->createStub(UserRepository::class),
+                $this->createStub(UserPasswordHasherInterface::class),
+                'test',
+            ),
             $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
             new CapabilityService(),

@@ -169,6 +169,8 @@
               </div>
             </Transition>
 
+            <DemoLoginHint @continue="continueAsDemoAdmin" />
+
             <!-- Social login -->
             <div
               v-if="socialProviders.length > 0"
@@ -403,7 +405,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -427,6 +429,12 @@ import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
+import {
+  FIRST_RUN_ADMIN_EMAIL,
+  FIRST_RUN_ADMIN_PASSWORD,
+  FIRST_RUN_SETUP_PATH,
+} from '@/constants/firstRunAdmin'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -517,6 +525,18 @@ const loadSocialProviders = async () => {
   }
 }
 
+watch(
+  () => config.setup.demoLoginHint,
+  (show) => {
+    if (!show) return
+    const emailFromQuery = route.query.email
+    if (typeof emailFromQuery === 'string' && emailFromQuery !== '') return
+    if (email.value === '') email.value = FIRST_RUN_ADMIN_EMAIL
+    if (password.value === '') password.value = FIRST_RUN_ADMIN_PASSWORD
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
   const emailFromQuery = route.query.email
   if (typeof emailFromQuery === 'string' && emailFromQuery !== '') {
@@ -570,6 +590,17 @@ function allowExpiredAutoRedirect(): boolean {
     // potential loop.
     return false
   }
+}
+
+const continueAsDemoAdmin = async () => {
+  email.value = FIRST_RUN_ADMIN_EMAIL
+  password.value = FIRST_RUN_ADMIN_PASSWORD
+  if (!route.query.redirect) {
+    await router.replace({
+      query: { ...route.query, redirect: FIRST_RUN_SETUP_PATH },
+    })
+  }
+  await handleLogin()
 }
 
 const handleLogin = async () => {

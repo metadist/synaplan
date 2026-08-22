@@ -11,6 +11,7 @@ use App\Entity\Config;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
@@ -68,6 +69,7 @@ class ConfigController extends AbstractController
         private GuestChatConfig $guestChatConfig,
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
+        private DemoLoginHint $demoLoginHint,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
         private CapabilityService $capabilityService,
@@ -396,14 +398,20 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     type: 'object',
-                    description: 'First-run setup status (only for authenticated users). Drives the "connect an AI provider" banner and the admin setup wizard.',
+                    description: 'First-run setup status. demoLoginHint is public so the login page can offer the seeded admin; chatReady is only set for authenticated users.',
                     nullable: true,
                     properties: [
                         new OA\Property(
                             property: 'chatReady',
                             type: 'boolean',
                             example: true,
-                            description: 'True when a real AI provider (cloud key or a pulled local Ollama model) can serve the requesting user\'s effective default chat model. The built-in TestProvider demo responder does not count.'
+                            description: 'True when a real AI provider (cloud key or a pulled local Ollama model) can serve the requesting user\'s effective default chat model. The built-in TestProvider demo responder does not count. Omitted for anonymous clients.'
+                        ),
+                        new OA\Property(
+                            property: 'demoLoginHint',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True only on a fresh dev/test install whose seeded admin@synaplan.com password is still the fixture default. The login page may then show that account. Always false in production.'
                         ),
                     ]
                 ),
@@ -491,7 +499,9 @@ class ConfigController extends AbstractController
         ];
 
         $unavailableProviders = [];
-        $setup = null;
+        $setup = [
+            'demoLoginHint' => $this->demoLoginHint->isVisible(),
+        ];
         if ($user) {
             // READ ONLY. Repairing a broken default is an explicit action
             // (`app:provider:auto-default` at container start, or an admin
@@ -504,7 +514,7 @@ class ConfigController extends AbstractController
             // (admins go to /admin/setup; others to the public docs) while
             // this is false. Evaluated per user so a working per-user model
             // override is honoured, exactly like the chat pipeline resolves it.
-            $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
+            $setup['chatReady'] = $this->chatReadiness->isChatReady(userId: $user->getId());
         }
 
         // Realtime / WebSocket gateway settings.
@@ -591,9 +601,7 @@ class ConfigController extends AbstractController
         if ($user && !empty($unavailableProviders)) {
             $response['unavailableProviders'] = $unavailableProviders;
         }
-        if (null !== $setup) {
-            $response['setup'] = $setup;
-        }
+        $response['setup'] = $setup;
 
         return $this->json($response);
     }

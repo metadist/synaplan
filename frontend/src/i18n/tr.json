@@ -1189,6 +1189,11 @@
   "auth": {
     "login": "Giriş Yap",
     "register": "Kayıt Ol",
+    "demoHint": {
+      "title": "Yeni demo kurulum",
+      "text": "Bir AI sağlayıcısı bağlamak ve kurulumu bitirmek için yönetici hesabını kullan.",
+      "cta": "Yönetici olarak devam et"
+    },
     "email": "E-posta",
     "emailPlaceholderPrefix": "sizin",
     "emailPlaceholderSuffix": "email.com",

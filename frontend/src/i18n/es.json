@@ -1189,6 +1189,11 @@
   "auth": {
     "login": "Iniciar Sesión",
     "register": "Registrarse",
+    "demoHint": {
+      "title": "Instalación de demostración nueva",
+      "text": "Usa la cuenta de administrador para conectar un proveedor de IA y terminar la configuración.",
+      "cta": "Continuar como administrador"
+    },
     "email": "Correo Electrónico",
     "emailPlaceholderPrefix": "tu",
     "emailPlaceholderSuffix": "correo.com",

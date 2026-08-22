@@ -4161,6 +4161,11 @@
     "register": "Registrieren",
     "welcomeBack": "Willkommen zurück",
     "loginSubtitle": "Melde dich an, um fortzufahren",
+    "demoHint": {
+      "title": "Frische Demo-Installation",
+      "text": "Melde dich als Administrator an, um einen KI-Anbieter zu verbinden und die Einrichtung abzuschließen.",
+      "cta": "Als Administrator fortfahren"
+    },
     "getStarted": "Loslegen",
     "registerSubtitle": "Erstelle dein kostenloses Konto",
     "email": "E-Mail",

@@ -2756,6 +2756,11 @@
     "register": "Register",
     "welcomeBack": "Welcome back",
     "loginSubtitle": "Sign in to continue",
+    "demoHint": {
+      "title": "Fresh demo install",
+      "text": "Use the administrator account to connect an AI provider and finish setup.",
+      "cta": "Continue as administrator"
+    },
     "getStarted": "Get started",
     "registerSubtitle": "Create your free account",
     "email": "Email",
