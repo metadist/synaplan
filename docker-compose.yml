@@ -40,8 +40,12 @@ services:
         cat <<'EOF'
 
         ============================================================
-         Synaplan is starting -- please wait
+         Synaplan is starting
         ============================================================
+         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         screen shows every boot step (database, backend, AI model
+         download) and switches to the app automatically.
+
          The first start can take 5-15 minutes depending on your
          machine and connection. In the background Docker is:
            - building the backend dev image (first run only)
@@ -49,7 +53,7 @@ services:
            - running database migrations + seeding
            - downloading the local embedding model (~1 GB)
 
-         When everything is ready, open:
+         When everything is ready:
            App      http://localhost:5173
            Login    admin@synaplan.com / admin123
            API      http://localhost:8000  (docs: /api/doc)
@@ -80,7 +84,17 @@ services:
         done
         echo "[startup-notes] backend is up (after $$(elapsed)s)"
         echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
-        until wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null; do
+        # The boot-status onboarding page answers on :5173 long before Vite
+        # does, so "port answers" is not enough: the app is only ready when
+        # the port answers AND the boot page's status feed is gone (the
+        # entrypoint stops it right before Vite takes over). Vite answers
+        # /boot-status.json too (SPA html fallback, 200), so we must inspect
+        # the BODY: only the real feed contains "boot":true.
+        while true; do
+          if wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null \
+            && ! wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null | grep -q '"boot":true'; then
+            break
+          fi
           if [ "$$(elapsed)" -ge 1800 ]; then
             echo "[startup-notes] frontend still not ready after 30 minutes -- something is probably wrong."
             echo "[startup-notes] check:  docker compose logs frontend"
@@ -116,33 +130,41 @@ services:
       # behind any domain / reverse proxy). Set ALLOWED_HOSTS to a
       # comma-separated allow-list to restrict to ONLY those hosts.
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
+      # Probed by the boot-status onboarding page (see /boot-status mount).
+      BOOT_STATUS_OLLAMA_URL: http://ollama:11434
+      BOOT_STATUS_DB_HOST: db
     ports:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Boot-status onboarding page: a zero-dependency Node server the entrypoint
+      # runs on :5173 BEFORE npm ci, so the browser shows live boot progress
+      # instead of a connection error during a cold first start.
+      - ./_docker/frontend/boot-status:/boot-status:ro
+      # Read-only view of the backend's var/ so the boot-status page can show
+      # backend boot milestones (boot-status.json) and the Ollama model download
+      # progress (ollama-download.json) written by the backend entrypoint.
+      - ./backend/var:/synaplan-backend-var:ro
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
-    depends_on:
-      # service_STARTED, not service_healthy: the Vite dev server does not need a
-      # HEALTHY backend to boot -- its only backend dependency is schema generation
-      # (20-generate-schemas.sh), which already polls the backend for ~5 min and,
-      # combined with `restart: unless-stopped`, retries until it succeeds.
-      #
-      # Gating on service_healthy made `docker compose up -d` BLOCK for the
-      # backend's 900s health start_period. If that blocking command was ever
-      # interrupted (Ctrl+C, IDE/tool timeout, laptop sleep) the frontend was left
-      # in state "Created" and NEVER started -- and restart policies do not cover a
-      # container that never started, so it sat there forever ("just wait" never
-      # helped). service_started returns immediately, so the stack self-heals.
-      backend:
-        condition: service_started
-    # Vite dev server readiness: npm ci + schema generation + server start can
-    # take 1-3 min (longer on a cold first boot while the backend is still
-    # running migrations). Without this healthcheck the container shows
-    # "Started" immediately, which is misleading -- the dev server is not yet
-    # listening. start_period matches the schema script's 5-min poll ceiling.
+    # NO depends_on -- on purpose. The frontend must start IMMEDIATELY so the
+    # boot-status onboarding page binds :5173 within seconds of `up -d`, even
+    # while the backend image is still building on a fresh checkout. The only
+    # real backend dependency is schema generation (20-generate-schemas.sh),
+    # which polls the backend API for up to ~15 min and, combined with
+    # `restart: unless-stopped`, retries until it succeeds.
+    #
+    # (History: gating on service_healthy made `up -d` block for the backend's
+    # 900s start_period and could strand the frontend in state "Created";
+    # service_started fixed that but still delayed the boot page by the whole
+    # image build + db health wait. No dependency is both faster and safer.)
+    #
+    # Vite dev server readiness: the boot-status page answers on :5173 within
+    # seconds, so this healthcheck turns healthy early -- it verifies that port
+    # 5173 serves SOMETHING useful (boot page first, Vite after the handover).
+    # start_period still covers a slow cold boot of the real dev server.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -274,7 +296,9 @@ services:
       WHISPER_DEFAULT_MODEL: tiny
       WHISPER_ENABLED: "true"
       FFMPEG_BINARY: /usr/bin/ffmpeg
-      # Piper TTS Service (self-hosted, voice conversations)
+      # Piper TTS (optional). Default reaches a host-bound synaplan-tts
+      # (`docker compose --profile tts` or the standalone repo on :10200).
+      # Image: ghcr.io/metadist/synaplan-tts — 4 baked voices (en/de/es/tr).
       SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
       # Raise PHP's `max_file_uploads` (base-php default is 20). The Files /
       # RAG manager allows selecting any number of files but PHP silently
@@ -822,6 +846,30 @@ services:
     networks:
       - synaplan-network
 
+  # Optional Piper TTS — four baked voices (en, de, es, tr).
+  # Not started by default (keeps the core stack small). Enable with:
+  #   docker compose --profile tts up -d
+  # Image: https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts
+  # Docs:  https://docs.synaplan.com/index.php/tts
+  # Extra voices: mount more .onnx + .onnx.json into /voices-extra (see the
+  # synaplan-tts README). The UI locale / detected reply language selects
+  # the matching baked voice automatically.
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest
+    container_name: synaplan-tts
+    profiles: [tts]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10200:10200"
+    volumes:
+      - tts_extra_voices:/voices-extra
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks:
+      - synaplan-network
+
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
     image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
@@ -840,6 +888,7 @@ volumes:
   whisper_models:
   qdrant_storage:
   keycloak_certs:
+  tts_extra_voices:
 
 networks:
   synaplan-network:

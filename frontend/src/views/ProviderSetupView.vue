@@ -50,7 +50,11 @@
       >
         <Icon icon="mdi:cloud-alert" class="w-8 h-8 mx-auto text-[var(--status-warning)]" />
         <p class="txt-secondary mt-3">{{ $t('adminSetup.loadFailed') }}</p>
-        <button class="btn-primary mt-4" data-testid="setup-retry" @click="refresh">
+        <button
+          class="btn-primary px-6 py-2.5 rounded-lg font-medium mt-4"
+          data-testid="setup-retry"
+          @click="refresh"
+        >
           {{ $t('common.retry') }}
         </button>
       </div>

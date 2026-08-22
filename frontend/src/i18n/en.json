@@ -2598,7 +2598,7 @@
     "statusReadyTitle": "Your AI is ready",
     "statusReadyText": "The default chat model has a working provider. You can add more providers below at any time.",
     "statusNotReadyTitle": "No AI provider connected yet",
-    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute.",
+    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute — or connect a local Ollama, which needs no key at all.",
     "cloudProviders": "Cloud providers",
     "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
     "recommended": "Recommended",
@@ -2677,9 +2677,9 @@
   "setupBanner": {
     "adminTitle": "No AI provider configured",
     "userTitle": "Chat is not ready yet",
-    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute.",
+    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute — or connect a local Ollama, which needs no key at all.",
     "userText": "An administrator still needs to connect an AI provider. You can read how that works in the documentation.",
-    "cta": "Open AI provider setup",
+    "cta": "Go to AI provider setup",
     "docsCta": "Open documentation"
   },
   "localAiDownload": {

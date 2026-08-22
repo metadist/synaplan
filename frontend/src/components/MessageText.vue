@@ -574,6 +574,13 @@ function postProcessHtml(html: string): string {
   html = processFeedbackBadges(processMemoryBadges(html))
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
+  // Demo-mode CTA: when no AI provider is configured, the built-in demo
+  // responder links to /admin/setup. Render that link as a real button so a
+  // new user clicks once instead of following written instructions.
+  html = html.replace(
+    /<a href="\/admin\/setup"(?![^>]*class=)/g,
+    '<a href="/admin/setup" class="chat-setup-cta btn-primary"'
+  )
   return html
 }
 
@@ -996,5 +1003,27 @@ watch(
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Demo-mode provider-setup CTA (see postProcessHtml): the markdown link to
+   /admin/setup becomes a real button. btn-primary supplies the theme-safe
+   background; the white label must be restated here because markdown.css
+   colors every `.markdown-content a` brand-blue (invisible on the brand
+   button), in light and dark mode alike. */
+.markdown-content :deep(a.chat-setup-cta),
+.dark .markdown-content :deep(a.chat-setup-cta) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  text-decoration: none;
+  color: #fff;
+}
+.markdown-content :deep(a.chat-setup-cta:hover),
+.dark .markdown-content :deep(a.chat-setup-cta:hover) {
+  text-decoration: none;
+  color: #fff;
 }
 </style>

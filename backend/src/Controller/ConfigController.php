@@ -403,7 +403,7 @@ class ConfigController extends AbstractController
                             property: 'chatReady',
                             type: 'boolean',
                             example: true,
-                            description: 'True when the provider serving the requesting user\'s effective default chat model (per-user override, then global default) is available (key configured / local AI reachable), i.e. sending a chat message can work for this user.'
+                            description: 'True when a real AI provider (cloud key or a pulled local Ollama model) can serve the requesting user\'s effective default chat model. The built-in TestProvider demo responder does not count.'
                         ),
                     ]
                 ),
@@ -498,13 +498,12 @@ class ConfigController extends AbstractController
             // saving a key) — never a side effect of this GET.
             $unavailableProviders = $this->chatReadiness->unavailableProviderNames();
 
-            // First-run signal: can a plain chat message work right now for
-            // THIS user? The frontend replaces chat with a setup tombstone
+            // First-run signal: can a REAL AI provider answer chat for THIS
+            // user? The built-in TestProvider does not count — it is canned
+            // demo text. The frontend replaces chat with a setup tombstone
             // (admins go to /admin/setup; others to the public docs) while
-            // this is false — e.g. a fresh install whose default chat model
-            // points at a provider without a key. Evaluated per user so a
-            // working per-user model override is honoured, exactly like the
-            // chat pipeline resolves it.
+            // this is false. Evaluated per user so a working per-user model
+            // override is honoured, exactly like the chat pipeline resolves it.
             $setup = ['chatReady' => $this->chatReadiness->isChatReady(userId: $user->getId())];
         }
 

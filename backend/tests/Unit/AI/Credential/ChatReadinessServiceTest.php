@@ -181,4 +181,20 @@ class ChatReadinessServiceTest extends TestCase
 
         $this->assertFalse($this->service()->isChatReady([]));
     }
+
+    public function testBuiltInTestProviderDoesNotCountAsReady(): void
+    {
+        $this->givenDefaultChatBindings([
+            0 => 'test',
+        ]);
+        $this->providerRegistry->expects($this->once())
+            ->method('getAvailableProviders')
+            ->with('chat', false)
+            ->willReturn([]);
+
+        $this->assertFalse(
+            $this->service()->isChatReady(['test' => true, 'anthropic' => false]),
+            'The demo TestProvider must not make the setup page claim AI is ready.'
+        );
+    }
 }

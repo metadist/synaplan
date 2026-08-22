@@ -39,8 +39,12 @@ services:
         cat <<'EOF'
 
         ============================================================
-         Synaplan (minimal install) is starting -- please wait
+         Synaplan (minimal install) is starting
         ============================================================
+         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         screen shows every boot step and switches to the app
+         automatically.
+
          The first start can take 5-15 minutes depending on your
          machine and connection. In the background Docker is:
            - building the backend dev image (first run only)
@@ -79,7 +83,14 @@ services:
         done
         echo "[startup-notes] backend is up (after $$(elapsed)s)"
         echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
-        until wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null; do
+        # Ready = port answers AND the boot-status feed is gone (Vite took
+        # over). Vite answers /boot-status.json too (SPA html fallback, 200),
+        # so inspect the BODY: only the real feed contains "boot":true.
+        while true; do
+          if wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null \
+            && ! wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null | grep -q '"boot":true'; then
+            break
+          fi
           if [ "$$(elapsed)" -ge 1800 ]; then
             echo "[startup-notes] frontend still not ready after 30 minutes -- something is probably wrong."
             echo "[startup-notes] check:  docker compose -f docker-compose-minimal.yml logs frontend"
@@ -110,17 +121,22 @@ services:
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
+      # Probed by the boot-status onboarding page (no Ollama in the minimal stack).
+      BOOT_STATUS_DB_HOST: db
     ports:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Boot-status onboarding page + read-only backend var/ for boot milestones.
+      # See docker-compose.yml for the full rationale.
+      - ./_docker/frontend/boot-status:/boot-status:ro
+      - ./backend/var:/synaplan-backend-var:ro
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
-    depends_on:
-      - backend
-    # See docker-compose.yml frontend healthcheck comment for full rationale.
+    # NO depends_on -- on purpose: the boot-status page must bind :5173
+    # immediately. See docker-compose.yml frontend comments for full rationale.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -234,6 +250,9 @@ services:
       WHISPER_DEFAULT_MODEL: base
       WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # Piper TTS (optional). Same host-bound default as the standard compose.
+      # Enable with: docker compose -f docker-compose-minimal.yml --profile tts up -d
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
       # See docker-compose.yml for context -- raises PHP's silent 20-file cap.
       PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
@@ -257,6 +276,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 300s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - synaplan-network
 
@@ -464,8 +485,27 @@ services:
     networks:
       - synaplan-network
 
+  # Optional Piper TTS — four baked voices (en, de, es, tr).
+  #   docker compose -f docker-compose-minimal.yml --profile tts up -d
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest
+    container_name: synaplan-tts
+    profiles: [tts]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10200:10200"
+    volumes:
+      - tts_extra_voices:/voices-extra
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks:
+      - synaplan-network
+
 volumes:
   mysql_data:
+  tts_extra_voices:
   # Note: No ollama_data or whisper_models volumes in standard mode
 
 networks:

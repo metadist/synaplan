@@ -2596,6 +2596,10 @@ const streamAIResponse = async (
       let spokenLength = 0
       let audioText = ''
       let insideThinkBlock = false
+      // Frontend language selects the Piper voice. Seed English, then adopt
+      // the backend-detected reply language (meta.language) — the request
+      // already sent locale.value. Piper maps en/de/es/tr to the four voices
+      // baked into synaplan-tts; there is no separate voice picker.
       let detectedLanguage = 'en'
 
       if (options?.voiceReply) {
