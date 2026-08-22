@@ -340,7 +340,7 @@ for portable in pre-update.sh post-update.sh; do
     }
 done
 
-# systemd, the symlinks in /usr/local/bin and the SSM document all invoke these
+# systemd, the wrappers in /usr/local/bin and the SSM document all invoke these
 # by path. A file that lost its executable bit fails at boot, not at build.
 for script in "$AWS_DIR/scripts"/*.sh; do
     [[ -x "$script" ]] || {

@@ -55,6 +55,34 @@ if [[ -n "$non_ascii_ami_metadata" ]]; then
 fi
 
 # --------------------------------------------------------------------------
+# The boot order the units ask of systemd
+# --------------------------------------------------------------------------
+
+# A unit that is WantedBy=multi-user.target must not order itself after
+# cloud-init.target or cloud-final.service: both sit after multi-user.target,
+# which closes an ordering cycle that systemd resolves by deleting the unit's
+# start job. The 4.2.4 verification instance booted exactly like that — no
+# firstboot, no stack, no Caddy, an idle machine for fifty minutes.
+for unit in "$DEPLOY_ROOT/aws/systemd/"*.service; do
+    grep -Eq '^WantedBy=.*multi-user\.target' "$unit" || continue
+    if grep -Eq '^(After|Wants|Requires)=.*cloud-(init\.target|final\.service)' "$unit"; then
+        fail "$(basename "$unit") is WantedBy=multi-user.target and orders itself after cloud-init — that is an ordering cycle, and systemd answers it by never starting the unit"
+    fi
+done
+
+# --------------------------------------------------------------------------
+# The operator commands provision.sh publishes
+# --------------------------------------------------------------------------
+
+# Wrappers, never symlinks: every published script locates lib.sh relative to
+# its own path, and through a symlink that path is /usr/local/bin. Each command
+# then fails with "lib.sh: No such file or directory" — first observed when
+# synaplan-smoke-test did exactly that during a verification post-mortem.
+if grep -E '^[[:space:]]*ln\b' "$AWS_SCRIPTS_DIR/provision.sh" | grep -q '/usr/local/bin/'; then
+    fail "provision.sh symlinks a command into /usr/local/bin; publish an exec wrapper instead, or the command cannot find lib.sh next to its real path"
+fi
+
+# --------------------------------------------------------------------------
 # The instance, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 

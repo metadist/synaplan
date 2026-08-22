@@ -122,10 +122,18 @@ ln -sfn "$DATA_MOUNT/.lifecycle" "$APP_DIR/deploy/.lifecycle"
 ln -sfn "$DATA_MOUNT/.env" "$APP_DIR/deploy/.env"
 
 log "Publishing the operator commands"
-ln -sfn "$APP_DIR/deploy/aws/scripts/update.sh" /usr/local/bin/synaplan-update
-ln -sfn "$APP_DIR/deploy/aws/scripts/snapshot.sh" /usr/local/bin/synaplan-snapshot
-ln -sfn "$APP_DIR/deploy/aws/scripts/configure-tls.sh" /usr/local/bin/synaplan-tls
-ln -sfn "$APP_DIR/deploy/scripts/smoke-test.sh" /usr/local/bin/synaplan-smoke-test
+# Wrappers, not symlinks. Every one of these scripts locates lib.sh relative
+# to its own path, and through a symlink that path is /usr/local/bin — each
+# command then dies with "lib.sh: No such file or directory". An exec wrapper
+# hands the script its real path as $0, so the lookup works unchanged.
+publish_command() {
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$2" > "/usr/local/bin/$1"
+    chmod 0755 "/usr/local/bin/$1"
+}
+publish_command synaplan-update "$APP_DIR/deploy/aws/scripts/update.sh"
+publish_command synaplan-snapshot "$APP_DIR/deploy/aws/scripts/snapshot.sh"
+publish_command synaplan-tls "$APP_DIR/deploy/aws/scripts/configure-tls.sh"
+publish_command synaplan-smoke-test "$APP_DIR/deploy/scripts/smoke-test.sh"
 
 log "Recording the baked release"
 # Read by firstboot.sh to pin deploy/.env, and by support to tell instantly
