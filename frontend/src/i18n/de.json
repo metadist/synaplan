@@ -2027,7 +2027,7 @@
       "deleteConfirm": "Entfernen",
       "deleted": "{name} wurde entfernt.",
       "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
-      "channelHint": "Im Chat heißt dieser Kanal {channel}",
+      "channelHint": "Um diese Verbindung im Chat zu nutzen, schreib das Wort {channel} in deine Nachricht.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",

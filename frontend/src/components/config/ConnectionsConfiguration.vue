@@ -68,7 +68,12 @@ const loadDropbox = async () => {
 }
 
 const formatChecked = (timestamp: number | null): string =>
-  timestamp ? new Date(timestamp * 1000).toLocaleString(locale.value) : ''
+  timestamp
+    ? new Date(timestamp * 1000).toLocaleString(locale.value, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : ''
 
 const onAdapterOpen = async (item: ConnectionItem) => {
   if (item.manage_path) {
@@ -180,31 +185,35 @@ onMounted(async () => {
         <li
           v-for="item in adapterItems"
           :key="item.id"
-          class="surface-card p-4 flex flex-wrap items-center gap-3"
+          class="surface-card p-4 space-y-3"
           data-testid="connection-row"
         >
-          <div class="flex-1 min-w-0">
-            <p class="font-medium txt-primary truncate">{{ item.name }}</p>
-            <p class="text-xs txt-secondary">
-              {{ $t(`config.connections.types.${item.type}`, item.type) }}
-              <span v-if="item.last_checked">
-                ·
-                {{
-                  $t('config.connections.lastChecked', { when: formatChecked(item.last_checked) })
-                }}
-              </span>
-            </p>
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <p class="font-medium txt-primary break-words">{{ item.name }}</p>
+              <p class="text-xs txt-secondary mt-0.5">
+                {{ $t(`config.connections.types.${item.type}`, item.type) }}
+                <span v-if="item.last_checked">
+                  ·
+                  {{
+                    $t('config.connections.lastChecked', { when: formatChecked(item.last_checked) })
+                  }}
+                </span>
+              </p>
+            </div>
+            <ConnectionStatusPill :status="item.status" class="shrink-0 mt-0.5" />
           </div>
-          <ConnectionStatusPill :status="item.status" />
-          <button
-            type="button"
-            class="btn-secondary inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
-            data-testid="btn-test-connection"
-            @click="onAdapterOpen(item)"
-          >
-            <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
-            {{ $t('config.connections.manage') }}
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="btn-secondary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
+              data-testid="btn-test-connection"
+              @click="onAdapterOpen(item)"
+            >
+              <Icon icon="heroicons:cog-6-tooth" class="w-4 h-4" />
+              {{ $t('config.connections.manage') }}
+            </button>
+          </div>
         </li>
       </ul>
     </section>

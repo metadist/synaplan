@@ -1941,7 +1941,7 @@
       "deleteConfirm": "Remove",
       "deleted": "{name} was removed.",
       "deleteFailed": "The connection could not be removed.",
-      "channelHint": "In chat, ask for {channel}",
+      "channelHint": "To use this connection in chat, type the word {channel} in your message.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",

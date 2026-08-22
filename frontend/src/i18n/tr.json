@@ -2595,7 +2595,7 @@
       "deleteConfirm": "Kaldır",
       "deleted": "{name} kaldırıldı.",
       "deleteFailed": "Bağlantı kaldırılamadı.",
-      "channelHint": "Sohbette bu kanala {channel} deyin",
+      "channelHint": "Bu bağlantıyı sohbette kullanmak için mesajına {channel} kelimesini yaz.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",

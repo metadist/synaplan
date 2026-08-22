@@ -2594,7 +2594,7 @@
       "deleteConfirm": "Quitar",
       "deleted": "Se quitó {name}.",
       "deleteFailed": "No se pudo quitar la conexión.",
-      "channelHint": "En el chat, usa el nombre {channel}",
+      "channelHint": "Para usar esta conexión en el chat, escribe la palabra {channel} en tu mensaje.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
