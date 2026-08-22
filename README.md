@@ -35,7 +35,7 @@ cd synaplan
 docker compose up -d
 ```
 
-1. **Open <http://localhost:5173>.** The UI is ready in about two minutes.
+1. **Open <http://localhost:5173>.** The UI is ready in about two minutes. Not sure if it's still booting? `docker compose logs -f startup-notes` explains what is happening and prints **READY** the moment the app answers.
 2. **Log in** as `admin@synaplan.com` / `admin123`.
 3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat is replaced by a first-run setup screen. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
@@ -306,6 +306,9 @@ git clone https://github.com/metadist/synaplan-tts.git && cd synaplan-tts && doc
 ## Common Commands
 
 ```bash
+# Startup progress ("please wait..." notes + READY message)
+docker compose logs -f startup-notes
+
 # Logs
 docker compose logs -f backend
 

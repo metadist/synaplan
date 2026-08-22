@@ -14,6 +14,94 @@
 #   docker compose -f docker-compose-minimal.yml up -d
 #
 services:
+  # ----------------------------------------------------------------------------
+  # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
+  #
+  # `docker compose up -d` detaches immediately and only prints container
+  # status lines, so this tiny container carries the "please wait" notes in
+  # its logs and reports READY once backend + frontend actually answer:
+  #
+  #   docker compose logs -f startup-notes
+  #
+  # With attached `docker compose up` (no -d) the notes appear directly in the
+  # terminal. restart: "no" makes it one-shot; every later `up` re-runs it,
+  # which then finishes in seconds because the stack is already healthy.
+  # ----------------------------------------------------------------------------
+  startup-notes:
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    container_name: synaplan-startup-notes
+    command:
+      - sh
+      - -c
+      # Quoted heredoc = no shell expansion in the banner; $$ = compose escape.
+      - |
+        started=$$(date +%s)
+        elapsed() { echo $$(( $$(date +%s) - started )); }
+        cat <<'EOF'
+
+        ============================================================
+         Synaplan is starting -- please wait
+        ============================================================
+         The first start can take 5-15 minutes depending on your
+         machine and connection. In the background Docker is:
+           - building the backend dev image (first run only)
+           - installing frontend dependencies (npm ci)
+           - running database migrations + seeding
+           - downloading the local embedding model (~1 GB)
+
+         When everything is ready, open:
+           App      http://localhost:5173
+           Login    admin@synaplan.com / admin123
+           API      http://localhost:8000  (docs: /api/doc)
+           Mail UI  http://localhost:8025  (MailHog)
+           DB UI    http://localhost:8082  (phpMyAdmin)
+
+         Chat needs one AI provider key -- the app greets you with
+         a first-run setup screen and guides you (free key: Groq).
+
+         Follow this readiness check:  docker compose logs -f startup-notes
+         Follow the whole stack:       docker compose logs -f
+        ============================================================
+
+        EOF
+        echo "[startup-notes] waiting for the backend (image build + migrations can take a while on first boot)..."
+        i=0
+        until wget -q -T 3 -O /dev/null http://backend/api/health 2>/dev/null; do
+          i=$$((i + 1))
+          if [ $$((i % 6)) -eq 0 ]; then
+            echo "[startup-notes] still waiting for the backend... ($$(elapsed)s elapsed -- normal on first boot)"
+          fi
+          if [ "$$(elapsed)" -ge 1500 ]; then
+            echo "[startup-notes] backend still not ready after 25 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose ps   and   docker compose logs backend"
+            exit 1
+          fi
+          sleep 5
+        done
+        echo "[startup-notes] backend is up (after $$(elapsed)s)"
+        echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
+        until wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null; do
+          if [ "$$(elapsed)" -ge 1800 ]; then
+            echo "[startup-notes] frontend still not ready after 30 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose logs frontend"
+            exit 1
+          fi
+          sleep 5
+        done
+        cat <<EOF
+
+        ============================================================
+         Synaplan is READY (took $$(elapsed)s)
+
+           Open   http://localhost:5173
+           Login  admin@synaplan.com / admin123
+        ============================================================
+
+        EOF
+    restart: "no"
+    networks:
+      - synaplan-network
+
   # Vue.js Frontend
   frontend:
     image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
