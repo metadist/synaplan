@@ -1073,6 +1073,11 @@
     "removed": "{provider} anahtarı kaldırıldı",
     "removedEnvStillSet": "Kayıtlı {provider} anahtarı kaldırıldı — {envVar} ortamda hâlâ tanımlı, bu nedenle {provider} bu değerle bağlı kalır",
     "loadFailed": "Sağlayıcı durumu yüklenemedi",
+    "ownService": {
+      "title": "Kendi hizmetini ekle",
+      "description": "Listede olmayan bir sağlayıcı mı var? Onu AI Model Yapılandırması'ndaki Modelleri düzenle sekmesine ekle.",
+      "cta": "Kendi hizmetini ekle"
+    },
     "localAi": {
       "title": "Yerel AI (Ollama) — anahtar gerekmez",
       "description": "Standart kurulum, tamamen kendi donanımınızda çalışan yerel AI modelleri içerir. İlk başlatmada model indirme biraz sürebilir; yukarıdaki bulut sağlayıcıları anında kullanılabilir."

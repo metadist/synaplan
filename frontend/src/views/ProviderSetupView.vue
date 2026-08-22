@@ -75,6 +75,24 @@
           />
         </div>
 
+        <div class="surface-card rounded-lg p-5 flex items-start gap-3 mb-8">
+          <Icon icon="mdi:puzzle-plus-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
+          <div class="min-w-0 flex-1">
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('adminSetup.ownService.title') }}
+            </h3>
+            <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.ownService.description') }}</p>
+            <RouterLink
+              :to="{ path: '/ai/models', query: { tab: 'edit' } }"
+              class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
+              data-testid="setup-own-service"
+            >
+              {{ $t('adminSetup.ownService.cta') }}
+              <Icon icon="mdi:arrow-right" class="w-4 h-4" aria-hidden="true" />
+            </RouterLink>
+          </div>
+        </div>
+
         <!-- Local AI note -->
         <div class="surface-card rounded-lg p-5 flex items-start gap-3">
           <Icon icon="mdi:server-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
@@ -100,6 +118,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'

@@ -2628,6 +2628,11 @@
     "removed": "{provider} key removed",
     "removedEnvStillSet": "Stored {provider} key removed — {envVar} is still set in the environment, so {provider} stays connected from that value",
     "loadFailed": "Could not load provider status",
+    "ownService": {
+      "title": "Add your own service",
+      "description": "Need a provider that is not listed? Add it on the Edit models tab of AI Model Config.",
+      "cta": "Add your own service"
+    },
     "localAi": {
       "title": "Local AI (Ollama) — no key needed",
       "description": "The standard installation includes local AI models that run entirely on your hardware. Downloading models can take a while on first start; cloud providers above are available instantly."

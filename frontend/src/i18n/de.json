@@ -2694,6 +2694,11 @@
     "removed": "{provider}-Schlüssel entfernt",
     "removedEnvStillSet": "Gespeicherter {provider}-Schlüssel entfernt — {envVar} ist in der Umgebung weiterhin gesetzt, {provider} bleibt damit verbunden",
     "loadFailed": "Anbieter-Status konnte nicht geladen werden",
+    "ownService": {
+      "title": "Eigenen Dienst hinzufügen",
+      "description": "Dein Anbieter fehlt in der Liste? Füge ihn im Tab „Modelle bearbeiten“ der KI-Modell-Konfiguration hinzu.",
+      "cta": "Eigenen Dienst hinzufügen"
+    },
     "localAi": {
       "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
       "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."

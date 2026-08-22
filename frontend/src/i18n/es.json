@@ -1073,6 +1073,11 @@
     "removed": "Clave de {provider} eliminada",
     "removedEnvStillSet": "Clave de {provider} eliminada de la base de datos: {envVar} sigue definida en el entorno, así que {provider} continúa conectado con ese valor",
     "loadFailed": "No se pudo cargar el estado de los proveedores",
+    "ownService": {
+      "title": "Añadir tu propio servicio",
+      "description": "¿Falta un proveedor en la lista? Añádelo en la pestaña Editar modelos de la configuración de modelos IA.",
+      "cta": "Añadir tu propio servicio"
+    },
     "localAi": {
       "title": "IA local (Ollama) — sin clave",
       "description": "La instalación estándar incluye modelos de IA locales que se ejecutan completamente en tu hardware. La descarga de modelos puede tardar en el primer arranque; los proveedores en la nube de arriba están disponibles al instante."
