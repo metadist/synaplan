@@ -167,6 +167,16 @@ install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan.service" /etc/systemd/syst
 install -d -m 0755 /etc/caddy
 install -d -o caddy -g caddy -m 0750 /var/log/caddy
 install -m 0644 "$APP_DIR/deploy/aws/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
+# The Caddyfile serves a certificate pair that only exists once the first boot
+# has minted it for the instance (configure-tls.sh) — baking a real pair into
+# the image would hand the SAME private key to every customer. Validation still
+# needs files to load, so: a throwaway pair, validate, delete. caddy.service
+# orders itself after synaplan-firstboot below, which mints the real pair
+# before Caddy first starts.
+install -d -m 0755 /etc/caddy/selfsigned
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+    -keyout /etc/caddy/selfsigned/key.pem -out /etc/caddy/selfsigned/cert.pem \
+    -days 1 -subj '/CN=throwaway' 2>/dev/null
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 # validate provisions the log writer and thereby CREATES synaplan.log — as
 # root, since this whole script is root. Left alone, the AMI ships a root-owned
@@ -174,6 +184,7 @@ caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 # milliseconds with "permission denied" and nothing ever listens on 443, which
 # is exactly how a verification run with an otherwise healthy stack died.
 chown -R caddy:caddy /var/log/caddy
+rm -f /etc/caddy/selfsigned/key.pem /etc/caddy/selfsigned/cert.pem
 install -d -m 0755 /etc/systemd/system/caddy.service.d
 cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
 [Unit]

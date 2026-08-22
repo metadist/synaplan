@@ -121,6 +121,40 @@ grep -Fq 'systemctl is-failed caddy.service' "$repo_root/.github/workflows/aws-a
     fail "the AMI verification wait does not probe caddy.service; a failed TLS terminator would again cost fifty minutes next to a healthy stack"
 
 # --------------------------------------------------------------------------
+# The self-signed certificate an instance without a domain serves
+# --------------------------------------------------------------------------
+
+# `tls internal` cannot answer a client that dials the bare IP — which is how
+# every launch is reached until a domain is attached. The catch-all site has no
+# host name, the ClientHello carries no SNI, so the internal issuer has no name
+# to mint a certificate for and aborts every handshake with "tlsv1 alert
+# internal error". A verification run watched a fully healthy stack refuse
+# connections for fifty minutes behind exactly that. The Caddyfile must serve
+# the pair configure-tls.sh mints instead.
+selfsigned_caddyfile="$DEPLOY_ROOT/aws/caddy/Caddyfile.selfsigned"
+if grep -Eq '^[[:space:]]*tls[[:space:]]+internal([[:space:]]|$)' "$selfsigned_caddyfile"; then
+    fail "Caddyfile.selfsigned uses tls internal, which cannot answer a client connecting by bare IP (no SNI, no name to issue for) — every handshake dies with a tlsv1 internal error"
+fi
+grep -Fq '/etc/caddy/selfsigned/cert.pem' "$selfsigned_caddyfile" ||
+    fail "Caddyfile.selfsigned does not serve the minted pair under /etc/caddy/selfsigned/; without it Caddy has no certificate at all"
+grep -Fq 'openssl req' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
+    fail "configure-tls.sh does not mint the self-signed certificate that Caddyfile.selfsigned serves"
+
+# The pair is minted on the instance, never shipped in the image: an AMI that
+# carries a private key hands the SAME key to every customer. provision.sh may
+# create a throwaway pair so `caddy validate` has files to load, but it must
+# delete that pair before the image is snapshotted. Comment lines are skipped,
+# so a commented-out rm does not count as one.
+awk '
+    { line = $0; sub(/^[[:space:]]*/, "", line) }
+    index(line, "#") == 1 { next }
+    /openssl req/ { minted = NR }
+    /rm -f \/etc\/caddy\/selfsigned/ { removed = NR }
+    END { exit !(!minted || removed > minted) }
+' "$AWS_SCRIPTS_DIR/provision.sh" ||
+    fail "provision.sh mints a certificate pair without deleting it afterwards — the AMI would ship one private key to every customer"
+
+# --------------------------------------------------------------------------
 # The XFS label firstboot writes on a blank data volume
 # --------------------------------------------------------------------------
 
