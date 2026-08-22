@@ -141,6 +141,14 @@ EOF
 SYNAPLAN_DOMAIN="$domain" SYNAPLAN_ACME_EMAIL="$acme_email" \
     caddy validate --config "$CADDY_FILE" --adapter caddyfile
 
+# validate PROVISIONS the configuration, and provisioning a `log { output file }`
+# block OPENS the file — as root, because this script runs as root. That leaves
+# /var/log/caddy/synaplan.log owned by root, mode 0600, and caddy.service
+# (User=caddy) then dies in milliseconds on "permission denied" opening its own
+# log. This killed a verification run whose whole stack was healthy behind the
+# dead proxy. Hand everything back to the service user, every time validate ran.
+chown -R caddy:caddy /var/log/caddy
+
 # During the first boot systemd starts Caddy itself, right after this unit.
 if systemctl is-active --quiet caddy.service; then
     systemctl daemon-reload
