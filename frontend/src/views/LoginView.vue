@@ -1,7 +1,7 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative overflow-hidden"
-    :class="isNativeApp() ? 'items-start' : 'items-center'"
+    class="h-dvh min-h-dvh bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative overflow-y-auto overflow-x-hidden"
+    :class="isNativeApp() ? 'items-start' : 'items-start sm:items-center'"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
     "
