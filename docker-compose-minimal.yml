@@ -87,8 +87,12 @@ services:
         # over). Vite answers /boot-status.json too (SPA html fallback, 200),
         # so inspect the BODY: only the real feed contains "boot":true.
         while true; do
+          # A failed /boot-status.json fetch must NOT count as ready: `! wget | grep`
+          # is true when wget itself fails, which used to print READY too early.
+          body=$$(wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null) || body=""
           if wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null \
-            && ! wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null | grep -q '"boot":true'; then
+            && [ -n "$$body" ] \
+            && ! printf '%s' "$$body" | grep -q '"boot":true'; then
             break
           fi
           if [ "$$(elapsed)" -ge 1800 ]; then

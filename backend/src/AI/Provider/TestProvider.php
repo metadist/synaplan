@@ -147,9 +147,9 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         // This text is the FIRST thing a fresh install answers when no real AI
         // provider key is configured yet (TestProvider is the dev fallback in
         // ModelConfigService::getDefaultModel). It must onboard the user with
-        // an ACTION, not instructions: the /admin/setup link below is rendered
-        // as a real button by the frontend (MessageText.vue styles it), so one
-        // click lands in the provider setup instead of reading a manual.
+        // an ACTION, not instructions: the [[SETUP_CTA]] marker below is
+        // rendered as a button that signs the guest in as the seeded admin
+        // and opens /admin/setup.
         $contextInfo = count($messages) > 1 ? ' (message #'.count($messages).' in this conversation)' : '';
 
         return "**You're in demo mode** — no AI provider is connected yet, so this is a canned reply to your message '{$userMessage}'{$contextInfo}.\n\n"
@@ -157,15 +157,18 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     }
 
     /**
-     * Shared call-to-action for every user-facing demo reply. The
-     * /admin/setup link is rendered as a real button by the frontend
-     * (MessageText.vue), so the user clicks once instead of following
-     * written instructions.
+     * Shared call-to-action for every user-facing demo reply.
+     *
+     * `[[SETUP_CTA]]` is a marker, not a markdown link: MessageText.vue
+     * turns it into a button that signs the guest in as the seeded admin
+     * and opens /admin/setup. Markdown links must not appear here — the
+     * chat renderer turns `[label](url)` into broken chips, and a raw
+     * /admin/setup href is useless to a guest (the typical first-run user).
      */
     private function demoSetupFooter(): string
     {
-        return "[Go to AI provider setup](/admin/setup)\n\n"
-            .'A free cloud key ([Groq](https://console.groq.com)) or a local [Ollama](https://ollama.com) model — no key needed.';
+        return "[[SETUP_CTA]]\n\n"
+            .'A free Groq key or a local Ollama model — no key needed.';
     }
 
     /**

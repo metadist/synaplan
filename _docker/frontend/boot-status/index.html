@@ -272,7 +272,13 @@
     if (state === 'done') badge.textContent = '✓'
     const detailEl = $('detail-' + id)
     if (detail !== undefined && detailEl) {
-      detailEl.innerHTML = (withSpinner ? '<span class="spinner"></span> ' : '') + detail
+      detailEl.replaceChildren()
+      if (withSpinner) {
+        const spinner = document.createElement('span')
+        spinner.className = 'spinner'
+        detailEl.append(spinner, ' ')
+      }
+      detailEl.append(document.createTextNode(detail))
     }
   }
 

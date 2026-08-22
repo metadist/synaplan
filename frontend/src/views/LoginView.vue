@@ -518,6 +518,10 @@ const loadSocialProviders = async () => {
 }
 
 onMounted(async () => {
+  const emailFromQuery = route.query.email
+  if (typeof emailFromQuery === 'string' && emailFromQuery !== '') {
+    email.value = emailFromQuery
+  }
   const reason = route.query.reason as string
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true

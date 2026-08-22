@@ -315,6 +315,14 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
   }
 }
 
+const handleSetupCtaClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  if (!target.closest('[data-setup-cta]')) return
+  event.preventDefault()
+  // ChatView owns the login + redirect (widget / shared chat ignore this).
+  window.dispatchEvent(new CustomEvent('open-first-run-setup'))
+}
+
 // Handle feedback badge clicks (feedback badges use .memory-ref class but have data-feedback-id attribute)
 const handleFeedbackBadgeClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -574,13 +582,12 @@ function postProcessHtml(html: string): string {
   html = processFeedbackBadges(processMemoryBadges(html))
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
-  // Demo-mode CTA: when no AI provider is configured, the built-in demo
-  // responder links to /admin/setup. Render that link as a real button so a
-  // new user clicks once instead of following written instructions.
-  html = html.replace(
-    /<a href="\/admin\/setup"(?![^>]*class=)/g,
-    '<a href="/admin/setup" class="chat-setup-cta btn-primary"'
-  )
+  // Demo-mode CTA from TestProvider. A <button> (not an <a>) so ChatView
+  // can log the guest in as admin and then open /admin/setup. Also rewrite
+  // leftover markdown links from older demo replies still in history.
+  const setupButton = `<button type="button" class="chat-setup-cta btn-primary" data-setup-cta="1">${escapeHtmlForBadge(t('setupBanner.cta'))}</button>`
+  html = html.replaceAll('[[SETUP_CTA]]', setupButton)
+  html = html.replace(/<a\b[^>]*href="\/admin\/setup"[^>]*>[\s\S]*?<\/a>/gi, setupButton)
   return html
 }
 
@@ -884,6 +891,7 @@ onBeforeUnmount(() => {
   if (containerRef.value) {
     containerRef.value.removeEventListener('click', handleMemoryBadgeClick)
     containerRef.value.removeEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.removeEventListener('click', handleSetupCtaClick)
   }
 })
 
@@ -899,6 +907,7 @@ onMounted(() => {
   if (containerRef.value) {
     containerRef.value.addEventListener('click', handleMemoryBadgeClick)
     containerRef.value.addEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.addEventListener('click', handleSetupCtaClick)
   }
 
   // Fetch memories if needed
@@ -1005,25 +1014,23 @@ watch(
   -webkit-overflow-scrolling: touch;
 }
 
-/* Demo-mode provider-setup CTA (see postProcessHtml): the markdown link to
-   /admin/setup becomes a real button. btn-primary supplies the theme-safe
-   background; the white label must be restated here because markdown.css
-   colors every `.markdown-content a` brand-blue (invisible on the brand
-   button), in light and dark mode alike. */
-.markdown-content :deep(a.chat-setup-cta),
-.dark .markdown-content :deep(a.chat-setup-cta) {
+/* Demo-mode provider-setup CTA (see postProcessHtml). A <button>, not a
+   markdown <a>, so a guest click can log in as admin then open setup.
+   White label is restated because markdown.css recolors nested text. */
+.markdown-content :deep(button.chat-setup-cta),
+.dark .markdown-content :deep(button.chat-setup-cta) {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   font-weight: 500;
-  text-decoration: none;
+  border: 0;
+  cursor: pointer;
   color: #fff;
 }
-.markdown-content :deep(a.chat-setup-cta:hover),
-.dark .markdown-content :deep(a.chat-setup-cta:hover) {
-  text-decoration: none;
+.markdown-content :deep(button.chat-setup-cta:hover),
+.dark .markdown-content :deep(button.chat-setup-cta:hover) {
   color: #fff;
 }
 </style>

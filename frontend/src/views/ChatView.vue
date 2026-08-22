@@ -465,6 +465,7 @@ import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
 import ProviderSetupBanner from '@/components/setup/ProviderSetupBanner.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
+import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
 import {
   useHistoryStore,
@@ -553,6 +554,7 @@ const router = useRouter()
 const { showLimitModal, limitData, checkAndShowLimit, closeLimitModal } = useLimitCheck()
 const { isPaywallOpen, paywallReason, shouldRemind, openPaywall, closePaywall } = usePaywallPrompt()
 const { error: showErrorToast, success: showSuccessToast } = useNotification()
+const { goToProviderSetup } = useFirstRunSetup()
 
 const chatContainer = ref<HTMLElement | null>(null)
 const chatInputRef = ref<InstanceType<typeof ChatInput> | null>(null)
@@ -834,6 +836,7 @@ onMounted(async () => {
 
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+    window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
     maybeRemindAboutUpgrade()
     return
   }
@@ -898,6 +901,7 @@ onMounted(async () => {
   window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   // Setup window event listener for feedback dialog (used by MessageText.vue)
   window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+  window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
 
   // Phase 1d: keep the SSE token cache warm.
   //   - Prefetch on mount so the first message of a session never waits.
@@ -973,6 +977,11 @@ const handleOpenFeedbackDialogEvent = (event: Event) => {
   }
 }
 
+// Demo-mode CTA: sign in as the seeded admin (if needed) and open setup.
+const handleOpenFirstRunSetupEvent = () => {
+  void goToProviderSetup()
+}
+
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
 // clears local streaming state WITHOUT telling the backend to stop — the turn
@@ -1004,6 +1013,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
+  window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()

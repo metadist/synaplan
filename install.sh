@@ -59,16 +59,23 @@ ask() {
     printf '%s' "${answer:-$2}"
 }
 
+need_arg() {
+    # $1 flag  $2 next token — refuse a missing value or another flag.
+    case "${2:-}" in
+        ''|-*) die "$1 requires a value (see --help)" ;;
+    esac
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
-        --mode)           MODE="${2:-}"; shift 2 ;;
-        --dir)            INSTALL_DIR="${2:-}"; shift 2 ;;
+        --mode)           need_arg "$1" "${2:-}"; MODE="$2"; shift 2 ;;
+        --dir)            need_arg "$1" "${2:-}"; INSTALL_DIR="$2"; shift 2 ;;
         --minimal)        MINIMAL="true"; shift ;;
-        --domain)         DOMAIN="${2:-}"; shift 2 ;;
-        --admin-email)    ADMIN_EMAIL="${2:-}"; shift 2 ;;
-        --admin-password) ADMIN_PASSWORD="${2:-}"; shift 2 ;;
-        --version)        PIN_VERSION="${2:-}"; shift 2 ;;
-        --branch)         BRANCH="${2:-}"; shift 2 ;;
+        --domain)         need_arg "$1" "${2:-}"; DOMAIN="$2"; shift 2 ;;
+        --admin-email)    need_arg "$1" "${2:-}"; ADMIN_EMAIL="$2"; shift 2 ;;
+        --admin-password) need_arg "$1" "${2:-}"; ADMIN_PASSWORD="$2"; shift 2 ;;
+        --version)        need_arg "$1" "${2:-}"; PIN_VERSION="$2"; shift 2 ;;
+        --branch)         need_arg "$1" "${2:-}"; BRANCH="$2"; shift 2 ;;
         --yes|-y)         ASSUME_YES="true"; shift ;;
         -h|--help)        sed -n '2,30p' "$0" 2>/dev/null || true; exit 0 ;;
         *)                die "Unknown option: $1 (see --help)" ;;
@@ -101,6 +108,11 @@ elif command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
     FETCH_TOOL="tarball"
 else
     die "Neither git nor curl+tar found - install git and re-run."
+fi
+# Server mode looks up the latest GitHub release with curl even when git
+# cloned the repo, so require it up front instead of failing mid-run.
+if [ "$MODE" = "server" ] && ! command -v curl >/dev/null 2>&1; then
+    die "Server mode needs curl (GitHub release lookup). Install curl and re-run."
 fi
 say "Docker, Compose v2 and ${FETCH_TOOL} are available."
 
