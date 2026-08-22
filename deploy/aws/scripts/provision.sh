@@ -168,6 +168,12 @@ install -d -m 0755 /etc/caddy
 install -d -o caddy -g caddy -m 0750 /var/log/caddy
 install -m 0644 "$APP_DIR/deploy/aws/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# validate provisions the log writer and thereby CREATES synaplan.log — as
+# root, since this whole script is root. Left alone, the AMI ships a root-owned
+# 0600 log file that caddy.service (User=caddy) cannot open: it exits in
+# milliseconds with "permission denied" and nothing ever listens on 443, which
+# is exactly how a verification run with an otherwise healthy stack died.
+chown -R caddy:caddy /var/log/caddy
 install -d -m 0755 /etc/systemd/system/caddy.service.d
 cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
 [Unit]
@@ -175,12 +181,11 @@ After=synaplan-firstboot.service
 Requires=synaplan-firstboot.service
 
 [Service]
-# The Caddyfile writes /var/log/caddy/synaplan.log. The packaged unit runs as
-# user caddy and typically ProtectSystem=strict, which makes /var read-only
-# unless LogsDirectory is set — the 4.2.4 verification died on
-# "open /var/log/caddy/synaplan.log: permission denied" with a healthy stack
-# behind it. systemd then creates the directory owned by caddy and adds it
-# to the writable paths. test-firstboot.sh enforces the directive.
+# The Caddyfile writes /var/log/caddy/synaplan.log. LogsDirectory makes systemd
+# own the directory for the service user and keep it writable under any
+# ProtectSystem setting; the ownership of the FILE inside is handled where
+# `caddy validate` runs as root (provision.sh, configure-tls.sh), because
+# validate creates it. test-firstboot.sh enforces both.
 LogsDirectory=caddy
 EOF
 

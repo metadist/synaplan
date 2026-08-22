@@ -96,6 +96,23 @@ grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/provision.sh" ||
 grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
     fail "configure-tls.sh does not set LogsDirectory=caddy; a later synaplan-tls would drop the writable log directory"
 
+# LogsDirectory alone is not enough. `caddy validate` PROVISIONS the config,
+# and provisioning a `log { output file }` block opens the file — as root,
+# because both scripts run as root. The file then belongs to root, mode 0600,
+# and caddy.service (User=caddy) dies on "permission denied" opening its own
+# log while the whole stack behind it is healthy. Proven with the packaged
+# caddy binary: validate as root leaves -rw------- root root synaplan.log.
+# So after the LAST validate in each script, ownership must be handed back.
+for script in "$AWS_SCRIPTS_DIR/provision.sh" "$AWS_SCRIPTS_DIR/configure-tls.sh"; do
+    awk '
+        { line = $0; sub(/^[[:space:]]*/, "", line) }
+        index(line, "#") == 1 { next }
+        /caddy validate/ { validate = NR }
+        /chown -R caddy:caddy \/var\/log\/caddy/ { restored = NR }
+        END { exit !(validate && restored > validate) }
+    ' "$script" || fail "$(basename "$script") runs caddy validate (as root, which creates a root-owned synaplan.log) without a chown -R caddy:caddy /var/log/caddy afterwards — caddy.service cannot open its own log"
+done
+
 # The wait used to probe only firstboot and synaplan. Both were active
 # (oneshot RemainAfterExit) while Caddy was failed, so the probe sat out
 # fifty minutes next to a stack that had been healthy for 45 of them.
