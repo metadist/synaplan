@@ -323,7 +323,7 @@ jobs:
                   --instance-ids "$INSTANCE_ID" \
                   --document-name AWS-RunShellScript \
                   --comment "Synaplan verification unit probe" \
-                  --parameters 'commands=["systemctl is-failed synaplan-firstboot.service; systemctl is-failed synaplan.service"]' \
+                  --parameters 'commands=["systemctl is-failed synaplan-firstboot.service; systemctl is-failed synaplan.service; systemctl is-failed caddy.service"]' \
                   --query Command.CommandId --output text 2>/dev/null || true)"
                 if [ -n "${command_id:-}" ] && [ "$command_id" != None ]; then
                   for _ in $(seq 1 12); do

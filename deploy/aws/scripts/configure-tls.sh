@@ -108,8 +108,8 @@ if [[ -n "$requested_domain" && -f "$ENV_FILE" ]]; then
     log "Apply it to the running stack with: sudo systemctl restart synaplan"
 fi
 
-install -d -m 0755 /etc/caddy /var/log/caddy
-chown caddy:caddy /var/log/caddy
+install -d -m 0755 /etc/caddy
+install -d -o caddy -g caddy -m 0750 /var/log/caddy
 
 if [[ -n "$domain" ]]; then
     log "Serving https://$domain with a Let's Encrypt certificate"
@@ -132,6 +132,7 @@ install -d -m 0755 /etc/systemd/system/caddy.service.d
 cat > /etc/systemd/system/caddy.service.d/10-synaplan.conf <<EOF
 [Service]
 EnvironmentFile=$CADDY_ENV
+LogsDirectory=caddy
 EOF
 
 # With the same environment the unit will run under: the domain Caddyfile is a
