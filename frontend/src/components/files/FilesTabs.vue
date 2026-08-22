@@ -1,19 +1,17 @@
 <template>
   <div data-testid="tabs-files">
-    <TabNav
-      :model-value="active"
-      :tabs="tabNavItems"
-      :aria-label="$t('nav.files')"
-      mobile-trigger-testid="tab-files-mobile-trigger"
-      mobile-menu-testid="tab-files-mobile-menu"
-      @update:model-value="onTabChange"
-    />
-
-    <!-- §4.8 #1: one vocabulary — say what the chat input already implies. -->
-    <div class="mt-3">
-      <h2 class="text-lg font-semibold txt-primary">{{ $t('files.intro') }}</h2>
-      <p class="text-sm txt-secondary mt-1">{{ $t('files.introCta') }}</p>
-    </div>
+    <PageHeader :title="$t('nav.files')" icon="heroicons:folder-open">
+      <!-- §4.8 #1: one vocabulary — say what the chat input already implies. -->
+      <template #subtitle>{{ $t('files.intro') }} {{ $t('files.introCta') }}</template>
+      <TabNav
+        :model-value="active"
+        :tabs="tabNavItems"
+        :aria-label="$t('nav.files')"
+        mobile-trigger-testid="tab-files-mobile-trigger"
+        mobile-menu-testid="tab-files-mobile-menu"
+        @update:model-value="onTabChange"
+      />
+    </PageHeader>
   </div>
 </template>
 
@@ -21,6 +19,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import filesService from '@/services/filesService'
 

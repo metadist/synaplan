@@ -39,6 +39,7 @@
         <div class="v2-status-bar-band" aria-hidden="true" data-testid="section-status-bar-band" />
 
         <main
+          ref="mainRef"
           class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
           data-testid="section-primary-content"
         >
@@ -97,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
 import { useSidebarStore } from '../stores/sidebar'
@@ -133,6 +134,33 @@ const goToLogin = () => {
   fireHaptic()
   router.push('/login')
 }
+
+/**
+ * Page-enter animation: a quick, subtle zoom-in of the content area on every
+ * navigation. Runs via the Web Animations API instead of a <Transition> so it
+ * covers BOTH navigation kinds uniformly: full view swaps (this layout
+ * remounts → onMounted) and sub-page switches inside a reused view like
+ * ConfigView (route change without remount → the fullPath watcher). Only
+ * compositor-friendly properties (transform/opacity) are animated, and the
+ * animation leaves no fill, so `position: fixed` descendants regain the
+ * viewport as containing block the moment it finishes.
+ */
+const mainRef = ref<HTMLElement | null>(null)
+const PAGE_ENTER_KEYFRAMES: Keyframe[] = [
+  { opacity: 0.35, transform: 'scale(0.985)' },
+  { opacity: 1, transform: 'scale(1)' },
+]
+const PAGE_ENTER_TIMING: KeyframeAnimationOptions = {
+  duration: 180,
+  easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+}
+
+const playPageEnter = () => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+  mainRef.value?.animate(PAGE_ENTER_KEYFRAMES, PAGE_ENTER_TIMING)
+}
+
+watch(() => route.fullPath, playPageEnter)
 
 /** Minimum horizontal travel (px) that counts as a swipe. */
 const SWIPE_THRESHOLD_PX = 60
@@ -341,6 +369,7 @@ const onKeyboardDismissPointerCancel = () => {
 }
 
 onMounted(() => {
+  playPageEnter()
   measureTopTapBand()
   document.addEventListener('keydown', handleEscape)
   document.addEventListener('pointerdown', onKeyboardDismissPointerDown)

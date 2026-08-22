@@ -94,20 +94,20 @@
     "error": "Fehler",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Chat-Widget",
+    "chatWidget": "Deine Widgets",
     "docSummary": "Zusammenfasser",
-    "mailHandler": "E-Mail-Automatisierung",
+    "mailHandler": "IMAP-E-Mail-Handler",
     "plugins": "Plugins",
     "files": "Quellen",
     "memories": "Erinnerungen",
     "feedback": "Feedback",
     "ragSearch": "Suche",
     "vectorStorage": "Vektorspeicher",
-    "configInbound": "Kanäle",
-    "configAiModels": "KI-Modelle",
+    "configInbound": "Standard-Eingang",
+    "configAiModels": "KI-Modell-Konfiguration",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "KI-Anweisungen",
-    "configSortingPrompt": "Routing",
+    "configTaskPrompts": "Vordefinierte Anweisungen",
+    "configSortingPrompt": "Routing-Konfiguration",
     "configApiKeys": "API-Schlüssel",
     "configApiDocs": "API-Dokumentation",
     "statistics": "Statistiken",
@@ -133,7 +133,7 @@
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
     "connections": "Verbindungen",
-    "savedTasks": "Gespeicherte Aufgaben"
+    "savedTasks": "Wiederkehrende Aufgaben"
   },
   "adminModelStatus": {
     "title": "Modell-Status",
@@ -636,27 +636,29 @@
     "historyDescription": "Chat-Verlauf",
     "profile": "Profil",
     "tools": "Tools",
-    "toolsChatWidget": "Chat-Widget",
+    "toolsChatWidget": "Deine Widgets",
     "toolsDocSummary": "Zusammenfasser",
-    "toolsMailHandler": "E-Mail-Automatisierung",
+    "toolsMailHandler": "IMAP-E-Mail-Handler",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
-    "savedTasks": "Gespeicherte Aufgaben",
+    "configConnections": "Verbindungen einrichten",
+    "groupApi": "API",
+    "savedTasks": "Wiederkehrende Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
     "channels": "Kanäle",
     "channelsDescription": "Verbundene Kanäle",
-    "aiSetup": "KI-Konfiguration",
-    "aiSetupDescription": "Modelle, Anweisungen & Routing",
+    "aiSetup": "KI-Setup & Tools",
+    "aiSetupDescription": "Modelle, Anweisungen, Routing & Tools",
     "preferences": "Einstellungen",
     "account": "Konto",
     "accountDescription": "Konto & Einstellungen",
-    "configInbound": "Übersicht",
-    "configAiModels": "KI-Modelle",
+    "configInbound": "Standard-Eingang",
+    "configAiModels": "KI-Modell-Konfiguration",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "KI-Anweisungen",
-    "configSortingPrompt": "Routing",
+    "configTaskPrompts": "Vordefinierte Anweisungen",
+    "configSortingPrompt": "Routing-Konfiguration",
     "configApiKeys": "API-Schlüssel",
     "statistics": "Statistiken",
     "subscription": "Abonnement",
@@ -1469,6 +1471,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Erweiterte Funktionen für Ihren Workflow",
+    "fallbackTitle": "Plugin",
+    "loading": "Plugin wird geladen…",
     "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
     "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
@@ -2027,7 +2031,7 @@
       "deleteConfirm": "Entfernen",
       "deleted": "{name} wurde entfernt.",
       "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
-      "channelHint": "Im Chat heißt dieser Kanal {channel}",
+      "channelHint": "Um diese Verbindung im Chat zu nutzen, schreib das Wort {channel} in deine Nachricht.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -4289,6 +4293,7 @@
     },
     "listView": {
       "title": "Listenansicht",
+      "shortTitle": "Liste",
       "source": "Quelle",
       "allMemories": "Alle Erinnerungen",
       "categories": "Kategorien",
@@ -4298,10 +4303,12 @@
       "sortByDate": "Nach Datum sortieren"
     },
     "graphView": {
-      "title": "Netzwerk-Ansicht"
+      "title": "Netzwerk-Ansicht",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D-Visualisierung"
+      "title": "3D-Visualisierung",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Kategorien",

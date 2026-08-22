@@ -1,5 +1,12 @@
 <template>
   <div class="space-y-6" data-testid="page-config-api-keys">
+    <PageHeader
+      :title="$t('config.apiKeys.title')"
+      :subtitle="$t('config.apiKeys.description')"
+      icon="heroicons:key"
+      data-testid="section-header"
+    />
+
     <!-- Error Alert -->
     <div
       v-if="error"
@@ -46,13 +53,6 @@
     </div>
 
     <div class="surface-card p-6" data-testid="section-create-key">
-      <h2 class="text-2xl font-semibold txt-primary mb-3">
-        {{ $t('config.apiKeys.title') }}
-      </h2>
-      <p class="txt-secondary text-sm mb-6">
-        {{ $t('config.apiKeys.description') }}
-      </p>
-
       <div class="flex flex-col sm:flex-row gap-3">
         <input
           v-model="newKeyName"
@@ -387,6 +387,7 @@ import {
   CheckIcon,
   CommandLineIcon,
 } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import {
   listApiKeys,
   createApiKey,

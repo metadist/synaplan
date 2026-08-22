@@ -99,34 +99,48 @@
                 </button>
 
                 <div v-if="expandedSection === item.key && item.children" class="pl-4 pb-1">
-                  <router-link
-                    v-for="child in item.children"
-                    :key="child.key"
-                    :to="child.path"
-                    class="v2-drawer-child"
-                    :class="
-                      route.path === child.path
-                        ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                        : 'txt-secondary'
-                    "
-                    :data-nav-active="route.path === child.path ? 'true' : undefined"
-                    :data-testid="`link-mobile-more-${child.key}`"
-                    @click="closeDrawer"
+                  <!-- Same grouped rendering as the desktop flyout, so the two
+                       surfaces show an identical (up to 3-level) hierarchy. -->
+                  <template
+                    v-for="(section, sIdx) in groupNavChildren(item.children)"
+                    :key="section.group ?? sIdx"
                   >
-                    <span
-                      class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      :class="
-                        route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'
-                      "
-                    />
-                    <span class="flex-1 truncate">{{ child.label }}</span>
-                    <span
-                      v-if="child.badge"
-                      class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                    <p
+                      v-if="section.group"
+                      class="px-3 pt-2 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
                     >
-                      {{ child.badge }}
-                    </span>
-                  </router-link>
+                      {{ section.group }}
+                    </p>
+                    <router-link
+                      v-for="child in section.items"
+                      :key="child.key"
+                      :to="child.path"
+                      class="v2-drawer-child"
+                      :class="[
+                        route.path === child.path
+                          ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                          : 'txt-secondary',
+                        section.group && 'pl-5',
+                      ]"
+                      :data-nav-active="route.path === child.path ? 'true' : undefined"
+                      :data-testid="`link-mobile-more-${child.key}`"
+                      @click="closeDrawer"
+                    >
+                      <span
+                        class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        :class="
+                          route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'
+                        "
+                      />
+                      <span class="flex-1 truncate">{{ child.label }}</span>
+                      <span
+                        v-if="child.badge"
+                        class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                      >
+                        {{ child.badge }}
+                      </span>
+                    </router-link>
+                  </template>
                 </div>
               </div>
 
@@ -217,6 +231,18 @@
                   >
                     <ChartBarIcon class="w-5 h-5" />
                     <span>{{ $t('nav.statistics') }}</span>
+                  </button>
+                  <button
+                    class="v2-drawer-account"
+                    :class="
+                      isPathActive('/feedbacks') ? 'v2-drawer-account--active' : 'txt-primary'
+                    "
+                    :data-nav-active="isPathActive('/feedbacks') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-feedback"
+                    @click="handleNavigate('/feedbacks')"
+                  >
+                    <Icon icon="mdi:comment-quote-outline" class="w-5 h-5" />
+                    <span>{{ $t('pageTitles.feedback') }}</span>
                   </button>
                   <button
                     v-if="
@@ -476,7 +502,7 @@ import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, type NavItem } from '../composables/useNavItems'
+import { useNavItems, groupNavChildren, type NavItem } from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
@@ -532,7 +558,9 @@ const moreActive = computed(() => moreSections.value.some((item) => isItemActive
 // row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
 const isPathActive = (path: string) => route.path.startsWith(path)
 const accountActive = computed(() =>
-  ['/profile', '/memories', '/statistics', '/settings', '/subscription'].some(isPathActive)
+  ['/profile', '/memories', '/statistics', '/feedbacks', '/settings', '/subscription'].some(
+    isPathActive
+  )
 )
 
 // Widget sessions live in their dedicated view — never in the main history.

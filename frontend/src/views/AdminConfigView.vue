@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
@@ -400,13 +401,144 @@ onBeforeUnmount(() => {
         </Transition>
 
         <!-- Header -->
-        <div class="mb-8">
-          <div class="flex items-center gap-3 mb-2">
-            <Icon icon="mdi:cog" class="w-8 h-8 text-[var(--brand)]" />
-            <h1 class="text-3xl font-bold txt-primary">{{ $t('admin.config.title') }}</h1>
-          </div>
-          <p class="txt-secondary">{{ $t('admin.config.description') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('admin.config.title')"
+          :subtitle="$t('admin.config.description')"
+          icon="mdi:cog"
+        >
+          <template v-if="!loading && schema" #default>
+            <!-- Tab group dropdowns (desktop/tablet, max 3, mirrors AdvancedWidgetConfig).
+                 On phones this is replaced by the single dropdown below (same
+                 pattern as FilesTabs.vue). -->
+            <div
+              ref="tabBarRef"
+              class="hidden md:block border-b border-light-border/30 dark:border-dark-border/20"
+            >
+              <div class="flex gap-1 sm:gap-2 py-2">
+                <div
+                  v-for="group in tabGroups"
+                  :key="group.id"
+                  class="relative flex-1 sm:flex-none"
+                >
+                  <button
+                    type="button"
+                    :class="[
+                      'tab-nav-item w-full sm:w-auto justify-between',
+                      group.tabs.some((t) => t.id === activeTab) && 'tab-nav-item--active',
+                    ]"
+                    :data-testid="`btn-config-group-${group.id}`"
+                    @click="toggleGroup(group.id)"
+                  >
+                    <span class="flex items-center gap-1.5 min-w-0">
+                      <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{{ $t(group.labelKey) }}</span>
+                    </span>
+                    <Icon
+                      icon="heroicons:chevron-down"
+                      :class="[
+                        'w-4 h-4 flex-shrink-0 transition-transform',
+                        openGroup === group.id && 'rotate-180',
+                      ]"
+                    />
+                  </button>
+
+                  <!-- Dropdown menu -->
+                  <div
+                    v-if="openGroup === group.id"
+                    class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
+                    :data-testid="`menu-config-group-${group.id}`"
+                  >
+                    <button
+                      v-for="tab in group.tabs"
+                      :key="tab.id"
+                      type="button"
+                      :class="[
+                        'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                        activeTab === tab.id
+                          ? 'txt-brand bg-[var(--brand)]/5'
+                          : 'txt-secondary hover:txt-primary hover-surface',
+                      ]"
+                      :data-testid="`btn-config-tab-${tab.id}`"
+                      @click="selectTab(tab.id)"
+                    >
+                      <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
+                      <span class="truncate">{{ tab.label }}</span>
+                      <Icon
+                        v-if="activeTab === tab.id"
+                        icon="heroicons:check"
+                        class="w-4 h-4 ml-auto flex-shrink-0"
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab dropdown (mobile): a single dropdown replaces the 3-group bar
+                 (same pattern as FilesTabs.vue). The trigger shows the current
+                 tab; the panel keeps every group's sub-tabs under its own
+                 section header so nothing from the desktop dropdowns is lost. -->
+            <div
+              ref="mobileTabDropdownRef"
+              class="md:hidden relative border-b border-light-border/30 dark:border-dark-border/20 pb-2"
+            >
+              <button
+                type="button"
+                class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
+                :aria-expanded="mobileTabMenuOpen"
+                aria-haspopup="menu"
+                data-testid="tab-admin-config-mobile-trigger"
+                @click="toggleMobileTabMenu"
+              >
+                <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
+                  <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
+                  <span class="truncate">{{ currentTab?.label }}</span>
+                </span>
+                <Icon
+                  icon="heroicons:chevron-down"
+                  class="w-5 h-5 flex-shrink-0 transition-transform"
+                  :class="{ 'rotate-180': mobileTabMenuOpen }"
+                />
+              </button>
+
+              <div
+                v-if="mobileTabMenuOpen"
+                class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 max-h-[70vh] overflow-y-auto scroll-thin"
+                role="menu"
+                data-testid="tab-admin-config-mobile-menu"
+              >
+                <template v-for="(group, groupIdx) in tabGroups" :key="group.id">
+                  <p
+                    class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
+                    :class="{
+                      'border-t border-light-border/10 dark:border-dark-border/10 mt-1':
+                        groupIdx > 0,
+                    }"
+                  >
+                    {{ $t(group.labelKey) }}
+                  </p>
+                  <button
+                    v-for="tab in group.tabs"
+                    :key="tab.id"
+                    type="button"
+                    role="menuitem"
+                    :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
+                    :data-testid="`btn-config-tab-${tab.id}-mobile`"
+                    @click="selectMobileTab(tab.id)"
+                  >
+                    <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
+                    <span class="flex-1 text-left truncate">{{ tab.label }}</span>
+                    <Icon
+                      v-if="activeTab === tab.id"
+                      icon="heroicons:check"
+                      class="w-4 h-4 flex-shrink-0"
+                    />
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+        </PageHeader>
 
         <!-- Release notice: informs and links to the guide, never updates anything -->
         <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
@@ -418,132 +550,6 @@ onBeforeUnmount(() => {
 
         <!-- Content -->
         <div v-else-if="schema" class="space-y-6">
-          <!-- Tab group dropdowns (desktop/tablet, max 3, mirrors AdvancedWidgetConfig).
-               On phones this is replaced by the single dropdown below (same
-               pattern as FilesTabs.vue). -->
-          <div
-            ref="tabBarRef"
-            class="hidden md:block border-b border-light-border/30 dark:border-dark-border/20"
-          >
-            <div class="flex gap-1 sm:gap-2 py-2">
-              <div v-for="group in tabGroups" :key="group.id" class="relative flex-1 sm:flex-none">
-                <button
-                  type="button"
-                  :class="[
-                    'tab-nav-item w-full sm:w-auto justify-between',
-                    group.tabs.some((t) => t.id === activeTab) && 'tab-nav-item--active',
-                  ]"
-                  :data-testid="`btn-config-group-${group.id}`"
-                  @click="toggleGroup(group.id)"
-                >
-                  <span class="flex items-center gap-1.5 min-w-0">
-                    <Icon :icon="group.icon" class="w-4 h-4 flex-shrink-0" />
-                    <span class="truncate">{{ $t(group.labelKey) }}</span>
-                  </span>
-                  <Icon
-                    icon="heroicons:chevron-down"
-                    :class="[
-                      'w-4 h-4 flex-shrink-0 transition-transform',
-                      openGroup === group.id && 'rotate-180',
-                    ]"
-                  />
-                </button>
-
-                <!-- Dropdown menu -->
-                <div
-                  v-if="openGroup === group.id"
-                  class="absolute left-0 top-full mt-1 z-20 min-w-[12rem] surface-card rounded-lg shadow-xl border border-light-border/30 dark:border-dark-border/20 py-1"
-                  :data-testid="`menu-config-group-${group.id}`"
-                >
-                  <button
-                    v-for="tab in group.tabs"
-                    :key="tab.id"
-                    type="button"
-                    :class="[
-                      'w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                      activeTab === tab.id
-                        ? 'txt-brand bg-[var(--brand)]/5'
-                        : 'txt-secondary hover:txt-primary hover-surface',
-                    ]"
-                    :data-testid="`btn-config-tab-${tab.id}`"
-                    @click="selectTab(tab.id)"
-                  >
-                    <Icon :icon="tab.icon" class="w-4 h-4 flex-shrink-0" />
-                    <span class="truncate">{{ tab.label }}</span>
-                    <Icon
-                      v-if="activeTab === tab.id"
-                      icon="heroicons:check"
-                      class="w-4 h-4 ml-auto flex-shrink-0"
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Tab dropdown (mobile): a single dropdown replaces the 3-group bar
-               (same pattern as FilesTabs.vue). The trigger shows the current
-               tab; the panel keeps every group's sub-tabs under its own
-               section header so nothing from the desktop dropdowns is lost. -->
-          <div
-            ref="mobileTabDropdownRef"
-            class="md:hidden relative border-b border-light-border/30 dark:border-dark-border/20 pb-2"
-          >
-            <button
-              type="button"
-              class="dropdown-trigger surface-card w-full justify-between border border-light-border/20 dark:border-dark-border/10"
-              :aria-expanded="mobileTabMenuOpen"
-              aria-haspopup="menu"
-              data-testid="tab-admin-config-mobile-trigger"
-              @click="toggleMobileTabMenu"
-            >
-              <span class="flex items-center gap-2 txt-primary font-medium min-w-0">
-                <Icon :icon="tabIcons[activeTab] || 'mdi:cog'" class="w-5 h-5 flex-shrink-0" />
-                <span class="truncate">{{ currentTab?.label }}</span>
-              </span>
-              <Icon
-                icon="heroicons:chevron-down"
-                class="w-5 h-5 flex-shrink-0 transition-transform"
-                :class="{ 'rotate-180': mobileTabMenuOpen }"
-              />
-            </button>
-
-            <div
-              v-if="mobileTabMenuOpen"
-              class="dropdown-panel absolute left-0 right-0 top-full mt-1 z-30 max-h-[70vh] overflow-y-auto scroll-thin"
-              role="menu"
-              data-testid="tab-admin-config-mobile-menu"
-            >
-              <template v-for="(group, groupIdx) in tabGroups" :key="group.id">
-                <p
-                  class="px-3 pt-2.5 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
-                  :class="{
-                    'border-t border-light-border/10 dark:border-dark-border/10 mt-1': groupIdx > 0,
-                  }"
-                >
-                  {{ $t(group.labelKey) }}
-                </p>
-                <button
-                  v-for="tab in group.tabs"
-                  :key="tab.id"
-                  type="button"
-                  role="menuitem"
-                  :class="['dropdown-item', activeTab === tab.id && 'dropdown-item--active']"
-                  :data-testid="`btn-config-tab-${tab.id}-mobile`"
-                  @click="selectMobileTab(tab.id)"
-                >
-                  <Icon :icon="tab.icon" class="w-5 h-5 flex-shrink-0" />
-                  <span class="flex-1 text-left truncate">{{ tab.label }}</span>
-                  <Icon
-                    v-if="activeTab === tab.id"
-                    icon="heroicons:check"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
-                </button>
-              </template>
-            </div>
-          </div>
-
           <!-- Active tab title + actions -->
           <div class="flex items-center justify-between gap-2">
             <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">

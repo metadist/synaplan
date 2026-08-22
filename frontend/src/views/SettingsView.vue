@@ -6,10 +6,12 @@
     >
       <div class="max-w-4xl mx-auto space-y-6">
         <!-- Header -->
-        <div class="surface-card p-6" data-testid="section-header">
-          <h1 class="text-2xl font-semibold txt-primary mb-1">⚙️ {{ $t('settings.title') }}</h1>
-          <p class="txt-secondary text-sm">{{ $t('settings.subtitle') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('settings.title')"
+          :subtitle="$t('settings.subtitle')"
+          icon="heroicons:cog-6-tooth"
+          data-testid="section-header"
+        />
 
         <!-- General Settings Content -->
         <div class="space-y-6" data-testid="section-general-settings">
@@ -137,6 +139,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import NativeServerControl from '@/components/NativeServerControl.vue'
 import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'

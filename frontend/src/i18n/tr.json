@@ -94,18 +94,18 @@
     "error": "Hata",
     "chat": "Sohbet",
     "tools": "Araçlar",
-    "chatWidget": "Sohbet Widget'ı",
+    "chatWidget": "Widget'ların",
     "docSummary": "Özetleyici",
-    "mailHandler": "E-posta Otomasyonu",
+    "mailHandler": "IMAP E-posta İşleyici",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "ragSearch": "Arama",
     "vectorStorage": "Vektör Deposu",
-    "configInbound": "Kanallar",
-    "configAiModels": "AI Modelleri",
+    "configInbound": "Standart Gelen",
+    "configAiModels": "AI Model Yapılandırması",
     "configProviderHiggsfield": "Higgsfield Bağlantısı",
-    "configTaskPrompts": "AI Talimatları",
-    "configSortingPrompt": "Yönlendirme",
+    "configTaskPrompts": "Hazır Talimatlar",
+    "configSortingPrompt": "Yönlendirme Yapılandırması",
     "configApiKeys": "API Anahtarları",
     "configApiDocs": "API Dokümantasyonu",
     "statistics": "İstatistikler",
@@ -132,7 +132,7 @@
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
     "connections": "Bağlantılar",
-    "savedTasks": "Kayıtlı görevler"
+    "savedTasks": "Yinelenen görevler"
   },
   "adminModelStatus": {
     "title": "Model Durumu",
@@ -629,26 +629,28 @@
     "history": "Geçmiş",
     "historyDescription": "Sohbet geçmişi",
     "tools": "Araçlar",
-    "toolsChatWidget": "Sohbet Widgetı",
+    "toolsChatWidget": "Widget'ların",
     "toolsDocSummary": "Özetleyici",
-    "toolsMailHandler": "E-posta Otomasyonu",
+    "toolsMailHandler": "IMAP E-posta İşleyici",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
-    "savedTasks": "Kayıtlı görevler",
+    "configConnections": "Bağlantıları yapılandır",
+    "groupApi": "API",
+    "savedTasks": "Yinelenen görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
     "channels": "Kanallar",
     "channelsDescription": "Bağlı kanallar",
-    "aiSetup": "AI Yapılandırması",
-    "aiSetupDescription": "Modeller, talimatlar ve yönlendirme",
+    "aiSetup": "AI Kurulumu ve Araçlar",
+    "aiSetupDescription": "Modeller, talimatlar, yönlendirme ve araçlar",
     "preferences": "Tercihler",
     "account": "Hesap",
     "accountDescription": "Hesap ve tercihler",
-    "configInbound": "Genel Bakış",
-    "configAiModels": "AI Modelleri",
-    "configTaskPrompts": "AI Talimatları",
-    "configSortingPrompt": "Yönlendirme",
+    "configInbound": "Standart Gelen",
+    "configAiModels": "AI Model Yapılandırması",
+    "configTaskPrompts": "Hazır Talimatlar",
+    "configSortingPrompt": "Yönlendirme Yapılandırması",
     "configApiKeys": "API Anahtarları",
     "statistics": "İstatistikler",
     "subscription": "Abonelik",
@@ -836,6 +838,8 @@
   "plugins": {
     "title": "Eklentiler",
     "description": "İş akışınız için genişletilmiş işlevsellik",
+    "fallbackTitle": "Eklenti",
+    "loading": "Eklenti yükleniyor…",
     "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş",
     "commandEmpty": "Eklenti boş bir yanıt döndürdü.",
     "commandError": "Eklenti komutu başarısız oldu. Lütfen tekrar deneyin."
@@ -2595,7 +2599,7 @@
       "deleteConfirm": "Kaldır",
       "deleted": "{name} kaldırıldı.",
       "deleteFailed": "Bağlantı kaldırılamadı.",
-      "channelHint": "Sohbette bu kanala {channel} deyin",
+      "channelHint": "Bu bağlantıyı sohbette kullanmak için mesajına {channel} kelimesini yaz.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -3468,6 +3472,7 @@
     },
     "listView": {
       "title": "Liste Görünümü",
+      "shortTitle": "Liste",
       "source": "Kaynak",
       "allMemories": "Tüm Anılar",
       "categories": "Kategoriler",
@@ -3477,10 +3482,12 @@
       "sortByDate": "Tarihe Göre Sırala"
     },
     "graphView": {
-      "title": "Nöral Görünüm"
+      "title": "Nöral Görünüm",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D Görselleştirme"
+      "title": "3D Görselleştirme",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Kategoriler",
