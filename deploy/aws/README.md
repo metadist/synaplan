@@ -215,10 +215,13 @@ account exists.
 
 That secret is the ARN of a role in the seller account that trusts GitHub's OIDC
 provider — **not** an access key, of which this repository holds none. Its trust
-policy must be narrowed to this repository, and it needs the permissions Packer
-uses to build an AMI (EC2 instance, key pair, security group, snapshot, image),
-plus CloudFormation, IAM, SSM and EC2 for the verification stack. The AWS
-managed policy `AWSMarketplaceAmiIngestion` goes on a separate role, the one the
+policy is narrowed to this repository's `ami-build` environment, which the
+workflow's jobs declare — so the workflow can also be dispatched by hand from a
+pull request branch to build and verify a deployment fix *before* it is merged,
+while forks stay excluded. The role needs the permissions Packer uses to build
+an AMI (EC2 instance, key pair, security group, snapshot, image), plus
+CloudFormation, IAM, SSM and EC2 for the verification stack. The AWS managed
+policy `AWSMarketplaceAmiIngestion` goes on a separate role, the one the
 Marketplace assumes to read the finished AMI.
 
 The AMI bakes the version pinned in `packer/synaplan.pkr.hcl`, which
