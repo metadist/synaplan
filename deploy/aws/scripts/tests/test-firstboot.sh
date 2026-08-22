@@ -143,16 +143,18 @@ grep -Fq 'openssl req' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
 # The pair is minted on the instance, never shipped in the image: an AMI that
 # carries a private key hands the SAME key to every customer. provision.sh may
 # create a throwaway pair so `caddy validate` has files to load, but it must
-# delete that pair before the image is snapshotted. Comment lines are skipped,
-# so a commented-out rm does not count as one.
+# delete BOTH files before the image is snapshotted — the key is the secret,
+# and a leftover certificate would mask the missing mint at first boot.
+# Comment lines are skipped, so a commented-out rm does not count as one.
 awk '
     { line = $0; sub(/^[[:space:]]*/, "", line) }
     index(line, "#") == 1 { next }
     /openssl req/ { minted = NR }
-    /rm -f \/etc\/caddy\/selfsigned/ { removed = NR }
-    END { exit !(!minted || removed > minted) }
+    /rm .*\/etc\/caddy\/selfsigned\/key\.pem/ { removed_key = NR }
+    /rm .*\/etc\/caddy\/selfsigned\/cert\.pem/ { removed_cert = NR }
+    END { exit !(!minted || (removed_key > minted && removed_cert > minted)) }
 ' "$AWS_SCRIPTS_DIR/provision.sh" ||
-    fail "provision.sh mints a certificate pair without deleting it afterwards — the AMI would ship one private key to every customer"
+    fail "provision.sh mints a certificate pair without deleting both files afterwards — the AMI would ship one private key to every customer"
 
 # --------------------------------------------------------------------------
 # The XFS label firstboot writes on a blank data volume

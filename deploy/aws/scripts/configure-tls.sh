@@ -126,19 +126,21 @@ ensure_selfsigned_certificate() {
         return 0
     fi
 
-    local san="DNS:localhost,IP:127.0.0.1" address token public_ip
+    local san="DNS:localhost,IP:127.0.0.1,IP:::1" address token public_ip
     for address in $(hostname -I 2>/dev/null || true); do
         san+=",IP:$address"
     done
     # The public address is the one the operator's browser actually dials.
     # Best effort over IMDSv2: an instance without metadata access still gets
     # a working certificate, just without its public IP in the SANs — the
-    # browser warning is identical either way.
-    token="$(curl -sf -X PUT --connect-timeout 2 \
+    # browser warning is identical either way. --max-time bounds the whole
+    # request: an endpoint that accepts the connection and then stalls would
+    # otherwise hang the first boot here indefinitely.
+    token="$(curl -sf -X PUT --connect-timeout 2 --max-time 5 \
         -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
         http://169.254.169.254/latest/api/token 2>/dev/null || true)"
     if [[ -n "$token" ]]; then
-        public_ip="$(curl -sf --connect-timeout 2 \
+        public_ip="$(curl -sf --connect-timeout 2 --max-time 5 \
             -H "X-aws-ec2-metadata-token: $token" \
             http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)"
         [[ -n "$public_ip" ]] && san+=",IP:$public_ip"
