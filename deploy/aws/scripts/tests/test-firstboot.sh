@@ -83,6 +83,18 @@ if grep -E '^[[:space:]]*ln\b' "$AWS_SCRIPTS_DIR/provision.sh" | grep -q '/usr/l
 fi
 
 # --------------------------------------------------------------------------
+# The XFS label firstboot writes on a blank data volume
+# --------------------------------------------------------------------------
+
+# mkfs.xfs -L rejects anything longer than 12 characters. The verification of
+# 4.2.4 died seven seconds into firstboot on DATA_LABEL=synaplan-data (13).
+data_label="$(sed -n 's/^DATA_LABEL=//p' "$FIRSTBOOT" | head -n1)"
+[[ -n "$data_label" ]] || fail "firstboot.sh no longer defines DATA_LABEL on its own line; update this test"
+if (( ${#data_label} > 12 )); then
+    fail "DATA_LABEL is ${#data_label} characters ($data_label); XFS labels are at most 12, and mkfs.xfs -L will refuse to format the data volume"
+fi
+
+# --------------------------------------------------------------------------
 # The instance, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 

@@ -18,7 +18,11 @@ set -Eeuo pipefail
 APP_DIR=/opt/synaplan
 DEPLOY_DIR="$APP_DIR/deploy"
 DATA_MOUNT=/var/lib/synaplan
-DATA_LABEL=synaplan-data
+# XFS labels are at most 12 characters. synaplan-data is 13, and mkfs.xfs
+# rejects it with "Invalid value synaplan-data for -L option" — which is how
+# the 4.2.4 verification died seven seconds into firstboot. test-firstboot.sh
+# enforces the length.
+DATA_LABEL=synaplan
 ENV_FILE="$DATA_MOUNT/.env"
 STATE_FILE="$DATA_MOUNT/.firstboot-complete"
 
