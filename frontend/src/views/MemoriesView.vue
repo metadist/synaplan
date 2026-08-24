@@ -259,6 +259,12 @@ const selectedGraphMemory = ref<UserMemory | null>(null)
 
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 
+// The dedicated memories page must tolerate a slow first Qdrant read (e.g.
+// cold collection / CI load) instead of the store's 1500ms fast-fail default,
+// which would otherwise render the "service unavailable" branch on a healthy
+// service. See useMemoriesStore.init().
+const PAGE_MEMORY_FETCH_TIMEOUT_MS = 15000
+
 const graphCategoryColors: Record<string, string> = {
   preferences: '#3b82f6',
   personal: '#10b981',
@@ -283,7 +289,7 @@ onMounted(async () => {
   update3dSupport()
 
   try {
-    await memoriesStore.init()
+    await memoriesStore.init({ timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
     availableCategories.value = await getCategories()
     isServiceUnavailable.value = false
 
@@ -349,7 +355,7 @@ async function retryConnection() {
   retryingConnection.value = true
   isServiceUnavailable.value = false
   try {
-    await memoriesStore.init()
+    await memoriesStore.init({ timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
     availableCategories.value = await getCategories()
     isServiceUnavailable.value = false
   } catch (err) {
@@ -541,7 +547,7 @@ function handleFormDialogClose() {
 }
 
 async function loadMemories() {
-  await memoriesStore.fetchMemories()
+  await memoriesStore.fetchMemories(undefined, { timeoutMs: PAGE_MEMORY_FETCH_TIMEOUT_MS })
   availableCategories.value = await getCategories()
 }
 

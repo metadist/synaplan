@@ -273,8 +273,14 @@ export const useMemoriesStore = defineStore('memories', () => {
   }
 
   // Initialize
-  async function init() {
-    await Promise.all([fetchMemories(), fetchCategories()])
+  //
+  // `timeoutMs` is forwarded to `fetchMemories`. The default there (1500ms) is
+  // a deliberate fast-fail for the chat badge sidebar, where a slow Qdrant must
+  // not stall the chat. The dedicated /memories page has no such constraint and
+  // must NOT flip to the "service unavailable" branch just because the first
+  // Qdrant read is slow under load, so it passes a generous timeout instead.
+  async function init(options: { timeoutMs?: number } = {}) {
+    await Promise.all([fetchMemories(undefined, options), fetchCategories()])
   }
 
   // Track IDs we've already tried to fetch individually (to avoid repeated requests)
