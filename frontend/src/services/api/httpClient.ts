@@ -238,6 +238,72 @@ interface HttpClientOptions<S extends z.Schema | undefined = undefined> extends 
 let isRefreshing = false
 let refreshPromise: Promise<RefreshResult> | null = null
 
+// --- Auth-mutation lock -----------------------------------------------------
+// A deliberate principal swap (admin impersonation start/stop) rewrites the
+// session cookies out-of-band. While it runs, the automatic 401 -> refresh
+// path must NOT fire its own /auth/refresh: a refresh triggered by a request
+// that still carries the PRE-swap cookies mints a token for the old principal
+// and clobbers the just-installed session cookie (the impersonation banner
+// then never mounts — a real cookie race, see stores/auth.ts). The lock is
+// inert outside a swap, so normal login/logout/refresh/OIDC/native behaviour
+// is byte-for-byte unchanged.
+let authMutationPromise: Promise<void> | null = null
+let authMutationResolve: (() => void) | null = null
+let authMutationTimer: ReturnType<typeof setTimeout> | null = null
+let authMutationDepth = 0
+
+/**
+ * Safety net: never let a swap that forgot to release (unexpected throw before
+ * `endAuthMutation`, navigation mid-swap) suspend the refresh path forever.
+ */
+const AUTH_MUTATION_MAX_MS = 15000
+
+/**
+ * Open the auth-mutation critical section. While open, `refreshAccessToken`
+ * waits for it to close instead of issuing a competing refresh. Reentrant:
+ * balanced with `endAuthMutation`.
+ */
+function beginAuthMutation(): void {
+  authMutationDepth++
+  if (authMutationPromise) return
+  authMutationPromise = new Promise<void>((resolve) => {
+    authMutationResolve = resolve
+  })
+  authMutationTimer = setTimeout(() => {
+    console.warn('Auth-mutation lock auto-released after timeout')
+    forceReleaseAuthMutation()
+  }, AUTH_MUTATION_MAX_MS)
+}
+
+/** Close the auth-mutation critical section (balanced with `beginAuthMutation`). */
+function endAuthMutation(): void {
+  if (authMutationDepth === 0) return
+  authMutationDepth--
+  if (authMutationDepth > 0) return
+  forceReleaseAuthMutation()
+}
+
+function forceReleaseAuthMutation(): void {
+  authMutationDepth = 0
+  if (authMutationTimer) {
+    clearTimeout(authMutationTimer)
+    authMutationTimer = null
+  }
+  const resolve = authMutationResolve
+  authMutationPromise = null
+  authMutationResolve = null
+  resolve?.()
+}
+
+/**
+ * The refresh currently in flight, if any. Callers starting a principal swap
+ * await this so an already-running refresh settles BEFORE the swap request is
+ * sent, guaranteeing the swap response is the last writer of the session cookie.
+ */
+function getInFlightRefresh(): Promise<RefreshResult> | null {
+  return refreshPromise
+}
+
 // Track auth failures to prevent redirect loops
 let authFailureCount = 0
 let lastAuthFailureTime = 0
@@ -294,6 +360,14 @@ function recordAuthFailure(): void {
  * session in the first place.
  */
 async function refreshAccessToken(): Promise<RefreshResult> {
+  // A principal swap is rewriting the session cookies. Don't race it: wait for
+  // it to finish, then report success so the caller retries against the new,
+  // valid cookie instead of firing a competing (clobbering) refresh.
+  if (authMutationPromise) {
+    await authMutationPromise
+    return { success: true }
+  }
+
   // Native gates on a stored refresh token (no cookie); web on the UX hint.
   const native = isNativeApp()
   if (native ? !hasNativeTokens() : !hasSessionHint()) {
@@ -580,4 +654,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
   return data as T
 }
 
-export { httpClient, getApiBaseUrl, refreshAccessToken }
+export {
+  httpClient,
+  getApiBaseUrl,
+  refreshAccessToken,
+  beginAuthMutation,
+  endAuthMutation,
+  getInFlightRefresh,
+}

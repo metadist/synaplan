@@ -11,6 +11,9 @@ vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
   getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+  beginAuthMutation: vi.fn(),
+  endAuthMutation: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 // auth.logout() dynamically imports the realtime store so it can disconnect
