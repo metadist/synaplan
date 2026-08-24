@@ -33,6 +33,12 @@ final readonly class UrlContentService
     private const MAX_API_RESPONSE_LENGTH = 8000;
     private const USER_AGENT = 'SynaplanBot/1.0 (+https://synaplan.com/bot)';
     private const ROBOTS_TXT_TIMEOUT = 3;
+    /**
+     * A targeted landmark (`<main>`, `class="entry-content"`, …) that yields
+     * less than this is treated as a failed extract and we fall back to the
+     * full body — page builders often put "content" in column class names.
+     */
+    private const MIN_USEFUL_TEXT_CHARS = 80;
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -445,40 +451,78 @@ final readonly class UrlContentService
 
     private function extractTextWithLimit(string $html, bool $fullMode): string
     {
-        $contentPatterns = [
+        $targeted = $this->selectTargetedHtml($html);
+        $body = $this->selectBodyHtml($html);
+
+        $candidates = [];
+        if ('' !== $targeted) {
+            $candidates[] = $this->htmlToPlainText($targeted, !$fullMode);
+        }
+        $candidates[] = $this->htmlToPlainText($body, !$fullMode);
+        if (!$fullMode) {
+            // Last resort: keep nav/header/footer when chrome-stripping
+            // left almost nothing (JS builders often skip those tags).
+            $candidates[] = $this->htmlToPlainText($body, false);
+        }
+
+        $best = '';
+        foreach ($candidates as $text) {
+            if ($this->isUsefulText($text)) {
+                return $text;
+            }
+            if (mb_strlen($text) > mb_strlen($best)) {
+                $best = $text;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Prefer semantic landmarks. Avoid substring matches like Kubio's
+     * `h-column__content`, which previously ate the whole extract.
+     */
+    private function selectTargetedHtml(string $html): string
+    {
+        $patterns = [
             '/<main[^>]*>(.*?)<\/main>/is',
             '/<article[^>]*>(.*?)<\/article>/is',
-            '/<div[^>]*(?:role=["\']main["\']|id=["\']content["\']|class=["\'][^"\']*content[^"\']*["\'])[^>]*>(.*?)<\/div>/is',
+            '/<(?:div|section)[^>]+role=["\']main["\'][^>]*>(.*?)<\/(?:div|section)>/is',
+            '/<(?:div|section)[^>]+id=["\'](?:content|main|primary)["\'][^>]*>(.*?)<\/(?:div|section)>/is',
+            '/<(?:div|section)[^>]+class=["\'](?:[^"\']*\s)?(?:entry-content|post-content|page-content|site-content|main-content|article-content|wp-block-post-content)(?:\s[^"\']*)?["\'][^>]*>(.*?)<\/(?:div|section)>/is',
         ];
 
-        $content = '';
-        foreach ($contentPatterns as $pattern) {
+        foreach ($patterns as $pattern) {
             if (preg_match($pattern, $html, $matches)) {
-                $content = $matches[1];
-                break;
+                return $matches[1];
             }
         }
 
-        if ('' === $content) {
-            if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $matches)) {
-                $content = $matches[1];
-            } else {
-                $content = $html;
-            }
+        return '';
+    }
+
+    private function selectBodyHtml(string $html): string
+    {
+        if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $matches)) {
+            return $matches[1];
         }
 
+        return $html;
+    }
+
+    private function htmlToPlainText(string $content, bool $stripChrome): string
+    {
         $content = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $content) ?? $content;
         $content = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $content) ?? $content;
         $content = preg_replace('/<svg[^>]*>.*?<\/svg>/is', '', $content) ?? $content;
         $content = preg_replace('/<noscript[^>]*>.*?<\/noscript>/is', '', $content) ?? $content;
 
-        if (!$fullMode) {
+        if ($stripChrome) {
             $content = preg_replace('/<nav[^>]*>.*?<\/nav>/is', '', $content) ?? $content;
             $content = preg_replace('/<header[^>]*>.*?<\/header>/is', '', $content) ?? $content;
             $content = preg_replace('/<footer[^>]*>.*?<\/footer>/is', '', $content) ?? $content;
         }
 
-        // Insert newlines before block-level elements to prevent word concatenation
         $content = preg_replace('/<\/(div|p|h[1-6]|li|section|article|header|footer|nav|main|blockquote|tr|td|th|dt|dd|figcaption|details|summary)>/i', "</$1>\n", $content) ?? $content;
         $content = preg_replace('/<(br|hr)\s*\/?>/i', "\n", $content) ?? $content;
 
@@ -489,6 +533,11 @@ final readonly class UrlContentService
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
         return trim($text);
+    }
+
+    private function isUsefulText(string $text): bool
+    {
+        return mb_strlen($text) >= self::MIN_USEFUL_TEXT_CHARS;
     }
 
     private function extractMetaDescription(string $html): string
