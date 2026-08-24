@@ -456,7 +456,9 @@ final readonly class UrlContentService
 
         $candidates = [];
         if ('' !== $targeted) {
-            $candidates[] = $this->htmlToPlainText($targeted, !$fullMode);
+            // Already scoped to a landmark — keep inner <header>/<nav>
+            // (article H1s often live in <header>).
+            $candidates[] = $this->htmlToPlainText($targeted, false);
         }
         $candidates[] = $this->htmlToPlainText($body, !$fullMode);
         if (!$fullMode) {
