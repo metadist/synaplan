@@ -21,8 +21,74 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
-| `REGISTRATION_ENABLED` | `true` | Local email/password self-registration; set `false` on SSO-/OIDC-only instances (#462) |
-| `GUEST_CHAT_ENABLED` | `true` | Anonymous guest trial chat; set `false` on SSO-/OIDC-only instances so unauthenticated visitors go to the login page (#1517) |
+| `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
+| `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+
+---
+
+## First-Run Setup
+
+An installation that has no administrator — `APP_ENV=prod` without
+`BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`, which is what Umbrel,
+Elestio, AWS and a hand-rolled `deploy/` produce — serves a short wizard at
+`/setup`:
+
+1. **Create the administrator.** Email and password, signed in immediately. The
+   address counts as verified, so a missing mailer cannot lock you out.
+2. **Connect an AI provider** (skippable). The same provider cards as
+   **Admin → AI Providers**, narrowed to the recommended ones.
+3. **Decide who may in.** Self-registration and guest chat, both explained in
+   plain words. A switch that an environment variable pins is shown as pinned
+   rather than as an editable value that would do nothing.
+
+While the wizard is pending, every other API route answers
+`503 SETUP_REQUIRED`; only `/api/v1/setup/*`, the health probe and the runtime
+config stay open. The frontend follows that and sends every route to `/setup`, so
+there is no half-configured state to stumble into.
+
+> **The window between the first start and the first administrator is open.** The
+> account belongs to whoever fills in that form first, as in Open WebUI, Immich
+> or n8n. Complete the wizard right after deploying a publicly reachable host, or
+> create the administrator through `BOOTSTRAP_ADMIN_*` so the window never
+> exists.
+
+`SETUP_WIZARD_ENABLED=false` switches the wizard off. An installation without an
+administrator then has no browser route in at all, which is the right choice when
+the account only ever comes from automation.
+
+Once an administrator exists the wizard is closed for good, and it does **not**
+reopen if every administrator is later deleted or demoted — a wizard that
+reappears on a running instance would let the next visitor claim it. Use
+`app:admin:reset-password --promote` for that case, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+**Dev and test installations never see the wizard**, because their fixtures seed
+a demo account. To reproduce a virgin instance locally, start the stack with
+`SEED_DEMO_DATA=false` and an empty database:
+
+```bash
+docker compose down -v
+SEED_DEMO_DATA=false docker compose up -d
+```
+
+---
+
+## Access Policy
+
+Self-registration and guest chat are switches in **Admin → System
+Configuration**, stored in `BCONFIG` and effective without a restart. The setup
+wizard writes the same two rows.
+
+`REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` used to be the only place these
+lived. They still work and now act as a **pin**: when either is set in the
+environment, it wins over the database and the admin UI marks the field as
+overridden instead of showing a value that has no effect. Leave them unset unless
+a deployment has to guarantee the setting — an SSO-only instance, for example,
+where nobody may ever register locally.
+
+Both accept `true`/`false`. Unsetting the variable and restarting hands control
+back to the database value.
 
 ---
 
