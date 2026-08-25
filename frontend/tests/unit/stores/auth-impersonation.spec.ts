@@ -11,6 +11,9 @@ vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
   getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+  beginAuthMutation: vi.fn(),
+  endAuthMutation: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 // auth.logout() dynamically imports the realtime store so it can disconnect
@@ -150,6 +153,37 @@ describe('useAuthStore — impersonation', () => {
     expect(store.isImpersonating).toBe(true)
     // /auth/me must have been called as part of the post-swap refresh.
     expect(refreshUserMock).toHaveBeenCalled()
+  })
+
+  it('startImpersonation mints a fresh token (bypassing the lock) as the last writer before the swap', async () => {
+    const httpClient = await import('@/services/api/httpClient')
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    vi.mocked(httpClient.beginAuthMutation).mockClear()
+    vi.mocked(httpClient.endAuthMutation).mockClear()
+    vi.mocked(httpClient.refreshAccessToken).mockClear()
+
+    startApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+
+    const store = useAuthStore()
+    await store.startImpersonation(99)
+
+    // The whole swap is wrapped in the auth-mutation lock…
+    expect(httpClient.beginAuthMutation).toHaveBeenCalledTimes(1)
+    expect(httpClient.endAuthMutation).toHaveBeenCalledTimes(1)
+    // …and a bypass refresh is issued so the impersonate call never goes out
+    // with an expired cookie.
+    expect(httpClient.refreshAccessToken).toHaveBeenCalledWith({ bypassMutationLock: true })
+
+    // Ordering: the pre-swap refresh must run BEFORE the impersonate request.
+    const refreshOrder = vi.mocked(httpClient.refreshAccessToken).mock.invocationCallOrder[0]
+    const startOrder = startApiMock.mock.invocationCallOrder[0]
+    expect(refreshOrder).toBeLessThan(startOrder)
   })
 
   it('startImpersonation surfaces a server error verbatim and leaves state untouched', async () => {
