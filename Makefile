@@ -20,7 +20,11 @@ test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
 
-test-e2e: ## Run e2e tests (against dev stack :5173 or BASE_URL)
+# Restart Vite first so a stale optimize-deps cache can't serve 504s (blank app
+# -> openApp timeout). Costs a few seconds; skip with SKIP_FRONTEND_RESTART=1
+# when targeting a non-dev BASE_URL (e.g. the :8001 test stack).
+test-e2e: ## Run e2e tests (fast loop, dev stack :5173 or BASE_URL)
+	@[ -n "$(SKIP_FRONTEND_RESTART)" ] || docker compose restart frontend
 	$(MAKE) -C frontend test-e2e
 
 test-e2e-full: ## Build test stack + run all E2E tests (CI-like, port 8001)

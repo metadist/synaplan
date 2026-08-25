@@ -487,6 +487,21 @@ export const selectors = {
     inputNewName: '[data-testid="input-new-name"]',
     inputNewContent: '[data-testid="input-new-content"]',
     btnConfirmCreate: '[data-testid="btn-confirm-create"]',
+    /** Header action on the editor of a custom prompt: turn it into a Saved Task */
+    btnSaveAsTask: '[data-testid="btn-save-as-task"]',
+  },
+  savedTasks: {
+    page: '[data-testid="page-saved-tasks"]',
+    emptyState: '[data-testid="saved-tasks-empty"]',
+    /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
+    card: '[data-testid="saved-task-card"]',
+    runNow: '[data-testid="btn-run-now"]',
+    /** Only rendered once the task has a chat (i.e. after it has run at least once) */
+    showResults: '[data-testid="btn-show-results"]',
+    viewRuns: '[data-testid="btn-view-runs"]',
+    /** Run history list, visible after clicking "View runs" */
+    runsList: '[data-testid="saved-task-runs"]',
+    lastRun: '[data-testid="saved-task-last-run"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',
