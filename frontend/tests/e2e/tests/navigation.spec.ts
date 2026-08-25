@@ -110,6 +110,37 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
+  // Connections and Saved Tasks are both gated behind features.savedTasks
+  // (SAVEDTASKS.ENABLED) but live in different flyouts since the nav restructure:
+  // Connections under Channels, Saved Tasks under AI Setup & Tools. The test
+  // stack runs app:seed, which seeds the global flag ON, so both must render. If
+  // this fails, check the seeded default before touching the test.
+  test('@ci Saved Tasks and Connections appear when enabled', async ({ page }) => {
+    await test.step('Arrange: login and wait for nav', async () => {
+      await openApp(page)
+      await ensureNavReady(page)
+    })
+
+    await test.step('Assert: Connections lives in the Channels flyout', async () => {
+      const channels = await openFlyout(page, NAV.sidebarV2Channels)
+      await expect(channels.locator(NAV.flyoutLinkConnections)).toBeVisible()
+      // Dismiss via the backdrop; its overlay would otherwise intercept the
+      // click that opens the next flyout.
+      await page.locator(NAV.navOverlay).click()
+      await expect(channels).toBeHidden({ timeout: TIMEOUTS.SHORT })
+    })
+
+    await test.step('Assert: Saved Tasks lives in the AI Setup & Tools flyout', async () => {
+      const aiSetup = await openFlyout(page, NAV.sidebarV2AiSetup)
+      await expect(aiSetup.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
+    })
+
+    await test.step('Act: Saved Tasks link navigates to /channels/tasks', async () => {
+      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkSavedTasks).click()
+      await expect(page).toHaveURL(/\/channels\/tasks/, { timeout: TIMEOUTS.STANDARD })
+    })
+  })
+
   test('@ci AI Setup flyout opens with child links', async ({ page }) => {
     await test.step('Arrange: login and ensure advanced mode', async () => {
       await openApp(page)
