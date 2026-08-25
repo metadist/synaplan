@@ -433,3 +433,7 @@ See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
 ## License
 
 [Apache-2.0](LICENSE)
+
+<p align="center">
+  <a href="https://osb-alliance.de/" target="_blank" rel="noopener noreferrer"><img src="docs/images/osba-member.png" alt="OSBA" width="180" height="90"></a>
+</p>
