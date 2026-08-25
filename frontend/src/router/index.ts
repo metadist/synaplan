@@ -15,6 +15,7 @@ import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
+import { isSetupWizardRequired, resolveSetupGate, SETUP_ROUTE } from '@/router/setupGate'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -129,6 +130,16 @@ const router = createRouter({
       name: 'logged-out',
       component: () => import('@/views/LoggedOutView.vue'),
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.loggedOut' },
+    },
+    {
+      // First-run setup of the INSTALLATION (not of a user): reachable only
+      // while the instance has no administrator. The beforeEach guard forces
+      // every other route here in that state and pushes this route away
+      // otherwise, so it can never be reached on a running instance.
+      path: '/setup',
+      name: SETUP_ROUTE,
+      component: () => import('@/views/SetupWizardView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.setup' },
     },
     {
       // MOBILE-APP SEAM (first-run onboarding): native-only first-run welcome
@@ -683,6 +694,26 @@ router.beforeEach(async (to, from, next) => {
   }
 
   const { isAuthenticated, isAdmin, user } = useAuth()
+
+  // First-run setup comes before every other decision: on an installation
+  // without an administrator the backend answers 503 SETUP_REQUIRED everywhere
+  // else, so a login page or a landing page would only render an error the
+  // visitor cannot act on. `wizardRequired` defaults to false, so an instance
+  // whose runtime config failed to load never lands here.
+  const setupGate = resolveSetupGate({
+    wizardRequired: isSetupWizardRequired(),
+    routeName: to.name,
+    isNativeOnboarding: 'onboarding' === to.name && isNativeApp(),
+  })
+  if ('force' === setupGate) {
+    next({ name: SETUP_ROUTE })
+    return
+  }
+  if ('release' === setupGate) {
+    next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
+    return
+  }
+
   const guestChatEnabled = useConfigStore().auth.guestChatEnabled
   const guestTrialOff = to.meta.allowGuest === true && !guestChatEnabled
   const requiresAuth = to.meta.requiresAuth !== false || guestTrialOff // Default to true

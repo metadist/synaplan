@@ -91,6 +91,10 @@
             </Button>
           </form>
 
+          <p class="mt-5 text-xs txt-secondary leading-relaxed" data-testid="text-no-mailer-hint">
+            {{ $t('auth.forgotPasswordNoMailerHint') }}
+          </p>
+
           <div class="mt-6 text-center">
             <router-link
               to="/login"

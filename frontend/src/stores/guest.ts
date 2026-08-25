@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getApiBaseUrl } from '@/services/api/httpClient'
+import { getApiBaseUrl, redirectToSetupWizard } from '@/services/api/httpClient'
 import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
 
 export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
@@ -80,6 +80,22 @@ export const useGuestStore = defineStore('guest', () => {
         initFailed.value = true
         initialized.value = true
         return
+      }
+
+      // A virgin installation answers 503 SETUP_REQUIRED everywhere. Rendering
+      // the "trial unavailable" card here would strand the visitor: nothing on
+      // that screen leads anywhere, because every other endpoint is shut too.
+      // The router's setup gate normally catches this earlier, but it depends on
+      // a runtime config that may not have loaded yet.
+      if (response.status === 503) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'SETUP_REQUIRED') {
+          clearExpiredStorage()
+          initialized.value = true
+          await redirectToSetupWizard()
+          return
+        }
+        throw new Error('Failed to init guest session')
       }
 
       if (response.status === 403) {
