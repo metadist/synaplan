@@ -29,6 +29,19 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every BUSER row, deliberately without a BUSERLEVEL filter — anonymous
+     * channel users (email/WhatsApp webhooks, widget sessions) count too.
+     *
+     * Used by {@see \App\Service\Setup\SetupStateService} as the runtime proof
+     * that an installation was already in use: a single row of any level closes
+     * the first-run setup window.
+     */
+    public function countAll(): int
+    {
+        return $this->count([]);
+    }
+
+    /**
      * Find user by Stripe customer ID (searches in paymentDetails JSON).
      */
     public function findByStripeCustomerId(string $stripeCustomerId): ?User

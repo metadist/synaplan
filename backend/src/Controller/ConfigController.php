@@ -29,6 +29,7 @@ use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
+use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WhisperService;
@@ -70,6 +71,7 @@ class ConfigController extends AbstractController
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
+        private SetupStateService $setupState,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
         private CapabilityService $capabilityService,
@@ -398,9 +400,15 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     type: 'object',
-                    description: 'First-run setup status. demoLoginHint is public so the login page can offer the seeded admin; chatReady is only set for authenticated users.',
+                    description: 'First-run setup status. wizardRequired and demoLoginHint are public so the SPA can route a virgin install into the setup wizard; chatReady is only set for authenticated users.',
                     nullable: true,
                     properties: [
+                        new OA\Property(
+                            property: 'wizardRequired',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True only on a virgin installation that still needs its first administrator: no BCONFIG SETUP.COMPLETED flag, not a single BUSER row, and SETUP_WIZARD_ENABLED not disabled. The SPA then redirects every route to the setup wizard, and the rest of the API answers 503 SETUP_REQUIRED. False on every existing installation.'
+                        ),
                         new OA\Property(
                             property: 'chatReady',
                             type: 'boolean',
@@ -500,6 +508,11 @@ class ConfigController extends AbstractController
 
         $unavailableProviders = [];
         $setup = [
+            // Public on purpose: this is the ONLY signal the SPA has to route a
+            // virgin install into the wizard, and it is the one route the setup
+            // lockdown lets through. It leaks nothing — on every installation
+            // that has ever had a user it is simply false.
+            'wizardRequired' => $this->setupState->isSetupRequired(),
             'demoLoginHint' => $this->demoLoginHint->isVisible(),
         ];
         if ($user) {

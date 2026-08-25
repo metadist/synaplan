@@ -196,6 +196,16 @@ security:
         # Public subscription plans (no auth needed to view plans)
         - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }
 
+        # First-run setup. Public because on a virgin installation there is no
+        # account to authenticate with — that is the whole point. Both endpoints
+        # refuse with 409 as soon as SetupStateService says setup is done, so
+        # they are dead ends on every installation that has ever had a user.
+        # /complete is NOT listed: by then the wizard is signed in as the
+        # administrator it just created, so it goes through the catch-all below
+        # and its own ROLE_ADMIN check.
+        - { path: ^/api/v1/setup/state$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/setup/admin$, roles: PUBLIC_ACCESS }
+
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 

@@ -37,3 +37,14 @@ framework:
             limit: 120
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # First-run setup endpoints (PUBLIC_ACCESS, keyed per client IP in
+        # SetupController). They are only reachable on an installation that has
+        # not a single user yet, and the very first successful POST closes the
+        # window for good — so this limit exists to blunt scripted hammering of
+        # a virgin instance, not to ration a workflow. A human needs one or two
+        # attempts; 10/minute leaves room for a mistyped password.
+        setup_attempt:
+            policy: 'sliding_window'
+            limit: 10
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
