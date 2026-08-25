@@ -84,7 +84,7 @@ services:
 
   # MariaDB Test Database
   db_test:
-    image: mariadb:12.3.2@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
     container_name: synaplan-db-test
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
     environment:
@@ -111,7 +111,7 @@ services:
   # collections (the backend auto-creates them on first use). Not published
   # to a host port; only app_test talks to it.
   qdrant_test:
-    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+    image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
     container_name: synaplan-qdrant-test
     restart: "no"
     networks:
@@ -119,7 +119,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:9d30908e41144b1f1da89b9d8e33c07e4aeb43ff41a8660241b1686e2cc330ad
+    image: ollama/ollama:latest@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -213,7 +213,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.7@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
+    image: quay.io/keycloak/keycloak:26.7@sha256:831330513f55695572286e521f94fcd3c7e285250ed5b848090265a33192f669
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -246,7 +246,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
+    image: quay.io/keycloak/keycloak:26.7@sha256:831330513f55695572286e521f94fcd3c7e285250ed5b848090265a33192f669
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:

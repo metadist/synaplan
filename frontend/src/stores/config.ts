@@ -284,9 +284,10 @@ const config = {
 
   /**
    * First-run setup status (authenticated users only).
-   * chatReady is false when the provider serving the current user's effective
-   * default chat model (per-user override, then global default) has no usable
-   * key/connection — the chat shows a full-page setup tombstone and
+   * chatReady is false when no real AI provider can serve the current user's
+   * effective default chat model (per-user override, then global default) —
+   * a cloud key or a pulled local Ollama model. The built-in demo responder
+   * does not count. The chat then shows a full-page setup tombstone and
    * admins are pointed at /admin/setup.
    * Defaults to true so anonymous pages and the pre-config phase never flash
    * the banner.
@@ -294,6 +295,14 @@ const config = {
   setup: {
     get chatReady(): boolean {
       return getConfigSync().setup?.chatReady ?? true
+    },
+    /**
+     * Public first-run signal: the login page may show the seeded
+     * administrator. Always false in production, and false once that
+     * password has been changed.
+     */
+    get demoLoginHint(): boolean {
+      return getConfigSync().setup?.demoLoginHint === true
     },
   },
 

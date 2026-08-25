@@ -1,31 +1,22 @@
 <template>
   <div class="space-y-6" data-testid="page-config-higgsfield">
-    <!-- Header -->
-    <div class="surface-card p-6" data-testid="section-higgsfield-overview">
-      <div class="flex items-start gap-3">
-        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
-          <Icon icon="heroicons:film" class="w-6 h-6 text-[var(--brand)]" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold txt-primary mb-1">
-            {{ $t('config.providers.higgsfield.title') }}
-          </h2>
-          <p class="txt-secondary text-sm leading-relaxed">
-            {{ $t('config.providers.higgsfield.description') }}
-          </p>
-          <p class="txt-secondary text-xs mt-3">
-            <a
-              href="https://cloud.higgsfield.ai/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-[var(--brand)] hover:underline font-medium"
-            >
-              {{ $t('config.providers.higgsfield.getKeyLink') }}
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      :title="$t('config.providers.higgsfield.title')"
+      icon="heroicons:film"
+      data-testid="section-higgsfield-overview"
+    >
+      <template #subtitle>
+        {{ $t('config.providers.higgsfield.description') }}
+        <a
+          href="https://cloud.higgsfield.ai/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-[var(--brand)] hover:underline font-medium"
+        >
+          {{ $t('config.providers.higgsfield.getKeyLink') }}
+        </a>
+      </template>
+    </PageHeader>
 
     <!-- Status -->
     <div v-if="!loading" class="surface-card p-6" data-testid="section-higgsfield-status">
@@ -182,6 +173,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import PageHeader from '@/components/PageHeader.vue'
 import {
   clearHiggsfieldCredentials,
   getHiggsfieldCredentialState,

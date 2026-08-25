@@ -37,6 +37,207 @@ fail() {
 }
 
 # --------------------------------------------------------------------------
+# The AMI metadata the build hands to EC2
+# --------------------------------------------------------------------------
+
+# Not firstboot, but the same build, and there is nowhere cheaper to catch it.
+# EC2 refuses a non-ASCII AMI description with "Character sets beyond ASCII are
+# not supported", and it refuses it in ModifyImageAttribute — the last call of a
+# ten-minute Packer run, once the image and its snapshots already exist. An em
+# dash in that one line burned exactly that, for both architectures at once.
+non_ascii_ami_metadata="$(
+    grep -E '^[[:space:]]*ami_(description|name)[[:space:]]*=' \
+        "$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl" |
+        LC_ALL=C grep '[^ -~]' || true
+)"
+if [[ -n "$non_ascii_ami_metadata" ]]; then
+    fail "The AMI name or description carries a character EC2 will reject: $non_ascii_ami_metadata"
+fi
+
+# --------------------------------------------------------------------------
+# The boot order the units ask of systemd
+# --------------------------------------------------------------------------
+
+# A unit that is WantedBy=multi-user.target must not order itself after
+# cloud-init.target or cloud-final.service: both sit after multi-user.target,
+# which closes an ordering cycle that systemd resolves by deleting the unit's
+# start job. The 4.2.4 verification instance booted exactly like that — no
+# firstboot, no stack, no Caddy, an idle machine for fifty minutes.
+for unit in "$DEPLOY_ROOT/aws/systemd/"*.service; do
+    grep -Eq '^WantedBy=.*multi-user\.target' "$unit" || continue
+    if grep -Eq '^(After|Wants|Requires)=.*cloud-(init\.target|final\.service)' "$unit"; then
+        fail "$(basename "$unit") is WantedBy=multi-user.target and orders itself after cloud-init — that is an ordering cycle, and systemd answers it by never starting the unit"
+    fi
+done
+
+# --------------------------------------------------------------------------
+# The operator commands provision.sh publishes
+# --------------------------------------------------------------------------
+
+# Wrappers, never symlinks: every published script locates lib.sh relative to
+# its own path, and through a symlink that path is /usr/local/bin. Each command
+# then fails with "lib.sh: No such file or directory" — first observed when
+# synaplan-smoke-test did exactly that during a verification post-mortem.
+if grep -E '^[[:space:]]*ln\b' "$AWS_SCRIPTS_DIR/provision.sh" | grep -q '/usr/local/bin/'; then
+    fail "provision.sh symlinks a command into /usr/local/bin; publish an exec wrapper instead, or the command cannot find lib.sh next to its real path"
+fi
+
+# --------------------------------------------------------------------------
+# Caddy must be able to write the access log
+# --------------------------------------------------------------------------
+
+# The packaged unit runs as user caddy, often with ProtectSystem=strict. A
+# chown of /var/log/caddy on the host is not enough: the namespace still has
+# /var read-only unless LogsDirectory=caddy is set. The 4.2.4 verification
+# brought the whole stack up and then died on
+# "open /var/log/caddy/synaplan.log: permission denied".
+grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/provision.sh" ||
+    fail "provision.sh does not set LogsDirectory=caddy; Caddy cannot write /var/log/caddy/synaplan.log under ProtectSystem=strict"
+grep -Fq 'LogsDirectory=caddy' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
+    fail "configure-tls.sh does not set LogsDirectory=caddy; a later synaplan-tls would drop the writable log directory"
+
+# LogsDirectory alone is not enough. `caddy validate` PROVISIONS the config,
+# and provisioning a `log { output file }` block opens the file — as root,
+# because both scripts run as root. The file then belongs to root, mode 0600,
+# and caddy.service (User=caddy) dies on "permission denied" opening its own
+# log while the whole stack behind it is healthy. Proven with the packaged
+# caddy binary: validate as root leaves -rw------- root root synaplan.log.
+# So after the LAST validate in each script, ownership must be handed back.
+for script in "$AWS_SCRIPTS_DIR/provision.sh" "$AWS_SCRIPTS_DIR/configure-tls.sh"; do
+    awk '
+        { line = $0; sub(/^[[:space:]]*/, "", line) }
+        index(line, "#") == 1 { next }
+        /caddy validate/ { validate = NR }
+        /chown -R caddy:caddy \/var\/log\/caddy/ { restored = NR }
+        END { exit !(validate && restored > validate) }
+    ' "$script" || fail "$(basename "$script") runs caddy validate (as root, which creates a root-owned synaplan.log) without a chown -R caddy:caddy /var/log/caddy afterwards — caddy.service cannot open its own log"
+done
+
+# The wait used to probe only firstboot and synaplan. Both were active
+# (oneshot RemainAfterExit) while Caddy was failed, so the probe sat out
+# fifty minutes next to a stack that had been healthy for 45 of them.
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+grep -Fq 'systemctl is-failed caddy.service' "$repo_root/.github/workflows/aws-ami.yml" ||
+    fail "the AMI verification wait does not probe caddy.service; a failed TLS terminator would again cost fifty minutes next to a healthy stack"
+
+# --------------------------------------------------------------------------
+# The self-signed certificate an instance without a domain serves
+# --------------------------------------------------------------------------
+
+# `tls internal` cannot answer a client that dials the bare IP — which is how
+# every launch is reached until a domain is attached. The catch-all site has no
+# host name, the ClientHello carries no SNI, so the internal issuer has no name
+# to mint a certificate for and aborts every handshake with "tlsv1 alert
+# internal error". A verification run watched a fully healthy stack refuse
+# connections for fifty minutes behind exactly that. The Caddyfile must serve
+# the pair configure-tls.sh mints instead.
+selfsigned_caddyfile="$DEPLOY_ROOT/aws/caddy/Caddyfile.selfsigned"
+if grep -Eq '^[[:space:]]*tls[[:space:]]+internal([[:space:]]|$)' "$selfsigned_caddyfile"; then
+    fail "Caddyfile.selfsigned uses tls internal, which cannot answer a client connecting by bare IP (no SNI, no name to issue for) — every handshake dies with a tlsv1 internal error"
+fi
+grep -Fq '/etc/caddy/selfsigned/cert.pem' "$selfsigned_caddyfile" ||
+    fail "Caddyfile.selfsigned does not serve the minted pair under /etc/caddy/selfsigned/; without it Caddy has no certificate at all"
+grep -Fq 'openssl req' "$AWS_SCRIPTS_DIR/configure-tls.sh" ||
+    fail "configure-tls.sh does not mint the self-signed certificate that Caddyfile.selfsigned serves"
+
+# The pair is minted on the instance, never shipped in the image: an AMI that
+# carries a private key hands the SAME key to every customer. provision.sh may
+# create a throwaway pair so `caddy validate` has files to load, but it must
+# delete BOTH files before the image is snapshotted — the key is the secret,
+# and a leftover certificate would mask the missing mint at first boot.
+# Comment lines are skipped, so a commented-out rm does not count as one.
+awk '
+    { line = $0; sub(/^[[:space:]]*/, "", line) }
+    index(line, "#") == 1 { next }
+    /openssl req/ { minted = NR }
+    /rm .*\/etc\/caddy\/selfsigned\/key\.pem/ { removed_key = NR }
+    /rm .*\/etc\/caddy\/selfsigned\/cert\.pem/ { removed_cert = NR }
+    END { exit !(!minted || (removed_key > minted && removed_cert > minted)) }
+' "$AWS_SCRIPTS_DIR/provision.sh" ||
+    fail "provision.sh mints a certificate pair without deleting both files afterwards — the AMI would ship one private key to every customer"
+
+# --------------------------------------------------------------------------
+# The XFS label firstboot writes on a blank data volume
+# --------------------------------------------------------------------------
+
+# mkfs.xfs -L rejects anything longer than 12 characters. The verification of
+# 4.2.4 died seven seconds into firstboot on DATA_LABEL=synaplan-data (13).
+data_label="$(sed -n 's/^DATA_LABEL=//p' "$FIRSTBOOT" | head -n1)"
+[[ -n "$data_label" ]] || fail "firstboot.sh no longer defines DATA_LABEL on its own line; update this test"
+if (( ${#data_label} > 12 )); then
+    fail "DATA_LABEL is ${#data_label} characters ($data_label); XFS labels are at most 12, and mkfs.xfs -L will refuse to format the data volume"
+fi
+
+# --------------------------------------------------------------------------
+# Bind mounts the AMI has to ship, because compose.yaml asks for them
+# --------------------------------------------------------------------------
+
+# deploy/compose.yaml is the stack the instance runs. A bind mount whose source
+# is not ./data (created at first boot) is a file the AMI must contain, or
+# Docker creates a directory at the mount point and the service never becomes
+# healthy. Centrifugo's config is ../_docker/centrifugo/config.json relative to
+# deploy/ — without it, compose up waits until synaplan.service's 30-minute
+# TimeoutStartSec.
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+packer_file="$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl"
+# Bind specs look like `- ./data/uploads:...` or `- ../_docker/centrifugo/config.json:...`.
+# A YAML parser would be nicer, but this suite has to run in the lint job, which
+# has bash and a checkout and nothing else.
+while IFS= read -r spec; do
+    [[ -n "$spec" ]] || continue
+    source_path="${spec%%:*}"
+    source_path="${source_path#- }"
+    source_path="${source_path#"${source_path%%[![:space:]]*}"}"
+    case "$source_path" in
+        ./data/*) continue ;;
+        /*) continue ;;
+        -*) continue ;;
+    esac
+    [[ "$source_path" == .* ]] || continue
+    resolved="$(cd "$DEPLOY_ROOT" && python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$source_path")"
+    [[ -e "$resolved" ]] || fail "compose.yaml bind-mounts $source_path, which does not exist in the repository"
+    case "$resolved" in
+        "$repo_root/deploy"/*|"$repo_root/_docker"/*) ;;
+        *)
+            fail "compose.yaml bind-mounts $source_path ($resolved), which the AMI does not copy — only deploy/ and _docker/ ship"
+            ;;
+    esac
+    case "$resolved" in
+        "$repo_root/_docker"/*)
+            grep -Fq '_docker/centrifugo' "$packer_file" ||
+                fail "compose.yaml bind-mounts $source_path from _docker/, but the Packer template does not copy _docker/centrifugo into the image"
+            grep -Fq '_docker/' "$AWS_SCRIPTS_DIR/provision.sh" ||
+                fail "compose.yaml bind-mounts $source_path from _docker/, but provision.sh does not install it under /opt/synaplan/_docker"
+            ;;
+    esac
+done < <(grep -E '^[[:space:]]+-[[:space:]]+\.\./' "$DEPLOY_ROOT/compose.yaml" | sed 's/^[[:space:]]*-[[:space:]]*//')
+
+# After mkfs the label is not yet in udev; mounting by LABEL= is how a successful
+# format still fails firstboot. The device we just formatted has to be the mount
+# source, and LABEL= belongs only in fstab for later boots.
+if ! awk '
+    /mkfs\.xfs/ { seen = 1 }
+    seen && /mount "\$device"/ { found = 1 }
+    END { exit !found }
+' "$FIRSTBOOT"; then
+    fail "firstboot.sh formats the data volume but does not mount the device it formatted — mounting by LABEL= races udev and fails the boot"
+fi
+if awk '
+    /mkfs\.xfs/ { seen = 1 }
+    seen && /mount "\$DATA_MOUNT"/ { found = 1 }
+    /Mounted the data volume/ { seen = 0 }
+    END { exit !found }
+' "$FIRSTBOOT"; then
+    fail "firstboot.sh still mounts the data volume by mountpoint right after mkfs; that is a LABEL= lookup and udev has not learned the label yet"
+fi
+
+# NVMe partitions are named nvme0n1p1, not nvme0n11. Stripping trailing digits
+# does not yield the parent disk, so the root disk would look like a blank data
+# volume. PKNAME is the parent lsblk already reports.
+grep -Fq PKNAME "$FIRSTBOOT" ||
+    fail "firstboot.sh no longer uses lsblk PKNAME to find the root disk; NVMe partition names would make the root disk look like a data volume"
+
+# --------------------------------------------------------------------------
 # The instance, as far as firstboot.sh can tell
 # --------------------------------------------------------------------------
 

@@ -112,6 +112,12 @@ aws cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
+The same command updates the roles later, and it has to be run again whenever
+the template changes: the account keeps the permissions it was deployed with, so
+a permission added here reaches the build role only after a redeploy. A missing
+one shows up as `AccessDenied` in the verification stack, after the AMI it was
+meant to verify has already been built.
+
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
   its own account for the security scan. Name it in the Management Portal under
   Settings.
@@ -120,7 +126,11 @@ aws cloudformation deploy \
   must never be. Store its ARN as the repository secret
   `AWS_AMI_BUILD_ROLE_ARN`. Until that secret exists,
   [`aws-ami.yml`](../.github/workflows/aws-ami.yml) skips itself with a notice,
-  so releases stay green in the meantime.
+  so releases stay green in the meantime. The role trusts the workflow's
+  `ami-build` GitHub environment rather than a branch, so a deployment fix can
+  be built and verified from its pull request branch before it is merged; to
+  require a human approval per build, add a required-reviewers protection rule
+  to that environment in the repository settings.
 
 ## Submission sequence
 

@@ -21,6 +21,101 @@
 #   docker compose up -d
 #
 services:
+  # ----------------------------------------------------------------------------
+  # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
+  # See docker-compose.yml for the full rationale; follow it with:
+  #   docker compose -f docker-compose-minimal.yml logs -f startup-notes
+  # ----------------------------------------------------------------------------
+  startup-notes:
+    image: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    container_name: synaplan-startup-notes
+    command:
+      - sh
+      - -c
+      # Quoted heredoc = no shell expansion in the banner; $$ = compose escape.
+      - |
+        started=$$(date +%s)
+        elapsed() { echo $$(( $$(date +%s) - started )); }
+        cat <<'EOF'
+
+        ============================================================
+         Synaplan (minimal install) is starting
+        ============================================================
+         OPEN  http://localhost:5173  RIGHT NOW -- a live status
+         screen shows every boot step and switches to the app
+         automatically.
+
+         The first start can take 5-15 minutes depending on your
+         machine and connection. In the background Docker is:
+           - building the backend dev image (first run only)
+           - installing frontend dependencies (npm ci)
+           - running database migrations + seeding
+
+         When everything is ready, open:
+           App      http://localhost:5173
+           Login    admin@synaplan.com / admin123
+           API      http://localhost:8000  (docs: /api/doc)
+           Mail UI  http://localhost:8025  (MailHog)
+           DB UI    http://localhost:8082  (phpMyAdmin)
+
+         This minimal install uses cloud AI only: the app greets
+         you with a first-run setup screen where you paste one
+         provider key (free key: Groq) -- then chat works.
+
+         Follow this readiness check:
+           docker compose -f docker-compose-minimal.yml logs -f startup-notes
+        ============================================================
+
+        EOF
+        echo "[startup-notes] waiting for the backend (image build + migrations can take a while on first boot)..."
+        i=0
+        until wget -q -T 3 -O /dev/null http://backend/api/health 2>/dev/null; do
+          i=$$((i + 1))
+          if [ $$((i % 6)) -eq 0 ]; then
+            echo "[startup-notes] still waiting for the backend... ($$(elapsed)s elapsed -- normal on first boot)"
+          fi
+          if [ "$$(elapsed)" -ge 1500 ]; then
+            echo "[startup-notes] backend still not ready after 25 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose -f docker-compose-minimal.yml ps  and  ... logs backend"
+            exit 1
+          fi
+          sleep 5
+        done
+        echo "[startup-notes] backend is up (after $$(elapsed)s)"
+        echo "[startup-notes] waiting for the frontend dev server (npm ci + schema generation + Vite start)..."
+        # Ready = port answers AND the boot-status feed is gone (Vite took
+        # over). Vite answers /boot-status.json too (SPA html fallback, 200),
+        # so inspect the BODY: only the real feed contains "boot":true.
+        while true; do
+          # A failed /boot-status.json fetch must NOT count as ready: `! wget | grep`
+          # is true when wget itself fails, which used to print READY too early.
+          body=$$(wget -q -T 3 -O - http://frontend:5173/boot-status.json 2>/dev/null) || body=""
+          if wget -q -T 3 -O /dev/null http://frontend:5173 2>/dev/null \
+            && [ -n "$$body" ] \
+            && ! printf '%s' "$$body" | grep -q '"boot":true'; then
+            break
+          fi
+          if [ "$$(elapsed)" -ge 1800 ]; then
+            echo "[startup-notes] frontend still not ready after 30 minutes -- something is probably wrong."
+            echo "[startup-notes] check:  docker compose -f docker-compose-minimal.yml logs frontend"
+            exit 1
+          fi
+          sleep 5
+        done
+        cat <<EOF
+
+        ============================================================
+         Synaplan is READY (took $$(elapsed)s)
+
+           Open   http://localhost:5173
+           Login  admin@synaplan.com / admin123
+        ============================================================
+
+        EOF
+    restart: "no"
+    networks:
+      - synaplan-network
+
   # Vue.js Frontend
   frontend:
     image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
@@ -30,17 +125,22 @@ services:
     environment:
       NODE_ENV: development
       BACKEND_URL: http://backend
+      # Probed by the boot-status onboarding page (no Ollama in the minimal stack).
+      BOOT_STATUS_DB_HOST: db
     ports:
       - "5173:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
+      # Boot-status onboarding page + read-only backend var/ for boot milestones.
+      # See docker-compose.yml for the full rationale.
+      - ./_docker/frontend/boot-status:/boot-status:ro
+      - ./backend/var:/synaplan-backend-var:ro
       - ./frontend:/app
        # Anonymous volume to prevent host node_modules from being mounted (avoids platform-specific binary conflicts)
       - /app/node_modules
-    depends_on:
-      - backend
-    # See docker-compose.yml frontend healthcheck comment for full rationale.
+    # NO depends_on -- on purpose: the boot-status page must bind :5173
+    # immediately. See docker-compose.yml frontend comments for full rationale.
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5173',r=>{r.resume();process.exit(r.statusCode<400?0:1)}).on('error',()=>process.exit(1))"]
       interval: 10s
@@ -154,6 +254,9 @@ services:
       WHISPER_DEFAULT_MODEL: base
       WHISPER_ENABLED: "false"
       FFMPEG_BINARY: /usr/bin/ffmpeg
+      # Piper TTS (optional). Same host-bound default as the standard compose.
+      # Enable with: docker compose -f docker-compose-minimal.yml --profile tts up -d
+      SYNAPLAN_TTS_URL: ${SYNAPLAN_TTS_URL:-http://host.docker.internal:10200}
       # See docker-compose.yml for context -- raises PHP's silent 20-file cap.
       PHP_MAX_FILE_UPLOADS: "100"
     depends_on:
@@ -177,6 +280,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 300s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - synaplan-network
 
@@ -188,7 +293,7 @@ services:
     # Pinned to Redis 7.4 for Centrifugo pub/sub compatibility (see
     # docker-compose.yml for the full rationale). Redis 8.x dropped publication
     # fan-out to the Centrifugo node and broke realtime delivery.
-    image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -211,7 +316,7 @@ services:
   # /centrifugo/api/* so the browser connects same-origin. Auth via short-lived
   # JWTs minted by the PHP backend.
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.1@sha256:8ba0c9443dadedc21b20254b3fc76f35c1998b29acc7cdec877ea0c3636c237e
+    image: centrifugo/centrifugo:v6.9.2@sha256:f89352e38ef8043aaaa9045dec41cc8f2d35075b86ff553d4091ac19b547a3a6
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -316,7 +421,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.3.2@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -384,8 +489,27 @@ services:
     networks:
       - synaplan-network
 
+  # Optional Piper TTS — four baked voices (en, de, es, tr).
+  #   docker compose -f docker-compose-minimal.yml --profile tts up -d
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:f4cabd3fec77a682be1aa853ae7958e6369353abbd7b8b19e0162058eb98ff81
+    container_name: synaplan-tts
+    profiles: [tts]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10200:10200"
+    volumes:
+      - tts_extra_voices:/voices-extra
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium
+    networks:
+      - synaplan-network
+
 volumes:
   mysql_data:
+  tts_extra_voices:
   # Note: No ollama_data or whisper_models volumes in standard mode
 
 networks:

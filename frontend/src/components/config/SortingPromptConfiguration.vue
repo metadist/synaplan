@@ -1,40 +1,24 @@
 <template>
   <div class="space-y-6" data-testid="page-config-routing">
-    <!-- Header: what routing is + how to add custom prompts -->
-    <div class="surface-card p-6" data-testid="section-routing-overview">
-      <div class="flex items-start gap-3">
-        <div class="p-2 rounded-lg bg-[var(--brand)]/10">
-          <Icon icon="heroicons:share" class="w-6 h-6 text-[var(--brand)]" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <h2 class="text-2xl font-semibold txt-primary mb-1">
-            {{ $t('config.routing.title') }}
-          </h2>
-          <p class="txt-secondary text-sm">
-            {{ $t('config.routing.flowBody') }}
-          </p>
+    <PageHeader
+      :title="$t('config.routing.title')"
+      :subtitle="$t('config.routing.flowBody')"
+      icon="heroicons:share"
+      data-testid="section-routing-overview"
+    />
 
-          <!-- Prominent callout: custom prompts live in Task Prompts -->
-          <div
-            class="mt-4 p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
-            data-testid="callout-custom-prompts"
-          >
-            <Icon
-              icon="heroicons:light-bulb"
-              class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5"
-            />
-            <p class="text-sm txt-secondary leading-relaxed">
-              {{ $t('config.routing.customCalloutBody') }}
-              <router-link
-                to="/ai/instructions"
-                class="text-[var(--brand)] hover:underline font-medium"
-              >
-                {{ $t('config.routing.customCalloutLink') }}
-              </router-link>
-            </p>
-          </div>
-        </div>
-      </div>
+    <!-- Prominent callout: custom prompts live in Task Prompts -->
+    <div
+      class="p-4 rounded-lg bg-[var(--brand)]/5 border border-[var(--brand)]/20 flex items-start gap-3"
+      data-testid="callout-custom-prompts"
+    >
+      <Icon icon="heroicons:light-bulb" class="w-5 h-5 text-[var(--brand)] flex-shrink-0 mt-0.5" />
+      <p class="text-sm txt-secondary leading-relaxed">
+        {{ $t('config.routing.customCalloutBody') }}
+        <router-link to="/ai/instructions" class="text-[var(--brand)] hover:underline font-medium">
+          {{ $t('config.routing.customCalloutLink') }}
+        </router-link>
+      </p>
     </div>
 
     <!-- Master switch (admin only): turn the multi-task planner on/off -->
@@ -537,6 +521,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, EyeIcon, CheckIcon, InformationCircleIcon } from '@heroicons/vue/24/outline'
+import PageHeader from '@/components/PageHeader.vue'
 import { mockSortingPrompt } from '@/mocks/sortingPrompt'
 import type { SortingPromptData } from '@/mocks/sortingPrompt'
 import { promptsApi } from '@/services/api/promptsApi'

@@ -127,3 +127,60 @@ describe('MessageText streaming (anti-flash)', () => {
     expect(el.textContent).toContain('mehr Text')
   })
 })
+
+describe('MessageText first-run setup CTA', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('turns [[SETUP_CTA]] into a button, not a markdown link', async () => {
+    const wrapper = mount(MessageText, {
+      props: {
+        content:
+          "**You're in demo mode**\n\n[[SETUP_CTA]]\n\nA free Groq key or a local Ollama model — no key needed.",
+        readonly: true,
+      },
+    })
+
+    const el = messageTextEl(wrapper)
+    const button = el.querySelector('[data-setup-cta]')
+    expect(button?.tagName).toBe('BUTTON')
+    expect(button?.textContent).toContain('Go to AI provider setup')
+    expect(el.querySelector('a[href="/admin/setup"]')).toBeNull()
+    expect(el.textContent).not.toContain('[[SETUP_CTA]]')
+    expect(el.textContent).toContain('A free Groq key or a local Ollama model')
+  })
+
+  it('rewrites leftover /admin/setup markdown links into the same button', async () => {
+    const wrapper = mount(MessageText, {
+      props: {
+        content: '[Go to AI provider setup](/admin/setup)',
+        readonly: true,
+      },
+    })
+
+    const el = messageTextEl(wrapper)
+    expect(el.querySelector('a[href="/admin/setup"]')).toBeNull()
+    expect(el.querySelector('[data-setup-cta]')?.tagName).toBe('BUTTON')
+  })
+
+  it('asks ChatView to sign in as admin instead of navigating as a guest', async () => {
+    const wrapper = mount(MessageText, {
+      props: { content: '[[SETUP_CTA]]', readonly: true },
+    })
+
+    const opened: Event[] = []
+    const onOpen = (event: Event) => {
+      opened.push(event)
+    }
+    window.addEventListener('open-first-run-setup', onOpen)
+    try {
+      const button = messageTextEl(wrapper).querySelector('[data-setup-cta]')
+      expect(button).not.toBeNull()
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      expect(opened).toHaveLength(1)
+    } finally {
+      window.removeEventListener('open-first-run-setup', onOpen)
+    }
+  })
+})

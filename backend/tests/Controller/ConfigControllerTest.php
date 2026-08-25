@@ -97,4 +97,20 @@ final class ConfigControllerTest extends WebTestCase
         // Should be very fast (no slow health checks)
         $this->assertLessThan(0.5, $duration, 'Runtime config should respond in less than 500ms');
     }
+
+    public function testRuntimeConfigTellsAnonymousClientsWhetherDemoLoginIsOffered(): void
+    {
+        $client = static::createClient();
+
+        $client->request('GET', '/api/v1/config/runtime');
+
+        $this->assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('setup', $data);
+        $this->assertIsArray($data['setup']);
+        $this->assertArrayHasKey('demoLoginHint', $data['setup']);
+        $this->assertIsBool($data['setup']['demoLoginHint']);
+    }
 }

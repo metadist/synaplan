@@ -76,16 +76,33 @@ log "Installing Caddy from the project's own package repository"
 # Caddy terminates TLS on the host. Installed from the vendor repository rather
 # than as a loose binary so the instance keeps receiving security updates
 # through dnf like everything else.
-cat > /etc/yum.repos.d/caddy-stable.repo <<'REPO'
-[caddy-stable]
-name=Caddy stable
-baseurl=https://dl.cloudsmith.io/public/caddy/stable/rpm/fedora/40/$basearch
+#
+# The RPMs live in Fedora COPR, not in the Cloudsmith repository the Caddy
+# install page shows first — that one carries Debian packages only, and asking
+# it for an RPM yields an empty repository that fails as "Unable to find a
+# match: caddy" on every architecture. The EPEL 9 build is the one that fits
+# Amazon Linux 2023: it needs nothing beyond glibc 2.34 and systemd, both of
+# which AL2023 has, and it exists for x86_64 and aarch64 alike.
+#
+# COPR does not sign repository metadata, only the packages, so gpgcheck is on
+# and repo_gpgcheck stays off.
+cat > /etc/yum.repos.d/caddy.repo <<'REPO'
+[caddy]
+name=Caddy (COPR @caddy/caddy, EPEL 9)
+baseurl=https://download.copr.fedorainfracloud.org/results/@caddy/caddy/epel-9-$basearch/
 gpgcheck=1
 enabled=1
-gpgkey=https://dl.cloudsmith.io/public/caddy/stable/gpg.key
-repo_gpgcheck=1
+gpgkey=https://download.copr.fedorainfracloud.org/results/@caddy/caddy/pubkey.gpg
+repo_gpgcheck=0
+skip_if_unavailable=False
 REPO
 dnf -y install caddy
+
+# Same reasoning as the Compose plugin above: prove the thing that was just
+# installed actually runs on this architecture, while the build can still fail
+# cheaply. A broken TLS terminator would otherwise only surface on a customer's
+# first boot.
+caddy version
 
 log "Installing the application tree into $APP_DIR"
 install -d -m 0755 "$APP_DIR"
@@ -96,6 +113,17 @@ rsync -a --delete \
     "$STAGE_DIR/deploy/" "$APP_DIR/deploy/"
 chmod 0755 "$APP_DIR/deploy/scripts"/*.sh "$APP_DIR/deploy/aws/scripts"/*.sh
 
+# compose.yaml bind-mounts ../_docker/centrifugo/config.json from deploy/, so
+# the file has to live at $APP_DIR/_docker on the instance. Packer stages it
+# next to deploy/; a missing copy is a first boot that waits 30 minutes for a
+# healthcheck that can never pass.
+install -d -m 0755 "$APP_DIR/_docker"
+rsync -a "$STAGE_DIR/_docker/" "$APP_DIR/_docker/"
+[[ -f "$APP_DIR/_docker/centrifugo/config.json" ]] || {
+    printf 'The Centrifugo config did not land in the image; refusing to bake an AMI whose stack cannot start\n' >&2
+    exit 1
+}
+
 # Persistent state lives on a separate EBS volume so an instance can be replaced
 # without losing anything. The application tree keeps the paths lib.sh expects
 # and reaches the volume through symlinks.
@@ -105,10 +133,18 @@ ln -sfn "$DATA_MOUNT/.lifecycle" "$APP_DIR/deploy/.lifecycle"
 ln -sfn "$DATA_MOUNT/.env" "$APP_DIR/deploy/.env"
 
 log "Publishing the operator commands"
-ln -sfn "$APP_DIR/deploy/aws/scripts/update.sh" /usr/local/bin/synaplan-update
-ln -sfn "$APP_DIR/deploy/aws/scripts/snapshot.sh" /usr/local/bin/synaplan-snapshot
-ln -sfn "$APP_DIR/deploy/aws/scripts/configure-tls.sh" /usr/local/bin/synaplan-tls
-ln -sfn "$APP_DIR/deploy/scripts/smoke-test.sh" /usr/local/bin/synaplan-smoke-test
+# Wrappers, not symlinks. Every one of these scripts locates lib.sh relative
+# to its own path, and through a symlink that path is /usr/local/bin — each
+# command then dies with "lib.sh: No such file or directory". An exec wrapper
+# hands the script its real path as $0, so the lookup works unchanged.
+publish_command() {
+    printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$2" > "/usr/local/bin/$1"
+    chmod 0755 "/usr/local/bin/$1"
+}
+publish_command synaplan-update "$APP_DIR/deploy/aws/scripts/update.sh"
+publish_command synaplan-snapshot "$APP_DIR/deploy/aws/scripts/snapshot.sh"
+publish_command synaplan-tls "$APP_DIR/deploy/aws/scripts/configure-tls.sh"
+publish_command synaplan-smoke-test "$APP_DIR/deploy/scripts/smoke-test.sh"
 
 log "Recording the baked release"
 # Read by firstboot.sh to pin deploy/.env, and by support to tell instantly
@@ -122,6 +158,48 @@ chmod 0644 "$APP_DIR/ami-release"
 log "Installing the systemd units"
 install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan-firstboot.service" /etc/systemd/system/
 install -m 0644 "$APP_DIR/deploy/aws/systemd/synaplan.service" /etc/systemd/system/
+
+# The packaged Caddyfile listens on :80 only. Firstboot replaces it, but a
+# failed firstboot used to leave Caddy serving that default for the whole
+# verification window. Bake the self-signed site now so 443 is the listener
+# even if firstboot is still running, and do not start Caddy until firstboot
+# has at least had its chance to write the real file.
+install -d -m 0755 /etc/caddy
+install -d -o caddy -g caddy -m 0750 /var/log/caddy
+install -m 0644 "$APP_DIR/deploy/aws/caddy/Caddyfile.selfsigned" /etc/caddy/Caddyfile
+# The Caddyfile serves a certificate pair that only exists once the first boot
+# has minted it for the instance (configure-tls.sh) — baking a real pair into
+# the image would hand the SAME private key to every customer. Validation still
+# needs files to load, so: a throwaway pair, validate, delete. caddy.service
+# orders itself after synaplan-firstboot below, which mints the real pair
+# before Caddy first starts.
+install -d -m 0755 /etc/caddy/selfsigned
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+    -keyout /etc/caddy/selfsigned/key.pem -out /etc/caddy/selfsigned/cert.pem \
+    -days 1 -subj '/CN=throwaway' 2>/dev/null
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# validate provisions the log writer and thereby CREATES synaplan.log — as
+# root, since this whole script is root. Left alone, the AMI ships a root-owned
+# 0600 log file that caddy.service (User=caddy) cannot open: it exits in
+# milliseconds with "permission denied" and nothing ever listens on 443, which
+# is exactly how a verification run with an otherwise healthy stack died.
+chown -R caddy:caddy /var/log/caddy
+rm -f /etc/caddy/selfsigned/key.pem /etc/caddy/selfsigned/cert.pem
+install -d -m 0755 /etc/systemd/system/caddy.service.d
+cat > /etc/systemd/system/caddy.service.d/20-synaplan-order.conf <<'EOF'
+[Unit]
+After=synaplan-firstboot.service
+Requires=synaplan-firstboot.service
+
+[Service]
+# The Caddyfile writes /var/log/caddy/synaplan.log. LogsDirectory makes systemd
+# own the directory for the service user and keep it writable under any
+# ProtectSystem setting; the ownership of the FILE inside is handled where
+# `caddy validate` runs as root (provision.sh, configure-tls.sh), because
+# validate creates it. test-firstboot.sh enforces both.
+LogsDirectory=caddy
+EOF
+
 systemctl daemon-reload
 systemctl enable docker amazon-ssm-agent synaplan-firstboot.service synaplan.service caddy.service
 

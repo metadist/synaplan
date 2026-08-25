@@ -5,6 +5,8 @@
  * Named templates only prefill the form (name, auth header, write default)
  * and can be cleared again — they are not exclusive integrations.
  */
+export type McpAuthMode = 'none' | 'bearer' | 'oauth'
+
 export interface McpServerTemplate {
   key: string
   icon: string
@@ -12,6 +14,10 @@ export interface McpServerTemplate {
   name: string
   authHeader: string
   allowWrite: boolean
+  /** Default `bearer` — static header. `oauth` templates hide the token fields. */
+  authMode?: McpAuthMode
+  /** Locked Streamable HTTP URL for hosted OAuth servers. */
+  urlPrefill?: string
 }
 
 export const MCP_CUSTOM_TEMPLATE = 'custom'
@@ -52,7 +58,33 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     authHeader: 'Authorization',
     allowWrite: false,
   },
+  {
+    key: 'notion',
+    icon: 'simple-icons:notion',
+    name: 'Notion',
+    authHeader: '',
+    allowWrite: false,
+    authMode: 'oauth',
+    urlPrefill: 'https://mcp.notion.com/mcp',
+  },
+  {
+    key: 'higgsfield',
+    icon: 'heroicons:sparkles',
+    name: 'Higgsfield',
+    authHeader: '',
+    allowWrite: false,
+    authMode: 'oauth',
+    urlPrefill: 'https://mcp.higgsfield.ai/mcp',
+  },
 ]
+
+export function visibleMcpServerTemplates(oauthEnabled: boolean): McpServerTemplate[] {
+  return mcpServerTemplates.filter((template) => template.authMode !== 'oauth' || oauthEnabled)
+}
+
+export function isOAuthTemplate(template: McpServerTemplate): boolean {
+  return template.authMode === 'oauth'
+}
 
 export function findMcpServerTemplate(key: string): McpServerTemplate {
   return mcpServerTemplates.find((template) => template.key === key) ?? mcpServerTemplates[0]

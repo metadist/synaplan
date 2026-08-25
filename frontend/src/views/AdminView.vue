@@ -2,22 +2,20 @@
   <MainLayout data-testid="view-admin">
     <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
       <!-- Header -->
-      <div class="mb-8">
-        <div class="flex items-center gap-3 mb-2">
-          <Icon icon="mdi:shield-crown" class="w-8 h-8 text-[var(--brand)]" />
-          <h1 class="text-3xl font-bold txt-primary">{{ $t('admin.title') }}</h1>
-        </div>
-        <p class="txt-secondary">{{ $t('admin.description') }}</p>
-      </div>
-
-      <TabNav
-        :model-value="activeTab"
-        :tabs="tabNavItems"
-        :aria-label="$t('admin.title')"
-        mobile-trigger-testid="tab-admin-mobile-trigger"
-        mobile-menu-testid="tab-admin-mobile-menu"
-        @update:model-value="onTabNavChange"
-      />
+      <PageHeader
+        :title="$t('admin.title')"
+        :subtitle="$t('admin.description')"
+        icon="mdi:shield-crown"
+      >
+        <TabNav
+          :model-value="activeTab"
+          :tabs="tabNavItems"
+          :aria-label="$t('admin.title')"
+          mobile-trigger-testid="tab-admin-mobile-trigger"
+          mobile-menu-testid="tab-admin-mobile-menu"
+          @update:model-value="onTabNavChange"
+        />
+      </PageHeader>
 
       <!-- Tab Content -->
       <div class="space-y-6">
@@ -697,6 +695,7 @@
 import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'

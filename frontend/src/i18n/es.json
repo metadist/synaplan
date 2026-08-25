@@ -94,18 +94,18 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Herramientas",
-    "chatWidget": "Widget de chat",
+    "chatWidget": "Tus widgets",
     "docSummary": "Resumidor",
-    "mailHandler": "Automatización de correo",
+    "mailHandler": "Gestor de correo IMAP",
     "plugins": "Plugins",
     "files": "Fuentes",
     "ragSearch": "Búsqueda",
     "vectorStorage": "Almacenamiento vectorial",
-    "configInbound": "Canales",
-    "configAiModels": "Modelos de IA",
+    "configInbound": "Entrada estándar",
+    "configAiModels": "Configuración de modelos IA",
     "configProviderHiggsfield": "Conexión con Higgsfield",
-    "configTaskPrompts": "Instrucciones de IA",
-    "configSortingPrompt": "Enrutamiento",
+    "configTaskPrompts": "Instrucciones predefinidas",
+    "configSortingPrompt": "Configuración de enrutamiento",
     "configApiKeys": "Claves API",
     "configApiDocs": "Documentación API",
     "statistics": "Estadísticas",
@@ -132,7 +132,7 @@
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
     "connections": "Conexiones",
-    "savedTasks": "Tareas guardadas"
+    "savedTasks": "Tareas recurrentes"
   },
   "adminModelStatus": {
     "title": "Estado de modelos",
@@ -629,26 +629,28 @@
     "history": "Historial",
     "historyDescription": "Historial de chats",
     "tools": "Herramientas",
-    "toolsChatWidget": "Widget de Chat",
+    "toolsChatWidget": "Tus widgets",
     "toolsDocSummary": "Resumidor",
-    "toolsMailHandler": "Automatización de correo",
+    "toolsMailHandler": "Gestor de correo IMAP",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
-    "savedTasks": "Tareas guardadas",
+    "configConnections": "Configurar conexiones",
+    "groupApi": "API",
+    "savedTasks": "Tareas recurrentes",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
     "channels": "Canales",
     "channelsDescription": "Canales conectados",
-    "aiSetup": "Configuración de IA",
-    "aiSetupDescription": "Modelos, instrucciones y enrutamiento",
+    "aiSetup": "IA y herramientas",
+    "aiSetupDescription": "Modelos, instrucciones, enrutamiento y herramientas",
     "preferences": "Preferencias",
     "account": "Cuenta",
     "accountDescription": "Cuenta y preferencias",
-    "configInbound": "Resumen",
-    "configAiModels": "Modelos IA",
-    "configTaskPrompts": "Instrucciones de IA",
-    "configSortingPrompt": "Enrutamiento",
+    "configInbound": "Entrada estándar",
+    "configAiModels": "Configuración de modelos IA",
+    "configTaskPrompts": "Instrucciones predefinidas",
+    "configSortingPrompt": "Configuración de enrutamiento",
     "configApiKeys": "Claves API",
     "statistics": "Estadísticas",
     "subscription": "Suscripción",
@@ -836,6 +838,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Funcionalidad extendida para tu flujo de trabajo",
+    "fallbackTitle": "Plugin",
+    "loading": "Cargando plugin…",
     "notFound": "Plugin no encontrado o no habilitado para tu cuenta",
     "commandEmpty": "El plugin devolvió una respuesta vacía.",
     "commandError": "El comando del plugin falló. Inténtalo de nuevo."
@@ -1039,7 +1043,7 @@
     "statusReadyTitle": "Tu IA está lista",
     "statusReadyText": "El modelo de chat predeterminado tiene un proveedor funcional. Puedes añadir más proveedores abajo en cualquier momento.",
     "statusNotReadyTitle": "Aún no hay un proveedor de IA conectado",
-    "statusNotReadyText": "El chat no funcionará hasta que conectes un proveedor. Añade una clave API abajo — Groq ofrece una clave gratuita que funciona en menos de un minuto.",
+    "statusNotReadyText": "El chat no funcionará hasta que conectes un proveedor. Añade una clave API abajo — Groq ofrece una clave gratuita que funciona en menos de un minuto — o conecta un Ollama local, que no necesita ninguna clave.",
     "cloudProviders": "Proveedores en la nube",
     "cloudProvidersHint": "Pega una clave API: se prueba en vivo y se guarda cifrada. Las claves de tu archivo .env se detectan automáticamente.",
     "recommended": "Recomendado",
@@ -1069,6 +1073,11 @@
     "removed": "Clave de {provider} eliminada",
     "removedEnvStillSet": "Clave de {provider} eliminada de la base de datos: {envVar} sigue definida en el entorno, así que {provider} continúa conectado con ese valor",
     "loadFailed": "No se pudo cargar el estado de los proveedores",
+    "ownService": {
+      "title": "Añadir tu propio servicio",
+      "description": "¿Falta un proveedor en la lista? Añádelo en la pestaña Editar modelos de la configuración de modelos IA.",
+      "cta": "Añadir tu propio servicio"
+    },
     "localAi": {
       "title": "IA local (Ollama) — sin clave",
       "description": "La instalación estándar incluye modelos de IA locales que se ejecutan completamente en tu hardware. La descarga de modelos puede tardar en el primer arranque; los proveedores en la nube de arriba están disponibles al instante."
@@ -1118,7 +1127,7 @@
   "setupBanner": {
     "adminTitle": "Ningún proveedor de IA configurado",
     "userTitle": "El chat aún no está listo",
-    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto.",
+    "adminText": "El chat no puede empezar hasta que haya un proveedor de IA conectado. Abre la página de configuración y añade una clave — Groq tiene una opción gratuita que funciona en aproximadamente un minuto — o conecta un Ollama local, que no necesita ninguna clave.",
     "userText": "Un administrador todavía tiene que conectar un proveedor de IA. En la documentación se explica cómo se hace.",
     "cta": "Abrir configuración de IA",
     "docsCta": "Abrir documentación"
@@ -1180,6 +1189,11 @@
   "auth": {
     "login": "Iniciar Sesión",
     "register": "Registrarse",
+    "demoHint": {
+      "title": "Instalación de demostración nueva",
+      "text": "Usa la cuenta de administrador para conectar un proveedor de IA y terminar la configuración.",
+      "cta": "Continuar como administrador"
+    },
     "email": "Correo Electrónico",
     "emailPlaceholderPrefix": "tu",
     "emailPlaceholderSuffix": "correo.com",
@@ -2594,7 +2608,7 @@
       "deleteConfirm": "Quitar",
       "deleted": "Se quitó {name}.",
       "deleteFailed": "No se pudo quitar la conexión.",
-      "channelHint": "En el chat, usa el nombre {channel}",
+      "channelHint": "Para usar esta conexión en el chat, escribe la palabra {channel} en tu mensaje.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -3467,6 +3481,7 @@
     },
     "listView": {
       "title": "Vista de lista",
+      "shortTitle": "Lista",
       "source": "Fuente",
       "allMemories": "Todos los recuerdos",
       "categories": "Categorías",
@@ -3476,10 +3491,12 @@
       "sortByDate": "Ordenar por fecha"
     },
     "graphView": {
-      "title": "Vista neuronal"
+      "title": "Vista neuronal",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "Visualización 3D"
+      "title": "Visualización 3D",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Categorías",
@@ -4015,7 +4032,38 @@
         "name": "n8n",
         "summary": "Flujos de automatización",
         "hint": "Conecta un servidor MCP de n8n para que el asistente pueda inspeccionar o disparar tus flujos de automatización. Pega la URL del endpoint MCP y el token de acceso de tu instancia n8n."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Páginas y bases de datos",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Notion. Synaplan podrá buscar y leer las páginas a las que des acceso. Puedes revocar el acceso en Notion en cualquier momento."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Herramientas de imagen y vídeo",
+        "hint": "Guarda la conexión y, a continuación, inicia sesión con tu cuenta de Higgsfield. Consultar el historial es de solo lectura; crear imágenes o vídeos requiere acciones de escritura y consume tus créditos de Higgsfield."
       }
+    },
+    "oauthFormHint": "Este servidor usa el inicio de sesión de tu cuenta. Guárdalo y se te enviará al proveedor para permitir el acceso. No hay token que pegar.",
+    "connect": "Conectar",
+    "reconnect": "Volver a conectar",
+    "connecting": "Abriendo el inicio de sesión…",
+    "connectFailed": "No se pudo iniciar el acceso",
+    "oauthConnected": "Conectado",
+    "oauthReauth": "Acción necesaria (volver a conectar)",
+    "oauthNotConnected": "No conectado",
+    "oauthConnectedToast": "Sesión iniciada correctamente",
+    "disconnect": "Desconectar",
+    "disconnecting": "Desconectando…",
+    "disconnectTitle": "¿Desconectar este servidor?",
+    "disconnectMessage": "Se eliminará el acceso guardado de \"{name}\". El servidor permanece en tu lista — inicia sesión de nuevo para usarlo.",
+    "disconnected": "Acceso eliminado",
+    "disconnectFailed": "No se pudo eliminar el acceso",
+    "oauthError": {
+      "denied": "El inicio de sesión se canceló",
+      "missing_code": "El inicio de sesión no se completó. Inténtalo de nuevo.",
+      "exchange_failed": "No se pudo terminar el inicio de sesión. Inténtalo de nuevo.",
+      "disabled": "Un administrador ha desactivado el inicio de sesión con el proveedor"
     },
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",

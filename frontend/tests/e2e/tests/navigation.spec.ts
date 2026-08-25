@@ -106,7 +106,6 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       const flyout = await openFlyout(page, NAV.sidebarV2Channels)
       await expect(flyout.locator(NAV.flyoutLinkInbound)).toBeVisible()
       await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutLinkMailHandler)).toBeVisible()
       await expect(flyout.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
     })
   })
@@ -139,10 +138,13 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       await ensureNavReady(page)
     })
 
-    await test.step('Act+Assert: AI Setup flyout shows its links', async () => {
+    await test.step('Act+Assert: AI Setup & Tools flyout shows its links', async () => {
       const flyout = await openFlyout(page, NAV.sidebarV2AiSetup)
       await expect(flyout.locator(NAV.flyoutLinkAiModels)).toBeVisible()
       await expect(flyout.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
+      // The IMAP email handler lives under AI Setup & Tools since the
+      // navigation restructure (it is a tool, not an inbound channel).
+      await expect(flyout.locator(NAV.flyoutLinkMailHandler)).toBeVisible()
     })
   })
 

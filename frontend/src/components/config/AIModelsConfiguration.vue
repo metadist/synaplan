@@ -1,28 +1,18 @@
 <template>
   <div class="space-y-6" data-testid="page-config-ai-models">
-    <TabNav
-      :model-value="activeTab"
-      :tabs="tabNavItems"
-      :aria-label="$t('config.aiModels.title')"
-      mobile-trigger-testid="tab-ai-models-mobile-trigger"
-      mobile-menu-testid="tab-ai-models-mobile-menu"
-      @update:model-value="onModelsTabChange"
-    />
-
-    <div
-      v-show="activeTab === 'choice'"
-      class="surface-card p-6 relative"
-      :class="openDropdown ? 'z-20' : 'z-0'"
-      data-testid="section-default-config"
+    <PageHeader
+      :title="$t('config.aiModels.title')"
+      :subtitle="$t('config.aiModels.description')"
+      icon="heroicons:cpu-chip"
+      data-testid="section-header"
     >
-      <div class="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-2xl font-semibold txt-primary flex items-center gap-2 min-w-0">
-          <CpuChipIcon class="w-6 h-6 flex-shrink-0 text-[var(--brand)]" />
-          {{ $t('config.aiModels.defaultConfigTitle') }}
-        </h2>
+      <!-- Reset applies to the default-model choices, so it only shows on that tab.
+           v-if on the template keeps PageHeader's actions wrapper (and its flex gap)
+           from rendering empty on the other tabs. -->
+      <template v-if="activeTab === 'choice'" #actions>
         <button
           type="button"
-          class="self-start sm:self-auto flex-shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="resetting"
           data-testid="btn-reset-defaults"
           @click="confirmResetDefaults"
@@ -30,7 +20,27 @@
           <ArrowPathIcon :class="['w-4 h-4', resetting && 'animate-spin']" />
           {{ $t('config.aiModels.resetDefaults') }}
         </button>
-      </div>
+      </template>
+      <TabNav
+        :model-value="activeTab"
+        :tabs="tabNavItems"
+        :aria-label="$t('config.aiModels.title')"
+        mobile-trigger-testid="tab-ai-models-mobile-trigger"
+        mobile-menu-testid="tab-ai-models-mobile-menu"
+        @update:model-value="onModelsTabChange"
+      />
+    </PageHeader>
+
+    <div
+      v-show="activeTab === 'choice'"
+      class="surface-card p-6 relative"
+      :class="openDropdown ? 'z-20' : 'z-0'"
+      data-testid="section-default-config"
+    >
+      <h3 class="text-lg font-semibold txt-primary mb-6 flex items-center gap-2 min-w-0">
+        <CpuChipIcon class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
+        {{ $t('config.aiModels.defaultConfigTitle') }}
+      </h3>
 
       <div v-if="loading" class="text-center py-8" data-testid="section-loading">
         <div
@@ -462,7 +472,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowPathIcon,
   ChevronDownIcon,
@@ -475,6 +485,7 @@ import {
 import AddModelForm from '@/components/config/AddModelForm.vue'
 import AIModelsAdminPanel from '@/components/config/AIModelsAdminPanel.vue'
 import OpenAiCompatibleEndpointsPanel from '@/components/config/OpenAiCompatibleEndpointsPanel.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import EmbeddingRunsPanel from '@/components/config/EmbeddingRunsPanel.vue'
 import EmbeddingSwitchModal from '@/components/config/EmbeddingSwitchModal.vue'
 import SortIndicator from '@/components/config/SortIndicator.vue'
@@ -507,10 +518,41 @@ type ModelsTabId = 'choice' | 'list' | 'runs' | 'edit'
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
 
 const activeTab = ref<ModelsTabId>('choice')
 const adminPanelRef = ref<InstanceType<typeof AIModelsAdminPanel> | null>(null)
+const MODELS_TABS = ['choice', 'list', 'runs', 'edit'] as const
+
+function parseModelsTab(raw: unknown): ModelsTabId | null {
+  if (typeof raw !== 'string') return null
+  return (MODELS_TABS as readonly string[]).includes(raw) ? (raw as ModelsTabId) : null
+}
+
+function canOpenModelsTab(tab: ModelsTabId): boolean {
+  if (tab === 'edit' || tab === 'runs') return authStore.isAdmin
+  return true
+}
+
+function applyTabFromQuery(): void {
+  const tab = parseModelsTab(route.query.tab)
+  if (!tab || !canOpenModelsTab(tab)) return
+  activeTab.value = tab
+}
+
+function syncTabToUrl(tab: ModelsTabId): void {
+  const query = { ...route.query }
+  if (tab === 'choice') {
+    delete query.tab
+  } else {
+    query.tab = tab
+  }
+  const current = typeof route.query.tab === 'string' ? route.query.tab : undefined
+  const next = typeof query.tab === 'string' ? query.tab : undefined
+  if (current === next) return
+  void router.replace({ query })
+}
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const items: TabNavItem[] = [
@@ -547,7 +589,10 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 })
 
 function onModelsTabChange(id: string) {
-  activeTab.value = id as ModelsTabId
+  const tab = id as ModelsTabId
+  if (!canOpenModelsTab(tab)) return
+  activeTab.value = tab
+  syncTabToUrl(tab)
 }
 
 function onAdminModelCreated() {
@@ -676,6 +721,8 @@ onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleKeydown)
 
+  applyTabFromQuery()
+
   // Check for highlight query parameter
   const highlightParam = route.query.highlight as string | undefined
   if (!highlightParam) return
@@ -711,6 +758,13 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('keydown', handleKeydown)
 })
+
+watch(
+  () => route.query.tab,
+  () => {
+    applyTabFromQuery()
+  }
+)
 
 // Watch for route changes to handle highlight parameter
 watch(

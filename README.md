@@ -29,21 +29,29 @@
 
 ## Your first answer in three steps
 
+One line — the installer checks Docker, fetches Synaplan, and starts the stack:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
+```
+
+Or do exactly the same by hand:
+
 ```bash
 git clone https://github.com/metadist/synaplan.git
 cd synaplan
 docker compose up -d
 ```
 
-1. **Open <http://localhost:5173>.** The UI is ready in about two minutes.
-2. **Log in** as `admin@synaplan.com` / `admin123`.
-3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat is replaced by a first-run setup screen. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
+1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). The same notes print in `docker compose logs -f startup-notes`.
+2. **Log in** as `admin@synaplan.com` / `admin123` — the status screen shows these too.
+3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat answers in demo mode and points you to the setup. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
 That is the whole local-hosting onboarding. After chat works, open **Channels → Connections** to hook up Outlook, Nextcloud, Dropbox, a calendar, or Jira / Confluence — then you can say *"summarize the latest mail from X"* or *"create a picture and put it in nextcloud"*.
 
 ### Key management, the short version
 
-- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Open AI provider setup** button. The same wizard lives at **Admin → AI Providers** (`/admin/setup`) later.
+- **The first-run screen is the setup.** You do not have to hunt through Admin: an empty install blocks chat with a single **Go to AI provider setup** button. The same wizard lives at **Admin → AI Providers** (`/admin/setup`) later.
 - **Tested before it's saved.** The key is validated against the live provider API, so a typo fails immediately instead of at your first chat.
 - **Encrypted at rest.** It lives encrypted in your own database, not in a plaintext file on disk.
 - **Active instantly.** No restart and no rebuild — the next message already uses it.
@@ -55,7 +63,14 @@ That is the whole local-hosting onboarding. After chat works, open **Channels �
 
 ### Host it on your own server
 
-The commands above start the **development** stack (source build, Vite, MailHog, phpMyAdmin). For a production install on a Linux box, use the published image and the `deploy/` contract — secrets can be generated for you, and you set the first administrator before the stack starts:
+The commands above start the **development** stack (source build, Vite, MailHog, phpMyAdmin). For a production install on a Linux box, the same installer drives the published image and the `deploy/` contract — it writes `deploy/.env` for you (the step most installs stumble over), pins the latest release, creates the first administrator, and runs the full lifecycle (prepare → pull → validate → start → smoke-test). Secrets are generated on first start and recorded in `deploy/data/secrets.env`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
+  bash -s -- --mode server --domain https://ai.example.com
+```
+
+Prefer manual control? The identical steps by hand:
 
 ```bash
 cp deploy/selfhost.env.example deploy/.env
@@ -170,6 +185,22 @@ Details and channel words: [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
 
 ---
 
+## The Synaplan ecosystem
+
+Everything below is the same platform, packaged for different homes. Pick what fits — nothing else is required.
+
+| Project | What it is |
+|---------|------------|
+| **[synaplan](https://github.com/metadist/synaplan)** | The platform itself (this repo): backend, frontend, widget, plugins, dev stack, and the `deploy/` production contract with Elestio, AWS Marketplace, and Umbrel adapters |
+| **[synaplan-charts](https://github.com/metadist/synaplan-charts)** | Helm charts for Kubernetes — for partners and enterprises running K8s clusters |
+| **[iPhone app](https://apps.apple.com/app/id6784278288?ct=github-readme)** | Native iOS app — point it at web.synaplan.com or any server you host |
+| **[Synamail](https://github.com/metadist/Synamail)** | Outlook add-in (Web, new & classic, Mac) — Synaplan inside your mailbox |
+| **[synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud)** / **[synaplan-opencloud](https://github.com/metadist/synaplan-opencloud)** | Apps for Nextcloud / OpenCloud — use those files as AI knowledge while the file store stays in charge (ownCloud works via the built-in WebDAV connection) |
+| **[synaplan-tts](https://github.com/metadist/synaplan-tts)** | Optional self-hosted text-to-speech service for voice output |
+| **[synaplan-base-php](https://github.com/metadist/synaplan-base-php)** | The base Docker image (FrankenPHP + gRPC + whisper.cpp) the platform builds on |
+
+---
+
 ## Prerequisites
 
 - **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
@@ -186,9 +217,11 @@ Details and channel words: [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
 
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
+| **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~9 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--minimal` and `--mode server` available) |
 | **Standard** | `docker compose up -d` | ~9 GB | Local try-out: full features, local embeddings (local chat model optional, +~14 GB) |
 | **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Fastest first boot — cloud AI only (Groq/OpenAI) |
-| **Production** | `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
+| **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
+| **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
 
 The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
 
@@ -235,7 +268,7 @@ docker compose -f docker-compose-minimal.yml up -d
 - **Email** — AI-powered email responses, plus live mailbox search (IMAP and Microsoft 365)
 - **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
 - **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule (**Channels → Saved Tasks**)
-- **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output)
+- **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; four baked voices, UI language selects the voice)
 - **Documents** — PDF, Word, Excel, images with OCR
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
@@ -295,17 +328,28 @@ In a multi-node cluster all nodes share one Redis, so WebSocket events published
 
 ## Text-to-Speech (Optional)
 
-For voice output, run [synaplan-tts](https://github.com/metadist/synaplan-tts) alongside Synaplan:
+Voice output is an **optional companion**, not part of the core stack — [synaplan-tts](https://github.com/metadist/synaplan-tts), image [`ghcr.io/metadist/synaplan-tts`](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts). The image already contains **four Piper voices** (English, German, Spanish, Turkish). Synaplan runs fully without it; the speaker control appears when the service answers.
 
 ```bash
-git clone https://github.com/metadist/synaplan-tts.git && cd synaplan-tts && docker compose up -d
+# Same compose file (recommended)
+docker compose --profile tts up -d
+
+# Or standalone, on this host or another machine
+docker run -d --name synaplan-tts -p 127.0.0.1:10200:10200 ghcr.io/metadist/synaplan-tts:latest
 ```
+
+The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://host.docker.internal:10200`).
+
+**The UI language selects the voice.** Chat sends the active frontend locale (`en` / `de` / `es` / `tr`); if the backend detects a different reply language, that wins. Piper then maps the short code to the matching baked voice (German UI → Thorsten, Spanish → davefx, …). There is no separate voice picker. Add more Piper models by dropping `.onnx` + `.onnx.json` into the extra-voices volume — see [synaplan-tts README](https://github.com/metadist/synaplan-tts#adding-more-voices) and [docs.synaplan.com/tts](https://docs.synaplan.com/index.php/tts).
 
 ---
 
 ## Common Commands
 
 ```bash
+# Startup progress ("please wait..." notes + READY message)
+docker compose logs -f startup-notes
+
 # Logs
 docker compose logs -f backend
 
@@ -353,7 +397,7 @@ In-repo guides (for developers working on this codebase):
 | [Synamail](https://github.com/metadist/Synamail) | Outlook add-in |
 | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) | Nextcloud integration |
 | [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) | OpenCloud integration |
-| [synaplan-tts](https://github.com/metadist/synaplan-tts) | Optional Piper TTS service |
+| [synaplan-tts](https://github.com/metadist/synaplan-tts) | Optional Piper TTS — [image](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts) with 4 baked voices |
 | [synaplan-sortx](https://github.com/metadist/synaplan-sortx) | Document-sorting plugin + local tool |
 | [synaplan-charts](https://github.com/metadist/synaplan-charts) | Helm charts for Kubernetes |
 | [synaplan-platform](https://github.com/metadist/synaplan-platform) | Production deployment configs |
@@ -389,3 +433,7 @@ See [AGENTS.md](AGENTS.md) for development guidelines and code standards.
 ## License
 
 [Apache-2.0](LICENSE)
+
+<p align="center">
+  <a href="https://osb-alliance.de/" target="_blank" rel="noopener noreferrer"><img src="docs/images/osba-member.png" alt="OSBA" width="180" height="90"></a>
+</p>

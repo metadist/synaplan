@@ -1,68 +1,61 @@
 <template>
   <div class="space-y-6" data-testid="page-config-task-prompts">
-    <!-- Header / overview card -->
-    <div class="surface-card p-6" data-testid="section-task-prompts-overview">
-      <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div class="flex items-start gap-3 flex-1 min-w-0">
-          <div class="p-2 rounded-lg bg-[var(--brand)]/10 flex-shrink-0">
-            <Icon icon="heroicons:document-text" class="w-6 h-6 text-[var(--brand)]" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <h2 class="text-2xl font-semibold txt-primary">{{ $t('config.taskPrompts.title') }}</h2>
-            <p class="txt-secondary text-sm mt-1">{{ $t('config.taskPrompts.subtitle') }}</p>
-            <div class="flex items-center gap-2 mt-3 text-xs flex-wrap">
-              <span
-                class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
-                data-testid="badge-language"
-              >
-                <Icon icon="heroicons:language" class="w-3.5 h-3.5" />
-                {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
-              </span>
-              <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row sm:items-center gap-3 lg:flex-shrink-0">
-          <!-- Stat pills -->
-          <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-total"
-            >
-              <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
-              <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
-            </div>
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-system"
-            >
-              <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
-              <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
-            </div>
-            <div
-              class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
-              data-testid="stat-custom"
-            >
-              <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
-              <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
-              <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
-            </div>
-          </div>
-
-          <button
-            class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
-            data-testid="btn-create-prompt"
-            @click="showCreateModal = true"
+    <PageHeader
+      :title="$t('config.taskPrompts.title')"
+      :subtitle="$t('config.taskPrompts.subtitle')"
+      icon="heroicons:document-text"
+      data-testid="section-task-prompts-overview"
+    >
+      <template #actions>
+        <!-- Stat pills -->
+        <div class="flex flex-wrap items-center gap-2" data-testid="section-task-prompts-stats">
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-total"
           >
-            <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
-            {{ $t('config.taskPrompts.createNew') }}
-          </button>
+            <Icon icon="heroicons:rectangle-stack" class="w-4 h-4 text-[var(--brand)]" />
+            <span class="text-sm font-semibold txt-primary">{{ prompts.length }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statTotal') }}</span>
+          </div>
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-system"
+          >
+            <Icon icon="heroicons:shield-check" class="w-4 h-4 text-blue-500" />
+            <span class="text-sm font-semibold txt-primary">{{ systemPromptCount }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statSystem') }}</span>
+          </div>
+          <div
+            class="px-3 py-2 rounded-lg surface-chip flex items-center gap-2"
+            data-testid="stat-custom"
+          >
+            <Icon icon="heroicons:user" class="w-4 h-4 text-purple-500" />
+            <span class="text-sm font-semibold txt-primary">{{ customPromptCount }}</span>
+            <span class="text-xs txt-secondary">{{ $t('config.taskPrompts.statCustom') }}</span>
+          </div>
         </div>
+
+        <button
+          class="px-4 py-2.5 rounded-lg bg-[var(--brand)] text-white hover:bg-[var(--brand)]/90 transition-colors font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap"
+          data-testid="btn-create-prompt"
+          @click="showCreateModal = true"
+        >
+          <Icon icon="heroicons:plus-circle" class="w-5 h-5" />
+          {{ $t('config.taskPrompts.createNew') }}
+        </button>
+      </template>
+
+      <div class="flex items-center gap-2 text-xs flex-wrap">
+        <span
+          class="px-2 py-1 rounded-full bg-[var(--brand)]/10 text-[var(--brand)] flex items-center gap-1.5"
+          data-testid="badge-language"
+        >
+          <Icon icon="heroicons:language" class="w-3.5 h-3.5" />
+          {{ $t('config.taskPrompts.workingLanguage', { language: currentLanguageLabel }) }}
+        </span>
+        <span class="txt-secondary">{{ $t('config.taskPrompts.workingLanguageHint') }}</span>
       </div>
-    </div>
+    </PageHeader>
 
     <!-- Two-pane layout: list + editor -->
     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] gap-6">
@@ -1209,6 +1202,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { useDialog } from '@/composables/useDialog'
 import ModelSelectDropdown from '@/components/ModelSelectDropdown.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'

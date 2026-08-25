@@ -90,8 +90,12 @@ source "amazon-ebs" "synaplan" {
     most_recent = true
   }
 
+  # Both ASCII only. EC2 rejects anything beyond it in the description, and it
+  # does so in ModifyImageAttribute, which runs after the image and its
+  # snapshots already exist: an em dash here failed a ten-minute build at its
+  # very last call. test-firstboot.sh guards the two lines.
   ami_name        = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}-{{timestamp}}"
-  ami_description = "Synaplan ${var.synaplan_version} — AI knowledge management, all-in-one on a single instance"
+  ami_description = "Synaplan ${var.synaplan_version} - AI knowledge management, all-in-one on a single instance"
 
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
@@ -132,7 +136,7 @@ build {
 
   # The file provisioner does not create parent directories.
   provisioner "shell" {
-    inline = ["mkdir -p /tmp/synaplan/deploy"]
+    inline = ["mkdir -p /tmp/synaplan/deploy /tmp/synaplan/_docker"]
   }
 
   # The portable deployment contract, unmodified. The AWS adapter calls these
@@ -150,6 +154,15 @@ build {
   provisioner "file" {
     source      = "${local.repo_root}/deploy/aws"
     destination = "/tmp/synaplan/deploy"
+  }
+
+  # compose.yaml bind-mounts ../_docker/centrifugo/config.json relative to
+  # deploy/, which on the instance is /opt/synaplan/_docker/.... Without this
+  # file Docker creates a directory at the mount point, Centrifugo never
+  # becomes healthy, and synaplan.service waits out its 30-minute start budget.
+  provisioner "file" {
+    source      = "${local.repo_root}/_docker/centrifugo"
+    destination = "/tmp/synaplan/_docker/centrifugo"
   }
 
   provisioner "shell" {

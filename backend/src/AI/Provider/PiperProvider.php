@@ -12,6 +12,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class PiperProvider implements TextToSpeechProviderInterface
 {
+    /**
+     * Frontend language selects the voice.
+     *
+     * ChatView sends the UI locale, then prefers the backend-detected reply
+     * language (meta.language) when streaming TTS. The four keys en/de/es/tr
+     * match the voices baked into ghcr.io/metadist/synaplan-tts. ru/fa resolve
+     * only when the operator added those extras under EXTRA_VOICES_DIR.
+     *
+     * @var array<string, string>
+     */
     private const LANGUAGE_VOICE_MAP = [
         'en' => 'en_US-lessac-medium',
         'de' => 'de_DE-thorsten-medium',

@@ -18,6 +18,7 @@ APP_DIR=/opt/synaplan
 CADDY_SRC="$APP_DIR/deploy/aws/caddy"
 CADDY_FILE=/etc/caddy/Caddyfile
 CADDY_ENV=/etc/caddy/synaplan.env
+SELFSIGNED_DIR=/etc/caddy/selfsigned
 DATA_MOUNT=/var/lib/synaplan
 ENV_FILE="$DATA_MOUNT/.env"
 
@@ -108,8 +109,55 @@ if [[ -n "$requested_domain" && -f "$ENV_FILE" ]]; then
     log "Apply it to the running stack with: sudo systemctl restart synaplan"
 fi
 
-install -d -m 0755 /etc/caddy /var/log/caddy
-chown caddy:caddy /var/log/caddy
+# The certificate pair Caddyfile.selfsigned serves. Not Caddy's `tls internal`:
+# that site address has no host name, a client connecting by bare IP sends no
+# SNI, and the internal issuer then has no name to mint a certificate for — it
+# aborts every handshake with "tlsv1 alert internal error". A bare IP is
+# exactly how this AMI is reached until a domain is attached, so the
+# certificate is minted here, with the instance's own addresses in the SANs.
+#
+# Minted on the instance and never baked into the image: an AMI that ships a
+# private key hands the SAME key to every customer. An existing pair is kept —
+# regenerating it on every boot would invalidate the exception the operator's
+# browser has already stored.
+ensure_selfsigned_certificate() {
+    install -d -m 0755 "$SELFSIGNED_DIR"
+    if [[ -s "$SELFSIGNED_DIR/cert.pem" && -s "$SELFSIGNED_DIR/key.pem" ]]; then
+        return 0
+    fi
+
+    local san="DNS:localhost,IP:127.0.0.1,IP:::1" address token public_ip
+    for address in $(hostname -I 2>/dev/null || true); do
+        san+=",IP:$address"
+    done
+    # The public address is the one the operator's browser actually dials.
+    # Best effort over IMDSv2: an instance without metadata access still gets
+    # a working certificate, just without its public IP in the SANs — the
+    # browser warning is identical either way. --max-time bounds the whole
+    # request: an endpoint that accepts the connection and then stalls would
+    # otherwise hang the first boot here indefinitely.
+    token="$(curl -sf -X PUT --connect-timeout 2 --max-time 5 \
+        -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
+        http://169.254.169.254/latest/api/token 2>/dev/null || true)"
+    if [[ -n "$token" ]]; then
+        public_ip="$(curl -sf --connect-timeout 2 --max-time 5 \
+            -H "X-aws-ec2-metadata-token: $token" \
+            http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)"
+        [[ -n "$public_ip" ]] && san+=",IP:$public_ip"
+    fi
+
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+        -keyout "$SELFSIGNED_DIR/key.pem" -out "$SELFSIGNED_DIR/cert.pem" \
+        -days 3650 -subj '/CN=synaplan' -addext "subjectAltName=$san" \
+        2>/dev/null
+    chown caddy:caddy "$SELFSIGNED_DIR/key.pem" "$SELFSIGNED_DIR/cert.pem"
+    chmod 0600 "$SELFSIGNED_DIR/key.pem"
+    chmod 0644 "$SELFSIGNED_DIR/cert.pem"
+    log "Minted a self-signed certificate ($san)"
+}
+
+install -d -m 0755 /etc/caddy
+install -d -o caddy -g caddy -m 0750 /var/log/caddy
 
 if [[ -n "$domain" ]]; then
     log "Serving https://$domain with a Let's Encrypt certificate"
@@ -121,6 +169,7 @@ EOF
 else
     log "No domain configured; serving HTTPS with a self-signed certificate"
     log "Attach one later with: sudo synaplan-tls app.example.com"
+    ensure_selfsigned_certificate
     install -m 0644 "$CADDY_SRC/Caddyfile.selfsigned" "$CADDY_FILE"
     : > "$CADDY_ENV"
 fi
@@ -132,6 +181,7 @@ install -d -m 0755 /etc/systemd/system/caddy.service.d
 cat > /etc/systemd/system/caddy.service.d/10-synaplan.conf <<EOF
 [Service]
 EnvironmentFile=$CADDY_ENV
+LogsDirectory=caddy
 EOF
 
 # With the same environment the unit will run under: the domain Caddyfile is a
@@ -139,6 +189,14 @@ EOF
 # reject a configuration that is correct.
 SYNAPLAN_DOMAIN="$domain" SYNAPLAN_ACME_EMAIL="$acme_email" \
     caddy validate --config "$CADDY_FILE" --adapter caddyfile
+
+# validate PROVISIONS the configuration, and provisioning a `log { output file }`
+# block OPENS the file — as root, because this script runs as root. That leaves
+# /var/log/caddy/synaplan.log owned by root, mode 0600, and caddy.service
+# (User=caddy) then dies in milliseconds on "permission denied" opening its own
+# log. This killed a verification run whose whole stack was healthy behind the
+# dead proxy. Hand everything back to the service user, every time validate ran.
+chown -R caddy:caddy /var/log/caddy
 
 # During the first boot systemd starts Caddy itself, right after this unit.
 if systemctl is-active --quiet caddy.service; then

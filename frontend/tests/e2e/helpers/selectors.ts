@@ -601,5 +601,19 @@ export const selectors = {
     btnSave: '[data-testid="btn-save"]',
     btnClose: '[data-testid="btn-close"]',
   },
+  mcp: {
+    page: '[data-testid="page-config-mcp-servers"]',
+    list: '[data-testid="section-mcp-list"]',
+    addBtn: '[data-testid="btn-mcp-add"]',
+    editor: '[data-testid="section-mcp-editor"]',
+    inputName: '[data-testid="input-mcp-name"]',
+    inputUrl: '[data-testid="input-mcp-url"]',
+    saveBtn: '[data-testid="btn-mcp-save"]',
+    stateEmpty: '[data-testid="mcp-empty"]',
+    /** One list entry per configured server; also a stable presence marker */
+    serverRow: (id: number) => `[data-testid="mcp-server-${id}"]`,
+    serverRowAny: '[data-testid^="mcp-server-"]',
+    deleteServer: (id: number) => `[data-testid="btn-mcp-delete-${id}"]`,
+  },
   toast: {},
 } as const

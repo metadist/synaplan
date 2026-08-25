@@ -94,20 +94,20 @@
     "error": "Fehler",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Chat-Widget",
+    "chatWidget": "Deine Widgets",
     "docSummary": "Zusammenfasser",
-    "mailHandler": "E-Mail-Automatisierung",
+    "mailHandler": "IMAP-E-Mail-Handler",
     "plugins": "Plugins",
     "files": "Quellen",
     "memories": "Erinnerungen",
     "feedback": "Feedback",
     "ragSearch": "Suche",
     "vectorStorage": "Vektorspeicher",
-    "configInbound": "Kanäle",
-    "configAiModels": "KI-Modelle",
+    "configInbound": "Standard-Eingang",
+    "configAiModels": "KI-Modell-Konfiguration",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "KI-Anweisungen",
-    "configSortingPrompt": "Routing",
+    "configTaskPrompts": "Vordefinierte Anweisungen",
+    "configSortingPrompt": "Routing-Konfiguration",
     "configApiKeys": "API-Schlüssel",
     "configApiDocs": "API-Dokumentation",
     "statistics": "Statistiken",
@@ -133,7 +133,7 @@
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
     "connections": "Verbindungen",
-    "savedTasks": "Gespeicherte Aufgaben"
+    "savedTasks": "Wiederkehrende Aufgaben"
   },
   "adminModelStatus": {
     "title": "Modell-Status",
@@ -636,27 +636,29 @@
     "historyDescription": "Chat-Verlauf",
     "profile": "Profil",
     "tools": "Tools",
-    "toolsChatWidget": "Chat-Widget",
+    "toolsChatWidget": "Deine Widgets",
     "toolsDocSummary": "Zusammenfasser",
-    "toolsMailHandler": "E-Mail-Automatisierung",
+    "toolsMailHandler": "IMAP-E-Mail-Handler",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
-    "savedTasks": "Gespeicherte Aufgaben",
+    "configConnections": "Verbindungen einrichten",
+    "groupApi": "API",
+    "savedTasks": "Wiederkehrende Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
     "channels": "Kanäle",
     "channelsDescription": "Verbundene Kanäle",
-    "aiSetup": "KI-Konfiguration",
-    "aiSetupDescription": "Modelle, Anweisungen & Routing",
+    "aiSetup": "KI-Setup & Tools",
+    "aiSetupDescription": "Modelle, Anweisungen, Routing & Tools",
     "preferences": "Einstellungen",
     "account": "Konto",
     "accountDescription": "Konto & Einstellungen",
-    "configInbound": "Übersicht",
-    "configAiModels": "KI-Modelle",
+    "configInbound": "Standard-Eingang",
+    "configAiModels": "KI-Modell-Konfiguration",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "KI-Anweisungen",
-    "configSortingPrompt": "Routing",
+    "configTaskPrompts": "Vordefinierte Anweisungen",
+    "configSortingPrompt": "Routing-Konfiguration",
     "configApiKeys": "API-Schlüssel",
     "statistics": "Statistiken",
     "subscription": "Abonnement",
@@ -1469,6 +1471,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Erweiterte Funktionen für Ihren Workflow",
+    "fallbackTitle": "Plugin",
+    "loading": "Plugin wird geladen…",
     "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
     "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
@@ -2027,7 +2031,7 @@
       "deleteConfirm": "Entfernen",
       "deleted": "{name} wurde entfernt.",
       "deleteFailed": "Die Verbindung konnte nicht entfernt werden.",
-      "channelHint": "Im Chat heißt dieser Kanal {channel}",
+      "channelHint": "Um diese Verbindung im Chat zu nutzen, schreib das Wort {channel} in deine Nachricht.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2660,7 +2664,7 @@
     "statusReadyTitle": "Deine KI ist bereit",
     "statusReadyText": "Das Standard-Chat-Modell hat einen funktionierenden Anbieter. Du kannst unten jederzeit weitere Anbieter hinzufügen.",
     "statusNotReadyTitle": "Noch kein KI-Anbieter verbunden",
-    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert.",
+    "statusNotReadyText": "Der Chat funktioniert erst, wenn ein Anbieter verbunden ist. Füge unten einen API-Schlüssel hinzu — Groq bietet einen kostenlosen Schlüssel, der in unter einer Minute funktioniert — oder verbinde ein lokales Ollama, das ganz ohne Schlüssel auskommt.",
     "cloudProviders": "Cloud-Anbieter",
     "cloudProvidersHint": "API-Schlüssel einfügen — er wird live getestet und verschlüsselt gespeichert. Schlüssel aus deiner .env-Datei werden automatisch übernommen.",
     "recommended": "Empfohlen",
@@ -2690,6 +2694,11 @@
     "removed": "{provider}-Schlüssel entfernt",
     "removedEnvStillSet": "Gespeicherter {provider}-Schlüssel entfernt — {envVar} ist in der Umgebung weiterhin gesetzt, {provider} bleibt damit verbunden",
     "loadFailed": "Anbieter-Status konnte nicht geladen werden",
+    "ownService": {
+      "title": "Eigenen Dienst hinzufügen",
+      "description": "Dein Anbieter fehlt in der Liste? Füge ihn im Tab „Modelle bearbeiten“ der KI-Modell-Konfiguration hinzu.",
+      "cta": "Eigenen Dienst hinzufügen"
+    },
     "localAi": {
       "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
       "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
@@ -2739,7 +2748,7 @@
   "setupBanner": {
     "adminTitle": "Kein KI-Anbieter eingerichtet",
     "userTitle": "Der Chat ist noch nicht bereit",
-    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert.",
+    "adminText": "Der Chat startet erst, wenn ein KI-Anbieter verbunden ist. Öffne die Einrichtungsseite und hinterlege einen Schlüssel — Groq hat eine kostenlose Option, die in etwa einer Minute funktioniert — oder verbinde ein lokales Ollama, das ganz ohne Schlüssel auskommt.",
     "userText": "Ein Administrator muss noch einen KI-Anbieter verbinden. In der Dokumentation steht, wie das geht.",
     "cta": "KI-Anbieter einrichten",
     "docsCta": "Dokumentation öffnen"
@@ -4152,6 +4161,11 @@
     "register": "Registrieren",
     "welcomeBack": "Willkommen zurück",
     "loginSubtitle": "Melde dich an, um fortzufahren",
+    "demoHint": {
+      "title": "Frische Demo-Installation",
+      "text": "Melde dich als Administrator an, um einen KI-Anbieter zu verbinden und die Einrichtung abzuschließen.",
+      "cta": "Als Administrator fortfahren"
+    },
     "getStarted": "Loslegen",
     "registerSubtitle": "Erstelle dein kostenloses Konto",
     "email": "E-Mail",
@@ -4289,6 +4303,7 @@
     },
     "listView": {
       "title": "Listenansicht",
+      "shortTitle": "Liste",
       "source": "Quelle",
       "allMemories": "Alle Erinnerungen",
       "categories": "Kategorien",
@@ -4298,10 +4313,12 @@
       "sortByDate": "Nach Datum sortieren"
     },
     "graphView": {
-      "title": "Netzwerk-Ansicht"
+      "title": "Netzwerk-Ansicht",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D-Visualisierung"
+      "title": "3D-Visualisierung",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Kategorien",
@@ -4935,7 +4952,38 @@
         "name": "n8n",
         "summary": "Automatisierungs-Workflows",
         "hint": "Verbinde einen n8n-MCP-Server, damit der Assistent deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Seiten und Datenbanken",
+        "hint": "Speichere die Verbindung und melde dich danach mit deinem Notion-Konto an. Synaplan kann dann Seiten suchen und lesen, die du freigibst. Den Zugriff kannst du jederzeit in Notion widerrufen."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Bild- und Videowerkzeuge",
+        "hint": "Speichere die Verbindung und melde dich danach mit deinem Higgsfield-Konto an. Der Verlauf ist nur lesend; Bilder oder Videos erzeugen braucht Schreibaktionen und verbraucht deine Higgsfield-Credits."
       }
+    },
+    "oauthFormHint": "Dieser Server nutzt deine Kontoanmeldung. Speichere ihn, danach wirst du zum Anbieter weitergeleitet. Es gibt kein Zugriffstoken zum Einfügen.",
+    "connect": "Verbinden",
+    "reconnect": "Erneut verbinden",
+    "connecting": "Anmeldung wird geöffnet…",
+    "connectFailed": "Anmeldung konnte nicht gestartet werden",
+    "oauthConnected": "Verbunden",
+    "oauthReauth": "Aktion nötig (erneut verbinden)",
+    "oauthNotConnected": "Nicht verbunden",
+    "oauthConnectedToast": "Erfolgreich angemeldet",
+    "disconnect": "Trennen",
+    "disconnecting": "Wird getrennt…",
+    "disconnectTitle": "Diesen Server trennen?",
+    "disconnectMessage": "Die gespeicherte Anmeldung für \"{name}\" wird gelöscht. Der Server bleibt in der Liste — zur Nutzung erneut anmelden.",
+    "disconnected": "Anmeldung entfernt",
+    "disconnectFailed": "Anmeldung konnte nicht entfernt werden",
+    "oauthError": {
+      "denied": "Anmeldung wurde abgebrochen",
+      "missing_code": "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",
+      "exchange_failed": "Anmeldung konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
+      "disabled": "Die Anmeldung über den Anbieter ist vom Administrator deaktiviert"
     },
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",

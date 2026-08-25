@@ -43,7 +43,12 @@ const promptName = computed((): string => {
 })
 
 const formatChecked = (timestamp: number | null): string =>
-  timestamp ? new Date(timestamp * 1000).toLocaleString(props.locale) : ''
+  timestamp
+    ? new Date(timestamp * 1000).toLocaleString(props.locale, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : ''
 
 const davMarker = (type: string): string =>
   type === 'caldav' ? '/remote.php/dav/calendars/' : '/remote.php/dav/files/'
@@ -156,34 +161,53 @@ const onDelete = async () => {
 
 <template>
   <li class="surface-card p-4 space-y-3" data-testid="connection-row">
-    <div class="flex flex-wrap items-center gap-3">
+    <!-- Name + status get the full card width so neither is squeezed on phones. -->
+    <div class="flex items-start justify-between gap-3">
       <div class="flex-1 min-w-0">
-        <p class="font-medium txt-primary truncate">{{ item.name }}</p>
-        <p class="text-xs txt-secondary">
+        <p class="font-medium txt-primary break-words">{{ item.name }}</p>
+        <p class="text-xs txt-secondary mt-0.5">
           {{ $t(`config.connections.types.${item.type}`, item.type) }}
           <span v-if="item.last_checked">
             ·
             {{ $t('config.connections.lastChecked', { when: formatChecked(item.last_checked) }) }}
           </span>
         </p>
-        <p v-if="promptName" class="text-xs txt-secondary mt-1" data-testid="connection-channel">
-          {{ $t('config.connections.channelHint', { channel: promptName }) }}
-          <span class="pill ml-1">{{ promptName }}</span>
-        </p>
-        <p
-          v-if="item.status === 'reauth_required'"
-          class="text-xs text-[var(--status-warning)] mt-1"
-        >
-          {{ $t('config.connections.reauthHint') }}
-        </p>
       </div>
-      <ConnectionStatusPill :status="item.status" />
+      <ConnectionStatusPill :status="item.status" class="shrink-0 mt-0.5" />
+    </div>
+
+    <p v-if="item.status === 'reauth_required'" class="text-xs text-[var(--status-warning)]">
+      {{ $t('config.connections.reauthHint') }}
+    </p>
+
+    <!-- The chat word: this is what the user types in a message to use the connection. -->
+    <div
+      v-if="promptName"
+      class="flex items-start gap-2.5 rounded-lg bg-[var(--brand-alpha-light)] px-3 py-2.5"
+      data-testid="connection-channel"
+    >
+      <Icon
+        icon="heroicons:chat-bubble-oval-left-ellipsis"
+        class="w-4 h-4 text-[var(--brand)] shrink-0 mt-1"
+        aria-hidden="true"
+      />
+      <p class="text-sm txt-primary leading-relaxed min-w-0">
+        <i18n-t keypath="config.connections.channelHint" tag="span" scope="global">
+          <template #channel>
+            <span class="pill mx-0.5 font-mono">{{ promptName }}</span>
+          </template>
+        </i18n-t>
+      </p>
+    </div>
+
+    <!-- Actions share the row evenly on phones instead of crushing the text column. -->
+    <div class="flex flex-wrap gap-2">
       <button
         v-if="
           (item.type === 'm365' || item.type === 'dropbox') && item.status === 'reauth_required'
         "
         type="button"
-        class="btn-primary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
         @click="emit('reconnect')"
       >
         <Icon icon="heroicons:arrow-path" class="w-4 h-4" />
@@ -191,7 +215,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
         :disabled="testing"
         data-testid="btn-test-connection"
         @click="onTest"
@@ -204,7 +228,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="btn-secondary inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
         data-testid="btn-edit-connection"
         @click="openEdit"
       >
@@ -213,7 +237,7 @@ const onDelete = async () => {
       </button>
       <button
         type="button"
-        class="icon-ghost icon-ghost--danger inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium"
+        class="icon-ghost icon-ghost--danger inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium flex-1 sm:flex-none"
         data-testid="btn-delete-connection"
         @click="onDelete"
       >

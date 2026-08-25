@@ -318,7 +318,7 @@ final readonly class SavedTaskRunner
             $this->mail->sendTaskResultEmail(
                 $address,
                 'Saved Task paused: '.$task->getName(),
-                "The Saved Task “{$task->getName()}” was paused automatically after repeated failures.\n\nReason: {$reason}\n\nOpen AI Instructions to resume it.",
+                "The Saved Task “{$task->getName()}” was paused automatically after repeated failures.\n\nReason: {$reason}\n\nGo to AI Instructions to resume it.",
             );
         } catch (\Throwable $e) {
             $this->logger->warning('SavedTaskRunner: pause notice failed', [

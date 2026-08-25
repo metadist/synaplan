@@ -18,7 +18,11 @@ set -Eeuo pipefail
 APP_DIR=/opt/synaplan
 DEPLOY_DIR="$APP_DIR/deploy"
 DATA_MOUNT=/var/lib/synaplan
-DATA_LABEL=synaplan-data
+# XFS labels are at most 12 characters. synaplan-data is 13, and mkfs.xfs
+# rejects it with "Invalid value synaplan-data for -L option" — which is how
+# the 4.2.4 verification died seven seconds into firstboot. test-firstboot.sh
+# enforces the length.
+DATA_LABEL=synaplan
 ENV_FILE="$DATA_MOUNT/.env"
 STATE_FILE="$DATA_MOUNT/.firstboot-complete"
 
@@ -88,7 +92,19 @@ setting() {
 # --------------------------------------------------------------------------
 
 root_device() {
-    findmnt --noheadings --output SOURCE --target / | sed 's/[0-9]*$//'
+    # The disk that holds `/`, not the partition. Stripping trailing digits
+    # turns /dev/nvme0n1p1 into /dev/nvme0n1p, which then fails to match the
+    # whole-disk name nvme0n1 — so a Nitro instance would treat its own root
+    # disk as a candidate data volume. PKNAME is the parent lsblk already
+    # knows; when `/` is on a whole disk, PKNAME is empty and SOURCE is used.
+    local source parent
+    source="$(findmnt --noheadings --output SOURCE --target /)"
+    parent="$(lsblk --noheadings --output PKNAME "$source" 2>/dev/null | tr -d '[:space:]')"
+    if [[ -n "$parent" ]]; then
+        printf '/dev/%s\n' "$parent"
+        return 0
+    fi
+    printf '%s\n' "$source"
 }
 
 # The empty block device the stack attached for user data. The next step
@@ -149,6 +165,10 @@ prepare_data_volume() {
     elif device="$(find_blank_data_device)"; then
         log "Formatting $device as the Synaplan data volume"
         mkfs.xfs -L "$DATA_LABEL" "$device"
+        # udev and blkid learn the new label in the background. Mounting by
+        # LABEL= in the next lines can fail even though mkfs succeeded; wait
+        # for udev, then mount the device we just formatted.
+        command -v udevadm >/dev/null && udevadm settle --timeout=30 || true
     else
         # No separate volume. Not the recommended layout — the CloudFormation
         # templates always attach one — but a bare "launch this AMI" must still
@@ -162,7 +182,9 @@ prepare_data_volume() {
     if ! grep -q "LABEL=$DATA_LABEL" /etc/fstab; then
         printf 'LABEL=%s %s xfs defaults,nofail 0 2\n' "$DATA_LABEL" "$DATA_MOUNT" >> /etc/fstab
     fi
-    mount "$DATA_MOUNT"
+    # By the device we just identified, not by LABEL=. A LABEL= lookup right
+    # after mkfs is the udev race above; later boots go through fstab.
+    mount "$device" "$DATA_MOUNT"
     log "Mounted the data volume at $DATA_MOUNT"
 }
 

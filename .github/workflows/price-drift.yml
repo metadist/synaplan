@@ -29,7 +29,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:12.3@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+        image: mariadb:12.3@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -44,7 +44,7 @@ jobs:
           --health-retries=5
 
       redis:
-        image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+        image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
         ports:
           - 6379:6379
         options: >-

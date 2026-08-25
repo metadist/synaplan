@@ -1,7 +1,7 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-12 relative overflow-hidden"
-    :class="isNativeApp() ? 'items-start' : 'items-center'"
+    class="h-dvh min-h-dvh bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative overflow-y-auto overflow-x-hidden"
+    :class="isNativeApp() ? 'items-start' : 'items-start sm:items-center'"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
     "
@@ -64,7 +64,7 @@
 
     <div class="w-full max-w-sm auth-card-enter relative z-10" data-testid="section-card">
       <div
-        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8"
+        class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-6 sm:p-8"
         :class="
           isDark
             ? 'ring-1 ring-white/[0.04] shadow-black/30'
@@ -74,8 +74,8 @@
           backgroundColor: isDark ? 'rgba(15, 15, 16, 0.8)' : 'rgba(255, 255, 255, 0.95)',
         }"
       >
-        <div class="text-center mb-8" data-testid="section-header">
-          <div class="auth-accent-enter mb-5">
+        <div class="text-center mb-[18px] sm:mb-8" data-testid="section-header">
+          <div class="auth-accent-enter mb-4 sm:mb-5">
             <div class="w-10 h-[3px] bg-brand rounded-full mx-auto"></div>
           </div>
           <h1 class="text-2xl font-bold txt-primary auth-title-enter">
@@ -168,6 +168,8 @@
                 </div>
               </div>
             </Transition>
+
+            <DemoLoginHint @continue="continueAsDemoAdmin" />
 
             <!-- Social login -->
             <div
@@ -362,7 +364,7 @@
 
             <p
               v-if="config.auth.registrationEnabled"
-              class="mt-6 text-center text-sm txt-secondary"
+              class="mt-[21px] -mb-[3px] sm:mt-6 sm:mb-0 text-center text-sm txt-secondary"
             >
               {{ $t('auth.noAccount') }}
               <router-link
@@ -378,7 +380,7 @@
       </div>
 
       <!-- Footer -->
-      <div class="mt-8 flex justify-center">
+      <div class="mt-6 sm:mt-8 flex justify-center">
         <a
           :href="config.branding.homepageUrl"
           target="_blank"
@@ -403,7 +405,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -427,6 +429,12 @@ import { useConfigStore } from '@/stores/config'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
+import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
+import {
+  FIRST_RUN_ADMIN_EMAIL,
+  FIRST_RUN_ADMIN_PASSWORD,
+  FIRST_RUN_SETUP_PATH,
+} from '@/constants/firstRunAdmin'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -517,7 +525,23 @@ const loadSocialProviders = async () => {
   }
 }
 
+watch(
+  () => config.setup.demoLoginHint,
+  (show) => {
+    if (!show) return
+    const emailFromQuery = route.query.email
+    if (typeof emailFromQuery === 'string' && emailFromQuery !== '') return
+    if (email.value === '') email.value = FIRST_RUN_ADMIN_EMAIL
+    if (password.value === '') password.value = FIRST_RUN_ADMIN_PASSWORD
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
+  const emailFromQuery = route.query.email
+  if (typeof emailFromQuery === 'string' && emailFromQuery !== '') {
+    email.value = emailFromQuery
+  }
   const reason = route.query.reason as string
   if (reason === 'session_expired') sessionExpired.value = true
   if (route.query.registered === 'true') justRegistered.value = true
@@ -566,6 +590,17 @@ function allowExpiredAutoRedirect(): boolean {
     // potential loop.
     return false
   }
+}
+
+const continueAsDemoAdmin = async () => {
+  email.value = FIRST_RUN_ADMIN_EMAIL
+  password.value = FIRST_RUN_ADMIN_PASSWORD
+  if (!route.query.redirect) {
+    await router.replace({
+      query: { ...route.query, redirect: FIRST_RUN_SETUP_PATH },
+    })
+  }
+  await handleLogin()
 }
 
 const handleLogin = async () => {

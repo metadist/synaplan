@@ -49,4 +49,22 @@ class TestProviderContractTest extends ChatProviderContractTest
                 "TestProvider should have '$capability' capability");
         }
     }
+
+    /**
+     * User-facing demo replies must ship a marker (not markdown links).
+     * Guests cannot follow /admin/setup; the frontend turns the marker into
+     * a button that signs in as the seeded admin first.
+     */
+    public function testUserFacingDemoReplyUsesSetupMarkerNotMarkdownLinks(): void
+    {
+        $result = $this->getProvider()->chat(
+            [['role' => 'user', 'content' => 'which model are you?']],
+            ['model' => 'test-model']
+        );
+
+        $this->assertStringContainsString('[[SETUP_CTA]]', $result['content']);
+        $this->assertStringNotContainsString('/admin/setup', $result['content']);
+        $this->assertStringNotContainsString('](', $result['content']);
+        $this->assertStringContainsString('Ollama', $result['content']);
+    }
 }

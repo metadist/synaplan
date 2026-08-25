@@ -5,13 +5,12 @@
       data-testid="page-model-status"
     >
       <div class="max-w-6xl mx-auto space-y-6">
-        <div class="surface-card p-6" data-testid="section-header">
-          <div class="flex items-center gap-3 mb-2">
-            <Icon icon="mdi:heart-pulse" class="w-8 h-8 text-[var(--brand)]" />
-            <h1 class="text-3xl font-bold txt-primary">{{ $t('adminModelStatus.title') }}</h1>
-          </div>
-          <p class="txt-secondary">{{ $t('adminModelStatus.subtitle') }}</p>
-        </div>
+        <PageHeader
+          :title="$t('adminModelStatus.title')"
+          :subtitle="$t('adminModelStatus.subtitle')"
+          icon="mdi:heart-pulse"
+          data-testid="section-header"
+        />
 
         <div v-if="isLoading" class="surface-card p-8 text-center" data-testid="state-loading">
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto mb-4 txt-secondary" />
@@ -245,6 +244,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import {

@@ -44,8 +44,10 @@ x-app-environment: &app-environment
   BOOTSTRAP_ADMIN_EMAIL: "${BOOTSTRAP_ADMIN_EMAIL:-}"
   BOOTSTRAP_ADMIN_PASSWORD: "${BOOTSTRAP_ADMIN_PASSWORD:-}"
   BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE: "${BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE:-false}"
-  # Auth-surface switches (issues #462 / #1517). Empty keeps the default
-  # (enabled); SSO-/OIDC-only deployments set both to "false".
+  # Auth-surface switches (issues #462 / #1517). Empty keeps the application
+  # default, which is enabled, so an existing deployment is unaffected. An
+  # install reachable from the open internet that nobody watches wants
+  # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   DB_HOST: db
@@ -85,10 +87,6 @@ x-app-environment: &app-environment
   GOOGLE_GEMINI_API_KEY: "${GOOGLE_GEMINI_API_KEY:-}"
   MISTRAL_API_KEY: "${MISTRAL_API_KEY:-}"
   XAI_API_KEY: "${XAI_API_KEY:-}"
-  # Whether visitors can create their own account. An install reachable from the
-  # open internet that nobody watches wants this off; the application default
-  # stays `true` so an existing deployment is unaffected.
-  REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-true}"
   # Operator billing. Empty keys mean open-source mode: no plans, no quotas, no
   # upgrade prompts, and every tier gate open (see docs/BILLING_SELFHOST.md).
   # Setting them turns this install into a paid product run by YOU, billed
@@ -195,7 +193,7 @@ services:
     networks: [internal]
 
   db:
-    image: mariadb:12.3.2@sha256:759869cb6f003234a95c6384cdee245b4bce7de26913fe607a8110362c0c007d
+    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MARIADB_DATABASE: "${MARIADB_DATABASE:-synaplan}"
@@ -218,7 +216,7 @@ services:
     networks: [internal]
 
   redis:
-    image: redis:7.4-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - ./data/redis:/data
@@ -232,7 +230,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.1@sha256:8ba0c9443dadedc21b20254b3fc76f35c1998b29acc7cdec877ea0c3636c237e
+    image: centrifugo/centrifugo:v6.9.2@sha256:f89352e38ef8043aaaa9045dec41cc8f2d35075b86ff553d4091ac19b547a3a6
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     environment:
       CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
@@ -268,7 +266,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.18.3@sha256:0bd98fa7977f1e75694779359ca4e212822e5a71334e28421182f72f209d5286
+    image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
@@ -281,7 +279,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:9d30908e41144b1f1da89b9d8e33c07e4aeb43ff41a8660241b1686e2cc330ad
+    image: ollama/ollama:latest@sha256:57d60e686821ea81a7748a3ec8141308c8b8f95b27105713954abf7a6529e700
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

@@ -28,6 +28,9 @@ vi.mock('@/services/api/impersonationApi', () => ({
 vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
+  beginAuthMutation: vi.fn(),
+  endAuthMutation: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
 }))
 
 vi.mock('@/services/authService', async () => {

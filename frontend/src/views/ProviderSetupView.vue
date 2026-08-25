@@ -2,13 +2,11 @@
   <MainLayout data-testid="view-admin-setup">
     <div class="container mx-auto px-6 py-8 max-w-5xl overflow-x-hidden">
       <!-- Header -->
-      <div class="mb-6">
-        <div class="flex items-center gap-3 mb-2">
-          <Icon icon="mdi:rocket-launch-outline" class="w-8 h-8 text-[var(--brand)]" />
-          <h1 class="text-3xl font-bold txt-primary">{{ $t('adminSetup.title') }}</h1>
-        </div>
-        <p class="txt-secondary">{{ $t('adminSetup.description') }}</p>
-      </div>
+      <PageHeader
+        :title="$t('adminSetup.title')"
+        :subtitle="$t('adminSetup.description')"
+        icon="mdi:rocket-launch-outline"
+      />
 
       <LocalAiDownloadCard class="mb-6" />
 
@@ -52,7 +50,11 @@
       >
         <Icon icon="mdi:cloud-alert" class="w-8 h-8 mx-auto text-[var(--status-warning)]" />
         <p class="txt-secondary mt-3">{{ $t('adminSetup.loadFailed') }}</p>
-        <button class="btn-primary mt-4" data-testid="setup-retry" @click="refresh">
+        <button
+          class="btn-primary px-6 py-2.5 rounded-lg font-medium mt-4"
+          data-testid="setup-retry"
+          @click="refresh"
+        >
           {{ $t('common.retry') }}
         </button>
       </div>
@@ -71,6 +73,24 @@
             :is-default-chat="provider.name === defaultChatProvider"
             @changed="refresh"
           />
+        </div>
+
+        <div class="surface-card rounded-lg p-5 flex items-start gap-3 mb-8">
+          <Icon icon="mdi:puzzle-plus-outline" class="w-6 h-6 shrink-0 txt-brand mt-0.5" />
+          <div class="min-w-0 flex-1">
+            <h3 class="text-lg font-semibold txt-primary">
+              {{ $t('adminSetup.ownService.title') }}
+            </h3>
+            <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.ownService.description') }}</p>
+            <RouterLink
+              :to="{ path: '/ai/models', query: { tab: 'edit' } }"
+              class="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-[var(--brand)] hover:underline"
+              data-testid="setup-own-service"
+            >
+              {{ $t('adminSetup.ownService.cta') }}
+              <Icon icon="mdi:arrow-right" class="w-4 h-4" aria-hidden="true" />
+            </RouterLink>
+          </div>
         </div>
 
         <!-- Local AI note -->
@@ -98,8 +118,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'

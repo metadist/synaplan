@@ -94,20 +94,20 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Chat Widget",
+    "chatWidget": "Your Widgets",
     "docSummary": "Summarizer",
-    "mailHandler": "Email Automation",
+    "mailHandler": "IMAP Email Handler",
     "plugins": "Plugins",
     "files": "Sources",
     "memories": "Memories",
     "feedback": "Feedback",
     "ragSearch": "Search",
     "vectorStorage": "Vector Storage",
-    "configInbound": "Channels",
-    "configAiModels": "AI Models",
+    "configInbound": "Standard Inbound",
+    "configAiModels": "AI Model Config",
     "configProviderHiggsfield": "Higgsfield Connection",
-    "configTaskPrompts": "AI Instructions",
-    "configSortingPrompt": "Routing",
+    "configTaskPrompts": "Preconfigured Instructions",
+    "configSortingPrompt": "Routing Config",
     "configApiKeys": "API Keys",
     "configApiDocs": "API Documentation",
     "statistics": "Statistics",
@@ -133,7 +133,7 @@
     "mcpServers": "MCP Servers",
     "aiAgents": "AI Agents",
     "connections": "Connections",
-    "savedTasks": "Saved Tasks"
+    "savedTasks": "Saved Recurring Tasks"
   },
   "adminModelStatus": {
     "title": "Model Status",
@@ -641,26 +641,28 @@
     "historyDescription": "Chat history",
     "profile": "Profile",
     "tools": "Tools",
-    "toolsChatWidget": "Chat Widget",
+    "toolsChatWidget": "Your Widgets",
     "toolsDocSummary": "Summarizer",
-    "toolsMailHandler": "Email Automation",
+    "toolsMailHandler": "IMAP Email Handler",
     "mcpServers": "MCP Servers",
     "connections": "Connections",
-    "savedTasks": "Saved Tasks",
+    "configConnections": "Configure Connections",
+    "groupApi": "API",
+    "savedTasks": "Saved Recurring Tasks",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
     "channels": "Channels",
     "channelsDescription": "Connected channels",
-    "aiSetup": "AI Setup",
-    "aiSetupDescription": "Models, instructions & routing",
+    "aiSetup": "AI Setup & Tools",
+    "aiSetupDescription": "Models, instructions, routing & tools",
     "preferences": "Preferences",
     "account": "Account",
     "accountDescription": "Account & preferences",
-    "configInbound": "Overview",
-    "configAiModels": "AI Models",
-    "configTaskPrompts": "AI Instructions",
-    "configSortingPrompt": "Routing",
+    "configInbound": "Standard Inbound",
+    "configAiModels": "AI Model Config",
+    "configTaskPrompts": "Preconfigured Instructions",
+    "configSortingPrompt": "Routing Config",
     "configApiKeys": "API Keys",
     "statistics": "Statistics",
     "subscription": "Subscription",
@@ -804,6 +806,8 @@
   "plugins": {
     "title": "Plugins",
     "description": "Extended functionality for your workflow",
+    "fallbackTitle": "Plugin",
+    "loading": "Loading plugin…",
     "notFound": "Plugin not found or not enabled for your account",
     "commandEmpty": "The plugin returned an empty response.",
     "commandError": "The plugin command failed. Please try again."
@@ -1941,7 +1945,7 @@
       "deleteConfirm": "Remove",
       "deleted": "{name} was removed.",
       "deleteFailed": "The connection could not be removed.",
-      "channelHint": "In chat, ask for {channel}",
+      "channelHint": "To use this connection in chat, type the word {channel} in your message.",
       "providers": {
         "m365": {
           "name": "Microsoft 365",
@@ -2594,7 +2598,7 @@
     "statusReadyTitle": "Your AI is ready",
     "statusReadyText": "The default chat model has a working provider. You can add more providers below at any time.",
     "statusNotReadyTitle": "No AI provider connected yet",
-    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute.",
+    "statusNotReadyText": "Chat will not work until a provider is connected. Add an API key below — Groq offers a free key that works in under a minute — or connect a local Ollama, which needs no key at all.",
     "cloudProviders": "Cloud providers",
     "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
     "recommended": "Recommended",
@@ -2624,6 +2628,11 @@
     "removed": "{provider} key removed",
     "removedEnvStillSet": "Stored {provider} key removed — {envVar} is still set in the environment, so {provider} stays connected from that value",
     "loadFailed": "Could not load provider status",
+    "ownService": {
+      "title": "Add your own service",
+      "description": "Need a provider that is not listed? Add it on the Edit models tab of AI Model Config.",
+      "cta": "Add your own service"
+    },
     "localAi": {
       "title": "Local AI (Ollama) — no key needed",
       "description": "The standard installation includes local AI models that run entirely on your hardware. Downloading models can take a while on first start; cloud providers above are available instantly."
@@ -2673,9 +2682,9 @@
   "setupBanner": {
     "adminTitle": "No AI provider configured",
     "userTitle": "Chat is not ready yet",
-    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute.",
+    "adminText": "Chat cannot start until an AI provider is connected. Open the setup page to add a key — Groq has a free option that works in about a minute — or connect a local Ollama, which needs no key at all.",
     "userText": "An administrator still needs to connect an AI provider. You can read how that works in the documentation.",
-    "cta": "Open AI provider setup",
+    "cta": "Go to AI provider setup",
     "docsCta": "Open documentation"
   },
   "localAiDownload": {
@@ -2747,6 +2756,11 @@
     "register": "Register",
     "welcomeBack": "Welcome back",
     "loginSubtitle": "Sign in to continue",
+    "demoHint": {
+      "title": "Fresh demo install",
+      "text": "Use the administrator account to connect an AI provider and finish setup.",
+      "cta": "Continue as administrator"
+    },
     "getStarted": "Get started",
     "registerSubtitle": "Create your free account",
     "email": "Email",
@@ -4355,6 +4369,7 @@
     },
     "listView": {
       "title": "List View",
+      "shortTitle": "List",
       "source": "Source",
       "allMemories": "All Memories",
       "categories": "Categories",
@@ -4364,10 +4379,12 @@
       "sortByDate": "Sort by Date"
     },
     "graphView": {
-      "title": "Neural View"
+      "title": "Neural View",
+      "shortTitle": "2D"
     },
     "graph3dView": {
-      "title": "3D Visualization"
+      "title": "3D Visualization",
+      "shortTitle": "3D"
     },
     "graph3d": {
       "categories": "Categories",
@@ -5001,7 +5018,38 @@
         "name": "n8n",
         "summary": "Automation workflows",
         "hint": "Connect an n8n MCP server so the assistant can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
+      },
+      "notion": {
+        "name": "Notion",
+        "summary": "Pages and databases",
+        "hint": "Save the connection, then sign in with your Notion account. Synaplan can then search and read pages you grant access to. You can revoke access in Notion at any time."
+      },
+      "higgsfield": {
+        "name": "Higgsfield",
+        "summary": "Image and video tools",
+        "hint": "Save the connection, then sign in with your Higgsfield account. Browsing your history is read-only; creating images or videos needs write actions and uses your Higgsfield credits."
       }
+    },
+    "oauthFormHint": "This server uses your account sign-in. Save it, then you will be sent to the provider to allow access. No access token to paste.",
+    "connect": "Connect",
+    "reconnect": "Reconnect",
+    "connecting": "Opening sign-in…",
+    "connectFailed": "Could not start sign-in",
+    "oauthConnected": "Connected",
+    "oauthReauth": "Action needed (reconnect)",
+    "oauthNotConnected": "Not connected",
+    "oauthConnectedToast": "Signed in successfully",
+    "disconnect": "Disconnect",
+    "disconnecting": "Disconnecting…",
+    "disconnectTitle": "Disconnect this server?",
+    "disconnectMessage": "The stored sign-in for \"{name}\" will be deleted. The server stays in your list — sign in again to use it.",
+    "disconnected": "Sign-in removed",
+    "disconnectFailed": "Could not remove the sign-in",
+    "oauthError": {
+      "denied": "Sign-in was cancelled",
+      "missing_code": "Sign-in did not complete. Please try again.",
+      "exchange_failed": "Could not finish sign-in. Please try again.",
+      "disabled": "Connecting with a sign-in is turned off by an administrator"
     },
     "allowWriteLabel": "Allow write actions (create/update)",
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",

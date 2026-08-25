@@ -5,18 +5,13 @@
       data-testid="page-tools"
     >
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
-        <div
+        <PageHeader
           v-if="currentPage !== 'mail-handler' && currentPage !== 'doc-summary'"
-          class="mb-8"
+          :title="getPageTitle()"
+          :subtitle="getPageDescription()"
+          icon="heroicons:wrench-screwdriver"
           data-testid="section-header"
-        >
-          <h1 class="text-3xl font-semibold txt-primary mb-2">
-            {{ getPageTitle() }}
-          </h1>
-          <p class="txt-secondary">
-            {{ getPageDescription() }}
-          </p>
-        </div>
+        />
 
         <div v-if="currentPage === 'chat-widget'">
           <div v-if="!showWidgetEditor">
@@ -195,6 +190,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import MainLayout from '@/components/MainLayout.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
