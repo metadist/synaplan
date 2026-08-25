@@ -419,11 +419,13 @@ export const useAuthStore = defineStore('auth', () => {
    * can show success / error notifications.
    */
   async function startImpersonation(userId: number): Promise<{ success: boolean; error?: string }> {
-    const [{ impersonationApi }, { beginAuthMutation, endAuthMutation, getInFlightRefresh }] =
-      await Promise.all([
-        import('@/services/api/impersonationApi'),
-        import('@/services/api/httpClient'),
-      ])
+    const [
+      { impersonationApi },
+      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
+    ] = await Promise.all([
+      import('@/services/api/impersonationApi'),
+      import('@/services/api/httpClient'),
+    ])
 
     // Guard the cookie-swap window (impersonate response -> /auth/me read)
     // against the automatic 401 -> /auth/refresh path. A refresh that fires
@@ -444,6 +446,14 @@ export const useAuthStore = defineStore('auth', () => {
           // A failed background refresh must not abort the swap.
         }
       }
+
+      // Mint a fresh admin access token as the guaranteed LAST writer before
+      // the swap. impersonationApi.start() is a raw fetch with no 401-retry, so
+      // without this it would fail outright if the admin's short-lived access
+      // cookie had already expired and no refresh happened to be in flight.
+      // Bypass the lock we hold — no competing refresh can run right now.
+      // Best-effort: on failure the impersonate call surfaces the real error.
+      await refreshAccessToken({ bypassMutationLock: true })
 
       const result = await impersonationApi.start(userId)
       if (!result.success) {
@@ -496,11 +506,13 @@ export const useAuthStore = defineStore('auth', () => {
    * refresh pattern as `startImpersonation`.
    */
   async function stopImpersonation(): Promise<{ success: boolean; error?: string }> {
-    const [{ impersonationApi }, { beginAuthMutation, endAuthMutation, getInFlightRefresh }] =
-      await Promise.all([
-        import('@/services/api/impersonationApi'),
-        import('@/services/api/httpClient'),
-      ])
+    const [
+      { impersonationApi },
+      { beginAuthMutation, endAuthMutation, getInFlightRefresh, refreshAccessToken },
+    ] = await Promise.all([
+      import('@/services/api/impersonationApi'),
+      import('@/services/api/httpClient'),
+    ])
 
     // Symmetric to startImpersonation: while exiting, a concurrent refresh
     // still carrying the impersonation cookies (stash present) would be
@@ -516,6 +528,12 @@ export const useAuthStore = defineStore('auth', () => {
           // A failed background refresh must not abort the swap.
         }
       }
+
+      // Keep the session alive as the last writer before exiting: the exit call
+      // is a raw fetch with no 401-retry, so a fresh (still impersonation-aware)
+      // token guarantees it can authenticate even if the current access cookie
+      // just expired. Bypass the lock we hold; best-effort.
+      await refreshAccessToken({ bypassMutationLock: true })
 
       const result = await impersonationApi.stop()
       if (!result.success) {

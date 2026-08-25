@@ -97,9 +97,10 @@ export const useMemoriesStore = defineStore('memories', () => {
     const timeoutMs = options.timeoutMs ?? 1500
     const silent = options.silent ?? false
 
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
     try {
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Memory service timeout')), timeoutMs)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error('Memory service timeout')), timeoutMs)
       })
 
       const fetchPromise = getMemories(category)
@@ -128,6 +129,9 @@ export const useMemoriesStore = defineStore('memories', () => {
       // Set empty array so page can continue
       memories.value = []
     } finally {
+      // Clear the race timer so a resolved fetch doesn't leave a dangling
+      // (now up to 15s) timeout pending.
+      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle)
       loading.value = false
     }
   }

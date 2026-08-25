@@ -359,13 +359,24 @@ function recordAuthFailure(): void {
  * "session expired" noise into the console for users who never had a
  * session in the first place.
  */
-async function refreshAccessToken(): Promise<RefreshResult> {
-  // A principal swap is rewriting the session cookies. Don't race it: wait for
-  // it to finish, then report success so the caller retries against the new,
-  // valid cookie instead of firing a competing (clobbering) refresh.
-  if (authMutationPromise) {
+async function refreshAccessToken(
+  options: { bypassMutationLock?: boolean } = {}
+): Promise<RefreshResult> {
+  // A principal swap (impersonation start/stop) is rewriting the session
+  // cookies out-of-band. An automatic refresh triggered by a request still
+  // carrying the PRE-swap cookies would clobber the freshly installed cookie,
+  // so wait for the swap to finish — then fall through to a REAL refresh
+  // against the now-stable cookies.
+  //
+  // We must NOT short-circuit with a synthetic success here: if the swap
+  // failed and this 401 was a genuinely expired token, the caller's retry
+  // would 401 again and hit handleAuthFailure(), logging the admin out. A real
+  // refresh against the stable post-swap cookies recovers cleanly instead.
+  //
+  // `bypassMutationLock` lets the swap itself mint a fresh pre-swap token while
+  // it holds the lock, without deadlocking by waiting on its own promise.
+  if (authMutationPromise && !options.bypassMutationLock) {
     await authMutationPromise
-    return { success: true }
   }
 
   // Native gates on a stored refresh token (no cookie); web on the UX hint.
