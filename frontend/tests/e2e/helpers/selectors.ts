@@ -51,6 +51,8 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
+    /** Full-screen backdrop behind an open rail flyout; click it to dismiss. */
+    navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
