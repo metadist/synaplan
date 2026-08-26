@@ -189,4 +189,60 @@ class ModelEnableCommandTest extends TestCase
         $this->assertStringContainsString('--provider', $this->commandTester->getDisplay());
         $this->assertCount(0, $this->statements);
     }
+
+    public function testEnableOnlyEnablesListedProvidersAndDisablesTheRest(): void
+    {
+        $this->givenModelsAreMissing();
+
+        $this->commandTester->execute(['--only' => ['ollama', 'piper']]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+
+        $allow = ['ollama', 'piper'];
+        $expectedEnabled = 0;
+        $expectedDisabled = 0;
+        foreach (array_keys(ModelCatalog::serviceNames()) as $service) {
+            foreach (ModelCatalog::findByService($service) as $model) {
+                if (in_array($service, $allow, true)) {
+                    if (!ModelCatalog::isRetired($model['id'])) {
+                        ++$expectedEnabled;
+                    }
+                } else {
+                    ++$expectedDisabled;
+                }
+            }
+        }
+
+        $this->assertGreaterThan(0, $expectedEnabled);
+        $this->assertGreaterThan(0, $expectedDisabled);
+        $this->assertNotEmpty($this->statements);
+
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString(
+            sprintf('enabled %d model(s), disabled %d from other providers', $expectedEnabled, $expectedDisabled),
+            $output
+        );
+        $this->assertStringNotContainsString('DELETE FROM', implode("\n", $this->statements));
+    }
+
+    public function testEnableOnlyRejectsUnknownProvider(): void
+    {
+        $this->commandTester->execute(['--only' => ['skynet']]);
+
+        $this->assertSame(Command::FAILURE, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('Unknown provider: skynet', $this->commandTester->getDisplay());
+        $this->assertCount(0, $this->statements);
+    }
+
+    public function testEnableOnlyCannotMixWithProviderOrKeys(): void
+    {
+        $this->commandTester->execute([
+            '--only' => ['ollama'],
+            '--provider' => ['groq'],
+        ]);
+
+        $this->assertSame(Command::INVALID, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('cannot be combined', $this->commandTester->getDisplay());
+        $this->assertCount(0, $this->statements);
+    }
 }
