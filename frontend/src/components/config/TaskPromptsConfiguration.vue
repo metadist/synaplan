@@ -1192,7 +1192,7 @@ import {
 } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { findModelIdByString } from '@/utils/aiModelDefaults'
+import { resolveModelIdForSave } from '@/utils/aiModelDefaults'
 import {
   type InternetSearchMode,
   internetModeFromMetadata,
@@ -1857,10 +1857,19 @@ const handleSave = saveChanges(async () => {
   try {
     const metadata: PromptMetadata = {}
 
+    // A pinned model whose provider is unavailable is missing from the picker
+    // list, so it loads as "default". Only an explicit change clears the pin —
+    // otherwise merely opening and saving a prompt would drop it.
+    const pinnedModelId = currentPrompt.value.metadata?.aiModel
     if (formData.value.aiModel === 'default' || !formData.value.aiModel) {
-      metadata.aiModel = 0
+      metadata.aiModel =
+        originalData.value.aiModel === formData.value.aiModel ? (pinnedModelId ?? 0) : 0
     } else {
-      metadata.aiModel = findModelIdByString(allModels.value, formData.value.aiModel)
+      metadata.aiModel = resolveModelIdForSave(
+        allModels.value,
+        formData.value.aiModel,
+        pinnedModelId
+      )
     }
 
     metadata.tool_files = (formData.value.availableTools || []).includes('files-search')
