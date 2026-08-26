@@ -67,7 +67,6 @@ final readonly class ModelConfigService
         private OllamaModelInventory $ollamaModelInventory,
         private ModelHealthRepository $modelHealthRepository,
         private LoggerInterface $logger,
-        private string $environment = 'prod',
     ) {
     }
 
@@ -851,25 +850,25 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Seed recommended model defaults for a newly registered user.
+     * New accounts do not receive frozen per-user DEFAULTMODEL rows.
      *
-     * Skipped in test environment so E2E/integration tests keep their
-     * global test defaults (negative BIDs → TestProvider) instead of
-     * receiving production model bindings that require real API keys.
+     * Global defaults (and the runtime fallback to the first usable model)
+     * apply until the user explicitly picks a model. Copying the seed
+     * catalog into every BUSER left air-gapped installs pointed at
+     * Claude/Gemini after the provider was never configured.
      */
     public function initializeNewUserDefaults(int $userId): void
     {
-        if ('test' === $this->environment) {
-            return;
-        }
-
-        $this->resetUserDefaults($userId);
+        $this->logger->debug('Skipping per-user default-model seed', ['user_id' => $userId]);
     }
 
     /**
-     * Replace per-user DEFAULTMODEL overrides with the code-recommended
-     * defaults from {@see DefaultModelConfigSeeder::getRecommendedDefaults()}.
+     * Replace per-user DEFAULTMODEL overrides with recommended defaults
+     * that are actually usable on this installation.
      *
+     * A recommended binding whose provider has no key is skipped; the
+     * first usable model for that capability is written instead so
+     * "Select suggested models" never points at a dead cloud row.
      * VECTORIZE is system-wide (single Qdrant collection) and is never
      * written as a per-user override.
      *
@@ -899,13 +898,14 @@ final readonly class ModelConfigService
                 continue;
             }
 
-            $model = $this->modelRepository->find($modelId);
-            if (!$model || 1 !== $model->getActive()) {
+            $chosen = $this->usableRecommendedModelId($modelId)
+                ?? $this->firstUsableModelForCapability($capability);
+            if (null === $chosen) {
                 continue;
             }
 
-            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $modelId);
-            $defaults[$capability] = $modelId;
+            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $chosen);
+            $defaults[$capability] = $chosen;
             ++$written;
         }
 
@@ -914,6 +914,16 @@ final readonly class ModelConfigService
             'written' => $written,
             'defaults' => $defaults,
         ];
+    }
+
+    private function usableRecommendedModelId(int $modelId): ?int
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model || !$this->isModelUsable($model)) {
+            return null;
+        }
+
+        return $modelId;
     }
 
     public function getModelTag(int $modelId): ?string

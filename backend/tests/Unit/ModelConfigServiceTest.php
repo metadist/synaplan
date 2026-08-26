@@ -1190,4 +1190,69 @@ class ModelConfigServiceTest extends TestCase
             'Web channel should return userId regardless of phone verification status'
         );
     }
+
+    public function testInitializeNewUserDefaultsDoesNotWritePerUserRows(): void
+    {
+        $this->configRepository->expects($this->never())->method('findBy');
+        $this->configRepository->expects($this->never())->method('setValue');
+        $this->configRepository->expects($this->never())->method('removeAll');
+
+        $this->service->initializeNewUserDefaults(42);
+    }
+
+    public function testResetUserDefaultsWritesOnlyUsableRecommendedModels(): void
+    {
+        $recommended = \App\Seed\DefaultModelConfigSeeder::getRecommendedDefaults();
+        $servicesById = [];
+        $keyToService = [
+            'anthropic:claude-sonnet-5:chat' => 'Anthropic',
+            'groq:openai/gpt-oss-120b:chat' => 'Groq',
+            'groq:openai/gpt-oss-120b:mem' => 'Groq',
+            'google:gemini-3.1-flash-image-preview:text2pic' => 'Google',
+            'google:veo-3.1-generate-preview:text2vid' => 'Google',
+            'higgsfield:higgsfield-ai/dop/standard:text2vid' => 'Higgsfield',
+            'google:gemini-2.5-flash-preview-tts:text2sound' => 'Google',
+            'groq:qwen/qwen3.6-27b:pic2text' => 'Groq',
+            'groq:whisper-large-v3:sound2text' => 'Groq',
+            'ollama:bge-m3:vectorize' => 'Ollama',
+        ];
+        foreach ($keyToService as $key => $service) {
+            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $this->assertNotNull($bid, "catalog key $key must resolve");
+            $servicesById[$bid] = $service;
+        }
+
+        $this->givenModels($servicesById);
+        $this->givenUsableProviders(['groq']);
+        $this->modelRepository->method('findByTag')->willReturn([]);
+
+        $this->configRepository->method('findBy')->willReturn([]);
+        $this->configRepository->expects($this->once())->method('removeAll')->with([]);
+
+        $written = [];
+        $this->configRepository
+            ->expects($this->atLeastOnce())
+            ->method('setValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting, string $value) use (&$written): Config {
+                $this->assertSame(7, $ownerId);
+                $this->assertSame('DEFAULTMODEL', $group);
+                $written[$setting] = (int) $value;
+
+                return $this->createMock(Config::class);
+            });
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame($written, $result['defaults']);
+        $this->assertArrayNotHasKey('VECTORIZE', $written);
+        $this->assertArrayNotHasKey('CHAT', $written, 'Anthropic CHAT must not be frozen when the provider has no key');
+        $this->assertArrayNotHasKey('TEXT2PIC', $written, 'Google image models must not be written without a key');
+        $this->assertArrayHasKey('SORT', $written);
+        $this->assertSame($recommended['SORT'], $written['SORT']);
+        $this->assertArrayHasKey('SOUND2TEXT', $written);
+        $this->assertSame($recommended['SOUND2TEXT'], $written['SOUND2TEXT']);
+        foreach ($written as $capability => $modelId) {
+            $this->assertSame('Groq', $servicesById[$modelId], "$capability must resolve to a Groq model");
+        }
+    }
 }
