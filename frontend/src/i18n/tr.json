@@ -2743,6 +2743,12 @@
       },
       "admin": {
         "catalogSubtitle": "Sistem model kataloğunu arayın ve düzenleyin.",
+        "availability": {
+          "providerUnavailable": "Sağlayıcı yapılandırılmamış",
+          "providerUnavailableTooltip": "Bu yapay zeka sağlayıcısı için bu kurulumda API anahtarı veya sunucu URL'si yok. Sağlayıcı yapılandırılana kadar kullanıcılar bu modeli görmez.",
+          "notPulled": "İndirilmemiş",
+          "notPulledTooltip": "Bu model yerel Ollama sunucusuna henüz indirilmedi. İndirilene kadar kullanıcılar bu modeli görmez."
+        },
         "bulkImportSubtitle": "Sağlayıcı belgelerinden SQL oluşturup uygulayın (gelişmiş).",
         "addModels": "Toplu içe aktarma (SQL)",
         "failedCreate": "Model oluşturulamadı",

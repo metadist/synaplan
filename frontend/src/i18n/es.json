@@ -2742,6 +2742,12 @@
       },
       "admin": {
         "catalogSubtitle": "Busca y edita el catálogo de modelos del sistema.",
+        "availability": {
+          "providerUnavailable": "Proveedor no configurado",
+          "providerUnavailableTooltip": "Este proveedor de IA no tiene clave de API ni URL de servidor en esta instalación. Los usuarios no verán este modelo hasta que el proveedor esté configurado.",
+          "notPulled": "No descargado",
+          "notPulledTooltip": "Este modelo aún no está descargado en el servidor local de Ollama. Los usuarios no lo verán hasta que se descargue."
+        },
         "bulkImportSubtitle": "Genera y aplica SQL desde la documentación del proveedor (avanzado).",
         "addModels": "Importación masiva (SQL)",
         "failedCreate": "No se pudo crear el modelo",

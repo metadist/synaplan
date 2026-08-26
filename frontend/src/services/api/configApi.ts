@@ -1,10 +1,12 @@
-import type { AIModel, Capability } from '@/types/ai-models'
+import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import { httpClient } from './httpClient'
 import { z } from 'zod'
 
 export interface ModelsResponse {
   success: boolean
   models: Partial<Record<Capability, AIModel[]>>
+  /** Provider-level availability of this installation (key/URL configured). */
+  providers: ProviderAvailability[]
 }
 
 export interface DefaultsResponse {

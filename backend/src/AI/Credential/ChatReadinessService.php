@@ -6,6 +6,7 @@ namespace App\AI\Credential;
 
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
+use App\Model\ModelCatalog;
 use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 use Psr\Cache\CacheItemPoolInterface;
@@ -131,6 +132,39 @@ final class ChatReadinessService
     public function isOllamaModelPulled(string $model): bool
     {
         return $this->ollamaModelInventory->isPulled($model);
+    }
+
+    /**
+     * Availability of one concrete model row on this installation.
+     *
+     * Ollama rows are judged per model (the server answers even with nothing
+     * pulled), every other service by its provider's key/URL. A service name
+     * the registry does not know cannot be judged and counts as available —
+     * hiding an operator's custom row on a guess would be worse.
+     *
+     * @param array<string, bool>|null $availability lowercase provider => usable;
+     *                                               defaults to the cached snapshot
+     *
+     * @return array{available: bool, reason: ?string} reason is 'not_pulled' or
+     *                                                 'provider_unavailable' when unavailable
+     */
+    public function modelAvailability(string $service, string $providerId, ?array $availability = null): array
+    {
+        $provider = ModelCatalog::normalizeProvider($service);
+
+        if ('ollama' === $provider) {
+            return $this->ollamaModelInventory->isPulled($providerId)
+                ? ['available' => true, 'reason' => null]
+                : ['available' => false, 'reason' => 'not_pulled'];
+        }
+
+        $availability ??= $this->providerAvailability();
+
+        if (!array_key_exists($provider, $availability) || $availability[$provider]) {
+            return ['available' => true, 'reason' => null];
+        }
+
+        return ['available' => false, 'reason' => 'provider_unavailable'];
     }
 
     /**
