@@ -33,6 +33,10 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('ollama')).toBe('simple-icons:ollama')
   })
 
+  it('should return a microphone icon for local Whisper', () => {
+    expect(getProviderIcon('Whisper')).toBe('mdi:microphone')
+  })
+
   it('should return Stability AI icon for stability service', () => {
     expect(getProviderIcon('stability')).toBe('simple-icons:stabilityai')
   })
@@ -92,6 +96,7 @@ describe('Provider Flag Utility', () => {
 
   it('should classify only self-hosted engines as local', () => {
     expect(isLocalSelfHostedProvider('ollama')).toBe(true)
+    expect(isLocalSelfHostedProvider('whisper')).toBe(true)
     expect(isLocalSelfHostedProvider('triton')).toBe(true)
     expect(isLocalSelfHostedProvider('TrustedTokens')).toBe(false)
     expect(isLocalSelfHostedProvider('openai')).toBe(false)

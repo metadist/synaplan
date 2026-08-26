@@ -723,6 +723,31 @@ class ModelCatalog
                 'meta' => ['context_window' => '32768', 'max_output' => '32768'],
             ],
         ],
+        // ==================== WHISPER (local whisper.cpp) ====================
+        // In-process STT for air-gapped / browser-limited installs. No API key.
+        // Availability is WHISPER_ENABLED + the whisper.cpp binary (see WhisperProvider).
+        [
+            'id' => 330,
+            'service' => 'Whisper',
+            'name' => 'Whisper (local)',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'showWhenFree' => 1,
+            'providerId' => 'whisper',
+            'priceIn' => 0,
+            'inUnit' => 'free',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 6,
+            'rating' => 1,
+            'json' => [
+                'description' => 'On-server whisper.cpp transcription. Works without a cloud API key — use this for air-gapped speech-to-text. The model file is WHISPER_DEFAULT_MODEL (tiny/base/small/medium/large).',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'whisper'],
+                'features' => ['local', 'multilingual'],
+            ],
+        ],
         // ==================== GROQ MODELS ====================
         // Retired 2026-08 (Groq shutdowns, https://console.groq.com/docs/deprecations):
         //   - BID 9   llama-3.3-70b-versatile                    (chat)     → 324
