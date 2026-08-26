@@ -428,6 +428,10 @@ services:
         tags:
             - { name: 'app.ai.text_to_speech' }
 
+    App\AI\Provider\WhisperProvider:
+        tags:
+            - { name: 'app.ai.speech_to_text' }
+
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'

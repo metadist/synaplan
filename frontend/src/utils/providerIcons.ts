@@ -18,6 +18,8 @@ export const getProviderIcon = (provider: string): string => {
     return 'simple-icons:groq'
   } else if (providerLower.includes('ollama')) {
     return 'simple-icons:ollama'
+  } else if (providerLower.includes('whisper')) {
+    return 'mdi:microphone'
   } else if (providerLower.includes('cloudflare')) {
     return 'simple-icons:cloudflare'
   } else if (providerLower.includes('stability')) {
@@ -63,6 +65,7 @@ export const isLocalSelfHostedProvider = (provider: string): boolean => {
 
   return (
     p.includes('ollama') ||
+    p.includes('whisper') ||
     p.includes('piper') ||
     p.includes('triton') ||
     p.includes('synaplan') ||
