@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Command;
 
 use App\Command\ModelEnableCommand;
+use App\Model\ModelCatalog;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -14,11 +16,23 @@ use Symfony\Component\Console\Tester\CommandTester;
 class ModelEnableCommandTest extends TestCase
 {
     private CommandTester $commandTester;
-    private Connection $connection;
+    private Connection&MockObject $connection;
+
+    /** @var list<string> every SQL statement the command issued */
+    private array $statements = [];
 
     protected function setUp(): void
     {
+        $this->statements = [];
+
         $this->connection = $this->createMock(Connection::class);
+        $this->connection->method('executeStatement')
+            ->willReturnCallback(function (string $sql): int {
+                $this->statements[] = $sql;
+
+                return 1;
+            });
+
         $command = new ModelEnableCommand($this->connection);
 
         $application = new Application();
@@ -27,33 +41,58 @@ class ModelEnableCommandTest extends TestCase
         $this->commandTester = new CommandTester($application->find('app:model:enable'));
     }
 
-    public function testEnableSingleModel(): void
+    /** Model rows absent from the database (fetchOne finds nothing). */
+    private function givenModelsAreMissing(): void
     {
-        // @phpstan-ignore-next-line
-        $this->connection->expects($this->once())->method('executeStatement');
+        $this->connection->method('fetchOne')->willReturn(false);
+    }
+
+    /** Model rows already present in the database. */
+    private function givenModelsExist(): void
+    {
+        $this->connection->method('fetchOne')->willReturn('9');
+    }
+
+    public function testEnableMissingModelInsertsIt(): void
+    {
+        $this->givenModelsAreMissing();
 
         $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 1 model(s)', $this->commandTester->getDisplay());
+        $this->assertCount(1, $this->statements);
+        $this->assertStringContainsString('INSERT INTO BMODELS', $this->statements[0]);
+    }
+
+    public function testEnableExistingModelRestoresVisibilityFlagsOnly(): void
+    {
+        $this->givenModelsExist();
+
+        $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat']]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertCount(1, $this->statements);
+        $this->assertStringContainsString('UPDATE BMODELS SET BACTIVE = ?, BSELECTABLE = ?', $this->statements[0]);
+        // Catalog-owned columns (price, name) must survive an enable untouched.
+        $this->assertStringNotContainsString('BPRICEIN', $this->statements[0]);
     }
 
     public function testEnableMultipleModels(): void
     {
-        // @phpstan-ignore-next-line
-        $this->connection->expects($this->exactly(2))->method('executeStatement');
+        $this->givenModelsAreMissing();
 
         $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat', 'ollama:bge-m3']]);
 
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Enabled 2 model(s)', $this->commandTester->getDisplay());
+        $this->assertCount(2, $this->statements);
     }
 
     public function testEnableGroupedKeyEnablesAllVariants(): void
     {
         // google:gemini-2.5-pro resolves to chat + pic2text
-        // @phpstan-ignore-next-line
-        $this->connection->expects($this->exactly(2))->method('executeStatement');
+        $this->givenModelsAreMissing();
 
         $this->commandTester->execute(['models' => ['google:gemini-2.5-pro']]);
 
@@ -61,21 +100,78 @@ class ModelEnableCommandTest extends TestCase
         $this->assertStringContainsString('Enabled 2 model(s)', $this->commandTester->getDisplay());
     }
 
+    public function testEnableByProviderEnablesEveryNonRetiredCatalogModel(): void
+    {
+        $this->givenModelsAreMissing();
+
+        $this->commandTester->execute(['--provider' => ['groq']]);
+
+        $expected = count(array_filter(
+            ModelCatalog::findByService('groq'),
+            static fn (array $model): bool => !ModelCatalog::isRetired($model['id'])
+        ));
+        $this->assertGreaterThan(0, $expected, 'fixture assumption: the catalog has Groq models');
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString("Enabled $expected model(s)", $this->commandTester->getDisplay());
+        $this->assertCount($expected, $this->statements);
+    }
+
+    public function testEnableByProviderAndExplicitKeyDeduplicates(): void
+    {
+        $this->givenModelsAreMissing();
+
+        $this->commandTester->execute([
+            'models' => ['ollama:bge-m3'],
+            '--provider' => ['ollama'],
+        ]);
+
+        $expected = count(array_filter(
+            ModelCatalog::findByService('ollama'),
+            static fn (array $model): bool => !ModelCatalog::isRetired($model['id'])
+        ));
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertCount($expected, $this->statements, 'the explicit key must not be enabled twice');
+    }
+
+    public function testEnableRetiredModelIsSkipped(): void
+    {
+        // xai:grok-tts (BID 320) is kept in the catalog but recorded as retired.
+        $this->givenModelsAreMissing();
+
+        $this->commandTester->execute(['models' => ['xai:grok-tts']]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Skipped (retired)', $output);
+        $this->assertStringNotContainsString('Enabled 1', $output);
+        $this->assertCount(0, $this->statements);
+    }
+
     public function testEnableUnknownKeyReturnsFailure(): void
     {
-        // @phpstan-ignore-next-line
-        $this->connection->expects($this->never())->method('executeStatement');
-
         $this->commandTester->execute(['models' => ['nonexistent:model']]);
 
         $this->assertSame(Command::FAILURE, $this->commandTester->getStatusCode());
         $this->assertStringContainsString('Unknown model key', $this->commandTester->getDisplay());
+        $this->assertCount(0, $this->statements);
+    }
+
+    public function testEnableUnknownProviderReturnsFailure(): void
+    {
+        $this->commandTester->execute(['--provider' => ['skynet']]);
+
+        $this->assertSame(Command::FAILURE, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Unknown provider: skynet', $output);
+        $this->assertStringContainsString('Known providers:', $output);
+        $this->assertCount(0, $this->statements);
     }
 
     public function testEnableMixedKnownAndUnknown(): void
     {
-        // @phpstan-ignore-next-line
-        $this->connection->expects($this->once())->method('executeStatement');
+        $this->givenModelsAreMissing();
 
         $this->commandTester->execute(['models' => ['groq:qwen/qwen3.6-27b:chat', 'fake:nope']]);
 
@@ -83,5 +179,14 @@ class ModelEnableCommandTest extends TestCase
         $output = $this->commandTester->getDisplay();
         $this->assertStringContainsString('Enabled 1 model(s)', $output);
         $this->assertStringContainsString('Unknown model key: fake:nope', $output);
+    }
+
+    public function testNoArgumentsIsRejected(): void
+    {
+        $this->commandTester->execute([]);
+
+        $this->assertSame(Command::INVALID, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('--provider', $this->commandTester->getDisplay());
+        $this->assertCount(0, $this->statements);
     }
 }
