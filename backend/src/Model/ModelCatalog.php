@@ -289,6 +289,32 @@ class ModelCatalog
             'successor' => null,
             'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
         ],
+
+        // --- 2026-08-17 (Google Imagen 4 hard shutdown) ---
+        // Google deprecated all Imagen 4 IDs on 2026-06-15 and hard-shut them
+        // down on 2026-08-17; direct GET now answers 404, so the availability
+        // check confirms them Gone. Nano Banana is the vendor-named successor;
+        // gemini-3.1-flash-image-preview (BID 190) is already the TEXT2PIC
+        // default, so all three tiers point at it rather than at the flat/ultra
+        // Gemini image variants we do not carry.
+        115 => [
+            'providerId' => 'imagen-4.0-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
+        230 => [
+            'providerId' => 'imagen-4.0-fast-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
+        231 => [
+            'providerId' => 'imagen-4.0-ultra-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
     ];
 
     /**
@@ -1983,8 +2009,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[115].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-generate-001',
             // Imagen 4.0 is a flat per-image-fee model in production
             // ($0.04/image standard quality). Mirrors live BMODELS BID 115:
@@ -2400,8 +2428,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0 Fast',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[230].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-fast-generate-001',
             'priceIn' => 0,
             'inUnit' => 'perImage',
@@ -2424,8 +2454,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0 Ultra',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[231].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-ultra-generate-001',
             'priceIn' => 0,
             'inUnit' => 'perImage',

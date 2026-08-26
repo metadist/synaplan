@@ -30,7 +30,8 @@ use App\Repository\ModelRepository;
  * blind spots. Only a model the provider itself reports as unknown is confirmed.
  *
  * Findings stay advisory and are never applied automatically: retirement
- * touches every user of an install and remains a reviewed migration.
+ * touches every user of an install and remains a reviewed registry entry
+ * (`ModelCatalog::RETIREMENTS`).
  */
 final readonly class ModelAvailabilityChecker
 {
