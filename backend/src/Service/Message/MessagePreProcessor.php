@@ -573,9 +573,6 @@ final readonly class MessagePreProcessor
                 $options['language'] = $languageHint;
             }
 
-            // Use base model by default (good balance of speed/accuracy)
-            $options['model'] = 'base';
-
             return $this->whisperService->transcribe($filePath, $options);
         } catch (\Exception $e) {
             $this->logger->error("Whisper transcription failed: {$e->getMessage()}", [
