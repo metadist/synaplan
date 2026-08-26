@@ -58,4 +58,16 @@ final class WhisperProviderTest extends TestCase
         $this->expectException(ProviderException::class);
         $this->provider->transcribe('/tmp/a.wav');
     }
+
+    public function testTranslateAudioEnablesTranslateWithoutUsingTargetAsInputHint(): void
+    {
+        $this->whisperService->method('isAvailable')->willReturn(true);
+        $this->whisperService
+            ->expects(self::once())
+            ->method('transcribe')
+            ->with('/tmp/a.wav', ['translate' => true])
+            ->willReturn(['text' => 'hello']);
+
+        self::assertSame('hello', $this->provider->translateAudio('/tmp/a.wav', 'de'));
+    }
 }

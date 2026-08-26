@@ -95,9 +95,11 @@ final readonly class WhisperProvider implements SpeechToTextProviderInterface
 
     public function translateAudio(string $audioPath, string $targetLang): string
     {
+        // whisper.cpp --translate always outputs English. The -l flag is an
+        // input-language hint, not the target — never pass $targetLang as
+        // language (same as OpenAI/Groq: ignore the requested target).
         $result = $this->transcribe($audioPath, [
             'translate' => true,
-            'language' => $targetLang,
         ]);
 
         return $result['text'] ?? '';
