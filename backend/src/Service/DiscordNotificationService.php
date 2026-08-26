@@ -742,7 +742,7 @@ final readonly class DiscordNotificationService
             ],
             [
                 'name' => 'Action required',
-                'value' => 'Confirm on the provider deprecation page, then retire via migration (deactivate, never delete) — docs/PRICING_MAINTENANCE.md.',
+                'value' => 'Confirm on the provider deprecation page, then retire via ModelCatalog::RETIREMENTS (deactivate, never delete) — docs/PRICING_MAINTENANCE.md.',
                 'inline' => false,
             ],
         ];

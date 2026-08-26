@@ -21,7 +21,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * listing for reasons other than discontinuation (rename, region gate, account
  * tier), and an unattended `BACTIVE = 0` on a false positive would take a
  * working model away from every user of the install. Retirement stays a
- * reviewed migration — see `docs/PRICING_MAINTENANCE.md`.
+ * reviewed registry entry (`ModelCatalog::RETIREMENTS`) — see
+ * `docs/PRICING_MAINTENANCE.md`.
  */
 #[AsCommand(
     name: 'app:models:check-availability',
@@ -62,7 +63,8 @@ final class CheckModelAvailabilityCommand extends Command
             reached are reported as unchecked and never produce findings — an unreachable
             API must not look like an empty catalog.
 
-            Nothing is changed. Retire a confirmed dead model with a reviewed migration.
+            Nothing is changed. Retire a confirmed dead model with a reviewed registry entry
+            in ModelCatalog::RETIREMENTS.
             HELP)
         ;
     }
@@ -160,8 +162,8 @@ final class CheckModelAvailabilityCommand extends Command
 
         $io->warning(sprintf('%d model(s) are offered but no longer served by their provider.', count($findings)));
         $io->writeln([
-            'Verify each one against the provider\'s deprecation page, then retire it with a',
-            'migration — deactivate, never delete: see <info>docs/PRICING_MAINTENANCE.md</info>.',
+            'Verify each one against the provider\'s deprecation page, then retire it via',
+            'ModelCatalog::RETIREMENTS — deactivate, never delete: see <info>docs/PRICING_MAINTENANCE.md</info>.',
             '',
             'Rows marked as a provider default are urgent: <info>app:provider:apply-defaults --auto</info>',
             'assigns them unattended at container start.',
