@@ -9,9 +9,10 @@
       <!-- Reset applies to the default-model choices, so it only shows on that tab.
            v-if on the template keeps PageHeader's actions wrapper (and its flex gap)
            from rendering empty on the other tabs.
-           The suggested selection spans every provider in the catalog, so the
-           button is hidden unless ALL providers have credentials — otherwise it
-           would point defaults at models this installation cannot use. -->
+           The suggested selection spans the key-based cloud providers, so the
+           button is hidden unless every requiresKey provider has credentials —
+           otherwise it would point defaults at models this install cannot use.
+           URL/local providers (Ollama, custom endpoints) do not count. -->
       <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
         <button
           type="button"
