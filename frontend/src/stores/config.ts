@@ -123,10 +123,19 @@ const config = {
 
   /**
    * Speech-to-text configuration
+   * webSpeechEnabled: the browser's Web Speech API may be offered (deployment flag)
    * whisperEnabled: true when local Whisper.cpp is available (record-then-transcribe)
    * speechToTextAvailable: true when ANY transcription is available (local OR API models)
    */
   speech: {
+    /**
+     * The browser's cloud-backed Web Speech API may be used for live
+     * speech-to-text (WEB_SPEECH_ENABLED, default true; air-gapped
+     * instances turn it off)
+     */
+    get webSpeechEnabled(): boolean {
+      return getConfigSync().speech?.webSpeechEnabled ?? true
+    },
     /** Local Whisper.cpp is available for record-then-transcribe mode */
     get whisperEnabled(): boolean {
       return getConfigSync().speech?.whisperEnabled ?? false

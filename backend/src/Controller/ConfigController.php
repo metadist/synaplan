@@ -31,6 +31,7 @@ use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
+use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -67,6 +68,7 @@ class ConfigController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private RegistrationConfig $registrationConfig,
         private GuestChatConfig $guestChatConfig,
+        private WebSpeechConfig $webSpeechConfig,
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
@@ -200,6 +202,12 @@ class ConfigController extends AbstractController
                             type: 'boolean',
                             example: true,
                             description: 'When true, local Whisper.cpp is available for record-then-transcribe mode.'
+                        ),
+                        new OA\Property(
+                            property: 'webSpeechEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When false, the frontend never uses the browser\'s cloud-backed Web Speech API for speech-to-text (set WEB_SPEECH_ENABLED=false on air-gapped instances) and records for the server-side transcription path instead, or hides the microphone when speechToTextAvailable is false too.'
                         ),
                         new OA\Property(
                             property: 'speechToTextAvailable',
@@ -453,6 +461,7 @@ class ConfigController extends AbstractController
 
         $speech = [
             'whisperEnabled' => $whisperLocalAvailable,
+            'webSpeechEnabled' => $this->webSpeechConfig->isEnabled(),
             'speechToTextAvailable' => $whisperLocalAvailable || $apiProvidersAvailable,
         ];
 

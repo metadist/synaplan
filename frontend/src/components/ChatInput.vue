@@ -512,7 +512,8 @@ const speechLanguage = computed(() => {
 
 /**
  * Determine if microphone button should be shown.
- * Show when: Web Speech API is supported OR any backend speech-to-text is available.
+ * Show when: Web Speech API is usable (supported and not vetoed by
+ * WEB_SPEECH_ENABLED) OR any backend speech-to-text is available.
  * Backend speech-to-text includes: local Whisper.cpp OR API models (Groq/OpenAI Whisper).
  *
  * MOBILE-APP SEAM: in the app the Web Speech API does not count (see
@@ -521,10 +522,10 @@ const speechLanguage = computed(() => {
  */
 const showMicrophoneButton = computed(() => {
   const speechToTextAvailable = configStore.speech.speechToTextAvailable
-  const webSpeechSupported = isWebSpeechSupported() && !isNativeApp()
 
-  // Show if either browser API or backend transcription is available
-  return webSpeechSupported || speechToTextAvailable
+  // Show if either browser API (when the deployment allows it) or backend
+  // transcription is available
+  return useWebSpeech.value || speechToTextAvailable
 })
 
 /**
@@ -546,7 +547,10 @@ const textareaPaddingRightPx = computed(() => {
  * Determine which speech recognition method to use.
  * Priority: Web Speech API FIRST (real-time streaming), Whisper as fallback.
  *
- * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari
+ * - Web Speech API: Real-time streaming, works in Chrome/Edge/Safari. Streams
+ *   the audio to the browser vendor's cloud, so deployments can veto it with
+ *   WEB_SPEECH_ENABLED=false (air-gapped / data residency); Chromium builds
+ *   without Google API keys also advertise it without ever returning text.
  * - Whisper backend: Record-then-transcribe, works everywhere
  *
  * MOBILE-APP SEAM: never in the app. `isWebSpeechSupported()` only checks that
@@ -558,7 +562,7 @@ const textareaPaddingRightPx = computed(() => {
  * triggers the real iOS/Android permission prompt.
  */
 const useWebSpeech = computed(() => {
-  return isWebSpeechSupported() && !isNativeApp()
+  return isWebSpeechSupported() && !isNativeApp() && configStore.speech.webSpeechEnabled
 })
 
 // Input persistence - auto-save with proper debouncing. Disabled during an
@@ -1193,8 +1197,9 @@ watch(
 
 /**
  * Toggle speech recording using hybrid approach.
- * Uses Web Speech API for real-time transcription when available and whisperEnabled=false.
- * Falls back to Whisper.cpp backend recording when whisperEnabled=true.
+ * Uses Web Speech API for real-time transcription when the browser has it and
+ * the deployment allows it (see `useWebSpeech`), otherwise records for the
+ * server-side transcription path.
  */
 const toggleRecording = async () => {
   if (isRecording.value) {

@@ -50,6 +50,8 @@ x-app-environment: &app-environment
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
+  # Browser-side (cloud-backed) speech-to-text; air-gapped deployments set "false".
+  WEB_SPEECH_ENABLED: "${WEB_SPEECH_ENABLED:-}"
   DB_HOST: db
   DB_PORT: "3306"
   DB_NAME: "${MARIADB_DATABASE:-synaplan}"

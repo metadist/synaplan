@@ -32,6 +32,7 @@ use App\Service\RegistrationConfig;
 use App\Service\Search\BraveSearchService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
+use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -82,6 +83,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(RegistrationConfig::class),
             $this->createStub(GuestChatConfig::class),
+            $this->createStub(WebSpeechConfig::class),
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(ChatReadinessService::class),
             new DemoLoginHint(
