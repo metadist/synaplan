@@ -51,6 +51,8 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
+    /** Full-screen backdrop behind an open rail flyout; click it to dismiss. */
+    navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
@@ -98,6 +100,9 @@ export const selectors = {
     flyoutLinkChatWidget: '[data-testid="link-sidebar-v2-chat-widget"]',
     flyoutLinkMailHandler: '[data-testid="link-sidebar-v2-mail-handler"]',
     flyoutLinkApiDocs: '[data-testid="link-sidebar-v2-api-docs"]',
+    /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
+    flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
+    flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
@@ -279,10 +284,17 @@ export const selectors = {
     stateEmptyFolder: '[data-testid="state-empty-folder"]',
     /** File row action: delete this file (opens ConfirmDialog) */
     btnDeleteFile: '[data-testid="btn-delete"]',
-    /** §4.8: knowledge-base tabs shared by /files and /files/search */
+    /** §4.8: knowledge-base tabs shared by /files and its sub-views */
     tabsBar: '[data-testid="tabs-files"]',
     tabBrowse: '[data-testid="tab-files-browse"]',
     tabSearch: '[data-testid="tab-files-search"]',
+    tabIncoming: '[data-testid="tab-files-incoming"]',
+    tabGenerated: '[data-testid="tab-files-generated"]',
+    tabVectors: '[data-testid="tab-files-vectors"]',
+    /** Sub-view page roots reached via the Files tabs */
+    pageIncoming: '[data-testid="page-files-incoming"]',
+    pageGenerated: '[data-testid="page-files-generated"]',
+    pageVectors: '[data-testid="page-vector-storage"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',
@@ -311,6 +323,12 @@ export const selectors = {
   loggedOut: {
     page: '[data-testid="page-logged-out"]',
     loginAgainBtn: '[data-testid="btn-login-again"]',
+  },
+  accountDeletion: {
+    /** Public page (Google Play requirement) — reachable without login */
+    page: '[data-testid="page-account-deletion"]',
+    /** CTA linking to the in-app profile where the account is actually deleted */
+    profileLink: '[data-testid="link-profile-delete"]',
   },
   widgets: {
     page: '[data-testid="page-widgets"]',
@@ -471,6 +489,21 @@ export const selectors = {
     inputNewName: '[data-testid="input-new-name"]',
     inputNewContent: '[data-testid="input-new-content"]',
     btnConfirmCreate: '[data-testid="btn-confirm-create"]',
+    /** Header action on the editor of a custom prompt: turn it into a Saved Task */
+    btnSaveAsTask: '[data-testid="btn-save-as-task"]',
+  },
+  savedTasks: {
+    page: '[data-testid="page-saved-tasks"]',
+    emptyState: '[data-testid="saved-tasks-empty"]',
+    /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
+    card: '[data-testid="saved-task-card"]',
+    runNow: '[data-testid="btn-run-now"]',
+    /** Only rendered once the task has a chat (i.e. after it has run at least once) */
+    showResults: '[data-testid="btn-show-results"]',
+    viewRuns: '[data-testid="btn-view-runs"]',
+    /** Run history list, visible after clicking "View runs" */
+    runsList: '[data-testid="saved-task-runs"]',
+    lastRun: '[data-testid="saved-task-last-run"]',
   },
   pages: {
     chat: '[data-testid="page-chat"]',

@@ -51,6 +51,12 @@ compose exec -T backend curl -fsS -o /dev/null http://localhost/api/health
 printf 'ok: api health\n'
 compose exec -T backend curl -fsS -o /dev/null http://localhost/
 printf 'ok: web ui\n'
+# `GET /` only proves the static SPA shell is served. The runtime config is the
+# one API route the app fetches at boot to learn its apiBaseUrl; if it fails the
+# shell still loads but the app stays blank. Probe it so a deploy misconfig here
+# is caught instead of surfacing as a "white screen" for users.
+compose exec -T backend curl -fsS -o /dev/null http://localhost/api/v1/config/runtime
+printf 'ok: runtime config\n'
 
 assert_healthy backend
 assert_healthy worker
