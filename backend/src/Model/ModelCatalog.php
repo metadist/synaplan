@@ -391,6 +391,29 @@ class ModelCatalog
     }
 
     /**
+     * Collapse DB service-name buckets onto canonical provider keys so
+     * aliases ("Hugging Face" / "HuggingFace") count as one provider.
+     *
+     * @param array<string, array{active: int, total: int}> $countsByService
+     *
+     * @return array<string, array{active: int, total: int}>
+     */
+    public static function collapseCountsByProvider(array $countsByService): array
+    {
+        $merged = [];
+        foreach ($countsByService as $service => $counts) {
+            $key = self::normalizeProvider((string) $service);
+            if (!isset($merged[$key])) {
+                $merged[$key] = ['active' => 0, 'total' => 0];
+            }
+            $merged[$key]['active'] += (int) $counts['active'];
+            $merged[$key]['total'] += (int) $counts['total'];
+        }
+
+        return $merged;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:
@@ -501,11 +524,49 @@ class ModelCatalog
     }
 
     /**
-     * Delete a model from the database by its catalog ID.
+     * Enable a catalog model: insert it when absent, otherwise restore the
+     * operator-owned visibility flags to the catalog values. Catalog-owned
+     * columns of an existing row are left untouched — an admin's price or
+     * name edits must survive an enable exactly like they survive a re-seed.
      */
-    public static function remove(Connection $connection, array $model): void
+    public static function enable(Connection $connection, array $model, bool $system = false): void
     {
-        $connection->executeStatement('DELETE FROM BMODELS WHERE BID = ?', [$model['id']]);
+        if (!self::existsInDatabase($connection, $model)) {
+            self::upsert($connection, $model, $system);
+
+            return;
+        }
+
+        $connection->executeStatement(
+            'UPDATE BMODELS SET BACTIVE = ?, BSELECTABLE = ? WHERE BID = ?',
+            [$model['active'], $model['selectable'], $model['id']]
+        );
+    }
+
+    /**
+     * Disable a catalog model WITHOUT deleting it. Rows are never removed:
+     * BMESSAGES references the BID, and ModelSeeder re-inserts any absent
+     * catalog row on the next container start, which silently reverted the
+     * old DELETE-based disable. The flags are operator-owned (never written
+     * on the upsert UPDATE path), so the deactivation survives every re-seed.
+     * A model missing from the database is inserted first so the deactivation
+     * sticks for future seeds too.
+     */
+    public static function disable(Connection $connection, array $model): void
+    {
+        if (!self::existsInDatabase($connection, $model)) {
+            self::upsert($connection, $model);
+        }
+
+        $connection->executeStatement(
+            'UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0 WHERE BID = ?',
+            [$model['id']]
+        );
+    }
+
+    private static function existsInDatabase(Connection $connection, array $model): bool
+    {
+        return false !== $connection->fetchOne('SELECT BID FROM BMODELS WHERE BID = ?', [$model['id']]);
     }
 
     /**
@@ -600,6 +661,46 @@ class ModelCatalog
         $successor = self::RETIREMENTS[$bid]['successor'] ?? null;
 
         return null === $successor ? null : self::findBidByKey($successor);
+    }
+
+    /**
+     * All catalog models of a provider/service, matched via
+     * {@see normalizeProvider()} (case-insensitive, aliases collapsed —
+     * e.g. "groq", "Ollama", "Hugging Face").
+     *
+     * @return array[] matching model definitions
+     */
+    public static function findByService(string $service): array
+    {
+        $service = self::normalizeProvider($service);
+        $results = [];
+
+        foreach (self::MODELS as $model) {
+            if (self::normalizeProvider($model['service']) === $service) {
+                $results[] = $model;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Every service name in the catalog, keyed by its normalized form
+     * (e.g. 'openai' => 'OpenAI'). Used to validate --provider input and to
+     * print the accepted values.
+     *
+     * @return array<string, string>
+     */
+    public static function serviceNames(): array
+    {
+        $names = [];
+        foreach (self::MODELS as $model) {
+            $names[self::normalizeProvider($model['service'])] ??= $model['service'];
+        }
+
+        ksort($names);
+
+        return $names;
     }
 
     /**
