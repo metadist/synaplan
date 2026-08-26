@@ -395,13 +395,14 @@ final readonly class ModelConfigService
      * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
      *
      * A per-user binding whose provider currently has no credentials is skipped
-     * in favour of the global default. {@see resetUserDefaults()} writes the
-     * code-recommended bindings when an account is created, without knowing
-     * which providers this install can actually reach, while the key-save path
-     * only ever repairs the global row. Installs that receive their first API
-     * key AFTER the first account exists — every App Store or appliance
-     * install, where the operator logs in before configuring anything — would
-     * otherwise keep routing that user at a provider they never configured.
+     * in favour of the global default. Accounts created before this became the
+     * behaviour still carry bindings that {@see resetUserDefaults()} wrote
+     * without knowing which providers this install can actually reach, while
+     * the key-save path only ever repairs the global row. Installs that receive
+     * their first API key AFTER the first account exists — every App Store or
+     * appliance install, where the operator logs in before configuring
+     * anything — would otherwise keep routing that user at a provider they
+     * never configured.
      * The override stays stored and takes effect again as soon as its provider
      * has credentials.
      *

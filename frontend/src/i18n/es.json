@@ -2720,6 +2720,7 @@
       "resetDefaults": "Seleccionar modelos sugeridos",
       "resetDefaultsConfirm": "¿Aplicar la selección de modelos sugerida? Tus ajustes personales se reemplazarán por los valores predeterminados recomendados.",
       "resetDefaultsSuccess": "Se han aplicado los modelos sugeridos",
+      "resetDefaultsNoneApplied": "No se pudo aplicar ningún modelo sugerido: todavía no hay ningún proveedor de IA configurado. Añade primero una clave de API.",
       "resetDefaultsError": "No se pudieron aplicar los modelos sugeridos",
       "tableName": "Nombre",
       "tableService": "Servicio",

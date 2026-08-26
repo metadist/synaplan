@@ -2721,6 +2721,7 @@
       "resetDefaults": "Önerilen modelleri seç",
       "resetDefaultsConfirm": "Önerilen model seçimi uygulansın mı? Kişisel ayarlarınız önerilen varsayılanlarla değiştirilecek.",
       "resetDefaultsSuccess": "Önerilen modeller uygulandı",
+      "resetDefaultsNoneApplied": "Hiçbir önerilen model uygulanamadı — henüz yapılandırılmış bir AI sağlayıcısı yok. Önce bir API anahtarı ekleyin.",
       "resetDefaultsError": "Önerilen modeller uygulanamadı",
       "tableName": "Ad",
       "tableService": "Hizmet",

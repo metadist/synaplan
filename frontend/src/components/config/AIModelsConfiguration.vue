@@ -1246,7 +1246,14 @@ const confirmResetDefaults = async () => {
   try {
     const response = await resetDefaultModels()
     if (response.success) {
-      success(t('config.aiModels.resetDefaultsSuccess'))
+      // The backend skips a suggested model whose provider has no key, so on an
+      // install without credentials it applies nothing. Saying "applied" then
+      // would be wrong.
+      if (Object.keys(response.defaults).length === 0) {
+        warning(t('config.aiModels.resetDefaultsNoneApplied'))
+      } else {
+        success(t('config.aiModels.resetDefaultsSuccess'))
+      }
       await loadData()
     }
   } catch {

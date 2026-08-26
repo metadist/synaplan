@@ -1510,6 +1510,7 @@
       "resetDefaults": "Empfohlene Modelle auswählen",
       "resetDefaultsConfirm": "Die empfohlene Modellauswahl übernehmen? Deine persönlichen Änderungen werden durch die empfohlenen Standards ersetzt.",
       "resetDefaultsSuccess": "Empfohlene Modelle wurden übernommen",
+      "resetDefaultsNoneApplied": "Es konnte kein empfohlenes Modell übernommen werden – es ist noch kein KI-Anbieter konfiguriert. Hinterlege zuerst einen API-Schlüssel.",
       "resetDefaultsError": "Empfohlene Modelle konnten nicht übernommen werden",
       "tableName": "Name",
       "tableService": "Anbieter",
