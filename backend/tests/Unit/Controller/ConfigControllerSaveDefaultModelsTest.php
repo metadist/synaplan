@@ -24,6 +24,7 @@ use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\GuestChatConfig;
+use App\Service\WebSpeechConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MarketingNews\MarketingNewsConfig;
@@ -96,6 +97,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(UsageTaximeterConfig::class),
             $this->createStub(RegistrationConfig::class),
             $this->createStub(GuestChatConfig::class),
+            $this->createStub(WebSpeechConfig::class),
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(ChatReadinessService::class),
             new DemoLoginHint(
