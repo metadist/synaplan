@@ -205,6 +205,15 @@ if (result === 'error') {
 
 Only use deterministic UI hooks (`data-testid`), never text scanning.
 
+### Non-terminal states (recorded CI flakes)
+
+Assert the **stable terminal DOM**, never an intermediate signal the app discards or that loading shares with another state. Three failures that passed on `retries: 1`:
+
+* **Transient deep-link URLs.** `ChatView` reads `/?chat=<id>` from Saved Tasks "Run now" / "Show results" and immediately `router.replace`-strips the query. `toHaveURL(/[?&]chat=\d+/)` races that window (CI saw `/channels/tasks` then `/` with the chat already on screen). Wait for `selectors.pages.chat` + `ChatHelper.waitForAnswer`, not the query string.
+* **Loading that unmounts the same nodes as empty.** Admin user search sets `usersLoading` and replaces the table with a spinner — `select-user-level-*` count drops to 0 while the request is still in flight. `toHaveCount(0)` then passes, the next `fill('')` overlaps, and a stale empty response overwrites the restored list ("No users found" with an empty search box). Wait for a dedicated empty-state testid that only renders **after** loading finishes (`admin-users-empty`), never for "zero of the loaded rows".
+* **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
+* **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
+
 ---
 
 ## 4. Assertions
