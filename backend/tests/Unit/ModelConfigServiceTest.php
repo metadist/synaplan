@@ -501,14 +501,21 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * @param list<string> $names
+     * @param list<string> $unavailable registered providers that currently have no credentials
      */
-    private function givenUsableProviders(array $names): void
+    private function givenUsableProviders(array $names, array $unavailable = []): void
     {
         $providers = [];
         foreach ($names as $name) {
             $provider = $this->createMock(ProviderMetadataInterface::class);
             $provider->method('getName')->willReturn($name);
             $provider->method('isAvailable')->willReturn(true);
+            $providers[$name] = $provider;
+        }
+        foreach ($unavailable as $name) {
+            $provider = $this->createMock(ProviderMetadataInterface::class);
+            $provider->method('getName')->willReturn($name);
+            $provider->method('isAvailable')->willReturn(false);
             $providers[$name] = $provider;
         }
 
@@ -1254,5 +1261,27 @@ class ModelConfigServiceTest extends TestCase
         foreach ($written as $capability => $modelId) {
             $this->assertSame('Groq', $servicesById[$modelId], "$capability must resolve to a Groq model");
         }
+    }
+
+    /**
+     * isModelUsable() treats an empty usable list as "cannot tell". On a
+     * real install the registry is populated and [] means every provider
+     * lacks credentials — writing the seed catalog would re-freeze dead
+     * Claude/Gemini rows. Clear overrides and write nothing instead.
+     */
+    public function testResetUserDefaultsWritesNothingWhenRegisteredProvidersAreAllUnavailable(): void
+    {
+        $existing = [$this->createMock(Config::class)];
+        $this->configRepository->method('findBy')->willReturn($existing);
+        $this->configRepository->expects($this->once())->method('removeAll')->with($existing);
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $this->givenUsableProviders([], ['anthropic', 'groq', 'google', 'openai']);
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame(1, $result['removed']);
+        $this->assertSame(0, $result['written']);
+        $this->assertSame([], $result['defaults']);
     }
 }

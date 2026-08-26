@@ -869,6 +869,10 @@ final readonly class ModelConfigService
      * A recommended binding whose provider has no key is skipped; the
      * first usable model for that capability is written instead so
      * "Select suggested models" never points at a dead cloud row.
+     * When providers are registered but none have credentials, overrides
+     * are cleared and nothing is written — {@see isModelUsable()} treats
+     * an empty usable list as "cannot tell" and would otherwise re-freeze
+     * the seed catalog's cloud defaults.
      * VECTORIZE is system-wide (single Qdrant collection) and is never
      * written as a per-user override.
      *
@@ -883,6 +887,21 @@ final readonly class ModelConfigService
 
         $this->configRepository->removeAll($userOverrides);
         $removed = count($userOverrides);
+
+        if ([] !== $this->providerRegistry->getUniqueProviders()
+            && [] === $this->usableProviders()
+        ) {
+            $this->logger->debug('Skipping suggested-model writes: no provider is available', [
+                'user_id' => $userId,
+                'removed' => $removed,
+            ]);
+
+            return [
+                'removed' => $removed,
+                'written' => 0,
+                'defaults' => [],
+            ];
+        }
 
         try {
             $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
