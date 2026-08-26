@@ -62,7 +62,6 @@ class ChatReadinessServiceTest extends TestCase
             $ollamaModelInventory,
             $this->createMock(ModelHealthRepository::class),
             new NullLogger(),
-            'test',
         );
 
         return new ChatReadinessService(

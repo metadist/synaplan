@@ -501,14 +501,21 @@ class ModelConfigServiceTest extends TestCase
 
     /**
      * @param list<string> $names
+     * @param list<string> $unavailable registered providers that currently have no credentials
      */
-    private function givenUsableProviders(array $names): void
+    private function givenUsableProviders(array $names, array $unavailable = []): void
     {
         $providers = [];
         foreach ($names as $name) {
             $provider = $this->createMock(ProviderMetadataInterface::class);
             $provider->method('getName')->willReturn($name);
             $provider->method('isAvailable')->willReturn(true);
+            $providers[$name] = $provider;
+        }
+        foreach ($unavailable as $name) {
+            $provider = $this->createMock(ProviderMetadataInterface::class);
+            $provider->method('getName')->willReturn($name);
+            $provider->method('isAvailable')->willReturn(false);
             $providers[$name] = $provider;
         }
 
@@ -1189,5 +1196,92 @@ class ModelConfigServiceTest extends TestCase
             $result,
             'Web channel should return userId regardless of phone verification status'
         );
+    }
+
+    public function testInitializeNewUserDefaultsDoesNotWritePerUserRows(): void
+    {
+        $this->configRepository->expects($this->never())->method('findBy');
+        $this->configRepository->expects($this->never())->method('setValue');
+        $this->configRepository->expects($this->never())->method('removeAll');
+
+        $this->service->initializeNewUserDefaults(42);
+    }
+
+    public function testResetUserDefaultsWritesOnlyUsableRecommendedModels(): void
+    {
+        $recommended = \App\Seed\DefaultModelConfigSeeder::getRecommendedDefaults();
+        $servicesById = [];
+        $keyToService = [
+            'anthropic:claude-sonnet-5:chat' => 'Anthropic',
+            'groq:openai/gpt-oss-120b:chat' => 'Groq',
+            'groq:openai/gpt-oss-120b:mem' => 'Groq',
+            'google:gemini-3.1-flash-image-preview:text2pic' => 'Google',
+            'google:veo-3.1-generate-preview:text2vid' => 'Google',
+            'higgsfield:higgsfield-ai/dop/standard:text2vid' => 'Higgsfield',
+            'google:gemini-2.5-flash-preview-tts:text2sound' => 'Google',
+            'groq:qwen/qwen3.6-27b:pic2text' => 'Groq',
+            'groq:whisper-large-v3:sound2text' => 'Groq',
+            'ollama:bge-m3:vectorize' => 'Ollama',
+        ];
+        foreach ($keyToService as $key => $service) {
+            $bid = \App\Model\ModelCatalog::findBidByKey($key);
+            $this->assertNotNull($bid, "catalog key $key must resolve");
+            $servicesById[$bid] = $service;
+        }
+
+        $this->givenModels($servicesById);
+        $this->givenUsableProviders(['groq']);
+        $this->modelRepository->method('findByTag')->willReturn([]);
+
+        $this->configRepository->method('findBy')->willReturn([]);
+        $this->configRepository->expects($this->once())->method('removeAll')->with([]);
+
+        $written = [];
+        $this->configRepository
+            ->expects($this->atLeastOnce())
+            ->method('setValue')
+            ->willReturnCallback(function (int $ownerId, string $group, string $setting, string $value) use (&$written): Config {
+                $this->assertSame(7, $ownerId);
+                $this->assertSame('DEFAULTMODEL', $group);
+                $written[$setting] = (int) $value;
+
+                return $this->createMock(Config::class);
+            });
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame($written, $result['defaults']);
+        $this->assertArrayNotHasKey('VECTORIZE', $written);
+        $this->assertArrayNotHasKey('CHAT', $written, 'Anthropic CHAT must not be frozen when the provider has no key');
+        $this->assertArrayNotHasKey('TEXT2PIC', $written, 'Google image models must not be written without a key');
+        $this->assertArrayHasKey('SORT', $written);
+        $this->assertSame($recommended['SORT'], $written['SORT']);
+        $this->assertArrayHasKey('SOUND2TEXT', $written);
+        $this->assertSame($recommended['SOUND2TEXT'], $written['SOUND2TEXT']);
+        foreach ($written as $capability => $modelId) {
+            $this->assertSame('Groq', $servicesById[$modelId], "$capability must resolve to a Groq model");
+        }
+    }
+
+    /**
+     * isModelUsable() treats an empty usable list as "cannot tell". On a
+     * real install the registry is populated and [] means every provider
+     * lacks credentials — writing the seed catalog would re-freeze dead
+     * Claude/Gemini rows. Clear overrides and write nothing instead.
+     */
+    public function testResetUserDefaultsWritesNothingWhenRegisteredProvidersAreAllUnavailable(): void
+    {
+        $existing = [$this->createMock(Config::class)];
+        $this->configRepository->method('findBy')->willReturn($existing);
+        $this->configRepository->expects($this->once())->method('removeAll')->with($existing);
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $this->givenUsableProviders([], ['anthropic', 'groq', 'google', 'openai']);
+
+        $result = $this->service->resetUserDefaults(7);
+
+        $this->assertSame(1, $result['removed']);
+        $this->assertSame(0, $result['written']);
+        $this->assertSame([], $result['defaults']);
     }
 }

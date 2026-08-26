@@ -67,7 +67,6 @@ final readonly class ModelConfigService
         private OllamaModelInventory $ollamaModelInventory,
         private ModelHealthRepository $modelHealthRepository,
         private LoggerInterface $logger,
-        private string $environment = 'prod',
     ) {
     }
 
@@ -396,13 +395,14 @@ final readonly class ModelConfigService
      * In test env, ConfigFixtures seeds global defaults pointing to TestProvider models.
      *
      * A per-user binding whose provider currently has no credentials is skipped
-     * in favour of the global default. {@see resetUserDefaults()} writes the
-     * code-recommended bindings when an account is created, without knowing
-     * which providers this install can actually reach, while the key-save path
-     * only ever repairs the global row. Installs that receive their first API
-     * key AFTER the first account exists — every App Store or appliance
-     * install, where the operator logs in before configuring anything — would
-     * otherwise keep routing that user at a provider they never configured.
+     * in favour of the global default. Accounts created before this became the
+     * behaviour still carry bindings that {@see resetUserDefaults()} wrote
+     * without knowing which providers this install can actually reach, while
+     * the key-save path only ever repairs the global row. Installs that receive
+     * their first API key AFTER the first account exists — every App Store or
+     * appliance install, where the operator logs in before configuring
+     * anything — would otherwise keep routing that user at a provider they
+     * never configured.
      * The override stays stored and takes effect again as soon as its provider
      * has credentials.
      *
@@ -851,25 +851,29 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Seed recommended model defaults for a newly registered user.
+     * New accounts do not receive frozen per-user DEFAULTMODEL rows.
      *
-     * Skipped in test environment so E2E/integration tests keep their
-     * global test defaults (negative BIDs → TestProvider) instead of
-     * receiving production model bindings that require real API keys.
+     * Global defaults (and the runtime fallback to the first usable model)
+     * apply until the user explicitly picks a model. Copying the seed
+     * catalog into every BUSER left air-gapped installs pointed at
+     * Claude/Gemini after the provider was never configured.
      */
     public function initializeNewUserDefaults(int $userId): void
     {
-        if ('test' === $this->environment) {
-            return;
-        }
-
-        $this->resetUserDefaults($userId);
+        $this->logger->debug('Skipping per-user default-model seed', ['user_id' => $userId]);
     }
 
     /**
-     * Replace per-user DEFAULTMODEL overrides with the code-recommended
-     * defaults from {@see DefaultModelConfigSeeder::getRecommendedDefaults()}.
+     * Replace per-user DEFAULTMODEL overrides with recommended defaults
+     * that are actually usable on this installation.
      *
+     * A recommended binding whose provider has no key is skipped; the
+     * first usable model for that capability is written instead so
+     * "Select suggested models" never points at a dead cloud row.
+     * When providers are registered but none have credentials, overrides
+     * are cleared and nothing is written — {@see isModelUsable()} treats
+     * an empty usable list as "cannot tell" and would otherwise re-freeze
+     * the seed catalog's cloud defaults.
      * VECTORIZE is system-wide (single Qdrant collection) and is never
      * written as a per-user override.
      *
@@ -885,6 +889,21 @@ final readonly class ModelConfigService
         $this->configRepository->removeAll($userOverrides);
         $removed = count($userOverrides);
 
+        if ([] !== $this->providerRegistry->getUniqueProviders()
+            && [] === $this->usableProviders()
+        ) {
+            $this->logger->debug('Skipping suggested-model writes: no provider is available', [
+                'user_id' => $userId,
+                'removed' => $removed,
+            ]);
+
+            return [
+                'removed' => $removed,
+                'written' => 0,
+                'defaults' => [],
+            ];
+        }
+
         try {
             $recommended = DefaultModelConfigSeeder::getRecommendedDefaults();
         } catch (\RuntimeException) {
@@ -899,13 +918,14 @@ final readonly class ModelConfigService
                 continue;
             }
 
-            $model = $this->modelRepository->find($modelId);
-            if (!$model || 1 !== $model->getActive()) {
+            $chosen = $this->usableRecommendedModelId($modelId)
+                ?? $this->firstUsableModelForCapability($capability);
+            if (null === $chosen) {
                 continue;
             }
 
-            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $modelId);
-            $defaults[$capability] = $modelId;
+            $this->configRepository->setValue($userId, 'DEFAULTMODEL', $capability, (string) $chosen);
+            $defaults[$capability] = $chosen;
             ++$written;
         }
 
@@ -914,6 +934,16 @@ final readonly class ModelConfigService
             'written' => $written,
             'defaults' => $defaults,
         ];
+    }
+
+    private function usableRecommendedModelId(int $modelId): ?int
+    {
+        $model = $this->modelRepository->find($modelId);
+        if (!$model || !$this->isModelUsable($model)) {
+            return null;
+        }
+
+        return $modelId;
     }
 
     public function getModelTag(int $modelId): ?string

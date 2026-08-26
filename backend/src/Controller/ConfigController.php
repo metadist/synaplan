@@ -1262,15 +1262,15 @@ class ConfigController extends AbstractController
      * Replace the calling user's model configuration with the
      * code-recommended defaults from DefaultModelConfigSeeder.
      *
-     * Removes stale per-user overrides and writes fresh ones that
-     * match the catalog-recommended models. Other users and the
-     * global (ownerId=0) row are unaffected.
+     * Removes stale per-user overrides and writes fresh ones that match the
+     * catalog-recommended models, skipping any whose provider is not usable
+     * here. Other users and the global (ownerId=0) row are unaffected.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
         summary: 'Apply recommended model defaults to own configuration',
-        description: 'Replaces all per-user DEFAULTMODEL overrides with the code-recommended defaults (from DefaultModelConfigSeeder). Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
+        description: 'Replaces all per-user DEFAULTMODEL overrides with the recommended defaults (from DefaultModelConfigSeeder) that are usable on this installation: a recommended model whose provider has no key is replaced by the first usable model for that capability, and nothing is written when no provider is usable at all. Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]

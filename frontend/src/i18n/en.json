@@ -1411,6 +1411,7 @@
       "resetDefaults": "Select suggested models",
       "resetDefaultsConfirm": "Apply the suggested model selection? Your personal overrides will be replaced with the recommended defaults.",
       "resetDefaultsSuccess": "Suggested models have been applied",
+      "resetDefaultsNoneApplied": "No suggested model could be applied — no AI provider is configured yet. Add an API key first.",
       "resetDefaultsError": "Failed to apply suggested models",
       "tableName": "Name",
       "tableService": "Service",

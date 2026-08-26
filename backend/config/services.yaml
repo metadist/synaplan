@@ -654,7 +654,6 @@ services:
     App\Service\ModelConfigService:
         arguments:
             $cache: '@cache.model_config'
-            $environment: '%kernel.environment%'
 
     # Shares the model_config pool so applying provider defaults invalidates
     # the same cached lookups ModelConfigService serves from.
