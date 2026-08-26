@@ -33,6 +33,20 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('huggingface', ModelCatalog::normalizeProvider('huggingface'));
     }
 
+    public function testCollapseCountsByProviderMergesAliasSpellings(): void
+    {
+        $merged = ModelCatalog::collapseCountsByProvider([
+            'huggingface' => ['active' => 2, 'total' => 4],
+            'hugging face' => ['active' => 1, 'total' => 1],
+            'openai' => ['active' => 3, 'total' => 3],
+        ]);
+
+        $this->assertSame([
+            'huggingface' => ['active' => 3, 'total' => 5],
+            'openai' => ['active' => 3, 'total' => 3],
+        ], $merged);
+    }
+
     public function testFindIsCaseInsensitive(): void
     {
         $lower = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');

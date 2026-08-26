@@ -365,6 +365,29 @@ class ModelCatalog
     }
 
     /**
+     * Collapse DB service-name buckets onto canonical provider keys so
+     * aliases ("Hugging Face" / "HuggingFace") count as one provider.
+     *
+     * @param array<string, array{active: int, total: int}> $countsByService
+     *
+     * @return array<string, array{active: int, total: int}>
+     */
+    public static function collapseCountsByProvider(array $countsByService): array
+    {
+        $merged = [];
+        foreach ($countsByService as $service => $counts) {
+            $key = self::normalizeProvider((string) $service);
+            if (!isset($merged[$key])) {
+                $merged[$key] = ['active' => 0, 'total' => 0];
+            }
+            $merged[$key]['active'] += (int) $counts['active'];
+            $merged[$key]['total'] += (int) $counts['total'];
+        }
+
+        return $merged;
+    }
+
+    /**
      * Insert or update a model row via `INSERT … ON DUPLICATE KEY UPDATE`.
      *
      * Field ownership rules:

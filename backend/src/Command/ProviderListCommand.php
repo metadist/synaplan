@@ -90,8 +90,10 @@ final class ProviderListCommand extends Command
     }
 
     /**
-     * Active and total BMODELS rows per lowercase service name. Negative BIDs
+     * Active and total BMODELS rows per canonical provider key. Negative BIDs
      * are dev/test mock models and never part of the operator's catalog.
+     * Alias spellings (e.g. "Hugging Face") are collapsed onto the same key
+     * the rest of this command uses ({@see ModelCatalog::normalizeProvider()}).
      *
      * @return array<string, array{active: int, total: int}>
      */
@@ -114,7 +116,7 @@ final class ProviderListCommand extends Command
             ];
         }
 
-        return $counts;
+        return ModelCatalog::collapseCountsByProvider($counts);
     }
 
     private function credentialLabel(string $provider): string
