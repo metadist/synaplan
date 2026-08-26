@@ -1501,6 +1501,12 @@
         "showWhenFreeTooltip": "Show model in selection even when both price in and price out are 0 (free)",
         "showWhenFreeOn": "Override active: model visible even when both prices are 0",
         "showWhenFreeOff": "Default: model hidden when both prices are 0",
+        "availability": {
+          "providerUnavailable": "Provider not configured",
+          "providerUnavailableTooltip": "This AI provider has no API key or server URL on this installation. Users don't see this model until the provider is configured.",
+          "notPulled": "Not pulled",
+          "notPulledTooltip": "This model is not downloaded on the local Ollama server yet. Users don't see it until it is pulled."
+        },
         "actions": "Actions",
         "edit": "Edit",
         "save": "Save",

@@ -128,6 +128,7 @@ export const selectors = {
     capabilityItem: '[data-testid="item-capability"]',
     capabilityDropdown: '[data-testid="btn-model-dropdown"]',
     capabilityOption: '[data-testid="btn-model-option"]',
+    resetDefaults: '[data-testid="btn-reset-defaults"]',
   },
   rag: {
     page: '[data-testid="page-rag-search"]',

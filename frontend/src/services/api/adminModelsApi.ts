@@ -1,3 +1,4 @@
+import type { ModelUnavailableReason } from '@/types/ai-models'
 import { httpClient } from './httpClient'
 
 export interface AdminModel {
@@ -18,6 +19,9 @@ export interface AdminModel {
   json: Record<string, unknown>
   isSystemModel: boolean
   showWhenFree: number
+  /** False when the provider lacks credentials or the Ollama model is not pulled — the row is hidden from users. */
+  providerAvailable: boolean
+  unavailableReason: ModelUnavailableReason | null
 }
 
 export interface AdminModelsListResponse {

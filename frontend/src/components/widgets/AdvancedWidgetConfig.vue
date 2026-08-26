@@ -1891,7 +1891,7 @@ import * as widgetsApi from '@/services/api/widgetsApi'
 import { promptsApi, type AvailableFile } from '@/services/api/promptsApi'
 import { configApi } from '@/services/api/configApi'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { DEFAULT_AI_MODEL, findModelIdByString } from '@/utils/aiModelDefaults'
+import { DEFAULT_AI_MODEL, resolveModelIdForSave } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
 import { parsePromptAndRulesBlock } from '@/utils/widgetBehaviorRules'
@@ -2554,9 +2554,10 @@ const removeDomain = (domain: string) => {
 const handleSave = async () => {
   saving.value = true
   try {
-    // Resolve AI model ID from the selected model string
+    // Resolve AI model ID from the selected model string, keeping the stored
+    // pin when its provider is unavailable (then it is not in the picker list).
     const resolvedModelId = hasCustomPrompt.value
-      ? findModelIdByString(allModels.value, promptData.aiModel)
+      ? resolveModelIdForSave(allModels.value, promptData.aiModel, existingMetadata.value.aiModel)
       : -1
 
     // Include custom fields and AI model ID in config for saving
@@ -2899,7 +2900,11 @@ const savePromptData = async () => {
 
   const metadata: Record<string, unknown> = { ...existingMetadata.value }
 
-  metadata.aiModel = findModelIdByString(allModels.value, promptData.aiModel)
+  metadata.aiModel = resolveModelIdForSave(
+    allModels.value,
+    promptData.aiModel,
+    existingMetadata.value.aiModel
+  )
 
   let finalContent = removeKnowledgeBaseSection(manualPromptContent.value)
   finalContent += buildKnowledgeBaseSection()
