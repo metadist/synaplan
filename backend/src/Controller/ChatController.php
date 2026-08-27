@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
+use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
@@ -28,6 +29,7 @@ class ChatController extends AbstractController
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
         private ChatSummaryRepository $chatSummaryRepository,
+        private MessageDigestMaintenance $digestMaintenance,
         private MessageRepository $messageRepository,
         private WidgetSessionService $widgetSessionService,
         private OgImageService $ogImageService,
@@ -395,6 +397,10 @@ class ChatController extends AbstractController
 
         // No FK cascade on BCHATSUMMARIES (Galera rule) — clean up explicitly.
         $this->chatSummaryRepository->deleteByChatId($id);
+
+        // Deep-memory hygiene: digests of this chat stop resolving and their
+        // vectors leave the search index.
+        $this->digestMaintenance->deactivateForChat($user->getId(), $id);
 
         $this->em->remove($chat);
         $this->em->flush();

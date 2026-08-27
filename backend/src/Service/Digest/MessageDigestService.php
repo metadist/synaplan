@@ -285,18 +285,30 @@ PROMPT;
     }
 
     /**
+     * The deterministic logical point id of a digest in the Qdrant digests
+     * collection — shared by mirroring, deletion hygiene, and re-indexing so
+     * a rebuilt point always overwrites its predecessor.
+     */
+    public static function qdrantPointId(int $userId, int $digestId): string
+    {
+        return sprintf('dig_%d_%d', $userId, $digestId);
+    }
+
+    /**
      * Vector mirror is best-effort: MariaDB is authoritative, and a Qdrant
      * outage must not lose the digest row (a later re-index can rebuild the
-     * collection from the table).
+     * collection from the table). Public so `app:digest:reindex` can rebuild
+     * the collection after an embedding-model change. Returns whether the
+     * point was written.
      */
-    private function mirrorToQdrant(User $user, MessageDigest $digest): void
+    public function mirrorToQdrant(User $user, MessageDigest $digest): bool
     {
         if (!$this->qdrantClient->isAvailable()) {
             $this->logger->warning('Qdrant unavailable, digest stored in DB only', [
                 'digest_id' => $digest->getId(),
             ]);
 
-            return;
+            return false;
         }
 
         try {
@@ -321,7 +333,7 @@ PROMPT;
                 'source' => 'DIGEST_STORE',
             ]);
 
-            $pointId = sprintf('dig_%d_%d', $user->getId(), $digest->getId());
+            $pointId = self::qdrantPointId($user->getId(), $digest->getId());
 
             $this->qdrantClient->upsertDigest($pointId, $embedding, [
                 'user_id' => $digest->getUserId(),
@@ -337,11 +349,15 @@ PROMPT;
                 'vector_dim' => count($embedding),
                 'indexed_at' => date(\DATE_ATOM),
             ]);
+
+            return true;
         } catch (\Throwable $e) {
             $this->logger->error('Failed to mirror digest to Qdrant (DB row kept)', [
                 'digest_id' => $digest->getId(),
                 'error' => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 

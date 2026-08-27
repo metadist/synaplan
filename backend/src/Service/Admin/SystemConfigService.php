@@ -10,6 +10,7 @@ use App\AI\Credential\SecretValueGuard;
 use App\Repository\ConfigRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\Digest\MessageDigestConfig;
 use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
@@ -140,6 +141,19 @@ final readonly class SystemConfigService
                         'CONVERSATION_SUMMARY_MAX_SOURCE_MESSAGES',
                         'CONVERSATION_SUMMARY_TIERS',
                         'CONVERSATION_SUMMARY_CACHE_TTL',
+                    ]],
+                    'deep_memory' => ['label' => 'Deep memory (message digests)', 'fields' => [
+                        'DIGEST_ENABLED',
+                        'DIGEST_TOP_K',
+                        'DIGEST_MIN_SCORE',
+                        'DIGEST_RECENCY_HALF_LIFE_DAYS',
+                        'DIGEST_PULL_TOP_N',
+                        'DIGEST_PULL_MIN_SCORE',
+                        'DIGEST_BLOCK_MAX_CHARS',
+                        'DIGEST_BATCH_SIZE',
+                        'DIGEST_MAX_BATCHES_PER_USER',
+                        'DIGEST_QUIET_SECONDS',
+                        'DIGEST_MAX_PER_USER',
                     ]],
                 ],
             ],
@@ -417,6 +431,24 @@ final readonly class SystemConfigService
                 && ($numericValue < 1 || floor($numericValue) !== $numericValue)
             ) {
                 return ['success' => false, 'requiresRestart' => false, 'message' => 'Value must be a positive whole number'];
+            }
+
+            // Deep-memory knobs: scores are 0.0–1.0 floats; PULL_TOP_N may be
+            // 0 (disables verbatim pulling); everything else is a positive
+            // whole number. MessageDigestConfig clamps out-of-range values,
+            // so a row that would be silently corrected is rejected here.
+            if (MessageDigestConfig::CONFIG_GROUP === ($field['dbGroup'] ?? null)) {
+                if (str_contains($key, 'MIN_SCORE')) {
+                    if ($numericValue < 0.0 || $numericValue > 1.0) {
+                        return ['success' => false, 'requiresRestart' => false, 'message' => 'Score must be between 0.0 and 1.0'];
+                    }
+                } elseif (floor($numericValue) !== $numericValue
+                    || $numericValue < ('DIGEST_PULL_TOP_N' === $key ? 0 : 1)
+                ) {
+                    return ['success' => false, 'requiresRestart' => false, 'message' => 'DIGEST_PULL_TOP_N' === $key
+                        ? 'Value must be a whole number (0 disables pulling)'
+                        : 'Value must be a positive whole number'];
+                }
             }
         }
 
@@ -1100,6 +1132,111 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => ConversationSummaryConstants::CONFIG_GROUP,
                 'dbKey' => ConversationSummaryConstants::KEY_CACHE_TTL,
+            ],
+            // === Routing — deep memory / message digests (database-backed) ===
+            // BCONFIG group DIGEST (ownerId=0), the rows MessageDigestConfig
+            // reads. No row means "use the MessageDigestConfig default", so
+            // the defaults below must stay in sync with that class. The
+            // per-user scan cursor lives in the same group under the user's
+            // own id and is never exposed here.
+            'DIGEST_ENABLED' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Deep memory master switch. A daily job condenses each user\'s KEY messages (documents, decisions, important facts) into one-line digests indexed in the vector DB; a chat prompt months later can then find and quote the original message ("the office rent letter from May"). Controls both the daily indexing job and the retrieval during chat. When OFF, older conversations are only reachable through extracted memories.',
+                'default' => var_export(MessageDigestConfig::DEFAULT_ENABLED, true),
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_ENABLED,
+            ],
+            'DIGEST_TOP_K' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Maximum digest hits considered per chat turn (after re-ranking by similarity and recency). 1–20.',
+                'default' => (string) MessageDigestConfig::DEFAULT_TOP_K,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_TOP_K,
+            ],
+            'DIGEST_MIN_SCORE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Vector similarity floor (0.0–1.0) a digest must clear to be considered at all. Raise it to cut noise, lower it to increase recall. Tuned with app:digest:eval.',
+                'default' => (string) MessageDigestConfig::DEFAULT_MIN_SCORE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MIN_SCORE,
+            ],
+            'DIGEST_RECENCY_HALF_LIFE_DAYS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Half-life of the recency decay in days: at this age a digest\'s effective score is halved. Deliberately slow, so an old but highly relevant message still beats a recent vague one.',
+                'default' => (string) MessageDigestConfig::DEFAULT_RECENCY_HALF_LIFE_DAYS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_RECENCY_HALF_LIFE_DAYS,
+            ],
+            'DIGEST_PULL_TOP_N' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many of the best hits get their ORIGINAL message pulled verbatim into the prompt (so the model can quote amounts and dates, not just know the message exists). 0 disables pulling; the digest lines still appear.',
+                'default' => (string) MessageDigestConfig::DEFAULT_PULL_TOP_N,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_PULL_TOP_N,
+            ],
+            'DIGEST_PULL_MIN_SCORE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Raw similarity (0.0–1.0) a hit must clear before its source message is pulled verbatim. Higher than the search floor: pulling costs prompt space.',
+                'default' => (string) MessageDigestConfig::DEFAULT_PULL_MIN_SCORE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_PULL_MIN_SCORE,
+            ],
+            'DIGEST_BLOCK_MAX_CHARS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard character cap for the whole "Older conversations" block injected into the system prompt (digest lines plus pulled excerpts).',
+                'default' => (string) MessageDigestConfig::DEFAULT_BLOCK_MAX_CHARS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_BLOCK_MAX_CHARS,
+            ],
+            'DIGEST_BATCH_SIZE' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Messages handed to the digest model per call during the daily indexing job. 5–100.',
+                'default' => (string) MessageDigestConfig::DEFAULT_BATCH_SIZE,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_BATCH_SIZE,
+            ],
+            'DIGEST_MAX_BATCHES_PER_USER' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Cost cap: maximum digest-model calls per user per daily run. Unprocessed history is picked up by the next run (the per-user cursor never loses its place).',
+                'default' => (string) MessageDigestConfig::DEFAULT_MAX_BATCHES_PER_USER,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MAX_BATCHES_PER_USER,
+            ],
+            'DIGEST_QUIET_SECONDS' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Messages younger than this many seconds are left for a later run — the rolling summary covers the live conversation; the digest is the long-term index and must not race a chat still in progress.',
+                'default' => (string) MessageDigestConfig::DEFAULT_QUIET_SECONDS,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_QUIET_SECONDS,
+            ],
+            'DIGEST_MAX_PER_USER' => [
+                'tab' => 'routing', 'section' => 'deep_memory', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Per-user cap on active digest entries (the deep-memory sibling of the 500-memory limit). On overflow the oldest entries are deactivated first. Minimum 100.',
+                'default' => (string) MessageDigestConfig::DEFAULT_MAX_PER_USER,
+                'source' => 'database',
+                'dbGroup' => MessageDigestConfig::CONFIG_GROUP,
+                'dbKey' => MessageDigestConfig::KEY_MAX_PER_USER,
             ],
             // Stored in BCONFIG group MEDIA / setting ASYNC_JOBS_ENABLED (the row
             // MediaJobConfig reads). Master switch for detaching media renders to

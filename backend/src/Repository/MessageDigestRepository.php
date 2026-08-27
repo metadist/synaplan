@@ -161,4 +161,110 @@ class MessageDigestRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    public function countActiveForUser(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('d.userId = :userId')
+            ->andWhere('d.active = true')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Oldest active digests by source date — the prune candidates when a user
+     * is over the per-user cap.
+     *
+     * @return list<MessageDigest>
+     */
+    public function findOldestActive(int $userId, int $limit): array
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.userId = :userId')
+            ->andWhere('d.active = true')
+            ->setParameter('userId', $userId)
+            ->orderBy('d.sourceDate', 'ASC')
+            ->addOrderBy('d.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * All active digests of one chat — deletion hygiene when the chat goes away.
+     *
+     * @return list<MessageDigest>
+     */
+    public function findActiveByChat(int $userId, int $chatId): array
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.userId = :userId')
+            ->andWhere('d.chatId = :chatId')
+            ->andWhere('d.active = true')
+            ->setParameter('userId', $userId)
+            ->setParameter('chatId', $chatId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Soft-delete a set of digests. Bulk DQL, so any already-hydrated
+     * entities are NOT synchronized — callers work on fresh reads.
+     *
+     * @param list<int> $digestIds
+     */
+    public function deactivateByIds(array $digestIds): int
+    {
+        if ([] === $digestIds) {
+            return 0;
+        }
+
+        return (int) $this->createQueryBuilder('d')
+            ->update()
+            ->set('d.active', 'false')
+            ->where('d.id IN (:ids)')
+            ->setParameter('ids', $digestIds)
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
+     * Keyset page of a user's active digests (ordered by id) — lets the
+     * re-index command walk an arbitrarily large table without OFFSET scans
+     * or holding everything in memory.
+     *
+     * @return list<MessageDigest>
+     */
+    public function findActiveForUserAfterId(int $userId, int $afterId, int $limit): array
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.userId = :userId')
+            ->andWhere('d.active = true')
+            ->andWhere('d.id > :afterId')
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->orderBy('d.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * User ids that have at least one active digest — enumeration base for
+     * the re-index command.
+     *
+     * @return list<int>
+     */
+    public function findDistinctActiveUserIds(): array
+    {
+        $rows = $this->createQueryBuilder('d')
+            ->select('DISTINCT d.userId')
+            ->where('d.active = true')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(intval(...), $rows);
+    }
 }

@@ -27,6 +27,7 @@ final readonly class MessageDigestRunner
         private MessageDigestConfig $config,
         private MessageRepository $messageRepository,
         private MessageDigestRepository $digestRepository,
+        private MessageDigestMaintenance $maintenance,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
     ) {
@@ -154,6 +155,11 @@ final readonly class MessageDigestRunner
             if ($advanceCursor && !$dryRun) {
                 $this->config->setCursor($user->getId(), $result['cursor']);
             }
+        }
+
+        // Cap enforcement: only after real writes — a dry run must not mutate.
+        if ($result['created'] > 0 && !$dryRun) {
+            $this->maintenance->pruneOverflow($user->getId());
         }
 
         if ($result['batches'] > 0) {

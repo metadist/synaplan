@@ -10,6 +10,7 @@ use App\Repository\MessageDigestRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\Digest\MessageDigestRunner;
 use App\Service\Digest\MessageDigestService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -22,6 +23,7 @@ final class MessageDigestRunnerTest extends TestCase
     private MessageDigestConfig&MockObject $config;
     private MessageRepository&MockObject $messageRepository;
     private MessageDigestRepository&MockObject $digestRepository;
+    private MessageDigestMaintenance&MockObject $maintenance;
     private UserRepository&MockObject $userRepository;
     private MessageDigestRunner $runner;
 
@@ -31,6 +33,7 @@ final class MessageDigestRunnerTest extends TestCase
         $this->config = $this->createMock(MessageDigestConfig::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
         $this->digestRepository = $this->createMock(MessageDigestRepository::class);
+        $this->maintenance = $this->createMock(MessageDigestMaintenance::class);
         $this->userRepository = $this->createMock(UserRepository::class);
 
         $this->config->method('getBatchSize')->willReturn(25);
@@ -42,6 +45,7 @@ final class MessageDigestRunnerTest extends TestCase
             $this->config,
             $this->messageRepository,
             $this->digestRepository,
+            $this->maintenance,
             $this->userRepository,
             new NullLogger(),
         );
@@ -175,6 +179,43 @@ final class MessageDigestRunnerTest extends TestCase
 
         $this->config->expects(self::never())->method('setCursor');
 
+        $this->runner->runForUser($user, maxBatches: 4, dryRun: true);
+    }
+
+    public function testPruneRunsAfterAUserPassThatCreatedDigests(): void
+    {
+        $user = $this->makeUser(7);
+        $this->config->method('getCursor')->willReturn(0);
+        $this->digestRepository->method('maxMessageIdForUser')->willReturn(0);
+
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnOnConsecutiveCalls([$this->makeMessage(50)], []);
+        $this->digestService->method('digestBatch')
+            ->willReturn(['scanned' => 1, 'created' => 1, 'proposals' => []]);
+
+        $this->maintenance->expects(self::once())->method('pruneOverflow')->with(7);
+
+        $this->runner->runForUser($user, maxBatches: 4);
+    }
+
+    public function testPruneIsSkippedWhenNothingWasCreatedOrOnDryRun(): void
+    {
+        $user = $this->makeUser(7);
+        $this->config->method('getCursor')->willReturn(0);
+        $this->digestRepository->method('maxMessageIdForUser')->willReturn(0);
+
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnOnConsecutiveCalls([$this->makeMessage(50)], [], [$this->makeMessage(60)], []);
+        $this->digestService->method('digestBatch')
+            ->willReturnOnConsecutiveCalls(
+                ['scanned' => 1, 'created' => 0, 'proposals' => []],
+                ['scanned' => 1, 'created' => 1, 'proposals' => [['title' => 'x', 'message_id' => 60]]],
+            );
+
+        $this->maintenance->expects(self::never())->method('pruneOverflow');
+
+        // Pass 1: nothing created. Pass 2: created, but dry run.
+        $this->runner->runForUser($user, maxBatches: 4);
         $this->runner->runForUser($user, maxBatches: 4, dryRun: true);
     }
 

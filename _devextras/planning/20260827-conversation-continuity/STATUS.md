@@ -6,7 +6,7 @@
 | 2 — Durable summary + channel parity | `feat/durable-summary-channel-parity` | implemented (stacked on Sprint 1 branch) | `BCHATSUMMARIES` durable store behind Redis; summary injected + refreshed on web, WhatsApp, email, MCP, widget; cleanup on chat delete |
 | 3 — Message digest foundation | `feat/message-digest-foundation` | implemented (stacked on Sprint 2 branch) | `BMESSAGEDIGESTS` + Qdrant `user_message_digests`; `tools:message_digest` prompt; `app:digest:run` (daily scheduler) + `app:digest:backfill`; per-user BCONFIG cursor + cost caps; verified live end-to-end (rent-letter case digested + vector-indexed) |
 | 4 — Digest retrieval + badges | `feat/digest-retrieval` | implemented (stacked on Sprint 3 branch) | `DigestSearchService` (recency re-rank + top-N message pull) injected via `ChatHandler` on stream + non-stream; `[Message:ID]` badges (web SSE + reload endpoint) and plain-text resolution for WhatsApp/email/MCP; `app:digest:eval` retrieval harness (results below) |
-| 5 — Hardening, admin, docs, E2E | `feat/continuity-hardening` | not started | |
+| 5 — Hardening, admin, docs, E2E | `feat/continuity-hardening` | implemented (stacked on Sprint 4 branch) | Admin UI knobs for the `DIGEST` group (Routing → Deep memory) with validation; per-user cap (5000, prune-oldest-first) enforced after every digest run; chat delete deactivates digests + drops Qdrant points; `app:digest:reindex` rebuilds the vector index from MariaDB; `docs/CONVERSATION_CONTINUITY.md` runbooks; load sanity + mobile-impact verified (see below) |
 
 ## Investigation baseline (2026-08-27)
 
@@ -68,3 +68,22 @@ cosine + the production recency decay via `DigestSearchService::effectiveScore`)
    so the model can cite it. Tuning `MIN_SCORE` up would drop recall — not worth it.
 3. bge-m3 handles cross-language retrieval (German query → English digest and
    vice versa) without any special handling.
+
+## Sprint 5 verification notes (2026-08-27)
+
+- **Load sanity:** seeded a 10k-message user, ran
+  `app:digest:backfill --user=… --since-days=400 --max-batches=4 --dry-run`:
+  1.9 s wall for 4 model batches (100 messages scanned) under a 256M PHP
+  memory limit — hydration is bounded by `BATCH_SIZE` keyset pages by
+  construction. The model correctly proposed 0 digests for the deliberately
+  boring seeded messages. Seeded data removed afterwards.
+- **Mobile impact:** `node scripts/mobile-impact.mjs --base origin/main --head HEAD`
+  classifies the whole feature as `ota-candidate` (frontend badge work) +
+  `backend-only` (everything else). Nothing store-required.
+- **Badge E2E deferred:** there is no Playwright E2E for `[Memory:ID]` badges
+  either — house precedent is component-level coverage. The digest badge flow
+  is covered by `ChatHandlerDigestAcceptanceTest` (full backend stack, rent
+  letter case), `MessageTextMessageRefs.spec.ts` (render + click + navigation),
+  and the `messageDigests` store tests. A stub-model E2E would need the E2E
+  Ollama stub to emit `[Message:ID]` deterministically plus seeded Qdrant
+  state — noted as follow-up, not a sprint gate.

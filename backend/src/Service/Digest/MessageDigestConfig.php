@@ -29,6 +29,7 @@ final class MessageDigestConfig
     public const KEY_PULL_TOP_N = 'PULL_TOP_N';
     public const KEY_PULL_MIN_SCORE = 'PULL_MIN_SCORE';
     public const KEY_BLOCK_MAX_CHARS = 'BLOCK_MAX_CHARS';
+    public const KEY_MAX_PER_USER = 'MAX_PER_USER';
 
     public const DEFAULT_ENABLED = true;
     public const DEFAULT_BATCH_SIZE = 25;
@@ -40,6 +41,7 @@ final class MessageDigestConfig
     public const DEFAULT_PULL_TOP_N = 2;
     public const DEFAULT_PULL_MIN_SCORE = 0.6;
     public const DEFAULT_BLOCK_MAX_CHARS = 4000;
+    public const DEFAULT_MAX_PER_USER = 5000;
 
     private const MIN_BATCH_SIZE = 5;
     private const MAX_BATCH_SIZE = 100;
@@ -144,6 +146,16 @@ final class MessageDigestConfig
     public function getBlockMaxChars(): int
     {
         return max(500, $this->getInt(self::KEY_BLOCK_MAX_CHARS, self::DEFAULT_BLOCK_MAX_CHARS));
+    }
+
+    /**
+     * Per-user cap on ACTIVE digest entries — the digest sibling of the
+     * 500-memory discipline (digests are one-liners, so the cap is higher).
+     * On overflow the oldest entries are deactivated first.
+     */
+    public function getMaxPerUser(): int
+    {
+        return max(100, $this->getInt(self::KEY_MAX_PER_USER, self::DEFAULT_MAX_PER_USER));
     }
 
     private function getFloat(string $key, float $default): float
