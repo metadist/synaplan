@@ -340,6 +340,73 @@ final class RedisService
         }
     }
 
+    /**
+     * Number of members in a sorted set (0 when missing or unavailable).
+     */
+    public function zCard(string $key): int
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return 0;
+        }
+
+        try {
+            return (int) $client->zcard($this->prefix($key));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZCARD', $key, $e);
+
+            return 0;
+        }
+    }
+
+    /**
+     * Remove members by rank range (0 = lowest score). Used to trim a ring
+     * buffer to a fixed size by dropping the oldest entries.
+     */
+    public function zRemRangeByRank(string $key, int $start, int $stop): bool
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return false;
+        }
+
+        try {
+            $client->zremrangebyrank($this->prefix($key), $start, $stop);
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZREMRANGEBYRANK', $key, $e);
+
+            return false;
+        }
+    }
+
+    /**
+     * Range query by score in descending order (highest score first). `$max`/
+     * `$min` accept Redis range syntax ('+inf', '-inf', '(123' for exclusive).
+     *
+     * @return list<string>
+     */
+    public function zRevRangeByScore(string $key, string $max, string $min, ?int $limit = null): array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return [];
+        }
+
+        try {
+            $options = null === $limit ? [] : ['limit' => [0, $limit]];
+            /** @var array<int, mixed> $members */
+            $members = $client->zrevrangebyscore($this->prefix($key), $max, $min, $options);
+
+            return array_values(array_map(static fn ($m): string => (string) $m, $members));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('ZREVRANGEBYSCORE', $key, $e);
+
+            return [];
+        }
+    }
+
     public function sAdd(string $key, string $member): bool
     {
         $client = $this->client();
