@@ -11,6 +11,8 @@ use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Digest\DigestSearchService;
+use App\Service\Digest\MessageDigestConfig;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
@@ -83,6 +85,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private TimeContextBuilder $timeContextBuilder,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
         private VisionModelResolver $visionModelResolver,
+        private DigestSearchService $digestSearchService,
+        private MessageDigestConfig $digestConfig,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -249,6 +253,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
 
+        $digestResult = $this->loadDigestContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $digestContext = $digestResult['context'];
+        $loadedDigests = $digestResult['digests'];
+
         // Determine model: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
         $provider = null;
@@ -365,6 +381,28 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= $feedbackContext;
             $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
                 'feedback_context_length' => strlen($feedbackContext),
+            ]);
+        }
+
+        // Deep-memory digest block (references to key messages from older
+        // conversations) — same position as the streaming path.
+        if (!empty($digestContext)) {
+            $systemPrompt .= $digestContext;
+            $this->logger->info('ChatHandler: Digest context appended to system prompt', [
+                'digest_count' => count($loadedDigests),
+                'digest_context_length' => strlen($digestContext),
+            ]);
+        }
+
+        // Append the rolling conversation summary exactly like handleStream()
+        // does, so long email / MCP / webhook threads keep their topic and the
+        // user's position while the verbatim thread stays inside the window
+        // (channel parity — the non-streaming half of issue #615's promise).
+        $conversationSummary = $options['conversation_summary'] ?? '';
+        if (is_string($conversationSummary) && '' !== trim($conversationSummary)) {
+            $systemPrompt .= $this->formatConversationSummaryForPrompt($conversationSummary);
+            $this->logger->info('ChatHandler: Conversation summary appended to system prompt', [
+                'summary_length' => \strlen($conversationSummary),
             ]);
         }
 
@@ -617,6 +655,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId, // Include resolved model_id for storage
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'digests' => $loadedDigests,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
@@ -814,6 +853,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
 
+        $digestResult = $this->loadDigestContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $digestContext = $digestResult['context'];
+        $loadedDigests = $digestResult['digests'];
+
         // Get model - Priority: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
         $provider = null;
@@ -926,6 +977,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= $feedbackContext;
             $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
                 'feedback_context_length' => strlen($feedbackContext),
+            ]);
+        }
+
+        // Deep-memory digest block (references to key messages from older
+        // conversations) — same position as the non-streaming path.
+        if (!empty($digestContext)) {
+            $systemPrompt .= $digestContext;
+            $this->logger->info('ChatHandler: Digest context appended to system prompt', [
+                'digest_count' => count($loadedDigests),
+                'digest_context_length' => strlen($digestContext),
             ]);
         }
 
@@ -1228,6 +1289,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'response_id' => $metadata['response_id'] ?? null,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'digests' => $loadedDigests,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
@@ -2708,6 +2770,103 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'disabledByUser' => $disabledByUser,
             'requestDisableContext' => $requestDisableContext,
         ];
+    }
+
+    /**
+     * Deep-memory retrieval over the message digest index: find key messages
+     * from OLDER conversations that are relevant to the current prompt and
+     * inject them (plus verbatim excerpts for the top hits) into the system
+     * prompt — so "what did the realtor write about the rent?" finds the
+     * letter from three months ago.
+     *
+     * Shared between streaming and non-streaming paths (channel parity), and
+     * gated by exactly the same request/user levers as memories: a widget or
+     * guest visitor must never see the account owner's message history.
+     *
+     * Reuses the per-turn memory embedding (digest titles are embedded with
+     * the same memory embedding model), so this adds no extra embed call.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
+     *
+     * @return array{context: string, digests: list<array<string, mixed>>}
+     */
+    private function loadDigestContext(
+        Message $message,
+        ?User $user,
+        array $options,
+        array $classification,
+        ?callable $progressCallback,
+        \Closure $resolveMemoryVector,
+        PerfTimer $perfTimer,
+    ): array {
+        $disabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
+
+        if ($disabledByRequest || $disabledByUser || !$this->digestConfig->isEnabled()) {
+            return ['context' => '', 'digests' => []];
+        }
+
+        $digests = [];
+
+        try {
+            $perfTimer->start('digests_search');
+            $memoryVector = $resolveMemoryVector();
+            if (null !== $memoryVector) {
+                $digests = $this->digestSearchService->search(
+                    $message->getUserId(),
+                    $memoryVector,
+                    excludeChatId: $message->getChatId(),
+                );
+            }
+            $perfTimer->stop('digests_search');
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatHandler: Failed to load message digests, continuing without', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['context' => '', 'digests' => []];
+        }
+
+        if ([] === $digests) {
+            return ['context' => '', 'digests' => []];
+        }
+
+        $context = $this->knowledgeContextFormatter->formatDigestContext(
+            $digests,
+            $this->digestConfig->getBlockMaxChars(),
+        );
+
+        $this->logger->info('ChatHandler: Message digests loaded', [
+            'user_id' => $message->getUserId(),
+            'digest_count' => count($digests),
+            'context_length' => strlen($context),
+        ]);
+
+        if ($progressCallback && '' !== $context) {
+            // Excerpts stay backend-only: the frontend needs the reference
+            // list (id, chat, title) for [Message:ID] badges, not the pulled
+            // message bodies.
+            $progressCallback([
+                'status' => 'digests_loaded',
+                'message' => 'Older conversations loaded',
+                'metadata' => [
+                    'digests' => array_map(static fn (array $d): array => [
+                        'message_id' => $d['message_id'],
+                        'chat_id' => $d['chat_id'],
+                        'title' => $d['title'],
+                        'channel' => $d['channel'],
+                        'source_date' => $d['source_date'],
+                    ], $digests),
+                    'count' => count($digests),
+                ],
+                'timestamp' => time(),
+            ]);
+        }
+
+        return ['context' => $context, 'digests' => $digests];
     }
 
     /**

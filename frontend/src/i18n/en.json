@@ -4343,6 +4343,14 @@
     "privacy": "Privacy",
     "terms": "Terms"
   },
+  "messageRefs": {
+    "olderConversation": "Older conversation",
+    "clickToOpen": "Click to open the original conversation",
+    "missing": {
+      "badge": "Older message",
+      "tooltip": "This message reference could not be resolved. The message may have been deleted."
+    }
+  },
   "memories": {
     "fullscreen": {
       "enter": "Fullscreen",

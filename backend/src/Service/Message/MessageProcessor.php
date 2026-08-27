@@ -472,36 +472,13 @@ final readonly class MessageProcessor
             }
 
             // Step 2.9: Rolling conversation summary (read-only on the hot path).
-            //
-            // Injects the stored summary of older turns into the system prompt
-            // while the newest turns stay verbatim. NEVER calls an AI model
-            // here — the worker refreshes the store after the turn is
-            // persisted ({@see RefreshConversationSummaryCommand}), so this
-            // step is a cache read and must not show up in time-to-first-token.
-            //
-            // Only for the chat-style path with a persisted chat; other intents
-            // ignore the option. On a cold store the turn proceeds without a
-            // summary and the async refresh fills it for the next one.
-            $summaryIntent = $classification['intent'] ?? 'chat';
-            $summaryChatId = $message->getChatId();
-            if ('chat' === $summaryIntent && null !== $summaryChatId && $summaryChatId > 0) {
-                $perfTimer->start('summary');
-                $totalMessages = $this->messageRepository->countByChatId(
-                    $summaryChatId,
-                    excludeFailed: false,
-                );
-                $rolling = $this->conversationSummaryService->buildRollingContext(
-                    $conversationHistory,
-                    $totalMessages,
-                    $message->getUserId(),
-                    $summaryChatId,
-                );
-                if ($rolling->applied) {
-                    $options['conversation_summary'] = $rolling->summary;
-                    $conversationHistory = $rolling->recentMessages;
-                }
-                $perfTimer->stop('summary');
-            }
+            [$options, $conversationHistory] = $this->applyRollingSummary(
+                $message,
+                $classification ?? [],
+                $options,
+                $conversationHistory,
+                $perfTimer,
+            );
 
             // Step 3: Inference (AI Response) mit STREAMING
             // Get chat model info to display during generation
@@ -945,6 +922,16 @@ final readonly class MessageProcessor
                 }
             }
 
+            // Step 2.9: Rolling conversation summary — the same read-only
+            // injection as processStream(), so email / MCP / webhook turns get
+            // identical long-thread context (channel parity).
+            [$options, $conversationHistory] = $this->applyRollingSummary(
+                $message,
+                $classification,
+                $options,
+                $conversationHistory,
+            );
+
             // Step 3: Inference (AI Response)
             // Get chat model info to display during generation
             $chatModelId = $this->modelConfigService->getDefaultModel('CHAT', $message->getUserId());
@@ -1052,8 +1039,58 @@ final readonly class MessageProcessor
     }
 
     /**
-     * Send status notification to callback.
+     * Step 2.9 (shared by process() and processStream()): rolling conversation
+     * summary — read-only on the hot path.
+     *
+     * Injects the stored summary of older turns into the system prompt while
+     * the newest turns stay verbatim. NEVER calls an AI model here — the
+     * worker refreshes the store after the turn is persisted
+     * ({@see \App\Message\RefreshConversationSummaryCommand}), so this step is
+     * a cache/DB read and must not show up in time-to-first-token.
+     *
+     * Only for the chat-style path with a persisted chat; other intents ignore
+     * the option. On a cold store the turn proceeds without a summary and the
+     * async refresh fills it for the next one.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     * @param array<int, Message>  $conversationHistory
+     *
+     * @return array{0: array<string, mixed>, 1: array<int, Message>} updated [$options, $conversationHistory]
      */
+    private function applyRollingSummary(
+        Message $message,
+        array $classification,
+        array $options,
+        array $conversationHistory,
+        ?PerfTimer $perfTimer = null,
+    ): array {
+        $intent = $classification['intent'] ?? 'chat';
+        $chatId = $message->getChatId();
+        if ('chat' !== $intent || null === $chatId || $chatId <= 0) {
+            return [$options, $conversationHistory];
+        }
+
+        $perfTimer?->start('summary');
+        $totalMessages = $this->messageRepository->countByChatId(
+            $chatId,
+            excludeFailed: false,
+        );
+        $rolling = $this->conversationSummaryService->buildRollingContext(
+            $conversationHistory,
+            $totalMessages,
+            $message->getUserId(),
+            $chatId,
+        );
+        if ($rolling->applied) {
+            $options['conversation_summary'] = $rolling->summary;
+            $conversationHistory = $rolling->recentMessages;
+        }
+        $perfTimer?->stop('summary');
+
+        return [$options, $conversationHistory];
+    }
+
     /**
      * Human-readable reason for the consolidated web-search decision log.
      *

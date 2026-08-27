@@ -12,6 +12,7 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\FileRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\McpServerConfigRepository;
+use App\Repository\MessageDigestRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PluginDataRepository;
 use App\Repository\PromptMetaRepository;
@@ -26,6 +27,7 @@ use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\File\FileStorageService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -55,6 +57,8 @@ final readonly class UserDeletionService
         private FileStorageService $fileStorageService,
         private VectorStorageFacade $vectorStorageFacade,
         private UserMemoryService $userMemoryService,
+        private MessageDigestRepository $messageDigestRepository,
+        private QdrantClientInterface $qdrantClient,
         private LoggerInterface $logger,
     ) {
     }
@@ -98,6 +102,7 @@ final readonly class UserDeletionService
             $this->deleteMcpServerConfigs($userId);
             $this->deleteRevectorizeRuns($userId);
             $this->deleteMemoriesFromSql($userId);
+            $this->deleteMessageDigests($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -107,6 +112,7 @@ final readonly class UserDeletionService
 
             // Best-effort cleanup outside transaction (external services & filesystem)
             $this->purgeMemoryIndex($userId);
+            $this->purgeDigestIndex($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User and all related data deleted successfully', [
@@ -168,12 +174,14 @@ final readonly class UserDeletionService
             $this->deleteMcpServerConfigs($userId);
             $this->deleteRevectorizeRuns($userId);
             $this->deleteMemoriesFromSql($userId);
+            $this->deleteMessageDigests($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
             $this->purgeMemoryIndex($userId);
+            $this->purgeDigestIndex($userId);
             $this->cleanupUserDirectories($userId);
 
             $this->logger->info('User data cleanup completed successfully', [
@@ -248,6 +256,17 @@ final readonly class UserDeletionService
     private function purgeMemoryIndex(int $userId): void
     {
         $this->userMemoryService->purgeIndexForUser($userId);
+    }
+
+    private function deleteMessageDigests(int $userId): void
+    {
+        $this->messageDigestRepository->deleteAllForUser($userId);
+    }
+
+    /** Best-effort: MariaDB rows are already gone; a Qdrant failure only leaves orphaned vectors. */
+    private function purgeDigestIndex(int $userId): void
+    {
+        $this->qdrantClient->deleteAllDigestsForUser($userId);
     }
 
     private function deleteUseLogs(int $userId): void

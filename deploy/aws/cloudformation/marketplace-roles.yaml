@@ -101,6 +101,7 @@ Resources:
                 Resource: '*'
                 Action:
                   - ec2:DescribeImages
+                  - ec2:DescribeImageAttribute
                   - ec2:DescribeInstances
                   - ec2:DescribeInstanceStatus
                   - ec2:DescribeInstanceTypeOfferings
@@ -111,6 +112,7 @@ Resources:
                   - ec2:DescribeTags
                   - ec2:DescribeVolumes
                   - ec2:DescribeVpcs
+                  - ec2:GetEbsEncryptionByDefault
                   - ec2:RunInstances
                   - ec2:StopInstances
                   - ec2:TerminateInstances

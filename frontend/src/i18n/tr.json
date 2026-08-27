@@ -3456,6 +3456,14 @@
     "deleteSuccess": "{count} sohbet başarıyla silindi",
     "deleteFailed": "Sohbetler silinemedi"
   },
+  "messageRefs": {
+    "olderConversation": "Önceki konuşma",
+    "clickToOpen": "Orijinal konuşmayı açmak için tıklayın",
+    "missing": {
+      "badge": "Önceki mesaj",
+      "tooltip": "Bu mesaj referansı çözümlenemedi. Mesaj silinmiş olabilir."
+    }
+  },
   "memories": {
     "fullscreen": {
       "enter": "Tam ekran",

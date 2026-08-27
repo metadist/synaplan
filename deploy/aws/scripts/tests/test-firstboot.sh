@@ -54,6 +54,32 @@ if [[ -n "$non_ascii_ami_metadata" ]]; then
     fail "The AMI name or description carries a character EC2 will reject: $non_ascii_ami_metadata"
 fi
 
+# Marketplace must copy the source AMI into its ingestion account before it can
+# scan and publish it. An encrypted EBS snapshot cannot be shared, even when it
+# uses the seller account's default KMS key. The 4.2.4 submission reached the
+# portal with exactly that combination and failed with Image access exception.
+packer_file="$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl"
+launch_mapping="$(
+    awk '
+        /launch_block_device_mappings[[:space:]]*\{/ { capture = 1 }
+        capture { print }
+        capture && /^[[:space:]]*\}/ { exit }
+    ' "$packer_file"
+)"
+grep -Eq 'encrypted[[:space:]]*=[[:space:]]*false' <<<"$launch_mapping" ||
+    fail "The Packer launch root is not explicitly unencrypted; AWS Marketplace cannot ingest or share the resulting AMI"
+
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+ami_workflow="$repo_root/.github/workflows/aws-ami.yml"
+grep -Fq 'get-ebs-encryption-by-default' "$ami_workflow" ||
+    fail "the AMI workflow does not reject account-level default EBS encryption before paying for a Marketplace-incompatible build"
+grep -Fq 'describe-snapshots' "$ami_workflow" ||
+    fail "the AMI workflow does not verify that every built snapshot is unencrypted"
+grep -Fq '679593333241' "$ami_workflow" ||
+    fail "the AMI workflow does not name the AWS Marketplace ingestion account"
+grep -Fq 'modify-image-attribute' "$ami_workflow" ||
+    fail "the AMI workflow does not share the built AMI with the AWS Marketplace ingestion account"
+
 # --------------------------------------------------------------------------
 # The boot order the units ask of systemd
 # --------------------------------------------------------------------------

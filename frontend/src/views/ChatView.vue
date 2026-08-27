@@ -484,6 +484,7 @@ import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
+import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
@@ -584,6 +585,7 @@ const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
@@ -837,6 +839,7 @@ onMounted(async () => {
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+    window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
     return
   }
@@ -902,6 +905,7 @@ onMounted(async () => {
   // Setup window event listener for feedback dialog (used by MessageText.vue)
   window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
 
   // Phase 1d: keep the SSE token cache warm.
   //   - Prefetch on mount so the first message of a session never waits.
@@ -982,6 +986,18 @@ const handleOpenFirstRunSetupEvent = () => {
   void goToProviderSetup()
 }
 
+// Window event handler for [Message:ID] digest badges (used by MessageText.vue):
+// open the older conversation the reference points into.
+const handleOpenMessageReferenceEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ messageId: number; chatId: number }>
+  const chatId = customEvent.detail?.chatId
+  if (!chatId || chatId <= 0) return
+  if (chatsStore.activeChatId === chatId) return
+
+  chatsStore.setActiveChat(chatId)
+  void historyStore.loadMessages(chatId)
+}
+
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
 // clears local streaming state WITHOUT telling the backend to stop — the turn
@@ -1014,6 +1030,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
@@ -3143,6 +3160,22 @@ const streamAIResponse = async (
               if (streamingMessage && feedbackIds.length > 0) {
                 streamingMessage.feedbackIds = feedbackIds
               }
+            }
+          } else if (data.status === 'digests_loaded') {
+            // Deep-memory references loaded - store for [Message:ID] badge rendering
+            const digests = data.metadata?.digests
+            if (digests && Array.isArray(digests)) {
+              messageDigestsStore.addReferences(
+                digests
+                  .filter((d) => d && typeof d.message_id === 'number')
+                  .map((d) => ({
+                    messageId: d.message_id,
+                    chatId: d.chat_id ?? 0,
+                    title: d.title ?? '',
+                    channel: d.channel ?? '',
+                    sourceDate: d.source_date ?? 0,
+                  }))
+              )
             }
           } else if (data.status === 'memory_deleted') {
             // Legacy backend event - remove from local store only

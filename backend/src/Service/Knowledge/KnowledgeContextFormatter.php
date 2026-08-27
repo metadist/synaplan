@@ -81,6 +81,69 @@ final class KnowledgeContextFormatter
     }
 
     /**
+     * Digest block: references to key messages from OLDER conversations found
+     * via the deep-memory index, with optional verbatim excerpts for the top
+     * hits. Hard-capped at `$maxChars` — excerpts are dropped (whole, never
+     * mid-cut) before digest lines are.
+     *
+     * @param list<array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, excerpt: string|null}> $digests
+     */
+    public function formatDigestContext(array $digests, int $maxChars = 4000): string
+    {
+        if ([] === $digests) {
+            return '';
+        }
+
+        $header = "\n\n## Older conversations (references to past messages):\n";
+        $footer = "\nThese are the user's own past messages, found by relevance. Use them when the current question refers to something from an earlier conversation.\n";
+        $footer .= "REFERENCES: cite as [Message:ID] (clickable). Rules:\n";
+        $footer .= "- ONE ID per bracket. Good: [Message:1234]. Bad: [Message:1234, 1235].\n";
+        $footer .= "- Only use IDs from the list above. Never invent IDs.\n";
+
+        $budget = $maxChars - mb_strlen($header) - mb_strlen($footer);
+
+        // Pass 1: the digest lines themselves (cheap, always first priority).
+        $lines = [];
+        foreach ($digests as $digest) {
+            $line = sprintf(
+                "[Msg: %d | %s | %s] %s\n",
+                $digest['message_id'],
+                $digest['source_date'] > 0 ? gmdate('Y-m-d', $digest['source_date']) : 'unknown date',
+                '' !== $digest['channel'] ? $digest['channel'] : 'chat',
+                $digest['title'],
+            );
+
+            if (mb_strlen($line) > $budget) {
+                break;
+            }
+            $budget -= mb_strlen($line);
+            $lines[$digest['message_id']] = $line;
+        }
+
+        if ([] === $lines) {
+            return '';
+        }
+
+        // Pass 2: excerpts for pulled hits, appended under their line while
+        // budget remains. An excerpt that no longer fits is skipped whole.
+        foreach ($digests as $digest) {
+            $excerpt = $digest['excerpt'];
+            if (null === $excerpt || '' === $excerpt || !isset($lines[$digest['message_id']])) {
+                continue;
+            }
+
+            $quoted = '> '.str_replace("\n", "\n> ", trim($excerpt))."\n";
+            if (mb_strlen($quoted) > $budget) {
+                continue;
+            }
+            $budget -= mb_strlen($quoted);
+            $lines[$digest['message_id']] .= $quoted;
+        }
+
+        return $header.implode('', $lines).$footer;
+    }
+
+    /**
      * Combine RAG + memories and clamp to a hard character budget.
      */
     public function combineAndClamp(string $rag, string $memories, int $maxChars = 8000): string

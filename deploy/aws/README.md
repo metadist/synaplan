@@ -167,9 +167,13 @@ by the variable validation here, and by `validate-release.sh` at boot: with
 restart install a different application.
 
 The Marketplace ingests from **us-east-1**, and the source AMI must be
-unencrypted, EBS-backed and HVM — the build produces exactly that. Other regions
-are produced by copying the AMI. Build both architectures: the container images
-are multi-arch, so `-var architecture=arm64` yields the Graviton image.
+unencrypted, EBS-backed and HVM. The workflow rejects account-level EBS
+encryption before the build, verifies every resulting snapshot, and shares the
+AMI with Marketplace ingestion account `679593333241`. Marketplace encrypts its
+copy, and the CloudFormation templates independently encrypt every buyer volume.
+Other regions are produced by copying the AMI. Build both architectures: the
+container images are multi-arch, so `-var architecture=arm64` yields the Graviton
+image.
 
 ## Testing it without AWS
 
@@ -206,7 +210,7 @@ pipeline below.
 | Runs | Where | What it does |
 | ---- | ----- | ------------ |
 | Every push | `deployment-templates` job in [`ci.yml`](../../.github/workflows/ci.yml) | `cfn-lint` on both templates, `packer fmt -check` and `packer validate`. No AWS account, no cost. |
-| Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds both AMIs with Packer, then launches the x86_64 one through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Deletes the stack and the snapshot it leaves behind, whatever the outcome. |
+| Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds both unencrypted source AMIs with Packer, verifies and shares them with the AWS Marketplace ingestion account, then launches the x86_64 one through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Deletes the verification stack and the snapshot it leaves behind, whatever the outcome. |
 | Before a public listing | `taskcat` with [`.taskcat.yml`](.taskcat.yml) | Launches both templates in two or three regions. By hand, per release. |
 
 `aws-ami.yml` skips itself with a notice while the secret

@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
@@ -74,6 +75,7 @@ final class McpServerFactory
         private readonly RateLimitService $rateLimit,
         private readonly EntityManagerInterface $em,
         private readonly CacheItemPoolInterface $cache,
+        private readonly ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -463,6 +465,12 @@ final class McpServerFactory
             $this->em->persist($outgoing);
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Rolling-summary refresh after the OUT persist (channel parity):
+            // MCP conversations thread through Chats like every other channel.
+            if (null !== $chat->getId()) {
+                $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), $userId);
+            }
 
             $this->recordChatUsage($user, $message, $answer, $meta);
 

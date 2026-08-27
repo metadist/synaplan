@@ -3455,6 +3455,14 @@
     "deleteSuccess": "{count} chat(s) eliminados con éxito",
     "deleteFailed": "Error al eliminar chats"
   },
+  "messageRefs": {
+    "olderConversation": "Conversación anterior",
+    "clickToOpen": "Haz clic para abrir la conversación original",
+    "missing": {
+      "badge": "Mensaje anterior",
+      "tooltip": "No se pudo resolver esta referencia de mensaje. Es posible que el mensaje haya sido eliminado."
+    }
+  },
   "memories": {
     "fullscreen": {
       "enter": "Pantalla completa",

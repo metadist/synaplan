@@ -4277,6 +4277,14 @@
     "privacy": "Datenschutz",
     "terms": "AGB"
   },
+  "messageRefs": {
+    "olderConversation": "Ältere Unterhaltung",
+    "clickToOpen": "Klicken, um die ursprüngliche Unterhaltung zu öffnen",
+    "missing": {
+      "badge": "Ältere Nachricht",
+      "tooltip": "Dieser Nachrichtenverweis konnte nicht aufgelöst werden. Die Nachricht wurde möglicherweise gelöscht."
+    }
+  },
   "memories": {
     "fullscreen": {
       "enter": "Vollbild",

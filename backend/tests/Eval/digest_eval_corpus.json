@@ -1,0 +1,57 @@
+[
+  {
+    "id": "office_rent_letter",
+    "notes": "THE acceptance case: the 3-month-old rent letter must be found among plausible office-admin distractors, in English and German.",
+    "digests": [
+      { "key": "rent", "title": "office rent letter to realtor about the increase of payments", "days_ago": 90 },
+      { "key": "insurance", "title": "liability insurance policy renewal for the office, new premium 89 EUR monthly", "days_ago": 30 },
+      { "key": "cleaning", "title": "cleaning service contract for the office signed with CleanCo, twice a week", "days_ago": 60 },
+      { "key": "parking", "title": "parking spot subscription for the office garage cancelled", "days_ago": 14 },
+      { "key": "internet", "title": "fiber internet upgrade quote for the office from Telco, 500 Mbit", "days_ago": 7 }
+    ],
+    "queries": [
+      { "query": "What did the realtor write about the office rent increase?", "expect_top1": "rent" },
+      { "query": "how much is our new office rent?", "expect_top1": "rent" },
+      { "query": "Was stand im Brief vom Makler zur Miete?", "expect_top1": "rent" }
+    ]
+  },
+  {
+    "id": "invoice_vs_quote",
+    "notes": "Near-duplicate wording: the paid invoice must rank above the earlier quote for a payment question.",
+    "digests": [
+      { "key": "quote", "title": "quote from WebWorks agency for the website relaunch, 12,000 EUR", "days_ago": 120 },
+      { "key": "invoice", "title": "final invoice from WebWorks agency for the website relaunch paid, 13,400 EUR", "days_ago": 45 },
+      { "key": "kickoff", "title": "website relaunch kickoff meeting notes with WebWorks agency", "days_ago": 110 },
+      { "key": "hosting", "title": "hosting contract for the new website with CloudHost, 29 EUR monthly", "days_ago": 40 }
+    ],
+    "queries": [
+      { "query": "how much did we actually pay for the website relaunch in the end?", "expect_top1": "invoice" },
+      { "query": "what did the agency quote for the relaunch originally?", "expect_top1": "quote" }
+    ]
+  },
+  {
+    "id": "recency_tiebreak",
+    "notes": "Two similar digests about the same recurring topic: for a generic query the NEWER one must win via the recency decay.",
+    "digests": [
+      { "key": "old_report", "title": "quarterly sales report Q1 with revenue numbers and forecast", "days_ago": 300 },
+      { "key": "new_report", "title": "quarterly sales report Q3 with revenue numbers and forecast", "days_ago": 20 },
+      { "key": "hr", "title": "new vacation policy announced by HR, 30 days per year", "days_ago": 50 }
+    ],
+    "queries": [
+      { "query": "what were the numbers in the latest quarterly sales report?", "expect_top1": "new_report" }
+    ]
+  },
+  {
+    "id": "german_contract",
+    "notes": "German source digests, German and English queries — digests are written in the source language.",
+    "digests": [
+      { "key": "vertrag", "title": "Wartungsvertrag mit der Firma Kältetechnik Nord für die Klimaanlage unterschrieben", "days_ago": 75 },
+      { "key": "angebot", "title": "Angebot für neue Büromöbel von OfficeStyle, 4.500 EUR", "days_ago": 20 },
+      { "key": "steuer", "title": "Schreiben vom Steuerberater zur Umsatzsteuervoranmeldung Q2", "days_ago": 35 }
+    ],
+    "queries": [
+      { "query": "Mit wem haben wir den Wartungsvertrag für die Klimaanlage?", "expect_top1": "vertrag" },
+      { "query": "who maintains our air conditioning?", "expect_top1": "vertrag" }
+    ]
+  }
+]

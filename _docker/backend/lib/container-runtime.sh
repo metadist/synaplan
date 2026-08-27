@@ -392,6 +392,14 @@ run_scheduler_role() {
                 runtime_log "Model availability check failed; it will be retried on the next daily interval." >&2
             fi
 
+            # Message digest: out-of-band deep-memory indexing of new user
+            # messages (self-locking, per-user cost caps). A failure is
+            # harmless — the per-user cursor means the next run resumes
+            # exactly where this one stopped.
+            if ! run_scheduler_command bin/console --env="$env" app:digest:run --no-interaction; then
+                runtime_log "Message digest run failed; it will be retried on the next daily interval." >&2
+            fi
+
             next_daily=$((now + daily_seconds))
         fi
 

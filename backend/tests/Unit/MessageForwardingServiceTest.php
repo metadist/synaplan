@@ -22,6 +22,7 @@ class MessageForwardingServiceTest extends TestCase
     private WhatsAppService&MockObject $whatsAppService;
     private MessageRepository&MockObject $messageRepository;
     private UserMemoryService&MockObject $memoryService;
+    private \App\Service\Digest\MessageReferenceResolver&MockObject $messageReferenceResolver;
     private EntityManagerInterface&MockObject $em;
     private LoggerInterface&MockObject $logger;
     private MessageForwardingService $service;
@@ -31,16 +32,20 @@ class MessageForwardingServiceTest extends TestCase
         $this->whatsAppService = $this->createMock(WhatsAppService::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
         $this->memoryService = $this->createMock(UserMemoryService::class);
+        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->memoryService->method('resolveMemoryTags')
+            ->willReturnArgument(0);
+        $this->messageReferenceResolver->method('resolveMessageTags')
             ->willReturnArgument(0);
 
         $this->service = new MessageForwardingService(
             $this->whatsAppService,
             $this->messageRepository,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->em,
             $this->logger,
         );
@@ -183,6 +188,7 @@ class MessageForwardingServiceTest extends TestCase
             $this->whatsAppService,
             $this->messageRepository,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->em,
             $this->logger,
         );

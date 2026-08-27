@@ -6,6 +6,7 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\Entity\Message;
+use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
 use App\Service\ModelConfigService;
 use Psr\Cache\CacheItemPoolInterface;
@@ -22,6 +23,10 @@ use Psr\Log\LoggerInterface;
  * Worker path ({@see refresh()}): runs after the turn is persisted. Folds only
  * the newly aged-out messages into the previous summary (or bootstraps from
  * scratch on the first refresh). Uses the SUMMARIZE model default.
+ *
+ * Storage is read-through: Redis is the hot cache, `BCHATSUMMARIES` the
+ * durable layer. A cache miss falls back to the DB row and re-warms Redis, so
+ * slow channels (email, WhatsApp) keep continuity long after the cache TTL.
  *
  * Never throws into the chat turn: on any failure the hot path returns
  * {@see RollingSummaryResult::notApplied()} and the caller keeps its normal
@@ -46,6 +51,7 @@ final readonly class ConversationSummaryService
         private ModelConfigService $modelConfigService,
         private ConversationSummaryConfigService $config,
         private MessageRepository $messageRepository,
+        private ChatSummaryRepository $chatSummaryRepository,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
     ) {
@@ -171,7 +177,7 @@ final readonly class ConversationSummaryService
             return false;
         }
 
-        $this->writeStored($chatId, $summary, $olderLastId, $olderCount);
+        $this->writeStored($chatId, $userId, $summary, $olderLastId, $olderCount);
 
         return true;
     }
@@ -267,16 +273,69 @@ final readonly class ConversationSummaryService
     }
 
     /**
+     * Read-through: Redis hit wins; on a miss the durable DB row (written by
+     * a previous worker refresh, possibly days ago) is loaded, validated
+     * against the current config fingerprint, and re-warmed into Redis.
+     *
      * @return array{summary: string, upToMessageId: int, summarizedCount: int}|null
      */
     private function readStored(int $chatId): ?array
     {
         $item = $this->cache->getItem($this->storeKey($chatId));
-        if (!$item->isHit()) {
+        if ($item->isHit()) {
+            $cached = $this->validateStored($item->get());
+            if (null !== $cached) {
+                return $cached;
+            }
+            // Invalid/legacy shape: purge it so subsequent reads don't keep
+            // hitting the bad entry and can re-warm from the durable row.
+            $this->cache->deleteItem($this->storeKey($chatId));
+        }
+
+        return $this->readDurable($chatId);
+    }
+
+    /**
+     * @return array{summary: string, upToMessageId: int, summarizedCount: int}|null
+     */
+    private function readDurable(int $chatId): ?array
+    {
+        try {
+            $row = $this->chatSummaryRepository->findOneByChatId($chatId);
+        } catch (\Throwable $e) {
+            $this->logger->warning('ConversationSummaryService: durable read failed', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+
             return null;
         }
 
-        $raw = $item->get();
+        if (null === $row || $row->getFingerprint() !== $this->configFingerprint()) {
+            // Absent, or written under different summary settings — treat as
+            // cold so the worker re-bootstraps under the current config.
+            return null;
+        }
+
+        $stored = $this->validateStored([
+            'summary' => $row->getSummary(),
+            'upToMessageId' => $row->getUpToMessageId(),
+            'summarizedCount' => $row->getSummarizedCount(),
+        ]);
+        if (null === $stored) {
+            return null;
+        }
+
+        $this->writeCache($chatId, $stored['summary'], $stored['upToMessageId'], $stored['summarizedCount']);
+
+        return $stored;
+    }
+
+    /**
+     * @return array{summary: string, upToMessageId: int, summarizedCount: int}|null
+     */
+    private function validateStored(mixed $raw): ?array
+    {
         if (!is_array($raw)) {
             return null;
         }
@@ -294,7 +353,31 @@ final readonly class ConversationSummaryService
         ];
     }
 
-    private function writeStored(int $chatId, string $summary, int $upToMessageId, int $summarizedCount): void
+    private function writeStored(int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount): void
+    {
+        // Durable layer first: a DB failure must not leave the cache claiming
+        // more coverage than the row has. Fail-open — the Redis copy still
+        // carries the summary for the TTL window, like before this table.
+        try {
+            $this->chatSummaryRepository->upsert(
+                $chatId,
+                $userId,
+                $summary,
+                $upToMessageId,
+                $summarizedCount,
+                $this->configFingerprint(),
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('ConversationSummaryService: durable write failed', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->writeCache($chatId, $summary, $upToMessageId, $summarizedCount);
+    }
+
+    private function writeCache(int $chatId, string $summary, int $upToMessageId, int $summarizedCount): void
     {
         $item = $this->cache->getItem($this->storeKey($chatId));
         $item->set([
@@ -307,19 +390,23 @@ final readonly class ConversationSummaryService
     }
 
     /**
-     * Per-chat store key. Config knobs that change the summary shape are folded
-     * into a fingerprint so a settings change invalidates the previous store.
+     * Config knobs that change the summary shape, folded into a fingerprint.
+     * Used in both the cache key and the durable row so a settings change
+     * invalidates the previous store and forces a re-bootstrap.
      */
-    private function storeKey(int $chatId): string
+    private function configFingerprint(): string
     {
-        $fingerprint = md5(implode(':', [
+        return md5(implode(':', [
             $this->config->getSummaryMaxChars(),
             $this->config->getTiers(),
             $this->config->getRecentVerbatimChars(),
             'v2-async',
         ]));
+    }
 
-        return sprintf('conv_summary.chat.%d.%s', $chatId, $fingerprint);
+    private function storeKey(int $chatId): string
+    {
+        return sprintf('conv_summary.chat.%d.%s', $chatId, $this->configFingerprint());
     }
 
     /**
