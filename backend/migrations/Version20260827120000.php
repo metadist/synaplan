@@ -23,6 +23,13 @@ final class Version20260827120000 extends AbstractMigration
         return 'Add BCHATSUMMARIES for durable per-chat rolling conversation summaries';
     }
 
+    public function isTransactional(): bool
+    {
+        // Raw DDL implicitly commits on MariaDB — opt out of the migration
+        // transaction wrapper (same as the other CREATE TABLE migrations).
+        return false;
+    }
+
     public function up(Schema $schema): void
     {
         $this->addSql(<<<'SQL'
@@ -31,7 +38,7 @@ final class Version20260827120000 extends AbstractMigration
                 BCHATID INT NOT NULL,
                 BUSERID INT NOT NULL,
                 BSUMMARY LONGTEXT NOT NULL,
-                BUPTOMESSAGEID INT NOT NULL,
+                BUPTOMESSAGEID BIGINT NOT NULL,
                 BSUMMARIZEDCOUNT INT NOT NULL,
                 BFINGERPRINT VARCHAR(32) NOT NULL,
                 BUPDATED INT NOT NULL,
