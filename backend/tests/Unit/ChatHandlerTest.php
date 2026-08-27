@@ -101,6 +101,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $this->digestSearchService,
             $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
 

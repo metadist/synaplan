@@ -9,6 +9,8 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Destination\RequestedFolderDelivery;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileHelper;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
@@ -60,6 +62,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         private MediaJobMessageSync $mediaJobMessageSync,
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private PremiumFeatureGate $premiumFeatureGate,
+        private ConversationFileCatalog $conversationFileCatalog,
         private string $uploadDir = '/var/www/backend/var/uploads',
         // Public base URL that serves /api/v1/files/uploads/* (same value used
         // by OgImageService / shared chat pages). Needed for image-to-video:
@@ -147,30 +150,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // dispatch is cheap (a few ms) so the user doesn't notice.
         $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
-        // Extract media prompt via AI (mediamaker prompt)
-        $promptData = $this->promptExtractor->extract($message, $thread, $classification);
-        $prompt = trim($promptData['prompt'] ?? '');
-        $promptMediaType = $promptData['media_type'] ?? null;
-
-        if ('' === $prompt) {
-            $prompt = $message->getText();
-        }
-
-        if ('' === $prompt) {
-            throw new \RuntimeException('Unable to determine media prompt text');
-        }
-
         // Collect attached image paths for pic2pic. Besides the message's own
         // uploads we also accept reference images passed explicitly via options
         // (issue #1144: multitask media-to-media chains, where an upstream node's
         // generated image is the reference for this video/edit node).
         $referenceImagePaths = is_array($options['reference_image_paths'] ?? null) ? $options['reference_image_paths'] : [];
         $attachedImagePaths = $this->collectAttachedImagePaths($message, $referenceImagePaths);
-        $isPic2Pic = !empty($attachedImagePaths);
 
         // Detect public image URLs the user pasted directly into their message
         // text. A request like "make a video from https://…/photo.jpg where the
-        // sun sets over the sea" carries NO file attachment, so $isPic2Pic is
+        // sun sets over the sea" carries NO file attachment, so pic2pic is
         // false and the request would wrongly route to text-to-video (issue:
         // public image-URL → Veo text2vid). Treat an image URL in the text as an
         // image-to-video reference: it is already provider-fetchable, so it is
@@ -189,6 +178,58 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             }
         }
 
+        // Cross-turn edit: the user asks to change a picture that exists in the
+        // conversation but attached nothing to this message ("mach das Auto
+        // blau"). Without this the request fell through to a fresh text2pic and
+        // produced a completely different image — the composition the user was
+        // working on was simply lost. Only reached when nothing else supplied a
+        // reference, so attachments and multitask chains (#1144) keep priority.
+        // Resolved BEFORE prompt extraction so the mediamaker prompt can be told
+        // it is editing an existing picture and must describe only the CHANGE.
+        $editSource = null;
+        if ([] === $attachedImagePaths && [] === $imageUrlsInText) {
+            $editSource = $this->resolveConversationEditSource($message, $thread, $classification);
+        }
+
+        // Extract media prompt via AI (mediamaker prompt)
+        $promptData = $this->promptExtractor->extract(
+            $message,
+            $thread,
+            $classification,
+            null !== $editSource ? ['media_edit_source_name' => $editSource->displayName] : [],
+        );
+        $prompt = trim($promptData['prompt'] ?? '');
+        $promptMediaType = $promptData['media_type'] ?? null;
+
+        if ('' === $prompt) {
+            $prompt = $message->getText();
+        }
+
+        if ('' === $prompt) {
+            throw new \RuntimeException('Unable to determine media prompt text');
+        }
+
+        // The extractor has the final say on the media type. If it turns out
+        // this is a video or audio request after all, the picture must be
+        // dropped — otherwise a text-to-video turn would silently become
+        // image-to-video off an unrelated old image.
+        if (null !== $editSource && null !== $promptMediaType && 'image' !== $promptMediaType) {
+            $this->logger->info('MediaGenerationHandler: dropping conversation edit source, extractor asked for a different media type', [
+                'media_type' => $promptMediaType,
+                'edit_source' => $editSource->reference,
+            ]);
+            $editSource = null;
+        }
+
+        if (null !== $editSource) {
+            $attachedImagePaths[] = $editSource->absolutePath;
+            $this->notify($progressCallback, 'editing', 'Editing '.$editSource->displayName.'…', [
+                'edit_source_file_id' => $editSource->fileId,
+                'edit_source_name' => $editSource->displayName,
+            ]);
+        }
+
+        $isPic2Pic = !empty($attachedImagePaths);
         $hasVideoReferenceImage = $isPic2Pic || [] !== $imageUrlsInText;
 
         $this->logger->info('MediaGenerationHandler: Starting media generation', [
@@ -198,6 +239,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             'is_pic2pic' => $isPic2Pic,
             'attached_images' => count($attachedImagePaths),
             'image_urls_in_text' => count($imageUrlsInText),
+            'edit_source' => $editSource?->reference,
         ]);
 
         // Get media generation model - detect type from model tag if specified
@@ -280,6 +322,23 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             } elseif ($isPic2Pic) {
                 $modelId = $this->modelConfigService->getDefaultModel('PIC2PIC', $effectiveUserId);
                 $mediaType = 'image';
+
+                // The reference came from the conversation, not from the user.
+                // An install without a PIC2PIC default would answer "no model
+                // configured" for a request that used to produce a picture, so
+                // drop the reference and generate from text instead: degraded,
+                // never broken. An ATTACHED image keeps the hard error — there
+                // the user explicitly asked for an edit.
+                if (!$modelId && null !== $editSource) {
+                    $this->logger->warning('MediaGenerationHandler: no PIC2PIC model configured, falling back to text2pic for the conversation edit', [
+                        'edit_source' => $editSource->reference,
+                    ]);
+                    $modelId = $this->modelConfigService->getDefaultModel('TEXT2PIC', $effectiveUserId);
+                    $attachedImagePaths = [];
+                    $isPic2Pic = false;
+                    $editSource = null;
+                }
+
                 $this->logger->info('MediaGenerationHandler: Pic2pic detected, using PIC2PIC default model', [
                     'model_id' => $modelId,
                     'image_count' => count($attachedImagePaths),
@@ -944,6 +1003,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'type' => $mediaType,
                     ],
                     'folder_delivery' => $folderNote,
+                    // Which picture of the conversation this result was edited
+                    // from (null for a fresh generation) — the frontend shows it
+                    // so the user can see WHICH file the assistant reused.
+                    'edit_source_file_id' => $editSource?->fileId,
+                    'edit_source_name' => $editSource?->displayName,
                 ],
             ];
         } catch (ProviderCancelledException $e) {
@@ -1293,6 +1357,40 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // A non-IP hostname that isn't one of the local cases above is assumed
         // to resolve publicly (a real DNS name behind a proxy/tunnel).
         return true;
+    }
+
+    /**
+     * Resolve the picture an attachment-less edit request refers to.
+     *
+     * Deliberately conservative: reusing an old image on a "draw me something
+     * new" request is worse than the bug this fixes, so the edit has to be
+     * voted for by the sorter (BINPUTMODE=reference_images). New-image phrasing
+     * ("another one", "neues Bild") maps to text_only there and never reaches
+     * this method. The target is the newest picture of the conversation — the
+     * one the user was just looking at.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     * @param array<string, mixed>                                     $classification
+     */
+    private function resolveConversationEditSource(
+        Message $message,
+        array $thread,
+        array $classification,
+    ): ?ConversationFile {
+        if ('reference_images' !== ($classification['input_mode'] ?? null)) {
+            return null;
+        }
+
+        // A video/audio request must never pick up an old picture: that would
+        // silently turn text-to-video into image-to-video.
+        $requestedMediaType = $classification['media_type'] ?? null;
+        if (null !== $requestedMediaType && 'image' !== $requestedMediaType) {
+            return null;
+        }
+
+        $catalog = $this->conversationFileCatalog->build($message, $thread, [], ConversationFile::CATEGORY_IMAGE);
+
+        return $this->conversationFileCatalog->latestImage($catalog);
     }
 
     /**

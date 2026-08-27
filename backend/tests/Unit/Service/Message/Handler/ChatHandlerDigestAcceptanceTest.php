@@ -203,6 +203,8 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $digestSearchService,
             $digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
 }

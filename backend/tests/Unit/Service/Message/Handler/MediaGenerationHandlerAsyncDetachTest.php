@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Service\BillingService;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\GeneratedFileRegistrar;
@@ -87,6 +88,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->mediaJobMessageSync,
             $this->createMock(GeneratedFileRegistrar::class),
             new PremiumFeatureGate(new BillingService('', '')),
+            $this->createMock(ConversationFileCatalog::class),
             sys_get_temp_dir(),
             'https://app.example.test',
         );

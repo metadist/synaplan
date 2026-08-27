@@ -3,9 +3,11 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
+use App\Service\File\ConversationFile;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -46,6 +48,17 @@ final readonly class MessageSorter
      * a cap, not a spend: a well-behaved answer still costs the same.
      */
     private const CLASSIFICATION_MAX_TOKENS = 2048;
+
+    /**
+     * Character budget for the per-turn file notes added to the history.
+     *
+     * The sorter used to see history as pure text, so a picture generated two
+     * turns ago was invisible and "make the car blue" looked like a brand new
+     * image request instead of an edit. One clipped note per turn carrying a
+     * file is enough to tell the two apart; the budget keeps the notes inside
+     * the existing history window instead of growing it.
+     */
+    private const FILE_ANNOTATION_BUDGET = 600;
 
     /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
@@ -190,12 +203,14 @@ final readonly class MessageSorter
         ];
 
         // Add conversation history (truncated)
+        $fileAnnotationBudget = self::FILE_ANNOTATION_BUDGET;
         foreach ($conversationHistory as $msg) {
             if ('IN' === $msg->getDirection()) {
                 $msgText = $msg->getText();
                 if ($msg->getFileText()) {
                     $msgText .= ' User provided a file: '.$msg->getFileType().', saying: \''.substr($msg->getFileText(), 0, 200).'\'';
                 }
+                $msgText .= $this->fileAnnotation($msg, $fileAnnotationBudget);
                 $messages[] = ['role' => 'user', 'content' => $msgText];
             } elseif ('OUT' === $msg->getDirection()) {
                 // Truncate assistant responses
@@ -203,6 +218,7 @@ final readonly class MessageSorter
                 if (strlen($msg->getText()) > 200) {
                     $assistantText .= '...';
                 }
+                $assistantText .= $this->fileAnnotation($msg, $fileAnnotationBudget);
                 $messages[] = ['role' => 'assistant', 'content' => '['.$msg->getId().'] '.$assistantText];
             }
         }
@@ -369,6 +385,49 @@ final readonly class MessageSorter
         }
 
         return null;
+    }
+
+    /**
+     * One compact note naming the files a history turn carries, so the model
+     * can tell "edit the picture we just made" from "make me a new picture".
+     *
+     * Reads the message entities only — uploads through the attachment
+     * relation, generated media through the legacy path column — so the hot
+     * path stays query-free. Returns an empty string once the shared budget is
+     * spent or the turn has no file.
+     */
+    private function fileAnnotation(Message $message, int &$budget): string
+    {
+        if ($budget <= 0) {
+            return '';
+        }
+
+        $names = [];
+        foreach ($message->getFiles() as $file) {
+            $names[basename($file->getFilePath())] = true;
+        }
+
+        $legacyPath = $message->getFilePath();
+        if ('' !== $legacyPath) {
+            $names[basename($legacyPath)] = true;
+        }
+
+        if ([] === $names) {
+            return '';
+        }
+
+        $names = array_slice(array_keys($names), 0, 3);
+        $kind = ConversationFile::categoryForPath($names[0]);
+        $verb = 'OUT' === $message->getDirection() ? 'Generated' : 'Uploaded';
+
+        $annotation = ' ['.$verb.' '.$kind.' file: '.implode(', ', $names).']';
+        if (mb_strlen($annotation) > $budget) {
+            return '';
+        }
+
+        $budget -= mb_strlen($annotation);
+
+        return $annotation;
     }
 
     /**
