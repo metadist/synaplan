@@ -3,7 +3,7 @@
 | Sprint | Branch | State | Notes |
 | ------ | ------ | ----- | ----- |
 | 1 — Summary eval harness | `feat/summary-eval-harness` | implemented, eval run recorded below | `app:summary:eval`, `make -C backend summary-eval` |
-| 2 — Durable summary + channel parity | `feat/durable-summary-channel-parity` | not started | |
+| 2 — Durable summary + channel parity | `feat/durable-summary-channel-parity` | implemented (stacked on Sprint 1 branch) | `BCHATSUMMARIES` durable store behind Redis; summary injected + refreshed on web, WhatsApp, email, MCP, widget; cleanup on chat delete |
 | 3 — Message digest foundation | `feat/message-digest-foundation` | not started | |
 | 4 — Digest retrieval + badges | `feat/digest-retrieval` | not started | |
 | 5 — Hardening, admin, docs, E2E | `feat/continuity-hardening` | not started | |

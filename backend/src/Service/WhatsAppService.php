@@ -98,6 +98,7 @@ final class WhatsAppService
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
         private UserMemoryService $memoryService,
+        private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -1887,6 +1888,12 @@ final class WhatsAppService
         }
 
         $this->em->flush();
+
+        // Rolling-summary refresh, exactly like the web channel after its OUT
+        // persist (channel parity): async worker fold, never blocks the reply.
+        if ($chat && null !== $chat->getId()) {
+            $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), (int) $user->getId());
+        }
     }
 
     /**

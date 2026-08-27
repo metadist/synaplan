@@ -368,6 +368,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Append the rolling conversation summary exactly like handleStream()
+        // does, so long email / MCP / webhook threads keep their topic and the
+        // user's position while the verbatim thread stays inside the window
+        // (channel parity — the non-streaming half of issue #615's promise).
+        $conversationSummary = $options['conversation_summary'] ?? '';
+        if (is_string($conversationSummary) && '' !== trim($conversationSummary)) {
+            $systemPrompt .= $this->formatConversationSummaryForPrompt($conversationSummary);
+            $this->logger->info('ChatHandler: Conversation summary appended to system prompt', [
+                'summary_length' => \strlen($conversationSummary),
+            ]);
+        }
+
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, [
             'channel' => $classification['source'] ?? null,

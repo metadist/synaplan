@@ -11,6 +11,7 @@ use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
+use App\Service\Message\RollingSummaryResult;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -36,6 +37,7 @@ class MessageProcessorTest extends TestCase
     private BraveSearchService&MockObject $braveSearchService;
     private SearchQueryGenerator&MockObject $searchQueryGenerator;
     private LoggerInterface&MockObject $logger;
+    private ConversationSummaryService&MockObject $conversationSummaryService;
     private MessageProcessor $processor;
 
     protected function setUp(): void
@@ -50,6 +52,7 @@ class MessageProcessorTest extends TestCase
         $this->braveSearchService = $this->createMock(BraveSearchService::class);
         $this->searchQueryGenerator = $this->createMock(SearchQueryGenerator::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->conversationSummaryService = $this->createMock(ConversationSummaryService::class);
 
         $this->processor = new MessageProcessor(
             $this->messageRepository,
@@ -67,7 +70,7 @@ class MessageProcessorTest extends TestCase
             $this->createMock(TaskPlanner::class),
             $this->createMock(TaskPlanStore::class),
             $this->createMock(TaskPlanExecutor::class),
-            $this->createMock(ConversationSummaryService::class)
+            $this->conversationSummaryService
         );
     }
 
@@ -721,6 +724,91 @@ class MessageProcessorTest extends TestCase
         ]);
 
         $this->processor->process($message, ['force_web_search' => true]);
+    }
+
+    /**
+     * Channel parity: the NON-streaming `process()` path (email, MCP, generic
+     * webhook) must apply the rolling conversation summary exactly like
+     * `processStream()` — condensed summary into options, verbatim tail as the
+     * remaining history.
+     */
+    public function testProcessAppliesRollingSummaryForChatWithPersistedChat(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getChatId')->willReturn(500);
+        $message->method('getFile')->willReturn(0);
+
+        $tail = [$this->createMock(Message::class)];
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findChatHistory')->willReturn([]);
+        $this->messageRepository->method('countByChatId')->willReturn(40);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'CHAT',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->conversationSummaryService
+            ->expects($this->once())
+            ->method('buildRollingContext')
+            ->with($this->anything(), 40, 1, 500)
+            ->willReturn(new RollingSummaryResult(true, 'CONDENSED OLDER TURNS', $tail, 25));
+
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->with(
+                $message,
+                $tail,
+                $this->anything(),
+                $this->anything(),
+                $this->callback(static fn (array $options): bool => 'CONDENSED OLDER TURNS' === ($options['conversation_summary'] ?? null)),
+            )
+            ->willReturn([
+                'content' => 'Response',
+                'metadata' => ['provider' => 'test', 'model' => 'test'],
+            ]);
+
+        $result = $this->processor->process($message);
+
+        $this->assertTrue($result['success']);
+    }
+
+    /**
+     * The summary step only serves the chat-style path with a persisted chat;
+     * legacy trackingId-only messages must not touch the summary service.
+     */
+    public function testProcessSkipsRollingSummaryWithoutChatId(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getChatId')->willReturn(null);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'CHAT',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->conversationSummaryService
+            ->expects($this->never())
+            ->method('buildRollingContext');
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Response',
+            'metadata' => ['provider' => 'test', 'model' => 'test'],
+        ]);
+
+        $this->processor->process($message);
     }
 
     public function testProcessLoadsConversationHistory(): void

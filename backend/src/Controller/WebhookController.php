@@ -6,6 +6,7 @@ use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\EmailChatService;
@@ -47,6 +48,7 @@ class WebhookController extends AbstractController
         private ModelConfigService $modelConfigService,
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
+        private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
     ) {
     }
 
@@ -545,6 +547,13 @@ class WebhookController extends AbstractController
 
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Rolling-summary refresh after the OUT persist (channel parity
+            // with the web chat) — email threads are exactly the slow channel
+            // the durable summary store exists for.
+            if (null !== $chat->getId()) {
+                $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), (int) $user->getId());
+            }
 
             // Send email response back to user
             try {

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\Entity\ChatSummary;
 use App\Entity\Message;
+use App\Repository\ChatSummaryRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageRepository;
 use App\Service\Message\ConversationSummaryConfigService;
@@ -22,25 +24,63 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
  * Hot path ({@see ConversationSummaryService::buildRollingContext()}) must
  * never call the AI. The worker path ({@see ConversationSummaryService::refresh()})
  * owns every summarizer round-trip.
+ *
+ * Storage is read-through: the Redis-shaped cache in front, durable
+ * BCHATSUMMARIES rows behind (represented here by an in-memory fake).
  */
 class ConversationSummaryServiceTest extends TestCase
 {
+    /** Mirror of ConversationSummaryService::configFingerprint() for defaults. */
+    private const DEFAULT_FINGERPRINT_PARTS = [4000, 3, 8000, 'v2-async'];
+
     private AiFacade&MockObject $aiFacade;
     private ModelConfigService&MockObject $modelConfigService;
     private MessageRepository&MockObject $messageRepository;
+    private ChatSummaryRepository&MockObject $chatSummaryRepository;
     private ArrayAdapter $cache;
+
+    /** In-memory durable rows keyed by chat id, shared across service instances. */
+    /** @var array<int, ChatSummary> */
+    private array $durableRows = [];
 
     protected function setUp(): void
     {
         $this->aiFacade = $this->createMock(AiFacade::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->messageRepository = $this->createMock(MessageRepository::class);
+        $this->chatSummaryRepository = $this->makeDurableFake();
         $this->cache = new ArrayAdapter();
         $this->modelConfigService->method('getSummaryModelConfig')->willReturn([
             'provider' => 'groq',
             'model' => 'gpt-oss-120b',
             'model_id' => 300,
         ]);
+    }
+
+    /**
+     * A ChatSummaryRepository mock that behaves like the real table: upsert()
+     * stores a row per chat id and findOneByChatId() serves it back.
+     */
+    private function makeDurableFake(): ChatSummaryRepository&MockObject
+    {
+        $repo = $this->createMock(ChatSummaryRepository::class);
+        $repo->method('upsert')->willReturnCallback(
+            function (int $chatId, int $userId, string $summary, int $upToMessageId, int $summarizedCount, string $fingerprint): void {
+                $this->durableRows[$chatId] = (new ChatSummary())
+                    ->setChatId($chatId)
+                    ->setUserId($userId)
+                    ->setSummary($summary)
+                    ->setUpToMessageId($upToMessageId)
+                    ->setSummarizedCount($summarizedCount)
+                    ->setFingerprint($fingerprint)
+                    ->setUpdated(time());
+            },
+        );
+        $repo->method('findOneByChatId')->willReturnCallback(
+            fn (int $chatId): ?ChatSummary => $this->durableRows[$chatId] ?? null,
+        );
+
+        return $repo;
     }
 
     /**
@@ -58,6 +98,7 @@ class ConversationSummaryServiceTest extends TestCase
             $this->modelConfigService,
             new ConversationSummaryConfigService($repo),
             $this->messageRepository,
+            $this->chatSummaryRepository,
             $this->cache,
             new NullLogger(),
         );
@@ -249,6 +290,7 @@ class ConversationSummaryServiceTest extends TestCase
             $this->modelConfigService,
             new ConversationSummaryConfigService($this->createStub(ConfigRepository::class)),
             $this->messageRepository,
+            $this->chatSummaryRepository,
             $this->cache,
             new NullLogger(),
         );
@@ -271,6 +313,91 @@ class ConversationSummaryServiceTest extends TestCase
 
         self::assertTrue($result->applied);
         self::assertSame($window, $result->recentMessages);
+    }
+
+    /**
+     * The whole point of the durable layer: a cache eviction (TTL expiry,
+     * Redis restart) between turns must NOT lose the summary — exactly the
+     * situation of email/WhatsApp users answering hours or days later.
+     */
+    public function testCacheExpiryNoLongerLosesTheSummary(): void
+    {
+        $chat = $this->makeChat(40);
+        $window = array_slice($chat, -15);
+
+        $this->messageRepository->method('findIdBefore')->willReturn(25);
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $service = $this->makeService();
+        self::assertTrue($this->seedStoreViaRefresh($service, $chat, 'DURABLE SUMMARY'));
+
+        // Simulate the TTL expiring / Redis being wiped between turns.
+        $this->cache->clear();
+
+        $result = $service->buildRollingContext($window, count($chat), 7, 100);
+
+        self::assertTrue($result->applied);
+        self::assertIsString($result->summary);
+        self::assertStringContainsString('DURABLE SUMMARY', $result->summary);
+    }
+
+    public function testDurableFallbackRewarmsTheCache(): void
+    {
+        $chat = $this->makeChat(40);
+        $window = array_slice($chat, -15);
+
+        $this->messageRepository->method('findIdBefore')->willReturn(25);
+
+        $service = $this->makeService();
+        self::assertTrue($this->seedStoreViaRefresh($service, $chat, 'DURABLE SUMMARY'));
+        $this->cache->clear();
+
+        self::assertTrue($service->buildRollingContext($window, count($chat), 7, 100)->applied);
+
+        // The DB read must have re-warmed the cache under the production key.
+        $key = sprintf('conv_summary.chat.%d.%s', 100, $this->defaultFingerprint());
+        self::assertTrue($this->cache->getItem($key)->isHit());
+    }
+
+    public function testDurableRowWrittenUnderDifferentConfigIsTreatedAsCold(): void
+    {
+        $chat = $this->makeChat(40);
+        $window = array_slice($chat, -15);
+
+        $this->messageRepository->method('findIdBefore')->willReturn(25);
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        // Row exists but was produced under other summary settings.
+        $this->durableRows[100] = (new ChatSummary())
+            ->setChatId(100)
+            ->setUserId(7)
+            ->setSummary('STALE-CONFIG SUMMARY')
+            ->setUpToMessageId(25)
+            ->setSummarizedCount(25)
+            ->setFingerprint('0000deadbeef0000')
+            ->setUpdated(time());
+
+        $result = $this->makeService()->buildRollingContext($window, count($chat), 7, 100);
+
+        self::assertFalse($result->applied);
+    }
+
+    public function testRefreshPersistsTheDurableRow(): void
+    {
+        $chat = $this->makeChat(40);
+        $this->messageRepository->method('findAllByChatId')->willReturn($chat);
+        $this->aiFacade->method('chat')->willReturn(
+            ['content' => 'FRESH', 'provider' => 'groq', 'model' => 'gpt-oss-120b'],
+        );
+
+        self::assertTrue($this->makeService()->refresh(100, 7));
+
+        self::assertArrayHasKey(100, $this->durableRows);
+        $row = $this->durableRows[100];
+        self::assertSame('FRESH', $row->getSummary());
+        self::assertSame(7, $row->getUserId());
+        self::assertSame($this->defaultFingerprint(), $row->getFingerprint());
+        self::assertGreaterThan(0, $row->getUpToMessageId());
     }
 
     /**
@@ -308,6 +435,7 @@ class ConversationSummaryServiceTest extends TestCase
             $this->modelConfigService,
             new ConversationSummaryConfigService($this->createStub(ConfigRepository::class)),
             $repo,
+            $this->chatSummaryRepository,
             $this->cache,
             new NullLogger(),
         );
@@ -315,11 +443,15 @@ class ConversationSummaryServiceTest extends TestCase
         return $seeder->refresh(100, 7);
     }
 
+    private function defaultFingerprint(): string
+    {
+        // Mirror ConversationSummaryService::configFingerprint() defaults.
+        return md5(implode(':', self::DEFAULT_FINGERPRINT_PARTS));
+    }
+
     private function writeStoreDirectly(string $summary, int $upToMessageId, int $summarizedCount): void
     {
-        // Mirror ConversationSummaryService::storeKey fingerprint defaults.
-        $fingerprint = md5(implode(':', [4000, 3, 8000, 'v2-async']));
-        $key = sprintf('conv_summary.chat.%d.%s', 100, $fingerprint);
+        $key = sprintf('conv_summary.chat.%d.%s', 100, $this->defaultFingerprint());
         $item = $this->cache->getItem($key);
         $item->set([
             'summary' => $summary,

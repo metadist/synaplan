@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
+use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
@@ -26,6 +27,7 @@ class ChatController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
+        private ChatSummaryRepository $chatSummaryRepository,
         private MessageRepository $messageRepository,
         private WidgetSessionService $widgetSessionService,
         private OgImageService $ogImageService,
@@ -390,6 +392,9 @@ class ChatController extends AbstractController
         if (!$chat || $chat->getUserId() !== $user->getId()) {
             return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
         }
+
+        // No FK cascade on BCHATSUMMARIES (Galera rule) — clean up explicitly.
+        $this->chatSummaryRepository->deleteByChatId($id);
 
         $this->em->remove($chat);
         $this->em->flush();
