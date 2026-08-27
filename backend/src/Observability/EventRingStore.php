@@ -34,7 +34,7 @@ use App\Service\Infrastructure\RedisService;
  *     message?: string|null,
  *     exception_class?: string|null,
  *     exception_message?: string|null,
- *     stack?: list<string>,
+ *     stack?: array<int, mixed>,
  *     request_id?: string|null,
  *     route?: string|null,
  *     method?: string|null,
@@ -292,15 +292,15 @@ final readonly class EventRingStore
     private function matchesQuery(array $event, string $query): bool
     {
         $needle = mb_strtolower($query);
-        $haystack = mb_strtolower(implode(' ', array_filter([
+        $haystack = mb_strtolower(implode(' ', [
             $event['event'],
-            $event['message'],
-            $event['exception_class'],
-            $event['exception_message'],
-            $event['route'],
-            $event['provider'],
-            $event['model'],
-        ], static fn ($v): bool => \is_string($v))));
+            $event['message'] ?? '',
+            $event['exception_class'] ?? '',
+            $event['exception_message'] ?? '',
+            $event['route'] ?? '',
+            $event['provider'] ?? '',
+            $event['model'] ?? '',
+        ]));
 
         return str_contains($haystack, $needle);
     }
