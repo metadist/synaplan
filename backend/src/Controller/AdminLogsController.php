@@ -94,9 +94,9 @@ final class AdminLogsController extends AbstractController
                     properties: [
                         new OA\Property(property: 'window_start', type: 'integer', example: 1735689600),
                         new OA\Property(property: 'total', type: 'integer', example: 42),
-                        new OA\Property(property: 'by_level', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'integer'), example: ['error' => 12, 'warning' => 30]),
-                        new OA\Property(property: 'by_event', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'integer'), example: ['exception' => 12, 'log' => 30]),
-                        new OA\Property(property: 'by_route', type: 'object', additionalProperties: new OA\AdditionalProperties(type: 'integer'), example: ['chat_send' => 8]),
+                        new OA\Property(property: 'by_level', type: 'object', description: 'Map of level => count.', example: ['error' => 12, 'warning' => 30]),
+                        new OA\Property(property: 'by_event', type: 'object', description: 'Map of event type => count.', example: ['exception' => 12, 'log' => 30]),
+                        new OA\Property(property: 'by_route', type: 'object', description: 'Map of route => count.', example: ['chat_send' => 8]),
                         new OA\Property(property: 'recent_errors', type: 'array', items: new OA\Items(type: 'object')),
                     ],
                     type: 'object',
