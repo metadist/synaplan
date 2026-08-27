@@ -329,6 +329,9 @@ final class SummaryEvalCommand extends Command
      */
     private function buildMessages(array $raw): array
     {
+        // Reflection here is statically safe: Message::$id is a mapped Doctrine
+        // property, and PHPStan (level max) verifies the property exists — a
+        // try/catch around it would be provably dead code.
         $idProperty = new \ReflectionProperty(Message::class, 'id');
 
         $messages = [];

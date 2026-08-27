@@ -110,6 +110,28 @@ class SummaryEvalScorerTest extends TestCase
         self::assertFalse($score->passed());
     }
 
+    /**
+     * The prompt mandates `## <heading>` sections — a lone `# Title` first
+     * line is NOT compliant even when a `## ` section follows later.
+     */
+    public function testSingleHashFirstLineFailsStructure(): void
+    {
+        $summary = "# Summary\n## Topic\nSomething.";
+
+        $score = $this->scorer->score($summary, 4000, [], [], null);
+
+        self::assertFalse($score->structureOk);
+        self::assertFalse($score->passed());
+    }
+
+    public function testEmptySummaryIsReportedAsEmptyNotOverCap(): void
+    {
+        $score = $this->scorer->score('', 4000, [], [], null);
+
+        self::assertStringContainsString('empty summary', $score->problems());
+        self::assertStringNotContainsString('over cap', $score->problems());
+    }
+
     public function testGermanSummaryDetectedAndMatchesExpectation(): void
     {
         $summary = "## Topic\nDie Miete für das Büro wird erhöht und der Umbau ist entschieden.\n"

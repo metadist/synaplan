@@ -42,7 +42,9 @@ final readonly class SummaryEvalScore
     {
         $problems = [];
         if (!$this->sizeOk) {
-            $problems[] = sprintf('size %d chars over cap', $this->chars);
+            $problems[] = 0 === $this->chars
+                ? 'empty summary'
+                : sprintf('size %d chars over cap', $this->chars);
         }
         foreach ($this->missingRequired as $probe) {
             $problems[] = "missing '{$probe}'";
