@@ -102,7 +102,11 @@ source "amazon-ebs" "synaplan" {
     volume_size           = var.root_volume_size
     volume_type           = "gp3"
     delete_on_termination = true
-    encrypted             = true
+    # AWS Marketplace cannot ingest or scan an AMI backed by an encrypted
+    # snapshot. The workflow verifies this after the build and Marketplace
+    # encrypts its own copy during ingestion. Buyer launches are encrypted
+    # separately by the CloudFormation templates.
+    encrypted = false
   }
 
   # The published AMI's own root device. Marketplace re-encrypts on ingestion,

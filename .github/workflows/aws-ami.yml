@@ -46,6 +46,7 @@ env:
   # The Marketplace ingests from us-east-1 only; other regions are produced by
   # copying the published AMI.
   AWS_REGION: us-east-1
+  AWS_MARKETPLACE_INGESTION_ACCOUNT_ID: '679593333241'
   IMAGE_REPOSITORY: ghcr.io/metadist/synaplan
 
 jobs:
@@ -164,6 +165,19 @@ jobs:
           role-session-name: synaplan-ami-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Check Marketplace encryption compatibility
+        run: |
+          set -euo pipefail
+          encryption_by_default="$(
+            aws ec2 get-ebs-encryption-by-default \
+              --query EbsEncryptionByDefault \
+              --output text
+          )"
+          if [ "$encryption_by_default" != False ]; then
+            echo "::error::EBS encryption by default is enabled in ${AWS_REGION}. AWS Marketplace cannot ingest the encrypted AMI this build would produce."
+            exit 1
+          fi
+
       - name: Install Packer
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
         with:
@@ -204,6 +218,50 @@ jobs:
             echo "for the free compliance scan, then verify a launch from"
             echo "\`deploy/aws/cloudformation/synaplan-new-vpc.yaml\` before submitting."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate and share the AMI with AWS Marketplace
+        env:
+          AMI_ID: ${{ steps.ami.outputs.ami }}
+        run: |
+          set -euo pipefail
+          read -r -a snapshot_ids <<< "$(
+            aws ec2 describe-images \
+              --image-ids "$AMI_ID" \
+              --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId' \
+              --output text
+          )"
+          if [ "${#snapshot_ids[@]}" -eq 0 ]; then
+            echo "::error::${AMI_ID} has no EBS snapshots."
+            exit 1
+          fi
+
+          encrypted_snapshots="$(
+            aws ec2 describe-snapshots \
+              --snapshot-ids "${snapshot_ids[@]}" \
+              --query 'Snapshots[?Encrypted].SnapshotId' \
+              --output text
+          )"
+          if [ -n "$encrypted_snapshots" ]; then
+            echo "::error::${AMI_ID} uses encrypted snapshots (${encrypted_snapshots}); AWS Marketplace cannot ingest it."
+            exit 1
+          fi
+
+          aws ec2 modify-image-attribute \
+            --image-id "$AMI_ID" \
+            --launch-permission \
+            "Add=[{UserId=${AWS_MARKETPLACE_INGESTION_ACCOUNT_ID}}]"
+
+          shared_account="$(
+            aws ec2 describe-image-attribute \
+              --image-id "$AMI_ID" \
+              --attribute launchPermission \
+              --query "LaunchPermissions[?UserId=='${AWS_MARKETPLACE_INGESTION_ACCOUNT_ID}'].UserId | [0]" \
+              --output text
+          )"
+          if [ "$shared_account" != "$AWS_MARKETPLACE_INGESTION_ACCOUNT_ID" ]; then
+            echo "::error::${AMI_ID} was not shared with the AWS Marketplace ingestion account."
+            exit 1
+          fi
 
       - name: Upload the build manifest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
