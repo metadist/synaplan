@@ -492,7 +492,7 @@ services:
   # Optional Piper TTS — four baked voices (en, de, es, tr).
   #   docker compose -f docker-compose-minimal.yml --profile tts up -d
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:f4cabd3fec77a682be1aa853ae7958e6369353abbd7b8b19e0162058eb98ff81
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:c2aa56d90a30fc9c55ee76e4a2e7857d5705e4ecf4c8f256740407e0b9f61cd8
     container_name: synaplan-tts
     profiles: [tts]
     restart: unless-stopped
