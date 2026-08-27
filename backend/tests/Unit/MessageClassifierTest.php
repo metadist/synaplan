@@ -1183,4 +1183,183 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('fast_path_heuristic', $result['source']);
         $this->assertTrue($result['skip_sorting']);
     }
+
+    /**
+     * Session files, image half: "mach es blau" right after an image was
+     * generated names no format and hits none of the media trigger substrings,
+     * so the fast-path used to shortcut it to `general` — where the chat model
+     * can only talk about the picture instead of editing it. Generated media
+     * carries no `__FILE_GENERATED__:` marker, so it needs its own guard.
+     */
+    public function testFastPathDefersWhenPreviousTurnGeneratedAnImage(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image', 'input_mode' => 'reference_images']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $result = $classifier->classify($this->plainMessage(301, 'mach es blau'), [$imageTurn]);
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
+    /**
+     * Multi-turn editing: normal chat is interleaved after the picture was
+     * generated, and a later message references it by a visual property.
+     */
+    public function testFastPathDefersForLaterImageEditAfterInterleavedChat(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'image']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklaerung.');
+        $interleavedReply->method('getFilePath')->willReturn('');
+
+        $result = $classifier->classify(
+            $this->plainMessage(302, 'kannst du die Farbe noch anpassen'),
+            [$imageTurn, $interleavedReply],
+        );
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * Counterpart: no over-deferral. Plain chat after an interleaved reply still
+     * takes the fast path even though the thread contains a generated picture.
+     */
+    public function testFastPathTakenForUnrelatedChatAfterEarlierImage(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $imageTurn = $this->createMock(Message::class);
+        $imageTurn->method('getDirection')->willReturn('OUT');
+        $imageTurn->method('getText')->willReturn('Here is your image');
+        $imageTurn->method('getFilePath')->willReturn('ai/car-sunset.png');
+
+        $interleavedReply = $this->createMock(Message::class);
+        $interleavedReply->method('getDirection')->willReturn('OUT');
+        $interleavedReply->method('getText')->willReturn('Gerne, hier ist die Erklaerung.');
+        $interleavedReply->method('getFilePath')->willReturn('');
+
+        $result = $classifier->classify(
+            $this->plainMessage(303, 'Super, danke dir vielmals'),
+            [$imageTurn, $interleavedReply],
+        );
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    /**
+     * A generated DOCUMENT must not trip the media guard — documents have their
+     * own (already shipped) deferral and the media probe is extension-based.
+     */
+    public function testGeneratedDocumentDoesNotTripTheMediaGuard(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+
+        $documentTurn = $this->createMock(Message::class);
+        $documentTurn->method('getDirection')->willReturn('OUT');
+        $documentTurn->method('getText')->willReturn('Done.');
+        $documentTurn->method('getFilePath')->willReturn('ai/report.docx');
+
+        $result = $classifier->classify($this->plainMessage(304, 'Super, danke dir vielmals'), [$documentTurn]);
+
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    /**
+     * BINPUTMODE was parsed by the sorter and then dropped here, so the media
+     * handler never learned that a request edits an existing picture.
+     */
+    public function testInputModeFromTheSorterReachesTheClassification(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'language' => 'en',
+            'media_type' => 'image',
+            'input_mode' => 'reference_images',
+        ]);
+
+        $result = $this->service->classify($this->plainMessage(305, 'make the car blue'));
+
+        $this->assertSame('reference_images', $result['input_mode']);
+    }
+
+    public function testClassificationHasNoInputModeWhenTheSorterOmitsIt(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+        ]);
+
+        $this->assertArrayNotHasKey('input_mode', $this->service->classify($this->plainMessage(306, 'hello there')));
+    }
+
+    private function classifierWithFastPathEnabled(MessageSorter $sorter): MessageClassifier
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
+            if ('QDRANT_SEARCH' === $group) {
+                return '0';
+            }
+
+            return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
+        });
+
+        return new MessageClassifier(
+            $sorter,
+            $this->createMock(MessageMetaRepository::class),
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+        );
+    }
+
+    private function plainMessage(int $id, string $text): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn($id);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        return $message;
+    }
 }

@@ -26,6 +26,9 @@ final readonly class MediaPromptExtractor
      * @param Message $message        Current user message
      * @param array   $thread         Conversation history
      * @param array   $classification Classification result (topic, language, etc.)
+     * @param array   $options        forwarded to the prompt run; carries
+     *                                `media_edit_source_name` when this turn
+     *                                edits a picture from the conversation
      *
      * @return array{
      *     prompt: string,
@@ -33,7 +36,7 @@ final readonly class MediaPromptExtractor
      *     raw: string
      * }
      */
-    public function extract(Message $message, array $thread, array $classification): array
+    public function extract(Message $message, array $thread, array $classification, array $options = []): array
     {
         $overridePrompt = $message->getMeta('media_prompt_override');
         if ($overridePrompt) {
@@ -53,7 +56,7 @@ final readonly class MediaPromptExtractor
         $rawContent = '';
 
         try {
-            $rawContent = $this->runPrompt($message, $thread, $classification, 'mediamaker');
+            $rawContent = $this->runPrompt($message, $thread, $classification, 'mediamaker', $options);
         } catch (\Throwable $e) {
             $this->logger->warning('MediaPromptExtractor: ChatHandler extraction failed, using fallback', [
                 'error' => $e->getMessage(),
@@ -189,7 +192,7 @@ final readonly class MediaPromptExtractor
         };
     }
 
-    private function runPrompt(Message $message, array $thread, array $classification, string $topic): string
+    private function runPrompt(Message $message, array $thread, array $classification, string $topic, array $options = []): string
     {
         $promptClassification = $classification;
         $promptClassification['topic'] = $topic;
@@ -205,7 +208,7 @@ final readonly class MediaPromptExtractor
             $promptClassification['model_name']
         );
 
-        $response = $this->chatHandler->handle($message, $thread, $promptClassification);
+        $response = $this->chatHandler->handle($message, $thread, $promptClassification, null, $options);
 
         return (string) ($response['content'] ?? '');
     }

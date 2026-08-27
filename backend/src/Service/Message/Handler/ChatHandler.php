@@ -16,11 +16,14 @@ use App\Service\Digest\MessageDigestConfig;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
+use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -87,6 +90,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private VisionModelResolver $visionModelResolver,
         private DigestSearchService $digestSearchService,
         private MessageDigestConfig $digestConfig,
+        private ConversationFileCatalog $conversationFileCatalog,
+        private GeneratedImageVisionFlag $generatedImageVisionFlag,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -179,6 +184,39 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ]);
 
         return $this->documentImageCatalog->renderPromptBlock($images);
+    }
+
+    /**
+     * Tell the mediamaker prompt that this turn EDITS a picture that already
+     * exists in the conversation.
+     *
+     * Without it the prompt sees a bare "make the car blue", assumes a new
+     * scene and writes a full description ("a blue sports car, photorealistic,
+     * …") — which sends the image model off in its own direction even though a
+     * reference image is attached. The instruction keeps the enhanced prompt on
+     * the CHANGE. Only the mediamaker topic is affected; every other topic
+     * keeps its prompt shape unchanged.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildMediaEditContext(string $topic, array $options): string
+    {
+        if ('mediamaker' !== $topic) {
+            return '';
+        }
+
+        $sourceName = $options['media_edit_source_name'] ?? null;
+        if (!is_string($sourceName) || '' === trim($sourceName)) {
+            return '';
+        }
+
+        return "\n\n## You are editing an existing image\n\n"
+            .'This request modifies "'.trim($sourceName).'", an image from earlier in this conversation. '
+            ."It is attached to the generation call as a reference image, so the image model can already see it.\n"
+            ."- Write ONLY the requested CHANGE, in the user's words.\n"
+            ."- Do NOT describe the existing scene, its subject, or its style — you cannot see the picture.\n"
+            ."- Do NOT invent details that were not asked for.\n"
+            ."- Add \"keep everything else unchanged\" so the rest of the composition survives.\n";
     }
 
     /**
@@ -348,6 +386,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
+
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
         if ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
@@ -440,6 +480,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Images this document may embed (officemaker only).
         $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
 
+        // The picture this turn edits (mediamaker only).
+        $systemPrompt .= $this->buildMediaEditContext($topic, $options);
+
         $modelMaxTokens = null;
         $systemPromptFallback = null;
         if ($modelId) {
@@ -490,6 +533,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'search_results' => $searchResults,
             'rag_context' => $ragContext,
             'include_images' => $includeImagesInMessages,
+            'include_generated_images' => $options['include_generated_images'],
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
         ]);
@@ -942,6 +986,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
+
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
@@ -1047,6 +1093,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Images this document may embed (officemaker only).
         $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
+
+        // The picture this turn edits (mediamaker only).
+        $systemPrompt .= $this->buildMediaEditContext($topic, $options);
 
         // Check if model supports system messages (o1 models don't)
         $systemPromptFallback = null;
@@ -1380,6 +1429,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
+        $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
 
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
@@ -1426,6 +1476,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($content, $imageUrls);
+            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
+                $messageContent = $this->buildMultimodalContent($content, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $content;
             }
@@ -1669,18 +1721,22 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
+        $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
 
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $this->humanizeFileMarkersForModel($msg->getText());
+            $stamped = '['.$msg->getDateTime().']: '.$content;
 
             // For user messages in thread, include images for vision (if enabled)
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
-                $messageContent = $this->buildMultimodalContent('['.$msg->getDateTime().']: '.$content, $imageUrls);
+                $messageContent = $this->buildMultimodalContent($stamped, $imageUrls);
+            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
+                $messageContent = $this->buildMultimodalContent($stamped, $generatedImages[$msg->getId()]);
             } else {
-                $messageContent = '['.$msg->getDateTime().']: '.$content;
+                $messageContent = $stamped;
             }
 
             // #1115 — same empty-assistant filter as buildStreamingMessages.
@@ -2046,10 +2102,84 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Build multimodal content array with text and images.
+     * Base64 data URLs for images the ASSISTANT generated earlier in this
+     * conversation, keyed by the message that produced them.
      *
-     * @param string $textContent The text content
-     * @param array  $imageUrls   Array of base64 data URLs for images
+     * Without this, "draw a cat" → "what breed is it?" is answered from the
+     * text prompt alone: only user turns ever contributed image content, so the
+     * model could not see its own picture. Off unless
+     * FILE_CONTEXT.VISION_INCLUDE_GENERATED is set and the chosen model is
+     * vision-capable, and capped at MAX_GENERATED_IMAGES — every image rides
+     * along as a base64 payload on each following request of the conversation.
+     *
+     * @param array<int, Message>  $thread
+     * @param array<string, mixed> $options
+     *
+     * @return array<int, list<string>>
+     */
+    private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
+    {
+        if (true !== ($options['include_generated_images'] ?? false)) {
+            return [];
+        }
+
+        $catalog = $this->conversationFileCatalog->build(
+            $currentMessage,
+            $thread,
+            [],
+            ConversationFile::CATEGORY_IMAGE,
+        );
+
+        $byMessage = [];
+        $included = 0;
+
+        foreach ($catalog as $file) {
+            if ($included >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
+                break;
+            }
+            if (!$file->isGenerated() || null === $file->messageId) {
+                continue;
+            }
+            if (!$this->isVisionSupportedImage($file->relativePath)) {
+                continue;
+            }
+
+            $dataUrl = $this->imageToBase64DataUrl($file->relativePath);
+            if (null === $dataUrl) {
+                continue;
+            }
+
+            $byMessage[$file->messageId][] = $dataUrl;
+            ++$included;
+        }
+
+        if ($included > 0) {
+            $this->logger->info('ChatHandler: Including generated images for vision', [
+                'message_id' => $currentMessage->getId(),
+                'image_count' => $included,
+            ]);
+        }
+
+        return $byMessage;
+    }
+
+    /**
+     * Whether generated images may be shown to the model: the operator flag is
+     * on and the model that will actually answer can read images.
+     */
+    private function shouldIncludeGeneratedImages(?int $modelId, ?int $effectiveUserId): bool
+    {
+        if (!$this->generatedImageVisionFlag->isEnabled($effectiveUserId)) {
+            return false;
+        }
+
+        $model = $modelId ? $this->modelRepository->find($modelId) : null;
+
+        return null !== $model && $model->hasFeature('vision');
+    }
+
+    /**
+     * Build multimodal content array with text and images.
      *
      * @return array|string Content as multimodal array or plain string if no images
      */

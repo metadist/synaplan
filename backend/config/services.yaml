@@ -229,9 +229,11 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
-    # Images a document turn may embed: attachments, upstream node output and
-    # the pictures of the conversation, validated against the uploads dir.
-    App\Service\File\DocumentImageCatalog:
+    # Every file a conversation has in hand — attachments, upstream node output
+    # and the artifacts generated earlier in the thread — validated against the
+    # uploads dir. Single resolver behind media edits, document embedding and
+    # the routing file inventory.
+    App\Service\File\ConversationFileCatalog:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 

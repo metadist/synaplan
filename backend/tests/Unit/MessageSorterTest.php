@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
@@ -564,5 +565,118 @@ class MessageSorterTest extends TestCase
         $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
 
         $this->assertGreaterThanOrEqual(2048, $options['max_tokens'] ?? 0);
+    }
+
+    /**
+     * The sorter used to see history as pure text, so a picture generated two
+     * turns ago was invisible and "make the car blue" looked like a brand new
+     * image request. Each history turn carrying a file now gets a compact note.
+     */
+    public function testHistoryNotesTheFilesEarlierTurnsCarry(): void
+    {
+        $sent = $this->captureSorterMessages([
+            (new Message())->setDirection('IN')->setText('generate a red sports car'),
+            (new Message())->setDirection('OUT')->setText('Here is your image')->setFilePath('ai/car-sunset.png'),
+        ]);
+
+        $assistantTurn = $this->turnByRole($sent, 'assistant');
+        $this->assertStringContainsString('[Generated image file: car-sunset.png]', $assistantTurn);
+    }
+
+    public function testHistoryNotesDistinguishUploadsFromGeneratedFiles(): void
+    {
+        $sent = $this->captureSorterMessages([
+            (new Message())->setDirection('IN')->setText('what is in here?')->setFilePath('uploads/contract.pdf'),
+        ]);
+
+        $this->assertStringContainsString('[Uploaded document file: contract.pdf]', $this->turnByRole($sent, 'user'));
+    }
+
+    public function testTurnsWithoutFilesAreNotAnnotated(): void
+    {
+        $sent = $this->captureSorterMessages([
+            (new Message())->setDirection('OUT')->setText('Sure, here is the answer.'),
+        ]);
+
+        $this->assertStringNotContainsString('[Generated', $this->turnByRole($sent, 'assistant'));
+    }
+
+    /**
+     * The notes ride inside the existing history window, so a long thread full
+     * of files must not grow it without bound.
+     */
+    public function testFileNotesStayInsideTheirBudget(): void
+    {
+        $history = [];
+        for ($i = 0; $i < 40; ++$i) {
+            $history[] = (new Message())->setDirection('OUT')->setText('done')->setFilePath('ai/render-'.$i.'.png');
+        }
+
+        $sent = $this->captureSorterMessages($history);
+
+        $annotated = 0;
+        foreach ($sent as $entry) {
+            $annotated += mb_substr_count((string) $entry['content'], '[Generated image file:');
+        }
+
+        $this->assertGreaterThan(0, $annotated);
+        $this->assertLessThan(40, $annotated, 'the annotation budget must stop before the whole thread is annotated');
+    }
+
+    /**
+     * @param list<Message> $history
+     *
+     * @return list<array{role: string, content: string}>
+     */
+    private function captureSorterMessages(array $history): array
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'mediamaker']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $sent = [];
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$sent): array {
+                $sent = $messages;
+
+                return ['content' => '{"BTOPIC":"general","BLANG":"en"}', 'provider' => 'groq'];
+            }
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+        );
+
+        $sorter->classify(['BTEXT' => 'make the car blue', 'BLANG' => 'en', 'BTOPIC' => ''], $history, null);
+
+        return $sent;
+    }
+
+    /**
+     * @param list<array{role: string, content: string}> $messages
+     */
+    private function turnByRole(array $messages, string $role): string
+    {
+        foreach ($messages as $entry) {
+            if ($role === $entry['role']) {
+                return (string) $entry['content'];
+            }
+        }
+
+        return '';
     }
 }

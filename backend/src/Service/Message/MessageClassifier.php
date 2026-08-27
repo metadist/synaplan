@@ -6,6 +6,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -314,6 +315,16 @@ final readonly class MessageClassifier
         $resolution = $result['resolution'] ?? null;
         if (is_string($resolution) && '' !== $resolution) {
             $classification['resolution'] = $resolution;
+        }
+
+        // Pass through the sorter's BINPUTMODE vote. `reference_images` is how
+        // MediaGenerationHandler learns that an image request edits an existing
+        // picture instead of drawing a new one — without this the vote was
+        // parsed, logged and then dropped here, so every attachment-less
+        // follow-up ("make the car blue") fell back to a fresh generation.
+        $inputMode = $result['input_mode'] ?? null;
+        if (is_string($inputMode) && '' !== $inputMode) {
+            $classification['input_mode'] = $inputMode;
         }
 
         return $classification;
@@ -655,6 +666,21 @@ final readonly class MessageClassifier
             return false;
         }
 
+        // The same two cases for generated MEDIA. Pictures and videos never
+        // carry the `__FILE_GENERATED__:` marker the document guards key on —
+        // they ride the message's file path — so "mach es blau" right after an
+        // image generation missed every trigger below and was shortcut to
+        // `general`, where the chat model can only talk about the picture
+        // instead of editing it.
+        if ($this->lastAssistantGeneratedMedia($conversationHistory)) {
+            return false;
+        }
+
+        if ($this->threadHasGeneratedMedia($conversationHistory)
+            && $this->mentionsMediaReference($trimmed)) {
+            return false;
+        }
+
         // Media / media-generation triggers across the major UI languages
         // (EN/DE/ES/FR/IT/TR + a little PT). If any appear, the sorter may
         // pick a topic other than `general`/`chat` (e.g. mediamaker →
@@ -824,6 +850,77 @@ final readonly class MessageClassifier
         }
 
         return false;
+    }
+
+    /**
+     * Whether the most recent assistant turn produced a picture or a video.
+     *
+     * Generated media is stored on the message itself (BFILEPATH/BFILETYPE),
+     * not behind the `__FILE_GENERATED__:` marker used for office documents,
+     * so it needs its own probe. Only the latest assistant message counts, for
+     * the same reason as {@see lastAssistantGeneratedFile()}.
+     *
+     * @param array<int, Message> $conversationHistory oldest-first thread
+     */
+    private function lastAssistantGeneratedMedia(array $conversationHistory): bool
+    {
+        for ($i = count($conversationHistory) - 1; $i >= 0; --$i) {
+            $msg = $conversationHistory[$i];
+            if ('OUT' !== $msg->getDirection()) {
+                continue;
+            }
+
+            return $this->isGeneratedMediaMessage($msg);
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether any assistant turn in the thread produced a picture or a video.
+     *
+     * @param array<int, Message> $conversationHistory
+     */
+    private function threadHasGeneratedMedia(array $conversationHistory): bool
+    {
+        foreach ($conversationHistory as $msg) {
+            if ('OUT' === $msg->getDirection() && $this->isGeneratedMediaMessage($msg)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isGeneratedMediaMessage(Message $message): bool
+    {
+        $path = $message->getFilePath();
+        if ('' === $path) {
+            return false;
+        }
+
+        $category = ConversationFile::categoryForPath($path);
+
+        return ConversationFile::CATEGORY_IMAGE === $category
+            || ConversationFile::CATEGORY_VIDEO === $category;
+    }
+
+    /**
+     * Whether the message refers to a picture or one of its visual properties.
+     *
+     * The media sibling of {@see mentionsDocumentReference()}, used together
+     * with {@see threadHasGeneratedMedia()} to catch edits that span several
+     * turns ("und jetzt die Farbe ändern"). Kept deliberately visual so normal
+     * chat rarely matches; a false positive costs one extra AI-sorter call.
+     */
+    private function mentionsMediaReference(string $text): bool
+    {
+        return 1 === preg_match(
+            '/\b(bild|bildes|bilder|foto|fotos|grafik|logo|image|picture|photo|imagen|imagem|immagine|resim|görsel|'
+            .'farbe|farben|color|colour|colore|renk|hintergrund|background|fondo|stil|style|estilo|'
+            .'auflösung|aufloesung|resolution|zuschneiden|crop|retusch\w*|retouch\w*)\b/iu',
+            $text
+        );
     }
 
     /**
