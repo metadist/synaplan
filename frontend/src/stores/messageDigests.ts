@@ -50,7 +50,12 @@ export const useMessageDigestsStore = defineStore('messageDigests', () => {
 
     loading.value = true
     try {
-      const resolved = await resolveMessageDigests(missing)
+      // The resolve endpoint caps a single request at 100 ids — chunk so ids
+      // beyond the cap are still resolved.
+      const resolved: MessageDigestReference[] = []
+      for (let i = 0; i < missing.length; i += 100) {
+        resolved.push(...(await resolveMessageDigests(missing.slice(i, i + 100))))
+      }
       addReferences(resolved)
 
       const resolvedIds = new Set(resolved.map((r) => r.messageId))

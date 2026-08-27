@@ -133,7 +133,7 @@ final readonly class MessageForwardingService
      */
     private function resolveMessageTagsForChat(Chat $chat, string $text): string
     {
-        if (!str_contains($text, '[Message')) {
+        if (false === stripos($text, '[message')) {
             return $text;
         }
 

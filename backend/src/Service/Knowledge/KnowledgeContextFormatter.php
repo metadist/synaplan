@@ -108,7 +108,7 @@ final class KnowledgeContextFormatter
             $line = sprintf(
                 "[Msg: %d | %s | %s] %s\n",
                 $digest['message_id'],
-                $digest['source_date'] > 0 ? date('Y-m-d', $digest['source_date']) : 'unknown date',
+                $digest['source_date'] > 0 ? gmdate('Y-m-d', $digest['source_date']) : 'unknown date',
                 '' !== $digest['channel'] ? $digest['channel'] : 'chat',
                 $digest['title'],
             );
