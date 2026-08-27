@@ -85,12 +85,12 @@ Parameters:
 
   AllowedWebCidr:
     Type: String
-    Default: 0.0.0.0/0
     AllowedPattern: '^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$'
     ConstraintDescription: Must be a CIDR range such as 203.0.113.0/24.
     Description: >-
-      Which source addresses may reach the web interface. 0.0.0.0/0 is the whole
-      internet - narrow it to your own range for an internal installation.
+      Required source range for web access. Use your public IP with /32 for one
+      administrator, another trusted CIDR for a network, or 0.0.0.0/0 only when
+      you intentionally want to allow the entire internet.
 
   DomainName:
     Type: String

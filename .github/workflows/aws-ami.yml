@@ -337,6 +337,7 @@ jobs:
               "ParameterKey=ImageId,ParameterValue=${AMI_ID}" \
               ParameterKey=InstanceType,ParameterValue=c7i.xlarge \
               ParameterKey=DataVolumeSize,ParameterValue=20 \
+              ParameterKey=AllowedWebCidr,ParameterValue=0.0.0.0/0 \
               ParameterKey=EnableDailySnapshots,ParameterValue=false \
               ParameterKey=AdminEmail,ParameterValue=verify@example.com
           aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
