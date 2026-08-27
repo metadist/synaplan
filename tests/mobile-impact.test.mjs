@@ -220,6 +220,7 @@ test('classifies the model status surfaces as backend-only plus ota-candidate', 
 test('classifies the first-run setup wizard as backend-only plus ota-candidate', () => {
   const backendPaths = [
     'backend/src/Command/AdminResetPasswordCommand.php',
+    'backend/src/Command/SetupResetCommand.php',
     'backend/src/Controller/SetupController.php',
     'backend/src/DTO/SetupAdminRequest.php',
     'backend/src/DTO/SetupCompleteRequest.php',

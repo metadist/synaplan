@@ -64,8 +64,21 @@ reappears on a running instance would let the next visitor claim it. Use
 [Lost Administrator Password](ADMIN.md#lost-administrator-password).
 
 **Dev and test installations never see the wizard**, because their fixtures seed
-a demo account. To reproduce a virgin instance locally, start the stack with
-`SEED_DEMO_DATA=false` and an empty database:
+a demo account. To reopen it on a running dev stack, without touching the volume:
+
+```bash
+make -C backend setup-reset
+```
+
+That is `app:setup:reset`, which deletes every account and the completion flag,
+then the next page load lands on `/setup` again. It refuses to run outside
+`APP_ENV=dev` or `test`. Add `--keep-policy` to leave the registration and
+guest-chat switches at the values the previous run stored.
+
+The reset only holds until the backend container restarts: the entrypoint sees an
+empty `BUSER` table and loads the demo fixtures again, and any account closes the
+wizard. Start the stack with `SEED_DEMO_DATA=false` to keep it open across
+restarts:
 
 ```bash
 docker compose down -v
