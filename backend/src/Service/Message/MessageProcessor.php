@@ -474,7 +474,7 @@ final readonly class MessageProcessor
             // Step 2.9: Rolling conversation summary (read-only on the hot path).
             [$options, $conversationHistory] = $this->applyRollingSummary(
                 $message,
-                $classification,
+                $classification ?? [],
                 $options,
                 $conversationHistory,
                 $perfTimer,

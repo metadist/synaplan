@@ -287,6 +287,9 @@ final readonly class ConversationSummaryService
             if (null !== $cached) {
                 return $cached;
             }
+            // Invalid/legacy shape: purge it so subsequent reads don't keep
+            // hitting the bad entry and can re-warm from the durable row.
+            $this->cache->deleteItem($this->storeKey($chatId));
         }
 
         return $this->readDurable($chatId);
