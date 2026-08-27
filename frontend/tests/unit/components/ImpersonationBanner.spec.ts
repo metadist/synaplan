@@ -172,6 +172,8 @@ describe('ImpersonationBanner', () => {
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
     expect(successMock).toHaveBeenCalledWith('Admin session restored.')
+    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin')
+    expect(wrapper.vm.$router.currentRoute.value.query).toEqual({ tab: 'users' })
   })
 
   it('shows the server-supplied error when Exit fails', async () => {

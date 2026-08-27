@@ -173,7 +173,11 @@
             <div v-if="usersLoading" class="text-center py-12">
               <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
             </div>
-            <div v-else-if="users.length === 0" class="text-center py-12 txt-secondary">
+            <div
+              v-else-if="users.length === 0"
+              class="text-center py-12 txt-secondary"
+              data-testid="admin-users-empty"
+            >
               {{ $t('admin.users.noUsers') }}
             </div>
             <div v-else>
