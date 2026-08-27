@@ -4923,6 +4923,9 @@
       "submitting": "Konto wird angelegt…",
       "errorMismatch": "Die beiden Passwörter stimmen nicht überein.",
       "errorWeak": "Das Passwort braucht mindestens 8 Zeichen, einen Groß-, einen Kleinbuchstaben und eine Zahl.",
+      "errorInProgress": "Dieses Konto wird gerade an anderer Stelle angelegt. Warte einen Moment und lade die Seite neu.",
+      "errorAlreadyDone": "Dieser Server hat bereits einen Administrator, hier ist also nichts anzulegen. Melde dich stattdessen an.",
+      "errorDisabled": "Die Einrichtung im Browser ist auf diesem Server abgeschaltet. Das erste Konto legt an, wer den Server betreibt.",
       "errorGeneric": "Das Konto konnte nicht angelegt werden. Bitte versuche es erneut."
     },
     "provider": {

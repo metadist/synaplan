@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Security\PasswordPolicy;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -42,13 +43,11 @@ final class AdminResetPasswordCommand extends Command
 {
     /**
      * 24 hex characters, same shape the AWS first-boot script generates. Long
-     * enough to be unguessable, short enough to retype from a terminal, and it
-     * satisfies the 8-64 character rule without needing a character-class dance.
+     * enough to be unguessable, short enough to retype from a terminal, and past
+     * {@see PasswordPolicy::COMPOSITION_WAIVER_LENGTH}, so it needs no character-
+     * class dance to satisfy the policy it is checked against.
      */
     private const GENERATED_PASSWORD_BYTES = 12;
-
-    private const MIN_PASSWORD_LENGTH = 8;
-    private const MAX_PASSWORD_LENGTH = 64;
 
     public function __construct(
         private readonly UserRepository $userRepository,
@@ -62,7 +61,12 @@ final class AdminResetPasswordCommand extends Command
     {
         $this
             ->addArgument('email', InputArgument::REQUIRED, 'Email address of the account')
-            ->addOption('password', null, InputOption::VALUE_REQUIRED, 'The new password (8-64 characters)')
+            ->addOption('password', null, InputOption::VALUE_REQUIRED, sprintf(
+                'The new password (%d-%d characters; below %d it also needs an uppercase letter, a lowercase letter and a number)',
+                PasswordPolicy::MINIMUM_LENGTH,
+                PasswordPolicy::MAXIMUM_LENGTH,
+                PasswordPolicy::COMPOSITION_WAIVER_LENGTH,
+            ))
             ->addOption('generate', null, InputOption::VALUE_NONE, 'Generate a random password, print it once, and require a change at next sign-in')
             ->addOption('promote', null, InputOption::VALUE_NONE, 'Also make this account an administrator and mark its email verified')
             ->setHelp(<<<'HELP'
@@ -78,6 +82,10 @@ final class AdminResetPasswordCommand extends Command
                 Recover an instance that has no administrator left:
 
                   <info>php %command.full_name% someone@example.com --generate --promote</info>
+
+                A password given with --password follows the same rules as
+                BOOTSTRAP_ADMIN_PASSWORD: 8 to 64 characters, and below 16 characters it
+                must also contain an uppercase letter, a lowercase letter and a number.
 
                 Accounts managed by an enterprise identity provider are refused: their
                 password lives in that provider, not here.
@@ -125,9 +133,9 @@ final class AdminResetPasswordCommand extends Command
         }
 
         $password = $generate ? $this->generatePassword() : (string) $explicitPassword;
-        $lengthError = $this->validatePasswordLength($password);
-        if (null !== $lengthError) {
-            $io->error($lengthError);
+        $violation = PasswordPolicy::violation($password, 'The password');
+        if (null !== $violation) {
+            $io->error($violation);
 
             return Command::FAILURE;
         }
@@ -176,20 +184,5 @@ final class AdminResetPasswordCommand extends Command
     private function generatePassword(): string
     {
         return bin2hex(random_bytes(self::GENERATED_PASSWORD_BYTES));
-    }
-
-    private function validatePasswordLength(string $password): ?string
-    {
-        $length = mb_strlen($password);
-
-        if ($length < self::MIN_PASSWORD_LENGTH) {
-            return sprintf('The password must be at least %d characters long.', self::MIN_PASSWORD_LENGTH);
-        }
-
-        if ($length > self::MAX_PASSWORD_LENGTH) {
-            return sprintf('The password must be at most %d characters long.', self::MAX_PASSWORD_LENGTH);
-        }
-
-        return null;
     }
 }

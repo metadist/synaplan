@@ -179,6 +179,44 @@ final class AdminResetPasswordCommandTest extends TestCase
     }
 
     /**
+     * The documented policy for an operator-set password is the one
+     * BOOTSTRAP_ADMIN_PASSWORD follows. A recovery path that quietly accepted
+     * less would be the weakest way onto the account that can reach everything.
+     */
+    public function testRefusesAShortPasswordWithoutTheRequiredCharacterClasses(): void
+    {
+        $this->givenLocalUser();
+        $this->entityManager->expects($this->never())->method('flush');
+
+        $tester = $this->tester();
+        $tester->execute(['email' => 'admin@example.com', '--password' => 'alllowercase']);
+
+        $this->assertSame(Command::FAILURE, $tester->getStatusCode());
+        $this->assertStringContainsString('uppercase', $tester->getDisplay());
+        $this->assertStringNotContainsString(
+            'alllowercase',
+            $tester->getDisplay(),
+            'a terminal keeps scrollback, so the refusal must not repeat the password'
+        );
+    }
+
+    /**
+     * NIST SP 800-63B: length substitutes for composition. The same waiver lets a
+     * managed platform's generated secret through on the bootstrap path.
+     */
+    public function testAcceptsALongPasswordWithoutCharacterClasses(): void
+    {
+        $user = $this->givenLocalUser();
+        $this->entityManager->expects($this->once())->method('flush');
+
+        $tester = $this->tester();
+        $tester->execute(['email' => 'admin@example.com', '--password' => str_repeat('a', 16)]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $this->assertSame('new-hash', $user->getPw());
+    }
+
+    /**
      * Operators reach for this command because the reset mail never arrived. Say
      * why, so the next person fixes the mailer instead of running this again.
      */

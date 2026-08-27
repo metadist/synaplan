@@ -78,10 +78,12 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import { createFirstAdmin } from '@/services/api/setupApi'
+import { ApiError } from '@/services/api/httpClient'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const emit = defineEmits<{
   created: []
+  stale: []
 }>()
 
 const { t } = useI18n()
@@ -121,9 +123,32 @@ async function submit(): Promise<void> {
     await createFirstAdmin(email.value.trim(), password.value)
     emit('created')
   } catch (err) {
-    serverError.value = getErrorMessage(err) || t('setup.admin.errorGeneric')
+    serverError.value = describe(err)
+    if (err instanceof ApiError && 'SETUP_ALREADY_COMPLETED' === err.code) {
+      // The wizard is looking at a state the server has moved past. Reloading it
+      // swaps this form for the "already set up, sign in" card, which is the
+      // only thing left to do here.
+      emit('stale')
+    }
   } finally {
     busy.value = false
   }
+}
+
+/**
+ * This form is the first screen an installation ever shows, and the three
+ * conflicts it can hit are written for an operator reading a log — one of them
+ * names a console command — and are only ever English. Say what happened in the
+ * visitor's own language instead, and keep the server's text for everything
+ * unforeseen, where it is better than nothing.
+ */
+function describe(err: unknown): string {
+  if (err instanceof ApiError) {
+    if ('SETUP_IN_PROGRESS' === err.code) return t('setup.admin.errorInProgress')
+    if ('SETUP_ALREADY_COMPLETED' === err.code) return t('setup.admin.errorAlreadyDone')
+    if ('SETUP_WIZARD_DISABLED' === err.code) return t('setup.admin.errorDisabled')
+  }
+
+  return getErrorMessage(err) || t('setup.admin.errorGeneric')
 }
 </script>

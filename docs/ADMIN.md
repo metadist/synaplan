@@ -111,7 +111,10 @@ docker compose exec -T backend php bin/console app:admin:reset-password \
 
 The generated password is printed once and has to be replaced at the next
 sign-in; that rule is enforced server-side, so an API key is no way around it.
-Pass `--password='Str0ngPass'` instead to set a password you chose yourself.
+Pass `--password='Str0ngPass'` instead to set a password you chose yourself. It
+follows the same rules as `BOOTSTRAP_ADMIN_PASSWORD`: 8 to 64 characters, and
+below 16 characters it must also contain at least one uppercase letter, one
+lowercase letter, and one number.
 
 If every administrator is gone — deleted, or demoted, so nobody can reach
 **Admin → Users** anymore — add `--promote`. It makes the named account an

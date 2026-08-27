@@ -4003,6 +4003,9 @@
       "submitting": "Creando la cuenta…",
       "errorMismatch": "Las dos contraseñas no coinciden.",
       "errorWeak": "La contraseña necesita al menos 8 caracteres, una mayúscula, una minúscula y un número.",
+      "errorInProgress": "Esta cuenta ya se está creando en otro sitio. Espera un momento y vuelve a cargar la página.",
+      "errorAlreadyDone": "Este servidor ya tiene un administrador, así que aquí no hay nada que crear. Inicia sesión.",
+      "errorDisabled": "La configuración desde el navegador está desactivada en este servidor. Quien lo administra crea la primera cuenta.",
       "errorGeneric": "No se pudo crear la cuenta. Inténtalo de nuevo."
     },
     "provider": {

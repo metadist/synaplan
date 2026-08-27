@@ -4004,6 +4004,9 @@
       "submitting": "Hesap oluşturuluyor…",
       "errorMismatch": "İki şifre birbiriyle aynı değil.",
       "errorWeak": "Şifre en az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam gerektirir.",
+      "errorInProgress": "Bu hesap şu anda başka bir yerde oluşturuluyor. Biraz bekle ve sayfayı yeniden yükle.",
+      "errorAlreadyDone": "Bu sunucunun zaten bir yöneticisi var, burada oluşturulacak bir şey yok. Bunun yerine giriş yap.",
+      "errorDisabled": "Bu sunucuda tarayıcı üzerinden kurulum kapalı. İlk hesabı sunucuyu işleten kişi oluşturur.",
       "errorGeneric": "Hesap oluşturulamadı. Lütfen tekrar dene."
     },
     "provider": {

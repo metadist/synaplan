@@ -165,7 +165,7 @@ final class SetupController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Validation error (email format, password rules)')]
-    #[OA\Response(response: 409, description: 'Setup is already complete — code SETUP_ALREADY_COMPLETED, or the wizard is switched off through SETUP_WIZARD_ENABLED=false — code SETUP_WIZARD_DISABLED')]
+    #[OA\Response(response: 409, description: 'Setup is already complete — code SETUP_ALREADY_COMPLETED; the wizard is switched off through SETUP_WIZARD_ENABLED=false — code SETUP_WIZARD_DISABLED; or another caller is creating the administrator right now — code SETUP_IN_PROGRESS, retriable')]
     #[OA\Response(response: 429, description: 'Too many setup attempts from this IP')]
     public function createFirstAdmin(
         #[MapRequestPayload] SetupAdminRequest $dto,
@@ -181,16 +181,20 @@ final class SetupController extends AbstractController
                 : $this->wizardDisabled();
         }
 
-        // Two containers starting at once (Compose scale, a Kubernetes rollout)
-        // would otherwise both pass the check above and create two "first"
-        // administrators. Same lock discipline as BootstrapAdminService, which
-        // solves the identical race on the headless path.
+        // Two containers starting at once (Compose scale, a Kubernetes rollout),
+        // or simply a second browser tab, would otherwise both pass the check
+        // above and create two "first" administrators. Same lock discipline as
+        // BootstrapAdminService, which solves the identical race on the headless
+        // path.
+        //
+        // Non-blocking on purpose: the caller is a person waiting on a form, and
+        // the loser of this race has nothing to wait for — the request holding
+        // the lock is about to create the one administrator there will be. An
+        // answer it can act on beats holding the connection open for the lock's
+        // whole lifetime.
         $lock = $this->lockFactory->createLock('first-run-setup-admin', self::LOCK_TTL_SECONDS, false);
-        if (!$lock->acquire(true)) {
-            return $this->json([
-                'error' => 'Setup is already in progress',
-                'code' => 'SETUP_IN_PROGRESS',
-            ], Response::HTTP_CONFLICT);
+        if (!$lock->acquire()) {
+            return $this->setupInProgress();
         }
 
         try {
@@ -275,6 +279,21 @@ final class SetupController extends AbstractController
             'error' => 'Setup is already complete',
             'code' => 'SETUP_ALREADY_COMPLETED',
             'message' => 'This instance already has accounts. Sign in, or reset an administrator password with `php bin/console app:admin:reset-password`.',
+        ], Response::HTTP_CONFLICT);
+    }
+
+    /**
+     * The only retriable of the three conflicts: a second tab, or a second
+     * container in a rollout, arriving while the administrator is being created.
+     * Nothing is wrong and nothing is lost — the account the other request is
+     * creating is the one to sign in with a moment later.
+     */
+    private function setupInProgress(): JsonResponse
+    {
+        return $this->json([
+            'error' => 'Setup is already in progress',
+            'code' => 'SETUP_IN_PROGRESS',
+            'message' => 'The first administrator is already being created. Wait a moment, then reload this page.',
         ], Response::HTTP_CONFLICT);
     }
 

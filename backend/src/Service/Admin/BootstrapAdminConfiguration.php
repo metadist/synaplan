@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\Security\PasswordPolicy;
+
 /**
  * The validated first-admin bootstrap configuration.
  *
@@ -18,15 +20,19 @@ namespace App\Service\Admin;
  *   2. BootstrapAdminService, which performs the actual bootstrap;
  *   3. the host-side deployment preflight, through the application image.
  *
+ * The password half of those rules lives in {@see PasswordPolicy}, which
+ * `app:admin:reset-password` shares — the recovery path writes to the same
+ * account and must not be the lenient one.
+ *
  * Values are only ever validated here, never echoed: the password is a secret,
  * so no rule violation message may contain it.
  */
 final readonly class BootstrapAdminConfiguration
 {
     public const MAXIMUM_EMAIL_LENGTH = 128;
-    public const MINIMUM_PASSWORD_LENGTH = 8;
-    public const MAXIMUM_PASSWORD_LENGTH = 64;
-    public const COMPOSITION_WAIVER_LENGTH = 16;
+    public const MINIMUM_PASSWORD_LENGTH = PasswordPolicy::MINIMUM_LENGTH;
+    public const MAXIMUM_PASSWORD_LENGTH = PasswordPolicy::MAXIMUM_LENGTH;
+    public const COMPOSITION_WAIVER_LENGTH = PasswordPolicy::COMPOSITION_WAIVER_LENGTH;
 
     /**
      * The accepted password, wrapped so that only password() can read it.
@@ -91,23 +97,9 @@ final readonly class BootstrapAdminConfiguration
             throw new \InvalidArgumentException(sprintf('BOOTSTRAP_ADMIN_EMAIL must be a valid email address of at most %d characters.', self::MAXIMUM_EMAIL_LENGTH));
         }
 
-        if (strlen($configuredPassword) < self::MINIMUM_PASSWORD_LENGTH) {
-            throw new \InvalidArgumentException(sprintf('BOOTSTRAP_ADMIN_PASSWORD must be at least %d characters.', self::MINIMUM_PASSWORD_LENGTH));
-        }
-
-        if (strlen($configuredPassword) > self::MAXIMUM_PASSWORD_LENGTH) {
-            throw new \InvalidArgumentException(sprintf('BOOTSTRAP_ADMIN_PASSWORD must be at most %d characters.', self::MAXIMUM_PASSWORD_LENGTH));
-        }
-
-        // Following NIST SP 800-63B, composition rules only apply to short
-        // passwords. Long values are waived because managed platforms (for
-        // example Elestio) inject a high-entropy generated password and show it
-        // to the operator as the login credential: such a value can legitimately
-        // lack a digit, and rejecting it would crash-loop the whole deployment.
-        if (strlen($configuredPassword) < self::COMPOSITION_WAIVER_LENGTH
-            && 1 !== preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $configuredPassword)
-        ) {
-            throw new \InvalidArgumentException(sprintf('BOOTSTRAP_ADMIN_PASSWORD must contain at least one uppercase letter, one lowercase letter, and one number, or be at least %d characters long.', self::COMPOSITION_WAIVER_LENGTH));
+        $passwordViolation = PasswordPolicy::violation($configuredPassword, 'BOOTSTRAP_ADMIN_PASSWORD');
+        if (null !== $passwordViolation) {
+            throw new \InvalidArgumentException($passwordViolation);
         }
 
         return new self($email, $configuredPassword);

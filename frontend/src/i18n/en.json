@@ -4989,6 +4989,9 @@
       "submitting": "Creating account…",
       "errorMismatch": "The two passwords do not match.",
       "errorWeak": "The password needs at least 8 characters, an uppercase letter, a lowercase letter and a number.",
+      "errorInProgress": "This account is already being created somewhere else. Wait a moment, then reload this page.",
+      "errorAlreadyDone": "This server already has an administrator, so there is nothing to create here. Sign in instead.",
+      "errorDisabled": "Setting this server up in the browser is switched off. Whoever runs it creates the first account.",
       "errorGeneric": "The account could not be created. Please try again."
     },
     "provider": {

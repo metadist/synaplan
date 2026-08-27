@@ -113,7 +113,7 @@
           {{ loadError }}
         </p>
 
-        <SetupAdminStep v-else-if="'admin' === step" @created="afterAdminCreated" />
+        <SetupAdminStep v-else-if="'admin' === step" @created="afterAdminCreated" @stale="load" />
 
         <SetupProviderStep v-else-if="'provider' === step" @next="step = 'access'" />
 

@@ -18,6 +18,7 @@ use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * The setup endpoints, from both sides: on an installation that has users they
@@ -175,6 +176,31 @@ final class SetupControllerTest extends WebTestCase
         $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'alllowercase');
 
         self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        self::assertNull($this->findUser($client, self::NEW_ADMIN_EMAIL));
+    }
+
+    /**
+     * The lock is what keeps a Compose scale or a Kubernetes rollout from
+     * producing two "first" administrators. Whoever loses that race has nothing
+     * to wait for, so the refusal has to come back straight away instead of
+     * holding the request open until the winner is finished — and it has to be
+     * the retriable code, not "this instance already has accounts".
+     */
+    public function testCreateFirstAdminRefusesWhileAnotherCallerHoldsTheLock(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $competitor = static::getContainer()->get(LockFactory::class)->createLock('first-run-setup-admin');
+        self::assertTrue($competitor->acquire(), 'the competing caller must own the lock for this test to mean anything');
+
+        try {
+            $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123');
+        } finally {
+            $competitor->release();
+        }
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        self::assertSame('SETUP_IN_PROGRESS', $this->payload($client)['code'] ?? null);
         self::assertNull($this->findUser($client, self::NEW_ADMIN_EMAIL));
     }
 
