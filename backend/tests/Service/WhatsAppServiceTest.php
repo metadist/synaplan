@@ -70,6 +70,8 @@ class WhatsAppServiceTest extends TestCase
     private $emailChatService;
     /** @var UserMemoryService&\PHPUnit\Framework\MockObject\MockObject */
     private $memoryService;
+    /** @var \App\Service\Digest\MessageReferenceResolver&\PHPUnit\Framework\MockObject\MockObject */
+    private $messageReferenceResolver;
     /** @var ConversationSummaryRefreshDispatcher&\PHPUnit\Framework\MockObject\MockObject */
     private $summaryRefreshDispatcher;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
@@ -109,6 +111,8 @@ class WhatsAppServiceTest extends TestCase
         $this->emailChatService = $this->createMock(EmailChatService::class);
         $this->memoryService = $this->createMock(UserMemoryService::class);
         $this->memoryService->method('resolveMemoryTags')->willReturnArgument(0);
+        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
+        $this->messageReferenceResolver->method('resolveMessageTags')->willReturnArgument(0);
         $this->summaryRefreshDispatcher = $this->createMock(ConversationSummaryRefreshDispatcher::class);
 
         // Create service with test configuration (dynamic multi-number support)
@@ -126,6 +130,7 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             true,
@@ -156,6 +161,7 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             false, // disabled
@@ -182,6 +188,7 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             false,
@@ -399,6 +406,7 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             false,
@@ -1226,6 +1234,7 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             true,
@@ -1569,6 +1578,7 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
             'test_token',
             true,

@@ -10,6 +10,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
+use App\Service\Digest\MessageReferenceResolver;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
@@ -98,6 +99,7 @@ final class WhatsAppService
         private LockFactory $lockFactory,
         private EmailChatService $emailChatService,
         private UserMemoryService $memoryService,
+        private MessageReferenceResolver $messageReferenceResolver,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
@@ -888,6 +890,7 @@ final class WhatsAppService
 
         $responseText = $result['response']['content'] ?? $collectedResponse;
         $responseText = $this->memoryService->resolveMemoryTags($responseText, $user);
+        $responseText = $this->messageReferenceResolver->resolveMessageTags($responseText, $user);
         $metadata = $result['response']['metadata'] ?? [];
         $classification = is_array($result['classification'] ?? null) ? $result['classification'] : null;
         $fileData = $metadata['file'] ?? null;

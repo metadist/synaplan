@@ -95,6 +95,31 @@ class MessageDigestRepository extends ServiceEntityRepository
     }
 
     /**
+     * Active digests for a set of message ids, scoped to one user — resolves
+     * `[Message:ID]` badge references in the web UI after a page reload.
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<MessageDigest>
+     */
+    public function findActiveByUserAndMessageIds(int $userId, array $messageIds): array
+    {
+        if ([] === $messageIds) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('d')
+            ->where('d.userId = :userId')
+            ->andWhere('d.messageId IN (:messageIds)')
+            ->andWhere('d.active = true')
+            ->setParameter('userId', $userId)
+            ->setParameter('messageIds', $messageIds)
+            ->orderBy('d.messageId', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Atomic per-(user, message) upsert. Native SQL so a concurrent run and a
      * backfill hitting the same message cannot race into a duplicate-key
      * failure; the existing BID is preserved so the Qdrant point id stays

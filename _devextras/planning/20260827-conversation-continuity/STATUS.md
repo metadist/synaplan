@@ -5,7 +5,7 @@
 | 1 — Summary eval harness | `feat/summary-eval-harness` | implemented, eval run recorded below | `app:summary:eval`, `make -C backend summary-eval` |
 | 2 — Durable summary + channel parity | `feat/durable-summary-channel-parity` | implemented (stacked on Sprint 1 branch) | `BCHATSUMMARIES` durable store behind Redis; summary injected + refreshed on web, WhatsApp, email, MCP, widget; cleanup on chat delete |
 | 3 — Message digest foundation | `feat/message-digest-foundation` | implemented (stacked on Sprint 2 branch) | `BMESSAGEDIGESTS` + Qdrant `user_message_digests`; `tools:message_digest` prompt; `app:digest:run` (daily scheduler) + `app:digest:backfill`; per-user BCONFIG cursor + cost caps; verified live end-to-end (rent-letter case digested + vector-indexed) |
-| 4 — Digest retrieval + badges | `feat/digest-retrieval` | not started | |
+| 4 — Digest retrieval + badges | `feat/digest-retrieval` | implemented (stacked on Sprint 3 branch) | `DigestSearchService` (recency re-rank + top-N message pull) injected via `ChatHandler` on stream + non-stream; `[Message:ID]` badges (web SSE + reload endpoint) and plain-text resolution for WhatsApp/email/MCP; `app:digest:eval` retrieval harness (results below) |
 | 5 — Hardening, admin, docs, E2E | `feat/continuity-hardening` | not started | |
 
 ## Investigation baseline (2026-08-27)
@@ -47,10 +47,24 @@ Run: `php bin/console app:summary:eval --models=...` with `SUMMARY_MAX_CHARS = 4
    ("1 Sept", "14 Nov", "09-01", ...). The `--json` output now includes the raw
    summary per case for exactly this kind of inspection.
 
-## Digest retrieval tuning (fill in after Sprint 4)
+## Digest retrieval tuning (Sprint 4, 2026-08-27)
+
+Run: `php bin/console app:digest:eval` (4-case corpus, 8 queries, bge-m3 embeddings,
+cosine + the production recency decay via `DigestSearchService::effectiveScore`).
 
 | Setting | Default | Tuned | Eval hit@5 / MRR |
 | ------- | ------- | ----- | ---------------- |
-| MIN_SCORE | 0.5 | | |
-| RECENCY_HALF_LIFE_DAYS | 180 | | |
-| PULL_MIN_SCORE | 0.6 | | |
+| MIN_SCORE | 0.5 | kept | hit@1 6/8, hit@5 **8/8**, MRR 0.823 |
+| RECENCY_HALF_LIFE_DAYS | 180 | kept | recency tie-break case correctly prefers the newer report |
+| PULL_MIN_SCORE | 0.6 | kept | |
+
+**Observations**
+
+1. Every query retrieves its target within top-5, including the acceptance
+   rent-letter case in both English and German — defaults kept.
+2. The two hit@1 misses are paraphrase-heavy queries ("how much is our new
+   office rent?", "what did the agency quote originally?") where near-duplicate
+   distractors outrank the target; the target still lands in the injected block,
+   so the model can cite it. Tuning `MIN_SCORE` up would drop recall — not worth it.
+3. bge-m3 handles cross-language retrieval (German query → English digest and
+   vice versa) without any special handling.
