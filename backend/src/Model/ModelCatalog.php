@@ -289,6 +289,32 @@ class ModelCatalog
             'successor' => null,
             'reason' => 'Retired by xAI with no replacement speech endpoint (#1514).',
         ],
+
+        // --- 2026-08-17 (Google Imagen 4 hard shutdown) ---
+        // Google deprecated all Imagen 4 IDs on 2026-06-15 and hard-shut them
+        // down on 2026-08-17; direct GET now answers 404, so the availability
+        // check confirms them Gone. Nano Banana is the vendor-named successor;
+        // gemini-3.1-flash-image-preview (BID 190) is already the TEXT2PIC
+        // default, so all three tiers point at it rather than at the flat/ultra
+        // Gemini image variants we do not carry.
+        115 => [
+            'providerId' => 'imagen-4.0-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
+        230 => [
+            'providerId' => 'imagen-4.0-fast-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
+        231 => [
+            'providerId' => 'imagen-4.0-ultra-generate-001',
+            'retiredOn' => '2026-08-17',
+            'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
+            'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
+        ],
     ];
 
     /**
@@ -362,6 +388,29 @@ class ModelCatalog
         $key = strtolower(trim($service));
 
         return self::PROVIDER_ALIASES[$key] ?? $key;
+    }
+
+    /**
+     * Collapse DB service-name buckets onto canonical provider keys so
+     * aliases ("Hugging Face" / "HuggingFace") count as one provider.
+     *
+     * @param array<string, array{active: int, total: int}> $countsByService
+     *
+     * @return array<string, array{active: int, total: int}>
+     */
+    public static function collapseCountsByProvider(array $countsByService): array
+    {
+        $merged = [];
+        foreach ($countsByService as $service => $counts) {
+            $key = self::normalizeProvider((string) $service);
+            if (!isset($merged[$key])) {
+                $merged[$key] = ['active' => 0, 'total' => 0];
+            }
+            $merged[$key]['active'] += (int) $counts['active'];
+            $merged[$key]['total'] += (int) $counts['total'];
+        }
+
+        return $merged;
     }
 
     /**
@@ -475,11 +524,49 @@ class ModelCatalog
     }
 
     /**
-     * Delete a model from the database by its catalog ID.
+     * Enable a catalog model: insert it when absent, otherwise restore the
+     * operator-owned visibility flags to the catalog values. Catalog-owned
+     * columns of an existing row are left untouched — an admin's price or
+     * name edits must survive an enable exactly like they survive a re-seed.
      */
-    public static function remove(Connection $connection, array $model): void
+    public static function enable(Connection $connection, array $model, bool $system = false): void
     {
-        $connection->executeStatement('DELETE FROM BMODELS WHERE BID = ?', [$model['id']]);
+        if (!self::existsInDatabase($connection, $model)) {
+            self::upsert($connection, $model, $system);
+
+            return;
+        }
+
+        $connection->executeStatement(
+            'UPDATE BMODELS SET BACTIVE = ?, BSELECTABLE = ? WHERE BID = ?',
+            [$model['active'], $model['selectable'], $model['id']]
+        );
+    }
+
+    /**
+     * Disable a catalog model WITHOUT deleting it. Rows are never removed:
+     * BMESSAGES references the BID, and ModelSeeder re-inserts any absent
+     * catalog row on the next container start, which silently reverted the
+     * old DELETE-based disable. The flags are operator-owned (never written
+     * on the upsert UPDATE path), so the deactivation survives every re-seed.
+     * A model missing from the database is inserted first so the deactivation
+     * sticks for future seeds too.
+     */
+    public static function disable(Connection $connection, array $model): void
+    {
+        if (!self::existsInDatabase($connection, $model)) {
+            self::upsert($connection, $model);
+        }
+
+        $connection->executeStatement(
+            'UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0 WHERE BID = ?',
+            [$model['id']]
+        );
+    }
+
+    private static function existsInDatabase(Connection $connection, array $model): bool
+    {
+        return false !== $connection->fetchOne('SELECT BID FROM BMODELS WHERE BID = ?', [$model['id']]);
     }
 
     /**
@@ -574,6 +661,46 @@ class ModelCatalog
         $successor = self::RETIREMENTS[$bid]['successor'] ?? null;
 
         return null === $successor ? null : self::findBidByKey($successor);
+    }
+
+    /**
+     * All catalog models of a provider/service, matched via
+     * {@see normalizeProvider()} (case-insensitive, aliases collapsed —
+     * e.g. "groq", "Ollama", "Hugging Face").
+     *
+     * @return array[] matching model definitions
+     */
+    public static function findByService(string $service): array
+    {
+        $service = self::normalizeProvider($service);
+        $results = [];
+
+        foreach (self::MODELS as $model) {
+            if (self::normalizeProvider($model['service']) === $service) {
+                $results[] = $model;
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Every service name in the catalog, keyed by its normalized form
+     * (e.g. 'openai' => 'OpenAI'). Used to validate --provider input and to
+     * print the accepted values.
+     *
+     * @return array<string, string>
+     */
+    public static function serviceNames(): array
+    {
+        $names = [];
+        foreach (self::MODELS as $model) {
+            $names[self::normalizeProvider($model['service'])] ??= $model['service'];
+        }
+
+        ksort($names);
+
+        return $names;
     }
 
     /**
@@ -695,6 +822,31 @@ class ModelCatalog
                 'max_tokens' => 32768,
                 'params' => ['model' => 'qwen3.5:35b'],
                 'meta' => ['context_window' => '32768', 'max_output' => '32768'],
+            ],
+        ],
+        // ==================== WHISPER (local whisper.cpp) ====================
+        // In-process STT for air-gapped / browser-limited installs. No API key.
+        // Availability is WHISPER_ENABLED + the whisper.cpp binary (see WhisperProvider).
+        [
+            'id' => 330,
+            'service' => 'Whisper',
+            'name' => 'Whisper (local)',
+            'tag' => 'sound2text',
+            'selectable' => 1,
+            'active' => 1,
+            'showWhenFree' => 1,
+            'providerId' => 'whisper',
+            'priceIn' => 0,
+            'inUnit' => 'free',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 6,
+            'rating' => 1,
+            'json' => [
+                'description' => 'On-server whisper.cpp transcription. Works without a cloud API key — use this for air-gapped speech-to-text. The model file is WHISPER_DEFAULT_MODEL (tiny/base/small/medium/large).',
+                'pricing_mode' => 'per_second',
+                'params' => ['model' => 'whisper'],
+                'features' => ['local', 'multilingual'],
             ],
         ],
         // ==================== GROQ MODELS ====================
@@ -1983,8 +2135,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[115].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-generate-001',
             // Imagen 4.0 is a flat per-image-fee model in production
             // ($0.04/image standard quality). Mirrors live BMODELS BID 115:
@@ -2400,8 +2554,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0 Fast',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[230].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-fast-generate-001',
             'priceIn' => 0,
             'inUnit' => 'perImage',
@@ -2424,8 +2580,10 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Imagen 4.0 Ultra',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: Google shut down the Imagen 4 endpoints on 2026-08-17.
+            // See ModelCatalog::RETIREMENTS[231].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'imagen-4.0-ultra-generate-001',
             'priceIn' => 0,
             'inUnit' => 'perImage',

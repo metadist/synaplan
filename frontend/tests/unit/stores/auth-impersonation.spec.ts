@@ -76,9 +76,10 @@ vi.mock('@/services/authService', async () => {
   }
 })
 
+const configReloadMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({
-    reload: vi.fn().mockResolvedValue(undefined),
+    reload: (...args: unknown[]) => configReloadMock(...args),
     billing: { enabled: false },
   }),
 }))
@@ -115,6 +116,8 @@ describe('useAuthStore — impersonation', () => {
     realtimeDisconnectMock.mockClear()
     mediaJobsSubscribeMock.mockClear()
     mediaJobsUnsubscribeMock.mockClear()
+    configReloadMock.mockReset()
+    configReloadMock.mockResolvedValue(undefined)
     localStorage.clear()
   })
 
@@ -330,6 +333,36 @@ describe('useAuthStore — impersonation', () => {
     expect(chatsStore.activeChatId).toBeNull()
     expect(chatsStore.chats).toEqual([])
     expect(historyStore.messages).toEqual([])
+  })
+
+  it('stopImpersonation returns without waiting for config reload or realtime resubscribe', async () => {
+    const authServiceModule = (await import('@/services/authService')) as unknown as {
+      __setUser: (u: unknown) => void
+      __setImpersonator: (i: unknown) => void
+    }
+
+    authServiceModule.__setUser({ id: 99, email: 'target@example.com', level: 'PRO' })
+    authServiceModule.__setImpersonator({ id: 1, email: 'admin@example.com', level: 'ADMIN' })
+    const store = useAuthStore()
+    await store.refreshUser()
+
+    stopApiMock.mockResolvedValueOnce({ success: true })
+    authServiceModule.__setUser({
+      id: 1,
+      email: 'admin@example.com',
+      level: 'ADMIN',
+      isAdmin: true,
+    })
+    authServiceModule.__setImpersonator(null)
+
+    // Hang config reload. If stop awaited it, this test would time out.
+    configReloadMock.mockReturnValueOnce(new Promise(() => {}))
+
+    const result = await store.stopImpersonation()
+
+    expect(result.success).toBe(true)
+    expect(store.isImpersonating).toBe(false)
+    expect(configReloadMock).toHaveBeenCalledTimes(1)
   })
 
   it('logout wipes both user and impersonator state', async () => {

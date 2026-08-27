@@ -27,10 +27,18 @@ class ModelListCommandTest extends TestCase
         $this->commandTester = new CommandTester($application->find('app:model:list'));
     }
 
-    public function testListWithNoEnabledModels(): void
+    /**
+     * @param array<int|string, int|string> $activeByBid
+     */
+    private function givenRows(array $activeByBid): void
     {
         // @phpstan-ignore-next-line
-        $this->connection->method('fetchFirstColumn')->willReturn([]);
+        $this->connection->method('fetchAllKeyValue')->willReturn($activeByBid);
+    }
+
+    public function testListWithNoEnabledModels(): void
+    {
+        $this->givenRows([]);
 
         $this->commandTester->execute([]);
 
@@ -45,8 +53,7 @@ class ModelListCommandTest extends TestCase
     {
         // Enable the Groq Qwen 3.6 27B chat model (BID=324). Has to be a BID the
         // catalog still carries — the command only renders catalog entries.
-        // @phpstan-ignore-next-line
-        $this->connection->method('fetchFirstColumn')->willReturn(['324']);
+        $this->givenRows(['324' => '1']);
 
         $this->commandTester->execute([]);
 
@@ -54,10 +61,23 @@ class ModelListCommandTest extends TestCase
         $this->assertStringContainsString('yes', $this->commandTester->getDisplay());
     }
 
+    /**
+     * app:model:disable keeps the row and only clears BACTIVE, so row
+     * existence must never be reported as "active".
+     */
+    public function testListShowsASoftDisabledModelAsNo(): void
+    {
+        $this->givenRows(['324' => '0']);
+
+        $this->commandTester->execute([]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringNotContainsString('yes', $this->commandTester->getDisplay());
+    }
+
     public function testListShowsAllCatalogModels(): void
     {
-        // @phpstan-ignore-next-line
-        $this->connection->method('fetchFirstColumn')->willReturn([]);
+        $this->givenRows([]);
 
         $this->commandTester->execute([]);
 

@@ -112,7 +112,7 @@ docker compose exec -T backend php bin/console app:models:check-availability --f
 
 It runs in **two stages, and the second one is the point**: the provider's model list is only a cheap pre-filter, then every model missing from that list is confirmed individually via `GET {listUrl}/{modelId}`. Only a model the provider itself answers `404`/`400` for is reported. Judging by list membership alone is wrong in both directions, verified against the live APIs on 2026-08-19:
 
-- **False alarm** — Gemini serves `imagen-4.0-generate-001` through `:predict` and leaves it out of `models.list`, but answers `200` when asked directly. A list-only check reports all three Imagen rows as dead.
+- **False alarm (the mechanism, not the current status)** — the point is that list membership is not evidence either way; the confirm step is. On 2026-08-19 Gemini still served `imagen-4.0-generate-001` through `:predict` and left it out of `models.list` while answering `200` on a direct GET, so a list-only check wrongly reported all three Imagen rows as dead. **That example has since flipped:** Google hard-shut the Imagen 4 endpoints on 2026-08-17, direct GET now answers `404`, and the three rows are genuinely retired (see [Google Imagen 4 shutdown](#google-imagen-4-shutdown-2026-08-17) below). The lesson stands — only the per-model probe decides.
 - **Blind spot** — xAI's `grok-tts` is also absent from `/v1/models`, and there it really is gone (`404`). Any heuristic that excused the Imagen case (per-capability coverage, tag families) hid this one.
 
 What it deliberately does **not** do: change anything. No `BACTIVE=0`, no default repointing. A model also disappears from a listing through a rename, a region gate or an account tier, and an unattended deactivation on a false positive takes a working model away from every user of the install. Retirement stays a reviewed, human decision — now a reviewed registry entry rather than a reviewed migration (see [Retiring a model](#retiring-a-model)).
@@ -133,6 +133,18 @@ Six confirmed retirements, each re-verified by hand: Groq dropped `llama-3.3-70b
 The four Groq rows were retired in `Version20260819080000` (#1513), which also added Groq Qwen 3.6 27B (324/325) as their successor. Re-running the check after that migration reports Groq at `7/7 matched`: the retired rows are out of the active set and the freshly added successor BIDs produce no false positive.
 
 The two xAI rows were retired in `Version20260820120000` (#1514). Because the catalog has no xAI replacement for either capability, this is the **no-successor** variant of the policy: the rows are deactivated and their `DEFAULTMODEL` bindings are **deleted** instead of repointed, which hands the capability back to the normal resolution chain rather than binding the install to a provider whose key the operator may not hold. The xAI `SOUND2TEXT` recommendation was dropped from `ProviderDefaultsService` in the same change — without that, `app:provider:apply-defaults --auto` writes the dead binding back on the next container start.
+
+### Google Imagen 4 shutdown (2026-08-17)
+
+Google deprecated all three Imagen 4 IDs on 2026-06-15 and **hard-shut them down on 2026-08-17** (both the Gemini Developer API and Vertex). This is the same trio that was a *false alarm* on 2026-08-19 in the availability check's initial run — back then a direct GET still answered `200`. After the shutdown the direct GET answers `404`, so the two-stage check now **confirms** them Gone and the daily Discord digest lists them until they are retired.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 115 | Imagen 4.0 | `imagen-4.0-generate-001` | `google:gemini-3.1-flash-image-preview:text2pic` (Nano Banana 2, BID 190) |
+| 230 | Imagen 4.0 Fast | `imagen-4.0-fast-generate-001` | same |
+| 231 | Imagen 4.0 Ultra | `imagen-4.0-ultra-generate-001` | same |
+
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. Nano Banana 2 (`gemini-3.1-flash-image-preview`, BID 190) is already the seeded `DEFAULTMODEL.TEXT2PIC`/`PIC2PIC`, so no default binding is orphaned; all three tiers point at it because we do not carry the flat `gemini-3.1-flash-image` / `gemini-3-pro-image` variants Google's migration table names per tier. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
 
 ## Maintenance links
 

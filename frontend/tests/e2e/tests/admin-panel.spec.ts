@@ -66,14 +66,23 @@ test.describe('@ci Admin panel', () => {
 
     await test.step('A full-email search returns exactly the matching user', async () => {
       await page.locator(selectors.admin.userSearch).fill(adminCreds.user)
-      // Debounced (300ms) → server-side filter. toHaveCount auto-retries.
-      await expect(page.locator(selectors.admin.userLevelSelectAny)).toHaveCount(1)
+      // Debounced (300ms) → server-side filter. Positive count waits through
+      // the loading spinner (which unmounts the rows).
+      await expect(page.locator(selectors.admin.userLevelSelectAny)).toHaveCount(1, {
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(page.locator(selectors.admin.userLevelSelect(adminId))).toBeVisible()
     })
 
     await test.step('A non-matching search empties the list', async () => {
       await page.locator(selectors.admin.userSearch).fill('zzz-no-such-user-zzz@nowhere.invalid')
-      await expect(page.locator(selectors.admin.userLevelSelectAny)).toHaveCount(0)
+      // Wait for the empty-state marker, NOT toHaveCount(0): the spinner
+      // unmounts every row while the zzz request is still in flight, so a
+      // zero count matches loading and lets the next fill race a stale empty
+      // response over the restored full list.
+      await expect(page.locator(selectors.admin.usersEmpty)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
     })
 
     await test.step('Clearing the search restores the full list', async () => {

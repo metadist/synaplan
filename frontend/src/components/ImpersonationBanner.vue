@@ -126,7 +126,9 @@ async function onExit(): Promise<void> {
       success(t('admin.impersonate.stopped'))
       // Send the admin back to the user list so they can either pick another
       // impersonation target or continue admin work without a stale view.
-      await router.push({ name: 'admin', query: { tab: 'users' } }).catch(() => {})
+      // Do not swallow navigation failures — a silent `.catch` left CI on
+      // `/` after the banner hid, waiting 15s for `view-admin`.
+      await router.push({ name: 'admin', query: { tab: 'users' } })
     } else {
       error(result.error ?? t('admin.impersonate.stopFailed'))
     }

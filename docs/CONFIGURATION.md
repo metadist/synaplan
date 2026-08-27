@@ -24,6 +24,7 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
 | `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
 | `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
 
 ---
 

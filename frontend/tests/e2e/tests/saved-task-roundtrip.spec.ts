@@ -6,7 +6,6 @@ import { TIMEOUTS } from '../config/config'
 
 const PROMPTS = selectors.taskPrompts
 const TASKS = selectors.savedTasks
-const CHAT = selectors.chat
 
 /**
  * Saved Task roundtrip — the one flow that unit/integration tests can't cover:
@@ -24,6 +23,9 @@ const CHAT = selectors.chat
  */
 test.describe('@ci Saved Task roundtrip', () => {
   test('create task from a prompt, run it, and land in its chat', async ({ page }) => {
+    // Arrange + synchronous /run + chat land exceeds the 60s default under
+    // CI shard load. VERY_LONG covers the run; EXTREME is headroom for setup.
+    test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const topic = `e2e-task-${Date.now()}`
     const taskName = `E2E Task ${topic}`
     const card = page.locator(TASKS.card).filter({ hasText: taskName })
@@ -61,27 +63,20 @@ test.describe('@ci Saved Task roundtrip', () => {
 
     await test.step('Act: run the task now', async () => {
       await card.locator(TASKS.runNow).click()
-      // Run now executes synchronously, then routes to the task's chat.
-      await expect(page).toHaveURL(/[?&]chat=\d+/, { timeout: TIMEOUTS.LONG })
+      // Run now executes the pipeline synchronously, then router.push('/?chat=').
+      // ChatView applies the id and immediately router.replace-strips the query
+      // — asserting toHaveURL(/[?&]chat=/) races a URL the app deletes on
+      // purpose (CI: 5× /channels/tasks, then 27× / with the chat already
+      // showing). Wait for the chat page instead.
+      await expect(page.locator(selectors.pages.chat)).toBeVisible({
+        timeout: TIMEOUTS.VERY_LONG,
+      })
     })
 
     await test.step('Assert: the task chat shows a completed reply (no error)', async () => {
-      // The run is synchronous, so the reply is a fully-committed historical
-      // message on load — same bubble scoping as ChatHelper.waitForAnswer.
-      const bubble = new ChatHelper(page).conversationBubbles().first()
-      await bubble.waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-
-      const outcome = await Promise.race([
-        bubble
-          .locator(CHAT.messageDone)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-          .then(() => 'done' as const),
-        bubble
-          .locator(CHAT.messageTopicError)
-          .waitFor({ state: 'visible', timeout: TIMEOUTS.LONG })
-          .then(() => 'error' as const),
-      ])
-      expect(outcome).toBe('done')
+      // Historical message on load — ChatHelper.waitForAnswer races done vs error.
+      const aiText = await new ChatHelper(page).waitForAnswer(0)
+      expect(aiText.length).toBeGreaterThan(0)
     })
 
     await test.step('Assert: the run is recorded on the task', async () => {

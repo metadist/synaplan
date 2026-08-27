@@ -31,22 +31,46 @@ export function getStubBaseUrl(): string {
   return process.env.OLLAMA_STUB_URL || 'http://localhost:11434'
 }
 
+function isTransientSocketError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /socket hang up|ECONNRESET/i.test(message)
+}
+
+/**
+ * Retry once on keep-alive poison: a beforeAll-scoped APIRequestContext can
+ * reuse a socket the Node stub already closed after idle (default 5s).
+ */
+async function withTransientRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (error) {
+    if (!isTransientSocketError(error)) {
+      throw error
+    }
+    return await fn()
+  }
+}
+
 export async function getStubRequests(
   request: RequestLike,
   baseUrl = getStubBaseUrl()
 ): Promise<StubRequestRecord[]> {
-  const res = await request.get(`${baseUrl}/__requests`)
-  if (res.status() !== 200) {
-    throw new Error(`Ollama stub __requests returned ${res.status()}`)
-  }
-  return (await res.json()) as StubRequestRecord[]
+  return withTransientRetry(async () => {
+    const res = await request.get(`${baseUrl}/__requests`)
+    if (res.status() !== 200) {
+      throw new Error(`Ollama stub __requests returned ${res.status()}`)
+    }
+    return (await res.json()) as StubRequestRecord[]
+  })
 }
 
 export async function resetStub(request: RequestLike, baseUrl = getStubBaseUrl()): Promise<void> {
-  const res = await request.post(`${baseUrl}/__reset`)
-  if (res.status() !== 200) {
-    throw new Error(`Ollama stub __reset returned ${res.status()}`)
-  }
+  await withTransientRetry(async () => {
+    const res = await request.post(`${baseUrl}/__reset`)
+    if (res.status() !== 200) {
+      throw new Error(`Ollama stub __reset returned ${res.status()}`)
+    }
+  })
 }
 
 export async function configureStub(
@@ -54,10 +78,12 @@ export async function configureStub(
   config: StubConfig,
   baseUrl = getStubBaseUrl()
 ): Promise<void> {
-  const res = await request.post(`${baseUrl}/__configure`, { data: config })
-  if (res.status() !== 200) {
-    throw new Error(`Ollama stub __configure returned ${res.status()}`)
-  }
+  await withTransientRetry(async () => {
+    const res = await request.post(`${baseUrl}/__configure`, { data: config })
+    if (res.status() !== 200) {
+      throw new Error(`Ollama stub __configure returned ${res.status()}`)
+    }
+  })
 }
 
 export function getChatRequests(requests: StubRequestRecord[]): StubRequestRecord[] {

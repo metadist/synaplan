@@ -16,7 +16,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:model:enable',
-    description: 'Add AI models to the database',
+    description: 'Enable AI models from the built-in catalog',
 )]
 class ModelEnableCommand extends Command
 {
@@ -29,15 +29,28 @@ class ModelEnableCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('models', InputArgument::IS_ARRAY | InputArgument::REQUIRED,
+            ->addArgument('models', InputArgument::IS_ARRAY,
                 'Model keys to enable (e.g. groq:qwen/qwen3.6-27b ollama:bge-m3)')
+            ->addOption('provider', 'p', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'Enable every catalog model of a provider (e.g. --provider groq). Repeatable.')
+            ->addOption('only', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'Air-gap allow-list: enable these providers and disable every other catalog provider. Repeatable. Cannot be combined with model keys or --provider.')
             ->addOption('system', null, InputOption::VALUE_NONE,
                 'Mark enabled models as system models (locked, users cannot change)')
             ->setHelp(
                 "Enable one or more AI models from the built-in catalog.\n\n".
                 "Key format: service:providerId (or service:providerId:tag to target a specific variant)\n\n".
-                "Use <info>--system</info> to lock models so users cannot change them.\n\n".
-                'Run <info>app:model:list</info> to see all available models and their status.'
+                "Use <info>--provider <name></info> to enable every catalog model of a provider at once.\n".
+                "Use <info>--only <name></info> (repeatable) as an allow-list: enable those providers\n".
+                "and soft-disable every other catalog provider. New cloud providers added later\n".
+                "are disabled automatically — no deny-list to keep in sync.\n\n".
+                "A model already in the database gets its visibility flags restored to the\n".
+                "catalog values; admin edits to prices or names are left untouched.\n".
+                "Retired models are skipped — the upstream provider no longer serves them.\n\n".
+                "Use <info>--system</info> to lock models so users cannot change them\n".
+                "(applies when the model is first added).\n\n".
+                'Run <info>app:model:list</info> to see all available models and their status, '.
+                'or <info>app:provider:list</info> for the provider overview.'
             );
     }
 
@@ -45,9 +58,31 @@ class ModelEnableCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $modelKeys = $input->getArgument('models');
+        $providers = $input->getOption('provider');
+        $only = $input->getOption('only');
         $system = $input->getOption('system');
-        $enabled = 0;
+
+        if ([] !== $only) {
+            if ([] !== $modelKeys || [] !== $providers) {
+                $io->error('--only cannot be combined with model keys or --provider.');
+
+                return Command::INVALID;
+            }
+
+            return $this->enableOnly($io, $only, $system);
+        }
+
+        if ([] === $modelKeys && [] === $providers) {
+            $io->error('Provide model keys, --provider <name>, or --only <name>. Run app:model:list to see the catalog.');
+
+            return Command::INVALID;
+        }
+
         $errors = false;
+
+        // Collect first, then write: dedupe by BID so an explicit key and a
+        // --provider covering the same model do not enable it twice.
+        $selected = [];
 
         foreach ($modelKeys as $key) {
             $models = ModelCatalog::find($key);
@@ -59,16 +94,120 @@ class ModelEnableCommand extends Command
             }
 
             foreach ($models as $model) {
-                ModelCatalog::upsert($this->connection, $model, $system);
-                $label = $system ? 'Enabled (system)' : 'Enabled';
-                $io->writeln("  <info>$label</info> {$model['service']}: {$model['name']} ({$model['tag']})");
-                ++$enabled;
+                $selected[$model['id']] = $model;
             }
+        }
+
+        foreach ($providers as $provider) {
+            $models = ModelCatalog::findByService($provider);
+
+            if (empty($models)) {
+                $io->warning(sprintf(
+                    'Unknown provider: %s. Known providers: %s',
+                    $provider,
+                    implode(', ', array_keys(ModelCatalog::serviceNames()))
+                ));
+                $errors = true;
+                continue;
+            }
+
+            foreach ($models as $model) {
+                $selected[$model['id']] = $model;
+            }
+        }
+
+        $enabled = 0;
+        $skippedRetired = 0;
+
+        foreach ($selected as $model) {
+            if (ModelCatalog::isRetired($model['id'])) {
+                $io->writeln("  <comment>Skipped (retired)</comment> {$model['service']}: {$model['name']} ({$model['tag']})");
+                ++$skippedRetired;
+                continue;
+            }
+
+            ModelCatalog::enable($this->connection, $model, $system);
+            $label = $system ? 'Enabled (system)' : 'Enabled';
+            $io->writeln("  <info>$label</info> {$model['service']}: {$model['name']} ({$model['tag']})");
+            ++$enabled;
+        }
+
+        if ($skippedRetired > 0) {
+            $io->note("Skipped $skippedRetired retired model(s) — the upstream provider no longer serves them.");
         }
 
         if ($enabled > 0) {
             $io->success("Enabled $enabled model(s)");
         }
+
+        return $errors ? Command::FAILURE : Command::SUCCESS;
+    }
+
+    /**
+     * Allow-list mode: enable every (non-retired) model of the named providers
+     * and soft-disable every other catalog provider. New providers added to the
+     * catalog later are disabled on the next run — no deny-list to maintain.
+     *
+     * @param list<string> $only
+     */
+    private function enableOnly(SymfonyStyle $io, array $only, bool $system): int
+    {
+        $known = ModelCatalog::serviceNames();
+        $allow = [];
+        $errors = false;
+
+        foreach ($only as $name) {
+            $key = ModelCatalog::normalizeProvider($name);
+            if (!isset($known[$key])) {
+                $io->warning(sprintf(
+                    'Unknown provider: %s. Known providers: %s',
+                    $name,
+                    implode(', ', array_keys($known))
+                ));
+                $errors = true;
+                continue;
+            }
+            $allow[$key] = true;
+        }
+
+        if ([] === $allow) {
+            return Command::FAILURE;
+        }
+
+        $enabled = 0;
+        $disabled = 0;
+        $skippedRetired = 0;
+
+        foreach ($known as $key => $_display) {
+            foreach (ModelCatalog::findByService($key) as $model) {
+                if (isset($allow[$key])) {
+                    if (ModelCatalog::isRetired($model['id'])) {
+                        $io->writeln("  <comment>Skipped (retired)</comment> {$model['service']}: {$model['name']} ({$model['tag']})");
+                        ++$skippedRetired;
+                        continue;
+                    }
+                    ModelCatalog::enable($this->connection, $model, $system);
+                    $label = $system ? 'Enabled (system)' : 'Enabled';
+                    $io->writeln("  <info>$label</info> {$model['service']}: {$model['name']} ({$model['tag']})");
+                    ++$enabled;
+                    continue;
+                }
+
+                ModelCatalog::disable($this->connection, $model);
+                $io->writeln("  <comment>Disabled</comment> {$model['service']}: {$model['name']} ({$model['tag']})");
+                ++$disabled;
+            }
+        }
+
+        if ($skippedRetired > 0) {
+            $io->note("Skipped $skippedRetired retired model(s) — the upstream provider no longer serves them.");
+        }
+
+        $io->success(sprintf(
+            'Allow-list applied: enabled %d model(s), disabled %d from other providers',
+            $enabled,
+            $disabled
+        ));
 
         return $errors ? Command::FAILURE : Command::SUCCESS;
     }

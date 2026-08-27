@@ -8,8 +8,12 @@
     >
       <!-- Reset applies to the default-model choices, so it only shows on that tab.
            v-if on the template keeps PageHeader's actions wrapper (and its flex gap)
-           from rendering empty on the other tabs. -->
-      <template v-if="activeTab === 'choice'" #actions>
+           from rendering empty on the other tabs.
+           The suggested selection spans the key-based cloud providers, so the
+           button is hidden unless every requiresKey provider has credentials —
+           otherwise it would point defaults at models this install cannot use.
+           URL/local providers (Ollama, custom endpoints) do not count. -->
+      <template v-if="activeTab === 'choice' && allProvidersAvailable" #actions>
         <button
           type="button"
           class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary hover:border-[var(--brand)]/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -505,7 +509,7 @@ import {
 import { adminEmbeddingApi, type EmbeddingGuardStatus } from '@/services/api/adminEmbeddingApi'
 import { ApiError } from '@/services/api/httpClient'
 import { useAuthStore } from '@/stores/auth'
-import type { AIModel, Capability } from '@/types/ai-models'
+import type { AIModel, Capability, ProviderAvailability } from '@/types/ai-models'
 import {
   dedupeModelsByPurpose,
   type ModelWithPurposes,
@@ -621,6 +625,17 @@ const loading = ref(false)
 const saving = ref(false)
 const resetting = ref(false)
 const availableModels = ref<ModelsData>({})
+const providers = ref<ProviderAvailability[]>([])
+
+// "Select suggested models" applies the seeded recommendation, which spans
+// the cloud providers. Only offer it when ALL key-based providers have keys
+// (empty = not loaded yet, treat as unavailable). URL/local providers like
+// Ollama or custom endpoints don't count: they are optional extras that most
+// installations never configure, and the suggestion does not depend on them.
+const allProvidersAvailable = computed(() => {
+  const keyProviders = providers.value.filter((p) => p.requiresKey)
+  return keyProviders.length > 0 && keyProviders.every((p) => p.available)
+})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
@@ -820,6 +835,7 @@ const loadData = async () => {
 
     if (modelsRes.success) {
       availableModels.value = modelsRes.models
+      providers.value = modelsRes.providers ?? []
     }
 
     if (defaultsRes.success) {
@@ -1246,7 +1262,14 @@ const confirmResetDefaults = async () => {
   try {
     const response = await resetDefaultModels()
     if (response.success) {
-      success(t('config.aiModels.resetDefaultsSuccess'))
+      // The backend skips a suggested model whose provider has no key, so on an
+      // install without credentials it applies nothing. Saying "applied" then
+      // would be wrong.
+      if (Object.keys(response.defaults).length === 0) {
+        warning(t('config.aiModels.resetDefaultsNoneApplied'))
+      } else {
+        success(t('config.aiModels.resetDefaultsSuccess'))
+      }
       await loadData()
     }
   } catch {

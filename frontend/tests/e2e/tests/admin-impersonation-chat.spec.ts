@@ -96,19 +96,14 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       expect(aiText.length).toBeGreaterThan(0)
     })
 
-    await test.step('Act: exit impersonation', async () => {
+    await test.step('Act: exit impersonation and land on admin', async () => {
       await page.locator(selectors.impersonation.exitBtn).click()
-
-      await page
-        .locator(selectors.impersonation.banner)
-        .waitFor({ state: 'hidden', timeout: TIMEOUTS.LONG })
-    })
-
-    await test.step('Assert: admin session restored — admin page visible', async () => {
-      await page.locator(selectors.pages.admin).waitFor({
-        state: 'visible',
+      // Terminal state is the admin page, not the banner disappearing.
+      // refreshUser() hides the banner before onExit's router.push('/admin').
+      await expect(page.locator(selectors.pages.admin)).toBeVisible({
         timeout: TIMEOUTS.LONG,
       })
+      await expect(page.locator(selectors.impersonation.banner)).toBeHidden()
     })
   })
 })

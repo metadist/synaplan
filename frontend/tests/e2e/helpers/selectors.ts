@@ -128,6 +128,7 @@ export const selectors = {
     capabilityItem: '[data-testid="item-capability"]',
     capabilityDropdown: '[data-testid="btn-model-dropdown"]',
     capabilityOption: '[data-testid="btn-model-option"]',
+    resetDefaults: '[data-testid="btn-reset-defaults"]',
   },
   rag: {
     page: '[data-testid="page-rag-search"]',
@@ -564,6 +565,12 @@ export const selectors = {
     userLevelSelect: (userId: number) => `[data-testid="select-user-level-${userId}"]`,
     /** Any user row's level <select> — count these to assert list size / search results */
     userLevelSelectAny: '[data-testid^="select-user-level-"]',
+    /**
+     * Empty-state copy after a completed users fetch with zero rows. Distinct
+     * from the loading spinner, which unmounts the table (count of level
+     * selects drops to 0 while the request is still in flight).
+     */
+    usersEmpty: '[data-testid="admin-users-empty"]',
   },
   impersonation: {
     banner: '[data-testid="banner-impersonation"]',

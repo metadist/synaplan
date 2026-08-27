@@ -3,12 +3,14 @@
 namespace App\Controller;
 
 use App\AI\Credential\ChatReadinessService;
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
+use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Auth\DemoLoginHint;
@@ -32,6 +34,7 @@ use App\Service\Search\BraveSearchService;
 use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
+use App\Service\WebSpeechConfig;
 use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -68,6 +71,7 @@ class ConfigController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private RegistrationConfig $registrationConfig,
         private GuestChatConfig $guestChatConfig,
+        private WebSpeechConfig $webSpeechConfig,
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
@@ -202,6 +206,12 @@ class ConfigController extends AbstractController
                             type: 'boolean',
                             example: true,
                             description: 'When true, local Whisper.cpp is available for record-then-transcribe mode.'
+                        ),
+                        new OA\Property(
+                            property: 'webSpeechEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'When false, the frontend never uses the browser\'s cloud-backed Web Speech API for speech-to-text (set WEB_SPEECH_ENABLED=false on air-gapped instances) and records for the server-side transcription path instead, or hides the microphone when speechToTextAvailable is false too.'
                         ),
                         new OA\Property(
                             property: 'speechToTextAvailable',
@@ -461,6 +471,7 @@ class ConfigController extends AbstractController
 
         $speech = [
             'whisperEnabled' => $whisperLocalAvailable,
+            'webSpeechEnabled' => $this->webSpeechConfig->isEnabled(),
             'speechToTextAvailable' => $whisperLocalAvailable || $apiProvidersAvailable,
         ];
 
@@ -743,9 +754,16 @@ class ConfigController extends AbstractController
     #[OA\Get(
         path: '/api/v1/config/models',
         summary: 'Get all available AI models',
-        description: 'Returns list of all active models grouped by capability (CHAT, IMAGE, SORT, etc.)',
+        description: 'Returns active models grouped by capability (CHAT, IMAGE, SORT, etc.), restricted to models whose provider is available on this installation (API key / URL configured; Ollama models must be pulled). Admins can pass includeUnavailable=1 to also receive models of unconfigured providers, flagged via available/unavailableReason, e.g. to grey them out.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
+    )]
+    #[OA\Parameter(
+        name: 'includeUnavailable',
+        description: 'Admin only (silently ignored otherwise): also return models whose provider is not configured, flagged with available=false.',
+        in: 'query',
+        required: false,
+        schema: new OA\Schema(type: 'boolean', default: false)
     )]
     #[OA\Response(
         response: 200,
@@ -767,20 +785,42 @@ class ConfigController extends AbstractController
                                     new OA\Property(property: 'name', type: 'string', example: 'Qwen 3.6 27B'),
                                     new OA\Property(property: 'quality', type: 'integer', example: 9),
                                     new OA\Property(property: 'features', type: 'array', items: new OA\Items(type: 'string', example: 'reasoning')),
+                                    new OA\Property(property: 'available', type: 'boolean', example: true, description: 'False only in the admin includeUnavailable view: the provider has no key/URL, or the Ollama model is not pulled.'),
+                                    new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
                                 ]
                             )
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'providers',
+                    type: 'array',
+                    description: 'Availability of every registered AI provider on this installation (internal test provider excluded).',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'name', type: 'string', example: 'groq'),
+                            new OA\Property(property: 'displayName', type: 'string', example: 'Groq'),
+                            new OA\Property(property: 'available', type: 'boolean', example: true),
+                            new OA\Property(property: 'requiresKey', type: 'boolean', description: 'True for cloud providers configured via a platform API key (the key wizard set); false for URL/local providers like Ollama or custom OpenAI-compatible endpoints.', example: true),
+                        ]
+                    )
+                ),
             ]
         )
     )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
-    public function getModels(#[CurrentUser] ?User $user): JsonResponse
+    public function getModels(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
+
+        // Unavailable models are HIDDEN from regular users — they could not be
+        // used anyway. Admin views request them explicitly to grey them out.
+        $includeUnavailable = $request->query->getBoolean('includeUnavailable')
+            && $this->isGranted('ROLE_ADMIN');
+
+        $availability = $this->chatReadiness->providerAvailability();
 
         $models = $this->modelRepository->findBy(
             ['active' => 1],
@@ -793,6 +833,12 @@ class ConfigController extends AbstractController
             if ($model->isHiddenBecauseFree()) {
                 continue;
             }
+
+            ['available' => $available, 'reason' => $unavailableReason] = $this->chatReadiness->modelAvailability($model->getService(), $model->getProviderId(), $availability);
+            if (!$available && !$includeUnavailable) {
+                continue;
+            }
+
             $modelList[] = [
                 'id' => $model->getId(),
                 'service' => $model->getService(),
@@ -806,6 +852,8 @@ class ConfigController extends AbstractController
                 'features' => $model->getFeatures(),
                 'priceIn' => $model->getPriceIn(),
                 'priceOut' => $model->getPriceOut(),
+                'available' => $available,
+                'unavailableReason' => $unavailableReason,
             ];
         }
 
@@ -896,9 +944,25 @@ class ConfigController extends AbstractController
             }
         }
 
+        $providers = [];
+        foreach ($this->providerRegistry->getUniqueProviders() as $name => $provider) {
+            $key = ModelCatalog::normalizeProvider((string) $name);
+            if ('test' === $key) {
+                continue;
+            }
+            $providers[] = [
+                'name' => $key,
+                'displayName' => $provider->getDisplayName(),
+                'available' => $availability[$key] ?? false,
+                'requiresKey' => ProviderKeyStore::isSupported($key),
+            ];
+        }
+        usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
+
         return $this->json([
             'success' => true,
             'models' => $grouped,
+            'providers' => $providers,
         ]);
     }
 
@@ -1211,15 +1275,15 @@ class ConfigController extends AbstractController
      * Replace the calling user's model configuration with the
      * code-recommended defaults from DefaultModelConfigSeeder.
      *
-     * Removes stale per-user overrides and writes fresh ones that
-     * match the catalog-recommended models. Other users and the
-     * global (ownerId=0) row are unaffected.
+     * Removes stale per-user overrides and writes fresh ones that match the
+     * catalog-recommended models, skipping any whose provider is not usable
+     * here. Other users and the global (ownerId=0) row are unaffected.
      */
     #[Route('/models/defaults/reset', name: 'models_defaults_reset', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/config/models/defaults/reset',
         summary: 'Apply recommended model defaults to own configuration',
-        description: 'Replaces all per-user DEFAULTMODEL overrides with the code-recommended defaults (from DefaultModelConfigSeeder). Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
+        description: 'Replaces all per-user DEFAULTMODEL overrides with the recommended defaults (from DefaultModelConfigSeeder) that are usable on this installation: a recommended model whose provider has no key is replaced by the first usable model for that capability, and nothing is written when no provider is usable at all. Does NOT modify global defaults — other users are unaffected. Returns the newly written defaults.',
         security: [['Bearer' => []]],
         tags: ['Configuration']
     )]

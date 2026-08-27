@@ -62,6 +62,8 @@ final class AdminModelsController extends AbstractController
                             new OA\Property(property: 'json', type: 'object', nullable: true),
                             new OA\Property(property: 'isSystemModel', type: 'boolean', example: false),
                             new OA\Property(property: 'showWhenFree', type: 'integer', example: 0, description: 'Override to show model in selection even when pricing is 0'),
+                            new OA\Property(property: 'providerAvailable', type: 'boolean', example: true, description: 'Whether this model can serve requests right now: its provider has a key/URL configured, and an Ollama model is actually pulled.'),
+                            new OA\Property(property: 'unavailableReason', type: 'string', nullable: true, enum: ['provider_unavailable', 'not_pulled'], example: null),
                         ]
                     )
                 ),

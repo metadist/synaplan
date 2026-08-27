@@ -502,8 +502,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Exit the active impersonation and restore the admin session. Same
-   * refresh pattern as `startImpersonation`.
+   * Exit the active impersonation and restore the admin session. The
+   * cookie-swap window matches `startImpersonation` (mutation lock, token
+   * refresh, API, user-state reset, `/auth/me`). Config reload and realtime
+   * resubscribe are fire-and-forget so the caller can `router.push('/admin')`
+   * as soon as the session is restored — those follow-ups must not delay the
+   * landing page past the banner hide (`refreshUser` clears `impersonator`).
    */
   async function stopImpersonation(): Promise<{ success: boolean; error?: string }> {
     const [
@@ -555,18 +559,19 @@ export const useAuthStore = defineStore('auth', () => {
       endAuthMutation()
     }
 
-    try {
-      await useConfigStore().reload()
-    } catch (err) {
-      console.warn('Config reload after impersonation stop failed:', err)
-    }
-
-    // Re-open realtime for the restored admin principal.
-    try {
-      await resubscribeRealtimeState()
-    } catch (realtimeErr) {
+    // Config reload + realtime resubscribe are user-scoped follow-ups, not
+    // part of the session swap. Awaiting them here delayed onExit's
+    // router.push('/admin') until after the banner already hid (refreshUser
+    // clears impersonator). CI then waited 15s for view-admin on the chat
+    // page and timed out. Kick them off without blocking the admin landing.
+    void useConfigStore()
+      .reload()
+      .catch((err) => {
+        console.warn('Config reload after impersonation stop failed:', err)
+      })
+    void resubscribeRealtimeState().catch((realtimeErr) => {
       console.warn('Realtime resubscribe after impersonation stop failed:', realtimeErr)
-    }
+    })
 
     return { success: true }
   }

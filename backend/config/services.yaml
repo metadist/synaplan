@@ -131,7 +131,9 @@ parameters:
     # Compose passes these through .env/env_file, but bare images (Kubernetes,
     # plain docker run) ship no .env, so a missing var used to crash service
     # instantiation (e.g. /api/v1/messages/stream 500ing on WHATSAPP_ENABLED).
-    # Values mirror backend/.env.example.
+    # Values mirror backend/.env.example; where the Dockerfile bakes an ENV
+    # (BRAVE_SEARCH_*, TIKA_*, RASTERIZE_*) that one wins inside containers,
+    # so these match the Dockerfile too.
     env(TIKA_TIMEOUT_MS): '30000'
     env(TIKA_RETRIES): '2'
     env(TIKA_RETRY_BACKOFF_MS): '1000'
@@ -145,7 +147,7 @@ parameters:
     env(WHISPER_BINARY): '/usr/local/bin/whisper'
     env(WHISPER_MODELS_PATH): '%kernel.project_dir%/var/whisper'
     env(FFMPEG_BINARY): '/usr/bin/ffmpeg'
-    env(BRAVE_SEARCH_ENABLED): 'true'
+    env(BRAVE_SEARCH_ENABLED): 'false'
     env(BRAVE_SEARCH_API_URL): 'https://api.search.brave.com/res/v1'
     env(BRAVE_SEARCH_COUNT): '10'
     env(BRAVE_SEARCH_COUNTRY): 'us'
@@ -426,6 +428,10 @@ services:
         tags:
             - { name: 'app.ai.text_to_speech' }
 
+    App\AI\Provider\WhisperProvider:
+        tags:
+            - { name: 'app.ai.speech_to_text' }
+
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
@@ -652,7 +658,6 @@ services:
     App\Service\ModelConfigService:
         arguments:
             $cache: '@cache.model_config'
-            $environment: '%kernel.environment%'
 
     # Shares the model_config pool so applying provider defaults invalidates
     # the same cached lookups ModelConfigService serves from.
