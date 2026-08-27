@@ -126,6 +126,16 @@ const showDbOverrideHint = computed(
  */
 const isPinnedByEnv = computed(() => props.value.envOverride === true)
 
+/**
+ * What the instance actually does, which is what the toggle has to show while an
+ * environment variable pins the field. The stored row usually still holds the
+ * shipped default, so rendering `localValue` here would put an "Enabled" switch
+ * directly above a hint reading "Currently: Disabled".
+ */
+const displayedValue = computed(() =>
+  isPinnedByEnv.value ? (props.value.effectiveValue ?? localValue.value) : localValue.value
+)
+
 const effectiveValueLabel = computed(() =>
   props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
 )
@@ -164,22 +174,22 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
         :disabled="disabled || isPinnedByEnv"
         :class="[
           'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
-          localValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
+          displayedValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
           (disabled || isPinnedByEnv) && 'opacity-50 cursor-not-allowed',
         ]"
         role="switch"
-        :aria-checked="localValue === 'true'"
+        :aria-checked="displayedValue === 'true'"
         @click="handleToggle"
       >
         <span
           :class="[
             'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-            localValue === 'true' ? 'translate-x-5' : 'translate-x-0',
+            displayedValue === 'true' ? 'translate-x-5' : 'translate-x-0',
           ]"
         />
       </button>
       <span class="text-sm txt-secondary">
-        {{ localValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
+        {{ displayedValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
       </span>
     </div>
 
@@ -264,7 +274,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 
     <p
       v-if="isPinnedByEnv"
-      class="text-xs text-[var(--status-warning)] mt-1.5"
+      class="text-xs text-[var(--status-warning-text)] mt-1.5"
       data-testid="config-field-env-override-hint"
     >
       {{

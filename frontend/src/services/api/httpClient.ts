@@ -490,7 +490,7 @@ async function handleAuthFailure(): Promise<never> {
   let sendToSetup = true === getConfigSync().setup?.wizardRequired
   try {
     const { ensureWizardRequired } = await import('@/router/setupGate')
-    sendToSetup = await ensureWizardRequired({ fresh: true })
+    sendToSetup = await ensureWizardRequired({ fresh: true, probe: true })
   } catch {
     // Keep the runtime-config answer when the dedicated probe cannot run.
   }

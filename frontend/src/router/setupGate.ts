@@ -5,8 +5,8 @@ export const SETUP_ROUTE = 'setup'
 
 /**
  * Public entry routes a visitor hits after `app:setup:reset` or a fresh tab.
- * These must re-ask the server instead of trusting a runtime config that was
- * loaded before the CLI wiped the installation.
+ * These re-read the runtime config instead of the memoized answer, so a config
+ * that was reloaded in the meantime is picked up.
  */
 const SETUP_RECHECK_ROUTES = new Set([
   'chat',
@@ -73,14 +73,22 @@ export function invalidateSetupWizardRequired(): void {
 /**
  * Resolves whether the installation still needs the first-run wizard.
  *
- * Runtime config is the fast path when it already says yes. When it says no —
- * including the default for a missing/failed load — `/api/v1/setup/state` is
- * the source of truth, because `app:setup:reset` cannot clear the SPA cache.
+ * Runtime config answers this on its own in both directions, and it is the only
+ * source consulted by default — it is already loaded when the router runs, so
+ * the common navigation costs nothing.
  *
- * `fresh` skips the in-memory answer so `/`, `/login` and `/setup` notice a
- * reset that happened while this tab stayed open.
+ * `fresh` skips the in-memory answer, so a navigation re-reads a runtime config
+ * that was reloaded in the meantime. `probe` additionally asks
+ * `/api/v1/setup/state`, which is the only way to notice an `app:setup:reset`
+ * that ran while this tab stayed open. It is deliberately NOT the default: an
+ * awaited round trip on every entry navigation would delay the app's main route
+ * on every installation, to observe a state only a dev-only CLI command can
+ * change. A reset that slips through still reaches the wizard, because every
+ * other endpoint answers 503 SETUP_REQUIRED and `httpClient` redirects on it.
  */
-export async function ensureWizardRequired(options: { fresh?: boolean } = {}): Promise<boolean> {
+export async function ensureWizardRequired(
+  options: { fresh?: boolean; probe?: boolean } = {}
+): Promise<boolean> {
   if (!options.fresh && null !== cachedRequired) {
     return cachedRequired
   }
@@ -89,14 +97,14 @@ export async function ensureWizardRequired(options: { fresh?: boolean } = {}): P
     return inflight
   }
 
-  inflight = resolveWizardRequired().finally(() => {
+  inflight = resolveWizardRequired(true === options.probe).finally(() => {
     inflight = null
   })
 
   return inflight
 }
 
-async function resolveWizardRequired(): Promise<boolean> {
+async function resolveWizardRequired(probe: boolean): Promise<boolean> {
   await getConfig()
 
   // An operator who switched the wizard off has answered this question for good.
@@ -107,9 +115,20 @@ async function resolveWizardRequired(): Promise<boolean> {
     return false
   }
 
-  if (true === getConfigSync().setup?.wizardRequired) {
+  const fromConfig = getConfigSync().setup?.wizardRequired
+
+  if (true === fromConfig) {
     cachedRequired = true
     return true
+  }
+
+  // A runtime config that loaded and reports a set-up installation IS the
+  // answer. `setup` missing entirely means the config never loaded (or the
+  // backend predates the flag), and only then is the dedicated endpoint worth a
+  // request.
+  if (false === fromConfig && !probe) {
+    cachedRequired = false
+    return false
   }
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined

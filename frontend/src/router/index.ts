@@ -671,9 +671,9 @@ function targetPath(target: RouteLocationRaw): string {
 router.beforeEach(async (to, _from, next) => {
   // First-run setup comes BEFORE the auth wait: leftover cookies from a wiped
   // admin must not stall the visitor on /login, and the 10s auth timeout must
-  // not skip the wizard. `/setup/state` is re-fetched on entry routes so a
-  // CLI `app:setup:reset` is visible even when this tab still holds a stale
-  // runtime config with wizardRequired: false.
+  // not skip the wizard. Answered from the runtime config the SPA already holds,
+  // so this adds no request to a normal navigation; the visibilitychange handler
+  // below is what re-asks the server after a CLI reset.
   const wizardRequired = await ensureWizardRequired({
     fresh: isSetupRecheckRoute(to.name),
   }).catch(() => false)
@@ -873,7 +873,7 @@ if (typeof document !== 'undefined') {
 
     invalidateSetupWizardRequired()
     void (async () => {
-      const required = await ensureWizardRequired({ fresh: true })
+      const required = await ensureWizardRequired({ fresh: true, probe: true })
       if (!required) {
         return
       }

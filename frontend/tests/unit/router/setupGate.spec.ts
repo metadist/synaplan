@@ -121,13 +121,13 @@ describe('isSetupWizardEnabled', () => {
 })
 
 describe('isSetupRecheckRoute', () => {
-  it('re-asks the server on the pages a reset operator actually opens', () => {
+  it('re-reads the runtime config on the pages a reset operator actually opens', () => {
     expect(isSetupRecheckRoute('chat')).toBe(true)
     expect(isSetupRecheckRoute('login')).toBe(true)
     expect(isSetupRecheckRoute(SETUP_ROUTE)).toBe(true)
   })
 
-  it('does not re-ask on ordinary in-app navigation', () => {
+  it('does not re-read on ordinary in-app navigation', () => {
     expect(isSetupRecheckRoute('files')).toBe(false)
     expect(isSetupRecheckRoute(undefined)).toBe(false)
   })
@@ -148,11 +148,36 @@ describe('ensureWizardRequired', () => {
     expect(getSetupState).not.toHaveBeenCalled()
   })
 
-  it('asks /setup/state when runtime config still says the instance is set up', async () => {
+  /**
+   * The cost of the opposite default: `/` is an entry route, so probing there
+   * would put an awaited round trip in front of the app's main view on every
+   * installation — for a state that only the dev-only `app:setup:reset` can
+   * change, and that 503 SETUP_REQUIRED catches anyway.
+   */
+  it('trusts a loaded runtime config that reports a set-up installation', async () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    expect(getSetupState).not.toHaveBeenCalled()
+  })
+
+  /**
+   * No `setup` object at all means the runtime config never loaded, so there is
+   * nothing to trust and the dedicated endpoint is worth the request.
+   */
+  it('asks /setup/state when the runtime config carries no setup state', async () => {
+    runtimeConfig.mockReturnValue({})
     getSetupState.mockResolvedValue({ wizardRequired: true })
 
     await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(true)
+    expect(getSetupState).toHaveBeenCalled()
+  })
+
+  it('asks /setup/state when the caller explicitly probes', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockResolvedValue({ wizardRequired: true })
+
+    await expect(ensureWizardRequired({ fresh: true, probe: true })).resolves.toBe(true)
     expect(isSetupWizardRequired()).toBe(true)
   })
 
@@ -160,7 +185,7 @@ describe('ensureWizardRequired', () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
     getSetupState.mockResolvedValue({ wizardRequired: false })
 
-    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    await expect(ensureWizardRequired({ fresh: true, probe: true })).resolves.toBe(false)
     expect(isSetupWizardRequired()).toBe(false)
   })
 
@@ -168,7 +193,7 @@ describe('ensureWizardRequired', () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
     getSetupState.mockResolvedValue({ wizardRequired: false })
 
-    await ensureWizardRequired({ fresh: true })
+    await ensureWizardRequired({ fresh: true, probe: true })
     getSetupState.mockClear()
 
     await expect(ensureWizardRequired()).resolves.toBe(false)
@@ -178,17 +203,17 @@ describe('ensureWizardRequired', () => {
   it('notices a CLI reset that happened after a previous false answer', async () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
     getSetupState.mockResolvedValue({ wizardRequired: false })
-    await ensureWizardRequired({ fresh: true })
+    await ensureWizardRequired({ fresh: true, probe: true })
 
     getSetupState.mockResolvedValue({ wizardRequired: true })
-    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(true)
+    await expect(ensureWizardRequired({ fresh: true, probe: true })).resolves.toBe(true)
   })
 
   it('keeps a working installation out of the wizard when /setup/state cannot be reached', async () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
     getSetupState.mockRejectedValue(new Error('offline'))
 
-    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    await expect(ensureWizardRequired({ fresh: true, probe: true })).resolves.toBe(false)
   })
 
   /**
@@ -199,7 +224,7 @@ describe('ensureWizardRequired', () => {
   it('never probes the server once the wizard is switched off by the operator', async () => {
     runtimeConfig.mockReturnValue({ setup: { wizardEnabled: false } })
 
-    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    await expect(ensureWizardRequired({ fresh: true, probe: true })).resolves.toBe(false)
     expect(getSetupState).not.toHaveBeenCalled()
   })
 })
