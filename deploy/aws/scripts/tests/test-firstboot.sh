@@ -193,6 +193,17 @@ awk '
 # Generated listing templates expose only compatible instance types. Keep them
 # byte-for-byte reproducible so a source-template fix cannot miss the copies
 # already prepared for S3.
+for template in "$DEPLOY_ROOT/aws/cloudformation/synaplan-new-vpc.yaml" \
+    "$DEPLOY_ROOT/aws/cloudformation/synaplan-existing-vpc.yaml"; do
+    awk '
+        /^  AllowedWebCidr:/ { found = 1; in_parameter = 1; next }
+        in_parameter && /^  [A-Za-z0-9]+:/ { in_parameter = 0 }
+        in_parameter && /^[[:space:]]+Default:/ { has_default = 1 }
+        END { exit !(found && !has_default) }
+    ' "$template" ||
+        fail "$(basename "$template") gives AllowedWebCidr a default; Marketplace requires the buyer to choose the ingress range explicitly"
+done
+
 node "$repo_root/scripts/generate-aws-marketplace-templates.mjs" --check ||
     fail "AWS Marketplace CloudFormation templates are stale; regenerate them before publishing"
 
