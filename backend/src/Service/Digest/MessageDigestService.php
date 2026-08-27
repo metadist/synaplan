@@ -29,7 +29,8 @@ final readonly class MessageDigestService
 {
     private const PROMPT_TOPIC = 'tools:message_digest';
     private const MIN_TITLE_CHARS = 8;
-    private const MAX_TITLE_CHARS = 500;
+    /** Matches the "max 200 characters" rule in the digest prompts (DB column allows 500 as headroom). */
+    private const MAX_TITLE_CHARS = 200;
     private const MESSAGE_CLIP_CHARS = 1500;
     private const FILE_TEXT_CLIP_CHARS = 1000;
 

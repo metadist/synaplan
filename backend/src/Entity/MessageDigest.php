@@ -31,7 +31,7 @@ class MessageDigest
     #[ORM\Column(name: 'BUSERID', type: 'integer')]
     private int $userId;
 
-    #[ORM\Column(name: 'BCHATID', type: 'integer')]
+    #[ORM\Column(name: 'BCHATID', type: 'integer', options: ['default' => 0])]
     private int $chatId = 0;
 
     #[ORM\Column(name: 'BMESSAGEID', type: 'bigint')]
@@ -42,17 +42,17 @@ class MessageDigest
     private string $title = '';
 
     /** Channel of the source message: web / whatsapp / email / mcp / api / … */
-    #[ORM\Column(name: 'BCHANNEL', type: 'string', length: 20)]
+    #[ORM\Column(name: 'BCHANNEL', type: 'string', length: 20, options: ['default' => ''])]
     private string $channel = '';
 
     /** Unix timestamp of the SOURCE message (recency ranking input). */
-    #[ORM\Column(name: 'BSOURCEDATE', type: 'bigint')]
+    #[ORM\Column(name: 'BSOURCEDATE', type: 'bigint', options: ['default' => 0])]
     private int $sourceDate = 0;
 
     #[ORM\Column(name: 'BACTIVE', type: 'boolean', options: ['default' => true])]
     private bool $active = true;
 
-    #[ORM\Column(name: 'BCREATED', type: 'bigint')]
+    #[ORM\Column(name: 'BCREATED', type: 'bigint', options: ['default' => 0])]
     private int $created = 0;
 
     public function getId(): int
