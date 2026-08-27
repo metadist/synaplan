@@ -95,9 +95,9 @@ final readonly class SummaryEvalScorer
     }
 
     /**
-     * The prompt forbids preamble and mandates `## <heading>` sections, so a
-     * compliant summary starts with a markdown heading and contains at least
-     * one `## ` section line.
+     * The prompt forbids preamble and mandates `## <heading>` sections, so
+     * the first non-empty line must itself be a `## <heading>` line — a
+     * lone `# Title` or any prose preamble fails.
      */
     private function structureOk(string $summary): bool
     {
@@ -112,8 +112,7 @@ final readonly class SummaryEvalScorer
                 continue;
             }
 
-            return str_starts_with($line, '#')
-                && 1 === preg_match('/^##\s+\S/mu', $summary);
+            return 1 === preg_match('/^##\s+\S/u', $line);
         }
 
         return false;
