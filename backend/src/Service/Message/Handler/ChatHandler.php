@@ -2102,11 +2102,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Build multimodal content array with text and images.
-     *
-     * @return array|string Content as multimodal array or plain string if no images
-     */
-    /**
      * Base64 data URLs for images the ASSISTANT generated earlier in this
      * conversation, keyed by the message that produced them.
      *
@@ -2183,6 +2178,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return null !== $model && $model->hasFeature('vision');
     }
 
+    /**
+     * Build multimodal content array with text and images.
+     *
+     * @return array|string Content as multimodal array or plain string if no images
+     */
     private function buildMultimodalContent(string $textContent, array $imageUrls): array|string
     {
         if (empty($imageUrls)) {

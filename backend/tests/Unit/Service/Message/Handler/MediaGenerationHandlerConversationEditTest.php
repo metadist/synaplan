@@ -53,6 +53,19 @@ final class MediaGenerationHandlerConversationEditTest extends TestCase
         $this->assertNull($this->resolve($catalog, ['input_mode' => 'reference_images', 'media_type' => 'audio']));
     }
 
+    /**
+     * `/vid` and `/tts` reach the handler without a media_type on the
+     * classification, so the topic has to carry the same veto.
+     */
+    public function testVideoAndAudioSlashCommandsNeverPickUpAConversationImage(): void
+    {
+        $catalog = $this->catalogReturning([$this->image('file:6', 'car-sunset.png')]);
+
+        $this->assertNull($this->resolve($catalog, ['input_mode' => 'reference_images', 'topic' => 'tools:vid']));
+        $this->assertNull($this->resolve($catalog, ['input_mode' => 'reference_images', 'topic' => 'tools:tts']));
+        $this->assertNotNull($this->resolve($catalog, ['input_mode' => 'reference_images', 'topic' => 'tools:pic']));
+    }
+
     public function testAnEmptyConversationResolvesToNothing(): void
     {
         $catalog = $this->catalogReturning([]);

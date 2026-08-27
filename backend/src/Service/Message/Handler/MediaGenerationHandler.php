@@ -198,8 +198,26 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             $classification,
             null !== $editSource ? ['media_edit_source_name' => $editSource->displayName] : [],
         );
-        $prompt = trim($promptData['prompt'] ?? '');
         $promptMediaType = $promptData['media_type'] ?? null;
+
+        // The extractor has the final say on the media type. If it turns out
+        // this is a video or audio request after all, the picture must be
+        // dropped — otherwise a text-to-video turn would silently become
+        // image-to-video off an unrelated old image. The prompt above was
+        // written under "you are editing <file>, describe only the change", so
+        // it is unusable here and gets re-extracted without that context
+        // instead of carrying edit-only wording into a video or audio prompt.
+        if (null !== $editSource && null !== $promptMediaType && 'image' !== $promptMediaType) {
+            $this->logger->info('MediaGenerationHandler: dropping conversation edit source, extractor asked for a different media type', [
+                'media_type' => $promptMediaType,
+                'edit_source' => $editSource->reference,
+            ]);
+            $editSource = null;
+            $promptData = $this->promptExtractor->extract($message, $thread, $classification);
+            $promptMediaType = $promptData['media_type'] ?? null;
+        }
+
+        $prompt = trim($promptData['prompt'] ?? '');
 
         if ('' === $prompt) {
             $prompt = $message->getText();
@@ -207,18 +225,6 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         if ('' === $prompt) {
             throw new \RuntimeException('Unable to determine media prompt text');
-        }
-
-        // The extractor has the final say on the media type. If it turns out
-        // this is a video or audio request after all, the picture must be
-        // dropped — otherwise a text-to-video turn would silently become
-        // image-to-video off an unrelated old image.
-        if (null !== $editSource && null !== $promptMediaType && 'image' !== $promptMediaType) {
-            $this->logger->info('MediaGenerationHandler: dropping conversation edit source, extractor asked for a different media type', [
-                'media_type' => $promptMediaType,
-                'edit_source' => $editSource->reference,
-            ]);
-            $editSource = null;
         }
 
         if (null !== $editSource) {
@@ -1385,6 +1391,13 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // silently turn text-to-video into image-to-video.
         $requestedMediaType = $classification['media_type'] ?? null;
         if (null !== $requestedMediaType && 'image' !== $requestedMediaType) {
+            return null;
+        }
+
+        // `/vid` and `/tts` say the same thing, but the sorter does not always
+        // fill media_type for a slash command — the topic is the reliable
+        // signal there.
+        if (in_array($classification['topic'] ?? null, ['tools:vid', 'tools:tts'], true)) {
             return null;
         }
 

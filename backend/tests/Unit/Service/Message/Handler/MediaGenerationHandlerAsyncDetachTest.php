@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Service\BillingService;
+use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\ThumbnailService;
 use App\Service\File\UserUploadPathBuilder;
@@ -51,6 +52,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
     private ModelConfigService&MockObject $modelConfigService;
     private EntityManagerInterface&MockObject $em;
     private RateLimitService&MockObject $rateLimitService;
+    private ConversationFileCatalog&MockObject $conversationFileCatalog;
     private MediaGenerationHandler $handler;
 
     protected function setUp(): void
@@ -64,6 +66,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->rateLimitService = $this->createMock(RateLimitService::class);
+        $this->conversationFileCatalog = $this->createMock(ConversationFileCatalog::class);
 
         // Per-user concurrency ceiling. `countActiveForUser` is left to PHPUnit's
         // int default (0) for existing detach paths; the limit test overrides it.
@@ -88,7 +91,7 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
             $this->mediaJobMessageSync,
             $this->createMock(GeneratedFileRegistrar::class),
             new PremiumFeatureGate(new BillingService('', '')),
-            $this->createMock(ConversationFileCatalog::class),
+            $this->conversationFileCatalog,
             sys_get_temp_dir(),
             'https://app.example.test',
         );
@@ -294,6 +297,75 @@ final class MediaGenerationHandlerAsyncDetachTest extends TestCase
 
         self::assertArrayNotHasKey('media_job', $result['metadata'] ?? []);
         self::assertSame('video', $result['metadata']['media_type'] ?? null);
+    }
+
+    /**
+     * The edit source is resolved BEFORE the prompt is extracted, so the
+     * mediamaker writes under "you are editing car-sunset.png, describe only
+     * the change". If the extractor then says this is a video after all, that
+     * wording must not survive into the video prompt — the picture is dropped
+     * AND the prompt is re-extracted without the edit context.
+     */
+    public function testEditPromptIsReExtractedWhenTheExtractorAsksForAnotherMediaType(): void
+    {
+        $message = $this->messageStub();
+        $this->bootstrapVideoModel();
+
+        $this->conversationFileCatalog->method('build')->willReturn([]);
+        $this->conversationFileCatalog->method('latestImage')->willReturn(new ConversationFile(
+            'file:6',
+            'car-sunset.png',
+            ConversationFile::CATEGORY_IMAGE,
+            ConversationFile::ORIGIN_GENERATED,
+            sys_get_temp_dir().'/car-sunset.png',
+            'car-sunset.png',
+            6,
+        ));
+
+        $optionsPerCall = [];
+        $this->promptExtractor->expects(self::exactly(2))
+            ->method('extract')
+            ->willReturnCallback(static function (
+                \App\Entity\Message $message,
+                array $thread,
+                array $classification,
+                array $options = [],
+            ) use (&$optionsPerCall): array {
+                $optionsPerCall[] = $options;
+
+                return 1 === count($optionsPerCall)
+                    ? ['prompt' => 'the same car, keep everything else unchanged', 'media_type' => 'video']
+                    : ['prompt' => 'a car driving into the sunset', 'media_type' => 'video'];
+            });
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->rateLimitService->method('checkLimit')->willReturn(['allowed' => true]);
+        $this->mediaJobConfig->expects(self::any())->method('isAsyncJobsEnabled')->with(7)->willReturn(false);
+
+        // No reference image survives, so this is text-to-video, not img2vid.
+        $this->modelConfigService->expects(self::atLeastOnce())
+            ->method('getDefaultModel')
+            ->with('TEXT2VID', 7)
+            ->willReturn(42);
+
+        $usedPrompt = null;
+        $this->aiFacade->expects(self::once())
+            ->method('generateVideo')
+            ->willReturnCallback(static function (string $prompt) use (&$usedPrompt): array {
+                $usedPrompt = $prompt;
+
+                return [
+                    'videos' => [['url' => 'data:video/mp4;base64,Zm9v']],
+                    'provider' => 'higgsfield',
+                    'model' => 'dop',
+                ];
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'chat', 'language' => 'en', 'input_mode' => 'reference_images']);
+
+        self::assertSame('car-sunset.png', $optionsPerCall[0]['media_edit_source_name'] ?? null);
+        self::assertArrayNotHasKey('media_edit_source_name', $optionsPerCall[1]);
+        self::assertSame('a car driving into the sunset', $usedPrompt);
     }
 
     private function bootstrapImageModel(): void
