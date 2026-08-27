@@ -2199,6 +2199,11 @@ const streamAIResponse = async (
           } else if (data.status === 'analyzing') {
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}
@@ -2703,6 +2708,11 @@ const streamAIResponse = async (
             // Analyzing phase (e.g., understanding media generation request)
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}

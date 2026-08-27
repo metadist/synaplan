@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\File;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\FileRepository;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentImage;
 use App\Service\File\DocumentImageCatalog;
 use PHPUnit\Framework\TestCase;
@@ -80,7 +81,7 @@ class DocumentImageCatalogTest extends TestCase
             ->method('findOneBy')
             ->with(['userId' => 7, 'filePath' => 'render.png'])
             ->willReturn($generated);
-        $repository->method('findImagesByMessageIds')->willReturn([]);
+        $repository->method('findFilesByMessageIds')->willReturn([]);
 
         $images = $this->catalog($repository)->build(
             (new Message())->setUserId(7),
@@ -142,7 +143,7 @@ class DocumentImageCatalogTest extends TestCase
 
     private function catalog(FileRepository $repository): DocumentImageCatalog
     {
-        return new DocumentImageCatalog($repository, $this->uploadDir);
+        return new DocumentImageCatalog(new ConversationFileCatalog($repository, $this->uploadDir));
     }
 
     /**
@@ -151,7 +152,7 @@ class DocumentImageCatalogTest extends TestCase
     private function repository(array $linkedImages): FileRepository
     {
         $repository = $this->createMock(FileRepository::class);
-        $repository->method('findImagesByMessageIds')->willReturn($linkedImages);
+        $repository->method('findFilesByMessageIds')->willReturn($linkedImages);
         $repository->method('findOneBy')->willReturn(null);
 
         return $repository;

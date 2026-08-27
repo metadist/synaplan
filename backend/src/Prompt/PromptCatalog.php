@@ -416,9 +416,18 @@ This is the list, use only this:
    - "Convert to speech" → BMEDIA: "audio"
 
 9. **Detect input mode (BINPUTMODE)**: If BTOPIC is "mediamaker" AND BMEDIA is "image", set BINPUTMODE:
-   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer
-   - "text_only" - if the user wants to generate an image purely from text description (no reference images)
+   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer,
+     OR if the user asks to change, edit, restyle, recolor, extend, or fix an image that was generated or uploaded
+     EARLIER IN THIS CONVERSATION. History turns that carry a file are marked with a note such as
+     "[Generated image file: car.png]" or "[Uploaded image file: photo.jpg]" - use those notes to tell an edit from a
+     new request. A short follow-up right after an image was generated is almost always an edit.
+   - "text_only" - if the user wants a NEW image generated purely from a text description, even when older images
+     exist in the conversation ("another one", "something completely different", "now draw a house")
    If unsure, omit BINPUTMODE.
+   Examples (assuming the previous assistant turn generated an image):
+   - "make the car blue" → BTOPIC: "mediamaker", BMEDIA: "image", BINPUTMODE: "reference_images"
+   - "remove the background" → BINPUTMODE: "reference_images"
+   - "now generate a picture of a house" → BINPUTMODE: "text_only"
 
 10. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
    - Supported durations: **4, 6, or 8 seconds only**
@@ -1153,12 +1162,16 @@ Take the user's request and create an enhanced, detailed prompt that will produc
 - Use the user's language
 
 ### For IMAGE EDITING / COMPOSITION prompts (with reference images):
-When the user has attached image(s) and wants to edit, combine, or compose them:
-- **You CANNOT see the attached images.** Do NOT describe what is in them.
+When the user wants to edit, combine, or compose image(s) — either attached to this message OR
+generated/shared earlier in this conversation (a follow-up like "make the car blue", "remove the
+background", "mach es heller" always refers to the picture that is already there):
+- **You CANNOT see the reference images.** Do NOT describe what is in them.
 - **Do NOT assign roles** to the images (e.g., "image 1 is the pattern, image 2 is the room").
 - **Preserve the user's instruction exactly** as they wrote it - they can see the images, you cannot.
 - Only lightly enhance clarity and add quality hints (e.g., "seamless blending, photorealistic, high resolution").
 - Keep the user's wording for object/scene references intact.
+- Write ONLY the requested change and add "keep everything else unchanged" — describing a full scene
+  makes the image model redraw the picture instead of editing it.
 - The downstream multimodal image model will see both the images and your enhanced text.
 
 ### For VIDEO prompts:
@@ -1183,6 +1196,9 @@ Output: A detailed image of a cat, photorealistic, soft natural lighting, high r
 
 Input (with 2 images attached): "Put the person from the coast next to the Android from the space ship"
 Output: Put the person from the coast next to the Android from the space ship. Seamless compositing, matching lighting and perspective, photorealistic blending, high resolution
+
+Input (follow-up to an image generated earlier): "make the car blue"
+Output: Change the colour of the car to blue, keep everything else unchanged. Photorealistic, matching the original lighting and composition
 
 Input (with 2 images attached): "Apply this pattern to the walls of the room"
 Output: Apply this pattern to the walls of the room. Realistic texture mapping, natural perspective, consistent lighting, photorealistic result, high resolution

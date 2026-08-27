@@ -248,22 +248,52 @@ class FileRepository extends ServiceEntityRepository
      */
     public function findImagesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
     {
+        return $this->findByMessageIds($userId, $messageIds, $limit, true);
+    }
+
+    /**
+     * Every file linked to the given chat messages, newest first.
+     *
+     * The unfiltered sibling of {@see findImagesByMessageIds()}: a follow-up
+     * request can reference any artifact of the conversation, not just a
+     * picture, so the shared conversation catalog needs documents and audio
+     * through the same BMESSAGEID channel.
+     *
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    public function findFilesByMessageIds(int $userId, array $messageIds, int $limit = 30): array
+    {
+        return $this->findByMessageIds($userId, $messageIds, $limit, false);
+    }
+
+    /**
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    private function findByMessageIds(int $userId, array $messageIds, int $limit, bool $imagesOnly): array
+    {
         if ([] === $messageIds) {
             return [];
         }
 
-        return $this->createQueryBuilder('f')
+        $qb = $this->createQueryBuilder('f')
             ->where('f.userId = :userId')
             ->andWhere('f.messageId IN (:messageIds)')
-            ->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')
             ->setParameter('userId', $userId)
             ->setParameter('messageIds', $messageIds)
-            ->setParameter('imageMime', 'image/%')
-            ->setParameter('imageTypes', ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp'])
             ->orderBy('f.id', 'DESC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($limit);
+
+        if ($imagesOnly) {
+            $qb->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')
+                ->setParameter('imageMime', 'image/%')
+                ->setParameter('imageTypes', ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
