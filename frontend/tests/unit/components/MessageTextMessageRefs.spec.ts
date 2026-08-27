@@ -106,6 +106,20 @@ describe('MessageText [Message:ID] badges', () => {
     }
   })
 
+  it('resolves badges while still streaming, like memory and feedback refs', async () => {
+    const store = useMessageDigestsStore()
+    store.addReferences([rentLetter])
+
+    const wrapper = mount(MessageText, {
+      props: { content: 'See [Message:1234] for the', isStreaming: true },
+    })
+    await wrapper.vm.$nextTick()
+
+    const el = messageTextEl(wrapper)
+    expect(el.querySelector('.message-ref[data-digest-message-id="1234"]')).not.toBeNull()
+    expect(el.textContent).not.toContain('[Message:1234]')
+  })
+
   it('readonly (shared) views render a neutral label without navigation', async () => {
     const wrapper = mount(MessageText, {
       props: { content: 'See [Message:1234].', readonly: true },

@@ -70,6 +70,32 @@ describe('Message Digests Store', () => {
     expect(messageDigestsApi.resolveMessageDigests).not.toHaveBeenCalled()
   })
 
+  it('coalesces callers of the same tick into one request without dropping ids', async () => {
+    const store = useMessageDigestsStore()
+    vi.mocked(messageDigestsApi.resolveMessageDigests).mockResolvedValue([rentLetter])
+
+    // A page reload mounts every history message at once: each bubble asks for
+    // its own ids in the same tick. None of them may be dropped.
+    await Promise.all([store.resolveMissing([1234]), store.resolveMissing([5678])])
+
+    expect(messageDigestsApi.resolveMessageDigests).toHaveBeenCalledTimes(1)
+    expect(messageDigestsApi.resolveMessageDigests).toHaveBeenCalledWith([1234, 5678])
+    expect(store.getByMessageId(1234)).toEqual(rentLetter)
+    expect(store.isUnresolvable(5678)).toBe(true)
+  })
+
+  it('does not refetch ids a running request already covers', async () => {
+    const store = useMessageDigestsStore()
+    vi.mocked(messageDigestsApi.resolveMessageDigests).mockResolvedValue([rentLetter])
+
+    const first = store.resolveMissing([1234])
+    await Promise.resolve() // let the batch flush and the request start
+    await store.resolveMissing([1234])
+    await first
+
+    expect(messageDigestsApi.resolveMessageDigests).toHaveBeenCalledTimes(1)
+  })
+
   it('a network failure marks nothing unresolvable so a later render retries', async () => {
     const store = useMessageDigestsStore()
     vi.mocked(messageDigestsApi.resolveMessageDigests).mockRejectedValue(new Error('offline'))

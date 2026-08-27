@@ -21,6 +21,14 @@ final readonly class MessageReferenceResolver
 {
     private const TAG_PATTERN = '/\[Message\s*:\s*(\d+)\.{0,3}\]/i';
 
+    /**
+     * Upper bound on distinct ids looked up per response, mirroring the web
+     * resolve endpoint. Retrieval offers the model at most `DIGEST.TOP_K`
+     * references, so anything beyond this is a model gone haywire — and must
+     * not turn one reply into an unbounded database lookup.
+     */
+    private const MAX_IDS_PER_RESPONSE = 100;
+
     public function __construct(
         private MessageDigestRepository $digestRepository,
         private LoggerInterface $logger,
@@ -34,20 +42,37 @@ final readonly class MessageReferenceResolver
         }
 
         preg_match_all(self::TAG_PATTERN, $text, $allMatches);
-        $uniqueIds = array_unique(array_map(intval(...), $allMatches[1]));
+        $uniqueIds = array_values(array_unique(array_map(intval(...), $allMatches[1])));
+        if ([] === $uniqueIds) {
+            return $text;
+        }
+
+        if (count($uniqueIds) > self::MAX_IDS_PER_RESPONSE) {
+            $this->logger->warning('Response carries more message reference tags than we resolve, extra tags are stripped', [
+                'user_id' => $user->getId(),
+                'tag_count' => count($uniqueIds),
+                'limit' => self::MAX_IDS_PER_RESPONSE,
+            ]);
+            $uniqueIds = array_slice($uniqueIds, 0, self::MAX_IDS_PER_RESPONSE);
+        }
+
+        // One query for the whole response — the digests are already scoped to
+        // the user, so an invented or foreign id simply has no row and its tag
+        // is stripped below.
+        $digests = $this->digestRepository->findActiveByUserAndMessageIds($user->getId(), $uniqueIds);
 
         /** @var array<int, string> $resolved */
         $resolved = [];
+        foreach ($digests as $digest) {
+            $resolved[$digest->getMessageId()] = sprintf('("%s")', $digest->getTitle());
+        }
+
         foreach ($uniqueIds as $messageId) {
-            $digest = $this->digestRepository->findOneByUserAndMessage($user->getId(), $messageId);
-            if (null !== $digest && $digest->isActive()) {
-                $resolved[$messageId] = sprintf('("%s")', $digest->getTitle());
-            } else {
+            if (!isset($resolved[$messageId])) {
                 $this->logger->debug('Message reference tag could not be resolved, stripping', [
                     'user_id' => $user->getId(),
                     'message_id' => $messageId,
                 ]);
-                $resolved[$messageId] = '';
             }
         }
 

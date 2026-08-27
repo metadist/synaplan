@@ -89,6 +89,7 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(QDRANT_DIGESTS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''

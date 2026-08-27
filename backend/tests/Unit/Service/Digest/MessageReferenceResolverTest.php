@@ -32,7 +32,7 @@ final class MessageReferenceResolverTest extends TestCase
 
     public function testTextWithoutTagsIsUntouchedAndSkipsTheRepository(): void
     {
-        $this->digestRepository->expects($this->never())->method('findOneByUserAndMessage');
+        $this->digestRepository->expects($this->never())->method('findActiveByUserAndMessageIds');
 
         $text = 'Plain answer, even with [Memory:42] tags.';
 
@@ -41,10 +41,10 @@ final class MessageReferenceResolverTest extends TestCase
 
     public function testKnownTagIsReplacedWithQuotedDigestTitle(): void
     {
-        $this->digestRepository->method('findOneByUserAndMessage')
-            ->willReturnCallback(fn (int $userId, int $messageId) => (self::USER_ID === $userId && 1234 === $messageId)
-                ? $this->digest('office rent letter about the increase')
-                : null);
+        $this->digestRepository->expects($this->once())
+            ->method('findActiveByUserAndMessageIds')
+            ->with(self::USER_ID, [1234])
+            ->willReturn([$this->digest(1234, 'office rent letter about the increase')]);
 
         $resolved = $this->resolver->resolveMessageTags('See [Message:1234] for details.', $this->user);
 
@@ -53,7 +53,7 @@ final class MessageReferenceResolverTest extends TestCase
 
     public function testUnknownTagIsStripped(): void
     {
-        $this->digestRepository->method('findOneByUserAndMessage')->willReturn(null);
+        $this->digestRepository->method('findActiveByUserAndMessageIds')->willReturn([]);
 
         $resolved = $this->resolver->resolveMessageTags('See [Message:999] for details.', $this->user);
 
@@ -62,44 +62,65 @@ final class MessageReferenceResolverTest extends TestCase
 
     public function testInactiveDigestIsStripped(): void
     {
-        $this->digestRepository->method('findOneByUserAndMessage')
-            ->willReturn($this->digest('soft-deleted digest', active: false));
+        // The repository only returns ACTIVE rows, so a soft-deleted digest
+        // arrives here as a missing id.
+        $this->digestRepository->method('findActiveByUserAndMessageIds')->willReturn([]);
 
         $resolved = $this->resolver->resolveMessageTags('Ref [Message:1].', $this->user);
 
         self::assertSame('Ref .', $resolved);
     }
 
-    public function testRepeatedTagIsLookedUpOnce(): void
+    public function testEveryTagOfAResponseIsResolvedInASingleQuery(): void
     {
         $this->digestRepository->expects($this->once())
-            ->method('findOneByUserAndMessage')
-            ->with(self::USER_ID, 1234)
-            ->willReturn($this->digest('the letter'));
+            ->method('findActiveByUserAndMessageIds')
+            ->with(self::USER_ID, [1234, 5678])
+            ->willReturn([
+                $this->digest(1234, 'the letter'),
+                $this->digest(5678, 'the invoice'),
+            ]);
 
         $resolved = $this->resolver->resolveMessageTags(
-            '[Message:1234] and again [Message:1234].',
+            '[Message:1234], again [Message:1234], and [Message:5678].',
             $this->user
         );
 
-        self::assertSame('("the letter") and again ("the letter").', $resolved);
+        self::assertSame('("the letter"), again ("the letter"), and ("the invoice").', $resolved);
+    }
+
+    public function testTagCountBeyondTheLimitIsCappedAndTheExtrasAreStripped(): void
+    {
+        $ids = range(1, 120);
+        $text = implode(' ', array_map(static fn (int $id): string => "[Message:{$id}]", $ids));
+
+        $this->digestRepository->expects($this->once())
+            ->method('findActiveByUserAndMessageIds')
+            ->with(self::USER_ID, self::callback(static fn (array $requested): bool => 100 === count($requested)))
+            ->willReturn([$this->digest(1, 'the letter')]);
+
+        $resolved = $this->resolver->resolveMessageTags($text, $this->user);
+
+        self::assertStringStartsWith('("the letter")', $resolved);
+        self::assertStringNotContainsString('[Message:', $resolved);
     }
 
     public function testToleratesWhitespaceAndCaseVariants(): void
     {
-        $this->digestRepository->method('findOneByUserAndMessage')
-            ->willReturn($this->digest('the letter'));
+        $this->digestRepository->method('findActiveByUserAndMessageIds')
+            ->willReturn([$this->digest(12, 'the letter')]);
 
         $resolved = $this->resolver->resolveMessageTags('Ref [message : 12].', $this->user);
 
         self::assertSame('Ref ("the letter").', $resolved);
     }
 
-    private function digest(string $title, bool $active = true): MessageDigest
+    private function digest(int $messageId, string $title): MessageDigest
     {
         $digest = new MessageDigest();
+        $digest->setMessageId($messageId);
         $digest->setTitle($title);
-        $digest->setActive($active);
+        $digest->setActive(true);
 
         return $digest;
     }

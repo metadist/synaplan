@@ -456,7 +456,7 @@ function processMessageReferenceBadges(html: string): string {
     }
 
     // Invented / deleted / foreign id — muted, non-clickable badge.
-    return `<span class="memory-badge-wrapper inline relative group"><button class="memory-ref message-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true" onclick="event.preventDefault()"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('messageRefs.missing.tooltip'))}</span></span></span></span>`
+    return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true" onclick="event.preventDefault()"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('messageRefs.missing.tooltip'))}</span></span></span></span>`
   })
 }
 
@@ -766,7 +766,7 @@ function renderStreamingIncremental(content: string): string {
   let tailHtml = ''
   if (trailingTail.length > 0) {
     tailHtml = renderStreamingTail(trailingTail)
-    tailHtml = processFeedbackBadges(processMemoryBadges(tailHtml))
+    tailHtml = processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(tailHtml)))
   }
 
   // Concatenation is fine now: morphdom diffs the combined HTML against the

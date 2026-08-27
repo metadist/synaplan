@@ -3,7 +3,10 @@ import {
   type MessageDigestReference,
 } from '@/services/api/messageDigestsApi'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+
+/** The resolve endpoint caps a single request at 100 ids. */
+const CHUNK_SIZE = 100
 
 /**
  * Deep-memory digest references for [Message:ID] badges.
@@ -16,7 +19,15 @@ import { ref } from 'vue'
 export const useMessageDigestsStore = defineStore('messageDigests', () => {
   const references = ref<Map<number, MessageDigestReference>>(new Map())
   const unresolvable = ref<Set<number>>(new Set())
-  const loading = ref(false)
+  const requestsInFlight = ref(0)
+  const loading = computed(() => requestsInFlight.value > 0)
+
+  // Ids waiting for the next flush, and ids a running request already covers.
+  // Deliberately outside the reactive state: they only gate what goes into the
+  // next request, nothing renders off them.
+  let queued = new Set<number>()
+  const fetching = new Set<number>()
+  let flush: Promise<void> | null = null
 
   function addReferences(refs: MessageDigestReference[]): void {
     if (refs.length === 0) return
@@ -38,37 +49,54 @@ export const useMessageDigestsStore = defineStore('messageDigests', () => {
     return unresolvable.value.has(messageId)
   }
 
-  /**
-   * Fetch references for ids not yet known. Best-effort: on network failure
-   * nothing is marked unresolvable, so a later call can retry.
-   */
-  async function resolveMissing(messageIds: number[]): Promise<void> {
-    const missing = Array.from(new Set(messageIds)).filter(
-      (id) => id > 0 && !references.value.has(id) && !unresolvable.value.has(id)
-    )
-    if (missing.length === 0 || loading.value) return
+  async function fetchQueued(): Promise<void> {
+    const batch = Array.from(queued)
+    queued = new Set()
+    flush = null
+    if (batch.length === 0) return
 
-    loading.value = true
+    for (const id of batch) fetching.add(id)
+    requestsInFlight.value += 1
     try {
-      // The resolve endpoint caps a single request at 100 ids — chunk so ids
-      // beyond the cap are still resolved.
       const resolved: MessageDigestReference[] = []
-      for (let i = 0; i < missing.length; i += 100) {
-        resolved.push(...(await resolveMessageDigests(missing.slice(i, i + 100))))
+      for (let i = 0; i < batch.length; i += CHUNK_SIZE) {
+        resolved.push(...(await resolveMessageDigests(batch.slice(i, i + CHUNK_SIZE))))
       }
       addReferences(resolved)
 
       const resolvedIds = new Set(resolved.map((r) => r.messageId))
       const nextUnresolvable = new Set(unresolvable.value)
-      for (const id of missing) {
+      for (const id of batch) {
         if (!resolvedIds.has(id)) nextUnresolvable.add(id)
       }
       unresolvable.value = nextUnresolvable
     } catch {
       // Network hiccup — leave ids unmarked so a later render retries.
     } finally {
-      loading.value = false
+      for (const id of batch) fetching.delete(id)
+      requestsInFlight.value -= 1
     }
+  }
+
+  /**
+   * Fetch references for ids not yet known. Best-effort: on network failure
+   * nothing is marked unresolvable, so a later call can retry.
+   *
+   * Callers of the same tick are coalesced into ONE request. A page reload
+   * mounts every history message at once, so a "first caller wins, the rest
+   * are dropped" guard would leave all but one bubble stuck on a loading
+   * badge forever — the store re-render they wake up on does not re-request.
+   */
+  async function resolveMissing(messageIds: number[]): Promise<void> {
+    for (const id of messageIds) {
+      if (id > 0 && !references.value.has(id) && !unresolvable.value.has(id) && !fetching.has(id)) {
+        queued.add(id)
+      }
+    }
+    if (queued.size === 0) return
+
+    flush ??= Promise.resolve().then(fetchQueued)
+    await flush
   }
 
   return {
@@ -82,7 +110,10 @@ export const useMessageDigestsStore = defineStore('messageDigests', () => {
     $reset() {
       references.value = new Map()
       unresolvable.value = new Set()
-      loading.value = false
+      requestsInFlight.value = 0
+      queued = new Set()
+      fetching.clear()
+      flush = null
     },
   }
 })
