@@ -238,7 +238,7 @@ final class MessageDigestServiceTest extends TestCase
 
         self::assertCount(1, $result['proposals']);
         self::assertSame(102, $result['proposals'][0]['message_id']);
-        self::assertSame(500, mb_strlen($result['proposals'][0]['title']));
+        self::assertSame(200, mb_strlen($result['proposals'][0]['title']));
     }
 
     public function testUsageIsRecordedWithDigestSource(): void

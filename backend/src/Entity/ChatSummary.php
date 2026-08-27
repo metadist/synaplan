@@ -38,8 +38,8 @@ class ChatSummary
     #[ORM\Column(name: 'BSUMMARY', type: 'text')]
     private string $summary = '';
 
-    /** High-water mark: id of the newest message covered by the summary. */
-    #[ORM\Column(name: 'BUPTOMESSAGEID', type: 'integer')]
+    /** High-water mark: id of the newest message covered by the summary (BMESSAGES.BID is bigint). */
+    #[ORM\Column(name: 'BUPTOMESSAGEID', type: 'bigint')]
     private int $upToMessageId = 0;
 
     #[ORM\Column(name: 'BSUMMARIZEDCOUNT', type: 'integer')]
