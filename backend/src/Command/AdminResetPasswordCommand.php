@@ -6,7 +6,7 @@ namespace App\Command;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
-use App\Security\PasswordPolicy;
+use App\Service\Admin\BootstrapAdminConfiguration;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -44,8 +44,8 @@ final class AdminResetPasswordCommand extends Command
     /**
      * 24 hex characters, same shape the AWS first-boot script generates. Long
      * enough to be unguessable, short enough to retype from a terminal, and past
-     * {@see PasswordPolicy::COMPOSITION_WAIVER_LENGTH}, so it needs no character-
-     * class dance to satisfy the policy it is checked against.
+     * {@see BootstrapAdminConfiguration::COMPOSITION_WAIVER_LENGTH}, so it needs
+     * no character-class dance to satisfy the rules it is checked against.
      */
     private const GENERATED_PASSWORD_BYTES = 12;
 
@@ -63,9 +63,9 @@ final class AdminResetPasswordCommand extends Command
             ->addArgument('email', InputArgument::REQUIRED, 'Email address of the account')
             ->addOption('password', null, InputOption::VALUE_REQUIRED, sprintf(
                 'The new password (%d-%d characters; below %d it also needs an uppercase letter, a lowercase letter and a number)',
-                PasswordPolicy::MINIMUM_LENGTH,
-                PasswordPolicy::MAXIMUM_LENGTH,
-                PasswordPolicy::COMPOSITION_WAIVER_LENGTH,
+                BootstrapAdminConfiguration::MINIMUM_PASSWORD_LENGTH,
+                BootstrapAdminConfiguration::MAXIMUM_PASSWORD_LENGTH,
+                BootstrapAdminConfiguration::COMPOSITION_WAIVER_LENGTH,
             ))
             ->addOption('generate', null, InputOption::VALUE_NONE, 'Generate a random password, print it once, and require a change at next sign-in')
             ->addOption('promote', null, InputOption::VALUE_NONE, 'Also make this account an administrator and mark its email verified')
@@ -133,7 +133,7 @@ final class AdminResetPasswordCommand extends Command
         }
 
         $password = $generate ? $this->generatePassword() : (string) $explicitPassword;
-        $violation = PasswordPolicy::violation($password, 'The password');
+        $violation = BootstrapAdminConfiguration::passwordViolation($password, 'The password');
         if (null !== $violation) {
             $io->error($violation);
 
