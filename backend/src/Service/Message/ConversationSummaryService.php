@@ -198,13 +198,12 @@ final readonly class ConversationSummaryService
      */
     private function bootstrap(array $older, int $userId, int $chatId): ?string
     {
-        $summaryMax = $this->config->getSummaryMaxChars();
         $maxSource = $this->config->getMaxSourceMessages();
         $source = count($older) > $maxSource ? array_slice($older, -$maxSource) : $older;
 
         return $this->callSummarizer(
-            $this->buildBootstrapSystemPrompt($summaryMax),
-            $this->buildSourceText($source, $this->config->getTiers()),
+            ConversationSummaryPrompts::bootstrapSystemPrompt($this->config->getSummaryMaxChars()),
+            ConversationSummaryPrompts::bootstrapUserContent($source, $this->config->getTiers()),
             $userId,
             $chatId,
             'bootstrap',
@@ -216,15 +215,9 @@ final readonly class ConversationSummaryService
      */
     private function foldIncremental(string $previousSummary, array $newMessages, int $userId, int $chatId): ?string
     {
-        $summaryMax = $this->config->getSummaryMaxChars();
-        $lines = ["## Previous rolling summary\n", $previousSummary, "\n## Newly aged-out messages\n"];
-        foreach ($newMessages as $msg) {
-            $lines[] = $this->renderMessage($msg);
-        }
-
         return $this->callSummarizer(
-            $this->buildIncrementalSystemPrompt($summaryMax),
-            trim(implode("\n", $lines)),
+            ConversationSummaryPrompts::incrementalSystemPrompt($this->config->getSummaryMaxChars()),
+            ConversationSummaryPrompts::incrementalUserContent($previousSummary, $newMessages),
             $userId,
             $chatId,
             'incremental',
@@ -245,7 +238,7 @@ final readonly class ConversationSummaryService
                 'provider' => $modelConfig['provider'] ?? null,
                 'model' => $modelConfig['model'] ?? null,
                 'temperature' => 0.2,
-                'max_tokens' => $this->tokenBudgetFor($summaryMax),
+                'max_tokens' => ConversationSummaryPrompts::tokenBudget($summaryMax),
             ]);
 
             $summary = $this->clip(trim((string) ($response['content'] ?? '')), $summaryMax);
@@ -329,51 +322,6 @@ final readonly class ConversationSummaryService
         return sprintf('conv_summary.chat.%d.%s', $chatId, $fingerprint);
     }
 
-    private function buildBootstrapSystemPrompt(int $summaryMax): string
-    {
-        return <<<PROMPT
-            You compress the earlier part of an ongoing chat conversation into a compact "rolling summary" that a chat assistant will read as background context. The most recent turns are shown to the assistant separately and verbatim, so DO NOT restate them — summarize only what is provided below.
-
-            Rules:
-            - Write in the SAME language the conversation uses.
-            - Apply GRADIENT compression: segments are ordered oldest → newest. Condense the OLDEST segment the hardest (only durable facts / the overall topic). Condense LATER segments progressively less, keeping more specifics for the newest segment.
-            - Be factual. Never invent information that is not present in the source.
-            - Output plain prose / short bullet lines under these headings (skip a heading when empty):
-              ## Topic
-              ## User position / goal
-              ## Decisions & constraints
-              ## Open questions
-              ## Already covered / answered
-              ## External results
-            - "Already covered / answered" is what stops the assistant from repeating earlier answers — list conclusions and deliverables already produced.
-            - No preamble, no meta commentary.
-            - Keep the whole summary under {$summaryMax} characters.
-            PROMPT;
-    }
-
-    private function buildIncrementalSystemPrompt(int $summaryMax): string
-    {
-        return <<<PROMPT
-            You maintain a rolling summary of an ongoing chat. You receive the PREVIOUS rolling summary plus a small set of NEWLY AGED-OUT messages that just left the verbatim window. Fold the new messages into the previous summary and return the updated summary.
-
-            Rules:
-            - Write in the SAME language the conversation uses.
-            - Keep durable facts from the previous summary; do not drop the user's position, decisions, or open questions unless the new messages explicitly resolve or replace them.
-            - Condense older material more aggressively than the newly aged-out messages.
-            - Be factual. Never invent information.
-            - Output plain prose / short bullet lines under these headings (skip a heading when empty):
-              ## Topic
-              ## User position / goal
-              ## Decisions & constraints
-              ## Open questions
-              ## Already covered / answered
-              ## External results
-            - "Already covered / answered" must grow when the new messages contain conclusions or deliverables, so the assistant does not repeat itself.
-            - No preamble, no meta commentary.
-            - Keep the whole summary under {$summaryMax} characters.
-            PROMPT;
-    }
-
     /**
      * @param list<Message> $gap
      */
@@ -381,7 +329,7 @@ final readonly class ConversationSummaryService
     {
         $lines = ["\n\n## Recent (not yet condensed)"];
         foreach ($gap as $msg) {
-            $lines[] = $this->renderMessage($msg);
+            $lines[] = ConversationSummaryPrompts::renderMessage($msg);
         }
 
         return $this->clip($summary.implode("\n", $lines), $this->config->getSummaryMaxChars() + self::GAP_CHAR_CAP);
@@ -410,58 +358,6 @@ final readonly class ConversationSummaryService
         return array_reverse($reversed);
     }
 
-    /**
-     * @param list<Message> $older
-     */
-    private function buildSourceText(array $older, int $tiers): string
-    {
-        $tiers = max(1, min($tiers, count($older)));
-        $perTier = (int) ceil(count($older) / $tiers);
-        $chunks = array_chunk($older, max(1, $perTier));
-        $segmentCount = count($chunks);
-
-        $lines = [];
-        foreach ($chunks as $index => $chunk) {
-            $lines[] = sprintf('## Segment %d of %d (%s):', $index + 1, $segmentCount, $this->compressionHint($index, $segmentCount));
-            foreach ($chunk as $msg) {
-                $lines[] = $this->renderMessage($msg);
-            }
-            $lines[] = '';
-        }
-
-        return trim(implode("\n", $lines));
-    }
-
-    private function compressionHint(int $index, int $segmentCount): string
-    {
-        if ($segmentCount <= 1) {
-            return 'condense to the essentials';
-        }
-
-        if (0 === $index) {
-            return 'oldest — condense aggressively, essentials only';
-        }
-
-        if ($index === $segmentCount - 1) {
-            return 'most recent of the older turns — condense lightly, keep specifics and the current position';
-        }
-
-        return 'middle — condense moderately';
-    }
-
-    private function renderMessage(Message $msg): string
-    {
-        $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-        $text = (string) $msg->getText();
-
-        $fileText = (string) $msg->getFileText();
-        if ('' !== $fileText) {
-            $text .= ' [attached '.((string) $msg->getFileType()).': '.$this->clip($fileText, 500).']';
-        }
-
-        return sprintf('[#%d %s]: %s', (int) $msg->getId(), $role, $this->clip($text, ConversationSummaryConstants::SOURCE_MESSAGE_CHAR_CAP));
-    }
-
     private function messageLength(Message $msg): int
     {
         return mb_strlen((string) $msg->getText()) + mb_strlen($msg->getFileText());
@@ -474,10 +370,5 @@ final readonly class ConversationSummaryService
         }
 
         return rtrim(mb_substr($value, 0, $maxChars)).'…';
-    }
-
-    private function tokenBudgetFor(int $summaryMaxChars): int
-    {
-        return max(256, (int) ceil($summaryMaxChars / 3) + 256);
     }
 }
