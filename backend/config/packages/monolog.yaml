@@ -28,6 +28,13 @@ when@prod:
                 formatter: app.monolog_formatter
                 process_psr_3_messages: false
                 channels: ['security']
+            # Redacted event ring for on-demand troubleshooting (admin API + MCP).
+            # Captures warning+ regardless of LOG_LEVEL so operational warnings
+            # (fallbacks, degradations) stay queryable even when stderr is errors-only.
+            event_ring:
+                type: service
+                id: App\Monolog\EventRingHandler
+                channels: ['!event']
 
 when@dev:
     monolog:
@@ -38,6 +45,11 @@ when@dev:
                 level: '%env(default:log_level_dev:LOG_LEVEL)%'
                 formatter: app.monolog_formatter
                 process_psr_3_messages: false
+            # Same redacted ring as prod, so the feed can be exercised in dev.
+            event_ring:
+                type: service
+                id: App\Monolog\EventRingHandler
+                channels: ['!event']
 
 when@test:
     monolog:
