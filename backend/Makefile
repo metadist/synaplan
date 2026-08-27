@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval summary-eval
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -86,6 +86,9 @@ test: ## Run all PHPUnit tests
 
 plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:multitask:plan-eval
+
+summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:summary:eval
 
 # Allow passing arguments to console target
 %:
