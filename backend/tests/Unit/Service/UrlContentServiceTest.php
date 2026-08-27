@@ -49,14 +49,14 @@ HTML;
 </body></html>
 HTML;
 
-        $chat = $this->service([
+        $result = $this->service([
             new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         ])->fetch('https://fps.energy/');
 
-        self::assertTrue($chat->success);
-        self::assertStringContainsString('Energiewende', $chat->extractedText);
-        self::assertStringContainsString('hydrogen', $chat->extractedText);
-        self::assertGreaterThan(80, mb_strlen($chat->extractedText));
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Energiewende', $result->extractedText);
+        self::assertStringContainsString('hydrogen', $result->extractedText);
+        self::assertGreaterThan(80, mb_strlen($result->extractedText));
 
         $crawl = $this->service([
             new MockResponse("User-agent: *\nDisallow:\n", ['http_code' => 200]),
@@ -66,6 +66,28 @@ HTML;
         self::assertTrue($crawl->success);
         self::assertStringContainsString('Energiewende', $crawl->extractedText);
         self::assertGreaterThan(80, mb_strlen($crawl->extractedText));
+    }
+
+    public function testKeepsArticleHeaderWhenLandmarkIsAlreadyTargeted(): void
+    {
+        $html = <<<'HTML'
+<html><body>
+<nav>Home About Pricing Contact lots of navigation chrome that is not the article</nav>
+<article>
+  <header><h1>Reliable hydrogen supply for city bus fleets</h1></header>
+  <p>The article body has enough characters on its own so the extractor stays inside the landmark and still keeps the heading.</p>
+</article>
+</body></html>
+HTML;
+
+        $result = $this->service([
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ])->fetch('https://example.com/buses');
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Reliable hydrogen supply', $result->extractedText);
+        self::assertStringContainsString('article body', $result->extractedText);
+        self::assertStringNotContainsString('navigation chrome', $result->extractedText);
     }
 
     public function testUsesEntryContentLandmarkWhenItHasEnoughText(): void
