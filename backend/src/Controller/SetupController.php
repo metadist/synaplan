@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Client\ClientContextResolver;
 use App\Service\GuestChatConfig;
+use App\Service\MailerConfig;
 use App\Service\RegistrationConfig;
 use App\Service\Setup\SetupStateService;
 use App\Service\TokenService;
@@ -59,6 +60,7 @@ final class SetupController extends AbstractController
         private readonly LockFactory $lockFactory,
         private readonly RateLimiterFactoryInterface $setupAttemptLimiter,
         private readonly LoggerInterface $logger,
+        private readonly MailerConfig $mailerConfig,
     ) {
     }
 
@@ -98,7 +100,7 @@ final class SetupController extends AbstractController
         return $this->json([
             'wizardRequired' => $this->setupState->isSetupRequired(),
             'adminExists' => $this->userRepository->hasAdmin(),
-            'mailerConfigured' => $this->isMailerConfigured(),
+            'mailerConfigured' => $this->mailerConfig->isConfigured(),
             'access' => [
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
@@ -309,16 +311,5 @@ final class SetupController extends AbstractController
         $this->tokenService->addAuthCookies($response, $accessToken, $refreshToken);
 
         return $response;
-    }
-
-    /**
-     * Same rule as {@see \App\Service\Admin\SystemConfigService::testMailer()}:
-     * an unset DSN or the null transport means nothing is ever delivered.
-     */
-    private function isMailerConfigured(): bool
-    {
-        $dsn = trim((string) ($_ENV['MAILER_DSN'] ?? ''));
-
-        return '' !== $dsn && 'null://null' !== $dsn;
     }
 }

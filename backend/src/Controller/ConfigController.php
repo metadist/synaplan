@@ -25,6 +25,7 @@ use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\GuestChatConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
+use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
@@ -78,6 +79,7 @@ class ConfigController extends AbstractController
         private SetupStateService $setupState,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
+        private MailerConfig $mailerConfig,
         private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
@@ -147,6 +149,7 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
                         new OA\Property(property: 'guestChatEnabled', type: 'boolean', example: true, description: 'When false, the anonymous guest trial chat is disabled (set GUEST_CHAT_ENABLED=false, e.g. for OIDC-only deployments): the frontend sends unauthenticated visitors to /login and every /api/v1/guest endpoint is refused server-side.'),
+                        new OA\Property(property: 'mailerConfigured', type: 'boolean', example: true, description: 'False when MAILER_DSN is unset or the null transport. The forgot-password page then shows the CLI reset instead of pretending an email will arrive.'),
                     ]
                 ),
                 new OA\Property(
@@ -597,6 +600,7 @@ class ConfigController extends AbstractController
                 // unauthenticated visitors are sent to /login instead of the
                 // anonymous guest trial (issue #1517).
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
+                'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),

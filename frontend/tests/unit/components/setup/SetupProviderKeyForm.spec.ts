@@ -109,4 +109,18 @@ describe('SetupProviderKeyForm', () => {
       'https://console.groq.com/keys'
     )
   })
+
+  // A bare "free tier available" was read as a statement about Synaplan's own
+  // pricing, so the hint has to name the provider that hands out the key.
+  it('names the provider when saying the key is free', () => {
+    expect(mountForm().get('[data-testid="setup-provider-free-tier"]').text()).toBe(
+      'Getting an API key from Groq is free.'
+    )
+  })
+
+  it('promises nothing about pricing for a provider without a free tier', () => {
+    const wrapper = mountForm({ freeTier: false })
+
+    expect(wrapper.find('[data-testid="setup-provider-free-tier"]').exists()).toBe(false)
+  })
 })

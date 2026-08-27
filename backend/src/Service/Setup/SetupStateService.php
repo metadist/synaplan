@@ -6,6 +6,7 @@ namespace App\Service\Setup;
 
 use App\Repository\ConfigRepository;
 use App\Repository\UserRepository;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Decides whether this installation still needs its first-run setup.
@@ -32,9 +33,11 @@ use App\Repository\UserRepository;
  *
  * Not `readonly`: the result is memoized per request because
  * {@see ConfigRepository} does not cache and the lockdown subscriber asks on
- * every single request.
+ * every single request. {@see ResetInterface} clears that memo between
+ * requests so a FrankenPHP worker does not keep answering "setup required"
+ * after the first administrator already exists.
  */
-final class SetupStateService
+final class SetupStateService implements ResetInterface
 {
     private ?bool $completed = null;
 
@@ -112,5 +115,11 @@ final class SetupStateService
 
         $this->completed = true;
         $this->required = false;
+    }
+
+    public function reset(): void
+    {
+        $this->completed = null;
+        $this->required = null;
     }
 }

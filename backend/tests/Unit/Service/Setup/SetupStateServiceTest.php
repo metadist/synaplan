@@ -152,6 +152,25 @@ final class SetupStateServiceTest extends TestCase
         $this->service()->markCompleted();
     }
 
+    /**
+     * FrankenPHP keeps the service alive across requests. Without a reset the
+     * first "setup required" answer would stick, and /auth/me after creating
+     * the administrator would keep returning 503.
+     */
+    public function testResetClearsTheMemoSoTheNextRequestSeesTheNewUser(): void
+    {
+        $this->configRepository->expects($this->exactly(2))->method('getValue')->willReturn(null);
+        $this->userRepository->expects($this->exactly(2))->method('countAll')
+            ->willReturnOnConsecutiveCalls(0, 1);
+
+        $service = $this->service();
+        self::assertTrue($service->isSetupRequired());
+
+        $service->reset();
+
+        self::assertFalse($service->isSetupRequired());
+    }
+
     private function service(): SetupStateService
     {
         return new SetupStateService($this->configRepository, $this->userRepository);

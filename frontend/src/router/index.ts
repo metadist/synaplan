@@ -15,6 +15,8 @@ import { isPurchaseAllowed } from '@/services/api/nativeServer'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
+import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
+import { resolveRegistrationRedirect } from '@/router/registrationGate'
 import { isSetupWizardRequired, resolveSetupGate, SETUP_ROUTE } from '@/router/setupGate'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -38,15 +40,16 @@ const guardSubscription = (
 // #462: on SSO-/OIDC-only instances (REGISTRATION_ENABLED=false) the /register
 // route must be unreachable by direct URL, not just hidden from the login page.
 const guardRegistration = (
-  _to: RouteLocationNormalized,
+  to: RouteLocationNormalized,
   _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ) => {
-  if (!useConfigStore().auth.registrationEnabled) {
-    next({ name: 'login' })
-  } else {
-    next()
+  const redirect = resolveRegistrationRedirect(useConfigStore().auth.registrationEnabled, to.query)
+  if (redirect) {
+    next(redirect)
+    return
   }
+  next()
 }
 
 /**
@@ -659,7 +662,7 @@ function targetPath(target: RouteLocationRaw): string {
 
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   // Wait for initial auth check with timeout to prevent hanging
   try {
     await Promise.race([
@@ -799,15 +802,12 @@ router.beforeEach(async (to, from, next) => {
     // entry. No loop is possible: the chat branch above only redirects here
     // while `shouldShowOnboarding` is true, which requires native + signed-out.
     next(authenticated ? resolveDefaultRoute() : { name: 'chat' })
-  } else if (isPublicRoute && isAuthenticated.value && to.name === 'login') {
-    // Already logged in, redirect to home (but check for loops)
-    const home = resolveDefaultRoute()
-    if (from.path === targetPath(home) || detectRedirectLoop('/')) {
-      // Prevent ping-pong between login and the home route
-      next()
-      return
-    }
-    next(home)
+  } else if (authenticated && isGuestOnlyAuthRoute(to.name)) {
+    // Signed-in users who type /login or /register belong in the app, not on
+    // a second sign-in form. Do not special-case "came from home": that is
+    // exactly the navigation this must catch (chat → /login, or a /login
+    // bookmark while the session cookie is still valid).
+    next(resolveDefaultRoute())
   } else {
     next()
   }

@@ -24,8 +24,9 @@ vi.mock('@/stores/config', () => ({
 }))
 
 const refreshUser = vi.fn().mockResolvedValue(undefined)
+const adoptCurrentSession = vi.fn()
 vi.mock('@/stores/auth', () => ({
-  useAuthStore: () => ({ refreshUser }),
+  useAuthStore: () => ({ refreshUser, adoptCurrentSession }),
 }))
 
 const virginState = {
@@ -119,7 +120,11 @@ describe('SetupWizardView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="stub-provider"]').exists()).toBe(true)
+    expect(adoptCurrentSession).toHaveBeenCalled()
     expect(refreshUser).toHaveBeenCalled()
+    expect(adoptCurrentSession.mock.invocationCallOrder[0]).toBeLessThan(
+      refreshUser.mock.invocationCallOrder[0]
+    )
   })
 
   it('stops claiming there is no administrator once one has been created', async () => {

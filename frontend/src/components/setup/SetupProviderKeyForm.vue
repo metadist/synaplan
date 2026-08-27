@@ -24,6 +24,20 @@
       </a>
     </div>
 
+    <!-- Names the provider, because a bare "free tier available" reads as a claim
+         about Synaplan's own pricing. What is free is the key this panel asks
+         for, and it is the provider who hands it out. -->
+    <p
+      v-if="provider.freeTier"
+      class="flex items-start gap-1.5 text-xs text-[var(--status-success-text)]"
+      data-testid="setup-provider-free-tier"
+    >
+      <!-- `items-start`, not `items-center`: at 375 px the sentence wraps to two
+           lines and a centred icon would float between them. -->
+      <Icon icon="mdi:gift-outline" class="w-4 h-4 shrink-0 mt-px" />
+      {{ $t('setup.provider.freeKeyHint', { provider: provider.displayName }) }}
+    </p>
+
     <div class="flex flex-col gap-2 sm:flex-row">
       <input
         ref="keyField"

@@ -9,6 +9,7 @@
 import { httpClient } from './httpClient'
 import { setNativeTokens } from '@/services/api/nativeAuth'
 import { setSessionHint } from '@/services/sessionHint'
+import { authService } from '@/services/authService'
 import {
   GetApiSetupStateResponseSchema,
   PostApiSetupAdminResponseSchema,
@@ -51,9 +52,17 @@ export const createFirstAdmin = async (
   })
 
   // Same order as a normal login: tokens first (the app needs them for the very
-  // next request), then the hint that unlocks the refresh path.
+  // next request), then the hint that unlocks the refresh path, then the user
+  // so Pinia is authenticated before /auth/me can run.
   setNativeTokens(result.tokens)
   setSessionHint()
+  authService.adoptSession({
+    id: result.user.id,
+    email: result.user.email,
+    level: result.user.level,
+    isAdmin: result.user.isAdmin,
+    emailVerified: true,
+  })
 
   return result
 }

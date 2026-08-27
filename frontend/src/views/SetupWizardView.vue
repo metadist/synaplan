@@ -229,12 +229,15 @@ const access = computed(() => state.value?.access ?? DEFAULT_ACCESS)
 
 /**
  * Step 1 already signed the new administrator in via auth cookies (or native
- * Bearer tokens). Syncing the auth store here means step 2's admin API calls and
- * the final navigation see a signed-in user instead of an anonymous one.
+ * Bearer tokens). Adopting that session into Pinia before refreshing means the
+ * completion screen navigates as a signed-in user even if /auth/me is still
+ * briefly closed by the setup lockdown.
  */
 async function afterAdminCreated(): Promise<void> {
   step.value = 'provider'
-  await useAuthStore().refreshUser()
+  const auth = useAuthStore()
+  auth.adoptCurrentSession()
+  await auth.refreshUser()
 }
 
 onMounted(load)

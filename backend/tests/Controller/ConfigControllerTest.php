@@ -113,4 +113,20 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertArrayHasKey('demoLoginHint', $data['setup']);
         $this->assertIsBool($data['setup']['demoLoginHint']);
     }
+
+    public function testRuntimeConfigTellsAnonymousClientsWhetherMailCanBeDelivered(): void
+    {
+        $client = static::createClient();
+
+        $client->request('GET', '/api/v1/config/runtime');
+
+        $this->assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('auth', $data);
+        $this->assertIsArray($data['auth']);
+        $this->assertArrayHasKey('mailerConfigured', $data['auth']);
+        $this->assertIsBool($data['auth']['mailerConfigured']);
+    }
 }

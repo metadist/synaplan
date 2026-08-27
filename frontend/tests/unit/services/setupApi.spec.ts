@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const httpClient = vi.fn()
 const setNativeTokens = vi.fn()
 const setSessionHint = vi.fn()
+const adoptSession = vi.fn()
 
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: (...args: unknown[]) => httpClient(...args),
@@ -14,6 +15,10 @@ vi.mock('@/services/api/nativeAuth', () => ({
 
 vi.mock('@/services/sessionHint', () => ({
   setSessionHint: () => setSessionHint(),
+}))
+
+vi.mock('@/services/authService', () => ({
+  authService: { adoptSession: (...args: unknown[]) => adoptSession(...args) },
 }))
 
 const { createFirstAdmin, completeSetup } = await import('@/services/api/setupApi')
@@ -40,6 +45,18 @@ describe('setupApi.createFirstAdmin', () => {
     expect(setSessionHint).toHaveBeenCalled()
   })
 
+  it('adopts the signed-in administrator so the SPA does not wait for /auth/me', async () => {
+    await createFirstAdmin('admin@example.com', 'Sup3rSecret')
+
+    expect(adoptSession).toHaveBeenCalledWith({
+      id: 1,
+      email: 'admin@example.com',
+      level: 'ADMIN',
+      isAdmin: true,
+      emailVerified: true,
+    })
+  })
+
   it('persists the Bearer tokens the native shell authenticates with', async () => {
     const tokens = { accessToken: 'a', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 300 }
     httpClient.mockResolvedValue({ ...adminResult, tokens })
@@ -61,6 +78,7 @@ describe('setupApi.createFirstAdmin', () => {
     await expect(createFirstAdmin('admin@example.com', 'Sup3rSecret')).rejects.toThrow()
     expect(setSessionHint).not.toHaveBeenCalled()
     expect(setNativeTokens).not.toHaveBeenCalled()
+    expect(adoptSession).not.toHaveBeenCalled()
   })
 
   it('sends the access policy as the signed-in administrator', async () => {

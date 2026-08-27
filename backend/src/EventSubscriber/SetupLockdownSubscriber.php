@@ -46,8 +46,11 @@ final readonly class SetupLockdownSubscriber
     /**
      * The only routes reachable during setup: the wizard's own endpoints, the
      * public runtime config the SPA needs in order to boot and find out that
-     * setup is required at all, and the health probe so orchestrators do not
-     * mark a fresh container as unhealthy.
+     * setup is required at all, the health probe so orchestrators do not mark
+     * a fresh container as unhealthy, and the session endpoints the wizard
+     * uses after POST /admin signs the new administrator in. Without those
+     * last two the SPA cannot learn who it is, and the completion screen
+     * would bounce to /login.
      */
     private const ALLOWED_ROUTES = [
         'api_setup_state',
@@ -55,6 +58,8 @@ final readonly class SetupLockdownSubscriber
         'api_setup_complete',
         'api_config_runtime_config',
         'api_health',
+        'api_auth_me',
+        'api_auth_refresh',
     ];
 
     /**

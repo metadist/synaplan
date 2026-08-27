@@ -28,12 +28,15 @@ describe('SetupProviderTile', () => {
     const wrapper = mountTile()
 
     expect(wrapper.text()).toContain('Groq')
-    expect(wrapper.text()).not.toContain('Free tier')
     expect(wrapper.text()).not.toContain('Recommended')
   })
 
-  it('marks a free tier, because that is what makes a provider worth trying first', () => {
-    expect(mountTile({ freeTier: true }).text()).toContain('Free tier')
+  it('marks the recommended provider, the one question this screen has to answer', () => {
+    expect(mountTile({ recommended: true }).text()).toContain('Recommended')
+  })
+
+  it('leaves the free-tier note to the key panel, where fetching a key happens', () => {
+    expect(mountTile({ freeTier: true }).text()).not.toMatch(/free/i)
   })
 
   it('carries the connected state for assistive technology too', () => {

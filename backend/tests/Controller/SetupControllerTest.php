@@ -117,6 +117,28 @@ final class SetupControllerTest extends WebTestCase
     }
 
     /**
+     * The completion screen refreshes the user via /auth/me. That call has to
+     * succeed with the cookies POST /admin just set, or the SPA thinks nobody
+     * is signed in and sends the administrator to /login.
+     */
+    public function testCreateFirstAdminSessionIsReadableViaAuthMe(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123');
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $this->rememberCreatedUser($client, self::NEW_ADMIN_EMAIL);
+
+        $client->request('GET', '/api/v1/auth/me');
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->payload($client);
+        self::assertTrue($payload['success']);
+        self::assertSame(self::NEW_ADMIN_EMAIL, $payload['user']['email']);
+        self::assertTrue($payload['user']['isAdmin']);
+    }
+
+    /**
      * Cookies only, unless the caller identifies itself as the native app — the
      * same rule AuthController::login() follows, because a web client that
      * received Bearer tokens in a JSON body would be storing them in JavaScript.

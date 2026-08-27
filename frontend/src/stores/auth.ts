@@ -299,6 +299,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /**
+   * Mirror a session that was opened outside `login()` — the setup wizard
+   * signs the new administrator in via cookies, then calls this so the rest
+   * of the SPA (and the completion-screen navigation) see a signed-in user.
+   */
+  function adoptCurrentSession(): void {
+    syncFromAuthService()
+  }
+
   async function refreshUser(): Promise<void> {
     loading.value = true
     try {
@@ -603,6 +612,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
+    adoptCurrentSession,
     refreshUser,
     checkAuth,
     handleOAuthCallback,

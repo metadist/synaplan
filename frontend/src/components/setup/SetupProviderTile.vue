@@ -30,34 +30,26 @@
     <!-- Screen readers get the state the check mark conveys visually. -->
     <span v-if="provider.configured" class="sr-only">{{ $t('adminSetup.connected') }}</span>
 
-    <!-- Both badges use a muted fill. Solid `--brand` with white ink is only
-         4.5:1 in light theme; in dark theme `--brand` lightens and the same
-         chip drops to 2.9:1, which is unreadable at this size. -->
-    <span v-if="hasBadge" class="flex flex-wrap justify-center gap-1">
-      <span
-        v-if="provider.recommended"
-        class="text-[11px] font-medium leading-none px-1.5 py-1 rounded-full bg-[var(--brand-alpha-light)] txt-brand"
-      >
-        {{ $t('adminSetup.recommended') }}
-      </span>
-      <span
-        v-if="provider.freeTier"
-        class="text-[11px] font-medium leading-none px-1.5 py-1 rounded-full bg-[var(--status-success-muted)] text-[var(--status-success-text)]"
-        :title="$t('adminSetup.freeTier')"
-      >
-        {{ $t('setup.provider.freeTierBadge') }}
-      </span>
+    <!-- Muted fill, not a solid brand chip: solid `--brand` with white ink is
+         only 4.5:1 in light theme, and in dark theme `--brand` lightens and the
+         same chip drops to 2.9:1 — unreadable at this size.
+         The free-tier note deliberately lives in the key panel instead: it
+         matters when someone is about to fetch a key, not while scanning logos. -->
+    <span
+      v-if="provider.recommended"
+      class="text-[11px] font-medium leading-none px-1.5 py-1 rounded-full bg-[var(--brand-alpha-light)] txt-brand"
+    >
+      {{ $t('adminSetup.recommended') }}
     </span>
   </button>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import type { ProviderKeyStatus } from '@/services/api/providerKeysApi'
 
-const props = defineProps<{
+defineProps<{
   provider: ProviderKeyStatus
   selected: boolean
 }>()
@@ -65,6 +57,4 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: []
 }>()
-
-const hasBadge = computed(() => props.provider.recommended || props.provider.freeTier)
 </script>

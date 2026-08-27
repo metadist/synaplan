@@ -11,19 +11,6 @@
       <p class="text-sm txt-secondary mt-1">{{ $t('setup.done.description') }}</p>
     </div>
 
-    <!--
-      The one line someone reads while locked out of their own server, so the
-      command is set apart from the prose instead of wrapping inside it.
-    -->
-    <div class="flex flex-col gap-1.5">
-      <p class="text-xs txt-secondary">{{ $t('setup.done.recoveryHint') }}</p>
-      <code
-        class="text-xs font-mono surface-chip px-2.5 py-2 rounded-lg txt-primary break-all text-left"
-        data-testid="setup-done-recovery-command"
-        >{{ $t('setup.done.recoveryCommand') }}</code
-      >
-    </div>
-
     <button
       type="button"
       class="btn-primary w-full py-2.5 rounded-lg text-sm font-semibold"

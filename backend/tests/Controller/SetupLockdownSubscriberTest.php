@@ -105,6 +105,37 @@ final class SetupLockdownSubscriberTest extends WebTestCase
     }
 
     /**
+     * After POST /admin the wizard calls /auth/me to populate the SPA session.
+     * A 503 here is what used to bounce the administrator to the login page
+     * at the end of the wizard.
+     */
+    public function testAuthMeStaysReachableDuringSetup(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $client->request('GET', '/api/v1/auth/me');
+
+        self::assertNotSame(
+            Response::HTTP_SERVICE_UNAVAILABLE,
+            $client->getResponse()->getStatusCode(),
+            'the wizard must be able to read the session it just opened'
+        );
+    }
+
+    public function testAuthRefreshStaysReachableDuringSetup(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $client->request('POST', '/api/v1/auth/refresh');
+
+        self::assertNotSame(
+            Response::HTTP_SERVICE_UNAVAILABLE,
+            $client->getResponse()->getStatusCode(),
+            'the wizard must be able to renew the session it just opened'
+        );
+    }
+
+    /**
      * A 503 on the preflight turns every cross-origin call into an opaque
      * browser error instead of the readable 503 the real request gets.
      */
