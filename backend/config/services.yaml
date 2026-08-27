@@ -428,6 +428,10 @@ services:
         tags:
             - { name: 'app.ai.text_to_speech' }
 
+    App\AI\Provider\WhisperProvider:
+        tags:
+            - { name: 'app.ai.speech_to_text' }
+
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
@@ -654,7 +658,6 @@ services:
     App\Service\ModelConfigService:
         arguments:
             $cache: '@cache.model_config'
-            $environment: '%kernel.environment%'
 
     # Shares the model_config pool so applying provider defaults invalidates
     # the same cached lookups ModelConfigService serves from.

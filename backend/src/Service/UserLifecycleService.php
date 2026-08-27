@@ -13,8 +13,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Central factory for BUSER rows.
  *
  * Every code path that creates a user account should go through createUser()
- * so entity defaults and post-create side effects (per-user default model
- * config) stay consistent. Deletion lives in {@see UserDeletionService};
+ * so entity defaults stay consistent. New accounts no longer receive frozen
+ * per-user DEFAULTMODEL rows — global defaults apply until the user picks.
+ * Deletion lives in {@see UserDeletionService};
  * together they form the user lifecycle.
  *
  * Current callers: AuthController::register(), AdminUserProvisioningService.
@@ -33,7 +34,7 @@ final readonly class UserLifecycleService
     }
 
     /**
-     * Create and persist a user, then seed per-user default model config.
+     * Create and persist a user. Default models stay global until the user picks.
      *
      * @param string               $email         login email (uniqueness must be checked by the caller,
      *                                            since the required conflict behavior differs per flow)

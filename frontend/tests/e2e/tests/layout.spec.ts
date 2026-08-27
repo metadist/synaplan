@@ -331,12 +331,19 @@ test.describe('@ci @layout UI guard — key pages', () => {
     await expect(page.locator(selectors.models.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await expectNoHorizontalOverflow(page, 'ai models')
 
-    // §2.8 B1: the "reset defaults" header button used to overflow the card
-    // on ~390px viewports. It must render fully inside the viewport.
-    const resetBtn = page.locator(selectors.inboundConfig.resetDefaults)
-    await expect(resetBtn).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await resetBtn.scrollIntoViewIfNeeded()
-    await expectInsideViewport(page, selectors.inboundConfig.resetDefaults, 'reset-defaults button')
+    // Wait for the catalog so the suggested-models button can appear.
+    await expect(page.locator(selectors.models.capabilityItem).first()).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+
+    // §2.8 B1: when "Select suggested models" is shown, it must stay inside
+    // the viewport on ~390px. The button is hidden unless every key-based
+    // provider has credentials (the CI E2E stack typically does not).
+    const resetBtn = page.locator(selectors.models.resetDefaults)
+    if (await resetBtn.isVisible()) {
+      await resetBtn.scrollIntoViewIfNeeded()
+      await expectInsideViewport(page, selectors.models.resetDefaults, 'reset-defaults button')
+    }
   })
 
   test('login page has no overflow and reachable submit', async ({ page }) => {

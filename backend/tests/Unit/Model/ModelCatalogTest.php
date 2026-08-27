@@ -33,6 +33,20 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('huggingface', ModelCatalog::normalizeProvider('huggingface'));
     }
 
+    public function testCollapseCountsByProviderMergesAliasSpellings(): void
+    {
+        $merged = ModelCatalog::collapseCountsByProvider([
+            'huggingface' => ['active' => 2, 'total' => 4],
+            'hugging face' => ['active' => 1, 'total' => 1],
+            'openai' => ['active' => 3, 'total' => 3],
+        ]);
+
+        $this->assertSame([
+            'huggingface' => ['active' => 3, 'total' => 5],
+            'openai' => ['active' => 3, 'total' => 3],
+        ], $merged);
+    }
+
     public function testFindIsCaseInsensitive(): void
     {
         $lower = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat');
@@ -125,18 +139,118 @@ class ModelCatalogTest extends TestCase
         ModelCatalog::upsert($connection, $model);
     }
 
-    public function testRemoveCallsDeleteById(): void
+    public function testEnableInsertsMissingModel(): void
     {
         $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(false);
         $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
 
         // @phpstan-ignore-next-line
         $connection
             ->expects($this->once())
             ->method('executeStatement')
-            ->with('DELETE FROM BMODELS WHERE BID = ?', [$model['id']]);
+            ->with($this->stringContains('INSERT INTO BMODELS'));
 
-        ModelCatalog::remove($connection, $model);
+        ModelCatalog::enable($connection, $model);
+    }
+
+    public function testEnableExistingModelRestoresVisibilityFlagsToCatalogValues(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn('42');
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        // Only the operator-owned visibility flags are written — an admin's
+        // price or name edits must survive an enable like they survive a re-seed.
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                'UPDATE BMODELS SET BACTIVE = ?, BSELECTABLE = ? WHERE BID = ?',
+                [$model['active'], $model['selectable'], $model['id']]
+            );
+
+        ModelCatalog::enable($connection, $model);
+    }
+
+    /**
+     * Disabling must never DELETE: BMESSAGES references the BID, and
+     * ModelSeeder re-inserts any absent catalog row on the next container
+     * start — which is exactly how the old DELETE-based disable silently
+     * reverted itself.
+     */
+    public function testDisableDeactivatesExistingRowWithoutDeleting(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn('42');
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                'UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0 WHERE BID = ?',
+                [$model['id']]
+            );
+
+        ModelCatalog::disable($connection, $model);
+    }
+
+    public function testDisableInsertsMissingRowSoTheDeactivationSurvivesReseed(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(false);
+        $model = ModelCatalog::find('groq:qwen/qwen3.6-27b:chat')[0];
+
+        $statements = [];
+        $connection->method('executeStatement')
+            ->willReturnCallback(static function (string $sql) use (&$statements): int {
+                $statements[] = $sql;
+
+                return 1;
+            });
+
+        ModelCatalog::disable($connection, $model);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString('INSERT INTO BMODELS', $statements[0]);
+        $this->assertStringContainsString('UPDATE BMODELS SET BACTIVE = 0, BSELECTABLE = 0', $statements[1]);
+        foreach ($statements as $sql) {
+            $this->assertStringNotContainsString('DELETE', $sql);
+        }
+    }
+
+    public function testFindByServiceMatchesCaseInsensitivelyAndCollapsesAliases(): void
+    {
+        $lower = ModelCatalog::findByService('groq');
+        $upper = ModelCatalog::findByService('  GROQ ');
+
+        $this->assertNotEmpty($lower);
+        $this->assertSame($lower, $upper);
+        $this->assertSame(['Groq'], array_unique(array_column($lower, 'service')));
+
+        // The 'Hugging Face' alias must resolve like the canonical name (#1313).
+        $this->assertSame(
+            ModelCatalog::findByService('huggingface'),
+            ModelCatalog::findByService('Hugging Face')
+        );
+
+        $this->assertSame([], ModelCatalog::findByService('skynet'));
+    }
+
+    public function testServiceNamesAreKeyedByNormalizedName(): void
+    {
+        $names = ModelCatalog::serviceNames();
+
+        $this->assertSame('Groq', $names['groq']);
+        $this->assertSame('OpenAI', $names['openai']);
+        $this->assertSame('Ollama', $names['ollama']);
+
+        foreach (array_keys($names) as $key) {
+            $this->assertSame(ModelCatalog::normalizeProvider($key), $key);
+        }
     }
 
     public function testUpsertSqlDoesNotOverwriteOperatorOwnedFields(): void

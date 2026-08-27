@@ -2721,6 +2721,7 @@
       "resetDefaults": "Önerilen modelleri seç",
       "resetDefaultsConfirm": "Önerilen model seçimi uygulansın mı? Kişisel ayarlarınız önerilen varsayılanlarla değiştirilecek.",
       "resetDefaultsSuccess": "Önerilen modeller uygulandı",
+      "resetDefaultsNoneApplied": "Hiçbir önerilen model uygulanamadı — henüz yapılandırılmış bir AI sağlayıcısı yok. Önce bir API anahtarı ekleyin.",
       "resetDefaultsError": "Önerilen modeller uygulanamadı",
       "tableName": "Ad",
       "tableService": "Hizmet",
@@ -2743,6 +2744,12 @@
       },
       "admin": {
         "catalogSubtitle": "Sistem model kataloğunu arayın ve düzenleyin.",
+        "availability": {
+          "providerUnavailable": "Sağlayıcı yapılandırılmamış",
+          "providerUnavailableTooltip": "Bu yapay zeka sağlayıcısı için bu kurulumda API anahtarı veya sunucu URL'si yok. Sağlayıcı yapılandırılana kadar kullanıcılar bu modeli görmez.",
+          "notPulled": "İndirilmemiş",
+          "notPulledTooltip": "Bu model yerel Ollama sunucusuna henüz indirilmedi. İndirilene kadar kullanıcılar bu modeli görmez."
+        },
         "bulkImportSubtitle": "Sağlayıcı belgelerinden SQL oluşturup uygulayın (gelişmiş).",
         "addModels": "Toplu içe aktarma (SQL)",
         "failedCreate": "Model oluşturulamadı",
