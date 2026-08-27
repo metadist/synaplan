@@ -17,7 +17,13 @@ import { shouldShowOnboarding } from '@/composables/useOnboarding'
 import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/forcedPasswordChange'
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
 import { resolveRegistrationRedirect } from '@/router/registrationGate'
-import { isSetupWizardRequired, resolveSetupGate, SETUP_ROUTE } from '@/router/setupGate'
+import {
+  ensureWizardRequired,
+  invalidateSetupWizardRequired,
+  isSetupRecheckRoute,
+  resolveSetupGate,
+  SETUP_ROUTE,
+} from '@/router/setupGate'
 import { i18n } from '@/i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -663,6 +669,25 @@ function targetPath(target: RouteLocationRaw): string {
 // Global navigation guard for authentication
 // With cookie-based auth, we wait for auth check then verify session
 router.beforeEach(async (to, _from, next) => {
+  // First-run setup comes BEFORE the auth wait: leftover cookies from a wiped
+  // admin must not stall the visitor on /login, and the 10s auth timeout must
+  // not skip the wizard. `/setup/state` is re-fetched on entry routes so a
+  // CLI `app:setup:reset` is visible even when this tab still holds a stale
+  // runtime config with wizardRequired: false.
+  const wizardRequired = await ensureWizardRequired({
+    fresh: isSetupRecheckRoute(to.name),
+  }).catch(() => false)
+
+  const setupGate = resolveSetupGate({
+    wizardRequired,
+    routeName: to.name,
+    isNativeOnboarding: 'onboarding' === to.name && isNativeApp(),
+  })
+  if ('force' === setupGate) {
+    next({ name: SETUP_ROUTE })
+    return
+  }
+
   // Wait for initial auth check with timeout to prevent hanging
   try {
     await Promise.race([
@@ -671,6 +696,10 @@ router.beforeEach(async (to, _from, next) => {
     ])
   } catch (err) {
     console.error('Auth initialization failed:', err)
+    if ('release' === setupGate) {
+      next({ name: 'login' })
+      return
+    }
     // If auth check times out, allow navigation to public routes only
     // (guest-allowed routes count as protected while the trial is disabled)
     if (
@@ -698,20 +727,6 @@ router.beforeEach(async (to, _from, next) => {
 
   const { isAuthenticated, isAdmin, user } = useAuth()
 
-  // First-run setup comes before every other decision: on an installation
-  // without an administrator the backend answers 503 SETUP_REQUIRED everywhere
-  // else, so a login page or a landing page would only render an error the
-  // visitor cannot act on. `wizardRequired` defaults to false, so an instance
-  // whose runtime config failed to load never lands here.
-  const setupGate = resolveSetupGate({
-    wizardRequired: isSetupWizardRequired(),
-    routeName: to.name,
-    isNativeOnboarding: 'onboarding' === to.name && isNativeApp(),
-  })
-  if ('force' === setupGate) {
-    next({ name: SETUP_ROUTE })
-    return
-  }
   if ('release' === setupGate) {
     next(isAuthenticated.value ? resolveDefaultRoute() : { name: 'login' })
     return
@@ -847,5 +862,30 @@ router.onError((error, to) => {
     stack: error.stack ?? '',
   })
 })
+
+// `app:setup:reset` cannot touch this tab. When the operator comes back from
+// the terminal, re-ask the server and send them into the wizard if it reopened.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if ('visible' !== document.visibilityState) {
+      return
+    }
+
+    invalidateSetupWizardRequired()
+    void (async () => {
+      const required = await ensureWizardRequired({ fresh: true })
+      if (!required) {
+        return
+      }
+
+      const current = router.currentRoute.value
+      if (SETUP_ROUTE === current.name || ('onboarding' === current.name && isNativeApp())) {
+        return
+      }
+
+      await router.replace({ name: SETUP_ROUTE })
+    })()
+  })
+}
 
 export default router

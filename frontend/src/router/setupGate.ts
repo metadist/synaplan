@@ -1,16 +1,135 @@
-import { getConfigSync } from '@/services/api/httpClient'
+import { getConfig, getConfigSync } from '@/services/api/httpClient'
+import { getSetupState } from '@/services/api/setupApi'
 
 export const SETUP_ROUTE = 'setup'
+
+/**
+ * Public entry routes a visitor hits after `app:setup:reset` or a fresh tab.
+ * These must re-ask the server instead of trusting a runtime config that was
+ * loaded before the CLI wiped the installation.
+ */
+const SETUP_RECHECK_ROUTES = new Set([
+  'chat',
+  'login',
+  'register',
+  SETUP_ROUTE,
+  'forgot-password',
+  'reset-password',
+  'logged-out',
+  'verify-email',
+])
+
+/** Last answer from `/api/v1/setup/state` (or runtime config). `null` = unknown. */
+let cachedRequired: boolean | null = null
+let inflight: Promise<boolean> | null = null
+
+export function isSetupRecheckRoute(routeName: string | symbol | null | undefined): boolean {
+  return 'string' === typeof routeName && SETUP_RECHECK_ROUTES.has(routeName)
+}
+
+/**
+ * False only when the operator set `SETUP_WIZARD_ENABLED=false`. That is the
+ * SSO/OIDC deployment: the administrator arrives through IdP roles, no local
+ * account is ever created, and an empty installation is a normal steady state
+ * rather than something to be set up.
+ *
+ * Defaults to true when the field is absent, so an older backend keeps the
+ * behaviour it has today.
+ */
+export function isSetupWizardEnabled(): boolean {
+  return false !== getConfigSync().setup?.wizardEnabled
+}
 
 /**
  * True only on a virgin installation that has no administrator and not a single
  * user yet.
  *
  * Defaults to false: a runtime config that could not be loaded must never send a
- * working installation into the wizard.
+ * working installation into the wizard. After a successful `/setup/state` probe
+ * the dedicated flag wins over a stale runtime config (CLI reset in another
+ * process leaves the SPA holding `wizardRequired: false`).
  */
 export function isSetupWizardRequired(): boolean {
-  return true === getConfigSync().setup?.wizardRequired
+  if (!isSetupWizardEnabled()) {
+    return false
+  }
+
+  if (true === getConfigSync().setup?.wizardRequired) {
+    return true
+  }
+
+  return true === cachedRequired
+}
+
+/**
+ * Drop the in-memory answer. Call this when the wizard closes so the next
+ * navigation does not bounce back into `/setup`.
+ */
+export function invalidateSetupWizardRequired(): void {
+  cachedRequired = null
+  inflight = null
+}
+
+/**
+ * Resolves whether the installation still needs the first-run wizard.
+ *
+ * Runtime config is the fast path when it already says yes. When it says no —
+ * including the default for a missing/failed load — `/api/v1/setup/state` is
+ * the source of truth, because `app:setup:reset` cannot clear the SPA cache.
+ *
+ * `fresh` skips the in-memory answer so `/`, `/login` and `/setup` notice a
+ * reset that happened while this tab stayed open.
+ */
+export async function ensureWizardRequired(options: { fresh?: boolean } = {}): Promise<boolean> {
+  if (!options.fresh && null !== cachedRequired) {
+    return cachedRequired
+  }
+
+  if (null !== inflight) {
+    return inflight
+  }
+
+  inflight = resolveWizardRequired().finally(() => {
+    inflight = null
+  })
+
+  return inflight
+}
+
+async function resolveWizardRequired(): Promise<boolean> {
+  await getConfig()
+
+  // An operator who switched the wizard off has answered this question for good.
+  // Probing `/setup/state` on every entry navigation would be pure noise on the
+  // SSO/OIDC installations that run permanently without local accounts.
+  if (!isSetupWizardEnabled()) {
+    cachedRequired = false
+    return false
+  }
+
+  if (true === getConfigSync().setup?.wizardRequired) {
+    cachedRequired = true
+    return true
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  try {
+    const state = await Promise.race([
+      getSetupState(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('setup state timeout')), 3000)
+      }),
+    ])
+    cachedRequired = true === state.wizardRequired
+    return cachedRequired
+  } catch {
+    cachedRequired = true === getConfigSync().setup?.wizardRequired
+    return cachedRequired
+  } finally {
+    if (undefined !== timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
 }
 
 /**

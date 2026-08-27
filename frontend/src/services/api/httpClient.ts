@@ -163,7 +163,8 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           ip: 'dev',
         },
       }
-      runtimeConfigRef.value = defaultConfig
+      // Do not cache the fallback. A failed load after `app:setup:reset` (backend
+      // briefly unreachable) must not permanently hide `setup.wizardRequired`.
       return defaultConfig
     } finally {
       configPromise = null
@@ -482,10 +483,21 @@ async function handleAuthFailure(): Promise<never> {
     `${basePath}/forgot-password`,
     `${basePath}/reset-password`,
     `${basePath}/logged-out`,
+    `${basePath}/setup`,
   ]
   const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
 
-  if (!isOnPublicAuthPage) {
+  let sendToSetup = true === getConfigSync().setup?.wizardRequired
+  try {
+    const { ensureWizardRequired } = await import('@/router/setupGate')
+    sendToSetup = await ensureWizardRequired({ fresh: true })
+  } catch {
+    // Keep the runtime-config answer when the dedicated probe cannot run.
+  }
+
+  if (sendToSetup) {
+    await redirectToSetupWizard()
+  } else if (!isOnPublicAuthPage) {
     try {
       const { default: router } = await import('@/router')
       router.push({ name: 'login', query: { reason: 'session_expired' } })

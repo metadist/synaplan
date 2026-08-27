@@ -54,7 +54,8 @@ downloads are disabled, and an AI provider key can be added after login under
 
 ### Create the First Administrator
 
-There are two ways to get the first administrator, and you only need one of them.
+There are three ways to get the first administrator, and you only need one of
+them.
 
 **In the browser.** Leave `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`
 empty and open the instance in a browser after the first start. A production
@@ -72,7 +73,16 @@ is no half-configured state to stumble into.
 
 Set `SETUP_WIZARD_ENABLED=false` to switch the wizard off entirely. An instance
 without an administrator then has no way in through the browser, which is what
-you want when the account is only ever created by automation.
+you want when the account is only ever created by automation or by an identity
+provider.
+
+**Through an identity provider.** For an OIDC/SSO deployment there is no local
+administrator to create at all: accounts appear on first sign-in, and an
+administrator is whoever carries a matching role claim. Switch the wizard off,
+point the instance at the provider, and leave the bootstrap variables empty —
+the empty database is then a normal steady state, not a pending setup. See
+[SSO-only instances](CONFIGURATION.md#sso-only-instances-no-local-accounts) for
+the full variable set and how the admin role mapping behaves.
 
 **Through the deployment environment.** Preferable for automated and
 platform-managed installs, because no browser step is involved. Before the first

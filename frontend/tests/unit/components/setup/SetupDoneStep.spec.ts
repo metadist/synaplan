@@ -14,6 +14,11 @@ vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({ refreshUser }),
 }))
 
+const invalidateSetupWizardRequired = vi.fn()
+vi.mock('@/router/setupGate', () => ({
+  invalidateSetupWizardRequired: () => invalidateSetupWizardRequired(),
+}))
+
 const notifyError = vi.fn()
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: notifyError }),
@@ -47,6 +52,7 @@ describe('SetupDoneStep', () => {
     await wrapper.get('[data-testid="setup-done-enter"]').trigger('click')
     await flushPromises()
 
+    expect(invalidateSetupWizardRequired).toHaveBeenCalled()
     expect(reload).toHaveBeenCalled()
     expect(refreshUser).toHaveBeenCalled()
     expect(replace).toHaveBeenCalledWith('/')

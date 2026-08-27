@@ -165,7 +165,7 @@ final class SetupController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Validation error (email format, password rules)')]
-    #[OA\Response(response: 409, description: 'Setup is already complete — code SETUP_ALREADY_COMPLETED')]
+    #[OA\Response(response: 409, description: 'Setup is already complete — code SETUP_ALREADY_COMPLETED, or the wizard is switched off through SETUP_WIZARD_ENABLED=false — code SETUP_WIZARD_DISABLED')]
     #[OA\Response(response: 429, description: 'Too many setup attempts from this IP')]
     public function createFirstAdmin(
         #[MapRequestPayload] SetupAdminRequest $dto,
@@ -176,7 +176,9 @@ final class SetupController extends AbstractController
         }
 
         if (!$this->setupState->isSetupRequired()) {
-            return $this->alreadyCompleted();
+            return $this->setupState->isWizardEnabled()
+                ? $this->alreadyCompleted()
+                : $this->wizardDisabled();
         }
 
         // Two containers starting at once (Compose scale, a Kubernetes rollout)
@@ -273,6 +275,21 @@ final class SetupController extends AbstractController
             'error' => 'Setup is already complete',
             'code' => 'SETUP_ALREADY_COMPLETED',
             'message' => 'This instance already has accounts. Sign in, or reset an administrator password with `php bin/console app:admin:reset-password`.',
+        ], Response::HTTP_CONFLICT);
+    }
+
+    /**
+     * The kill switch also lands here, but "already has accounts" would be a lie
+     * on the installation it is meant for: an SSO/OIDC instance runs with an
+     * empty user table on purpose, and an operator reading this needs to know
+     * which of the two situations they are in.
+     */
+    private function wizardDisabled(): JsonResponse
+    {
+        return $this->json([
+            'error' => 'Setup wizard is disabled',
+            'code' => 'SETUP_WIZARD_DISABLED',
+            'message' => 'SETUP_WIZARD_ENABLED=false on this instance. Administrators come from the identity provider (OIDC_ADMIN_ROLES) or from `php bin/console app:admin:reset-password --promote`.',
         ], Response::HTTP_CONFLICT);
     }
 

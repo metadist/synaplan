@@ -56,7 +56,8 @@ there is no half-configured state to stumble into.
 
 `SETUP_WIZARD_ENABLED=false` switches the wizard off. An installation without an
 administrator then has no browser route in at all, which is the right choice when
-the account only ever comes from automation.
+the account only ever comes from automation or from an identity provider — see
+[SSO-only instances](#sso-only-instances-no-local-accounts).
 
 Once an administrator exists the wizard is closed for good, and it does **not**
 reopen if every administrator is later deleted or demoted — a wizard that
@@ -85,6 +86,63 @@ restarts:
 docker compose down -v
 SEED_DEMO_DATA=false docker compose up -d
 ```
+
+---
+
+## SSO-Only Instances (No Local Accounts)
+
+An instance whose users all come from an identity provider does not need the
+wizard: there is no local administrator to create, and everything the wizard
+writes can come from the environment instead. Switch it off and let the IdP
+decide who is an administrator:
+
+```dotenv
+SETUP_WIZARD_ENABLED=false
+REGISTRATION_ENABLED=false
+GUEST_CHAT_ENABLED=false
+
+OIDC_DISCOVERY_URL=https://idp.example.com/realms/main/.well-known/openid-configuration
+OIDC_CLIENT_ID=synaplan
+OIDC_CLIENT_SECRET=…
+OIDC_AUTO_REDIRECT=true
+```
+
+The database then stays empty until the first person signs in, and that is a
+normal steady state rather than a pending setup: the API serves requests as
+usual, and the login page offers the identity provider instead of the wizard.
+
+**Administrators come from claims.** On sign-in, the roles found at
+`OIDC_ROLE_CLAIMS` are matched case-insensitively against `OIDC_ADMIN_ROLES`; a
+match sets `BUSERLEVEL=ADMIN`, and losing the role sets the account back to
+`NEW`. Both variables have Keycloak-shaped defaults and only need changing for a
+different provider:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `OIDC_ADMIN_ROLES` | `admin,realm-admin,synaplan-admin,administrator` | Claim values that grant admin |
+| `OIDC_ROLE_CLAIMS` | `realm_access.roles,resource_access.{client_id}.roles,groups` | Dot-notation paths; `{client_id}` expands to `OIDC_CLIENT_ID`. Azure AD: `roles`. Auth0: `https://myapp\.com/roles` |
+
+Two properties of that mapping are worth knowing before you rely on it:
+
+- **A role change takes effect on the next sign-in.** The claims are read during
+  the login callback and on every OIDC Bearer request, not on cookie-backed
+  session requests or token refresh. Revoking admin in the IdP does not end a
+  session that is already open.
+- **A token that carries no role claim at all changes nothing.** An empty result
+  is treated as "no information", so a misconfigured claim path cannot silently
+  demote every administrator. Verify the path once against a real token rather
+  than assuming the default fits your provider.
+
+**No AI provider step either.** The wizard's provider page is a convenience, not
+the only way in: a key in the environment (for example `GROQ_API_KEY`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) is picked up on start, so a fully
+configured instance needs no browser step at all. See
+[AI Providers](#ai-providers).
+
+Recovery does not depend on the IdP. `php bin/console app:admin:reset-password
+--promote` still creates or promotes a local administrator if the identity
+provider becomes unavailable, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
 
 ---
 

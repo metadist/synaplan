@@ -30,6 +30,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
+import { invalidateSetupWizardRequired } from '@/router/setupGate'
 import { useNotification } from '@/composables/useNotification'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -49,6 +50,7 @@ const brandName = computed(() => useConfigStore().branding.name)
 async function enter(): Promise<void> {
   busy.value = true
   try {
+    invalidateSetupWizardRequired()
     await useConfigStore().reload()
     await useAuthStore().refreshUser()
     await router.replace('/')

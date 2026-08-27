@@ -195,14 +195,73 @@ final class SetupLockdownSubscriberTest extends WebTestCase
      */
     public function testTheKillSwitchLiftsTheLockdownOnAVirginInstance(): void
     {
+        $client = $this->clientWithWizardDisabled();
+
+        $client->request('GET', '/api/v1/chats');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    /**
+     * The SSO/OIDC deployment: no local accounts, no wizard, the administrator
+     * arrives through IdP roles. The runtime config has to say so explicitly,
+     * because `wizardRequired: false` alone cannot tell the SPA whether the
+     * installation is set up or the wizard is switched off for good.
+     */
+    public function testTheRuntimeConfigReportsTheWizardAsSwitchedOff(): void
+    {
+        $client = $this->clientWithWizardDisabled();
+
+        $client->request('GET', '/api/v1/config/runtime');
+
+        self::assertResponseIsSuccessful();
+        $setup = $this->payload($client)['setup'];
+        self::assertFalse($setup['wizardEnabled']);
+        self::assertFalse($setup['wizardRequired']);
+    }
+
+    public function testTheRuntimeConfigReportsTheWizardAsAvailableByDefault(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $client->request('GET', '/api/v1/config/runtime');
+
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->payload($client)['setup']['wizardEnabled']);
+    }
+
+    /**
+     * With the wizard off there is no administrator and no BUSER row, so this
+     * endpoint is the one thing standing between an OIDC-only instance and a
+     * stranger claiming it as admin.
+     */
+    public function testTheWizardCannotCreateAnAdministratorWhileSwitchedOff(): void
+    {
+        $client = $this->clientWithWizardDisabled();
+
+        $client->request(
+            'POST',
+            '/api/v1/setup/admin',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            '{"email":"stranger@example.com","password":"SecurePass123"}'
+        );
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        // Not SETUP_ALREADY_COMPLETED: there are no accounts here, and an
+        // operator debugging this needs to be told about the kill switch.
+        self::assertSame('SETUP_WIZARD_DISABLED', $this->payload($client)['code']);
+    }
+
+    private function clientWithWizardDisabled(): KernelBrowser
+    {
         self::ensureKernelShutdown();
         $client = static::createClient();
         $this->disableSetupWizard();
         $this->replaceSetupState(userCount: 0, completedFlag: null);
 
-        $client->request('GET', '/api/v1/chats');
-
-        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        return $client;
     }
 
     private function clientOnAVirginInstance(): KernelBrowser

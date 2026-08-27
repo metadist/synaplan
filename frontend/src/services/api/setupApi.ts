@@ -74,9 +74,15 @@ export const createFirstAdmin = async (
 export const completeSetup = async (
   registrationEnabled: boolean,
   guestChatEnabled: boolean
-): Promise<SetupCompleteResult> =>
-  httpClient('/api/v1/setup/complete', {
+): Promise<SetupCompleteResult> => {
+  const result = await httpClient('/api/v1/setup/complete', {
     method: 'POST',
     body: JSON.stringify({ registrationEnabled, guestChatEnabled }),
     schema: PostApiSetupCompleteResponseSchema,
   })
+
+  const { invalidateSetupWizardRequired } = await import('@/router/setupGate')
+  invalidateSetupWizardRequired()
+
+  return result
+}

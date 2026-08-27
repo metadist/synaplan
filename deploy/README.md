@@ -96,7 +96,9 @@ first-run setup wizard at `/setup` and the first visitor creates the
 administrator there. On a publicly reachable host, either finish that wizard
 right after deploying or set the bootstrap pair, so the claim window never
 exists; `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
-[First-Run Setup](../docs/CONFIGURATION.md#first-run-setup).
+[First-Run Setup](../docs/CONFIGURATION.md#first-run-setup), and
+[SSO-only instances](../docs/CONFIGURATION.md#sso-only-instances-no-local-accounts)
+for a deployment whose administrator comes from an identity provider instead.
 
 The email must be a valid address of at most 128 characters. The
 password must be 8 to 64 characters, and below 16 characters it must also contain

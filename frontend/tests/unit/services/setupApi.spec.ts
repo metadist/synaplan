@@ -21,6 +21,11 @@ vi.mock('@/services/authService', () => ({
   authService: { adoptSession: (...args: unknown[]) => adoptSession(...args) },
 }))
 
+const invalidateSetupWizardRequired = vi.fn()
+vi.mock('@/router/setupGate', () => ({
+  invalidateSetupWizardRequired: () => invalidateSetupWizardRequired(),
+}))
+
 const { createFirstAdmin, completeSetup } = await import('@/services/api/setupApi')
 
 const adminResult = {
@@ -90,6 +95,7 @@ describe('setupApi.createFirstAdmin', () => {
 
     await completeSetup(false, false)
 
+    expect(invalidateSetupWizardRequired).toHaveBeenCalled()
     const [endpoint, options] = httpClient.mock.calls[0] as [string, Record<string, unknown>]
     expect(endpoint).toBe('/api/v1/setup/complete')
     expect(options.skipAuth).toBeUndefined()

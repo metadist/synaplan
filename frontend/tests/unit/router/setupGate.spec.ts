@@ -1,10 +1,27 @@
-import { describe, it, expect, vi } from 'vitest'
-import { isSetupWizardRequired, resolveSetupGate, SETUP_ROUTE } from '@/router/setupGate'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const runtimeConfig = vi.fn()
+const getConfig = vi.fn()
+const getSetupState = vi.fn()
+
 vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => runtimeConfig(),
+  getConfig: () => getConfig(),
 }))
+
+vi.mock('@/services/api/setupApi', () => ({
+  getSetupState: () => getSetupState(),
+}))
+
+const {
+  ensureWizardRequired,
+  invalidateSetupWizardRequired,
+  isSetupRecheckRoute,
+  isSetupWizardEnabled,
+  isSetupWizardRequired,
+  resolveSetupGate,
+  SETUP_ROUTE,
+} = await import('@/router/setupGate')
 
 const navigation = (overrides: Partial<Parameters<typeof resolveSetupGate>[0]> = {}) => ({
   wizardRequired: false,
@@ -56,6 +73,11 @@ describe('resolveSetupGate', () => {
 })
 
 describe('isSetupWizardRequired', () => {
+  beforeEach(() => {
+    invalidateSetupWizardRequired()
+    runtimeConfig.mockReturnValue({})
+  })
+
   it('reports the flag the backend sent', () => {
     runtimeConfig.mockReturnValue({ setup: { wizardRequired: true } })
 
@@ -66,5 +88,118 @@ describe('isSetupWizardRequired', () => {
     runtimeConfig.mockReturnValue({})
 
     expect(isSetupWizardRequired()).toBe(false)
+  })
+
+  /**
+   * The SSO/OIDC deployment: `SETUP_WIZARD_ENABLED=false` means an empty
+   * installation is the steady state, so even a backend that reports
+   * `wizardRequired` must not produce a wizard here.
+   */
+  it('stays out of the way when the operator switched the wizard off', () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardEnabled: false, wizardRequired: true } })
+
+    expect(isSetupWizardRequired()).toBe(false)
+  })
+})
+
+describe('isSetupWizardEnabled', () => {
+  beforeEach(() => {
+    invalidateSetupWizardRequired()
+  })
+
+  it('reports the operator kill switch', () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardEnabled: false } })
+
+    expect(isSetupWizardEnabled()).toBe(false)
+  })
+
+  it('assumes the wizard exists when an older backend does not report the flag', () => {
+    runtimeConfig.mockReturnValue({ setup: {} })
+
+    expect(isSetupWizardEnabled()).toBe(true)
+  })
+})
+
+describe('isSetupRecheckRoute', () => {
+  it('re-asks the server on the pages a reset operator actually opens', () => {
+    expect(isSetupRecheckRoute('chat')).toBe(true)
+    expect(isSetupRecheckRoute('login')).toBe(true)
+    expect(isSetupRecheckRoute(SETUP_ROUTE)).toBe(true)
+  })
+
+  it('does not re-ask on ordinary in-app navigation', () => {
+    expect(isSetupRecheckRoute('files')).toBe(false)
+    expect(isSetupRecheckRoute(undefined)).toBe(false)
+  })
+})
+
+describe('ensureWizardRequired', () => {
+  beforeEach(() => {
+    invalidateSetupWizardRequired()
+    getConfig.mockResolvedValue({})
+    runtimeConfig.mockReturnValue({})
+    getSetupState.mockReset()
+  })
+
+  it('trusts runtime config when it already says the wizard is required', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: true } })
+
+    await expect(ensureWizardRequired()).resolves.toBe(true)
+    expect(getSetupState).not.toHaveBeenCalled()
+  })
+
+  it('asks /setup/state when runtime config still says the instance is set up', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockResolvedValue({ wizardRequired: true })
+
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(true)
+    expect(isSetupWizardRequired()).toBe(true)
+  })
+
+  it('does not reopen the wizard when the dedicated endpoint agrees it is done', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockResolvedValue({ wizardRequired: false })
+
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    expect(isSetupWizardRequired()).toBe(false)
+  })
+
+  it('reuses the in-memory answer until the caller asks for a fresh probe', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockResolvedValue({ wizardRequired: false })
+
+    await ensureWizardRequired({ fresh: true })
+    getSetupState.mockClear()
+
+    await expect(ensureWizardRequired()).resolves.toBe(false)
+    expect(getSetupState).not.toHaveBeenCalled()
+  })
+
+  it('notices a CLI reset that happened after a previous false answer', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockResolvedValue({ wizardRequired: false })
+    await ensureWizardRequired({ fresh: true })
+
+    getSetupState.mockResolvedValue({ wizardRequired: true })
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(true)
+  })
+
+  it('keeps a working installation out of the wizard when /setup/state cannot be reached', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardRequired: false } })
+    getSetupState.mockRejectedValue(new Error('offline'))
+
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+  })
+
+  /**
+   * An OIDC instance runs for years with the wizard switched off. Asking
+   * `/setup/state` on every entry navigation would be noise for an answer that
+   * cannot change without a redeploy.
+   */
+  it('never probes the server once the wizard is switched off by the operator', async () => {
+    runtimeConfig.mockReturnValue({ setup: { wizardEnabled: false } })
+
+    await expect(ensureWizardRequired({ fresh: true })).resolves.toBe(false)
+    expect(getSetupState).not.toHaveBeenCalled()
   })
 })

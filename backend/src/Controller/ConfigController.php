@@ -413,7 +413,7 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     type: 'object',
-                    description: 'First-run setup status. wizardRequired and demoLoginHint are public so the SPA can route a virgin install into the setup wizard; chatReady is only set for authenticated users.',
+                    description: 'First-run setup status. wizardRequired, wizardEnabled and demoLoginHint are public so the SPA can route a virgin install into the setup wizard; chatReady is only set for authenticated users.',
                     nullable: true,
                     properties: [
                         new OA\Property(
@@ -421,6 +421,12 @@ class ConfigController extends AbstractController
                             type: 'boolean',
                             example: false,
                             description: 'True only on a virgin installation that still needs its first administrator: no BCONFIG SETUP.COMPLETED flag, not a single BUSER row, and SETUP_WIZARD_ENABLED not disabled. The SPA then redirects every route to the setup wizard, and the rest of the API answers 503 SETUP_REQUIRED. False on every existing installation.'
+                        ),
+                        new OA\Property(
+                            property: 'wizardEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'False only when the operator set SETUP_WIZARD_ENABLED=false. The wizard then never applies on this installation, no matter how empty it is — the intended setup for SSO/OIDC deployments where the administrator arrives through IdP roles and no local account is ever created. The SPA uses this to stop re-checking the setup state at all. True by default.'
                         ),
                         new OA\Property(
                             property: 'chatReady',
@@ -527,6 +533,11 @@ class ConfigController extends AbstractController
             // lockdown lets through. It leaks nothing — on every installation
             // that has ever had a user it is simply false.
             'wizardRequired' => $this->setupState->isSetupRequired(),
+            // Distinguishes "already set up" from "the operator switched the
+            // wizard off". Both leave wizardRequired false, but only the second
+            // one is permanent, which is what lets an SSO/OIDC deployment stop
+            // asking about the setup state altogether.
+            'wizardEnabled' => $this->setupState->isWizardEnabled(),
             'demoLoginHint' => $this->demoLoginHint->isVisible(),
         ];
         if ($user) {
