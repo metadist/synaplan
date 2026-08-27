@@ -13,7 +13,12 @@ const provider = (name: string, overrides: Record<string, unknown> = {}) => ({
   displayName: name,
   configured: false,
   recommended: false,
+  freeTier: false,
   source: 'db',
+  origin: null,
+  maskedKey: '',
+  consoleUrl: '',
+  envVar: '',
   ...overrides,
 })
 
@@ -21,8 +26,9 @@ const mountStep = () =>
   mount(SetupProviderStep, {
     global: {
       stubs: {
-        ProviderKeyCard: {
-          template: '<div class="provider-card" />',
+        SetupProviderKeyForm: {
+          name: 'SetupProviderKeyForm',
+          template: '<div class="key-form" />',
           props: ['provider', 'isDefaultChat'],
         },
       },
@@ -36,35 +42,82 @@ describe('SetupProviderStep', () => {
       providers: [
         provider('anthropic', { recommended: true }),
         provider('openai', { recommended: true }),
-        provider('groq'),
+        provider('groq', { freeTier: true }),
         provider('xai'),
       ],
       defaultChatProvider: 'anthropic',
     })
   })
 
-  it('shows only the recommended providers until the rest are asked for', async () => {
+  it('shows every provider as a tile, so nothing is hidden behind a "show more"', async () => {
     const wrapper = mountStep()
     await flushPromises()
 
-    expect(wrapper.findAll('.provider-card')).toHaveLength(2)
-    expect(wrapper.get('[data-testid="setup-provider-show-all"]').text()).toContain('2')
-
-    await wrapper.get('[data-testid="setup-provider-show-all"]').trigger('click')
-
-    expect(wrapper.findAll('.provider-card')).toHaveLength(4)
-    expect(wrapper.find('[data-testid="setup-provider-show-all"]').exists()).toBe(false)
+    expect(wrapper.findAllComponents({ name: 'SetupProviderTile' })).toHaveLength(4)
+    expect(wrapper.find('[data-testid="setup-provider-grid"]').exists()).toBe(true)
   })
 
-  it('keeps an already connected provider visible even when it is not recommended', async () => {
-    listProviderKeys.mockResolvedValue({
-      providers: [provider('groq', { configured: true }), provider('xai')],
-      defaultChatProvider: 'groq',
-    })
+  it('reveals the key field only for the provider that was clicked', async () => {
     const wrapper = mountStep()
     await flushPromises()
 
-    expect(wrapper.findAll('.provider-card')).toHaveLength(1)
+    expect(wrapper.find('.key-form').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="setup-provider-pick-hint"]').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="setup-provider-tile-groq"]').trigger('click')
+
+    const form = wrapper.getComponent({ name: 'SetupProviderKeyForm' })
+    expect(form.props('provider')).toMatchObject({ name: 'groq' })
+    expect(form.props('isDefaultChat')).toBe(false)
+    expect(wrapper.find('[data-testid="setup-provider-pick-hint"]').exists()).toBe(false)
+  })
+
+  it('tells the form when the picked provider already holds the default', async () => {
+    const wrapper = mountStep()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="setup-provider-tile-anthropic"]').trigger('click')
+
+    expect(wrapper.getComponent({ name: 'SetupProviderKeyForm' }).props('isDefaultChat')).toBe(true)
+  })
+
+  it('closes the panel when the same tile is clicked again', async () => {
+    const wrapper = mountStep()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="setup-provider-tile-groq"]').trigger('click')
+    expect(wrapper.find('.key-form').exists()).toBe(true)
+
+    await wrapper.get('[data-testid="setup-provider-tile-groq"]').trigger('click')
+    expect(wrapper.find('.key-form').exists()).toBe(false)
+  })
+
+  it('switches the panel straight over to another provider', async () => {
+    const wrapper = mountStep()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="setup-provider-tile-groq"]').trigger('click')
+    await wrapper.get('[data-testid="setup-provider-tile-xai"]').trigger('click')
+
+    expect(wrapper.findAll('.key-form')).toHaveLength(1)
+    expect(wrapper.getComponent({ name: 'SetupProviderKeyForm' }).props('provider')).toMatchObject({
+      name: 'xai',
+    })
+  })
+
+  it('collapses the panel and re-reads the list after a key was saved', async () => {
+    const wrapper = mountStep()
+    await flushPromises()
+    await wrapper.get('[data-testid="setup-provider-tile-groq"]').trigger('click')
+
+    listProviderKeys.mockResolvedValue({
+      providers: [provider('groq', { configured: true, freeTier: true })],
+      defaultChatProvider: 'groq',
+    })
+    wrapper.getComponent({ name: 'SetupProviderKeyForm' }).vm.$emit('saved')
+    await flushPromises()
+
+    expect(wrapper.find('.key-form').exists()).toBe(false)
     expect(wrapper.find('[data-testid="setup-provider-ready"]').exists()).toBe(true)
   })
 
@@ -85,6 +138,7 @@ describe('SetupProviderStep', () => {
     expect(wrapper.get('[data-testid="setup-provider-error"]').text()).toContain(
       'provider list unavailable'
     )
+    expect(wrapper.find('[data-testid="setup-provider-grid"]').exists()).toBe(false)
     await wrapper.get('[data-testid="setup-provider-continue"]').trigger('click')
     expect(wrapper.emitted('next')).toHaveLength(1)
   })

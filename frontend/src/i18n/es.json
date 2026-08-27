@@ -3994,13 +3994,19 @@
     },
     "provider": {
       "title": "Conecta un proveedor de IA",
-      "description": "La IA necesita un proveedor para responder. Pega una clave de API: se prueba al instante y se guarda cifrada en este servidor.",
+      "description": "La IA necesita un proveedor para responder. Elige uno y pega su clave API: se comprueba al instante y se guarda cifrada en este servidor.",
       "loading": "Cargando proveedores…",
       "loadFailed": "No se pudo cargar la lista de proveedores.",
       "ready": "Hay un proveedor conectado. La IA ya puede responder.",
-      "showAll": "Mostrar todos los proveedores ({count} más)",
       "continue": "Continuar",
-      "skipHint": "Puedes omitirlo y conectar un proveedor más tarde en Admin → Configuración de proveedor de IA. Hasta entonces el chat no funcionará."
+      "skipHint": "Puedes omitirlo y conectar un proveedor más tarde en Admin → Configuración de proveedor de IA. Hasta entonces el chat no funcionará.",
+      "freeTierBadge": "Nivel gratuito",
+      "chooseProvider": "Elige un proveedor de IA",
+      "pickHint": "Elige arriba un proveedor para añadir su clave. Basta con uno; puedes añadir más más adelante.",
+      "keyLabel": "Clave API de {provider}",
+      "saving": "Probando…",
+      "willBecomeDefault": "Al guardar esta clave, {provider} será la IA que responda por defecto.",
+      "alreadyDefault": "{provider} ya es la IA que responde por defecto."
     },
     "access": {
       "title": "Decide quién puede usar este servidor",

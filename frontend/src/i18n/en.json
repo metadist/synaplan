@@ -4980,13 +4980,19 @@
     },
     "provider": {
       "title": "Connect an AI provider",
-      "description": "The AI needs a provider to answer. Paste an API key — it is tested right away and stored encrypted on this server.",
+      "description": "The AI needs a provider to answer. Choose one and paste its API key — it is tested right away and stored encrypted on this server.",
       "loading": "Loading providers…",
       "loadFailed": "The provider list could not be loaded.",
       "ready": "A provider is connected. The AI can answer now.",
-      "showAll": "Show all providers ({count} more)",
       "continue": "Continue",
-      "skipHint": "You can skip this and connect a provider later under Admin → AI Provider Setup. Chat will not work until you do."
+      "skipHint": "You can skip this and connect a provider later under Admin → AI Provider Setup. Chat will not work until you do.",
+      "freeTierBadge": "Free tier",
+      "chooseProvider": "Choose an AI provider",
+      "pickHint": "Pick a provider above to add its key. You only need one, and you can add more later.",
+      "keyLabel": "API key for {provider}",
+      "saving": "Testing…",
+      "willBecomeDefault": "Saving this key also makes {provider} the AI that answers by default.",
+      "alreadyDefault": "{provider} is already the AI that answers by default."
     },
     "access": {
       "title": "Decide who can use this server",

@@ -26,25 +26,31 @@
         {{ $t('setup.provider.ready') }}
       </p>
 
-      <div class="flex flex-col gap-3">
-        <ProviderKeyCard
-          v-for="provider in visibleProviders"
+      <div
+        class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+        role="group"
+        :aria-label="$t('setup.provider.chooseProvider')"
+        data-testid="setup-provider-grid"
+      >
+        <SetupProviderTile
+          v-for="provider in sortedProviders"
           :key="provider.name"
           :provider="provider"
-          :is-default-chat="provider.name === defaultChatProvider"
-          @changed="load"
+          :selected="provider.name === selectedName"
+          @select="toggle(provider.name)"
         />
       </div>
 
-      <button
-        v-if="hiddenCount > 0"
-        type="button"
-        class="text-sm txt-brand hover:underline self-start"
-        data-testid="setup-provider-show-all"
-        @click="showAll = true"
-      >
-        {{ $t('setup.provider.showAll', { count: hiddenCount }) }}
-      </button>
+      <SetupProviderKeyForm
+        v-if="selectedProvider"
+        :key="selectedProvider.name"
+        :provider="selectedProvider"
+        :is-default-chat="selectedProvider.name === defaultChatProvider"
+        @saved="onSaved"
+      />
+      <p v-else class="text-xs txt-secondary" data-testid="setup-provider-pick-hint">
+        {{ $t('setup.provider.pickHint') }}
+      </p>
     </template>
 
     <div class="flex flex-col gap-2 mt-2">
@@ -66,7 +72,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
+import SetupProviderKeyForm from '@/components/setup/SetupProviderKeyForm.vue'
+import SetupProviderTile from '@/components/setup/SetupProviderTile.vue'
 import { listProviderKeys, type ProviderKeyStatus } from '@/services/api/providerKeysApi'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -80,7 +87,7 @@ const providers = ref<ProviderKeyStatus[]>([])
 const defaultChatProvider = ref('')
 const loading = ref(false)
 const loadError = ref('')
-const showAll = ref(false)
+const selectedName = ref('')
 
 /**
  * Same order as Admin > AI Provider Setup: recommended first, then already
@@ -94,19 +101,20 @@ const sortedProviders = computed(() =>
   })
 )
 
-/**
- * A wall of a dozen providers is the wrong thing to hand someone in their first
- * two minutes, so only the recommended and the already-connected ones show until
- * they ask for the rest.
- */
-const visibleProviders = computed(() =>
-  showAll.value
-    ? sortedProviders.value
-    : sortedProviders.value.filter((p) => p.recommended || p.configured)
+const selectedProvider = computed(
+  () => providers.value.find((p) => p.name === selectedName.value) ?? null
 )
 
-const hiddenCount = computed(() => sortedProviders.value.length - visibleProviders.value.length)
 const anyConfigured = computed(() => providers.value.some((p) => p.configured))
+
+/**
+ * The grid shows every provider as a logo and a name; the key field belongs to
+ * whichever one is open. Eight key fields at once was a wall of inputs on a
+ * screen whose only job is "connect one provider".
+ */
+function toggle(name: string): void {
+  selectedName.value = selectedName.value === name ? '' : name
+}
 
 async function load(): Promise<void> {
   loading.value = true
@@ -120,6 +128,14 @@ async function load(): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+// Collapsing the panel after a successful save puts the new "Connected" tile and
+// the Continue button in view, instead of leaving an empty field that looks like
+// the key did not take.
+async function onSaved(): Promise<void> {
+  selectedName.value = ''
+  await load()
 }
 
 onMounted(load)

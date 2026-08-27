@@ -3995,13 +3995,19 @@
     },
     "provider": {
       "title": "Bir AI sağlayıcısı bağla",
-      "description": "AI'nın yanıt verebilmesi için bir sağlayıcı gerekir. Bir API anahtarı yapıştır — anında test edilir ve bu sunucuda şifreli olarak saklanır.",
+      "description": "Yanıt verebilmesi için AI bir sağlayıcıya ihtiyaç duyar. Birini seçip API anahtarını yapıştırın — anahtar hemen test edilir ve bu sunucuda şifreli olarak saklanır.",
       "loading": "Sağlayıcılar yükleniyor…",
       "loadFailed": "Sağlayıcı listesi yüklenemedi.",
       "ready": "Bir sağlayıcı bağlı. AI artık yanıt verebilir.",
-      "showAll": "Tüm sağlayıcıları göster ({count} tane daha)",
       "continue": "Devam et",
-      "skipHint": "Bunu atlayıp sağlayıcıyı sonra Yönetici → AI Sağlayıcı Kurulumu altında bağlayabilirsin. O zamana kadar sohbet çalışmaz."
+      "skipHint": "Bunu atlayıp sağlayıcıyı sonra Yönetici → AI Sağlayıcı Kurulumu altında bağlayabilirsin. O zamana kadar sohbet çalışmaz.",
+      "freeTierBadge": "Ücretsiz katman",
+      "chooseProvider": "Bir AI sağlayıcısı seçin",
+      "pickHint": "Anahtarını girmek için yukarıdan bir sağlayıcı seçin. Biri yeterli, diğerlerini sonra ekleyebilirsiniz.",
+      "keyLabel": "{provider} için API anahtarı",
+      "saving": "Test ediliyor…",
+      "willBecomeDefault": "Bu anahtarı kaydettiğinizde yanıtları varsayılan olarak {provider} verir.",
+      "alreadyDefault": "Yanıtları hâlihazırda varsayılan olarak {provider} veriyor."
     },
     "access": {
       "title": "Bu sunucuyu kimin kullanabileceğine karar ver",

@@ -4914,13 +4914,19 @@
     },
     "provider": {
       "title": "KI-Anbieter verbinden",
-      "description": "Die KI braucht einen Anbieter, um zu antworten. Füge einen API-Schlüssel ein — er wird sofort geprüft und verschlüsselt auf diesem Server gespeichert.",
+      "description": "Die KI braucht einen Anbieter, um zu antworten. Wähle einen aus und füge seinen API-Schlüssel ein — er wird sofort getestet und verschlüsselt auf diesem Server gespeichert.",
       "loading": "Anbieter werden geladen…",
       "loadFailed": "Die Anbieterliste konnte nicht geladen werden.",
       "ready": "Ein Anbieter ist verbunden. Die KI kann jetzt antworten.",
-      "showAll": "Alle Anbieter anzeigen ({count} weitere)",
       "continue": "Weiter",
-      "skipHint": "Du kannst das überspringen und später unter Admin → KI-Anbieter-Setup nachholen. Bis dahin funktioniert der Chat nicht."
+      "skipHint": "Du kannst das überspringen und später unter Admin → KI-Anbieter-Setup nachholen. Bis dahin funktioniert der Chat nicht.",
+      "freeTierBadge": "Kostenlose Stufe",
+      "chooseProvider": "KI-Anbieter auswählen",
+      "pickHint": "Wähle oben einen Anbieter, um seinen Schlüssel einzutragen. Einer genügt, weitere kannst du später ergänzen.",
+      "keyLabel": "API-Schlüssel für {provider}",
+      "saving": "Wird getestet…",
+      "willBecomeDefault": "Mit dem Speichern antwortet {provider} künftig standardmäßig.",
+      "alreadyDefault": "{provider} antwortet bereits standardmäßig."
     },
     "access": {
       "title": "Festlegen, wer diesen Server nutzen darf",
