@@ -300,11 +300,13 @@ jobs:
     # nelmio:apidoc:dump compiles the container but never touches the DB
     # (Doctrine connects lazily), so no MariaDB service is needed here.
     #
-    # This is the ONLY job on the paid 16-core pool: the parallel Vite builds
-    # are the one workload where the cores shorten the critical path. All
-    # other former -m jobs moved to free runners so the warm -m runner is
-    # reliably available for this job at t=0.
-    runs-on: ubuntu-latest-m
+    # TIMING EXPERIMENT (do not merge as-is): temporarily on the free runner
+    # to measure how much the paid 16-core pool actually shortens this job.
+    # The Vite build step is suspected to be single-thread-bound (July data:
+    # widget build took 63s on the free 4-core runner, and today both builds
+    # in parallel take 62s on 16 cores), in which case the -m pool buys
+    # almost nothing here. Compare this run's job duration against main.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
