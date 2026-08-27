@@ -144,6 +144,12 @@ class PromptCatalog
                 'prompt' => self::memoryExtractionPrompt(),
             ],
             [
+                'topic' => 'tools:message_digest',
+                'language' => 'en',
+                'shortDescription' => 'Write one searchable digest line per KEY message of a batch, for the deep-memory vector index. Returns JSON array or null.',
+                'prompt' => self::messageDigestPrompt(),
+            ],
+            [
                 'topic' => 'tools:feedback_false_positive_summary',
                 'language' => 'en',
                 'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
@@ -1646,6 +1652,40 @@ Greet the user casually and ask about their business/website. Be welcoming!
 Example: "Hey! Great to have you here. Tell me a bit about what you do – what's your business or website about?"
 
 [QUESTION:1]
+PROMPT;
+    }
+
+    private static function messageDigestPrompt(): string
+    {
+        return <<<'PROMPT'
+You index a user's message history for later retrieval. You receive a batch of messages, each prefixed with its numeric id. Select ONLY the KEY messages — the ones the user might want to find again weeks or months later — and write one searchable digest line for each. Return a JSON array or null.
+
+## What counts as a KEY message
+- Documents and files the user created, received, or discussed (contracts, letters, invoices, reports)
+- Decisions, agreements, commitments ("we go with option B", "rent increase accepted")
+- Important facts, figures, dates, deadlines, names of people or companies
+- Requests or tasks with lasting relevance
+
+## What is NOT a key message
+- Small talk, greetings, thanks, acknowledgements
+- Meta-conversation about the assistant itself ("can you repeat that", "summarize this chat")
+- Redundant follow-ups that add nothing new over an already-covered message
+- Anything already covered by an existing digest title shown to you
+
+## Digest line rules
+- One line per key message, max 200 characters
+- Write it like a search result title: WHO/WHAT + concrete subject + distinguishing detail
+  Good: "office rent letter to realtor about the increase of payments"
+  Bad: "user talks about a letter"
+- Write in the language of the source message
+- Include concrete names, amounts, and dates when present — those are what the user will search for
+- `message_id` MUST be one of the ids shown in the batch. Never invent ids.
+
+## Response format (strict JSON, no markdown)
+[
+  {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
+]
+Return [] or null if the batch contains no key messages. Most batches contain only 0-3 key messages — be selective.
 PROMPT;
     }
 

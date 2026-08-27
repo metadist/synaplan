@@ -339,6 +339,57 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Keyset batch of messages eligible for the message-digest job: owned by
+     * the user, above the digest cursor, older than the quiet period, with
+     * some text to digest, and NOT part of a widget/guest chat (those belong
+     * to anonymous visitors, not the account owner's own history).
+     *
+     * @return Message[] ordered oldest-first
+     */
+    public function findDigestCandidates(int $userId, int $afterId, int $beforeUnix, int $limit, ?int $sinceUnix = null): array
+    {
+        $qb = $this->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere('m.unixTimestamp < :beforeUnix')
+            ->andWhere("(m.text != '' OR m.fileText != '')")
+            ->andWhere(
+                'm.chatId IS NULL OR m.chatId NOT IN (
+                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
+                )'
+            )
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('beforeUnix', $beforeUnix)
+            ->setParameter('excludedSources', ['widget', 'guest'])
+            ->orderBy('m.id', 'ASC')
+            ->setMaxResults($limit);
+
+        if (null !== $sinceUnix) {
+            $qb->andWhere('m.unixTimestamp >= :sinceUnix')
+                ->setParameter('sinceUnix', $sinceUnix);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Distinct owners of messages — the candidate set for the digest job.
+     * Cheap (indexed BUSERID) compared to walking the whole users table.
+     *
+     * @return list<int>
+     */
+    public function findDistinctUserIds(): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.userId')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return array_map(intval(...), $rows);
+    }
+
+    /**
      * Map a set of message ids to their owning chat id (BCHATID), skipping
      * messages that are not attached to a chat. Used by the file manager to
      * deep-link a generated artefact to the exact conversation it came from

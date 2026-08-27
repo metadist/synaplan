@@ -23,6 +23,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private const DEFAULT_VECTOR_DIM = 1024;
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
+    private const DEFAULT_DIGESTS_COLLECTION = 'user_message_digests';
     private const BATCH_LIMIT = 100;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
@@ -30,6 +31,7 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     private readonly string $memoriesCollection;
     private readonly string $documentsCollection;
+    private readonly string $digestsCollection;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -40,6 +42,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?string $memoriesCollection = null,
         ?string $documentsCollection = null,
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
+        ?string $digestsCollection = null,
     ) {
         $this->memoriesCollection = (null !== $memoriesCollection && '' !== $memoriesCollection)
             ? $memoriesCollection
@@ -47,6 +50,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         $this->documentsCollection = (null !== $documentsCollection && '' !== $documentsCollection)
             ? $documentsCollection
             : self::DEFAULT_DOCUMENTS_COLLECTION;
+        $this->digestsCollection = (null !== $digestsCollection && '' !== $digestsCollection)
+            ? $digestsCollection
+            : self::DEFAULT_DIGESTS_COLLECTION;
     }
 
     public function getMemoriesCollection(): string
@@ -57,6 +63,11 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getDocumentsCollection(): string
     {
         return $this->documentsCollection;
+    }
+
+    public function getDigestsCollection(): string
+    {
+        return $this->digestsCollection;
     }
 
     public function getQdrantUrl(): string
@@ -401,6 +412,147 @@ final class QdrantClientDirect implements QdrantClientInterface
             return $deletedCount;
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete all memories for user from Qdrant', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Message Digest Operations
+    // ──────────────────────────────────────────────
+
+    public function upsertDigest(string $pointId, array $vector, array $payload): void
+    {
+        $this->ensureDigestsCollection();
+
+        $payload['_point_id'] = $pointId;
+
+        try {
+            // Unlike memories, the digests collection never contained legacy
+            // integer-keyed points, so a plain deterministic-UUID upsert is
+            // sufficient — re-digesting the same message overwrites in place.
+            $this->upsertPoints($this->digestsCollection, [
+                [
+                    'id' => QdrantPointId::uuidFor($pointId),
+                    'vector' => $vector,
+                    'payload' => $payload,
+                ],
+            ]);
+
+            $this->logger->debug('Digest upserted to Qdrant', ['point_id' => $pointId]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to upsert digest to Qdrant', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to upsert digest: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    public function searchDigests(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.5,
+    ): array {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/query", [
+                'query' => $queryVector,
+                'filter' => [
+                    'must' => [
+                        ['key' => 'user_id', 'match' => ['value' => $userId]],
+                        ['key' => 'active', 'match' => ['value' => true]],
+                    ],
+                ],
+                'limit' => $limit,
+                'score_threshold' => $minScore,
+                'with_payload' => true,
+            ]);
+
+            $results = [];
+            foreach ($response['result']['points'] ?? [] as $hit) {
+                $results[] = [
+                    'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
+                    'score' => $hit['score'],
+                    'payload' => $hit['payload'] ?? [],
+                ];
+            }
+
+            return $results;
+        } catch (\Throwable $e) {
+            // Lazily created collection: searching before the first digest
+            // was ever written is a normal empty state, not an error.
+            if ($this->isMissingCollectionError($e)) {
+                $this->logger->debug('Qdrant digests collection does not exist yet, returning no results', [
+                    'user_id' => $userId,
+                ]);
+
+                return [];
+            }
+
+            $this->logger->error('Failed to search digests in Qdrant', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function deleteDigest(string $pointId): void
+    {
+        try {
+            $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/delete?wait=true", [
+                'filter' => QdrantPointId::payloadFilterFor($pointId),
+            ]);
+        } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                return;
+            }
+
+            $this->logger->error('Failed to delete digest from Qdrant', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to delete digest: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    public function deleteAllDigestsForUser(int $userId): int
+    {
+        try {
+            $filter = [
+                'must' => [
+                    ['key' => 'user_id', 'match' => ['value' => $userId]],
+                ],
+            ];
+
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/count", [
+                'filter' => $filter,
+            ]);
+            $deletedCount = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $deletedCount) {
+                return 0;
+            }
+
+            $this->qdrantRequest('POST', "/collections/{$this->digestsCollection}/points/delete?wait=true", [
+                'filter' => $filter,
+            ]);
+
+            $this->logger->info('All digests deleted from Qdrant for user', [
+                'user_id' => $userId,
+                'deleted_count' => $deletedCount,
+            ]);
+
+            return $deletedCount;
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to delete all digests for user from Qdrant', [
                 'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
@@ -1119,6 +1271,56 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->logger->info('Created Qdrant memories collection with indices', ['collection' => $collection]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to create memories collection', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    private function ensureDigestsCollection(): void
+    {
+        $collection = $this->digestsCollection;
+
+        if (isset($this->ensuredCollections[$collection])) {
+            return;
+        }
+
+        try {
+            $this->qdrantRequest('GET', "/collections/{$collection}");
+            // See ensureMemoriesCollection() — idempotent payload-index
+            // backfill for pre-existing collections.
+            $this->ensurePayloadIndexes($collection, [
+                'user_id' => 'integer',
+                'active' => 'bool',
+                'source_date' => 'integer',
+                '_point_id' => 'keyword',
+            ]);
+            $this->ensuredCollections[$collection] = true;
+
+            return;
+        } catch (\Throwable) {
+            // Collection doesn't exist, create it
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $this->vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'user_id', 'integer');
+            $this->createPayloadIndex($collection, 'active', 'bool');
+            $this->createPayloadIndex($collection, 'source_date', 'integer');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Created Qdrant digests collection with indices', ['collection' => $collection]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to create digests collection', [
                 'collection' => $collection,
                 'error' => $e->getMessage(),
             ]);

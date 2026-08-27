@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures schema-update schema-diff console cache-clear shell test plan-eval summary-eval
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures schema-update schema-diff console cache-clear shell test plan-eval summary-eval digest-run
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -86,6 +86,9 @@ plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE mod
 
 summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:summary:eval
+
+digest-run: ## Run the message-digest job once (LIVE model calls — normally scheduler-driven)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:digest:run
 
 # Allow passing arguments to console target
 %:

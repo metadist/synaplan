@@ -4,7 +4,7 @@
 | ------ | ------ | ----- | ----- |
 | 1 — Summary eval harness | `feat/summary-eval-harness` | implemented, eval run recorded below | `app:summary:eval`, `make -C backend summary-eval` |
 | 2 — Durable summary + channel parity | `feat/durable-summary-channel-parity` | implemented (stacked on Sprint 1 branch) | `BCHATSUMMARIES` durable store behind Redis; summary injected + refreshed on web, WhatsApp, email, MCP, widget; cleanup on chat delete |
-| 3 — Message digest foundation | `feat/message-digest-foundation` | not started | |
+| 3 — Message digest foundation | `feat/message-digest-foundation` | implemented (stacked on Sprint 2 branch) | `BMESSAGEDIGESTS` + Qdrant `user_message_digests`; `tools:message_digest` prompt; `app:digest:run` (daily scheduler) + `app:digest:backfill`; per-user BCONFIG cursor + cost caps; verified live end-to-end (rent-letter case digested + vector-indexed) |
 | 4 — Digest retrieval + badges | `feat/digest-retrieval` | not started | |
 | 5 — Hardening, admin, docs, E2E | `feat/continuity-hardening` | not started | |
 

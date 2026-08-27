@@ -1038,6 +1038,7 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $digestsCollection: '%env(default::QDRANT_DIGESTS_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect
