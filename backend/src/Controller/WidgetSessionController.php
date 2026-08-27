@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
+use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
@@ -35,6 +36,7 @@ class WidgetSessionController extends AbstractController
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
+        private ChatSummaryRepository $chatSummaryRepository,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
         private EntityManagerInterface $em,
@@ -661,8 +663,10 @@ class WidgetSessionController extends AbstractController
                 $this->messageRepository->deleteByChatIds($chatIds);
             }
 
-            // Delete chats
+            // Delete chats (+ their rolling-summary rows — no FK cascade on
+            // BCHATSUMMARIES per the Galera rule, so clean up explicitly)
             foreach ($chatIds as $chatId) {
+                $this->chatSummaryRepository->deleteByChatId((int) $chatId);
                 $chat = $this->chatRepository->find($chatId);
                 if ($chat) {
                     $this->chatRepository->remove($chat);

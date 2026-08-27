@@ -76,6 +76,36 @@ final class QdrantClientMock implements QdrantClientInterface
         return 0;
     }
 
+    // --- Message Digest Operations ---
+
+    public function upsertDigest(string $pointId, array $vector, array $payload): void
+    {
+        $this->logger->info('QdrantClientMock: upsertDigest', ['point_id' => $pointId]);
+    }
+
+    public function searchDigests(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.5,
+    ): array {
+        $this->logger->info('QdrantClientMock: searchDigests', ['user_id' => $userId]);
+
+        return [];
+    }
+
+    public function deleteDigest(string $pointId): void
+    {
+        $this->logger->info('QdrantClientMock: deleteDigest', ['point_id' => $pointId]);
+    }
+
+    public function deleteAllDigestsForUser(int $userId): int
+    {
+        $this->logger->info('QdrantClientMock: deleteAllDigestsForUser', ['user_id' => $userId]);
+
+        return 0;
+    }
+
     // --- Document Operations ---
 
     public function upsertDocument(string $pointId, array $vector, array $payload): void

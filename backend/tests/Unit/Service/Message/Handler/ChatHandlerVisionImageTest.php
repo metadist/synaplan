@@ -66,6 +66,8 @@ class ChatHandlerVisionImageTest extends TestCase
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->createMock(\App\Service\Digest\DigestSearchService::class),
+            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
         );
     }
 
