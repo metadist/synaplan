@@ -52,9 +52,11 @@ Partner Network terms becomes the **alliance lead**.
    business days for the Seller Operations review of the listing itself. The
    automated AMI scan is usually under an hour.
 
-Fixed technical constraints, which the build already satisfies: the source AMI
-must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
-CloudFormation template needs an architecture diagram
+Fixed technical constraints, which the build enforces: the source AMI must live
+in **us-east-1**, be unencrypted, EBS-backed and HVM, and be shared with AWS
+Marketplace ingestion account `679593333241`. Marketplace encrypts its copy
+during ingestion; every buyer volume is also encrypted by the deployment
+templates. Every CloudFormation template needs an architecture diagram
 ([`deploy/aws/cloudformation/architecture.md`](../deploy/aws/cloudformation/architecture.md)).
 
 ## Who needs which access
@@ -138,7 +140,8 @@ Each step is cheap, and each one catches what the next would otherwise catch
 later and slower.
 
 1. **Build the AMI.** Push a release tag; the workflow builds x86_64 and arm64 in
-   us-east-1, then launches the x86_64 image through
+   us-east-1, verifies their snapshots are unencrypted, shares both source AMIs
+   with the Marketplace ingestion account, then launches the x86_64 image through
    `synaplan-new-vpc.yaml`, runs the smoke test on it over Session Manager, and
    deletes the stack. About 20 minutes and a few cents of instance time.
 2. **Test Add Version** in the Management Portal. A free automated compliance
