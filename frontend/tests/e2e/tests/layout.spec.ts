@@ -12,7 +12,7 @@
  * project (via @layout). Visual snapshots (Layer 3) live in visual.spec.ts.
  */
 import AxeBuilder from '@axe-core/playwright'
-import { test, expect, type Page } from '../test-setup'
+import { test, expect, LOGGED_OUT, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
@@ -346,20 +346,31 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('login page has no overflow and reachable submit', async ({ page }) => {
-    await page.goto('/login')
-    await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expectNoHorizontalOverflow(page, 'login')
-    await expectInsideViewport(page, selectors.login.submit, 'login submit')
+  // The sign-in form only exists for a visitor who is not signed in: the
+  // guest-only route guard sends an authenticated one straight to the app, and
+  // every test context otherwise carries the worker's session.
+  test.describe('signed out', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page has no overflow and reachable submit', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expectNoHorizontalOverflow(page, 'login')
+      await expectInsideViewport(page, selectors.login.submit, 'login submit')
+    })
   })
 })
 
 test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () => {
-  test('login page — light and dark', async ({ page }) => {
-    await page.goto('/login')
-    await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await axeReportOnly(page, 'login', 'light')
-    await axeReportOnly(page, 'login', 'dark')
+  test.describe('signed out', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page — light and dark', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await axeReportOnly(page, 'login', 'light')
+      await axeReportOnly(page, 'login', 'dark')
+    })
   })
 
   test('chat and files — light and dark', async ({ page }) => {

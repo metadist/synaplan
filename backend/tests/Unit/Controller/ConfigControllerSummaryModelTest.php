@@ -25,11 +25,13 @@ use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\GuestChatConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
+use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\Search\BraveSearchService;
+use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WebSpeechConfig;
@@ -96,8 +98,10 @@ final class ConfigControllerSummaryModelTest extends TestCase
                 $this->createStub(UserPasswordHasherInterface::class),
                 'test',
             ),
+            $this->createStub(SetupStateService::class),
             $this->createStub(AiProviderDisclosure::class),
             $this->createStub(LocalAiDownloadStatusService::class),
+            new MailerConfig(),
             new CapabilityService(),
             'http://qdrant.example',
         );

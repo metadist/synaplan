@@ -704,6 +704,12 @@ services:
             $bootstrapAdminPassword: '%env(string:BOOTSTRAP_ADMIN_PASSWORD)%'
             $bootstrapAdminForcePasswordChange: '%env(bool:BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE)%'
 
+    # Development aid: reopens the first-run setup wizard. Refuses to run outside
+    # dev/test, which is why it needs the environment injected.
+    App\Command\SetupResetCommand:
+        arguments:
+            $environment: '%kernel.environment%'
+
     # Encryption Service (for sensitive data like IMAP passwords)
     App\Service\EncryptionService:
         arguments:

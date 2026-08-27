@@ -132,7 +132,8 @@
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
     "connections": "Bağlantılar",
-    "savedTasks": "Yinelenen görevler"
+    "savedTasks": "Yinelenen görevler",
+    "setup": "Kurulum"
   },
   "adminModelStatus": {
     "title": "Model Durumu",
@@ -564,6 +565,7 @@
       "saveError": "Yapılandırma kaydedilemedi",
       "saved": "Yapılandırma kaydedildi",
       "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
+      "envOverridesDb": "{key} ortam değişkeni tarafından sabitlendi. Şu anda: {value}. Bu ayarı burada yönetmek için değişkeni ortamdan kaldırın.",
       "unsaved": "Kaydedilmemiş değişiklikler",
       "testConnection": "Bağlantıyı Test Et",
       "testFailed": "Bağlantı testi başarısız",
@@ -1047,7 +1049,7 @@
     "cloudProviders": "Bulut sağlayıcıları",
     "cloudProvidersHint": "Bir API anahtarı yapıştırın; canlı olarak test edilir ve şifrelenmiş saklanır. .env dosyanızdaki anahtarlar otomatik olarak alınır.",
     "recommended": "Önerilen",
-    "freeTier": "Ücretsiz kullanım mevcut",
+    "freeTier": "Bu sağlayıcıda ücretsiz API anahtarı",
     "connected": "Bağlı",
     "sourceEnv": ".env dosyasından içe aktarıldı",
     "sourceDbFromEnv": "DB'de saklandı (.env'den)",
@@ -1204,6 +1206,7 @@
     "forgotPassword": "Şifrenizi mi unuttunuz?",
     "forgotPasswordDesc": "E-posta adresinizi girin, şifrenizi sıfırlamanız için size bir bağlantı göndereceğiz.",
     "noAccount": "Hesabınız yok mu?",
+    "registrationClosed": "Kayıt kapalı. Hesaba ihtiyacın varsa lütfen yöneticinle iletişime geç.",
     "hasAccount": "Zaten hesabınız var mı?",
     "signIn": "Giriş Yap",
     "signingIn": "Giriş yapılıyor...",
@@ -1246,6 +1249,8 @@
     "registrationCompleteDesc": "Size bir doğrulama bağlantısı gönderdik. Lütfen gelen kutunuzu ve spam klasörünüzü kontrol edin, ardından hesabınızı etkinleştirmek için bağlantıya tıklayın.",
     "passwordResetSuccess": "İstek Gönderildi!",
     "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
+    "forgotPasswordNoMailerHint": "Bu şifreyi kaybedersen ve hiçbir e-posta iletilemiyorsa, sunucuya erişimi olan biri yenisini şöyle belirleyebilir:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password sen{'@'}ornek.com --generate",
     "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
     "backToHomepage": "← www.synaplan.com'a geri dön",
     "hostingTermsNote": "Barındırma platformunun kullanım koşulları geçerlidir.",
@@ -3964,6 +3969,82 @@
       "connect": "Bağlan",
       "connecting": "Bağlantı kontrol ediliyor…",
       "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
+    }
+  },
+  "setup": {
+    "title": "{brand} kurulumu",
+    "subtitle": "Bu sunucunun henüz yöneticisi yok. Üç kısa adım ve kullanıma hazır.",
+    "subtitleProgress": "Adım {current} / {total}.",
+    "progressLabel": "Kurulum ilerlemesi",
+    "loading": "Sunucu kontrol ediliyor…",
+    "switchServer": "Başka bir sunucuya bağlan",
+    "toggleTheme": "Açık ve koyu tema arasında geçiş yap",
+    "switchLanguage": "Dili değiştir",
+    "footerHint": "Kurulum bitene kadar bu sunucuyu başka kimse kullanamaz.",
+    "steps": {
+      "admin": "Yönetici",
+      "provider": "AI sağlayıcısı",
+      "access": "Erişim"
+    },
+    "alreadyDone": {
+      "title": "Bu sunucu zaten kurulmuş",
+      "description": "Halihazırda bir yöneticisi var, burada yapılacak bir şey kalmadı. Devam etmek için giriş yap.",
+      "cta": "Girişe git"
+    },
+    "admin": {
+      "title": "Yönetici hesabını oluştur",
+      "description": "Giriş yapacağın hesap bu. Bu sunucudaki her şeyi yönetebilir.",
+      "emailLabel": "E-posta adresi",
+      "emailPlaceholder": "sen{'@'}ornek.com",
+      "passwordLabel": "Şifre",
+      "passwordHint": "En az 8 karakter; bir büyük harf, bir küçük harf ve bir rakam içermeli.",
+      "confirmLabel": "Şifreyi yeniden gir",
+      "togglePassword": "Şifreyi göster veya gizle",
+      "submit": "Hesap oluştur",
+      "submitting": "Hesap oluşturuluyor…",
+      "errorMismatch": "İki şifre birbiriyle aynı değil.",
+      "errorWeak": "Şifre en az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam gerektirir.",
+      "errorInProgress": "Bu hesap şu anda başka bir yerde oluşturuluyor. Biraz bekle ve sayfayı yeniden yükle.",
+      "errorAlreadyDone": "Bu sunucunun zaten bir yöneticisi var, burada oluşturulacak bir şey yok. Bunun yerine giriş yap.",
+      "errorDisabled": "Bu sunucuda tarayıcı üzerinden kurulum kapalı. İlk hesabı sunucuyu işleten kişi oluşturur.",
+      "errorGeneric": "Hesap oluşturulamadı. Lütfen tekrar dene."
+    },
+    "provider": {
+      "title": "Bir AI sağlayıcısı bağla",
+      "description": "Yanıt verebilmesi için AI bir sağlayıcıya ihtiyaç duyar. Birini seçip API anahtarını yapıştırın — anahtar hemen test edilir ve bu sunucuda şifreli olarak saklanır.",
+      "loading": "Sağlayıcılar yükleniyor…",
+      "loadFailed": "Sağlayıcı listesi yüklenemedi.",
+      "ready": "Bir sağlayıcı bağlı. AI artık yanıt verebilir.",
+      "continue": "Devam et",
+      "skipHint": "Bunu atlayıp sağlayıcıyı sonra Yönetici → AI Sağlayıcı Kurulumu altında bağlayabilirsin. O zamana kadar sohbet çalışmaz.",
+      "chooseProvider": "Bir AI sağlayıcısı seçin",
+      "pickHint": "Anahtarını girmek için yukarıdan bir sağlayıcı seçin. Biri yeterli, diğerlerini sonra ekleyebilirsiniz.",
+      "keyLabel": "{provider} için API anahtarı",
+      "freeKeyHint": "{provider} üzerinden API anahtarı almak ücretsizdir.",
+      "saving": "Test ediliyor…",
+      "willBecomeDefault": "Bu anahtarı kaydettiğinizde yanıtları varsayılan olarak {provider} verir.",
+      "alreadyDefault": "Yanıtları hâlihazırda varsayılan olarak {provider} veriyor."
+    },
+    "access": {
+      "title": "Bu sunucuyu kimin kullanabileceğine karar ver",
+      "description": "İkisini de dilediğin zaman Yönetici → Yapılandırma altında değiştirebilirsin.",
+      "registrationLabel": "Ziyaretçiler kendi hesaplarını oluşturabilsin",
+      "registrationHint": "Bu sunucuya erişebilen herkes kaydolabilir. Davetleri kendin yapmak istiyorsan kapat.",
+      "guestChatLabel": "Ziyaretçiler hesapsız olarak sohbeti deneyebilsin",
+      "guestChatHint": "Herkese açık bir demo için kullanışlı. Sunucu yalnızca ekibin içinse kapat.",
+      "lockedByEnv": "{key} ortam değişkeni tarafından belirlendiği için burada değiştirilemez.",
+      "noMailerWarning": "Yapılandırılmış bir posta sunucusu yok, bu yüzden yeni hesaplar e-posta adreslerini doğrulayamaz.",
+      "changeLaterHint": "Kurulumu tamamlamak bu sunucuyu kullanıma açar.",
+      "submit": "Kurulumu tamamla",
+      "submitting": "Tamamlanıyor…",
+      "errorGeneric": "Kurulum tamamlanamadı. Lütfen tekrar dene."
+    },
+    "done": {
+      "title": "Sunucun hazır",
+      "description": "Kurulum tamamlandı. Yönetici olarak giriş yaptın.",
+      "enter": "{brand} kullanmaya başla",
+      "entering": "Açılıyor…",
+      "enterFailed": "Uygulama açılamadı. Lütfen tekrar dene."
     }
   },
   "iap": {

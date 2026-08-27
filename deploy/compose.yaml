@@ -50,6 +50,11 @@ x-app-environment: &app-environment
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
+  # First-run setup wizard. Empty keeps it enabled, which is what a deployment
+  # without BOOTSTRAP_ADMIN_* needs: the API stays closed with 503 SETUP_REQUIRED
+  # until someone creates the first administrator at /setup. It never appears once
+  # the installation has a user, so an upgrade is unaffected either way.
+  SETUP_WIZARD_ENABLED: "${SETUP_WIZARD_ENABLED:-}"
   # Browser-side (cloud-backed) speech-to-text; air-gapped deployments set "false".
   WEB_SPEECH_ENABLED: "${WEB_SPEECH_ENABLED:-}"
   DB_HOST: db

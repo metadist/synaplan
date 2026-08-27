@@ -133,7 +133,8 @@
     "mcpServers": "MCP Servers",
     "aiAgents": "AI Agents",
     "connections": "Connections",
-    "savedTasks": "Saved Recurring Tasks"
+    "savedTasks": "Saved Recurring Tasks",
+    "setup": "Setup"
   },
   "adminModelStatus": {
     "title": "Model Status",
@@ -573,6 +574,7 @@
       "saved": "Configuration saved",
       "savedLive": "Saved — takes effect immediately",
       "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
+      "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Remove the variable from your environment to manage this setting here.",
       "unsaved": "Unsaved changes",
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
@@ -2609,7 +2611,7 @@
     "cloudProviders": "Cloud providers",
     "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
     "recommended": "Recommended",
-    "freeTier": "Free tier available",
+    "freeTier": "Free API key at this provider",
     "connected": "Connected",
     "sourceEnv": "imported from .env",
     "sourceDbFromEnv": "stored in DB (from .env)",
@@ -2780,6 +2782,7 @@
     "forgotPassword": "Forgot password?",
     "forgotPasswordDesc": "Enter your email address and we'll send you a link to reset your password.",
     "noAccount": "Don't have an account?",
+    "registrationClosed": "Registration is turned off. Please contact the administrator if you need an account.",
     "hasAccount": "Already have an account?",
     "signIn": "Sign In",
     "signingIn": "Signing in...",
@@ -2822,6 +2825,8 @@
     "registrationCompleteDesc": "We sent you a verification link. Please check your inbox and spam folder, then click the link to activate your account.",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
+    "forgotPasswordNoMailerHint": "If you ever lose this password and no email can be delivered, an administrator with server access can set a new one with:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password you{'@'}example.com --generate",
     "recaptchaError": "reCAPTCHA verification failed. Please try again.",
     "backToHomepage": "← Back to www.synaplan.com",
     "hostingTermsNote": "The terms and conditions of the hosting platform apply.",
@@ -4949,6 +4954,82 @@
       "connect": "Connect",
       "connecting": "Checking connection…",
       "connectError": "This server can't be reached. Check the address and try again."
+    }
+  },
+  "setup": {
+    "title": "Set up {brand}",
+    "subtitle": "This server has no administrator yet. Three short steps and it is ready to use.",
+    "subtitleProgress": "Step {current} of {total}.",
+    "progressLabel": "Setup progress",
+    "loading": "Checking this server…",
+    "switchServer": "Connect to a different server",
+    "toggleTheme": "Switch between light and dark",
+    "switchLanguage": "Change language",
+    "footerHint": "Nobody else can use this server until setup is finished.",
+    "steps": {
+      "admin": "Administrator",
+      "provider": "AI provider",
+      "access": "Access"
+    },
+    "alreadyDone": {
+      "title": "This server is already set up",
+      "description": "It already has an administrator, so there is nothing to set up here. Sign in to continue.",
+      "cta": "Go to sign-in"
+    },
+    "admin": {
+      "title": "Create your administrator account",
+      "description": "This is the account you will sign in with. It can manage everything on this server.",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "you{'@'}example.com",
+      "passwordLabel": "Password",
+      "passwordHint": "At least 8 characters, with an uppercase letter, a lowercase letter and a number.",
+      "confirmLabel": "Repeat password",
+      "togglePassword": "Show or hide the password",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "errorMismatch": "The two passwords do not match.",
+      "errorWeak": "The password needs at least 8 characters, an uppercase letter, a lowercase letter and a number.",
+      "errorInProgress": "This account is already being created somewhere else. Wait a moment, then reload this page.",
+      "errorAlreadyDone": "This server already has an administrator, so there is nothing to create here. Sign in instead.",
+      "errorDisabled": "Setting this server up in the browser is switched off. Whoever runs it creates the first account.",
+      "errorGeneric": "The account could not be created. Please try again."
+    },
+    "provider": {
+      "title": "Connect an AI provider",
+      "description": "The AI needs a provider to answer. Choose one and paste its API key — it is tested right away and stored encrypted on this server.",
+      "loading": "Loading providers…",
+      "loadFailed": "The provider list could not be loaded.",
+      "ready": "A provider is connected. The AI can answer now.",
+      "continue": "Continue",
+      "skipHint": "You can skip this and connect a provider later under Admin → AI Provider Setup. Chat will not work until you do.",
+      "chooseProvider": "Choose an AI provider",
+      "pickHint": "Pick a provider above to add its key. You only need one, and you can add more later.",
+      "keyLabel": "API key for {provider}",
+      "freeKeyHint": "Getting an API key from {provider} is free.",
+      "saving": "Testing…",
+      "willBecomeDefault": "Saving this key also makes {provider} the AI that answers by default.",
+      "alreadyDefault": "{provider} is already the AI that answers by default."
+    },
+    "access": {
+      "title": "Decide who can use this server",
+      "description": "You can change both of these at any time under Admin → Configuration.",
+      "registrationLabel": "Let visitors create their own account",
+      "registrationHint": "Anyone who can reach this server can sign up. Turn this off if you want to invite people yourself.",
+      "guestChatLabel": "Let visitors try the chat without an account",
+      "guestChatHint": "Useful for a public demo. Turn it off if this server is only for your team.",
+      "lockedByEnv": "Set by the environment variable {key}, so it cannot be changed here.",
+      "noMailerWarning": "No mail server is configured, so new accounts cannot confirm their email address.",
+      "changeLaterHint": "Finishing setup opens this server for use.",
+      "submit": "Finish setup",
+      "submitting": "Finishing…",
+      "errorGeneric": "Setup could not be finished. Please try again."
+    },
+    "done": {
+      "title": "Your server is ready",
+      "description": "Setup is complete. You are signed in as the administrator.",
+      "enter": "Start using {brand}",
+      "entering": "Opening…",
+      "enterFailed": "Could not open the app. Please try again."
     }
   },
   "iap": {

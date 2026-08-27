@@ -25,12 +25,14 @@ use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\GuestChatConfig;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
+use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
+use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WebSpeechConfig;
@@ -74,8 +76,10 @@ class ConfigController extends AbstractController
         private SavedTaskConfig $savedTaskConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
+        private SetupStateService $setupState,
         private AiProviderDisclosure $aiProviderDisclosure,
         private LocalAiDownloadStatusService $localAiDownloadStatus,
+        private MailerConfig $mailerConfig,
         private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
@@ -145,6 +149,7 @@ class ConfigController extends AbstractController
                     properties: [
                         new OA\Property(property: 'registrationEnabled', type: 'boolean', example: true, description: 'When false, local email/password self-registration is disabled (set REGISTRATION_ENABLED=false, e.g. for OIDC-only deployments). The /register endpoint is also refused server-side.'),
                         new OA\Property(property: 'guestChatEnabled', type: 'boolean', example: true, description: 'When false, the anonymous guest trial chat is disabled (set GUEST_CHAT_ENABLED=false, e.g. for OIDC-only deployments): the frontend sends unauthenticated visitors to /login and every /api/v1/guest endpoint is refused server-side.'),
+                        new OA\Property(property: 'mailerConfigured', type: 'boolean', example: true, description: 'False when MAILER_DSN is unset or the null transport. The forgot-password page then shows the CLI reset instead of pretending an email will arrive.'),
                     ]
                 ),
                 new OA\Property(
@@ -408,9 +413,21 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'setup',
                     type: 'object',
-                    description: 'First-run setup status. demoLoginHint is public so the login page can offer the seeded admin; chatReady is only set for authenticated users.',
+                    description: 'First-run setup status. wizardRequired, wizardEnabled and demoLoginHint are public so the SPA can route a virgin install into the setup wizard; chatReady is only set for authenticated users.',
                     nullable: true,
                     properties: [
+                        new OA\Property(
+                            property: 'wizardRequired',
+                            type: 'boolean',
+                            example: false,
+                            description: 'True only on a virgin installation that still needs its first administrator: no BCONFIG SETUP.COMPLETED flag, not a single BUSER row, and SETUP_WIZARD_ENABLED not disabled. The SPA then redirects every route to the setup wizard, and the rest of the API answers 503 SETUP_REQUIRED. False on every existing installation.'
+                        ),
+                        new OA\Property(
+                            property: 'wizardEnabled',
+                            type: 'boolean',
+                            example: true,
+                            description: 'False only when the operator set SETUP_WIZARD_ENABLED=false. The wizard then never applies on this installation, no matter how empty it is — the intended setup for SSO/OIDC deployments where the administrator arrives through IdP roles and no local account is ever created. The SPA uses this to stop re-checking the setup state at all. True by default.'
+                        ),
                         new OA\Property(
                             property: 'chatReady',
                             type: 'boolean',
@@ -511,6 +528,16 @@ class ConfigController extends AbstractController
 
         $unavailableProviders = [];
         $setup = [
+            // Public on purpose: this is the ONLY signal the SPA has to route a
+            // virgin install into the wizard, and it is the one route the setup
+            // lockdown lets through. It leaks nothing — on every installation
+            // that has ever had a user it is simply false.
+            'wizardRequired' => $this->setupState->isSetupRequired(),
+            // Distinguishes "already set up" from "the operator switched the
+            // wizard off". Both leave wizardRequired false, but only the second
+            // one is permanent, which is what lets an SSO/OIDC deployment stop
+            // asking about the setup state altogether.
+            'wizardEnabled' => $this->setupState->isWizardEnabled(),
             'demoLoginHint' => $this->demoLoginHint->isVisible(),
         ];
         if ($user) {
@@ -584,6 +611,7 @@ class ConfigController extends AbstractController
                 // unauthenticated visitors are sent to /login instead of the
                 // anonymous guest trial (issue #1517).
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
+                'mailerConfigured' => $this->mailerConfig->isConfigured(),
             ],
             'recaptcha' => $recaptchaConfig,
             'branding' => $this->brandingService->getBranding(),

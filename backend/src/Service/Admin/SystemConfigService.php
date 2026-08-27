@@ -14,12 +14,14 @@ use App\Service\Digest\MessageDigestConfig;
 use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
+use App\Service\GuestChatConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -47,6 +49,8 @@ final readonly class SystemConfigService
         private readonly string $defaultTtsUrl,
         private readonly ProviderKeyStore $providerKeyStore,
         private readonly EncryptionService $encryption,
+        private readonly RegistrationConfig $registrationConfig,
+        private readonly GuestChatConfig $guestChatConfig,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -97,6 +101,7 @@ final readonly class SystemConfigService
             'auth' => [
                 'label' => 'Authentication',
                 'sections' => [
+                    'access' => ['label' => 'Who can use this instance', 'fields' => ['REGISTRATION_ENABLED', 'GUEST_CHAT_ENABLED']],
                     'recaptcha' => ['label' => 'reCAPTCHA v3', 'fields' => ['RECAPTCHA_ENABLED', 'RECAPTCHA_SITE_KEY', 'RECAPTCHA_SECRET_KEY', 'RECAPTCHA_MIN_SCORE']],
                     'google' => ['label' => 'Google OAuth 2.0', 'fields' => ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'GOOGLE_CLOUD_PROJECT_ID']],
                     'github' => ['label' => 'GitHub OAuth 2.0', 'fields' => ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']],
@@ -196,7 +201,7 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
-     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool}>
+     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string}>
      */
     public function getValues(?int $actingUserId = null): array
     {
@@ -262,6 +267,22 @@ final readonly class SystemConfigService
                     ];
                 }
             }
+        }
+
+        // The access-surface flags are stored in BCONFIG but an explicit
+        // environment variable still wins. Report that, otherwise the page shows
+        // a toggle the operator can move while nothing changes — the exact kind
+        // of silent no-op that costs an afternoon of debugging.
+        foreach ([
+            'REGISTRATION_ENABLED' => $this->registrationConfig->envOverride(),
+            'GUEST_CHAT_ENABLED' => $this->guestChatConfig->envOverride(),
+        ] as $key => $envOverride) {
+            if (!isset($values[$key]) || null === $envOverride) {
+                continue;
+            }
+
+            $values[$key]['envOverride'] = true;
+            $values[$key]['effectiveValue'] = $envOverride ? 'true' : 'false';
         }
 
         // #1079: surface effective multitask routing for the acting admin so the
@@ -922,6 +943,30 @@ final readonly class SystemConfigService
     private function buildSchema(): array
     {
         return [
+            // === Access surface (database-backed, no restart required) ===
+            // Written by the first-run setup wizard and editable here. An
+            // explicit REGISTRATION_ENABLED / GUEST_CHAT_ENABLED environment
+            // variable still wins over the stored row — getValues() reports that
+            // as `envOverride` so this page never shows a toggle that silently
+            // does nothing.
+            'REGISTRATION_ENABLED' => [
+                'tab' => 'auth', 'section' => 'access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Allow visitors to create their own account with email and password. Turn this off for an invite-only instance (an administrator then creates every account) or for SSO-only deployments. The sign-up page and the API both refuse when off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => RegistrationConfig::CONFIG_GROUP,
+                'dbKey' => RegistrationConfig::KEY_ENABLED,
+            ],
+            'GUEST_CHAT_ENABLED' => [
+                'tab' => 'auth', 'section' => 'access', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let visitors try the chat without signing in. Turn this off so everyone has to sign in first — unauthenticated visitors are sent to the login page and every guest endpoint is refused.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => GuestChatConfig::CONFIG_GROUP,
+                'dbKey' => GuestChatConfig::KEY_ENABLED,
+            ],
             // === Routing (database-backed, no restart required) ===
             // Stored in BCONFIG group MULTITASK / setting ROUTING_ENABLED (the row
             // MultitaskRoutingConfig reads), not the default QDRANT_SEARCH group.

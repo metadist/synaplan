@@ -42,6 +42,10 @@ const ConfigValueZ = z.object({
   isMasked: z.boolean(),
   effectiveForMe: z.string().optional(),
   hasPersonalOverride: z.boolean().optional(),
+  // Set when an explicit environment variable pins the setting, so the stored
+  // value is inert until the operator removes it.
+  envOverride: z.boolean().optional(),
+  effectiveValue: z.string().optional(),
 })
 
 const ConfigBackupZ = z.object({

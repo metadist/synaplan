@@ -375,6 +375,7 @@
                 {{ $t('auth.signUp') }}
               </router-link>
             </p>
+            <RegistrationClosedHint v-else />
           </div>
         </template>
       </div>
@@ -430,6 +431,7 @@ import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import DemoLoginHint from '@/components/auth/DemoLoginHint.vue'
+import RegistrationClosedHint from '@/components/auth/RegistrationClosedHint.vue'
 import {
   FIRST_RUN_ADMIN_EMAIL,
   FIRST_RUN_ADMIN_PASSWORD,

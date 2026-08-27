@@ -133,7 +133,8 @@
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
     "connections": "Verbindungen",
-    "savedTasks": "Wiederkehrende Aufgaben"
+    "savedTasks": "Wiederkehrende Aufgaben",
+    "setup": "Einrichtung"
   },
   "adminModelStatus": {
     "title": "Modell-Status",
@@ -568,6 +569,7 @@
       "saved": "Konfiguration gespeichert",
       "savedLive": "Gespeichert — sofort wirksam",
       "dbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
+      "envOverridesDb": "Von der Umgebungsvariablen {key} festgelegt. Aktuell: {value}. Entferne die Variable aus der Umgebung, um diese Einstellung hier zu verwalten.",
       "unsaved": "Nicht gespeicherte Änderungen",
       "testConnection": "Verbindung testen",
       "testFailed": "Verbindungstest fehlgeschlagen",
@@ -2678,7 +2680,7 @@
     "cloudProviders": "Cloud-Anbieter",
     "cloudProvidersHint": "API-Schlüssel einfügen — er wird live getestet und verschlüsselt gespeichert. Schlüssel aus deiner .env-Datei werden automatisch übernommen.",
     "recommended": "Empfohlen",
-    "freeTier": "Kostenlose Stufe verfügbar",
+    "freeTier": "Kostenloser API-Key bei diesem Anbieter",
     "connected": "Verbunden",
     "sourceEnv": "aus .env importiert",
     "sourceDbFromEnv": "in DB gespeichert (aus .env)",
@@ -4188,6 +4190,7 @@
     "forgotPassword": "Passwort vergessen?",
     "forgotPasswordDesc": "Gib deine E-Mail-Adresse ein und wir senden dir einen Link zum Zurücksetzen deines Passworts.",
     "noAccount": "Noch kein Konto?",
+    "registrationClosed": "Die Registrierung ist ausgeschaltet. Wende dich an den Administrator, wenn du ein Konto brauchst.",
     "hasAccount": "Bereits ein Konto?",
     "signIn": "Anmelden",
     "signingIn": "Anmeldung läuft...",
@@ -4230,6 +4233,8 @@
     "registrationCompleteDesc": "Wir haben dir einen Bestätigungslink gesendet. Bitte überprüfe deinen Posteingang und Spam-Ordner und klicke auf den Link, um dein Konto zu aktivieren.",
     "passwordResetSuccess": "Anfrage gesendet!",
     "passwordResetSuccessDesc": "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet. Bitte überprüfe deinen Posteingang.",
+    "forgotPasswordNoMailerHint": "Falls du dieses Passwort einmal verlierst und keine E-Mail zugestellt werden kann, setzt es jemand mit Serverzugang neu:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password du{'@'}beispiel.de --generate",
     "recaptchaError": "reCAPTCHA-Verifizierung fehlgeschlagen. Bitte versuche es erneut.",
     "backToHomepage": "← Zurück zu www.synaplan.com",
     "hostingTermsNote": "Es gelten die Allgemeinen Geschäftsbedingungen der Hosting-Plattform.",
@@ -4883,6 +4888,82 @@
       "connect": "Verbinden",
       "connecting": "Verbindung wird geprüft…",
       "connectError": "Dieser Server ist nicht erreichbar. Prüfe die Adresse und versuche es erneut."
+    }
+  },
+  "setup": {
+    "title": "{brand} einrichten",
+    "subtitle": "Dieser Server hat noch keinen Administrator. Drei kurze Schritte, dann ist er nutzbar.",
+    "subtitleProgress": "Schritt {current} von {total}.",
+    "progressLabel": "Fortschritt der Einrichtung",
+    "loading": "Server wird geprüft…",
+    "switchServer": "Mit einem anderen Server verbinden",
+    "toggleTheme": "Zwischen hell und dunkel wechseln",
+    "switchLanguage": "Sprache wechseln",
+    "footerHint": "Solange die Einrichtung läuft, kann niemand anderes diesen Server nutzen.",
+    "steps": {
+      "admin": "Administrator",
+      "provider": "KI-Anbieter",
+      "access": "Zugang"
+    },
+    "alreadyDone": {
+      "title": "Dieser Server ist bereits eingerichtet",
+      "description": "Es gibt schon einen Administrator, hier ist also nichts mehr zu tun. Melde dich an, um weiterzumachen.",
+      "cta": "Zur Anmeldung"
+    },
+    "admin": {
+      "title": "Administrator-Konto anlegen",
+      "description": "Mit diesem Konto meldest du dich an. Es kann alles auf diesem Server verwalten.",
+      "emailLabel": "E-Mail-Adresse",
+      "emailPlaceholder": "du{'@'}example.com",
+      "passwordLabel": "Passwort",
+      "passwordHint": "Mindestens 8 Zeichen, mit einem Groß-, einem Kleinbuchstaben und einer Zahl.",
+      "confirmLabel": "Passwort wiederholen",
+      "togglePassword": "Passwort anzeigen oder verbergen",
+      "submit": "Konto anlegen",
+      "submitting": "Konto wird angelegt…",
+      "errorMismatch": "Die beiden Passwörter stimmen nicht überein.",
+      "errorWeak": "Das Passwort braucht mindestens 8 Zeichen, einen Groß-, einen Kleinbuchstaben und eine Zahl.",
+      "errorInProgress": "Dieses Konto wird gerade an anderer Stelle angelegt. Warte einen Moment und lade die Seite neu.",
+      "errorAlreadyDone": "Dieser Server hat bereits einen Administrator, hier ist also nichts anzulegen. Melde dich stattdessen an.",
+      "errorDisabled": "Die Einrichtung im Browser ist auf diesem Server abgeschaltet. Das erste Konto legt an, wer den Server betreibt.",
+      "errorGeneric": "Das Konto konnte nicht angelegt werden. Bitte versuche es erneut."
+    },
+    "provider": {
+      "title": "KI-Anbieter verbinden",
+      "description": "Die KI braucht einen Anbieter, um zu antworten. Wähle einen aus und füge seinen API-Schlüssel ein — er wird sofort getestet und verschlüsselt auf diesem Server gespeichert.",
+      "loading": "Anbieter werden geladen…",
+      "loadFailed": "Die Anbieterliste konnte nicht geladen werden.",
+      "ready": "Ein Anbieter ist verbunden. Die KI kann jetzt antworten.",
+      "continue": "Weiter",
+      "skipHint": "Du kannst das überspringen und später unter Admin → KI-Anbieter-Setup nachholen. Bis dahin funktioniert der Chat nicht.",
+      "chooseProvider": "KI-Anbieter auswählen",
+      "pickHint": "Wähle oben einen Anbieter, um seinen Schlüssel einzutragen. Einer genügt, weitere kannst du später ergänzen.",
+      "keyLabel": "API-Schlüssel für {provider}",
+      "freeKeyHint": "Einen API-Key von {provider} zu bekommen ist kostenlos.",
+      "saving": "Wird getestet…",
+      "willBecomeDefault": "Mit dem Speichern antwortet {provider} künftig standardmäßig.",
+      "alreadyDefault": "{provider} antwortet bereits standardmäßig."
+    },
+    "access": {
+      "title": "Festlegen, wer diesen Server nutzen darf",
+      "description": "Beides kannst du jederzeit unter Admin → Konfiguration ändern.",
+      "registrationLabel": "Besucher dürfen sich selbst ein Konto anlegen",
+      "registrationHint": "Jede Person, die diesen Server erreicht, kann sich registrieren. Schalte es aus, wenn du selbst einladen möchtest.",
+      "guestChatLabel": "Besucher dürfen den Chat ohne Konto ausprobieren",
+      "guestChatHint": "Praktisch für eine öffentliche Demo. Schalte es aus, wenn der Server nur für dein Team ist.",
+      "lockedByEnv": "Durch die Umgebungsvariable {key} festgelegt und hier deshalb nicht änderbar.",
+      "noMailerWarning": "Es ist kein Mailserver konfiguriert, neue Konten können ihre E-Mail-Adresse also nicht bestätigen.",
+      "changeLaterHint": "Mit dem Abschluss der Einrichtung wird dieser Server nutzbar.",
+      "submit": "Einrichtung abschließen",
+      "submitting": "Wird abgeschlossen…",
+      "errorGeneric": "Die Einrichtung konnte nicht abgeschlossen werden. Bitte versuche es erneut."
+    },
+    "done": {
+      "title": "Dein Server ist bereit",
+      "description": "Die Einrichtung ist fertig. Du bist als Administrator angemeldet.",
+      "enter": "{brand} starten",
+      "entering": "Wird geöffnet…",
+      "enterFailed": "Die App konnte nicht geöffnet werden. Bitte versuche es erneut."
     }
   },
   "iap": {

@@ -248,6 +248,10 @@ services:
       - ./_devextras/backend/docker-entrypoint.d:/docker-entrypoint.d:ro
     environment:
       APP_ENV: dev
+      # Demo user fixtures. Set SEED_DEMO_DATA=false to boot an EMPTY database
+      # and walk through the first-run setup wizard at /setup, the way a
+      # production install sees it. Production never loads fixtures at all.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
       # Local Docker Nextcloud (http://nextcloud) — ignored unless APP_ENV=dev.
       DAV_ALLOW_INSECURE_LOCAL: "1"
       # APP_SECRET loaded from backend/.env (env_file above)

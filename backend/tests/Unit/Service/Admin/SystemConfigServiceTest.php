@@ -10,8 +10,10 @@ use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\EncryptionService;
+use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
+use App\Service\RegistrationConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -46,7 +48,51 @@ final class SystemConfigServiceTest extends TestCase
             defaultTtsUrl: 'http://localhost:10200',
             providerKeyStore: $providerKeyStore,
             encryption: $encryption,
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
         );
+    }
+
+    /**
+     * REGISTRATION_ENABLED is stored in BCONFIG but an explicit environment
+     * variable still wins. Without the marker the page would show a toggle the
+     * admin can move while nothing changes.
+     */
+    public function testAccessFlagIsReportedAsPinnedByTheEnvironment(): void
+    {
+        $envWasSet = \array_key_exists('REGISTRATION_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['REGISTRATION_ENABLED'] : null;
+        $_ENV['REGISTRATION_ENABLED'] = 'false';
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertTrue($values['REGISTRATION_ENABLED']['envOverride']);
+            $this->assertSame('false', $values['REGISTRATION_ENABLED']['effectiveValue']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['REGISTRATION_ENABLED'] = $original;
+            } else {
+                unset($_ENV['REGISTRATION_ENABLED']);
+            }
+        }
+    }
+
+    public function testAccessFlagWithoutAnEnvironmentVariableIsNotMarked(): void
+    {
+        $envWasSet = \array_key_exists('GUEST_CHAT_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['GUEST_CHAT_ENABLED'] : null;
+        unset($_ENV['GUEST_CHAT_ENABLED']);
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertArrayNotHasKey('envOverride', $values['GUEST_CHAT_ENABLED']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['GUEST_CHAT_ENABLED'] = $original;
+            }
+        }
     }
 
     /**

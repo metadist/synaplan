@@ -99,17 +99,49 @@ platform generates for you on a redeploy and shows in its dashboard — is ignor
 so the account keeps the password from the very first start. Always sign in with
 the credentials of that first deployment.
 
-If they are lost, there are two ways back in:
+If they are lost, there are three ways back in.
 
-1. **Password reset by email.** Use *Forgot password?* on the sign-in page. This
-   only works when the deployment can send mail: `MAILER_DSN` must point at your
-   SMTP server. The production default is `null://null`, which silently discards
-   every message, so configure SMTP first (see [EMAIL.md](EMAIL.md)).
-2. **Through the database.** Sign up in the app with an address you control, then
-   make that account the administrator with the SQL in
-   [User Management](#user-management), which also shows how to open the database
-   prompt. Without working SMTP the sign-up confirmation mail never arrives, so
-   mark the account as verified in the same step — otherwise it cannot sign in.
+**1. On the server (recommended).** Anyone with shell access on the host can set
+a new password directly. This needs no mailer and no SQL:
+
+```bash
+docker compose exec -T backend php bin/console app:admin:reset-password \
+  admin@example.com --generate
+```
+
+The generated password is printed once and has to be replaced at the next
+sign-in; that rule is enforced server-side, so an API key is no way around it.
+Pass `--password='Str0ngPass'` instead to set a password you chose yourself. It
+follows the same rules as `BOOTSTRAP_ADMIN_PASSWORD`: 8 to 64 characters, and
+below 16 characters it must also contain at least one uppercase letter, one
+lowercase letter, and one number.
+
+If every administrator is gone — deleted, or demoted, so nobody can reach
+**Admin → Users** anymore — add `--promote`. It makes the named account an
+administrator and marks its address verified in the same step:
+
+```bash
+docker compose exec -T backend php bin/console app:admin:reset-password \
+  someone@example.com --generate --promote
+```
+
+The setup wizard deliberately does *not* reopen in that situation: a wizard that
+reappears on a running instance would let the next visitor claim it. Shell access
+is the intended proof of ownership instead.
+
+Accounts managed by an enterprise identity provider are refused — their password
+lives in that provider, not here.
+
+**2. Password reset by email.** Use *Forgot password?* on the sign-in page. This
+only works when the deployment can send mail: `MAILER_DSN` must point at your
+SMTP server. The production default is `null://null`, which silently discards
+every message, so configure SMTP first (see [EMAIL.md](EMAIL.md)).
+
+**3. Through the database.** Sign up in the app with an address you control, then
+make that account the administrator with the SQL in
+[User Management](#user-management), which also shows how to open the database
+prompt. Without working SMTP the sign-up confirmation mail never arrives, so mark
+the account as verified in the same step — otherwise it cannot sign in.
 
 There is no other recovery path: passwords are stored as hashes and cannot be
 read back out of the database.

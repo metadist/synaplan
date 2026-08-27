@@ -91,8 +91,16 @@ passes in as environment variables are used exactly as given.
 The bootstrap administrator is created only when no administrator exists. A
 restart must not rotate this account. `BOOTSTRAP_ADMIN_EMAIL` and
 `BOOTSTRAP_ADMIN_PASSWORD` must be set together or left empty together; leaving
-both empty is valid and simply skips the bootstrap, so an administrator can be
-promoted later. The email must be a valid address of at most 128 characters. The
+both empty is valid and skips the bootstrap, in which case the stack serves the
+first-run setup wizard at `/setup` and the first visitor creates the
+administrator there. On a publicly reachable host, either finish that wizard
+right after deploying or set the bootstrap pair, so the claim window never
+exists; `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
+[First-Run Setup](../docs/CONFIGURATION.md#first-run-setup), and
+[SSO-only instances](../docs/CONFIGURATION.md#sso-only-instances-no-local-accounts)
+for a deployment whose administrator comes from an identity provider instead.
+
+The email must be a valid address of at most 128 characters. The
 password must be 8 to 64 characters, and below 16 characters it must also contain
 an uppercase letter, a lowercase letter, and a number; from 16 characters there is
 no character requirement. `validate-release.sh` checks both values before the

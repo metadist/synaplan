@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import type { ConfigFieldSchema, ConfigValue } from '@/services/api/adminConfigApi'
 import { providerHelpByEnvVar } from '@/utils/providerHelp'
+
+const { t } = useI18n()
 
 interface Props {
   fieldKey: string
@@ -117,6 +120,26 @@ const showDbOverrideHint = computed(
     !isDirty.value
 )
 
+/**
+ * The reverse case of showDbOverrideHint: a stored value that an environment
+ * variable pins. Without this the toggle moves and nothing happens.
+ */
+const isPinnedByEnv = computed(() => props.value.envOverride === true)
+
+/**
+ * What the instance actually does, which is what the toggle has to show while an
+ * environment variable pins the field. The stored row usually still holds the
+ * shipped default, so rendering `localValue` here would put an "Enabled" switch
+ * directly above a hint reading "Currently: Disabled".
+ */
+const displayedValue = computed(() =>
+  isPinnedByEnv.value ? (props.value.effectiveValue ?? localValue.value) : localValue.value
+)
+
+const effectiveValueLabel = computed(() =>
+  props.value.effectiveValue === 'true' ? t('common.enabled') : t('common.disabled')
+)
+
 const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 </script>
 
@@ -148,25 +171,25 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
     <div v-if="schema.type === 'boolean'" class="flex items-center gap-3">
       <button
         type="button"
-        :disabled="disabled"
+        :disabled="disabled || isPinnedByEnv"
         :class="[
           'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
-          localValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
-          disabled && 'opacity-50 cursor-not-allowed',
+          displayedValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
+          (disabled || isPinnedByEnv) && 'opacity-50 cursor-not-allowed',
         ]"
         role="switch"
-        :aria-checked="localValue === 'true'"
+        :aria-checked="displayedValue === 'true'"
         @click="handleToggle"
       >
         <span
           :class="[
             'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-            localValue === 'true' ? 'translate-x-5' : 'translate-x-0',
+            displayedValue === 'true' ? 'translate-x-5' : 'translate-x-0',
           ]"
         />
       </button>
       <span class="text-sm txt-secondary">
-        {{ localValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
+        {{ displayedValue === 'true' ? $t('common.enabled') : $t('common.disabled') }}
       </span>
     </div>
 
@@ -247,6 +270,19 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       data-testid="config-field-db-override-hint"
     >
       {{ $t('admin.config.dbOverridesEnv') }}
+    </p>
+
+    <p
+      v-if="isPinnedByEnv"
+      class="text-xs text-[var(--status-warning-text)] mt-1.5"
+      data-testid="config-field-env-override-hint"
+    >
+      {{
+        $t('admin.config.envOverridesDb', {
+          key: fieldKey,
+          value: effectiveValueLabel,
+        })
+      }}
     </p>
   </div>
 </template>

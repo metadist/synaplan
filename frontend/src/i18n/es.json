@@ -132,7 +132,8 @@
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
     "connections": "Conexiones",
-    "savedTasks": "Tareas recurrentes"
+    "savedTasks": "Tareas recurrentes",
+    "setup": "Configuración"
   },
   "adminModelStatus": {
     "title": "Estado de modelos",
@@ -564,6 +565,7 @@
       "saveError": "Error al guardar la configuración",
       "saved": "Configuración guardada",
       "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
+      "envOverridesDb": "Fijado por la variable de entorno {key}. Actualmente: {value}. Elimina la variable del entorno para gestionar este ajuste aquí.",
       "unsaved": "Cambios sin guardar",
       "testConnection": "Probar Conexión",
       "testFailed": "Prueba de conexión fallida",
@@ -1047,7 +1049,7 @@
     "cloudProviders": "Proveedores en la nube",
     "cloudProvidersHint": "Pega una clave API: se prueba en vivo y se guarda cifrada. Las claves de tu archivo .env se detectan automáticamente.",
     "recommended": "Recomendado",
-    "freeTier": "Nivel gratuito disponible",
+    "freeTier": "Clave API gratuita en este proveedor",
     "connected": "Conectado",
     "sourceEnv": "importada de .env",
     "sourceDbFromEnv": "guardada en BD (desde .env)",
@@ -1204,6 +1206,7 @@
     "forgotPassword": "¿Olvidaste tu contraseña?",
     "forgotPasswordDesc": "Ingresa tu dirección de correo electrónico y te enviaremos un enlace para restablecer tu contraseña.",
     "noAccount": "¿No tienes cuenta?",
+    "registrationClosed": "El registro está desactivado. Contacta al administrador si necesitas una cuenta.",
     "hasAccount": "¿Ya tienes cuenta?",
     "signIn": "Iniciar Sesión",
     "signingIn": "Iniciando sesión...",
@@ -1246,6 +1249,8 @@
     "registrationCompleteDesc": "Te enviamos un enlace de verificación. Revisa tu bandeja de entrada y la carpeta de spam, luego haz clic en el enlace para activar tu cuenta.",
     "passwordResetSuccess": "¡Solicitud Enviada!",
     "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
+    "forgotPasswordNoMailerHint": "Si pierdes esta contraseña y no se puede enviar ningún correo, alguien con acceso al servidor puede establecer una nueva con:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password tu{'@'}ejemplo.com --generate",
     "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",
     "backToHomepage": "← Volver a www.synaplan.com",
     "hostingTermsNote": "Aplican los términos y condiciones de la plataforma de hosting.",
@@ -3963,6 +3968,82 @@
       "connect": "Conectar",
       "connecting": "Comprobando la conexión…",
       "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
+    }
+  },
+  "setup": {
+    "title": "Configurar {brand}",
+    "subtitle": "Este servidor aún no tiene administrador. Tres pasos cortos y estará listo.",
+    "subtitleProgress": "Paso {current} de {total}.",
+    "progressLabel": "Progreso de la configuración",
+    "loading": "Comprobando este servidor…",
+    "switchServer": "Conectar con otro servidor",
+    "toggleTheme": "Cambiar entre claro y oscuro",
+    "switchLanguage": "Cambiar idioma",
+    "footerHint": "Mientras la configuración no termine, nadie más puede usar este servidor.",
+    "steps": {
+      "admin": "Administrador",
+      "provider": "Proveedor de IA",
+      "access": "Acceso"
+    },
+    "alreadyDone": {
+      "title": "Este servidor ya está configurado",
+      "description": "Ya tiene un administrador, así que aquí no hay nada que configurar. Inicia sesión para continuar.",
+      "cta": "Ir al inicio de sesión"
+    },
+    "admin": {
+      "title": "Crea tu cuenta de administrador",
+      "description": "Es la cuenta con la que iniciarás sesión. Puede gestionar todo en este servidor.",
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tu{'@'}ejemplo.com",
+      "passwordLabel": "Contraseña",
+      "passwordHint": "Al menos 8 caracteres, con una mayúscula, una minúscula y un número.",
+      "confirmLabel": "Repite la contraseña",
+      "togglePassword": "Mostrar u ocultar la contraseña",
+      "submit": "Crear cuenta",
+      "submitting": "Creando la cuenta…",
+      "errorMismatch": "Las dos contraseñas no coinciden.",
+      "errorWeak": "La contraseña necesita al menos 8 caracteres, una mayúscula, una minúscula y un número.",
+      "errorInProgress": "Esta cuenta ya se está creando en otro sitio. Espera un momento y vuelve a cargar la página.",
+      "errorAlreadyDone": "Este servidor ya tiene un administrador, así que aquí no hay nada que crear. Inicia sesión.",
+      "errorDisabled": "La configuración desde el navegador está desactivada en este servidor. Quien lo administra crea la primera cuenta.",
+      "errorGeneric": "No se pudo crear la cuenta. Inténtalo de nuevo."
+    },
+    "provider": {
+      "title": "Conecta un proveedor de IA",
+      "description": "La IA necesita un proveedor para responder. Elige uno y pega su clave API: se comprueba al instante y se guarda cifrada en este servidor.",
+      "loading": "Cargando proveedores…",
+      "loadFailed": "No se pudo cargar la lista de proveedores.",
+      "ready": "Hay un proveedor conectado. La IA ya puede responder.",
+      "continue": "Continuar",
+      "skipHint": "Puedes omitirlo y conectar un proveedor más tarde en Admin → Configuración de proveedor de IA. Hasta entonces el chat no funcionará.",
+      "chooseProvider": "Elige un proveedor de IA",
+      "pickHint": "Elige arriba un proveedor para añadir su clave. Basta con uno; puedes añadir más más adelante.",
+      "keyLabel": "Clave API de {provider}",
+      "freeKeyHint": "Obtener una clave API de {provider} es gratis.",
+      "saving": "Probando…",
+      "willBecomeDefault": "Al guardar esta clave, {provider} será la IA que responda por defecto.",
+      "alreadyDefault": "{provider} ya es la IA que responde por defecto."
+    },
+    "access": {
+      "title": "Decide quién puede usar este servidor",
+      "description": "Puedes cambiar ambas opciones en cualquier momento en Admin → Configuración.",
+      "registrationLabel": "Permitir que los visitantes creen su propia cuenta",
+      "registrationHint": "Cualquiera que alcance este servidor podrá registrarse. Desactívalo si prefieres invitar tú.",
+      "guestChatLabel": "Permitir que los visitantes prueben el chat sin cuenta",
+      "guestChatHint": "Útil para una demo pública. Desactívalo si el servidor es solo para tu equipo.",
+      "lockedByEnv": "Definido por la variable de entorno {key}, así que no se puede cambiar aquí.",
+      "noMailerWarning": "No hay servidor de correo configurado, por lo que las cuentas nuevas no podrán confirmar su correo.",
+      "changeLaterHint": "Al terminar la configuración, este servidor queda disponible.",
+      "submit": "Finalizar configuración",
+      "submitting": "Finalizando…",
+      "errorGeneric": "No se pudo finalizar la configuración. Inténtalo de nuevo."
+    },
+    "done": {
+      "title": "Tu servidor está listo",
+      "description": "La configuración ha terminado. Has iniciado sesión como administrador.",
+      "enter": "Empezar a usar {brand}",
+      "entering": "Abriendo…",
+      "enterFailed": "No se pudo abrir la aplicación. Inténtalo de nuevo."
     }
   },
   "iap": {

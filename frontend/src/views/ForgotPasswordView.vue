@@ -91,6 +91,24 @@
             </Button>
           </form>
 
+          <!-- Only when nothing can be delivered: the form would otherwise
+               pretend an inbox will light up. The command is set apart so it
+               can be copied without retyping from a wrapped paragraph. -->
+          <div
+            v-if="!mailerConfigured"
+            class="mt-5 flex flex-col gap-1.5"
+            data-testid="text-no-mailer-hint"
+          >
+            <p class="text-xs txt-secondary leading-relaxed">
+              {{ $t('auth.forgotPasswordNoMailerHint') }}
+            </p>
+            <code
+              class="text-xs font-mono surface-chip px-2.5 py-2 rounded-lg txt-primary break-all text-left"
+              data-testid="text-no-mailer-command"
+              >{{ $t('auth.forgotPasswordRecoveryCommand') }}</code
+            >
+          </div>
+
           <div class="mt-6 text-center">
             <router-link
               to="/login"
@@ -158,6 +176,7 @@ import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
 import Button from '@/components/Button.vue'
+import { isMailerConfigured } from '@/utils/mailerConfigured'
 
 const { locale, t } = useI18n()
 const themeStore = useTheme()
@@ -172,6 +191,7 @@ const emailPlaceholder = computed(() => {
 const email = ref('')
 const emailSent = ref(false)
 const isLoading = ref(false)
+const mailerConfigured = computed(() => isMailerConfigured())
 
 const currentLanguage = computed(() => locale.value)
 
