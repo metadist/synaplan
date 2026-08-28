@@ -238,6 +238,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
           v-if="schema.type === 'password'"
           type="button"
           class="absolute right-2 top-1/2 -translate-y-1/2 p-1 txt-secondary hover:txt-primary"
+          :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
           @click="showPassword = !showPassword"
         >
           <Icon :icon="showPassword ? 'mdi:eye-off' : 'mdi:eye'" class="w-5 h-5" />

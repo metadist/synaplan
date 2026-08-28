@@ -300,6 +300,7 @@
                 <button
                   type="button"
                   class="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md txt-secondary hover:txt-primary hover:bg-black/5 dark:hover:bg-white/10 transition-all duration-150"
+                  :aria-label="showPassword ? $t('auth.hidePassword') : $t('auth.showPassword')"
                   data-testid="btn-toggle-password"
                   @click="showPassword = !showPassword"
                 >
@@ -386,18 +387,18 @@
           :href="config.branding.homepageUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="group inline-flex items-center gap-1.5 opacity-40 hover:opacity-60 transition-all duration-300"
+          class="group inline-flex items-center gap-1.5 transition-all duration-300"
           :data-testid="config.billing.enabled ? 'link-homepage' : 'link-powered-by'"
         >
           <span
             v-if="config.branding.showPoweredBy"
-            class="text-[10px] txt-secondary tracking-wide"
+            class="text-[10px] txt-secondary group-hover:txt-primary tracking-wide transition-colors duration-300"
             >{{ $t('branding.poweredBy') }}</span
           >
           <img
             :src="logoSrc"
             :alt="config.branding.name"
-            class="h-3.5 opacity-70 group-hover:opacity-100 transition-opacity duration-300"
+            class="h-3.5 opacity-50 group-hover:opacity-100 transition-opacity duration-300"
           />
         </a>
       </div>

@@ -101,7 +101,26 @@ async function expectInsideViewport(page: Page, selector: string, label: string)
  * test report and annotated, but NEVER fail the run. Flip to expect() per
  * surface once it is clean (target: blocking by end of phase 2).
  */
+/**
+ * axe composites ancestor opacity into the colors it measures, so scanning
+ * mid-fade-in reports the half-transparent frame instead of the resting one
+ * (the login entry animation alone produced seven phantom colour-contrast
+ * violations). Wait for every finite animation and transition to reach its end
+ * state first; infinite ones (background float, spinners) never finish and are
+ * skipped.
+ */
+async function waitForAnimationsSettled(page: Page) {
+  await page.evaluate(async () => {
+    const pending = document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map((animation) => animation.finished.catch(() => undefined))
+    await Promise.all(pending)
+  })
+}
+
 async function axeBlocking(page: Page, surface: string) {
+  await waitForAnimationsSettled(page)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   expect(severe, `${surface}: ${severe.map((v) => v.id).join(', ')}`).toEqual([])
@@ -109,6 +128,7 @@ async function axeBlocking(page: Page, surface: string) {
 
 async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' | 'dark') {
   await page.emulateMedia({ colorScheme })
+  await waitForAnimationsSettled(page)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   await test.info().attach(`axe-${surface}-${colorScheme}.json`, {
