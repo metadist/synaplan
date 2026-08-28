@@ -579,20 +579,22 @@ jobs:
     # immediately instead of queueing it. Firefox is a single unsharded
     # @crossbrowser smoke.
     #
-    # Three shards, not more. The config sets no `fullyParallel`, so Playwright
-    # assigns whole FILES to shards — a single file is therefore the hard floor
-    # for the slowest shard, no matter how many shards exist. Measured, slowest
-    # shard end to end: two shards 4.2 min, three shards 3.6 min. The floor is
-    # ~3.1 min, because layout.spec.ts alone runs ~75s on top of ~110s of fixed
-    # setup (image download, stack start, browser install). A fourth shard is
-    # therefore playing for ~30s that it would only win if the remaining files
-    # happened to balance perfectly — and it pays a full extra test stack for
-    # the attempt.
+    # Three shards, not more. Measured, slowest chromium job end to end: two
+    # shards 4.2 min, three shards 3.3 min.
     #
-    # So if the E2E tail needs to get faster again, adding shards is the wrong
-    # lever — split the slowest spec file, or set `fullyParallel: true` in
-    # playwright.config.ts to shard per test instead of per file (that changes
-    # isolation semantics inside a file, so it needs its own flake review).
+    # What is left is no longer test time, which is the only thing a shard can
+    # divide. Of that slowest job, ~55s was running tests and ~145s was fixed
+    # setup — image download, stack start, browser install — paid once per job
+    # whatever it then runs. And the config sets no `fullyParallel`, so
+    # Playwright assigns whole FILES to shards: layout.spec.ts alone runs ~75s
+    # and cannot be split at all. A fourth shard cannot shorten either term, so
+    # it would add a full test stack for nothing.
+    #
+    # If the E2E tail has to shrink again, the levers are those two terms: make
+    # the per-job setup cheaper, split the slowest spec file, or set
+    # `fullyParallel: true` in playwright.config.ts to shard per test rather
+    # than per file (that changes isolation semantics inside a file, so it needs
+    # its own flake review).
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
