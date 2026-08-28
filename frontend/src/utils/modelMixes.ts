@@ -50,6 +50,10 @@ const google = (providerId: string): MixCandidate => ({ service: 'Google', provi
 const xai = (providerId: string): MixCandidate => ({ service: 'xAI', providerId })
 const mistral = (providerId: string): MixCandidate => ({ service: 'Mistral', providerId })
 const ollama = (providerId: string): MixCandidate => ({ service: 'Ollama', providerId })
+const trustedTokens = (providerId: string): MixCandidate => ({
+  service: 'TrustedTokens',
+  providerId,
+})
 
 export const MODEL_MIXES: ModelMixDefinition[] = [
   {
@@ -134,12 +138,14 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
         ollama('gpt-oss:120b'),
         mistral('mistral-large-latest'),
         mistral('mistral-medium-latest'),
+        trustedTokens('openai/gpt-oss-120b'),
         ollama('gpt-oss:20b'),
       ],
       ANALYZE: [mistral('mistral-medium-latest'), ollama('gpt-oss:120b'), ollama('gpt-oss:20b')],
-      // Same weights the routing prompts are tuned for, hosted locally. Only
-      // applied when the Ollama model is actually pulled on this server.
-      SORT: [ollama('gpt-oss:120b')],
+      // Sorting must always move off the US default with this mix: the same
+      // gpt-oss-120b weights the routing prompts are tuned for, either pulled
+      // locally on Ollama or served by TrustedTokens (EU jurisdiction).
+      SORT: [ollama('gpt-oss:120b'), trustedTokens('openai/gpt-oss-120b')],
       PIC2TEXT: [mistral('mistral-medium-latest')],
       TEXT2SOUND: [
         mistral('voxtral-mini-tts-2603'),

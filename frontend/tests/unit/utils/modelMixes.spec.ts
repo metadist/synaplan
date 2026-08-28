@@ -144,38 +144,46 @@ describe('resolveModelMix', () => {
     expect(resolved.modelNames).toEqual(['Claude Fable 5'])
   })
 
-  it('moves sorting to a local gpt-oss only when Ollama actually serves it', () => {
-    // The routing prompts are tuned for gpt-oss-120b; the Europe mix may only
-    // repoint SORT when the same weights are pulled locally.
-    const withOllama: Partial<Record<Capability, AIModel[]>> = {
-      CHAT: [
-        model({ id: 79, service: 'Ollama', providerId: 'gpt-oss:120b', name: 'gpt-oss:120b' }),
-      ],
-      SORT: [
-        model({ id: 79, service: 'Ollama', providerId: 'gpt-oss:120b', name: 'gpt-oss:120b' }),
-      ],
+  it('moves sorting to gpt-oss-120b on Ollama first, then TrustedTokens', () => {
+    // The routing prompts are tuned for gpt-oss-120b; the Europe mix repoints
+    // SORT to the same weights — pulled locally on Ollama when available,
+    // otherwise served by TrustedTokens (EU jurisdiction). A US sorter must
+    // never remain the silent default of this mix when either option exists.
+    const ollamaSorter = model({
+      id: 79,
+      service: 'Ollama',
+      providerId: 'gpt-oss:120b',
+      name: 'gpt-oss:120b',
+    })
+    const trustedTokensSorter = model({
+      id: 330,
+      service: 'TrustedTokens',
+      providerId: 'openai/gpt-oss-120b',
+      name: 'GPT OSS 120B',
+    })
+    const mistralChat = model({
+      id: 245,
+      service: 'Mistral',
+      providerId: 'mistral-large-latest',
+      name: 'Mistral Large 3',
+    })
+
+    const withBoth: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [ollamaSorter, trustedTokensSorter],
+      SORT: [ollamaSorter, trustedTokensSorter],
     }
-    const withoutOllama: Partial<Record<Capability, AIModel[]>> = {
-      CHAT: [
-        model({
-          id: 245,
-          service: 'Mistral',
-          providerId: 'mistral-large-latest',
-          name: 'Mistral Large 3',
-        }),
-      ],
-      SORT: [
-        model({
-          id: 245,
-          service: 'Mistral',
-          providerId: 'mistral-large-latest',
-          name: 'Mistral Large 3',
-        }),
-      ],
+    const trustedTokensOnly: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [mistralChat, trustedTokensSorter],
+      SORT: [mistralChat, trustedTokensSorter],
+    }
+    const neither: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [mistralChat],
+      SORT: [mistralChat],
     }
 
-    expect(resolveModelMix(mixDefinition('europe'), withOllama).defaults.SORT).toBe(79)
-    expect(resolveModelMix(mixDefinition('europe'), withoutOllama).defaults.SORT).toBeUndefined()
+    expect(resolveModelMix(mixDefinition('europe'), withBoth).defaults.SORT).toBe(79)
+    expect(resolveModelMix(mixDefinition('europe'), trustedTokensOnly).defaults.SORT).toBe(330)
+    expect(resolveModelMix(mixDefinition('europe'), neither).defaults.SORT).toBeUndefined()
   })
 })
 
