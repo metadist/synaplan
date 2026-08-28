@@ -13,7 +13,7 @@ permissions:
 # Superseded runs on the same PR just burn runner capacity, which is shared
 # across the organization (the plan allows 60 concurrent standard-runner jobs
 # and one run peaks at ~7). Push/tag runs get a unique group (run_id) so main
-# runs neither serialize nor cancel each other — docker-push and
+# runs neither serialize nor cancel each other — the publish jobs and
 # cloudflare-deploy must never be interrupted or skipped.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
@@ -489,6 +489,12 @@ jobs:
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-labels: ${{ steps.meta.outputs.labels }}
+      # The version baked into the image this job builds and every downstream
+      # job publishes. Resolved once, here, so the amd64 image, the arm64
+      # image and the version advertised to deployments can never disagree —
+      # independent resolutions would drift the moment a tag lands between
+      # them.
+      app-version: ${{ steps.app-version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -549,8 +555,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.app-version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped per architecture: the arm64 build in docker-push-arm64 has
+          # entirely different layers, and sharing one scope means the two
+          # builds evict each other from the 10 GB Actions cache.
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
           # Export to tar file for sharing between jobs
           outputs: type=docker,dest=/tmp/docker-image.tar
 
@@ -978,12 +987,15 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
-  docker-push:
-    name: Publish Multi-Arch Docker Image
+  docker-push-amd64:
+    name: Publish amd64 Image
     runs-on: ubuntu-latest
-    # The amd64 tar produced by docker-build is the exact image consumed by E2E
-    # and later published. Only arm64 is built after the gates pass; the final
-    # manifest combines that build with the tested amd64 digest.
+    # The amd64 tar produced by docker-build is the exact image E2E ran
+    # against, so publishing that tar — rather than rebuilding — is what makes
+    # the released image the tested one. Nothing is built here, which is why
+    # the job needs neither a checkout nor the frontend artifacts.
+    #
+    # Runs in parallel with docker-push-arm64; docker-manifest joins the two.
     needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
     # Only publish green main pushes and release tags.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
@@ -991,72 +1003,21 @@ jobs:
       contents: read
       packages: write
     outputs:
-      # The version release-manifest advertises. Taken from the same resolver that
-      # bakes APP_VERSION into the image, so the manifest can only ever name a
-      # SemVer this job actually published — never the mutable `latest` tag.
-      version: ${{ steps.app-version.outputs.version }}
-      # Multi-arch manifest digest of the tags that were just published and
-      # verified. The Umbrel package pins tag@digest; the release-version-pin
-      # job writes this value into deploy/umbrel/ so a new store submission
-      # never invents a digest of its own.
-      digest: ${{ steps.release.outputs.digest }}
+      # Digest-pinned reference to the temporary tag, consumed by
+      # docker-manifest so the release manifest can only ever be built from
+      # the image this job actually pushed.
+      ref: ${{ steps.amd64.outputs.ref }}
+      digest: ${{ steps.amd64.outputs.digest }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-
-      - name: Download widget build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: widget-dist
-          path: frontend/dist-widget/
-
       - name: Download tested amd64 image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: docker-image
           path: /tmp
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-
-      - name: Extract release metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # Prevent metadata-action's SemVer flavor from moving latest on tags.
-          flavor: latest=false
-          tags: |
-            # Only the default branch moves latest.
-            type=raw,value=latest,enable={{is_default_branch}}
-            # Release tags vX.Y.Z publish the immutable version and aliases.
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-
-      # Same resolution as docker-build: the registry may still move the `latest`
-      # tag, but APP_VERSION inside that image must stay a SemVer so the UI never
-      # shows the word "latest" as the running release.
-      - name: Resolve application version
-        id: app-version
-        env:
-          META_VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          set -euo pipefail
-          git fetch --tags --force 2>/dev/null || true
-          version="$(node scripts/resolve-app-version.mjs --meta "$META_VERSION" --ref "$GITHUB_REF_NAME")"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Application version for this image: ${version} (metadata was ${META_VERSION:-empty})"
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -1089,28 +1050,153 @@ jobs:
           echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
+  docker-push-arm64:
+    name: Publish arm64 Image
+    # A native arm64 runner, not linux/arm64 under QEMU on an x86 host: the
+    # emulated build took 157-173s and was the single longest step of the
+    # release path.
+    #
+    # These runners are free and unlimited for PUBLIC repositories only. If
+    # this repository ever becomes private the label stops resolving and the
+    # job queues indefinitely — switch to an arm64 larger runner then.
+    runs-on: ubuntu-24.04-arm
+    # The same gates and the same publish condition as the amd64 job: arm64 is
+    # still built only once every check is green, and only for main pushes and
+    # release tags.
+    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.arm64.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The Dockerfile COPYs both into the image. They are plain JS/CSS and
+      # therefore architecture independent, so the arm64 image ships exactly
+      # the assets the amd64 image was tested with instead of a second build.
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Download widget build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only the labels are consumed here — the release tags are applied by
+      # docker-manifest, which is the one job allowed to move them.
+      - name: Extract release metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Prevent metadata-action's SemVer flavor from moving latest on tags.
+          flavor: latest=false
+          tags: |
+            # Only the default branch moves latest.
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags vX.Y.Z publish the immutable version and aliases.
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
       - name: Build and push arm64 image
         id: arm64
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
+          # Native on this runner, so there is no setup-qemu-action above.
           platforms: linux/arm64
           push: true
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}-arm64
           labels: ${{ steps.meta.outputs.labels }}
+          # Resolved once by docker-build, so both architectures report the
+          # same APP_VERSION even if a tag lands mid-run.
           build-args: |
-            APP_VERSION=${{ steps.app-version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            APP_VERSION=${{ needs.docker-build.outputs.app-version }}
+          # Separate scope from the amd64 build: the layer sets share nothing,
+          # so one scope would just evict the other from the 10 GB cache.
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+
+  docker-manifest:
+    name: Publish Multi-Arch Manifest
+    runs-on: ubuntu-latest
+    # Joins the tested amd64 image and the native arm64 build under the release
+    # tags. This is the only job that moves a release tag, and it is also the
+    # one that proves the result: the verification below refuses any tag that
+    # does not resolve to exactly the two digests published above.
+    needs: [docker-build, docker-push-amd64, docker-push-arm64]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      # The version release-manifest advertises. Resolved by docker-build and
+      # baked into both images, so the manifest can only ever name the version
+      # that was actually published — never the mutable `latest` tag.
+      version: ${{ needs.docker-build.outputs.app-version }}
+      # Multi-arch manifest digest of the tags that were just published and
+      # verified. The Umbrel package pins tag@digest; the release-version-pin
+      # job writes this value into deploy/umbrel/ so a new store submission
+      # never invents a digest of its own.
+      digest: ${{ steps.release.outputs.digest }}
+
+    steps:
+      # Only for scripts/resolve-manifest-digest.sh, which both steps below use.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Extract release metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Prevent metadata-action's SemVer flavor from moving latest on tags.
+          flavor: latest=false
+          tags: |
+            # Only the default branch moves latest.
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags vX.Y.Z publish the immutable version and aliases.
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish multi-arch manifest
         id: release
         env:
-          AMD64_REF: ${{ steps.amd64.outputs.ref }}
-          TESTED_AMD64_DIGEST: ${{ steps.amd64.outputs.digest }}
-          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+          AMD64_REF: ${{ needs.docker-push-amd64.outputs.ref }}
+          TESTED_AMD64_DIGEST: ${{ needs.docker-push-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.docker-push-arm64.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         run: |
@@ -1149,8 +1235,8 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-          TESTED_AMD64_DIGEST: ${{ steps.amd64.outputs.digest }}
-          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+          TESTED_AMD64_DIGEST: ${{ needs.docker-push-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.docker-push-arm64.outputs.digest }}
         run: |
           set -euo pipefail
           expected='["linux/amd64","linux/arm64"]'
@@ -1208,11 +1294,11 @@ jobs:
     name: Publish Release Manifest
     runs-on: ubuntu-latest
     # An instance learns that a newer release exists from versions.json, so the
-    # manifest must never exist before the image it names. docker-push completes
-    # only after the multi-arch manifest was created AND verified to expose both
-    # platforms at the tested digests, which makes it the earliest point where
-    # advertising the version is honest.
-    needs: [docker-push]
+    # manifest must never exist before the image it names. docker-manifest
+    # completes only after the multi-arch manifest was created AND verified to
+    # expose both platforms at the tested digests, which makes it the earliest
+    # point where advertising the version is honest.
+    needs: [docker-manifest]
     # Release tags only. A main push publishes `latest`, which is not a release,
     # and a pull request publishes nothing at all.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -1232,7 +1318,7 @@ jobs:
       - name: Publish versions.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.docker-push.outputs.version }}
+          VERSION: ${{ needs.docker-manifest.outputs.version }}
           # NOT main, and this is the reason the branch exists: Elestio pipelines
           # track main and redeploy on every commit, so a manifest commit there
           # would restart every managed instance on every release. The branch
@@ -1314,9 +1400,9 @@ jobs:
     # elestio.yml, deploy/selfhost.env.example, deploy/umbrel/synaplan/ and the
     # AWS Packer template decide which version a NEW deployment installs, so
     # they may only ever name a release whose image is published and verified —
-    # which is what docker-push guarantees. Umbrel also needs the digest of that
-    # image.
-    needs: [docker-push]
+    # which is what docker-manifest guarantees. Umbrel also needs the digest of
+    # that image.
+    needs: [docker-manifest]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -1366,8 +1452,8 @@ jobs:
       - name: Propose the new default version
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.docker-push.outputs.version }}
-          DIGEST: ${{ needs.docker-push.outputs.digest }}
+          VERSION: ${{ needs.docker-manifest.outputs.version }}
+          DIGEST: ${{ needs.docker-manifest.outputs.digest }}
           BRANCH: automation/default-release-version
           BASE: ${{ github.event.repository.default_branch }}
         run: |
@@ -1389,7 +1475,7 @@ jobs:
           fi
 
           if [ -z "$DIGEST" ]; then
-            echo "::error::docker-push did not provide the multi-arch manifest digest; Umbrel cannot be pinned without it"
+            echo "::error::docker-manifest did not provide the multi-arch manifest digest; Umbrel cannot be pinned without it"
             exit 1
           fi
 
@@ -1475,7 +1561,7 @@ jobs:
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
-    # Same rationale as docker-push: never deploy while tests/checks fail.
+    # Same rationale as the publish jobs: never deploy while tests/checks fail.
     needs: [e2e, backend, frontend-checks]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
 
@@ -1532,7 +1618,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check]
+    needs: [lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check]
     if: always()
     steps:
       - name: Check for failures
@@ -1547,7 +1633,9 @@ jobs:
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
             needs.e2e-visual.result != 'success' ||
-            (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped') ||
+            (needs.docker-push-amd64.result != 'success' && needs.docker-push-amd64.result != 'skipped') ||
+            (needs.docker-push-arm64.result != 'success' && needs.docker-push-arm64.result != 'skipped') ||
+            (needs.docker-manifest.result != 'success' && needs.docker-manifest.result != 'skipped') ||
             (needs.release-manifest.result != 'success' && needs.release-manifest.result != 'skipped') ||
             (needs.release-version-pin.result != 'success' && needs.release-version-pin.result != 'skipped') ||
             (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped') ||
