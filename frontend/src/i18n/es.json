@@ -748,6 +748,10 @@
     "voiceWhisper": "Grabar y transcribir con Whisper",
     "listeningStarted": "🎙️ Escuchando... habla ahora",
     "recordingStarted": "🎙️ Grabación iniciada...",
+    "voiceStatus": {
+      "recording": "Grabando...",
+      "transcribing": "Transcribiendo..."
+    },
     "speechError": "Error de reconocimiento de voz: {error}",
     "recordingError": "Error de grabación: {error}",
     "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",

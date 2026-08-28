@@ -748,6 +748,10 @@
     "voiceWhisper": "Kaydet ve Whisper ile yazıya dök",
     "listeningStarted": "🎙️ Dinleniyor... şimdi konuşun",
     "recordingStarted": "🎙️ Kayıt başladı...",
+    "voiceStatus": {
+      "recording": "Kaydediliyor...",
+      "transcribing": "Metne dönüştürülüyor..."
+    },
     "speechError": "Konuşma tanıma hatası: {error}",
     "recordingError": "Kayıt başarısız: {error}",
     "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
