@@ -8,14 +8,17 @@
       @dragleave="handleDragLeave"
       @drop.prevent="handleDrop"
     >
-      <!-- Incognito toggle (desktop): there is no chat header, so the button
-           floats over the top-right of the message area. The mobile instance
-           lives in MainLayout (fixed top-right, mirroring the menu button). -->
+      <!-- Incognito toggle + collapsed speed config (desktop): there is no
+           chat header, so the buttons float over the top-right of the message
+           area. The mobile instances live in MainLayout (fixed top-right,
+           mirroring the menu button). The mix button hides itself while the
+           expanded card is showing in the empty state below. -->
       <div
         v-if="authStore.isAuthenticated && !needsProviderSetup"
-        class="hidden md:block absolute top-3 right-3 z-30"
+        class="hidden md:flex items-center gap-2 absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
+        <ModelMixControl />
         <IncognitoToggle />
       </div>
 
@@ -171,6 +174,18 @@
                   incognitoStore.active ? $t('incognito.emptyHint') : $t('chatInput.placeholder')
                 }}
               </p>
+            </div>
+
+            <!-- Speed config: the expanded mix card greets the user on every
+                 fresh chat and collapses into the round top-right button on
+                 the first tap, click, or keystroke elsewhere. -->
+            <div
+              v-if="showInlineMixPanel"
+              ref="inlineMixPanelEl"
+              class="w-full max-w-sm"
+              data-testid="section-model-mix-inline"
+            >
+              <ModelMixPanel @select="dismissInlineMixPanel" />
             </div>
 
             <ExamplePrompts
@@ -487,6 +502,9 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
+import ModelMixControl from '@/components/chat/ModelMixControl.vue'
+import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
+import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
@@ -677,6 +695,67 @@ const isEmptyLanding = computed(
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
 )
+
+// --- Speed config (model mixes) -------------------------------------------
+// The expanded card shows on every fresh, non-incognito chat until the user
+// interacts anywhere (tap, click, or typing); it then collapses into the
+// round ModelMixControl button next to the incognito toggle. The store flag
+// keeps that button hidden while the card is up, on desktop AND mobile.
+const modelMixStore = useModelMixStore()
+const mixPanelDismissed = ref(false)
+const inlineMixPanelEl = ref<HTMLElement | null>(null)
+
+const showInlineMixPanel = computed(
+  () =>
+    authStore.isAuthenticated &&
+    !needsProviderSetup.value &&
+    !incognitoStore.active &&
+    !mixPanelDismissed.value &&
+    historyStore.messages.length === 0 &&
+    !historyStore.isLoadingMessages
+)
+
+watch(showInlineMixPanel, (visible) => {
+  modelMixStore.inlinePanelVisible = visible
+})
+
+const dismissInlineMixPanel = () => {
+  mixPanelDismissed.value = true
+}
+
+// A fresh chat gets the card back.
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    mixPanelDismissed.value = false
+  }
+)
+
+// "Once tapped, clicked or text is entered, the popup closes": any pointer
+// press outside the card and any keystroke (the composer is focused on load,
+// so typing lands there) collapse it.
+const collapseMixPanelOnPointer = (event: PointerEvent) => {
+  if (!showInlineMixPanel.value) return
+  if (inlineMixPanelEl.value?.contains(event.target as Node)) return
+  dismissInlineMixPanel()
+}
+
+const collapseMixPanelOnKeydown = () => {
+  if (!showInlineMixPanel.value) return
+  dismissInlineMixPanel()
+}
+
+onMounted(() => {
+  modelMixStore.inlinePanelVisible = showInlineMixPanel.value
+  document.addEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.addEventListener('keydown', collapseMixPanelOnKeydown)
+})
+
+onBeforeUnmount(() => {
+  modelMixStore.inlinePanelVisible = false
+  document.removeEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.removeEventListener('keydown', collapseMixPanelOnKeydown)
+})
 
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key

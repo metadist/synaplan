@@ -54,6 +54,23 @@
     "endConfirmMessage": "La conversación se descartará de forma permanente y los archivos de esta sesión se eliminarán.",
     "endConfirmButton": "Finalizar y descartar"
   },
+  "modelMix": {
+    "title": "Configuración rápida de modelos",
+    "buttonLabel": "Mix de modelos",
+    "activeLabel": "Mix de modelos activo: {name}",
+    "mixes": {
+      "default": "Mix de modelos predeterminado",
+      "openai": "Mix ChatGPT Sol",
+      "anthropic": "Mix Claude Fable",
+      "google": "Mix Google Gemini",
+      "xai": "Mix Grok",
+      "europe": "Mix Europa"
+    },
+    "defaultDescription": "Los modelos recomendados por esta instalación",
+    "unavailable": "No hay ningún proveedor compatible configurado en este servidor",
+    "applied": "{name} ya está activo para las nuevas respuestas",
+    "applyError": "No se pudo cambiar el mix de modelos. Inténtalo de nuevo."
+  },
   "jobs": {
     "kind": {
       "video": "vídeo",

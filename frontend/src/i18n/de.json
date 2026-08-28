@@ -54,6 +54,23 @@
     "endConfirmMessage": "Die Unterhaltung wird endgültig verworfen und Dateien aus dieser Sitzung werden gelöscht.",
     "endConfirmButton": "Beenden und verwerfen"
   },
+  "modelMix": {
+    "title": "Schnelle Modellwahl",
+    "buttonLabel": "Modell-Mix",
+    "activeLabel": "Aktiver Modell-Mix: {name}",
+    "mixes": {
+      "default": "Standard-Modell-Mix",
+      "openai": "ChatGPT Sol Mix",
+      "anthropic": "Claude Fable Mix",
+      "google": "Google Gemini Mix",
+      "xai": "Grok Mix",
+      "europe": "Europa-Mix"
+    },
+    "defaultDescription": "Die von dieser Installation empfohlenen Modelle",
+    "unavailable": "Auf diesem Server ist kein passender Anbieter eingerichtet",
+    "applied": "{name} ist jetzt für neue Antworten aktiv",
+    "applyError": "Der Modell-Mix konnte nicht gewechselt werden. Bitte versuche es erneut."
+  },
   "jobs": {
     "kind": {
       "video": "Video",
