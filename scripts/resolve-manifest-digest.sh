@@ -28,6 +28,9 @@ expected_arm64="${3:?linux/arm64 digest required}"
 timeout_seconds="${MANIFEST_TIMEOUT_SECONDS:-60}"
 poll_interval_seconds="${MANIFEST_POLL_INTERVAL_SECONDS:-2}"
 
+# A body that is not a manifest index — empty, truncated, an error page the
+# registry served instead — means "not converged yet", not "fail the build", so
+# an unparsable answer resolves to no digest and leaves the retry to the loop.
 child_digest() {
     local raw="$1" architecture="$2"
     jq -r --arg architecture "$architecture" '
@@ -35,15 +38,19 @@ child_digest() {
             | select(.platform.os == "linux" and .platform.architecture == $architecture)
             | .digest]
         | first // ""
-    ' <<<"$raw"
+    ' <<<"$raw" 2>/dev/null || true
 }
 
 deadline=$((SECONDS + timeout_seconds))
-candidate=""
-amd64=""
-arm64=""
+announced_wait=false
 
 while :; do
+    # Reset per attempt: the diagnostic below must describe what the registry
+    # answers now, not what an earlier poll happened to see.
+    candidate=""
+    amd64=""
+    arm64=""
+
     candidate="$(
         docker buildx imagetools inspect "$image" \
             --format '{{ .Manifest.Digest }}' 2>/dev/null || true
@@ -69,6 +76,14 @@ while :; do
             echo "::error::its linux/arm64 is ${arm64:-none} (expected ${expected_arm64})"
         } >&2
         exit 1
+    fi
+
+    if [[ "$announced_wait" == false ]]; then
+        # Said once, not per poll: a step that goes quiet for a minute reads
+        # like a hang, and the reason it waits is worth one line in the log.
+        echo "${image} does not serve this run's index yet" \
+            "(currently ${candidate:-nothing}); waiting up to ${timeout_seconds}s" >&2
+        announced_wait=true
     fi
 
     sleep "$poll_interval_seconds"
