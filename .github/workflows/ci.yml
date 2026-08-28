@@ -10,10 +10,11 @@ on:
 permissions:
   contents: read
 
-# Superseded runs on the same PR just burn runner capacity (and delay other
-# runs waiting for the limited ubuntu-latest-m pool). Push/tag runs get a
-# unique group (run_id) so main runs neither serialize nor cancel each other —
-# docker-push and cloudflare-deploy must never be interrupted or skipped.
+# Superseded runs on the same PR just burn runner capacity, which is shared
+# across the organization (the plan allows 60 concurrent standard-runner jobs
+# and one run peaks at ~7). Push/tag runs get a unique group (run_id) so main
+# runs neither serialize nor cancel each other — docker-push and
+# cloudflare-deploy must never be interrupted or skipped.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -126,12 +127,9 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    # Free runner on purpose: this job is off the critical path (done around
-    # minute 2-3 while e2e runs until ~minute 7), PHPUnit is single-process
-    # anyway, and free runners start instantly (queue p90 ~4s vs up to ~80s
-    # provisioning on the ubuntu-latest-m pool). Keeping it off the -m pool
-    # also leaves the warm -m runner to frontend-build, which IS the
-    # critical path. Revisit if this job ever becomes the longest one.
+    # Off the critical path (done around minute 2-3 while e2e runs until
+    # ~minute 7) and PHPUnit is single-process anyway, so more cores would not
+    # shorten the run. Revisit if this job ever becomes the longest one.
     runs-on: ubuntu-latest
 
     env:
@@ -294,17 +292,28 @@ jobs:
     # Head of the critical path (frontend-build → docker-build → e2e), so it
     # starts at t=0 with no `needs`: it dumps the OpenAPI spec itself (PHP
     # setup costs ~35s from caches) instead of waiting for a separate job —
-    # a mid-run job hop costs ~40-50s runner-provisioning latency on the
-    # ubuntu-latest-m pool. The spec is uploaded as the `openapi-spec`
-    # artifact for frontend-checks and mobile-release-artifacts.yml.
-    # nelmio:apidoc:dump compiles the container but never touches the DB
-    # (Doctrine connects lazily), so no MariaDB service is needed here.
+    # a mid-run job hop costs runner-provisioning latency. The spec is
+    # uploaded as the `openapi-spec` artifact for frontend-checks and
+    # mobile-release-artifacts.yml. nelmio:apidoc:dump compiles the container
+    # but never touches the DB (Doctrine connects lazily), so no MariaDB
+    # service is needed here.
     #
-    # This is the ONLY job on the paid 16-core pool: the parallel Vite builds
-    # are the one workload where the cores shorten the critical path. All
-    # other former -m jobs moved to free runners so the warm -m runner is
-    # reliably available for this job at t=0.
-    runs-on: ubuntu-latest-m
+    # Free runner, and it must stay one. This was the last job on the paid
+    # 16-core pool until the move was measured against it, job for job:
+    #
+    #   - `Build app and widget (parallel)`: 62s on 16 cores vs 69s on 4.
+    #     Rollup is largely single-thread-bound, so the extra cores buy ~7s.
+    #   - Runner provisioning: 18s on the paid pool vs 3s on the free one,
+    #     which more than cancels those 7s out.
+    #   - The paid pool has a limited number of slots and queues under load:
+    #     during a six-run PR burst three runs waited 30-59s for a -m runner
+    #     while every free-runner job in the same runs started in 2-5s.
+    #
+    # So the paid pool was slower in the only dimension that matters here
+    # (time to a green PR) and cost roughly $112/month at ~734 runs. Do not
+    # move this back to `ubuntu-latest-m` without re-measuring those three
+    # numbers first.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -414,9 +423,8 @@ jobs:
     # Format check, lint, vue-tsc and Vitest — everything that gates merging
     # but that docker-build/e2e don't need to wait for. Consumes the
     # openapi-spec artifact from frontend-build; runs off the critical path
-    # (plenty of slack before the e2e jobs finish), so a free instant-start
-    # runner beats the paid pool: vue-tsc is single-threaded anyway and the
-    # -m pool has up to ~80s provisioning latency for mid-run job requests.
+    # (plenty of slack before the e2e jobs finish) and vue-tsc is
+    # single-threaded anyway, so more cores would not shorten the run.
     runs-on: ubuntu-latest
     needs: [frontend-build]
 
@@ -555,11 +563,12 @@ jobs:
 
   e2e:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
-    # E2E jobs run on free ubuntu-latest runners (unlimited capacity for public
-    # repos) to avoid queue contention from the limited ubuntu-latest-m pool.
-    # Chromium runs the full @ci suite sharded (--shard=N/M) so each half
-    # finishes in ~50% of the time; the free runner pool ensures all shards
-    # start instantly. Firefox is a single unsharded @crossbrowser smoke.
+    # E2E jobs run on free ubuntu-latest runners, which are unlimited for
+    # public repositories: an extra shard costs nothing, so sharding trades
+    # runner count for wall-clock time at no price. Chromium runs the full
+    # @ci suite sharded (--shard=N/M) so each half finishes in ~50% of the
+    # time, and the free pool starts every shard immediately instead of
+    # queueing it. Firefox is a single unsharded @crossbrowser smoke.
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
