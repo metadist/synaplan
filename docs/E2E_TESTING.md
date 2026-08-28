@@ -59,7 +59,7 @@ backend reaches it container-to-container either way.
 ## 0. Tags & CI Matrix
 
 **`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
-(chromium 2 shards, one firefox cross-browser smoke, chromium-mobile) — a test
+(chromium 3 shards, one firefox cross-browser smoke, chromium-mobile) — a test
 without `@ci` in its title chain does not run in CI, period. Other tags:
 
 | Tag | Meaning |
