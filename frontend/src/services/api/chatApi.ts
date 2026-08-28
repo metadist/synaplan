@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod'
-import { httpClient, getApiBaseUrl } from './httpClient'
+import { httpClient, getApiBaseUrl, awaitAuthMutation } from './httpClient'
 import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
@@ -128,6 +128,11 @@ async function refreshAccessToken(): Promise<boolean> {
 
   tokenRefreshPromise = (async () => {
     try {
+      // This pool is invisible to the httpClient auth-mutation lock. Let an
+      // in-progress impersonation swap settle first, else this fires with
+      // pre-swap cookies and clobbers the new session.
+      await awaitAuthMutation()
+
       const refreshResponse = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include',

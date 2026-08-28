@@ -522,6 +522,38 @@ class AuthController extends AbstractController
         $result = $this->impersonationService->issueRefreshedImpersonationAccessToken($request);
 
         if (!$result) {
+            // A refresh that raced the cookie-swap can leave a valid admin stash
+            // next to a plain admin access token. Recover the admin session
+            // instead of wiping cookies (which logged the admin out).
+            $recovered = $this->impersonationService->recoverAdminSessionFromStash($request);
+            if ($recovered) {
+                /** @var User $admin */
+                $admin = $recovered['user'];
+
+                $this->logger->info('Impersonation refresh recovered admin session', [
+                    'admin_id' => $admin->getId(),
+                ]);
+
+                $response = new JsonResponse([
+                    'success' => true,
+                    'user' => [
+                        'id' => $admin->getId(),
+                        'email' => $admin->getMail(),
+                        'level' => $admin->getUserLevel(),
+                        'emailVerified' => $admin->isEmailVerified(),
+                        'isAdmin' => $admin->isAdmin(),
+                        'memoriesEnabled' => $admin->isMemoriesEnabled(),
+                        'firstName' => $this->extractFirstName($admin),
+                    ],
+                ]);
+
+                $response->headers->setCookie(
+                    $this->tokenService->createAccessCookie($recovered['access_token'])
+                );
+
+                return $response;
+            }
+
             $response = new JsonResponse([
                 'error' => 'Impersonation session expired',
                 'code' => 'IMPERSONATION_EXPIRED',

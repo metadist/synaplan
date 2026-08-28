@@ -305,6 +305,19 @@ function getInFlightRefresh(): Promise<RefreshResult> | null {
   return refreshPromise
 }
 
+/**
+ * Await the open auth-mutation critical section, if any. Independent
+ * `/auth/refresh` pools (chatApi's SSE warmer, authService, legacy apiService)
+ * call this before their raw refresh so they don't fire with pre-swap cookies
+ * during an impersonation swap and clobber the new session. Resolves
+ * immediately when no swap is in progress.
+ */
+async function awaitAuthMutation(): Promise<void> {
+  if (authMutationPromise) {
+    await authMutationPromise
+  }
+}
+
 // Track auth failures to prevent redirect loops
 let authFailureCount = 0
 let lastAuthFailureTime = 0
@@ -722,4 +735,5 @@ export {
   beginAuthMutation,
   endAuthMutation,
   getInFlightRefresh,
+  awaitAuthMutation,
 }
