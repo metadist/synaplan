@@ -81,11 +81,16 @@
       <span>{{ $t('auth.signIn') }}</span>
     </button>
 
-    <!-- Incognito toggle (top-right, mobile) — mirrors the drawer toggle on
-         the left. Signed-in users on the chat route only (guests have the
-         login CTA in that spot and no incognito). Desktop gets its own
-         floating instance inside ChatView. -->
-    <div v-if="showIncognitoToggle" class="v2-incognito-toggle fixed right-3 z-40 md:hidden">
+    <!-- Incognito toggle + collapsed speed config (top-right, mobile) —
+         mirrors the drawer toggle on the left. Signed-in users on the chat
+         route only (guests have the login CTA in that spot and no incognito).
+         Desktop gets its own floating instances inside ChatView. The mix
+         button hides itself while ChatView shows the expanded mix card. -->
+    <div
+      v-if="showIncognitoToggle"
+      class="v2-incognito-toggle fixed right-3 z-40 md:hidden flex items-center gap-2"
+    >
+      <ModelMixControl />
       <IncognitoToggle />
     </div>
 
@@ -110,6 +115,7 @@ import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
 import IncognitoToggle from './IncognitoToggle.vue'
+import ModelMixControl from './chat/ModelMixControl.vue'
 
 const route = useRoute()
 const router = useRouter()

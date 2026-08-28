@@ -54,6 +54,23 @@
     "endConfirmMessage": "Konuşma kalıcı olarak silinecek ve bu oturumdaki dosyalar kaldırılacak.",
     "endConfirmButton": "Bitir ve sil"
   },
+  "modelMix": {
+    "title": "Hızlı model kurulumu",
+    "buttonLabel": "Model karışımı",
+    "activeLabel": "Etkin model karışımı: {name}",
+    "mixes": {
+      "default": "Varsayılan Model Karışımı",
+      "openai": "ChatGPT Sol Karışımı",
+      "anthropic": "Claude Fable Karışımı",
+      "google": "Google Gemini Karışımı",
+      "xai": "Grok Karışımı",
+      "europe": "Avrupa Karışımı"
+    },
+    "defaultDescription": "Bu kurulumun önerdiği modeller",
+    "unavailable": "Bu sunucuda uygun bir sağlayıcı yapılandırılmamış",
+    "applied": "{name} artık yeni yanıtlar için etkin",
+    "applyError": "Model karışımı değiştirilemedi. Lütfen tekrar deneyin."
+  },
   "jobs": {
     "kind": {
       "video": "video",

@@ -54,6 +54,23 @@
     "endConfirmMessage": "The conversation will be discarded permanently and files from this session will be deleted.",
     "endConfirmButton": "End and discard"
   },
+  "modelMix": {
+    "title": "Quick model setup",
+    "buttonLabel": "Model mix",
+    "activeLabel": "Active model mix: {name}",
+    "mixes": {
+      "default": "Default Model Mix",
+      "openai": "ChatGPT Sol Mix",
+      "anthropic": "Claude Fable Mix",
+      "google": "Google Gemini Mix",
+      "xai": "Grok Mix",
+      "europe": "Europe Mix"
+    },
+    "defaultDescription": "The models recommended by this installation",
+    "unavailable": "No matching provider is set up on this server",
+    "applied": "{name} is now active for new answers",
+    "applyError": "The model mix could not be switched. Please try again."
+  },
   "jobs": {
     "kind": {
       "video": "video",
