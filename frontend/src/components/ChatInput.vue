@@ -88,6 +88,35 @@
           (via `md:contents` on the control bar).
         -->
         <div class="flex flex-col md:block">
+          <!-- Voice activity strip.
+               Only shown on the record-then-transcribe path (see
+               `showVoiceActivity`): there the transcript arrives in one piece
+               when the user stops, so between tapping the microphone and
+               releasing it the composer is completely inert. The Web Speech
+               path writes recognised words into the textarea as they arrive
+               and is its own progress indicator. -->
+          <div
+            v-if="showVoiceActivity"
+            class="voice-activity"
+            role="status"
+            aria-live="polite"
+            data-testid="chat-voice-activity"
+          >
+            <template v-if="transcribing">
+              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" aria-hidden="true" />
+            </template>
+            <template v-else>
+              <span class="voice-activity__pulse" aria-hidden="true"></span>
+              <span class="voice-activity__meter" aria-hidden="true">
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+              </span>
+            </template>
+            <span>{{ voiceActivityLabel }}</span>
+          </div>
+
           <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
                inset (matches the control bar below) so text never sits flush
                against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
@@ -459,6 +488,7 @@ const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const isRecording = ref(false)
+const transcribing = ref(false)
 const audioRecorder = ref<AudioRecorder | null>(null)
 const webSpeechService = ref<WebSpeechService | null>(null)
 const interimTranscript = ref('')
@@ -564,6 +594,25 @@ const textareaPaddingRightPx = computed(() => {
 const useWebSpeech = computed(() => {
   return isWebSpeechSupported() && !isNativeApp() && configStore.speech.webSpeechEnabled
 })
+
+/**
+ * Whether to show the animated "recording / transcribing" strip.
+ *
+ * Scoped to the record-then-transcribe path, which is what the native app
+ * always uses (see the seam on `useWebSpeech`) and what any browser without
+ * the Web Speech API falls back to. On that path no text reaches the textarea
+ * until the upload completes, so a live microphone is otherwise indistinguishable
+ * from a dead one. The Web Speech path already streams words in as it hears them.
+ */
+const showVoiceActivity = computed(
+  () => !useWebSpeech.value && (isRecording.value || transcribing.value)
+)
+
+const voiceActivityLabel = computed(() =>
+  transcribing.value
+    ? t('chatInput.voiceStatus.transcribing')
+    : t('chatInput.voiceStatus.recording')
+)
 
 // Input persistence - auto-save with proper debouncing. Disabled during an
 // incognito session: drafts must never survive in localStorage.
@@ -1212,9 +1261,15 @@ const toggleRecording = async () => {
       webSpeechService.value = null
     }
     if (audioRecorder.value) {
+      // Do NOT clear `isRecording` here: MediaRecorder's onstop event fires
+      // asynchronously, so a synchronous clear would unmount the activity
+      // strip for a frame before `transcribeAudio` sets `transcribing`. The
+      // recorder's onStop/onError callbacks and transcribeAudio's `finally`
+      // own the flag from this point on.
       audioRecorder.value.stopRecording()
+    } else {
+      isRecording.value = false
     }
-    isRecording.value = false
     return
   }
 
@@ -1377,6 +1432,12 @@ const transcribeAudio = async (audioBlob: Blob) => {
     return
   }
 
+  // Set before the first await so the activity strip switches straight from
+  // "recording" to "transcribing". This only avoids a blink because the stop
+  // tap in `toggleRecording` deliberately leaves `isRecording` true until the
+  // recorder's callbacks run, and AudioRecorder invokes this callback before
+  // its own onStop — so the strip is still mounted when `transcribing` is set.
+  transcribing.value = true
   uploading.value = true
 
   try {
@@ -1401,6 +1462,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
   } finally {
     isRecording.value = false
+    transcribing.value = false
     uploading.value = false
   }
 }
@@ -1502,3 +1564,95 @@ defineExpose<{
   submitText,
 })
 </script>
+
+<style scoped>
+/*
+ * Voice activity strip for the record-then-transcribe path.
+ *
+ * Three cues at once so the state reads at a glance: a pulsing red dot (the
+ * universal "we are recording" mark), a four-bar level meter that keeps moving
+ * so a live microphone never looks frozen, and the label. Colors come from the
+ * shared status tokens, which covers light, dark and the V2 glass design
+ * without a second definition. Follows the `.typing-dot` pattern in
+ * ChatMessage.vue.
+ */
+.voice-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--txt-secondary);
+}
+
+.voice-activity__pulse {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--status-error);
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+
+.voice-activity__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.voice-activity__bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--brand);
+  animation: voice-level 1s ease-in-out infinite;
+}
+
+/* Staggered so the meter sweeps left-to-right instead of pumping in unison. */
+.voice-activity__bar:nth-child(1) {
+  animation-delay: -0.9s;
+}
+.voice-activity__bar:nth-child(2) {
+  animation-delay: -0.6s;
+}
+.voice-activity__bar:nth-child(3) {
+  animation-delay: -0.3s;
+}
+
+@keyframes voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes voice-level {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* The motion is decoration — the label and the live region carry the meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .voice-activity__pulse,
+  .voice-activity__bar {
+    animation: none;
+  }
+  .voice-activity__bar {
+    transform: scaleY(0.7);
+  }
+}
+</style>
