@@ -575,30 +575,54 @@ jobs:
     # E2E jobs run on free ubuntu-latest runners, which are unlimited for
     # public repositories: an extra shard costs nothing, so sharding trades
     # runner count for wall-clock time at no price. Chromium runs the full
-    # @ci suite sharded (--shard=N/M) so each half finishes in ~50% of the
-    # time, and the free pool starts every shard immediately instead of
-    # queueing it. Firefox is a single unsharded @crossbrowser smoke.
+    # @ci suite sharded (--shard=N/M), and the free pool starts every shard
+    # immediately instead of queueing it. Firefox is a single unsharded
+    # @crossbrowser smoke.
+    #
+    # Three shards, not more. Measured, slowest chromium job end to end: two
+    # shards 4.2 min, three shards 3.3 min.
+    #
+    # What is left is no longer test time, which is the only thing a shard can
+    # divide. Of that slowest job, ~55s was running tests and ~145s was fixed
+    # setup — image download, stack start, browser install — paid once per job
+    # whatever it then runs. And the config sets no `fullyParallel`, so
+    # Playwright assigns whole FILES to shards: layout.spec.ts alone runs ~75s
+    # and cannot be split at all. A fourth shard cannot shorten either term, so
+    # it would add a full test stack for nothing.
+    #
+    # If the E2E tail has to shrink again, the levers are those two terms: make
+    # the per-job setup cheaper, split the slowest spec file, or set
+    # `fullyParallel: true` in playwright.config.ts to shard per test rather
+    # than per file (that changes isolation semantics inside a file, so it needs
+    # its own flake review).
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Standard password auth — chromium sharded into 2 parallel jobs
+          # Standard password auth — chromium sharded into 3 parallel jobs
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
-            shard: "1/2"
+            shard: "1/3"
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
-            shard: "2/2"
+            shard: "2/3"
+          - browser: chromium
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e"
+            grep_filter: "@ci"
+            shard: "3/3"
           # Firefox cross-browser SMOKE — a single unsharded job. The firefox
           # project only runs @crossbrowser-tagged tests (engine-divergent flows:
           # SSE, widget Shadow DOM, upload), so the lean set needs no sharding.
@@ -617,6 +641,18 @@ jobs:
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:mobile"
+            grep_filter: "@ci"
+            shard: ""
+          # Ollama stub smoke — its own job because the spec repoints the CHAT
+          # default model for the whole installation while it runs. Every job in
+          # this matrix gets its own test stack, so running it here is what
+          # keeps that mutation from reaching the sharded chromium jobs.
+          # See frontend/tests/e2e/playwright.config.ts (chromium-ollama).
+          - browser: chromium
+            variant: "Ollama"
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
