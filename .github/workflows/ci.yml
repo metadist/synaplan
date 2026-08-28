@@ -1079,6 +1079,7 @@ jobs:
         id: release
         env:
           AMD64_REF: ${{ steps.amd64.outputs.ref }}
+          TESTED_AMD64_DIGEST: ${{ steps.amd64.outputs.digest }}
           ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -1093,9 +1094,12 @@ jobs:
               --tag "$image" \
               "$AMD64_REF" \
               "$arm64_ref"
+            # Not a plain tag lookup: GHCR can still answer a tag from cache
+            # right after the push, and this digest leaves the job as the
+            # release digest the Umbrel pin is built from.
             current_digest="$(
-              docker buildx imagetools inspect "$image" \
-                --format '{{ .Manifest.Digest }}'
+              scripts/resolve-manifest-digest.sh \
+                "$image" "$TESTED_AMD64_DIGEST" "$ARM64_DIGEST"
             )"
             if [ -z "$manifest_digest" ]; then
               manifest_digest="$current_digest"
@@ -1126,8 +1130,8 @@ jobs:
             echo "Verifying ${image}"
 
             resolved_digest="$(
-              docker buildx imagetools inspect "$image" \
-                --format '{{ .Manifest.Digest }}'
+              scripts/resolve-manifest-digest.sh \
+                "$image" "$TESTED_AMD64_DIGEST" "$ARM64_DIGEST"
             )"
             if [ "$resolved_digest" != "$IMAGE_DIGEST" ]; then
               echo "::error::${image} resolved to ${resolved_digest}, expected ${IMAGE_DIGEST}"
