@@ -111,24 +111,24 @@
     "error": "Hata",
     "chat": "Sohbet",
     "tools": "Araçlar",
-    "chatWidget": "Widget'ların",
+    "chatWidget": "Sohbet widget'ları",
     "docSummary": "Özetleyici",
-    "mailHandler": "IMAP E-posta İşleyici",
+    "mailHandler": "E-posta işleyici",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "ragSearch": "Arama",
     "vectorStorage": "Vektör Deposu",
-    "configInbound": "Standart Gelen",
-    "configAiModels": "AI Model Yapılandırması",
+    "configInbound": "Gelen",
+    "configAiModels": "Modeller",
     "configProviderHiggsfield": "Higgsfield Bağlantısı",
-    "configTaskPrompts": "Hazır Talimatlar",
-    "configSortingPrompt": "Yönlendirme Yapılandırması",
+    "configTaskPrompts": "Talimatlar",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
     "configApiDocs": "API Dokümantasyonu",
-    "statistics": "İstatistikler",
+    "statistics": "Kullanım",
     "settings": "Tercihler",
     "profile": "Profil",
-    "admin": "Yönetici Paneli",
+    "admin": "İşlet",
     "adminFeatures": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
@@ -149,7 +149,7 @@
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
     "connections": "Bağlantılar",
-    "savedTasks": "Yinelenen görevler",
+    "savedTasks": "Kayıtlı görevler",
     "setup": "Kurulum"
   },
   "adminModelStatus": {
@@ -327,7 +327,9 @@
       "public": "Herkese Açık"
     },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
-    "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin."
+    "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",
+    "conversation": "sohbet",
+    "conversations": "sohbetler"
   },
   "moderation": {
     "report": {
@@ -378,7 +380,7 @@
     }
   },
   "admin": {
-    "title": "Yönetici Paneli",
+    "title": "İşlet",
     "description": "Sistem yönetimi ve yapılandırma",
     "tabs": {
       "overview": "Genel Bakış",
@@ -648,14 +650,14 @@
     "history": "Geçmiş",
     "historyDescription": "Sohbet geçmişi",
     "tools": "Araçlar",
-    "toolsChatWidget": "Widget'ların",
+    "toolsChatWidget": "Sohbet widget'ları",
     "toolsDocSummary": "Özetleyici",
-    "toolsMailHandler": "IMAP E-posta İşleyici",
+    "toolsMailHandler": "E-posta işleyici",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
     "configConnections": "Bağlantıları yapılandır",
     "groupApi": "API",
-    "savedTasks": "Yinelenen görevler",
+    "savedTasks": "Kayıtlı görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -666,16 +668,16 @@
     "preferences": "Tercihler",
     "account": "Hesap",
     "accountDescription": "Hesap ve tercihler",
-    "configInbound": "Standart Gelen",
-    "configAiModels": "AI Model Yapılandırması",
-    "configTaskPrompts": "Hazır Talimatlar",
-    "configSortingPrompt": "Yönlendirme Yapılandırması",
+    "configInbound": "Gelen",
+    "configAiModels": "Modeller",
+    "configTaskPrompts": "Talimatlar",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
-    "statistics": "İstatistikler",
+    "statistics": "Kullanım",
     "subscription": "Abonelik",
     "upgrade": "Yükselt",
-    "admin": "Yönetici",
-    "adminDashboard": "Kontrol Paneli",
+    "admin": "İşlet",
+    "adminDashboard": "Genel bakış",
     "adminFeatureStatus": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
@@ -684,7 +686,14 @@
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap",
     "menu": "Menü",
-    "aiAgents": "Yapay zeka ajanları"
+    "aiAgents": "Yapay zeka ajanları",
+    "manage": "Yönet",
+    "manageDescription": "Asistanlar, kanallar ve otomasyonlar",
+    "groupAssistants": "Asistanlar",
+    "groupAutomations": "Otomasyonlar",
+    "groupTools": "Araçlar",
+    "liveSupport": "Canlı destek",
+    "usage": "Kullanım"
   },
   "guest": {
     "disabledTitle": "Misafir sohbeti kullanılamıyor",
@@ -1203,7 +1212,9 @@
     "disabled": "Devre Dışı",
     "reset": "Sıfırla",
     "expand": "Genişlet",
-    "noResults": "Sonuç bulunamadı"
+    "noResults": "Sonuç bulunamadı",
+    "skipToContent": "İçeriğe geç",
+    "loadingMessages": "Mesajlar yükleniyor…"
   },
   "search": {
     "sources": "Kaynaklar",
@@ -1412,7 +1423,7 @@
       "knowledge": {
         "intro": "AI asistanının içeriğinizle ilgili soruları yanıtlayabilmesi için belgeler ekleyin. Bu adım isteğe bağlıdır.",
         "uploadLabel": "Dosya yükle",
-        "pickLabel": "Dosya Yöneticisinden seç",
+        "pickLabel": "Kaynaklardan seç",
         "uploadHint": "PDF, Word, metin, Markdown, CSV veya JSON. Dosyalar widget oluşturulduktan sonra işlenir.",
         "empty": "Henüz veri kaynağı yok — daha sonra da ekleyebilirsiniz."
       },
@@ -1592,7 +1603,9 @@
       "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Gelişmiş Ayarlar → AI Kurulumu → Prompt ve Model altından bir model seçin.",
       "editHintTitle": "AI asistanınızı ince ayarlamak ister misiniz?",
       "editHintDescription": "Kaydettikten sonra, AI asistanınızı Gelişmiş Ayarlar → AI Kurulumu → Widget AI Sihirbazı altından istediğiniz zaman ince ayarlayabilirsiniz."
-    }
+    },
+    "listTitle": "Sohbet widget'ları",
+    "listEmpty": "Henüz widget yok. Başlamak için bir sohbet widget'ı oluşturun."
   },
   "profile": {
     "title": "Profil Ayarları",
@@ -1606,7 +1619,8 @@
       "email": "E-posta",
       "emailHint": "Giriş e-postanız (değiştirilemez)",
       "phone": "Telefon",
-      "phonePlaceholder": "İsteğe bağlı iletişim numarası"
+      "phonePlaceholder": "İsteğe bağlı iletişim numarası",
+      "managedBy": "Bu hesap {provider} tarafından yönetiliyor"
     },
     "companyInfo": {
       "title": "Şirket Bilgileri",
@@ -1646,7 +1660,10 @@
       "newPasswordHint": "En az 8 karakter",
       "confirmPassword": "Şifreyi Onayla",
       "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
-      "confirmPasswordHint": "Yeni şifreyle eşleşmeli"
+      "confirmPasswordHint": "Yeni şifreyle eşleşmeli",
+      "externalAuth": "{provider} ile giriş yapıyorsunuz. Parola orada yönetilir.",
+      "mismatch": "Parolalar eşleşmiyor",
+      "tooShort": "Parola en az 8 karakter olmalı"
     },
     "appSecurity": {
       "title": "Uygulama güvenliği",
@@ -2184,7 +2201,8 @@
       "models": "model",
       "adminOnlyTitle": "Yönetici erişimi gerekli",
       "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
-    }
+    },
+    "notLoggedIn": "Oturum açılmadı"
   },
   "storage": {
     "title": "Depolama Kotası",
@@ -2341,7 +2359,7 @@
     "status_error": "Hata",
     "terms": {
       "vectorized": "yapay zekâ ile aranabilir",
-      "knowledgeGroup": "bilgi grubu",
+      "knowledgeGroup": "bilgi klasörü",
       "incoming": "gelen",
       "generated": "yapay zekâ üretimi",
       "notApplicable": "uygulanamaz"
@@ -2387,13 +2405,13 @@
     },
     "help": {
       "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
-      "group": "Bilgi grupları dosyaları bir araya getirir. Yapay zekâ bir grupta arama yaptığında içindeki tüm dosyaları kullanabilir.",
+      "group": "Bilgi klasörleri dosyaları bir araya getirir. AI bir klasörde arama yaptığında içindeki her dosyayı kullanabilir.",
       "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
       "incoming": "Diğer uygulamaların bilgi tabanınız için gönderdiği dosyalar. İnceleyin, sonra saklayın veya çıkarın.",
       "typeFilter": "Yalnızca tek bir dosya türünü göster — belgeler, görseller, video veya ses.",
       "vectorizedFilter": "Dosyaların yapay zekâ ile aranabilir olup olmadığına göre filtrele.",
       "reVectorize": "Bu dosyayı yeniden okuyup yapay zekânın ondan öğrendiklerini tazele. Düzenledikten sonra veya başarısız olduğunda kullan.",
-      "moveGroup": "Dosyaları başka bir bilgi grubuna taşı. Bu, yapay zekânın onları hangi grupta aradığını değiştirir; hiçbir şey silinmez.",
+      "moveGroup": "Dosyaları başka bir bilgi klasörüne taşıyın. AI'nın aradığı klasör değişir — hiçbir şey silinmez.",
       "storage": "Depolamanızın ne kadarını kullandığınız. Yapay zekâ üretimi içerik de sayılır ve ayrı gösterilir."
     },
     "empty": {

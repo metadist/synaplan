@@ -116,7 +116,7 @@ export class ChatHelper {
     await this.page.evaluate(() => localStorage.setItem('app_mode', 'advanced'))
     await this.page.reload()
     await this.page
-      .locator(selectors.nav.sidebarV2Channels)
+      .locator(selectors.nav.sidebarV2Manage)
       .waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
   }
 

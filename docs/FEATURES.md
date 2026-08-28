@@ -120,10 +120,11 @@ Extract content from:
 - Rate limiting
 - API keys for integrations
 
-## App Modes
+## Navigation
 
-- **Easy Mode**: Simplified interface for casual users
-- **Advanced Mode**: Full features for power users
+Everyday work lives on the rail (New, History, Sources). Assistants, channels
+and automations sit under **Manage**. Installation administration sits under
+**Operate** (administrators only). There is no Easy / Advanced mode toggle.
 
 ## AI Memories & Qdrant
 

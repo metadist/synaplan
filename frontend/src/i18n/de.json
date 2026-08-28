@@ -111,26 +111,26 @@
     "error": "Fehler",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Deine Widgets",
+    "chatWidget": "Chat-Widgets",
     "docSummary": "Zusammenfasser",
-    "mailHandler": "IMAP-E-Mail-Handler",
+    "mailHandler": "E-Mail-Handler",
     "plugins": "Plugins",
     "files": "Quellen",
     "memories": "Erinnerungen",
     "feedback": "Feedback",
     "ragSearch": "Suche",
     "vectorStorage": "Vektorspeicher",
-    "configInbound": "Standard-Eingang",
-    "configAiModels": "KI-Modell-Konfiguration",
+    "configInbound": "Eingang",
+    "configAiModels": "Modelle",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "Vordefinierte Anweisungen",
-    "configSortingPrompt": "Routing-Konfiguration",
+    "configTaskPrompts": "Anweisungen",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API-Schlüssel",
     "configApiDocs": "API-Dokumentation",
-    "statistics": "Statistiken",
+    "statistics": "Nutzung",
     "settings": "Einstellungen",
     "profile": "Profil",
-    "admin": "Admin-Panel",
+    "admin": "Betrieb",
     "adminFeatures": "Feature-Status",
     "adminModelStatus": "Modell-Status",
     "adminConfig": "Systemkonfiguration",
@@ -150,7 +150,7 @@
     "mcpServers": "MCP-Server",
     "aiAgents": "KI-Agenten",
     "connections": "Verbindungen",
-    "savedTasks": "Wiederkehrende Aufgaben",
+    "savedTasks": "Gespeicherte Aufgaben",
     "setup": "Einrichtung"
   },
   "adminModelStatus": {
@@ -329,7 +329,9 @@
       "public": "Öffentlich"
     },
     "fileOnlyDefaultMessage": "Bitte prüfe die angehängte Datei.",
-    "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht."
+    "voiceMessageDefaultMessage": "Bitte antworte auf meine Sprachnachricht.",
+    "conversation": "Unterhaltung",
+    "conversations": "Unterhaltungen"
   },
   "moderation": {
     "report": {
@@ -380,7 +382,7 @@
     }
   },
   "admin": {
-    "title": "Admin-Panel",
+    "title": "Betrieb",
     "description": "Systemverwaltung und Konfiguration",
     "tabs": {
       "overview": "Übersicht",
@@ -655,14 +657,14 @@
     "historyDescription": "Chat-Verlauf",
     "profile": "Profil",
     "tools": "Tools",
-    "toolsChatWidget": "Deine Widgets",
+    "toolsChatWidget": "Chat-Widgets",
     "toolsDocSummary": "Zusammenfasser",
-    "toolsMailHandler": "IMAP-E-Mail-Handler",
+    "toolsMailHandler": "E-Mail-Handler",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
     "configConnections": "Verbindungen einrichten",
     "groupApi": "API",
-    "savedTasks": "Wiederkehrende Aufgaben",
+    "savedTasks": "Gespeicherte Aufgaben",
     "plugins": "Plugins",
     "files": "Quellen",
     "filesDescription": "Quellen für deine Chats",
@@ -673,17 +675,17 @@
     "preferences": "Einstellungen",
     "account": "Konto",
     "accountDescription": "Konto & Einstellungen",
-    "configInbound": "Standard-Eingang",
-    "configAiModels": "KI-Modell-Konfiguration",
+    "configInbound": "Eingang",
+    "configAiModels": "Modelle",
     "configProviderHiggsfield": "Higgsfield-Verbindung",
-    "configTaskPrompts": "Vordefinierte Anweisungen",
-    "configSortingPrompt": "Routing-Konfiguration",
+    "configTaskPrompts": "Anweisungen",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API-Schlüssel",
-    "statistics": "Statistiken",
+    "statistics": "Nutzung",
     "subscription": "Abonnement",
     "upgrade": "Upgrade",
-    "admin": "Admin",
-    "adminDashboard": "Dashboard",
+    "admin": "Betrieb",
+    "adminDashboard": "Übersicht",
     "adminFeatureStatus": "Feature-Status",
     "adminModelStatus": "Modell-Status",
     "adminSystemConfig": "Systemkonfiguration",
@@ -691,7 +693,14 @@
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
     "menu": "Menü",
-    "aiAgents": "KI-Agenten"
+    "aiAgents": "KI-Agenten",
+    "manage": "Verwalten",
+    "manageDescription": "Assistenten, Kanäle und Automatisierungen",
+    "groupAssistants": "Assistenten",
+    "groupAutomations": "Automatisierungen",
+    "groupTools": "Werkzeuge",
+    "liveSupport": "Live-Support",
+    "usage": "Nutzung"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -1214,7 +1223,8 @@
       "email": "E-Mail",
       "emailHint": "Deine Login-E-Mail (kann nicht geändert werden)",
       "phone": "Telefon",
-      "phonePlaceholder": "Optionale Telefonnummer"
+      "phonePlaceholder": "Optionale Telefonnummer",
+      "managedBy": "Dieses Konto wird von {provider} verwaltet"
     },
     "companyInfo": {
       "title": "Firmeninformationen",
@@ -1261,7 +1271,10 @@
       "newPasswordHint": "Mindestens 8 Zeichen",
       "confirmPassword": "Passwort bestätigen",
       "confirmPasswordPlaceholder": "Neues Passwort bestätigen",
-      "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen"
+      "confirmPasswordHint": "Muss mit neuem Passwort übereinstimmen",
+      "externalAuth": "Sie melden sich mit {provider} an. Die Passwortverwaltung erfolgt dort.",
+      "mismatch": "Die Passwörter stimmen nicht überein",
+      "tooShort": "Das Passwort muss mindestens 8 Zeichen haben"
     },
     "appSecurity": {
       "title": "App-Sicherheit",
@@ -1867,7 +1880,7 @@
       "promptContentSubtitle": "Markdown-formatierte System-Nachricht für dieses Topic.",
       "knowledgeTitle": "Wissensdatenbank",
       "knowledgeSubtitle": "Vektorisierte Dateien für RAG-Kontext verknüpfen.",
-      "openFileManager": "Dateimanager",
+      "openFileManager": "Quellen",
       "linkedFiles": "Verknüpfte Dateien ({n})",
       "noFilesLinked": "Noch keine Dateien verknüpft",
       "noFilesLinkedHint": "Verknüpfen Sie Dateien unten, um sie der Wissensdatenbank dieses Prompts hinzuzufügen.",
@@ -1876,7 +1889,7 @@
       "searchFilesPlaceholderShort": "Dateien suchen...",
       "loadingFiles": "Dateien werden geladen...",
       "noFilesMatch": "Keine Dateien für diese Suche.",
-      "noVectorizedFiles": "Keine vektorisierten Dateien verfügbar. Laden Sie zunächst Dateien im Dateimanager hoch.",
+      "noVectorizedFiles": "Keine vektorisierten Dateien verfügbar. Laden Sie zunächst Dateien unter Quellen hoch.",
       "linked": "Verknüpft",
       "linkFile": "Verknüpfen",
       "fileMeta": "{chunks} Chunks · {date}",
@@ -2844,7 +2857,9 @@
     "clearSelection": "Auswahl aufheben",
     "view": "Ansehen",
     "expand": "Erweitern",
-    "noResults": "Keine Ergebnisse"
+    "noResults": "Keine Ergebnisse",
+    "skipToContent": "Zum Inhalt springen",
+    "loadingMessages": "Nachrichten werden geladen…"
   },
   "search": {
     "sources": "Quellen",
@@ -3016,7 +3031,7 @@
     "useInChat": "Im Chat nutzen",
     "terms": {
       "vectorized": "KI-durchsuchbar",
-      "knowledgeGroup": "Wissensgruppe",
+      "knowledgeGroup": "Wissensordner",
       "incoming": "Eingang",
       "generated": "KI-erzeugt",
       "notApplicable": "nicht zutreffend"
@@ -3062,13 +3077,13 @@
     },
     "help": {
       "vectorized": "Wenn eine Datei KI-durchsuchbar ist, wird ihr Inhalt deiner Wissensbasis hinzugefügt, damit der Assistent ihn für Antworten nutzen kann.",
-      "group": "Wissensgruppen bündeln Dateien. Wenn die KI eine Gruppe durchsucht, kann sie jede Datei darin nutzen.",
+      "group": "Wissensordner bündeln Dateien. Wenn die KI einen Ordner durchsucht, kann sie jede Datei darin nutzen.",
       "source": "Woher diese Datei stammt – Upload, Chat, Outlook, Nextcloud, OpenCloud, WhatsApp, Widget, API oder KI-erzeugt.",
       "incoming": "Dateien, die andere Apps für deine Wissensbasis eingeliefert haben. Prüfe sie und behalte oder verwirf sie.",
       "typeFilter": "Nur eine Dateiart anzeigen – Dokumente, Bilder, Video oder Audio.",
       "vectorizedFilter": "Danach filtern, ob Dateien KI-durchsuchbar sind.",
       "reVectorize": "Diese Datei neu einlesen und das Wissen der KI daraus auffrischen. Nach Änderungen oder bei Fehlern verwenden.",
-      "moveGroup": "Dateien in eine andere Wissensgruppe verschieben. Das ändert, in welcher Gruppe die KI sie durchsucht – es wird nichts gelöscht.",
+      "moveGroup": "Dateien in einen anderen Wissensordner verschieben. Das ändert, in welchem Ordner die KI sucht — nichts wird gelöscht.",
       "storage": "Wie viel deines Speichers belegt ist. KI-erzeugte Medien zählen mit und werden separat angezeigt."
     },
     "empty": {
@@ -3301,7 +3316,8 @@
       "models": "Modelle",
       "adminOnlyTitle": "Admin-Zugriff erforderlich",
       "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
-    }
+    },
+    "notLoggedIn": "Nicht angemeldet"
   },
   "mail": {
     "status": {
@@ -3458,7 +3474,7 @@
       "knowledge": {
         "intro": "Fügen Sie Dokumente hinzu, damit der KI-Assistent Fragen zu Ihren Inhalten beantworten kann. Dieser Schritt ist optional.",
         "uploadLabel": "Dateien hochladen",
-        "pickLabel": "Aus Dateimanager wählen",
+        "pickLabel": "Aus Quellen wählen",
         "uploadHint": "PDF, Word, Text, Markdown, CSV oder JSON. Die Dateien werden nach dem Erstellen des Widgets verarbeitet.",
         "empty": "Noch keine Datenquellen — Sie können sie auch später hinzufügen."
       },
@@ -3931,7 +3947,7 @@
       "title": "Dateien auswählen",
       "searchPlaceholder": "Dateien suchen...",
       "noResults": "Keine Dateien gefunden.",
-      "noFiles": "Keine Dateien verfügbar. Laden Sie zuerst Dateien im Dateimanager hoch.",
+      "noFiles": "Keine Dateien verfügbar. Laden Sie zuerst Dateien unter Quellen hoch.",
       "selected": "{count} ausgewählt",
       "addFiles": "Dateien hinzufügen"
     },
@@ -4088,7 +4104,9 @@
       "robot": "Roboter",
       "message": "Nachricht",
       "support": "Support"
-    }
+    },
+    "listTitle": "Chat-Widgets",
+    "listEmpty": "Noch keine Widgets. Erstellen Sie ein Chat-Widget, um zu beginnen."
   },
   "widget": {
     "title": "Chat Support",

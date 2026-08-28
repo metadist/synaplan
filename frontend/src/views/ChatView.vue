@@ -81,7 +81,7 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span class="ml-2 txt-secondary text-sm">Loading messages...</span>
+            <span class="ml-2 txt-secondary text-sm">{{ $t('common.loadingMessages') }}</span>
           </div>
 
           <div
@@ -189,7 +189,7 @@
             </div>
 
             <ExamplePrompts
-              v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
+              v-if="!incognitoStore.active && !configStore.marketingNews.enabled"
               @pick="handleExamplePick"
             />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
@@ -705,15 +705,7 @@ const modelMixStore = useModelMixStore()
 const mixPanelDismissed = ref(false)
 const inlineMixPanelEl = ref<HTMLElement | null>(null)
 
-const showInlineMixPanel = computed(
-  () =>
-    authStore.isAuthenticated &&
-    !needsProviderSetup.value &&
-    !incognitoStore.active &&
-    !mixPanelDismissed.value &&
-    historyStore.messages.length === 0 &&
-    !historyStore.isLoadingMessages
-)
+const showInlineMixPanel = computed(() => false)
 
 watch(showInlineMixPanel, (visible) => {
   modelMixStore.inlinePanelVisible = visible

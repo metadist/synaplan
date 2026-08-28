@@ -111,24 +111,24 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Herramientas",
-    "chatWidget": "Tus widgets",
+    "chatWidget": "Widgets de chat",
     "docSummary": "Resumidor",
-    "mailHandler": "Gestor de correo IMAP",
+    "mailHandler": "Gestor de correo",
     "plugins": "Plugins",
     "files": "Fuentes",
     "ragSearch": "Búsqueda",
     "vectorStorage": "Almacenamiento vectorial",
-    "configInbound": "Entrada estándar",
-    "configAiModels": "Configuración de modelos IA",
+    "configInbound": "Entrada",
+    "configAiModels": "Modelos",
     "configProviderHiggsfield": "Conexión con Higgsfield",
-    "configTaskPrompts": "Instrucciones predefinidas",
-    "configSortingPrompt": "Configuración de enrutamiento",
+    "configTaskPrompts": "Instrucciones",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
     "configApiDocs": "Documentación API",
-    "statistics": "Estadísticas",
+    "statistics": "Uso",
     "settings": "Preferencias",
     "profile": "Perfil",
-    "admin": "Panel de administración",
+    "admin": "Operar",
     "adminFeatures": "Estado de funciones",
     "adminModelStatus": "Estado de modelos",
     "adminConfig": "Configuración del Sistema",
@@ -149,7 +149,7 @@
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
     "connections": "Conexiones",
-    "savedTasks": "Tareas recurrentes",
+    "savedTasks": "Tareas guardadas",
     "setup": "Configuración"
   },
   "adminModelStatus": {
@@ -327,7 +327,9 @@
       "public": "Público"
     },
     "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
-    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz."
+    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz.",
+    "conversation": "conversación",
+    "conversations": "conversaciones"
   },
   "moderation": {
     "report": {
@@ -378,7 +380,7 @@
     }
   },
   "admin": {
-    "title": "Panel de Administración",
+    "title": "Operar",
     "description": "Gestión y configuración del sistema",
     "tabs": {
       "overview": "Resumen",
@@ -648,14 +650,14 @@
     "history": "Historial",
     "historyDescription": "Historial de chats",
     "tools": "Herramientas",
-    "toolsChatWidget": "Tus widgets",
+    "toolsChatWidget": "Widgets de chat",
     "toolsDocSummary": "Resumidor",
-    "toolsMailHandler": "Gestor de correo IMAP",
+    "toolsMailHandler": "Gestor de correo",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
     "configConnections": "Configurar conexiones",
     "groupApi": "API",
-    "savedTasks": "Tareas recurrentes",
+    "savedTasks": "Tareas guardadas",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -666,16 +668,16 @@
     "preferences": "Preferencias",
     "account": "Cuenta",
     "accountDescription": "Cuenta y preferencias",
-    "configInbound": "Entrada estándar",
-    "configAiModels": "Configuración de modelos IA",
-    "configTaskPrompts": "Instrucciones predefinidas",
-    "configSortingPrompt": "Configuración de enrutamiento",
+    "configInbound": "Entrada",
+    "configAiModels": "Modelos",
+    "configTaskPrompts": "Instrucciones",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
-    "statistics": "Estadísticas",
+    "statistics": "Uso",
     "subscription": "Suscripción",
     "upgrade": "Mejorar",
-    "admin": "Admin",
-    "adminDashboard": "Panel",
+    "admin": "Operar",
+    "adminDashboard": "Resumen",
     "adminFeatureStatus": "Estado de Funciones",
     "adminModelStatus": "Estado de Modelos",
     "adminSystemConfig": "Configuración del Sistema",
@@ -684,7 +686,14 @@
     "more": "Más",
     "moreDescription": "Más secciones y cuenta",
     "menu": "Menú",
-    "aiAgents": "Agentes de IA"
+    "aiAgents": "Agentes de IA",
+    "manage": "Gestionar",
+    "manageDescription": "Asistentes, canales y automatizaciones",
+    "groupAssistants": "Asistentes",
+    "groupAutomations": "Automatizaciones",
+    "groupTools": "Herramientas",
+    "liveSupport": "Soporte en vivo",
+    "usage": "Uso"
   },
   "guest": {
     "disabledTitle": "El chat de invitados no está disponible",
@@ -1203,7 +1212,9 @@
     "disabled": "Deshabilitado",
     "reset": "Restablecer",
     "expand": "Expandir",
-    "noResults": "Sin resultados"
+    "noResults": "Sin resultados",
+    "skipToContent": "Saltar al contenido",
+    "loadingMessages": "Cargando mensajes…"
   },
   "search": {
     "sources": "Fuentes",
@@ -1412,7 +1423,7 @@
       "knowledge": {
         "intro": "Añade documentos para que el asistente de IA pueda responder preguntas sobre tu contenido. Este paso es opcional.",
         "uploadLabel": "Subir archivos",
-        "pickLabel": "Elegir del Gestor de Archivos",
+        "pickLabel": "Elegir de Fuentes",
         "uploadHint": "PDF, Word, texto, Markdown, CSV o JSON. Los archivos se procesan después de crear el widget.",
         "empty": "Aún no hay fuentes de datos — también puedes añadirlas más tarde."
       },
@@ -1592,7 +1603,9 @@
       "modelNotConfigured": "No hay modelo de IA configurado. Selecciona uno en Configuración Avanzada → Configuración IA → Prompt y Modelo.",
       "editHintTitle": "¿Quieres afinar tu asistente de IA?",
       "editHintDescription": "Después de guardar, puedes afinar tu asistente de IA en cualquier momento en Configuración Avanzada → Configuración IA → Asistente IA del Widget."
-    }
+    },
+    "listTitle": "Widgets de chat",
+    "listEmpty": "Aún no hay widgets. Crea un widget de chat para empezar."
   },
   "profile": {
     "title": "Configuración de Perfil",
@@ -1606,7 +1619,8 @@
       "email": "Correo",
       "emailHint": "Tu correo de inicio de sesión (no se puede cambiar)",
       "phone": "Teléfono",
-      "phonePlaceholder": "Número de contacto opcional"
+      "phonePlaceholder": "Número de contacto opcional",
+      "managedBy": "Esta cuenta la gestiona {provider}"
     },
     "companyInfo": {
       "title": "Información de Empresa",
@@ -1646,7 +1660,10 @@
       "newPasswordHint": "Mínimo 8 caracteres",
       "confirmPassword": "Confirmar Contraseña",
       "confirmPasswordPlaceholder": "Confirma nueva contraseña",
-      "confirmPasswordHint": "Debe coincidir con la nueva contraseña"
+      "confirmPasswordHint": "Debe coincidir con la nueva contraseña",
+      "externalAuth": "Inicias sesión con {provider}. La contraseña se gestiona allí.",
+      "mismatch": "Las contraseñas no coinciden",
+      "tooShort": "La contraseña debe tener al menos 8 caracteres"
     },
     "appSecurity": {
       "title": "Seguridad de la app",
@@ -2183,7 +2200,8 @@
       "models": "modelos",
       "adminOnlyTitle": "Se requiere acceso de administrador",
       "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores."
-    }
+    },
+    "notLoggedIn": "No has iniciado sesión"
   },
   "storage": {
     "title": "Cuota de Almacenamiento",
@@ -2340,7 +2358,7 @@
     "status_error": "Error",
     "terms": {
       "vectorized": "consultable por IA",
-      "knowledgeGroup": "grupo de conocimiento",
+      "knowledgeGroup": "carpeta de conocimiento",
       "incoming": "entrantes",
       "generated": "generado por IA",
       "notApplicable": "no aplicable"
@@ -2386,13 +2404,13 @@
     },
     "help": {
       "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
-      "group": "Los grupos de conocimiento agrupan archivos. Cuando la IA busca en un grupo, puede usar todos sus archivos.",
+      "group": "Las carpetas de conocimiento agrupan archivos. Cuando la IA busca en una carpeta, puede usar cada archivo.",
       "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
       "incoming": "Archivos que otras apps han enviado para tu base de conocimiento. Revísalos y consérvalos o descártalos.",
       "typeFilter": "Mostrar solo un tipo de archivo: documentos, imágenes, vídeo o audio.",
       "vectorizedFilter": "Filtrar según si los archivos son consultables por IA.",
       "reVectorize": "Volver a leer este archivo y actualizar lo que la IA sabe de él. Úsalo tras editarlo o si falló.",
-      "moveGroup": "Mover archivos a otro grupo de conocimiento. Esto cambia en qué grupo los busca la IA; no elimina nada.",
+      "moveGroup": "Mueve archivos a otra carpeta de conocimiento. Cambia dónde los busca la IA — no elimina nada.",
       "storage": "Cuánto almacenamiento has usado. El contenido generado por IA también cuenta y se muestra por separado."
     },
     "empty": {

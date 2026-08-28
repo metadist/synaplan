@@ -305,10 +305,7 @@ const selectToolCommand = (toolId: string, commandName: string) => {
 
   // If feature is disabled, navigate to setup instructions instead
   if (feature && !feature.enabled && feature.setup_required) {
-    router.push({
-      path: '/settings',
-      query: { tab: 'features', feature: toolId },
-    })
+    router.push(authStore.isAdmin ? '/admin/features' : '/ai/models')
     closeDropdown()
     return
   }

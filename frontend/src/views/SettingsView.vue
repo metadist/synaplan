@@ -114,7 +114,9 @@
                 <label class="block text-sm font-medium txt-secondary mb-1">{{
                   $t('settings.account.email')
                 }}</label>
-                <div class="txt-primary">{{ authStore.user?.email || 'Not logged in' }}</div>
+                <div class="txt-primary">
+                  {{ authStore.user?.email || $t('settings.notLoggedIn') }}
+                </div>
               </div>
               <div data-testid="text-account-level">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{

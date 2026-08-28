@@ -101,6 +101,12 @@ async function expectInsideViewport(page: Page, selector: string, label: string)
  * test report and annotated, but NEVER fail the run. Flip to expect() per
  * surface once it is clean (target: blocking by end of phase 2).
  */
+async function axeBlocking(page: Page, surface: string) {
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(severe, `${surface}: ${severe.map((v) => v.id).join(', ')}`).toEqual([])
+}
+
 async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' | 'dark') {
   await page.emulateMedia({ colorScheme })
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
@@ -210,8 +216,12 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Channels expands its children inline (§4.3 #3).
-    await sheet.locator(NAV.mobileMoreChannels).click()
+    // Accordion: tapping Manage expands groups; Channels reveals Inbound.
+    await sheet.locator(NAV.mobileMoreManage).click()
+    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible({
+      timeout: TIMEOUTS.SHORT,
+    })
+    await sheet.locator(NAV.mobileMoreGroup('channels')).click()
     await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
@@ -382,6 +392,27 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await expect(page.locator(selectors.files.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await axeReportOnly(page, 'files', 'light')
     await axeReportOnly(page, 'files', 'dark')
+  })
+
+  test('login, empty chat and Manage panel — axe blocking', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    if (!isMobileViewport(page)) {
+      await axeBlocking(page, 'empty-chat')
+      await page.locator(NAV.sidebarV2Manage).click()
+      await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await axeBlocking(page, 'manage-panel')
+    }
+  })
+
+  test.describe('signed out axe blocking', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page — axe blocking', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await axeBlocking(page, 'login')
+    })
   })
 
   test('AI models — light and dark', async ({ page }) => {
