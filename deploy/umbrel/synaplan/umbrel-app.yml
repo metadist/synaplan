@@ -4,7 +4,7 @@ category: ai
 name: Synaplan
 # Maintained by CI together with APP_VERSION and the image pin in
 # docker-compose.yml — scripts/set-release-version.mjs owns this field.
-version: "4.0.16"
+version: "4.4.0"
 tagline: Private AI workspace with chat, document search and embeddable widgets
 description: >-
   Synaplan is a self-hosted AI workspace. Chat with the model of your choice,
