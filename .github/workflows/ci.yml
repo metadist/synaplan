@@ -564,10 +564,11 @@ jobs:
   e2e:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
     # E2E jobs run on free ubuntu-latest runners, which are unlimited for
-    # public repositories — so sharding buys wall-clock time for nothing.
-    # Chromium runs the full @ci suite sharded (--shard=N/M) so each half
-    # finishes in ~50% of the time; the free runner pool ensures all shards
-    # start instantly. Firefox is a single unsharded @crossbrowser smoke.
+    # public repositories: an extra shard costs nothing, so sharding trades
+    # runner count for wall-clock time at no price. Chromium runs the full
+    # @ci suite sharded (--shard=N/M) so each half finishes in ~50% of the
+    # time, and the free pool starts every shard immediately instead of
+    # queueing it. Firefox is a single unsharded @crossbrowser smoke.
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
