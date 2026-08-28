@@ -115,11 +115,29 @@ describe('ChatInput voice activity strip', () => {
     expect(wrapper.get(VOICE_ACTIVITY).text()).toContain('chatInput.voiceStatus.recording')
   })
 
+  it('stays visible between tapping stop and the recorder handing over the audio', async () => {
+    // MediaRecorder's onstop fires asynchronously, so there is a real window
+    // where the user has tapped stop but no audio has arrived yet. The strip
+    // must not blink out during that window (regression test: the stop tap
+    // used to clear `isRecording` synchronously).
+    const wrapper = mountInput()
+
+    await wrapper.get(MIC_BUTTON).trigger('click')
+    await wrapper.get(MIC_BUTTON).trigger('click')
+    await nextTick()
+
+    expect(wrapper.find(VOICE_ACTIVITY).exists()).toBe(true)
+    expect(wrapper.get(VOICE_ACTIVITY).text()).toContain('chatInput.voiceStatus.recording')
+  })
+
   it('switches to the transcribing label while the upload is in flight', async () => {
     const wrapper = mountInput()
 
     await wrapper.get(MIC_BUTTON).trigger('click')
+    await wrapper.get(MIC_BUTTON).trigger('click')
+    // Real recorder order on stop: onDataAvailable first, then onStop.
     recorderOptions.onDataAvailable?.(new Blob(['audio']))
+    recorderOptions.onStop?.()
     await nextTick()
 
     expect(wrapper.get(VOICE_ACTIVITY).text()).toContain('chatInput.voiceStatus.transcribing')
@@ -129,7 +147,9 @@ describe('ChatInput voice activity strip', () => {
     const wrapper = mountInput()
 
     await wrapper.get(MIC_BUTTON).trigger('click')
+    await wrapper.get(MIC_BUTTON).trigger('click')
     recorderOptions.onDataAvailable?.(new Blob(['audio']))
+    recorderOptions.onStop?.()
     await nextTick()
 
     resolveTranscription({ text: 'hello', file_id: 1 })

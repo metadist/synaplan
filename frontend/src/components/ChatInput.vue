@@ -1261,9 +1261,15 @@ const toggleRecording = async () => {
       webSpeechService.value = null
     }
     if (audioRecorder.value) {
+      // Do NOT clear `isRecording` here: MediaRecorder's onstop event fires
+      // asynchronously, so a synchronous clear would unmount the activity
+      // strip for a frame before `transcribeAudio` sets `transcribing`. The
+      // recorder's onStop/onError callbacks and transcribeAudio's `finally`
+      // own the flag from this point on.
       audioRecorder.value.stopRecording()
+    } else {
+      isRecording.value = false
     }
-    isRecording.value = false
     return
   }
 
@@ -1427,9 +1433,10 @@ const transcribeAudio = async (audioBlob: Blob) => {
   }
 
   // Set before the first await so the activity strip switches straight from
-  // "recording" to "transcribing". AudioRecorder invokes this callback before
-  // its own onStop, so `isRecording` is still true at this point and the strip
-  // never blinks out between the two states.
+  // "recording" to "transcribing". This only avoids a blink because the stop
+  // tap in `toggleRecording` deliberately leaves `isRecording` true until the
+  // recorder's callbacks run, and AudioRecorder invokes this callback before
+  // its own onStop — so the strip is still mounted when `transcribing` is set.
   transcribing.value = true
   uploading.value = true
 
