@@ -49,7 +49,7 @@ export default defineConfig({
           ],
         },
       },
-      grepInvert: /@oidc-redirect|@noci|@visual/,
+      grepInvert: /@oidc-redirect|@noci|@visual|@ollama/,
     },
     {
       name: 'firefox',
@@ -70,6 +70,26 @@ export default defineConfig({
       name: 'chromium-oidc-redirect',
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
+    },
+    {
+      // ollama-integration.spec.ts repoints the CHAT default model at the
+      // Ollama stub for the WHOLE installation (`global: true`) and restores it
+      // afterwards. Any chat test running in that window talks to the stub
+      // instead of its expected model and fails. It therefore gets its own
+      // project so CI can give it its own job — and with it its own test stack,
+      // which is the only thing that actually makes the mutation safe.
+      //
+      // It is excluded from the `chromium` project above; keeping it there was
+      // safe only by accident of how Playwright happened to distribute spec
+      // files across shards, and that broke the moment the shard count changed.
+      name: 'chromium-ollama',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@ollama/,
     },
     {
       // Mobile viewport for the layout UI guard only — functional specs are

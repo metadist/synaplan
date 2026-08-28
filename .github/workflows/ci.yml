@@ -581,12 +581,13 @@ jobs:
     #
     # Three shards, not more. The config sets no `fullyParallel`, so Playwright
     # assigns whole FILES to shards — a single file is therefore the hard floor
-    # for the slowest shard, no matter how many shards exist. Measured from a
-    # real run: layout.spec.ts alone takes ~75s while a job spends ~105s on
-    # fixed setup (image download, stack start, browser install), which puts
-    # that floor at ~3.2 min. Two shards take ~4.0 min, three take ~3.4 min, and
-    # a fourth would win back only the ~10s that still separate three shards
-    # from that floor — while starting another full test stack for it.
+    # for the slowest shard, no matter how many shards exist. Measured, slowest
+    # shard end to end: two shards 4.2 min, three shards 3.6 min. The floor is
+    # ~3.1 min, because layout.spec.ts alone runs ~75s on top of ~110s of fixed
+    # setup (image download, stack start, browser install). A fourth shard is
+    # therefore playing for ~30s that it would only win if the remaining files
+    # happened to balance perfectly — and it pays a full extra test stack for
+    # the attempt.
     #
     # So if the E2E tail needs to get faster again, adding shards is the wrong
     # lever — split the slowest spec file, or set `fullyParallel: true` in
@@ -638,6 +639,18 @@ jobs:
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:mobile"
+            grep_filter: "@ci"
+            shard: ""
+          # Ollama stub smoke — its own job because the spec repoints the CHAT
+          # default model for the whole installation while it runs. Every job in
+          # this matrix gets its own test stack, so running it here is what
+          # keeps that mutation from reaching the sharded chromium jobs.
+          # See frontend/tests/e2e/playwright.config.ts (chromium-ollama).
+          - browser: chromium
+            variant: "Ollama"
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
