@@ -584,9 +584,9 @@ jobs:
     # for the slowest shard, no matter how many shards exist. Measured from a
     # real run: layout.spec.ts alone takes ~75s while a job spends ~105s on
     # fixed setup (image download, stack start, browser install), which puts
-    # that floor at ~3.2 min. Two shards ran ~4.0 min, three run ~3.4 min, and a
-    # fourth would buy back only the remaining ~0.2 min while adding another
-    # full stack to start and another report to merge.
+    # that floor at ~3.2 min. Two shards take ~4.0 min, three take ~3.4 min, and
+    # a fourth would win back only the ~10s that still separate three shards
+    # from that floor — while starting another full test stack for it.
     #
     # So if the E2E tail needs to get faster again, adding shards is the wrong
     # lever — split the slowest spec file, or set `fullyParallel: true` in
