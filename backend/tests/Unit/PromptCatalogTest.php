@@ -59,6 +59,34 @@ final class PromptCatalogTest extends TestCase
         $this->assertArrayNotHasKey('tool_internet', $metadata, 'general must NOT seed tool_internet — absent = auto (classifier decides)');
     }
 
+    /**
+     * "Upload a photo and ask 'what is that?'" must be a vision turn, never a
+     * web search: the routing model has to understand that "that/das/this"
+     * points into the attachment. The prompt-side rule complements the
+     * deterministic veto in WebSearchTopicPolicy (rule 5a) — the model votes
+     * BWEBSEARCH=0 in the first place, the policy catches strays.
+     */
+    public function testSortPromptSuppressesWebSearchForAttachmentQuestions(): void
+    {
+        $sort = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:sort' === $entry['topic']) {
+                $sort = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($sort);
+        $prompt = $sort['prompt'];
+
+        $this->assertStringContainsString('Questions about an attached file or image', $prompt);
+        $this->assertStringContainsString('ALWAYS set BWEBSEARCH to 0', $prompt);
+        // The concrete repro is quoted as a routing example so smaller models
+        // pattern-match it directly.
+        $this->assertStringContainsString('"What is that?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"Was ist das?" → general, BWEBSEARCH: 0', $prompt);
+    }
+
     public function testTopicsAreUniquePerLanguage(): void
     {
         $seen = [];

@@ -120,6 +120,48 @@ final class WebSearchTopicPolicy
     private const TRIVIAL_MAX_WORDS = 2;
 
     /**
+     * Deictic / referential anchors: pronouns, demonstratives, and image
+     * nouns across the supported UI languages. When a message that CARRIES an
+     * image attachment contains one of these, the user is talking about the
+     * attachment ("what is that?", "was ist das?", "how much does this
+     * cost?") — the referent lives in the picture, not in the text. The
+     * search query is generated from the text alone, so it can never resolve
+     * the referent and the resulting Brave query is guaranteed garbage.
+     *
+     * Bare articles that double as demonstratives (German "das", Spanish
+     * "esta") are intentionally included: with an image attached in the SAME
+     * message, the attachment is the dominant signal, and a false positive
+     * only skips a search the vision answer rarely needs. Turkish bare "o"
+     * (he/she/it) is excluded — it collides with Spanish "o" ("or").
+     *
+     * Matched word-bounded against the punctuation-normalized message.
+     *
+     * @var list<string>
+     */
+    private const ATTACHMENT_REFERENCE_ANCHORS = [
+        // English pronouns/demonstratives
+        'this', 'that', 'these', 'those', 'it',
+        // German
+        'das', 'dies', 'diese', 'dieser', 'dieses', 'es', 'hier', 'darauf',
+        // Spanish
+        'esto', 'eso', 'esta', 'este', 'esa', 'ese', 'aquí', 'aqui',
+        // French
+        'ceci', 'cela', 'ça', 'ca', 'ici',
+        // Italian
+        'questo', 'questa', 'quello', 'quella', 'qui',
+        // Turkish
+        'bu', 'şu', 'su', 'bunu', 'şunu', 'bunun', 'burada',
+        // Image nouns (all languages) — "what's in the picture?"
+        'image', 'picture', 'photo', 'pic', 'screenshot', 'scan',
+        'bild', 'foto', 'aufnahme', 'imagen', 'imagem', 'immagine',
+        'resim', 'resmin', 'fotoğraf', 'fotograf', 'görsel', 'gorsel',
+        // Perception verbs — "what do you see?" next to a photo asks about
+        // the photo even without a pronoun.
+        'see', 'siehst', 'sehen', 'erkennst', 'ves', 'vois', 'vedi',
+        'görüyorsun', 'goruyorsun',
+    ];
+
+    /**
      * True if the topic is a pure asset/document generation topic and
      * web search should be suppressed regardless of the prompt's
      * `tool_internet` flag.
@@ -193,6 +235,41 @@ final class WebSearchTopicPolicy
     }
 
     /**
+     * True when the message text refers to something the user attached rather
+     * than to a self-contained, searchable subject.
+     *
+     * "what is that?" with an attached photo is a VISION question: the "that"
+     * lives in the image, the search pipeline only ever sees the text, and a
+     * Brave query built from it ("what is that") is meaningless. Blank text
+     * next to an attachment is the same situation — there is nothing to
+     * search at all.
+     *
+     * Only meaningful for messages that actually carry an image attachment;
+     * callers must gate on that (see {@see shouldSearch()}).
+     */
+    public static function refersToAttachedImage(?string $text): bool
+    {
+        if (null === $text || '' === trim($text)) {
+            // Attachment with no text: the attachment IS the message.
+            return true;
+        }
+
+        // Same normalization as the triviality check: collapse every run of
+        // non-letters to a single space so punctuation-hugging tokens match
+        // ("what is that?" → " what is that ").
+        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
+        $padded = ' '.trim($normalized).' ';
+
+        foreach (self::ATTACHMENT_REFERENCE_ANCHORS as $anchor) {
+            if (str_contains($padded, ' '.$anchor.' ')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Decide whether to run a web search, trusting the model's judgment but
      * vetoing it for obviously trivial chats.
      *
@@ -213,9 +290,16 @@ final class WebSearchTopicPolicy
      *   4. Topic is a NON_WEB_SEARCH topic           → false
      *      (the stock handler does not consume web context)
      *   5. Otherwise (`tool_internet` is `null`)     → trust the classifier's
-     *      `BWEBSEARCH` vote, UNLESS the message is an obvious greeting /
-     *      smalltalk (see {@see isTrivialConversational()}). The veto stops an
-     *      over-eager sorting model from searching on every "Hey, wie gehts?".
+     *      `BWEBSEARCH` vote, UNLESS
+     *        a) the message deictically refers to an attached image
+     *           ("what is that?" + photo — see {@see refersToAttachedImage()}):
+     *           the search query is built from the text alone, so it can never
+     *           name what the picture shows and the search is guaranteed
+     *           useless. The vision model answers such turns; or
+     *        b) the message is an obvious greeting / smalltalk (see
+     *           {@see isTrivialConversational()}). The veto stops an
+     *           over-eager sorting model from searching on every
+     *           "Hey, wie gehts?".
      *      No vote (e.g. the fast-path heuristic, which never calls the model)
      *      means no search, so trivial chats stay fast.
      *
@@ -225,7 +309,9 @@ final class WebSearchTopicPolicy
      * distinguishes the three states (true / false / null) intentionally.
      * Pass `$classifierVote` as the classifier's `web_search` hint
      * (`$classification['web_search'] ?? null`) and `$messageText` as the raw
-     * user message so the triviality veto can run.
+     * user message so the triviality veto can run. Pass `$hasImageAttachment`
+     * as "this message carries at least one image attachment" so the deictic
+     * veto (5a) can run.
      */
     public static function shouldSearch(
         ?string $topic,
@@ -233,6 +319,7 @@ final class WebSearchTopicPolicy
         ?bool $promptToolInternet = null,
         ?bool $classifierVote = null,
         ?string $messageText = null,
+        bool $hasImageAttachment = false,
     ): bool {
         // Rule 1: explicit prompt opt-out is a hard disable (beats everything).
         if (false === $promptToolInternet) {
@@ -254,8 +341,14 @@ final class WebSearchTopicPolicy
             return false;
         }
 
-        // Rule 5: trust the model's BWEBSEARCH vote, but veto trivial chats.
+        // Rule 5: trust the model's BWEBSEARCH vote, but veto searches that
+        // cannot work (deictic question about an attached image) and trivial
+        // chats.
         if (true !== $classifierVote) {
+            return false;
+        }
+
+        if ($hasImageAttachment && self::refersToAttachedImage($messageText)) {
             return false;
         }
 

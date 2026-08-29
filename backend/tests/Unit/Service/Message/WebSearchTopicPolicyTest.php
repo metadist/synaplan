@@ -90,6 +90,86 @@ final class WebSearchTopicPolicyTest extends TestCase
         );
     }
 
+    /**
+     * Rule 5a — the image-attachment veto. "Upload a photo and ask 'what is
+     * that?'" must reach the vision model, never Brave: the search query is
+     * generated from the text alone, so it cannot resolve a referent that
+     * lives inside the picture.
+     *
+     * @return iterable<string, array{0: bool, 1: ?bool, 2: ?bool, 3: ?string, 4: bool, 5: bool, 6: string}>
+     */
+    public static function imageAttachmentVetoProvider(): iterable
+    {
+        // The original bug: photo + "what is that" + over-eager yes-vote.
+        yield 'deictic_en_vetoed' => [false, null, true, 'what is that', true, false, 'veto: "that" is the attached image'];
+        yield 'deictic_de_vetoed' => [false, null, true, 'Was ist das?', true, false, 'veto: German deictic'];
+        yield 'deictic_cost_vetoed' => [false, null, true, 'how much does this cost?', true, false, 'veto: "this" refers to the photo'];
+        yield 'perception_verb_vetoed' => [false, null, true, 'what do you see?', true, false, 'veto: perception verb next to a photo'];
+        yield 'image_noun_vetoed' => [false, null, true, 'whats in the picture', true, false, 'veto: names the picture'];
+        yield 'empty_text_with_image_vetoed' => [false, null, true, '', true, false, 'veto: attachment-only message has nothing to search'];
+
+        // Self-contained queries still search — the image does not disable
+        // genuinely searchable text.
+        yield 'self_contained_query_searches' => [false, null, true, 'GTA 6 release date', true, true, 'no deictic reference → vote honoured'];
+
+        // Explicit opt-ins beat the veto, exactly like they beat triviality.
+        yield 'user_request_beats_veto' => [true, null, true, 'what is that', true, true, 'rule 2: explicit request wins'];
+        yield 'prompt_opt_in_beats_veto' => [false, true, true, 'what is that', true, true, 'rule 3: prompt opt-in wins'];
+
+        // Without an image attachment the deictic veto never fires.
+        yield 'no_image_no_veto' => [false, null, true, 'what is that', false, true, 'no attachment → vote honoured'];
+        yield 'no_vote_never_searches' => [false, null, null, 'what is that', true, false, 'no vote → no search regardless of veto'];
+    }
+
+    #[DataProvider('imageAttachmentVetoProvider')]
+    public function testShouldSearchVetoesDeicticImageQuestions(bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $hasImageAttachment, bool $expected, string $reason): void
+    {
+        self::assertSame(
+            $expected,
+            WebSearchTopicPolicy::shouldSearch('general', $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment),
+            sprintf('text=%s, hasImage=%s, %s', var_export($messageText, true), var_export($hasImageAttachment, true), $reason),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{0: ?string, 1: bool}>
+     */
+    public static function refersToAttachedImageProvider(): iterable
+    {
+        // Deictic pronouns / demonstratives.
+        yield 'what_is_that' => ['what is that?', true];
+        yield 'german_was_ist_das' => ['Was ist das?', true];
+        yield 'this_cost' => ['How much does this cost?', true];
+        yield 'spanish_que_es_esto' => ['¿Qué es esto?', true];
+        yield 'turkish_bu_ne' => ['bu ne?', true];
+        yield 'french_cest_quoi_ca' => ["c'est quoi ça", true];
+
+        // Image nouns and perception verbs.
+        yield 'picture_noun' => ['what is in the picture', true];
+        yield 'german_bild' => ['erkläre mir das Bild', true];
+        yield 'perception_see' => ['what do you see here', true];
+
+        // Attachment-only message: nothing to search.
+        yield 'empty' => ['', true];
+        yield 'null' => [null, true];
+        yield 'whitespace' => ['   ', true];
+
+        // Self-contained subjects do NOT refer to the attachment.
+        yield 'self_contained_release' => ['GTA 6 release date', false];
+        yield 'self_contained_price' => ['bitcoin price today', false];
+        yield 'self_contained_weather' => ['weather tomorrow in Berlin', false];
+    }
+
+    #[DataProvider('refersToAttachedImageProvider')]
+    public function testRefersToAttachedImage(?string $text, bool $expected): void
+    {
+        self::assertSame(
+            $expected,
+            WebSearchTopicPolicy::refersToAttachedImage($text),
+            sprintf('text=%s', var_export($text, true)),
+        );
+    }
+
     public function testIsNonWebSearchTopicCoversMediaAndDocumentTopics(): void
     {
         self::assertTrue(WebSearchTopicPolicy::isNonWebSearchTopic('mediamaker'));

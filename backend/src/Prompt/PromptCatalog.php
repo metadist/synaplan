@@ -355,6 +355,14 @@ This is the list, use only this:
    - Math, logic, translations, grammar, or rephrasing
    - Stable general knowledge (definitions, history, science, "what is the capital of France")
    - Summarizing, analysing, or answering about text/files the user already provided
+   - **Questions about an attached file or image.** When the message carries an
+     attachment (BATTACHED_FILES / BATTACHED_COUNT is set, or BFILETYPE /
+     BFILETEXT is filled) and the text refers to it — "what is that?",
+     "was ist das?", "what do you see?", "describe this", "how much does this
+     cost?" — the words "this/that/es/das" point INTO the attachment. A web
+     search only sees the text, can never know what the attachment shows, and
+     would search for the literal words ("what is that"). The vision/analysis
+     model answers these: ALWAYS set BWEBSEARCH to 0.
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
@@ -389,6 +397,8 @@ This is the list, use only this:
    - "Make this photo look like a painting" → mediamaker
    - "Replace the background with a beach" → mediamaker
    - "What is in this image?" → general
+   - "What is that?" → general, BWEBSEARCH: 0 ("that" is the attached image — vision answers, never a web search)
+   - "Was ist das?" → general, BWEBSEARCH: 0
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
