@@ -131,21 +131,26 @@ final class WebSearchTopicPolicy
      * literal question words alone.
      *
      * Bare articles that double as demonstratives (German "das", Spanish
-     * "esta") are intentionally included: with a file attached in the SAME
-     * message, the attachment is the dominant signal, and a false positive
-     * only means the query generator additionally sees the file content —
-     * which can only improve the query. Turkish bare "o" (he/she/it) is
-     * excluded — it collides with Spanish "o" ("or").
+     * "esta") are kept: with a file attached in the SAME message they are
+     * usually the referent. Bare "it" / German "es" / Spanish "es" ("is")
+     * are NOT listed — they collide with dummy pronouns and the copula
+     * ("is it raining in Berlin today?", "¿cuál es el precio?") and would
+     * pull file content into a self-contained search. Pointing at a file
+     * with those words still matches via a phrase below ("what is it",
+     * "was ist es") or via this/that/das/esto. Turkish bare "o" is
+     * excluded for the same reason (collides with Spanish "o" / "or").
      *
      * Matched word-bounded against the punctuation-normalized message.
      *
      * @var list<string>
      */
     private const ATTACHMENT_REFERENCE_ANCHORS = [
-        // English pronouns/demonstratives
-        'this', 'that', 'these', 'those', 'it',
-        // German
-        'das', 'dies', 'diese', 'dieser', 'dieses', 'es', 'hier', 'darauf',
+        // English pronouns/demonstratives (no bare "it" — see above)
+        'this', 'that', 'these', 'those',
+        'what is it',
+        // German (no bare "es" — it is both "it" and the Spanish copula)
+        'das', 'dies', 'diese', 'dieser', 'dieses', 'hier', 'darauf',
+        'was ist es',
         // Spanish
         'esto', 'eso', 'esta', 'este', 'esa', 'ese', 'aquí', 'aqui',
         // French

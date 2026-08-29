@@ -121,7 +121,9 @@ final class WebSearchTopicPolicyTest extends TestCase
     {
         // Deictic pronouns / demonstratives.
         yield 'what_is_that' => ['what is that?', true];
+        yield 'what_is_it' => ['what is it?', true];
         yield 'german_was_ist_das' => ['Was ist das?', true];
+        yield 'german_was_ist_es' => ['was ist es?', true];
         yield 'this_cost' => ['How much does this cost?', true];
         yield 'spanish_que_es_esto' => ['¿Qué es esto?', true];
         yield 'turkish_bu_ne' => ['bu ne?', true];
@@ -147,10 +149,14 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'null' => [null, true];
         yield 'whitespace' => ['   ', true];
 
-        // Self-contained subjects do NOT refer to the attachment.
+        // Self-contained subjects do NOT refer to the attachment — including
+        // questions that happen to contain dummy "it" or the Spanish copula
+        // "es". Those must not pull file content into the search query.
         yield 'self_contained_release' => ['GTA 6 release date', false];
         yield 'self_contained_price' => ['bitcoin price today', false];
         yield 'self_contained_weather' => ['weather tomorrow in Berlin', false];
+        yield 'dummy_it_weather' => ['Is it raining in Berlin today?', false];
+        yield 'spanish_copula_price' => ['¿Cuál es el precio del Bitcoin hoy?', false];
     }
 
     #[DataProvider('refersToAttachmentProvider')]

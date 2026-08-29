@@ -341,14 +341,16 @@ final readonly class MessageProcessor
 
             // Step 2.5: Web Search
             //
-            // Web-search decision (trust the model):
-            //   (a) Prompt opts in (`tool_internet=true`)        → always search.
-            //   (b) Asset/document-generation topic              → never search.
-            //   (c) Prompt opts out (`tool_internet=false`)      → never search.
-            //   (d) Otherwise → trust the classifier's BWEBSEARCH vote. The AI
-            //       sorter judges whether the message needs live information;
-            //       the fast-path (no model call) carries no vote, so trivial
-            //       chats stay fast and skip the search round-trip.
+            // Mirrors WebSearchTopicPolicy::shouldSearch() precedence:
+            //   (1) Prompt opts out (`tool_internet=false`)      → never search
+            //       (hard disable; beats the per-message toggle).
+            //   (2) User requested search for THIS message       → always search
+            //       (chat toggle / `/search`).
+            //   (3) Prompt opts in (`tool_internet=true`)        → always search.
+            //   (4) Asset/document-generation topic              → never search.
+            //   (5) Otherwise → trust the classifier's BWEBSEARCH vote, vetoed
+            //       for trivial greetings. The fast-path carries no vote, so
+            //       those chats skip the search round-trip.
             //
             // When the message refers to an attached/selected file ("what is
             // that?" + photo, "is this still valid?" + contract PDF), the
