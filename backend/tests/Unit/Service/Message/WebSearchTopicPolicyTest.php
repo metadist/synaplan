@@ -91,50 +91,33 @@ final class WebSearchTopicPolicyTest extends TestCase
     }
 
     /**
-     * Rule 5a — the image-attachment veto. "Upload a photo and ask 'what is
-     * that?'" must reach the vision model, never Brave: the search query is
-     * generated from the text alone, so it cannot resolve a referent that
-     * lives inside the picture.
-     *
-     * @return iterable<string, array{0: bool, 1: ?bool, 2: ?bool, 3: ?string, 4: bool, 5: bool, 6: string}>
+     * Attachment-referring questions are NOT vetoed by the policy: the vote
+     * is honoured, and MessageProcessor resolves the file's content so the
+     * search query names the actual subject ("sony wh-1000xm6 price" instead
+     * of "how much does this cost"). Only an unresolvable referent drops a
+     * vote-only search — and that fallback lives in MessageProcessor, not
+     * here. This test pins that shouldSearch() stays attachment-agnostic.
      */
-    public static function imageAttachmentVetoProvider(): iterable
+    public function testShouldSearchHonoursVoteForAttachmentQuestions(): void
     {
-        // The original bug: photo + "what is that" + over-eager yes-vote.
-        yield 'deictic_en_vetoed' => [false, null, true, 'what is that', true, false, 'veto: "that" is the attached image'];
-        yield 'deictic_de_vetoed' => [false, null, true, 'Was ist das?', true, false, 'veto: German deictic'];
-        yield 'deictic_cost_vetoed' => [false, null, true, 'how much does this cost?', true, false, 'veto: "this" refers to the photo'];
-        yield 'perception_verb_vetoed' => [false, null, true, 'what do you see?', true, false, 'veto: perception verb next to a photo'];
-        yield 'image_noun_vetoed' => [false, null, true, 'whats in the picture', true, false, 'veto: names the picture'];
-        yield 'empty_text_with_image_vetoed' => [false, null, true, '', true, false, 'veto: attachment-only message has nothing to search'];
-
-        // Self-contained queries still search — the image does not disable
-        // genuinely searchable text.
-        yield 'self_contained_query_searches' => [false, null, true, 'GTA 6 release date', true, true, 'no deictic reference → vote honoured'];
-
-        // Explicit opt-ins beat the veto, exactly like they beat triviality.
-        yield 'user_request_beats_veto' => [true, null, true, 'what is that', true, true, 'rule 2: explicit request wins'];
-        yield 'prompt_opt_in_beats_veto' => [false, true, true, 'what is that', true, true, 'rule 3: prompt opt-in wins'];
-
-        // Without an image attachment the deictic veto never fires.
-        yield 'no_image_no_veto' => [false, null, true, 'what is that', false, true, 'no attachment → vote honoured'];
-        yield 'no_vote_never_searches' => [false, null, null, 'what is that', true, false, 'no vote → no search regardless of veto'];
-    }
-
-    #[DataProvider('imageAttachmentVetoProvider')]
-    public function testShouldSearchVetoesDeicticImageQuestions(bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $hasImageAttachment, bool $expected, string $reason): void
-    {
-        self::assertSame(
-            $expected,
-            WebSearchTopicPolicy::shouldSearch('general', $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment),
-            sprintf('text=%s, hasImage=%s, %s', var_export($messageText, true), var_export($hasImageAttachment, true), $reason),
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, true, 'how much does this cost?'),
+            'deictic question + yes-vote must search — the query is built from the attachment content',
+        );
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, true, 'what is that'),
+            'even a pure deictic question searches when the model voted yes',
+        );
+        self::assertFalse(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, null, 'what is that'),
+            'no vote still means no search',
         );
     }
 
     /**
      * @return iterable<string, array{0: ?string, 1: bool}>
      */
-    public static function refersToAttachedImageProvider(): iterable
+    public static function refersToAttachmentProvider(): iterable
     {
         // Deictic pronouns / demonstratives.
         yield 'what_is_that' => ['what is that?', true];
@@ -149,7 +132,17 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'german_bild' => ['erkläre mir das Bild', true];
         yield 'perception_see' => ['what do you see here', true];
 
-        // Attachment-only message: nothing to search.
+        // Document nouns — a contract PDF, an invoice, a report.
+        yield 'contract_validity' => ['is the contract still valid', true];
+        yield 'german_rechnung' => ['stimmt die Rechnung so', true];
+        yield 'document_noun' => ['check the document for errors', true];
+
+        // Audio/video nouns.
+        yield 'recording_speaker' => ['who is speaking in the recording', true];
+        yield 'german_lied' => ['wie heißt das Lied', true];
+        yield 'video_noun' => ['where was the video filmed', true];
+
+        // Attachment-only message: the attachment IS the message.
         yield 'empty' => ['', true];
         yield 'null' => [null, true];
         yield 'whitespace' => ['   ', true];
@@ -160,12 +153,12 @@ final class WebSearchTopicPolicyTest extends TestCase
         yield 'self_contained_weather' => ['weather tomorrow in Berlin', false];
     }
 
-    #[DataProvider('refersToAttachedImageProvider')]
-    public function testRefersToAttachedImage(?string $text, bool $expected): void
+    #[DataProvider('refersToAttachmentProvider')]
+    public function testRefersToAttachment(?string $text, bool $expected): void
     {
         self::assertSame(
             $expected,
-            WebSearchTopicPolicy::refersToAttachedImage($text),
+            WebSearchTopicPolicy::refersToAttachment($text),
             sprintf('text=%s', var_export($text, true)),
         );
     }

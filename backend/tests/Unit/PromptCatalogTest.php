@@ -60,13 +60,14 @@ final class PromptCatalogTest extends TestCase
     }
 
     /**
-     * "Upload a photo and ask 'what is that?'" must be a vision turn, never a
-     * web search: the routing model has to understand that "that/das/this"
-     * points into the attachment. The prompt-side rule complements the
-     * deterministic veto in WebSearchTopicPolicy (rule 5a) — the model votes
-     * BWEBSEARCH=0 in the first place, the policy catches strays.
+     * Attachment questions split in two: "upload a photo and ask 'what is
+     * that?'" is answered FROM the file (BWEBSEARCH=0), while "how much does
+     * this cost?" needs live info ABOUT the file's subject (BWEBSEARCH=1 —
+     * the pipeline builds the search phrase from the file content, see
+     * AttachmentSearchContextResolver). Pin both sides of the rule and the
+     * concrete examples smaller models pattern-match on.
      */
-    public function testSortPromptSuppressesWebSearchForAttachmentQuestions(): void
+    public function testSortPromptRoutesAttachmentQuestions(): void
     {
         $sort = null;
         foreach (PromptCatalog::all() as $entry) {
@@ -79,12 +80,35 @@ final class PromptCatalogTest extends TestCase
         $this->assertNotNull($sort);
         $prompt = $sort['prompt'];
 
-        $this->assertStringContainsString('Questions about an attached file or image', $prompt);
-        $this->assertStringContainsString('ALWAYS set BWEBSEARCH to 0', $prompt);
-        // The concrete repro is quoted as a routing example so smaller models
-        // pattern-match it directly.
+        $this->assertStringContainsString('Questions answerable from an attached file alone', $prompt);
+        $this->assertStringContainsString('Attachment + live information = search', $prompt);
         $this->assertStringContainsString('"What is that?" → general, BWEBSEARCH: 0', $prompt);
         $this->assertStringContainsString('"Was ist das?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"How much does this cost?" → general, BWEBSEARCH: 1', $prompt);
+    }
+
+    /**
+     * The search-query prompt must resolve deictic references against the
+     * "Attached file content" block SearchQueryGenerator sends — otherwise
+     * "what is that?" + photo searches for the literal words again.
+     */
+    public function testSearchPromptResolvesAttachmentReferences(): void
+    {
+        $search = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:search' === $entry['topic']) {
+                $search = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($search);
+        $prompt = $search['prompt'];
+
+        $this->assertStringContainsString('Attached file content', $prompt);
+        $this->assertStringContainsString('NEVER search for the literal question words', $prompt);
+        // Worked example: deictic price question + product photo.
+        $this->assertStringContainsString('sony wh-1000xm6 price', $prompt);
     }
 
     public function testTopicsAreUniquePerLanguage(): void

@@ -7,7 +7,6 @@ use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
-use App\Service\File\FileTypeResolver;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\TaskPlanExecutor;
@@ -55,6 +54,7 @@ final readonly class MessageProcessor
         private PromptService $promptService,
         private BraveSearchService $braveSearchService,
         private SearchQueryGenerator $searchQueryGenerator,
+        private AttachmentSearchContextResolver $attachmentContextResolver,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
         private MultitaskRoutingConfig $multitaskConfig,
@@ -348,20 +348,23 @@ final readonly class MessageProcessor
             //   (d) Otherwise → trust the classifier's BWEBSEARCH vote. The AI
             //       sorter judges whether the message needs live information;
             //       the fast-path (no model call) carries no vote, so trivial
-            //       chats stay fast and skip the search round-trip. The vote is
-            //       vetoed when the message deictically refers to an attached
-            //       image ("what is that?" + photo): the text-only search query
-            //       can never resolve the referent, so the vision model answers
-            //       instead of a garbage Brave round-trip.
+            //       chats stay fast and skip the search round-trip.
+            //
+            // When the message refers to an attached/selected file ("what is
+            // that?" + photo, "is this still valid?" + contract PDF), the
+            // search query is built from the FILE's content — extracted text,
+            // transcript, or a vision identification — never from the literal
+            // question words (which would search "what is that").
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);
             $messageText = $message->getText();
-            $hasImageAttachment = $this->messageHasImageAttachment($message);
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment);
-            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment, $shouldSearch);
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
+                && WebSearchTopicPolicy::refersToAttachment($messageText);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -375,7 +378,7 @@ final readonly class MessageProcessor
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
-                'has_image_attachment' => $hasImageAttachment,
+                'needs_attachment_context' => $needsAttachmentContext,
                 'brave_enabled' => $braveEnabled,
             ]);
 
@@ -386,6 +389,27 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            $attachmentContext = null;
+            if ($needsAttachmentContext && $braveEnabled) {
+                $perfTimer->start('search_attachment_context');
+                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
+                $perfTimer->stop('search_attachment_context');
+
+                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                    // The question is about the attachment but its content
+                    // could not be resolved (no extracted text, vision
+                    // unavailable/failed). A purely vote-triggered search
+                    // would query the literal deictic words — guaranteed
+                    // garbage — so drop it; the answer model still analyzes
+                    // the file. An explicit user request / prompt opt-in
+                    // keeps searching with the raw text (deliberate choice).
+                    $shouldSearch = false;
+                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
+                        'message_id' => $message->getId(),
+                    ]);
+                }
+            }
+
             if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
@@ -394,7 +418,8 @@ final readonly class MessageProcessor
                     $perfTimer->start('search_query');
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
-                        $message->getUserId()
+                        $message->getUserId(),
+                        $attachmentContext
                     );
                     $perfTimer->stop('search_query');
 
@@ -826,9 +851,10 @@ final readonly class MessageProcessor
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);
             $messageText = $message->getText();
-            $hasImageAttachment = $this->messageHasImageAttachment($message);
-            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment);
-            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $hasImageAttachment, $shouldSearch);
+            $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+            $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
+                && WebSearchTopicPolicy::refersToAttachment($messageText);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
@@ -840,7 +866,7 @@ final readonly class MessageProcessor
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
-                'has_image_attachment' => $hasImageAttachment,
+                'needs_attachment_context' => $needsAttachmentContext,
                 'brave_enabled' => $braveEnabled,
                 'pipeline' => 'process',
             ]);
@@ -853,13 +879,30 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            $attachmentContext = null;
+            if ($needsAttachmentContext && $braveEnabled) {
+                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
+
+                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                    // See processStream(): a vote-only search whose referent
+                    // lives in an unresolvable attachment would query the
+                    // literal deictic words — drop it.
+                    $shouldSearch = false;
+                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
+                        'message_id' => $message->getId(),
+                        'pipeline' => 'process',
+                    ]);
+                }
+            }
+
             if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
-                        $message->getUserId()
+                        $message->getUserId(),
+                        $attachmentContext
                     );
 
                     $language = $this->resolveSearchLanguage($classification, $message);
@@ -1111,7 +1154,7 @@ final readonly class MessageProcessor
      * so the log line directly explains the decision without a reader
      * having to consult two services.
      */
-    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $hasImageAttachment, bool $shouldSearch): string
+    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
             // Mirror the real precedence in WebSearchTopicPolicy::shouldSearch():
@@ -1122,10 +1165,6 @@ final readonly class MessageProcessor
 
             if (WebSearchTopicPolicy::isNonWebSearchTopic($topic)) {
                 return 'non_web_search_topic';
-            }
-
-            if (true === $classifierVote && $hasImageAttachment && WebSearchTopicPolicy::refersToAttachedImage($messageText)) {
-                return 'suppressed_image_attachment_reference';
             }
 
             if (true === $classifierVote && WebSearchTopicPolicy::isTrivialConversational($messageText)) {
@@ -1159,32 +1198,6 @@ final readonly class MessageProcessor
     {
         return (bool) ($options['web_search'] ?? false)
             || (bool) ($options['force_web_search'] ?? false);
-    }
-
-    /**
-     * True if the message carries at least one image attachment. Accepts the
-     * generic kind `image` (as stored by generated-media pipelines) in
-     * addition to concrete extensions, and falls back to the legacy
-     * single-file columns for channel messages without File entities.
-     * Mirrors MessageClassifier::messageHasImageAttachment().
-     */
-    private function messageHasImageAttachment(Message $message): bool
-    {
-        foreach ($message->getFiles() as $file) {
-            if ('image' === FileTypeResolver::resolveCategory($file->getFileType() ?: '', $file->getFileName())) {
-                return true;
-            }
-        }
-
-        if ($message->getFile() > 0) {
-            return 'image' === FileTypeResolver::resolveCategory(
-                $message->getFileType() ?: '',
-                '',
-                (string) $message->getFilePath(),
-            );
-        }
-
-        return false;
     }
 
     /**

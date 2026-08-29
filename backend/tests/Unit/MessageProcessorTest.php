@@ -12,6 +12,7 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\Message\MessageProcessor;
 use App\Service\Message\RollingSummaryResult;
+use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -64,6 +65,7 @@ class MessageProcessorTest extends TestCase
             $this->promptService,
             $this->braveSearchService,
             $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
             $this->createMock(UrlContentService::class),
             $this->logger,
             $this->createMock(MultitaskRoutingConfig::class),

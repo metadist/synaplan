@@ -120,19 +120,22 @@ final class WebSearchTopicPolicy
     private const TRIVIAL_MAX_WORDS = 2;
 
     /**
-     * Deictic / referential anchors: pronouns, demonstratives, and image
-     * nouns across the supported UI languages. When a message that CARRIES an
-     * image attachment contains one of these, the user is talking about the
-     * attachment ("what is that?", "was ist das?", "how much does this
-     * cost?") — the referent lives in the picture, not in the text. The
-     * search query is generated from the text alone, so it can never resolve
-     * the referent and the resulting Brave query is guaranteed garbage.
+     * Deictic / referential anchors: pronouns, demonstratives, attachment
+     * nouns, and perception verbs across the supported UI languages. When a
+     * message that CARRIES an attachment contains one of these, the user is
+     * talking about that file ("what is that?", "was ist das?", "how much
+     * does this cost?", "is this contract still valid?") — the referent lives
+     * in the file, not in the text. The web-search query must then be built
+     * WITH the file's content (extracted text, transcript, or a vision
+     * identification — see AttachmentSearchContextResolver), never from the
+     * literal question words alone.
      *
      * Bare articles that double as demonstratives (German "das", Spanish
-     * "esta") are intentionally included: with an image attached in the SAME
+     * "esta") are intentionally included: with a file attached in the SAME
      * message, the attachment is the dominant signal, and a false positive
-     * only skips a search the vision answer rarely needs. Turkish bare "o"
-     * (he/she/it) is excluded — it collides with Spanish "o" ("or").
+     * only means the query generator additionally sees the file content —
+     * which can only improve the query. Turkish bare "o" (he/she/it) is
+     * excluded — it collides with Spanish "o" ("or").
      *
      * Matched word-bounded against the punctuation-normalized message.
      *
@@ -155,10 +158,27 @@ final class WebSearchTopicPolicy
         'image', 'picture', 'photo', 'pic', 'screenshot', 'scan',
         'bild', 'foto', 'aufnahme', 'imagen', 'imagem', 'immagine',
         'resim', 'resmin', 'fotoğraf', 'fotograf', 'görsel', 'gorsel',
-        // Perception verbs — "what do you see?" next to a photo asks about
-        // the photo even without a pronoun.
-        'see', 'siehst', 'sehen', 'erkennst', 'ves', 'vois', 'vedi',
-        'görüyorsun', 'goruyorsun',
+        // Document nouns — "is the contract still valid?"
+        'file', 'document', 'doc', 'pdf', 'page', 'contract', 'invoice',
+        'report', 'article', 'attachment',
+        'datei', 'dokument', 'seite', 'vertrag', 'rechnung', 'bericht',
+        'anhang', 'unterlagen',
+        'archivo', 'documento', 'contrato', 'factura', 'informe',
+        'fichier', 'contrat', 'facture', 'rapport',
+        'fattura', 'contratto', 'documento',
+        'dosya', 'belge', 'fatura', 'sözleşme', 'sozlesme', 'rapor',
+        // Audio/video nouns — "who is speaking in the recording?"
+        'audio', 'recording', 'video', 'clip', 'song', 'track', 'podcast',
+        'transcript', 'voicemail',
+        'aufzeichnung', 'lied', 'transkript', 'sprachnachricht',
+        'grabación', 'grabacion', 'canción', 'cancion',
+        'enregistrement', 'chanson', 'registrazione', 'canzone',
+        'kayıt', 'kayit', 'şarkı', 'sarki', 'ses',
+        // Perception verbs — "what do you see?" / "what do you hear?" next
+        // to an attachment asks about the attachment even without a pronoun.
+        'see', 'hear', 'shown', 'siehst', 'sehen', 'erkennst', 'hörst',
+        'hoerst', 'ves', 'oyes', 'vois', 'entends', 'vedi', 'senti',
+        'görüyorsun', 'goruyorsun', 'duyuyorsun',
     ];
 
     /**
@@ -235,19 +255,22 @@ final class WebSearchTopicPolicy
     }
 
     /**
-     * True when the message text refers to something the user attached rather
-     * than to a self-contained, searchable subject.
+     * True when the message text refers to something the user attached
+     * (image, document, audio, video — uploaded or selected from the library)
+     * rather than to a self-contained, searchable subject.
      *
-     * "what is that?" with an attached photo is a VISION question: the "that"
-     * lives in the image, the search pipeline only ever sees the text, and a
-     * Brave query built from it ("what is that") is meaningless. Blank text
-     * next to an attachment is the same situation — there is nothing to
-     * search at all.
+     * "what is that?" with an attached photo, "is this still valid?" with a
+     * contract PDF: the referent lives in the FILE. A search query built from
+     * the text alone ("what is that") is meaningless, so when this predicate
+     * matches, MessageProcessor resolves the attachment's content first
+     * (AttachmentSearchContextResolver) and the query generator builds the
+     * search phrase from it. Blank text next to an attachment is the same
+     * situation — the attachment IS the message.
      *
-     * Only meaningful for messages that actually carry an image attachment;
-     * callers must gate on that (see {@see shouldSearch()}).
+     * Only meaningful for messages that actually carry an attachment; callers
+     * must gate on that.
      */
-    public static function refersToAttachedImage(?string $text): bool
+    public static function refersToAttachment(?string $text): bool
     {
         if (null === $text || '' === trim($text)) {
             // Attachment with no text: the attachment IS the message.
@@ -290,18 +313,18 @@ final class WebSearchTopicPolicy
      *   4. Topic is a NON_WEB_SEARCH topic           → false
      *      (the stock handler does not consume web context)
      *   5. Otherwise (`tool_internet` is `null`)     → trust the classifier's
-     *      `BWEBSEARCH` vote, UNLESS
-     *        a) the message deictically refers to an attached image
-     *           ("what is that?" + photo — see {@see refersToAttachedImage()}):
-     *           the search query is built from the text alone, so it can never
-     *           name what the picture shows and the search is guaranteed
-     *           useless. The vision model answers such turns; or
-     *        b) the message is an obvious greeting / smalltalk (see
-     *           {@see isTrivialConversational()}). The veto stops an
-     *           over-eager sorting model from searching on every
-     *           "Hey, wie gehts?".
+     *      `BWEBSEARCH` vote, UNLESS the message is an obvious greeting /
+     *      smalltalk (see {@see isTrivialConversational()}). The veto stops an
+     *      over-eager sorting model from searching on every "Hey, wie gehts?".
      *      No vote (e.g. the fast-path heuristic, which never calls the model)
      *      means no search, so trivial chats stay fast.
+     *
+     * Attachment-referring questions ("what is that?" + photo) are NOT vetoed
+     * here: when the search runs, MessageProcessor resolves the attachment's
+     * content ({@see refersToAttachment()}, AttachmentSearchContextResolver)
+     * and the query is built from what the file actually shows/says. Only
+     * when that resolution comes back empty does MessageProcessor drop a
+     * purely vote-triggered search (a text-only query would be garbage).
      *
      * Pass `$userRequestedSearch` as the resolved per-message flag (frontend
      * web-search toggle / `/search`). Pass `$promptToolInternet` as the raw
@@ -309,9 +332,7 @@ final class WebSearchTopicPolicy
      * distinguishes the three states (true / false / null) intentionally.
      * Pass `$classifierVote` as the classifier's `web_search` hint
      * (`$classification['web_search'] ?? null`) and `$messageText` as the raw
-     * user message so the triviality veto can run. Pass `$hasImageAttachment`
-     * as "this message carries at least one image attachment" so the deictic
-     * veto (5a) can run.
+     * user message so the triviality veto can run.
      */
     public static function shouldSearch(
         ?string $topic,
@@ -319,7 +340,6 @@ final class WebSearchTopicPolicy
         ?bool $promptToolInternet = null,
         ?bool $classifierVote = null,
         ?string $messageText = null,
-        bool $hasImageAttachment = false,
     ): bool {
         // Rule 1: explicit prompt opt-out is a hard disable (beats everything).
         if (false === $promptToolInternet) {
@@ -341,14 +361,8 @@ final class WebSearchTopicPolicy
             return false;
         }
 
-        // Rule 5: trust the model's BWEBSEARCH vote, but veto searches that
-        // cannot work (deictic question about an attached image) and trivial
-        // chats.
+        // Rule 5: trust the model's BWEBSEARCH vote, but veto trivial chats.
         if (true !== $classifierVote) {
-            return false;
-        }
-
-        if ($hasImageAttachment && self::refersToAttachedImage($messageText)) {
             return false;
         }
 
