@@ -27,7 +27,7 @@ environments:
   # new deployments; existing ones stay on their pinned version until their
   # operator changes it, as described in docs/UPDATE_ELESTIO.md.
   - key: "SYNAPLAN_VERSION"
-    value: "4.4.0"
+    value: "4.4.1"
   # Deployment hint for the release notice, so the admin UI links to the Elestio
   # update guide instead of the self-hosted one. Display only: Synaplan never
   # updates itself.
