@@ -255,7 +255,7 @@ does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
 TRUSTEDTOKENS_API_KEY=your_key_here
 ```
 
-Open-weight models (GLM 5.2, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
+Open-weight models (GLM 5.2 / 5.3, DeepSeek V4 / Chimera, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
 Technology Consulting, under German jurisdiction with zero data retention. Synaplan talks to
 its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
 [trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.

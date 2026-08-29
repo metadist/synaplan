@@ -1575,7 +1575,7 @@ final readonly class SystemConfigService
             'TRUSTEDTOKENS_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true,
-                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, Qwen, GPT OSS)',
+                'description' => 'TrustedTokens API key — sovereign inference on German GPUs (GLM, DeepSeek, Qwen, GPT OSS)',
                 'default' => '', 'source' => 'database',
             ],
             'HUGGINGFACE_API_KEY' => [
