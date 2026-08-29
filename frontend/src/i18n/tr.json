@@ -754,6 +754,7 @@
     "plusMenu": {
       "label": "Ekle",
       "attach": "Dosya ekle",
+      "photo": "Fotoğraf çek",
       "model": "Model",
       "tools": "Araçlar",
       "knowledge": "Bilgi klasörü"

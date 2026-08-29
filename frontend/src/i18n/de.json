@@ -712,6 +712,7 @@
     "plusMenu": {
       "label": "Hinzufügen",
       "attach": "Dateien anhängen",
+      "photo": "Foto aufnehmen",
       "model": "Modell",
       "tools": "Tools",
       "knowledge": "Wissensordner"

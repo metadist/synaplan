@@ -13,6 +13,7 @@ use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Exception\VisionImageUnprocessableException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
@@ -62,6 +63,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * margin for the surrounding prompt (issue #1238).
      */
     private const MAX_VISION_BASE64_LENGTH = 450000;
+
+    /**
+     * Hard upper bound on the raw file size read for inline vision. Oversized
+     * files below this cap are downscaled to the base64 budget; above it we
+     * refuse to read the bytes at all. Deliberately generous — phone photos
+     * are routinely 10-20 MB and must survive this guard.
+     */
+    private const MAX_VISION_FILE_BYTES = 50 * 1024 * 1024;
 
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;
@@ -1588,6 +1597,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if ($includeImages) {
             $imageUrls = $this->extractImageDataUrls($currentMessage);
 
+            // Every attached image failed conversion (unreadable, or too large
+            // even after downscaling). Fail loudly instead of sending a
+            // text-only request the model would answer with "I see no image".
+            if ([] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
+                throw new VisionImageUnprocessableException();
+            }
+
             return $this->buildMultimodalContent($content, $imageUrls);
         }
 
@@ -1984,9 +2000,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $absolutePath = $resolvedPath;
 
-        // Check file size - skip very large images (>10MB)
+        // Sanity cap only — anything below it is read and downscaled to fit the
+        // inline budget further down. The old 10 MB cutoff silently dropped
+        // ordinary phone photos (routinely 10-20 MB) BEFORE the downscaler ever
+        // ran, so the model answered without seeing the image.
         $fileSize = filesize($absolutePath);
-        if ($fileSize > 10 * 1024 * 1024) {
+        if ($fileSize > self::MAX_VISION_FILE_BYTES) {
             $this->logger->warning('ChatHandler: Image too large for vision API', [
                 'path' => $relativePath,
                 'size_mb' => round($fileSize / 1024 / 1024, 2),
