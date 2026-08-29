@@ -35,9 +35,40 @@
   --color-success: var(--status-success);
 }
 
+/*
+ * Phone chrome vs desktop rail — keep in lockstep with
+ * `PHONE_CHROME_MQ` / `DESKTOP_CHROME_MQ` in usePhoneChrome.ts.
+ *
+ * A landscape phone is wider than Tailwind `md` (768px) but only ~390px
+ * tall. Showing the 80px desktop rail there clips the icons behind the
+ * chat card once the notch safe-area eats the fixed width. Keep the
+ * hamburger + push-drawer whenever the viewport is narrow OR short.
+ */
+.v2-desktop-chrome {
+  display: none !important;
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .v2-desktop-chrome {
+    display: flex !important;
+  }
+}
+@media (min-width: 768px) and (min-height: 520px) {
+  .v2-phone-chrome {
+    display: none !important;
+  }
+}
+
+/* Rail width includes the landscape notch so icons are never clipped when
+   the desktop chrome is showing (iPad landscape, notched desktops). */
+.v2-sidebar-rail {
+  box-sizing: border-box;
+  width: calc(80px + env(safe-area-inset-left, 0px));
+  min-width: calc(80px + env(safe-area-inset-left, 0px));
+}
+
 /* Mobile floating header button clearance — pushes titles below the button.
    Excluded: ChatView (page-chat) where messages scroll behind the button. */
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 519px) {
   [data-testid='section-primary-content'] > :first-child:not([data-testid='page-chat']) {
     padding-top: calc(env(safe-area-inset-top, 0px) + 62px);
   }
