@@ -87,7 +87,7 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     private function generateContent(array $messages): string
     {
         $lastMessage = end($messages);
-        $userContent = $lastMessage['content'] ?? 'hello';
+        [$userContent, $imageCount] = $this->flattenContent($lastMessage['content'] ?? 'hello');
         $userMessage = strtolower($userContent);
 
         $systemContent = 'system' === $messages[0]['role'] ? ($messages[0]['content'] ?? '') : '';
@@ -113,6 +113,18 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
         if (str_contains($systemContent, 'search') && str_contains($systemContent, 'query')) {
             return $this->mockSearchQueryExtraction($userContent);
+        }
+
+        // Vision request: the message carries inline image parts. Answer with
+        // a deterministic description BEFORE the image-GENERATION keyword
+        // branch below — prompts like "Describe what you see in this image"
+        // contain "image" and would otherwise trigger the picsum placeholder.
+        if ($imageCount > 0) {
+            return sprintf(
+                'Test image analysis: I can see %d attached image%s. This is a deterministic mock description from the test provider.',
+                $imageCount,
+                1 === $imageCount ? '' : 's'
+            );
         }
 
         // Image generation keywords
@@ -154,6 +166,44 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
 
         return "**You're in demo mode** — no AI provider is connected yet, so this is a canned reply to your message '{$userMessage}'{$contextInfo}.\n\n"
             .$this->demoSetupFooter();
+    }
+
+    /**
+     * Flatten a chat message's content to plain text.
+     *
+     * Once a vision-capable model is selected, ChatHandler sends the same
+     * multimodal shape real providers receive: an array of parts
+     * (['type' => 'text', ...] / ['type' => 'image_url', ...]). The mock must
+     * accept that shape too — assuming a plain string crashed with a
+     * TypeError (strtolower on an array) that surfaced as an HTTP 500 on the
+     * WhatsApp image webhook.
+     *
+     * @return array{0: string, 1: int} [flattened text, number of image parts]
+     */
+    private function flattenContent(mixed $content): array
+    {
+        if (is_string($content)) {
+            return [$content, 0];
+        }
+
+        if (!is_array($content)) {
+            return ['', 0];
+        }
+
+        $textParts = [];
+        $imageCount = 0;
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            if ('text' === ($part['type'] ?? null) && is_string($part['text'] ?? null)) {
+                $textParts[] = $part['text'];
+            } elseif ('image_url' === ($part['type'] ?? null)) {
+                ++$imageCount;
+            }
+        }
+
+        return [implode("\n", $textParts), $imageCount];
     }
 
     /**

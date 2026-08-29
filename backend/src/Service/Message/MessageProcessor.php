@@ -574,7 +574,11 @@ final readonly class MessageProcessor
             }
 
             return $errorResult;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            // \Throwable (not \Exception) to match process(): a TypeError in a
+            // provider must degrade to an error result the caller can handle
+            // (SSE error event, WhatsApp error reply) instead of escaping as
+            // an HTML 500 — see the WhatsApp image webhook regression.
             $this->logger->error('Message processing failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
