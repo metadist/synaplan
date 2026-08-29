@@ -13,6 +13,14 @@ use Psr\Log\LoggerInterface;
  */
 final class SttSessionStore
 {
+    /**
+     * Per-process re-entrancy table so append → commit → save on the same
+     * session does not deadlock. flock() is not re-entrant across fds.
+     *
+     * @var array<string, resource>
+     */
+    private array $heldLocks = [];
+
     public function __construct(
         private readonly RedisService $redis,
         private readonly LoggerInterface $logger,
@@ -135,10 +143,22 @@ final class SttSessionStore
     }
 
     /**
-     * @param callable(): void $callback
+     * Serialize work on one session. Re-entrant in-process so append → commit
+     * → save does not deadlock.
+     *
+     * @template T
+     *
+     * @param callable(): T $callback
+     *
+     * @return T
      */
-    public function withLock(string $sessionId, callable $callback): void
+    public function withLock(string $sessionId, callable $callback): mixed
     {
+        $id = $this->safeId($sessionId);
+        if (isset($this->heldLocks[$id])) {
+            return $callback();
+        }
+
         $dir = $this->sessionDir($sessionId);
         if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
             throw new \RuntimeException('Failed to create STT session directory');
@@ -149,14 +169,18 @@ final class SttSessionStore
             throw new \RuntimeException('Failed to open STT session lock');
         }
 
+        if (!flock($handle, LOCK_EX)) {
+            fclose($handle);
+            throw new \RuntimeException('Failed to lock STT session');
+        }
+
+        $this->heldLocks[$id] = $handle;
         try {
-            if (!flock($handle, LOCK_EX)) {
-                throw new \RuntimeException('Failed to lock STT session');
-            }
-            $callback();
+            return $callback();
         } finally {
             flock($handle, LOCK_UN);
             fclose($handle);
+            unset($this->heldLocks[$id]);
         }
     }
 
@@ -254,11 +278,29 @@ final class SttSessionStore
             return;
         }
 
-        $ids = $this->readIndex($path);
-        if (!in_array($sessionId, $ids, true)) {
-            $ids[] = $sessionId;
+        $handle = fopen($path.'.lock', 'c');
+        if (false === $handle) {
+            $this->logger->warning('STT session index lock could not be opened', ['path' => $path]);
+
+            return;
         }
 
-        file_put_contents($path, json_encode($ids, JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX);
+        try {
+            if (!flock($handle, LOCK_EX)) {
+                throw new \RuntimeException('Failed to lock STT session index');
+            }
+
+            $ids = $this->readIndex($path);
+            if (!in_array($sessionId, $ids, true)) {
+                $ids[] = $sessionId;
+            }
+
+            if (false === file_put_contents($path, json_encode($ids, JSON_INVALID_UTF8_SUBSTITUTE), LOCK_EX)) {
+                throw new \RuntimeException('Failed to write STT session index');
+            }
+        } finally {
+            flock($handle, LOCK_UN);
+            fclose($handle);
+        }
     }
 }

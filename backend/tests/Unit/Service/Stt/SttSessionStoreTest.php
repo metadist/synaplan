@@ -75,6 +75,26 @@ final class SttSessionStoreTest extends TestCase
         $this->assertNull($this->store->get('stt_sess_missing'));
     }
 
+    public function testReentrantLockDoesNotDeadlockOnNestedSave(): void
+    {
+        $session = $this->session('stt_sess_lock', '123', 1);
+        $this->store->save($session);
+
+        $result = $this->store->withLock('stt_sess_lock', function () use ($session): string {
+            $session->text = 'first';
+            $this->store->save($session);
+            $session->text = 'second';
+            $this->store->save($session);
+
+            return 'ok';
+        });
+
+        $this->assertSame('ok', $result);
+        $loaded = $this->store->get('stt_sess_lock');
+        $this->assertNotNull($loaded);
+        $this->assertSame('second', $loaded->text);
+    }
+
     private function session(string $id, string $clientId, int $apiKeyId): SttSession
     {
         $now = time();

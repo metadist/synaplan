@@ -163,37 +163,52 @@ final readonly class SttSessionService
             throw new \InvalidArgumentException(sprintf('Audio chunk is too large (%d bytes, max %d)', strlen($chunk), self::MAX_CHUNK_BYTES));
         }
 
-        $session = $this->getOwned($sessionId, $apiKeyId);
-        $this->assertOpen($session);
-
-        $pendingPath = $this->assembler->pendingPath($this->store->sessionDir($session->id));
-        if ($session->pendingBytes + strlen($chunk) > self::MAX_PENDING_BYTES && $session->pendingBytes > 0) {
-            $this->commit($user, $apiKeyId, $session->id, false);
+        /** @var array{session: SttSession, committed: bool, bytes_appended: int} $result */
+        $result = $this->store->withLock($sessionId, function () use ($user, $apiKeyId, $sessionId, $chunk, $commit): array {
             $session = $this->getOwned($sessionId, $apiKeyId);
-        }
-        if ($session->pendingBytes + strlen($chunk) > self::MAX_PENDING_BYTES) {
-            throw new \InvalidArgumentException('Audio chunk exceeds the pending buffer limit');
-        }
+            $this->assertOpen($session);
 
-        $written = $this->assembler->append($pendingPath, $chunk);
-        $session = $this->getOwned($sessionId, $apiKeyId);
-        $session->bytesReceived += $written;
-        $session->pendingBytes = $this->assembler->pendingSize($pendingPath);
-        $this->store->save($session);
+            $pendingPath = $this->assembler->pendingPath($this->store->sessionDir($session->id));
+            if ($session->pendingBytes + strlen($chunk) > self::MAX_PENDING_BYTES && $session->pendingBytes > 0) {
+                $this->commitLocked($user, $apiKeyId, $session->id, false);
+                $session = $this->getOwned($sessionId, $apiKeyId);
+            }
+            if ($session->pendingBytes + strlen($chunk) > self::MAX_PENDING_BYTES) {
+                throw new \InvalidArgumentException('Audio chunk exceeds the pending buffer limit');
+            }
 
-        $shouldCommit = $commit || $session->pendingBytes >= $session->commitAfterBytes;
-        if ($shouldCommit) {
-            $session = $this->commit($user, $apiKeyId, $session->id, false);
-        }
+            $written = $this->assembler->append($pendingPath, $chunk);
+            $session = $this->getOwned($sessionId, $apiKeyId);
+            $session->bytesReceived += $written;
+            $session->pendingBytes = $this->assembler->pendingSize($pendingPath);
+            $this->store->save($session);
 
-        return [
-            'session' => $session,
-            'committed' => $shouldCommit,
-            'bytes_appended' => $written,
-        ];
+            $shouldCommit = $commit || $session->pendingBytes >= $session->commitAfterBytes;
+            if ($shouldCommit) {
+                $session = $this->commitLocked($user, $apiKeyId, $session->id, false);
+            }
+
+            return [
+                'session' => $session,
+                'committed' => $shouldCommit,
+                'bytes_appended' => $written,
+            ];
+        });
+
+        return $result;
     }
 
     public function commit(User $user, int $apiKeyId, string $sessionId, bool $close = false): SttSession
+    {
+        /** @var SttSession $session */
+        $session = $this->store->withLock($sessionId, function () use ($user, $apiKeyId, $sessionId, $close): SttSession {
+            return $this->commitLocked($user, $apiKeyId, $sessionId, $close);
+        });
+
+        return $session;
+    }
+
+    private function commitLocked(User $user, int $apiKeyId, string $sessionId, bool $close): SttSession
     {
         $session = $this->getOwned($sessionId, $apiKeyId);
         $this->assertOpen($session);
@@ -288,12 +303,17 @@ final readonly class SttSessionService
 
     public function close(int $apiKeyId, string $sessionId): SttSession
     {
-        $session = $this->getOwned($sessionId, $apiKeyId);
-        if (!$session->isOpen()) {
-            return $session;
-        }
+        /** @var SttSession $session */
+        $session = $this->store->withLock($sessionId, function () use ($apiKeyId, $sessionId): SttSession {
+            $session = $this->getOwned($sessionId, $apiKeyId);
+            if (!$session->isOpen()) {
+                return $session;
+            }
 
-        return $this->closeSession($session);
+            return $this->closeSession($session);
+        });
+
+        return $session;
     }
 
     /**
