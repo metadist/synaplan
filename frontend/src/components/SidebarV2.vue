@@ -1,13 +1,10 @@
 <template>
   <!--
-    Desktop navigation rail (§4.3 #1). On mobile the rail does not exist —
-    the bottom tab bar (MobileNav.vue) is the primary navigation there.
+    Desktop navigation rail (§4.3 #1). Hidden on phone chrome (narrow or
+    short / landscape-phone viewports — see usePhoneChrome.ts); the push-drawer
+    is the primary navigation there.
   -->
-  <aside
-    class="v2-sidebar-rail hidden md:flex flex-col"
-    style="width: 80px; min-width: 80px"
-    data-testid="comp-sidebar-v2"
-  >
+  <aside class="v2-sidebar-rail v2-desktop-chrome flex-col" data-testid="comp-sidebar-v2">
     <!-- Brand logo -->
     <div
       class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"

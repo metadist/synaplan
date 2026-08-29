@@ -6,6 +6,7 @@ use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Exception\StreamCancelledException;
+use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -64,6 +65,7 @@ class MessageProcessorTest extends TestCase
             $this->promptService,
             $this->braveSearchService,
             $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
             $this->createMock(UrlContentService::class),
             $this->logger,
             $this->createMock(MultitaskRoutingConfig::class),

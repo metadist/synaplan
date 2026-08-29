@@ -27,15 +27,16 @@ const CHAT = selectors.chat
 const MIN_TARGET_PX = 44
 
 /**
- * Tailwind `md` — the rail exists only at >= md; below it the mobile
- * push-drawer (MobileNav, opened via the top-left toggle) is the primary
- * navigation.
+ * Phone chrome — matches `isPhoneChromeSize` in usePhoneChrome.ts: the
+ * rail exists only when the viewport is both ≥768px wide AND ≥520px tall.
+ * Landscape phones (wide but short) keep the push-drawer.
  */
 const MOBILE_MAX_WIDTH = 768
+const PHONE_CHROME_MAX_HEIGHT = 520
 
 function isMobileViewport(page: Page): boolean {
   const size = page.viewportSize()
-  return size !== null && size.width < MOBILE_MAX_WIDTH
+  return size !== null && (size.width < MOBILE_MAX_WIDTH || size.height < PHONE_CHROME_MAX_HEIGHT)
 }
 
 /** App-mode switch, same mechanism navigation.spec.ts uses. */
@@ -143,6 +144,18 @@ async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' |
 }
 
 test.describe('@ci @layout UI guard — chat surface', () => {
+  test('landscape phone keeps the drawer and hides the clipped rail', async ({ page }) => {
+    // iPhone 14 landscape CSS pixels — wide enough for Tailwind `md`, short
+    // enough that the 80px rail used to peek out from behind the chat card.
+    await page.setViewportSize({ width: 844, height: 390 })
+    await openApp(page)
+
+    await expect(page.locator(NAV.mobileDrawerToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(page.locator(NAV.sidebar)).toBeHidden()
+    await expectNoHorizontalOverflow(page, 'landscape-phone chat')
+    await expectInsideViewport(page, CHAT.textInput, 'landscape-phone chat input')
+  })
+
   test('chat page has no overflow and input is reachable', async ({ page }) => {
     await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat')
@@ -217,7 +230,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
   })
 
   test('More section expands with accordion sections and 44px rows (mobile)', async ({ page }) => {
-    test.skip(!isMobileViewport(page), 'the push-drawer exists only below md')
+    test.skip(!isMobileViewport(page), 'the push-drawer exists only on phone chrome')
 
     await openApp(page)
     await ensureAdvancedMode(page)

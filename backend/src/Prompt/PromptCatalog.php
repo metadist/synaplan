@@ -355,6 +355,21 @@ This is the list, use only this:
    - Math, logic, translations, grammar, or rephrasing
    - Stable general knowledge (definitions, history, science, "what is the capital of France")
    - Summarizing, analysing, or answering about text/files the user already provided
+   - **Questions answerable from an attached file alone.** When the message
+     carries an attachment (BATTACHED_FILES / BATTACHED_COUNT is set, or
+     BFILETYPE / BFILETEXT is filled) and the text only asks to describe,
+     identify, read, summarize, translate, compare, or extract from it —
+     "what is that?", "was ist das?", "what do you see?", "describe this",
+     "summarize this document" — the vision/analysis model answers from the
+     file itself: set BWEBSEARCH to 0.
+
+   **Attachment + live information = search.** When the message carries an
+   attachment AND answering needs fresh external information ABOUT what the
+   file shows or says — "how much does this cost?" (photo of a product),
+   "where can I buy this?", "is this contract clause still legal?", "what do
+   reviews say about it?" — set BWEBSEARCH to 1. Do NOT worry that the text
+   is deictic ("this/that/das"): the system analyzes the file first and
+   builds the search phrase from its content, not from the literal words.
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
@@ -389,6 +404,10 @@ This is the list, use only this:
    - "Make this photo look like a painting" → mediamaker
    - "Replace the background with a beach" → mediamaker
    - "What is in this image?" → general
+   - "What is that?" → general, BWEBSEARCH: 0 ("that" is the attached image — vision answers from the file)
+   - "Was ist das?" → general, BWEBSEARCH: 0
+   - "How much does this cost?" → general, BWEBSEARCH: 1 (needs live prices for the thing shown — the system searches using the file's content)
+   - "Wo kann ich das kaufen?" → general, BWEBSEARCH: 1
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
@@ -1437,6 +1456,7 @@ Your task is to analyze the user's question and generate a concise, effective se
 6. Maintain the original language of the question
 7. Keep the query concise (typically 3-8 words)
 8. Return ONLY the search query, no explanations or additional text
+9. If the input contains an "Attached file content" section, the question refers to THAT file (an uploaded image, document, audio or video). Resolve every reference ("this", "that", "it", "das", "esto") using the file content and build a self-contained query about the file's actual subject. NEVER search for the literal question words in that case.
 
 ## Examples:
 
@@ -1457,6 +1477,18 @@ Search Query: world cup 2022 winner
 
 Question: "How does a quantum computer work?"
 Search Query: quantum computer how it works
+
+Question: "How much does this cost?"
+Attached file content (the question refers to this): "Photo of Sony WH-1000XM6 wireless noise-cancelling headphones, black"
+Search Query: sony wh-1000xm6 price
+
+Question: "Was ist das für ein Gebäude?"
+Attached file content (the question refers to this): "The Elbphilharmonie concert hall in Hamburg, seen from the harbor"
+Search Query: elbphilharmonie hamburg
+
+Question: "Is this still valid law?"
+Attached file content (the question refers to this): "GENERAL DATA PROTECTION REGULATION (EU) 2016/679 — Article 17, Right to erasure..."
+Search Query: gdpr article 17 current status
 
 Now generate the search query for the following user question:
 PROMPT;

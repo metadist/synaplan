@@ -15,7 +15,7 @@
            expanded card is showing in the empty state below. -->
       <div
         v-if="authStore.isAuthenticated && !needsProviderSetup"
-        class="hidden md:flex items-center gap-2 absolute top-3 right-3 z-30"
+        class="v2-desktop-chrome items-center gap-2 absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
         <ModelMixControl />

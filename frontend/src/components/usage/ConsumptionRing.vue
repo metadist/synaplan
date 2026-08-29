@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
   top: calc(100% + 0.5rem);
 }
 
-/* On phones (< 768 px) center the ring under the fixed top-right incognito
+/* On phone chrome (narrow or short / landscape-phone) center the ring under the fixed top-right incognito
    ("anonymous") toggle (MainLayout: right 0.75rem, top = safe-area-inset-top +
    10px, 40px box). The 48px ring at a 0.5rem right inset lines its centre up
    with the 40px button centre (both at 32px from the edge), and the vertical
@@ -268,7 +268,7 @@ onBeforeUnmount(() => {
    order decides). Otherwise the panel keeps `left: 0` + `right: 0`, stretches
    from the ring's left edge and its content overflows the screen (issue: popup
    opened rightwards off-screen on mobile). */
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 519px) {
   .usage-ring {
     top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
     left: auto;

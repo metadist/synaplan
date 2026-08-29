@@ -10,15 +10,16 @@
     <SidebarV2 />
 
     <!--
-      Mobile push-drawer shell (§4.3): on small screens the content column
-      slides to the right (~85%, leaving a 15% peek) to reveal the drawer
-      underneath. On md+ this is just a plain flex column and the drawer /
-      toggle are hidden — the desktop rail (SidebarV2) stays the navigation.
+      Mobile push-drawer shell (§4.3): on phone chrome (narrow or short /
+      landscape-phone viewports) the content column slides to the right
+      (~85%, leaving a 15% peek) to reveal the drawer underneath. On desktop
+      chrome this is just a plain flex column and the drawer / toggle are
+      hidden — the desktop rail (SidebarV2) stays the navigation.
     -->
     <div class="v2-mobile-shell flex-1 flex min-w-0">
-      <!-- Drawer: sits underneath the sliding content, mobile only -->
+      <!-- Drawer: sits underneath the sliding content, phone chrome only -->
       <aside
-        class="v2-mobile-drawer md:hidden"
+        class="v2-mobile-drawer v2-phone-chrome"
         :aria-hidden="!sidebarStore.mobileDrawerOpen"
         :inert="!sidebarStore.mobileDrawerOpen"
         data-testid="nav-mobile-drawer"
@@ -58,7 +59,7 @@
         <!-- Tap-catcher over the peeking content closes the drawer (mobile only) -->
         <button
           v-if="sidebarStore.mobileDrawerOpen"
-          class="v2-drawer-scrim md:hidden"
+          class="v2-drawer-scrim v2-phone-chrome"
           :aria-label="$t('common.close')"
           data-testid="btn-mobile-drawer-scrim"
           @click="closeDrawer"
@@ -68,7 +69,7 @@
 
     <!-- Mobile drawer toggle (top-left) — primary navigation entry on phones -->
     <button
-      class="v2-drawer-toggle fixed left-3 z-40 md:hidden flex items-center justify-center w-10 h-10 rounded-full surface-card shadow-lg txt-primary active:scale-95 transition-transform"
+      class="v2-drawer-toggle v2-phone-chrome fixed left-3 z-40 flex items-center justify-center w-10 h-10 rounded-full surface-card shadow-lg txt-primary active:scale-95 transition-transform"
       :aria-label="sidebarStore.mobileDrawerOpen ? $t('common.close') : $t('nav.menu')"
       :aria-expanded="sidebarStore.mobileDrawerOpen"
       data-testid="btn-mobile-drawer-toggle"
@@ -82,7 +83,7 @@
          left. Only for signed-out users; hidden while the drawer is open. -->
     <button
       v-if="showLoginButton"
-      class="v2-login-cta fixed right-3 z-40 md:hidden inline-flex items-center gap-1.5 h-10 px-4 rounded-full btn-primary shadow-lg text-sm font-semibold active:scale-95 transition-transform"
+      class="v2-login-cta v2-phone-chrome fixed right-3 z-40 inline-flex items-center gap-1.5 h-10 px-4 rounded-full btn-primary shadow-lg text-sm font-semibold active:scale-95 transition-transform"
       data-testid="btn-mobile-login-cta"
       @click="goToLogin"
     >
@@ -97,7 +98,7 @@
          button hides itself while ChatView shows the expanded mix card. -->
     <div
       v-if="showIncognitoToggle"
-      class="v2-incognito-toggle fixed right-3 z-40 md:hidden flex items-center gap-2"
+      class="v2-incognito-toggle v2-phone-chrome fixed right-3 z-40 flex items-center gap-2"
     >
       <ModelMixControl />
       <IncognitoToggle />
@@ -115,6 +116,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bars3Icon, XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/24/outline'
+import { matchesPhoneChrome } from '../composables/usePhoneChrome'
 import { useSidebarStore } from '../stores/sidebar'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
@@ -184,7 +186,7 @@ let touchStartX = 0
 let touchStartY = 0
 let touchTracking = false
 
-const isMobileViewport = () => window.matchMedia('(max-width: 767px)').matches
+const isMobileViewport = () => matchesPhoneChrome()
 
 /**
  * Walk up from the touch target: if any ancestor can actually scroll
@@ -279,6 +281,14 @@ const removeNavGuard = router.beforeEach((_to, _from, next) => {
 
 const handleEscape = (event: KeyboardEvent) => {
   if (event.key === 'Escape' && sidebarStore.mobileDrawerOpen) {
+    sidebarStore.closeMobileDrawer()
+  }
+}
+
+/** Rotating a phone to a desktop-sized window must not leave the drawer open
+ *  under a rail that is now the only navigation. */
+const closeDrawerOnDesktopChrome = () => {
+  if (!isMobileViewport() && sidebarStore.mobileDrawerOpen) {
     sidebarStore.closeMobileDrawer()
   }
 }
@@ -392,6 +402,7 @@ onMounted(() => {
   document.addEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.addEventListener('pointerdown', scrollToTopOnBandTap)
   window.addEventListener('resize', measureTopTapBand)
+  window.addEventListener('resize', closeDrawerOnDesktopChrome)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
@@ -400,6 +411,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.removeEventListener('pointerdown', scrollToTopOnBandTap)
   window.removeEventListener('resize', measureTopTapBand)
+  window.removeEventListener('resize', closeDrawerOnDesktopChrome)
   removeNavGuard()
 })
 </script>
@@ -437,9 +449,10 @@ onBeforeUnmount(() => {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Mobile-only push-drawer mechanics. On md+ everything below is inert: the
+/* Phone-chrome push-drawer mechanics. Keep in lockstep with PHONE_CHROME_MQ
+   in usePhoneChrome.ts. On desktop chrome everything below is inert: the
    drawer is display:none and the content layer carries no transform. */
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 519px) {
   .v2-mobile-drawer {
     position: absolute;
     inset: 0 auto 0 0;

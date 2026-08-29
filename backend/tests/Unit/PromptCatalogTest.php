@@ -59,6 +59,58 @@ final class PromptCatalogTest extends TestCase
         $this->assertArrayNotHasKey('tool_internet', $metadata, 'general must NOT seed tool_internet — absent = auto (classifier decides)');
     }
 
+    /**
+     * Attachment questions split in two: "upload a photo and ask 'what is
+     * that?'" is answered FROM the file (BWEBSEARCH=0), while "how much does
+     * this cost?" needs live info ABOUT the file's subject (BWEBSEARCH=1 —
+     * the pipeline builds the search phrase from the file content, see
+     * AttachmentSearchContextResolver). Pin both sides of the rule and the
+     * concrete examples smaller models pattern-match on.
+     */
+    public function testSortPromptRoutesAttachmentQuestions(): void
+    {
+        $sort = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:sort' === $entry['topic']) {
+                $sort = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($sort);
+        $prompt = $sort['prompt'];
+
+        $this->assertStringContainsString('Questions answerable from an attached file alone', $prompt);
+        $this->assertStringContainsString('Attachment + live information = search', $prompt);
+        $this->assertStringContainsString('"What is that?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"Was ist das?" → general, BWEBSEARCH: 0', $prompt);
+        $this->assertStringContainsString('"How much does this cost?" → general, BWEBSEARCH: 1', $prompt);
+    }
+
+    /**
+     * The search-query prompt must resolve deictic references against the
+     * "Attached file content" block SearchQueryGenerator sends — otherwise
+     * "what is that?" + photo searches for the literal words again.
+     */
+    public function testSearchPromptResolvesAttachmentReferences(): void
+    {
+        $search = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('tools:search' === $entry['topic']) {
+                $search = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($search);
+        $prompt = $search['prompt'];
+
+        $this->assertStringContainsString('Attached file content', $prompt);
+        $this->assertStringContainsString('NEVER search for the literal question words', $prompt);
+        // Worked example: deictic price question + product photo.
+        $this->assertStringContainsString('sony wh-1000xm6 price', $prompt);
+    }
+
     public function testTopicsAreUniquePerLanguage(): void
     {
         $seen = [];

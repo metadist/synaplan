@@ -54,6 +54,7 @@ final readonly class MessageProcessor
         private PromptService $promptService,
         private BraveSearchService $braveSearchService,
         private SearchQueryGenerator $searchQueryGenerator,
+        private AttachmentSearchContextResolver $attachmentContextResolver,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
         private MultitaskRoutingConfig $multitaskConfig,
@@ -340,14 +341,22 @@ final readonly class MessageProcessor
 
             // Step 2.5: Web Search
             //
-            // Web-search decision (trust the model):
-            //   (a) Prompt opts in (`tool_internet=true`)        → always search.
-            //   (b) Asset/document-generation topic              → never search.
-            //   (c) Prompt opts out (`tool_internet=false`)      → never search.
-            //   (d) Otherwise → trust the classifier's BWEBSEARCH vote. The AI
-            //       sorter judges whether the message needs live information;
-            //       the fast-path (no model call) carries no vote, so trivial
-            //       chats stay fast and skip the search round-trip.
+            // Mirrors WebSearchTopicPolicy::shouldSearch() precedence:
+            //   (1) Prompt opts out (`tool_internet=false`)      → never search
+            //       (hard disable; beats the per-message toggle).
+            //   (2) User requested search for THIS message       → always search
+            //       (chat toggle / `/search`).
+            //   (3) Prompt opts in (`tool_internet=true`)        → always search.
+            //   (4) Asset/document-generation topic              → never search.
+            //   (5) Otherwise → trust the classifier's BWEBSEARCH vote, vetoed
+            //       for trivial greetings. The fast-path carries no vote, so
+            //       those chats skip the search round-trip.
+            //
+            // When the message refers to an attached/selected file ("what is
+            // that?" + photo, "is this still valid?" + contract PDF), the
+            // search query is built from the FILE's content — extracted text,
+            // transcript, or a vision identification — never from the literal
+            // question words (which would search "what is that").
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
@@ -356,6 +365,8 @@ final readonly class MessageProcessor
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
+                && WebSearchTopicPolicy::refersToAttachment($messageText);
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
@@ -369,6 +380,7 @@ final readonly class MessageProcessor
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
+                'needs_attachment_context' => $needsAttachmentContext,
                 'brave_enabled' => $braveEnabled,
             ]);
 
@@ -379,6 +391,27 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            $attachmentContext = null;
+            if ($needsAttachmentContext && $braveEnabled) {
+                $perfTimer->start('search_attachment_context');
+                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
+                $perfTimer->stop('search_attachment_context');
+
+                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                    // The question is about the attachment but its content
+                    // could not be resolved (no extracted text, vision
+                    // unavailable/failed). A purely vote-triggered search
+                    // would query the literal deictic words — guaranteed
+                    // garbage — so drop it; the answer model still analyzes
+                    // the file. An explicit user request / prompt opt-in
+                    // keeps searching with the raw text (deliberate choice).
+                    $shouldSearch = false;
+                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
+                        'message_id' => $message->getId(),
+                    ]);
+                }
+            }
+
             if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
@@ -387,7 +420,8 @@ final readonly class MessageProcessor
                     $perfTimer->start('search_query');
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
-                        $message->getUserId()
+                        $message->getUserId(),
+                        $attachmentContext
                     );
                     $perfTimer->stop('search_query');
 
@@ -821,6 +855,8 @@ final readonly class MessageProcessor
             $messageText = $message->getText();
             $shouldSearch = WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
             $triggerReason = $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+            $needsAttachmentContext = $shouldSearch && $message->hasFiles()
+                && WebSearchTopicPolicy::refersToAttachment($messageText);
 
             $braveEnabled = $this->braveSearchService->isEnabled();
             $this->logger->info('MessageProcessor: Web search decision', [
@@ -832,6 +868,7 @@ final readonly class MessageProcessor
                 'classifier_web_search_hint' => $classification['web_search'] ?? null,
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
+                'needs_attachment_context' => $needsAttachmentContext,
                 'brave_enabled' => $braveEnabled,
                 'pipeline' => 'process',
             ]);
@@ -844,13 +881,30 @@ final readonly class MessageProcessor
                 ]);
             }
 
+            $attachmentContext = null;
+            if ($needsAttachmentContext && $braveEnabled) {
+                $attachmentContext = $this->attachmentContextResolver->resolve($message, $message->getUserId());
+
+                if (null === $attachmentContext && !$userRequestedSearch && true !== $promptToolInternet) {
+                    // See processStream(): a vote-only search whose referent
+                    // lives in an unresolvable attachment would query the
+                    // literal deictic words — drop it.
+                    $shouldSearch = false;
+                    $this->logger->info('MessageProcessor: Skipping vote-triggered web search — attachment referent unresolvable', [
+                        'message_id' => $message->getId(),
+                        'pipeline' => 'process',
+                    ]);
+                }
+            }
+
             if ($shouldSearch && $braveEnabled) {
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
-                        $message->getUserId()
+                        $message->getUserId(),
+                        $attachmentContext
                     );
 
                     $language = $this->resolveSearchLanguage($classification, $message);
