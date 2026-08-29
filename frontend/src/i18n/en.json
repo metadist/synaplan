@@ -715,6 +715,7 @@
     "plusMenu": {
       "label": "Add",
       "attach": "Attach files",
+      "photo": "Take photo",
       "model": "Model",
       "tools": "Tools",
       "knowledge": "Knowledge folder"

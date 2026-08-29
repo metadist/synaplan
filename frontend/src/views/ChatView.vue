@@ -188,10 +188,7 @@
               <ModelMixPanel @select="dismissInlineMixPanel" />
             </div>
 
-            <ExamplePrompts
-              v-if="!incognitoStore.active && !configStore.marketingNews.enabled"
-              @pick="handleExamplePick"
-            />
+            <ExamplePrompts v-if="showExamplePrompts" @pick="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -281,10 +278,11 @@
       />
 
       <!-- Single composer, always docked at the bottom. On the empty landing
-           the messages area shows only the welcome hero + example prompts;
-           keeping the input at the bottom (instead of a centered hero composer)
-           means the "+" menu and its dropdowns always open upward with room and
-           are never clipped by the chat container's overflow (issue #1285). -->
+           the messages area shows the welcome hero (plus example prompts for
+           anonymous users); keeping the input at the bottom (instead of a
+           centered hero composer) means the "+" menu and its dropdowns always
+           open upward with room and are never clipped by the chat container's
+           overflow (issue #1285). -->
       <ChatInput
         v-if="!needsProviderSetup"
         ref="chatInputRef"
@@ -687,6 +685,11 @@ const isEmptyLanding = computed(
     !(guestStore.initFailed && !authStore.isAuthenticated) &&
     historyStore.messages.length === 0 &&
     !historyStore.isLoadingMessages
+)
+
+// Guest landing only — signed-in empty chats keep the greeting, no teaser cards.
+const showExamplePrompts = computed(
+  () => !authStore.isAuthenticated && !incognitoStore.active && !configStore.marketingNews.enabled
 )
 
 // Runtime-config first-run signal: the default chat model has no usable

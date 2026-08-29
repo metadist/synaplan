@@ -204,6 +204,19 @@
                   <span class="font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
                 </button>
 
+                <!-- One-tap photo path: opens the OS camera directly on mobile
+                 (via the `capture` input below) and an image-filtered picker on
+                 desktop — no detour through the file-manager modal. -->
+                <button
+                  type="button"
+                  class="pill text-xs md:text-sm self-start"
+                  data-testid="btn-plus-photo"
+                  @click="handlePlusPhoto"
+                >
+                  <Icon icon="mdi:camera-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span class="font-medium">{{ $t('chatInput.plusMenu.photo') }}</span>
+                </button>
+
                 <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
                      above (and the real Model/Tools/Knowledge triggers in the
                      authenticated branch below) for a consistent list. -->
@@ -267,6 +280,20 @@
                 class="hidden"
                 accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
                 data-testid="input-chat-file"
+                @change="handleFileSelect"
+              />
+
+              <!-- Camera capture input for the "Take photo" shortcut. `capture`
+                 opens the rear camera directly on mobile; desktop browsers
+                 ignore it and show an image-filtered file picker. Uploads go
+                 through the same pipeline as paste/drag (no file modal). -->
+              <input
+                ref="cameraInputRef"
+                type="file"
+                class="hidden"
+                accept="image/*,.heic,.heif"
+                capture="environment"
+                data-testid="input-chat-camera"
                 @change="handleFileSelect"
               />
             </div>
@@ -430,6 +457,7 @@ const keyboardOpen = useKeyboardOpen()
 
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
+const cameraInputRef = ref<HTMLInputElement | null>(null)
 
 const togglePlusMenu = () => {
   triggerHapticImpact('light')
@@ -444,6 +472,16 @@ const handlePlusAttach = () => {
     return
   }
   triggerFileUpload()
+}
+
+const handlePlusPhoto = () => {
+  plusMenuOpen.value = false
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
+  if (uploading.value) return
+  cameraInputRef.value?.click()
 }
 
 const handlePlusGate = (key: string) => {

@@ -754,6 +754,7 @@
     "plusMenu": {
       "label": "Añadir",
       "attach": "Adjuntar archivos",
+      "photo": "Tomar foto",
       "model": "Modelo",
       "tools": "Herramientas",
       "knowledge": "Carpeta de conocimiento"
