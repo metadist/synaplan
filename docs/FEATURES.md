@@ -104,6 +104,15 @@ Extract content from:
 | Images (PNG, JPEG, etc.) | Tesseract OCR |
 | Audio (MP3, WAV, etc.) | Whisper.cpp |
 
+## External speech-to-text API
+
+Local programs can transcribe against any configured SOUND2TEXT model (whisper.cpp, Groq, OpenAI, Mistral, …) with a Synaplan API key:
+
+- **One-shot** — OpenAI-compatible `POST /v1/audio/transcriptions`
+- **Streaming sessions** — `client_id` + `api_key_id` so client 123 and client 321 on the same key stay isolated; audio chunks in, SSE or poll for transcripts
+
+→ [OpenAI-compatible API](OPENAI_COMPATIBLE_API.md)
+
 ## File Management
 
 - Upload and organize files

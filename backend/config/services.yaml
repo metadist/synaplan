@@ -545,6 +545,11 @@ services:
     App\Realtime\Publisher\RealtimePublisherInterface:
         alias: App\Realtime\Publisher\CentrifugoPublisher
 
+    App\Service\Stt\SttSessionStore:
+        arguments:
+            $storageDir: '%kernel.project_dir%/var/stt'
+            $ttlSeconds: 7200
+
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
         arguments:
