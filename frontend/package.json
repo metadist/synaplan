@@ -86,7 +86,7 @@
     "@vue/test-utils": "2.4.11",
     "autoprefixer": "10.5.4",
     "dotenv": "17.4.2",
-    "eslint": "10.9.0",
+    "eslint": "10.9.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.10.0",
     "globals": "17.11.0",
