@@ -8,13 +8,9 @@ const NAV = selectors.nav
 const SET = selectors.settings
 const USR = selectors.userMenu
 
-/**
- * "Easy Mode" was removed in Release 4.0 — the full (advanced) navigation is
- * now the only mode. This just waits until the sidebar's advanced-only rail
- * items are present, so tests that rely on Channels/AI Setup are stable.
- */
+/** Wait until the signed-in Work + Manage rail is painted. */
 async function ensureNavReady(page: Page) {
-  await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(page.locator(NAV.sidebarV2Manage)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
 /** Avatar menu → Preferences → /settings page. */
@@ -25,7 +21,7 @@ async function openPreferences(page: Page) {
   await expect(page.locator(SET.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 }
 
-/** Open a rail flyout (Channels / AI Setup / Admin) and wait for it. */
+/** Open a rail flyout (Manage / Operate) and wait for it. */
 async function openFlyout(page: Page, railItemSelector: string) {
   await page.locator(railItemSelector).click()
   const flyout = page.locator(NAV.navDropdown)
@@ -33,20 +29,31 @@ async function openFlyout(page: Page, railItemSelector: string) {
   return flyout
 }
 
+/** Open Manage, then a named group (channels, assistants, …) in the second flyout. */
+async function openManageGroup(page: Page, groupKey: string) {
+  await openFlyout(page, NAV.sidebarV2Manage)
+  await page.locator(NAV.flyoutGroup(groupKey)).click()
+  const sub = page.locator(NAV.navSubDropdown)
+  await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
+  return sub
+}
+
 test.describe('Navigation: Sidebar basics (non-admin)', () => {
-  test('@ci Sidebar shows all primary rail items (Channels + AI Setup always present)', async ({
+  test('@ci Sidebar shows Work + Manage (no leftover Channels / AI Setup pair)', async ({
     page,
   }) => {
     await test.step('Arrange: login', async () => {
       await openApp(page)
     })
 
-    await test.step('Assert: primary + advanced items all visible (no Easy Mode)', async () => {
+    await test.step('Assert: everyday rail is New / History / Sources / Manage', async () => {
       await expect(page.locator(NAV.sidebar)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(NAV.sidebarV2NewChat)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2ChatNav)).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(page.locator(NAV.sidebarV2Files)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(page.locator(NAV.sidebarV2Channels)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await expect(page.locator(NAV.sidebarV2AiSetup)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(NAV.sidebarV2Manage)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator('[data-testid="btn-sidebar-v2-nav-channels"]')).toHaveCount(0)
+      await expect(page.locator('[data-testid="btn-sidebar-v2-nav-ai-setup"]')).toHaveCount(0)
     })
   })
 
@@ -96,76 +103,92 @@ test.describe('Navigation: Sidebar basics (non-admin)', () => {
 })
 
 test.describe('Navigation: Rail flyouts (non-admin)', () => {
-  test('@ci Channels flyout opens with child links', async ({ page }) => {
+  test('@ci Manage flyout opens with group entries, not a flat dump', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
       await openApp(page)
       await ensureNavReady(page)
     })
 
-    await test.step('Act+Assert: Channels flyout shows its links', async () => {
-      const flyout = await openFlyout(page, NAV.sidebarV2Channels)
-      await expect(flyout.locator(NAV.flyoutLinkInbound)).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
+    await test.step('Act+Assert: first flyout lists groups only', async () => {
+      const flyout = await openFlyout(page, NAV.sidebarV2Manage)
+      await expect(flyout.locator(NAV.flyoutGroup('assistants'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('channels'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('connections'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('api'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('automations'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('tools'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
+      await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
+    })
+
+    await test.step('Act+Assert: Channels submenu shows inbound, widgets, live support', async () => {
+      await page.locator(NAV.flyoutGroup('channels')).click()
+      const sub = page.locator(NAV.navSubDropdown)
+      await expect(sub).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(sub.locator(NAV.flyoutLinkInbound)).toBeVisible()
+      await expect(sub.locator(NAV.flyoutLinkChatWidget)).toBeVisible()
+      await expect(sub.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
+    })
+
+    await test.step('Act+Assert: API submenu shows API docs', async () => {
+      await page.locator(NAV.flyoutGroup('api')).click()
+      const sub = page.locator(NAV.navSubDropdown)
+      await expect(sub.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
     })
   })
 
-  // Connections and Saved Tasks are both gated behind features.savedTasks
-  // (SAVEDTASKS.ENABLED) but live in different flyouts since the nav restructure:
-  // Connections under Channels, Saved Tasks under AI Setup & Tools. The test
-  // stack runs app:seed, which seeds the global flag ON, so both must render. If
-  // this fails, check the seeded default before touching the test.
-  test('@ci Saved Tasks and Connections appear when enabled', async ({ page }) => {
+  // Connections and Saved Tasks are gated behind features.savedTasks
+  // (SAVEDTASKS.ENABLED). Both now live under Manage groups. The test
+  // stack runs app:seed, which seeds the global flag ON, so both must render.
+  test('@ci Saved Tasks and Connections appear in Manage when enabled', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
       await openApp(page)
       await ensureNavReady(page)
     })
 
-    await test.step('Assert: Connections lives in the Channels flyout', async () => {
-      const channels = await openFlyout(page, NAV.sidebarV2Channels)
-      await expect(channels.locator(NAV.flyoutLinkConnections)).toBeVisible()
-      // Dismiss via the backdrop; its overlay would otherwise intercept the
-      // click that opens the next flyout.
-      await page.locator(NAV.navOverlay).click()
-      await expect(channels).toBeHidden({ timeout: TIMEOUTS.SHORT })
+    await test.step('Assert: Connections lives under the Connections group', async () => {
+      const connections = await openManageGroup(page, 'connections')
+      await expect(connections.locator(NAV.flyoutLinkConnections)).toBeVisible()
     })
 
-    await test.step('Assert: Saved Tasks lives in the AI Setup & Tools flyout', async () => {
-      const aiSetup = await openFlyout(page, NAV.sidebarV2AiSetup)
-      await expect(aiSetup.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
-    })
-
-    await test.step('Act: Saved Tasks link navigates to /channels/tasks', async () => {
-      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkSavedTasks).click()
+    await test.step('Assert: Saved Tasks lives under Automations and navigates', async () => {
+      await page.locator(NAV.flyoutGroup('automations')).click()
+      const automations = page.locator(NAV.navSubDropdown)
+      await expect(automations.locator(NAV.flyoutLinkSavedTasks)).toBeVisible()
+      await automations.locator(NAV.flyoutLinkSavedTasks).click()
       await expect(page).toHaveURL(/\/channels\/tasks/, { timeout: TIMEOUTS.STANDARD })
     })
   })
 
-  test('@ci AI Setup flyout opens with child links', async ({ page }) => {
-    await test.step('Arrange: login and ensure advanced mode', async () => {
+  test('@ci Manage flyout includes models, instructions and email handler', async ({ page }) => {
+    await test.step('Arrange: login', async () => {
       await openApp(page)
       await ensureNavReady(page)
     })
 
-    await test.step('Act+Assert: AI Setup & Tools flyout shows its links', async () => {
-      const flyout = await openFlyout(page, NAV.sidebarV2AiSetup)
-      await expect(flyout.locator(NAV.flyoutLinkAiModels)).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
-      // The IMAP email handler lives under AI Setup & Tools since the
-      // navigation restructure (it is a tool, not an inbound channel).
-      await expect(flyout.locator(NAV.flyoutLinkMailHandler)).toBeVisible()
+    await test.step('Act+Assert: Assistants submenu shows models and instructions', async () => {
+      const assistants = await openManageGroup(page, 'assistants')
+      await expect(assistants.locator(NAV.flyoutLinkAiModels)).toBeVisible()
+      await expect(assistants.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
+    })
+
+    await test.step('Act+Assert: Channels submenu shows email handler', async () => {
+      await page.locator(NAV.flyoutGroup('channels')).click()
+      await expect(
+        page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkMailHandler)
+      ).toBeVisible()
     })
   })
 
-  test('@ci Channels flyout navigates to Chat Widget page', async ({ page }) => {
-    await test.step('Arrange: login, ensure advanced, open flyout', async () => {
+  test('@ci Manage flyout navigates to Chat Widget page', async ({ page }) => {
+    await test.step('Arrange: login, open Channels submenu', async () => {
       await openApp(page)
       await ensureNavReady(page)
-      await openFlyout(page, NAV.sidebarV2Channels)
+      await openManageGroup(page, 'channels')
     })
 
     await test.step('Act: click Chat Widget link', async () => {
-      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkChatWidget).click()
+      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkChatWidget).click()
     })
 
     await test.step('Assert: Widgets page visible', async () => {
@@ -175,15 +198,33 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     })
   })
 
-  test('@ci AI Setup flyout navigates to AI Models page', async ({ page }) => {
-    await test.step('Arrange: login, ensure advanced, open flyout', async () => {
+  test('@ci Manage flyout navigates to Live support', async ({ page }) => {
+    await test.step('Arrange: login, open Channels submenu', async () => {
       await openApp(page)
       await ensureNavReady(page)
-      await openFlyout(page, NAV.sidebarV2AiSetup)
+      await openManageGroup(page, 'channels')
+    })
+
+    await test.step('Act: click Live support', async () => {
+      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkLiveSupport).click()
+    })
+
+    await test.step('Assert: live support URL resolves', async () => {
+      await expect(page).toHaveURL(/\/channels\/widgets\/live-support/, {
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+  })
+
+  test('@ci Manage flyout navigates to AI Models page', async ({ page }) => {
+    await test.step('Arrange: login, open Assistants submenu', async () => {
+      await openApp(page)
+      await ensureNavReady(page)
+      await openManageGroup(page, 'assistants')
     })
 
     await test.step('Act: click AI Models link', async () => {
-      await page.locator(NAV.navDropdown).locator(NAV.flyoutLinkAiModels).click()
+      await page.locator(NAV.navSubDropdown).locator(NAV.flyoutLinkAiModels).click()
     })
 
     await test.step('Assert: AI Models page visible', async () => {

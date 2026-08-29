@@ -40,7 +40,7 @@
           <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
           <button
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
-            aria-label="Remove file"
+            :aria-label="$t('files.removeFile')"
             :disabled="file.processing"
             @click="removeFile(index)"
           >

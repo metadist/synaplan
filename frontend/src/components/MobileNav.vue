@@ -99,47 +99,99 @@
                 </button>
 
                 <div v-if="expandedSection === item.key && item.children" class="pl-4 pb-1">
-                  <!-- Same grouped rendering as the desktop flyout, so the two
-                       surfaces show an identical (up to 3-level) hierarchy. -->
+                  <!-- Same hierarchy as the desktop flyout: grouped items
+                       (Manage) nest under a second accordion; flat lists
+                       (Operate / Plugins) stay one tap away. -->
                   <template
                     v-for="(section, sIdx) in groupNavChildren(item.children)"
-                    :key="section.group ?? sIdx"
+                    :key="section.key ?? section.group ?? sIdx"
                   >
-                    <p
-                      v-if="section.group"
-                      class="px-3 pt-2 pb-1 text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
-                    >
-                      {{ section.group }}
-                    </p>
-                    <router-link
-                      v-for="child in section.items"
-                      :key="child.key"
-                      :to="child.path"
-                      class="v2-drawer-child"
-                      :class="[
-                        route.path === child.path
-                          ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                          : 'txt-secondary',
-                        section.group && 'pl-5',
-                      ]"
-                      :data-nav-active="route.path === child.path ? 'true' : undefined"
-                      :data-testid="`link-mobile-more-${child.key}`"
-                      @click="closeDrawer"
-                    >
-                      <span
-                        class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                    <template v-if="section.key">
+                      <button
+                        type="button"
+                        class="v2-drawer-child w-full"
                         :class="
-                          route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'
+                          expandedGroup === section.key || isGroupCurrent(item.path, section)
+                            ? 'text-[var(--brand)] font-medium'
+                            : 'txt-secondary'
                         "
-                      />
-                      <span class="flex-1 truncate">{{ child.label }}</span>
-                      <span
-                        v-if="child.badge"
-                        class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                        :aria-expanded="expandedGroup === section.key"
+                        :data-testid="`btn-mobile-more-group-${section.key}`"
+                        @click="toggleGroup(section.key)"
                       >
-                        {{ child.badge }}
-                      </span>
-                    </router-link>
+                        <span class="flex-1 text-left truncate">{{ section.group }}</span>
+                        <Icon
+                          icon="mdi:chevron-down"
+                          class="w-4 h-4 flex-shrink-0 transition-transform"
+                          :class="expandedGroup === section.key && 'rotate-180'"
+                          aria-hidden="true"
+                        />
+                      </button>
+                      <div v-if="expandedGroup === section.key" class="pl-3">
+                        <router-link
+                          v-for="child in section.items"
+                          :key="child.key"
+                          :to="child.path"
+                          class="v2-drawer-child"
+                          :class="
+                            route.path === child.path
+                              ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                              : 'txt-secondary'
+                          "
+                          :data-nav-active="route.path === child.path ? 'true' : undefined"
+                          :data-testid="`link-mobile-more-${child.key}`"
+                          @click="closeDrawer"
+                        >
+                          <span
+                            class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            :class="
+                              route.path === child.path
+                                ? 'bg-[var(--brand)]'
+                                : 'bg-current opacity-20'
+                            "
+                          />
+                          <span class="flex-1 truncate">{{ child.label }}</span>
+                          <span
+                            v-if="child.badge"
+                            class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                          >
+                            {{ child.badge }}
+                          </span>
+                        </router-link>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <router-link
+                        v-for="child in section.items"
+                        :key="child.key"
+                        :to="child.path"
+                        class="v2-drawer-child"
+                        :class="
+                          route.path === child.path
+                            ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
+                            : 'txt-secondary'
+                        "
+                        :data-nav-active="route.path === child.path ? 'true' : undefined"
+                        :data-testid="`link-mobile-more-${child.key}`"
+                        @click="closeDrawer"
+                      >
+                        <span
+                          class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          :class="
+                            route.path === child.path
+                              ? 'bg-[var(--brand)]'
+                              : 'bg-current opacity-20'
+                          "
+                        />
+                        <span class="flex-1 truncate">{{ child.label }}</span>
+                        <span
+                          v-if="child.badge"
+                          class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
+                        >
+                          {{ child.badge }}
+                        </span>
+                      </router-link>
+                    </template>
                   </template>
                 </div>
               </div>
@@ -502,7 +554,13 @@ import { useConfigStore } from '../stores/config'
 import { useSidebarStore } from '../stores/sidebar'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, groupNavChildren, type NavItem } from '../composables/useNavItems'
+import {
+  useNavItems,
+  groupNavChildren,
+  isNavChildActive,
+  type NavChildGroup,
+  type NavItem,
+} from '../composables/useNavItems'
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
@@ -526,6 +584,7 @@ const { navItems, isItemActive, isGuestMode } = useNavItems()
 
 const moreExpanded = ref(false)
 const expandedSection = ref<string | null>(null)
+const expandedGroup = ref<string | null>(null)
 const isCreatingChat = ref(false)
 const featureGateOpen = ref(false)
 const featureGateKey = ref('general')
@@ -625,6 +684,14 @@ const handleSectionClick = async (item: NavItem) => {
   closeDrawer()
   await router.push(item.path)
 }
+
+const toggleGroup = (key: string) => {
+  triggerHapticImpact('light')
+  expandedGroup.value = expandedGroup.value === key ? null : key
+}
+
+const isGroupCurrent = (sectionPath: string, section: NavChildGroup): boolean =>
+  section.items.some((child) => isNavChildActive(child, sectionPath, route.path))
 
 const handleNavigate = async (path: string) => {
   closeDrawer()
@@ -778,6 +845,16 @@ const syncExpansionToActiveRoute = () => {
   moreExpanded.value = activeSection !== undefined || accountActive.value
   expandedSection.value =
     activeSection?.children && activeSection.children.length > 0 ? activeSection.key : null
+  if (activeSection?.children) {
+    const match = groupNavChildren(activeSection.children).find(
+      (section) =>
+        section.key &&
+        section.items.some((child) => isNavChildActive(child, activeSection.path, route.path))
+    )
+    expandedGroup.value = match?.key ?? null
+  } else {
+    expandedGroup.value = null
+  }
 }
 
 // Bring the active (deepest) nav entry into view once the sections are expanded.

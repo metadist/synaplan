@@ -25,6 +25,7 @@ import {
   SETUP_ROUTE,
 } from '@/router/setupGate'
 import { i18n } from '@/i18n'
+import { inferNavContext } from '@/router/navContext'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -526,6 +527,10 @@ router.afterEach((to, from) => {
   // load or in-place query/hash updates.
   if (to.path !== from.path) {
     triggerHapticImpact('light')
+  }
+
+  if (!to.meta.context) {
+    to.meta.context = inferNavContext(to.path, to.meta as Record<string, unknown>)
   }
 
   const titleKey = to.meta.titleKey as string | undefined

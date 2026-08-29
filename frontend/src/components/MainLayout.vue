@@ -1,5 +1,12 @@
 <template>
   <div class="flex h-dvh overflow-hidden" data-testid="comp-main-layout">
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-[300] focus:px-3 focus:py-2 focus:rounded-lg btn-primary"
+      data-testid="link-skip-to-content"
+    >
+      {{ $t('common.skipToContent') }}
+    </a>
     <SidebarV2 />
 
     <!--
@@ -39,8 +46,10 @@
         <div class="v2-status-bar-band" aria-hidden="true" data-testid="section-status-bar-band" />
 
         <main
+          id="main-content"
           ref="mainRef"
           class="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+          tabindex="-1"
           data-testid="section-primary-content"
         >
           <slot />

@@ -111,26 +111,26 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Your Widgets",
+    "chatWidget": "Chat widgets",
     "docSummary": "Summarizer",
-    "mailHandler": "IMAP Email Handler",
+    "mailHandler": "Email handler",
     "plugins": "Plugins",
     "files": "Sources",
     "memories": "Memories",
     "feedback": "Feedback",
     "ragSearch": "Search",
     "vectorStorage": "Vector Storage",
-    "configInbound": "Standard Inbound",
-    "configAiModels": "AI Model Config",
+    "configInbound": "Inbound",
+    "configAiModels": "Models",
     "configProviderHiggsfield": "Higgsfield Connection",
-    "configTaskPrompts": "Preconfigured Instructions",
-    "configSortingPrompt": "Routing Config",
+    "configTaskPrompts": "Instructions",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
     "configApiDocs": "API Documentation",
-    "statistics": "Statistics",
+    "statistics": "Usage",
     "settings": "Preferences",
     "profile": "Profile",
-    "admin": "Admin Panel",
+    "admin": "Operate",
     "adminFeatures": "Feature Status",
     "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
@@ -150,7 +150,7 @@
     "mcpServers": "MCP Servers",
     "aiAgents": "AI Agents",
     "connections": "Connections",
-    "savedTasks": "Saved Recurring Tasks",
+    "savedTasks": "Saved tasks",
     "setup": "Setup"
   },
   "adminModelStatus": {
@@ -334,7 +334,9 @@
       "public": "Public"
     },
     "fileOnlyDefaultMessage": "Please review the attached file.",
-    "voiceMessageDefaultMessage": "Please respond to my voice message."
+    "voiceMessageDefaultMessage": "Please respond to my voice message.",
+    "conversation": "conversation",
+    "conversations": "conversations"
   },
   "moderation": {
     "report": {
@@ -385,7 +387,7 @@
     }
   },
   "admin": {
-    "title": "Admin Panel",
+    "title": "Operate",
     "description": "System management and configuration",
     "tabs": {
       "overview": "Overview",
@@ -660,14 +662,14 @@
     "historyDescription": "Chat history",
     "profile": "Profile",
     "tools": "Tools",
-    "toolsChatWidget": "Your Widgets",
+    "toolsChatWidget": "Chat widgets",
     "toolsDocSummary": "Summarizer",
-    "toolsMailHandler": "IMAP Email Handler",
+    "toolsMailHandler": "Email handler",
     "mcpServers": "MCP Servers",
     "connections": "Connections",
     "configConnections": "Configure Connections",
     "groupApi": "API",
-    "savedTasks": "Saved Recurring Tasks",
+    "savedTasks": "Saved tasks",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -678,24 +680,31 @@
     "preferences": "Preferences",
     "account": "Account",
     "accountDescription": "Account & preferences",
-    "configInbound": "Standard Inbound",
-    "configAiModels": "AI Model Config",
-    "configTaskPrompts": "Preconfigured Instructions",
-    "configSortingPrompt": "Routing Config",
+    "configInbound": "Inbound",
+    "configAiModels": "Models",
+    "configTaskPrompts": "Instructions",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
-    "statistics": "Statistics",
+    "statistics": "Usage",
     "subscription": "Subscription",
     "upgrade": "Upgrade",
-    "admin": "Admin",
-    "adminDashboard": "Dashboard",
+    "admin": "Operate",
+    "adminDashboard": "Overview",
     "adminFeatureStatus": "Feature Status",
     "adminModelStatus": "Model Status",
-    "adminSystemConfig": "System Config",
-    "adminProviderSetup": "AI Providers",
+    "adminSystemConfig": "System configuration",
+    "adminProviderSetup": "AI providers",
     "more": "More",
     "moreDescription": "More sections and account",
     "menu": "Menu",
-    "aiAgents": "AI Agents"
+    "aiAgents": "AI Agents",
+    "manage": "Manage",
+    "manageDescription": "Assistants, channels and automations",
+    "groupAssistants": "Assistants",
+    "groupAutomations": "Automations",
+    "groupTools": "Tools",
+    "liveSupport": "Live support",
+    "usage": "Usage"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -1176,7 +1185,7 @@
     "useInChat": "Use in chat",
     "terms": {
       "vectorized": "searchable by AI",
-      "knowledgeGroup": "knowledge group",
+      "knowledgeGroup": "knowledge folder",
       "incoming": "incoming",
       "generated": "AI-generated",
       "notApplicable": "not applicable"
@@ -1222,13 +1231,13 @@
     },
     "help": {
       "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
-      "group": "Knowledge groups bundle files together. When the AI searches a group, it can use every file in it.",
+      "group": "Knowledge folders bundle files together. When the AI searches a folder, it can use every file in it.",
       "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
       "incoming": "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss.",
       "typeFilter": "Show only one kind of file — documents, images, video or audio.",
       "vectorizedFilter": "Filter by whether files are searchable by AI.",
       "reVectorize": "Re-read this file and refresh what the AI knows from it. Use after editing it or if it failed.",
-      "moveGroup": "Move files into another knowledge group. This changes which group the AI searches them in — it doesn't delete anything.",
+      "moveGroup": "Move files into another knowledge folder. This changes which folder the AI searches them in — it doesn't delete anything.",
       "storage": "How much of your storage you've used. AI-generated media counts too, shown separately."
     },
     "empty": {
@@ -1778,7 +1787,7 @@
       "promptContentSubtitle": "Markdown-formatted system message used for this topic.",
       "knowledgeTitle": "Knowledge Base",
       "knowledgeSubtitle": "Link vectorized files for retrieval-augmented context.",
-      "openFileManager": "File Manager",
+      "openFileManager": "Sources",
       "linkedFiles": "Linked files ({n})",
       "noFilesLinked": "No files linked yet",
       "noFilesLinkedHint": "Link files below to add them to this prompt's knowledge base.",
@@ -1787,7 +1796,7 @@
       "searchFilesPlaceholderShort": "Search files...",
       "loadingFiles": "Loading files...",
       "noFilesMatch": "No files match your search.",
-      "noVectorizedFiles": "No vectorized files available. Upload files in the Files page first.",
+      "noVectorizedFiles": "No vectorized files available. Upload files in Sources first.",
       "linked": "Linked",
       "linkFile": "Link",
       "fileMeta": "{chunks} chunks · {date}",
@@ -2660,7 +2669,7 @@
     "loadFailed": "Could not load provider status",
     "ownService": {
       "title": "Add your own service",
-      "description": "Need a provider that is not listed? Add it on the Edit models tab of AI Model Config.",
+      "description": "Need a provider that is not listed? Add it on the Edit models tab of Models.",
       "cta": "Add your own service"
     },
     "localAi": {
@@ -2775,7 +2784,9 @@
     "clearSelection": "Clear selection",
     "view": "View",
     "expand": "Expand",
-    "noResults": "No results"
+    "noResults": "No results",
+    "skipToContent": "Skip to content",
+    "loadingMessages": "Loading messages…"
   },
   "search": {
     "sources": "Sources",
@@ -3226,7 +3237,7 @@
       "knowledge": {
         "intro": "Add documents so the AI assistant can answer questions about your content. This step is optional.",
         "uploadLabel": "Upload files",
-        "pickLabel": "Choose from File Manager",
+        "pickLabel": "Choose from Sources",
         "uploadHint": "PDF, Word, text, Markdown, CSV or JSON. Files are processed after the widget is created.",
         "empty": "No data sources yet — you can also add them later."
       },
@@ -3699,7 +3710,7 @@
       "title": "Select Files",
       "searchPlaceholder": "Search files...",
       "noResults": "No files match your search.",
-      "noFiles": "No files available. Upload files first in the File Manager.",
+      "noFiles": "No files available. Upload files first in Sources.",
       "selected": "{count} selected",
       "addFiles": "Add Files"
     },
@@ -3856,7 +3867,9 @@
       "robot": "Robot",
       "message": "Message",
       "support": "Support"
-    }
+    },
+    "listTitle": "Chat widgets",
+    "listEmpty": "No widgets yet. Create a chat widget to get started."
   },
   "profile": {
     "title": "Profile Settings",
@@ -3870,7 +3883,8 @@
       "email": "Email",
       "emailHint": "Your login email (cannot be changed)",
       "phone": "Phone",
-      "phonePlaceholder": "Optional contact number"
+      "phonePlaceholder": "Optional contact number",
+      "managedBy": "This account is managed by {provider}"
     },
     "companyInfo": {
       "title": "Company Information",
@@ -3917,7 +3931,10 @@
       "newPasswordHint": "Minimum 8 characters",
       "confirmPassword": "Confirm Password",
       "confirmPasswordPlaceholder": "Confirm new password",
-      "confirmPasswordHint": "Must match new password"
+      "confirmPasswordHint": "Must match new password",
+      "externalAuth": "You're using {provider} to sign in. Password management is handled there.",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 8 characters"
     },
     "appSecurity": {
       "title": "App Security",
@@ -4337,7 +4354,8 @@
       "models": "models",
       "adminOnlyTitle": "Admin access required",
       "adminOnlyMessage": "Feature status is available to administrators only."
-    }
+    },
+    "notLoggedIn": "Not logged in"
   },
   "cookies": {
     "title": "Cookie Settings",

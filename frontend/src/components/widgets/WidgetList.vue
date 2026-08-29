@@ -3,7 +3,7 @@
     <div class="mb-6 flex items-center justify-between" data-testid="section-header">
       <h2 class="text-xl font-semibold txt-primary flex items-center gap-2">
         <ListBulletIcon class="w-5 h-5" />
-        Your Widgets
+        {{ $t('widgets.listTitle') }}
       </h2>
       <button
         class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2"
@@ -11,7 +11,7 @@
         @click="$emit('create')"
       >
         <PlusIcon class="w-5 h-5" />
-        Create New Widget
+        {{ $t('widgets.createNewWidget') }}
       </button>
     </div>
 
@@ -21,7 +21,7 @@
       data-testid="section-empty"
     >
       <div class="txt-secondary mb-4">
-        No widgets created yet. Click "Create New Widget" to get started.
+        {{ $t('widgets.listEmpty') }}
       </div>
     </div>
 

@@ -51,6 +51,10 @@ export const selectors = {
   nav: {
     sidebar: '[data-testid="comp-sidebar-v2"]',
     navDropdown: '[data-testid="dropdown-sidebar-v2-nav"]',
+    /** Second-level Manage flyout (Assistants / Channels / …) */
+    navSubDropdown: '[data-testid="dropdown-sidebar-v2-nav-sub"]',
+    flyoutGroup: (key: string) => `[data-testid="btn-sidebar-v2-group-${key}"]`,
+    mobileMoreGroup: (key: string) => `[data-testid="btn-mobile-more-group-${key}"]`,
     /** Full-screen backdrop behind an open rail flyout; click it to dismiss. */
     navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
@@ -70,7 +74,8 @@ export const selectors = {
     /** Inline "More" section that expands under the primary buttons */
     mobileMoreSheet: '[data-testid="sheet-mobile-more"]',
     mobileMoreAccountSection: '[data-testid="section-mobile-more-account"]',
-    mobileMoreChannels: '[data-testid="btn-mobile-more-channels"]',
+    mobileMoreChannels: '[data-testid="btn-mobile-more-manage"]',
+    mobileMoreManage: '[data-testid="btn-mobile-more-manage"]',
     mobileMoreInbound: '[data-testid="link-mobile-more-inbound"]',
     mobileMorePreferences: '[data-testid="btn-mobile-more-preferences"]',
     /** In-drawer chat history (paginated, infinite scroll) */
@@ -87,11 +92,13 @@ export const selectors = {
     sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
     /** V2 sidebar: files nav icon */
     sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
-    /** V2 sidebar: Channels rail item (locked in easy mode, flyout in advanced) */
-    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-channels"]',
-    /** V2 sidebar: AI Setup rail item (locked in easy mode, flyout in advanced) */
-    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-ai-setup"]',
-    /** V2 sidebar: admin nav icon (admin only) */
+    /** V2 sidebar: Manage rail item (Channels + assistants + automations) */
+    sidebarV2Manage: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** Alias kept while specs migrate off the old Channels rail item */
+    sidebarV2Channels: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** Alias kept while specs migrate off the old AI Setup rail item */
+    sidebarV2AiSetup: '[data-testid="btn-sidebar-v2-nav-manage"]',
+    /** V2 sidebar: admin / Operate nav icon (admin only) */
     sidebarV2Admin: '[data-testid="btn-sidebar-v2-nav-admin"]',
     /** V2 rail: always-visible label node inside each nav button (§4.1 #3) */
     railLabel: '.v2-rail-label',
@@ -103,6 +110,7 @@ export const selectors = {
     /** Channels flyout children shown only when Saved Tasks is enabled (features.savedTasks) */
     flyoutLinkConnections: '[data-testid="link-sidebar-v2-connections"]',
     flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
+    flyoutLinkLiveSupport: '[data-testid="link-sidebar-v2-live-support"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
