@@ -261,4 +261,44 @@ class ModelRepository extends ServiceEntityRepository
 
         return array_map(static fn (array $row): string => (string) $row['service'], $results);
     }
+
+    /**
+     * Active SOUND2TEXT (or other tag) rows an external STT caller may request.
+     *
+     * @return list<Model>
+     */
+    public function findActiveByTag(string $tag): array
+    {
+        /** @var list<Model> $models */
+        $models = $this->createQueryBuilder('m')
+            ->where('m.tag = :tag')
+            ->andWhere('m.active = 1')
+            ->setParameter('tag', $tag)
+            ->orderBy('m.quality', 'DESC')
+            ->addOrderBy('m.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $models;
+    }
+
+    /**
+     * Resolve an active model of a capability by providerId or display name.
+     */
+    public function findActiveByTagAndIdentity(string $tag, string $identity): ?Model
+    {
+        /** @var Model|null $model */
+        $model = $this->createQueryBuilder('m')
+            ->where('m.tag = :tag')
+            ->andWhere('m.active = 1')
+            ->andWhere('(m.providerId = :identity OR m.name = :identity)')
+            ->setParameter('tag', $tag)
+            ->setParameter('identity', $identity)
+            ->orderBy('m.quality', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $model;
+    }
 }
