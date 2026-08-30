@@ -68,37 +68,12 @@
         class="group rounded-lg border border-light-border/15 dark:border-dark-border/5 bg-white dark:bg-white/[0.02]"
         data-testid="grid-tile"
       >
-        <div
-          :class="[
-            'w-full overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800 relative flex items-center justify-center',
-            kindOf(file) === 'audio' ? 'p-2' : 'aspect-video',
-          ]"
-        >
-          <img
-            v-if="kindOf(file) === 'image' && thumbnailUrl(file.id)"
-            :src="thumbnailUrl(file.id)"
-            :alt="file.display_name || file.filename"
-            class="w-full h-full object-cover transition-transform group-hover:scale-105"
-            loading="lazy"
+        <div class="rounded-t-lg overflow-hidden">
+          <FilePreview
+            :file="file"
+            :playing="activePlayerId === file.id"
+            @play="activePlayerId = file.id"
           />
-          <MessageVideo
-            v-else-if="kindOf(file) === 'video'"
-            :url="downloadUrl(file.id)"
-            :poster="file.thumb_url ?? undefined"
-            class="!my-0 w-full"
-          />
-          <MessageAudio
-            v-else-if="kindOf(file) === 'audio'"
-            :url="downloadUrl(file.id)"
-            class="!my-0 w-full"
-          />
-          <Icon v-else :icon="kindIcon(file)" class="w-10 h-10 text-gray-400" />
-          <div
-            v-if="!isInlineMediaKind(file)"
-            class="absolute bottom-2 right-2 bg-black/60 p-1 rounded backdrop-blur-sm"
-          >
-            <Icon :icon="kindIcon(file)" class="text-white w-4 h-4" />
-          </div>
         </div>
         <div class="p-2">
           <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
@@ -254,12 +229,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import MessageVideo from '@/components/MessageVideo.vue'
-import MessageAudio from '@/components/MessageAudio.vue'
+import FilePreview from '@/components/files/FilePreview.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
-import { getApiBaseUrl } from '@/services/api/httpClient'
-import { useMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
@@ -272,6 +244,11 @@ const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
 const loading = ref(false)
+// Only one media player is mounted at a time (#1499): tiles show a poster/icon
+// by default and mount the real <video>/<audio> only for the tile the user taps.
+// This keeps the grid lightweight and stays within the mobile WebView's
+// concurrent-media-element limit.
+const activePlayerId = ref<number | null>(null)
 const currentPage = ref(1)
 const totalCount = ref(0)
 const itemsPerPage = 30
@@ -322,6 +299,7 @@ const loadFolders = async () => {
 
 const load = async (page = currentPage.value) => {
   loading.value = true
+  activePlayerId.value = null
   try {
     const list = await filesService.listFiles({
       source: 'generated',
@@ -347,46 +325,6 @@ const nextPage = () => {
 const previousPage = () => {
   if (currentPage.value > 1) load(currentPage.value - 1)
 }
-
-const kindOf = (file: FileItem): FileOriginKind => {
-  if (file.origin_kind) return file.origin_kind
-  const type = (file.file_type || '').toLowerCase()
-  if (/png|jpe?g|gif|webp|image/.test(type)) return 'image'
-  if (/mp4|webm|mov|avi|mkv|video/.test(type)) return 'video'
-  if (/mp3|wav|ogg|m4a|audio/.test(type)) return 'audio'
-  if (/ics/.test(type)) return 'calendar'
-  return 'document'
-}
-
-// Image/video/audio render an inline player (or thumbnail), so the corner
-// kind-badge is only useful for the icon-only kinds (calendar/document/unknown).
-const isInlineMediaKind = (file: FileItem): boolean => {
-  const kind = kindOf(file)
-  return 'image' === kind || 'video' === kind || 'audio' === kind
-}
-
-const kindIcon = (file: FileItem): string => {
-  switch (kindOf(file)) {
-    case 'video':
-      return 'mdi:play-circle'
-    case 'audio':
-      return 'mdi:music-note'
-    case 'calendar':
-      return 'mdi:calendar'
-    case 'document':
-      return 'mdi:file-document-outline'
-    default:
-      return 'mdi:image'
-  }
-}
-
-const downloadUrl = (id: number): string => `${getApiBaseUrl()}/api/v1/files/${id}/download`
-
-// For the bare <img> thumbnail only: no-op on web, on native it appends a
-// read-only media token because <img> can't send auth headers.
-// MessageVideo/MessageAudio receive the raw URL and wrap it themselves.
-const { mediaSrc } = useMediaSrc()
-const thumbnailUrl = (id: number): string => mediaSrc(downloadUrl(id))
 
 const download = async (file: FileItem) => {
   try {

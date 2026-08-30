@@ -3139,6 +3139,9 @@
       "retry": "Erneut versuchen",
       "provenance": "von {source} · {time}"
     },
+    "preview": {
+      "play": "Abspielen"
+    },
     "generated": {
       "title": "Erzeugt",
       "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",

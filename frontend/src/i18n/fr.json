@@ -1293,6 +1293,9 @@
       "retry": "Réessayer",
       "provenance": "depuis {source} · {time}"
     },
+    "preview": {
+      "play": "Lire"
+    },
     "generated": {
       "title": "Générés",
       "subtitle": "Images, vidéos, audio, documents et invitations d’agenda créés dans vos chats et tâches.",

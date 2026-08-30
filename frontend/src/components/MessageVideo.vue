@@ -167,6 +167,7 @@ import { useMediaSrc } from '@/services/api/mediaAuth'
 interface Props {
   url: string
   poster?: string
+  autoplay?: boolean
 }
 
 const props = defineProps<Props>()
@@ -190,6 +191,7 @@ const maxRetries = 3
 const retryDelays = [1000, 2000, 3000] // Increasing delays: 1s, 2s, 3s
 const isRetrying = ref(false)
 const hasFailed = ref(false)
+const hasAutoPlayed = ref(false)
 
 const videoSrc = computed(() => mediaSrc(props.url))
 const posterSrc = computed(() => (props.poster ? mediaSrc(props.poster) : undefined))
@@ -233,6 +235,22 @@ const handleLoadSuccess = () => {
   isRetrying.value = false
   hasFailed.value = false
   updateDuration()
+
+  // Lazy-mounted grid tiles pass `autoplay` so a single tap on the poster both
+  // mounts the player and starts playback (#1499). Browser autoplay policies may
+  // reject this; the catch keeps the rejection from bubbling to the global
+  // handler (mirrors MessageAudio) — the user can still press play.
+  if (props.autoplay && !hasAutoPlayed.value && videoRef.value) {
+    hasAutoPlayed.value = true
+    videoRef.value
+      .play()
+      .then(() => {
+        isPlaying.value = true
+      })
+      .catch(() => {
+        // Autoplay blocked — the poster/controls remain; manual play works.
+      })
+  }
 }
 
 const formatTime = (seconds: number): string => {

@@ -2466,6 +2466,9 @@
       "retry": "Reintentar",
       "provenance": "de {source} · {time}"
     },
+    "preview": {
+      "play": "Reproducir"
+    },
     "generated": {
       "title": "Generados",
       "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",
