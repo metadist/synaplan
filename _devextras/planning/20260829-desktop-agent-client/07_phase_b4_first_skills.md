@@ -1,10 +1,13 @@
-# Sprint 5 — First real skills (pptx, not Outlook COM)
+# Sprint B4 — First real skills (pptx, not Outlook COM)
+
+**Phase B (`synaplan-desktop`), sprint 4 of 5.** Steps `DC15`–`DC18`.
 
 **Goal:** A user can produce a `.pptx` on Windows, macOS, and Linux using
 the official Agent Skill, through Synaplan Desktop only. Outlook stays on
 the Synaplan server path we already have.
-**Depends on:** Sprints 3–4. Checklist rows 11, 12, 15.
-**Unlocks:** Sprint 6 (worth polling once a real skill exists).
+**Depends on:** Sprints B2–B3. Checklist rows 11, 12, 15.
+**Unlocks:** Sprint B5 (worth polling once a real skill exists) and the GA
+flag flip in master plan §11.
 **Repos:** `synaplan-desktop` (bundle). `synaplan/` docs only.
 
 ---
@@ -48,7 +51,7 @@ Do **not** silently `pip install` from the model. A later step may offer
 “Install Python packages for this skill” with an explicit button and a
 requirements pin. Out of the first pptx PR if it bloats.
 
-### 1.3 Binary allowlist (tighten Sprint 3 Bash)
+### 1.3 Binary allowlist (tighten Sprint B2 Bash)
 
 Allow only:
 
@@ -99,7 +102,7 @@ Document in `docs/DESKTOP.md` and in the Skills empty-state:
 | Calendar write | Synaplan Phase M Graph path (when shipped), not a desktop COM skill |
 | “Control Outlook.exe” | Out of v1. Linux incompatible |
 
-A community Graph+curl skill may be **user-installed** (Sprint 4) at their
+A community Graph+curl skill may be **user-installed** (Sprint B3) at their
 risk. We do not vendor it, do not put Microsoft tokens in the desktop
 keychain in v1, and do not add a second OAuth stack.
 

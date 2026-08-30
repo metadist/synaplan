@@ -1,6 +1,7 @@
 # Synaplan Desktop — Agent Skills client
 
-**Status:** Plan drafted 2026-08-29. Research only until the decision checklist in
+**Status:** Plan drafted 2026-08-29, **reordered 2026-08-30 to server-first**.
+Research only until the decision checklist in
 [`00_master_plan.md`](./00_master_plan.md) is ticked. No product code in this
 change.
 **Product:** a **separate desktop client** (Windows, macOS, Linux) that signs in
@@ -17,7 +18,7 @@ No Claude.ai, Claude Code, or Agent37 Cloud.
 > **The ask:** users install Claude-style skills (for example from public
 > indexes such as [Agent37](https://www.agent37.com/skills?q=powerpoint)) and
 > use them through their Synaplan account. The laptop is the hands. Synaplan
-> is the account, the models, RAG, and (later) the job queue.
+> is the account, the models, RAG, and the job queue.
 
 ---
 
@@ -37,16 +38,47 @@ Agent Skills runtime. Synaplan’s DAG `SkillDescriptor` and the planned plugin
 prompt-packs stay on their own tracks. User-facing copy says **skill**, never
 “Claude skill”, “DAG”, or “TaskRunner”.
 
-Ship in this order:
+---
 
-1. **Enforce API key scopes** (independently valuable; blocker for any daemon).
-2. **Pair a computer** in the Synaplan web UI → scoped, revocable key.
-3. **Create `synaplan-desktop`** and get a signed-in chat that uses `/v1/messages`.
-4. **Load and run Agent Skills** behind a local directory allowlist.
-5. **Skills manager** (zip / git / GitHub URL). Agent37 is a catalog, not a host.
-6. **First vertical:** official `pptx` skill (no PowerPoint app; Win/Mac/Linux).
-7. **Poll `agent_checkin`** so web chat / Saved Tasks can queue a **named,
-   installed** skill. Never free-form shell from the planner.
+## Order of work — Synaplan first, then the client
+
+Decided 2026-08-30 (master plan §0.1). The epic runs in **two phases, not
+interleaved**: everything in `synaplan/` is finished, tested, documented, and
+merged **before** the `synaplan-desktop` repository is created.
+
+**Phase A — `synaplan/` (Sprints A1–A3)**
+
+1. **Enforce API key scopes** + the `DESKTOP_AGENT.ENABLED` flag
+   (independently valuable; blocker for any daemon).
+2. **Pair a computer** in the Synaplan web UI → scoped, revocable key;
+   device list; revoke.
+3. **Queue and check-in**: `BDESKTOPJOBS`, `POST /api/v1/desktop/jobs`, MCP
+   `agent_checkin` / `agent_report_result`, lease reaper, “Run on this
+   computer” in web chat — proved by a **fake-device harness** in
+   `_devextras/testing/desktop/`, then **frozen** as `protocol: 1`.
+
+**Phase B — `synaplan-desktop` (Sprints B1–B5)**
+
+1. **Create the repo** and get a signed-in chat that uses `/v1/messages`.
+2. **Load and run Agent Skills** behind a local directory allowlist.
+3. **Skills manager** (zip / git / GitHub URL). Agent37 is a catalog, not a host.
+4. **First vertical:** official `pptx` skill (no PowerPoint app; Win/Mac/Linux).
+5. **Poll `agent_checkin`** against the already-shipped contract, so web chat
+   can queue a **named, installed** skill. Never free-form shell from the
+   planner.
+
+### Why this order
+
+| Reason | Consequence |
+| ------ | ----------- |
+| Scopes must exist before any key reaches a laptop | A stolen laptop is a revoke, not an account takeover |
+| The queue contract is designed once, with no client deadline pressure | No `command` field sneaks into `BINPUT` to unblock a client sprint |
+| Every Phase A PR merges to `main` with the flag off | Small reviewable PRs; the surface is 404 / hidden until GA |
+| The client is written against a frozen, documented contract | Phase B is client work only, not cross-repo negotiation |
+
+**Trade-off accepted:** Phase A ships a feature nothing consumes yet. The
+mitigations are invariant **C8** (flag off is inert) and the harness
+(decision 20), which is the acceptance demo instead of a real device.
 
 ---
 
@@ -54,37 +86,54 @@ Ship in this order:
 
 | File | Role |
 | ---- | ---- |
-| [`00_master_plan.md`](./00_master_plan.md) | Decisions, architecture, two-repo split, non-goals. **Tick the checklist before any code.** |
-| [`01_sprint_0_scopes_and_flag.md`](./01_sprint_0_scopes_and_flag.md) | Scope enforcement + feature flag. Synaplan only. |
-| [`02_sprint_1_pairing.md`](./02_sprint_1_pairing.md) | Device pairing, scoped keys, Channels UI. |
-| [`03_sprint_2_client_repo.md`](./03_sprint_2_client_repo.md) | Create `synaplan-desktop`, sign-in, chat. |
-| [`04_sprint_3_skills_runtime.md`](./04_sprint_3_skills_runtime.md) | `SKILL.md` loader + sandboxed tools. |
-| [`05_sprint_4_skills_manager.md`](./05_sprint_4_skills_manager.md) | Install / enable / remove skills. |
-| [`06_sprint_5_first_skills.md`](./06_sprint_5_first_skills.md) | Bundled `pptx`; Outlook via existing Synaplan mail — not COM. |
-| [`07_sprint_6_checkin_jobs.md`](./07_sprint_6_checkin_jobs.md) | Poll loop + out-of-band web jobs. |
-| [`08_testing_and_documentation.md`](./08_testing_and_documentation.md) | Gates for **both** repos. Binding. |
-| [`09_work_breakdown.md`](./09_work_breakdown.md) | PR-sized D-steps. This is the implementation order. |
-| [`10_security_and_compatibility.md`](./10_security_and_compatibility.md) | Allowlist, scopes, invariants, mobile classification. |
-| [`11_ux_and_i18n.md`](./11_ux_and_i18n.md) | Canonical terms in EN/DE/ES/TR. Copy before UI. |
+| [`00_master_plan.md`](./00_master_plan.md) | Decisions, phase order, architecture, two-repo split, non-goals. **Tick the checklist before any code.** |
+| [`01_phase_a1_scopes_and_flag.md`](./01_phase_a1_scopes_and_flag.md) | **Phase A** — scope enforcement + feature flag. |
+| [`02_phase_a2_pairing.md`](./02_phase_a2_pairing.md) | **Phase A** — device pairing, scoped keys, Channels UI. |
+| [`03_phase_a3_jobs_and_checkin.md`](./03_phase_a3_jobs_and_checkin.md) | **Phase A** — job queue, MCP check-in, web enqueue, harness, contract freeze. |
+| [`04_phase_b1_client_repo.md`](./04_phase_b1_client_repo.md) | **Phase B** — create `synaplan-desktop`, sign-in, chat. |
+| [`05_phase_b2_skills_runtime.md`](./05_phase_b2_skills_runtime.md) | **Phase B** — `SKILL.md` loader + sandboxed tools. |
+| [`06_phase_b3_skills_manager.md`](./06_phase_b3_skills_manager.md) | **Phase B** — install / enable / remove skills. |
+| [`07_phase_b4_first_skills.md`](./07_phase_b4_first_skills.md) | **Phase B** — bundled `pptx`; Outlook via existing Synaplan mail — not COM. |
+| [`08_phase_b5_desktop_poll_loop.md`](./08_phase_b5_desktop_poll_loop.md) | **Phase B** — poll loop + unattended opt-in against the frozen contract. |
+| [`09_testing_and_documentation.md`](./09_testing_and_documentation.md) | Gates for **both** repos. Binding. |
+| [`10_work_breakdown.md`](./10_work_breakdown.md) | PR-sized steps (`DS*` server, `DC*` client). This is the implementation order. |
+| [`11_security_and_compatibility.md`](./11_security_and_compatibility.md) | Allowlist, scopes, invariants, mobile classification. |
+| [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) | Canonical terms in EN/DE/ES/TR. Copy before UI. |
 
-**Execute from [`09_work_breakdown.md`](./09_work_breakdown.md).** The sprint
+**Execute from [`10_work_breakdown.md`](./10_work_breakdown.md).** The sprint
 files say why. The breakdown says how big and what “done” means.
 
 ---
 
 ## Two repositories
 
-| Repo | What it owns | First sprint that touches it |
-| ---- | ------------ | ---------------------------- |
-| `synaplan/` (this repo) | Scopes, flag, pairing API, device registry, job queue, Channels page, docs | Sprint 0 |
-| **`synaplan-desktop`** (new, private sibling of `synaplan-apps`) | Tauri 2 + Vue 3 client, skill loader, sandbox, tray, local audit | Sprint 2 |
+| Repo | What it owns | Touched in |
+| ---- | ------------ | ---------- |
+| `synaplan/` (this repo) | Scopes, flag, pairing API, device registry, job queue, MCP check-in, Channels page, harness, docs | **All of Phase A** (`DS1`–`DS18`); afterwards docs only |
+| **`synaplan-desktop`** (new, private sibling of `synaplan-apps`) | Tauri 2 + Vue 3 client, skill loader, sandbox, poll loop, local audit | **Phase B** (`DC1`–`DC21`); created at `DC1`, never earlier |
 
 Do **not** put this in `synaplan-apps` (Capacitor / store / OTA). Do **not**
-vendor Agent37 or Claude Code.
+vendor Agent37 or Claude Code. Do **not** create the client repo — not even an
+empty scaffold — while Phase A steps are open (master plan decision 23).
 
 ---
 
-## What “done” looks like for the epic
+## What “done” looks like
+
+### Phase A (server, no client yet)
+
+1. A `desktop:messages` key reaches `/v1` and nothing else; legacy keys are
+   untouched.
+2. A user can pair a computer, see it, and revoke it — flag-gated.
+3. `_devextras/testing/desktop/fake-device.sh` pairs, checks in, runs a
+   `skill.run` job, reports a result, and the chat shows the completion.
+4. The same harness proves the refusal paths (unknown skill, extra
+   `command` key, foreign device).
+5. Flag off: nothing is visible, `/api/v1/desktop/*` is 404, `tools/list`
+   is unchanged.
+6. `docs/DESKTOP.md` describes the contract; fixtures freeze it.
+
+### Phase B (client)
 
 A Synaplan user on Windows, macOS, or Linux can:
 
@@ -94,7 +143,7 @@ A Synaplan user on Windows, macOS, or Linux can:
 3. Install the bundled PowerPoint skill (and later a zip / GitHub skill folder).
 4. Ask for a slide deck; a `.pptx` appears in an allowlisted folder and can be
    uploaded back into Synaplan Sources.
-5. Later: from **web** chat, queue “make slides from this outline” and have the
+5. From **web** chat, queue “make slides from this outline” and have the
    paired computer pick it up on the next check-in. The web reply is
    “queued for this computer”, not a same-turn file.
 
@@ -113,13 +162,15 @@ the Outlook **application** are marked incompatible on Linux and are out of v1.
 - Outlook COM / AppleScript automation.
 - `shell.exec` job type from the server.
 - A public skills marketplace operated by Synaplan.
+- A shipped reference daemon inside `synaplan/` (the harness is a test script).
 
 ---
 
 ## Workflow for each step
 
 1. Tick any open decision that the step depends on.
-2. Implement **one** D-step from the breakdown.
-3. Run the gate in [`08_testing_and_documentation.md`](./08_testing_and_documentation.md)
+2. Implement **one** step from the breakdown — `DS*` in `synaplan/`,
+   `DC*` in `synaplan-desktop`.
+3. Run the gate in [`09_testing_and_documentation.md`](./09_testing_and_documentation.md)
    for the repo you touched.
 4. PR on a feature branch. Conventional Commits. No AI attribution. Never `main`.

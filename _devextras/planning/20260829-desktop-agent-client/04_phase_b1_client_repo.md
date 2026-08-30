@@ -1,27 +1,45 @@
-# Sprint 2 — Create the extra client and sign in
+# Sprint B1 — Create the extra client and sign in
+
+**Phase B (`synaplan-desktop`), sprint 1 of 5.** Steps `DC1`–`DC5`.
 
 **Goal:** A new repository `synaplan-desktop` exists, builds on Windows /
 macOS / Linux (CI matrix), pairs against a Synaplan instance, and can send
 one streaming chat turn through `POST /v1/messages`.
-**Depends on:** Sprint 1 merged on a reachable instance. Checklist rows 1, 2,
-5, 9, 17.
-**Unlocks:** Sprint 3 (skills need a working Messages loop).
-**Repos:** **new `synaplan-desktop`**. `synaplan/` only if runtime config or
-docs need a download URL.
+**Depends on:** **all of Phase A merged** (`DS1`–`DS18`) on a reachable
+instance. Checklist rows 1, 2, 5, 9, 17, 22, 23.
+**Unlocks:** Sprint B2 (skills need a working Messages loop).
+**Repos:** **new `synaplan-desktop`**. `synaplan/` only for the
+`docs/DESKTOP.md` download section, as a separate docs-only PR.
 
 Do not import the Synaplan Vue SPA. Do not WebView `https://web.synaplan.com`.
 
 ---
 
-## 0. Why this sprint exists
+## 0. Why this sprint exists — and why it starts now, not earlier
 
-The extra client is the product. Server pairing without an app is a
-dead-end. This sprint proves **account-only inference**: no Anthropic
-dashboard, no Claude Code binary, no Agent37.
+The extra client is the product. This sprint proves **account-only
+inference**: no Anthropic dashboard, no Claude Code binary, no Agent37.
+
+Under the server-first order (master plan §0.1) this is the **first line of
+client code in the epic**. `DC1` is therefore also the moment the repo is
+created — decision 23 forbids an earlier scaffold, so that “we already have
+the repo” cannot become a reason to start client work while a server step is
+open.
+
+What the client can rely on, already shipped and frozen:
+
+| Available from | What |
+| -------------- | ---- |
+| Sprint A1 | Scoped keys; a `desktop:*` key that cannot touch admin |
+| Sprint A2 | `POST /api/v1/desktop/pair`, device list, revoke |
+| Sprint A3 | `POST /api/v1/desktop/jobs`, `agent_checkin`, `agent_report_result`, `protocol: 1`, committed fixtures |
+
+Sprints B1–B4 do not use the A3 endpoints; Sprint B5 does. They exist anyway,
+which means **no client sprint is ever blocked on a server PR**.
 
 ---
 
-## 1. Repo bootstrap (do this as several D-steps)
+## 1. Repo bootstrap (`DC1`)
 
 Create `synaplan-desktop` (private, `main` protected, PR-only):
 
@@ -91,7 +109,7 @@ Minimum:
 
 No skill loop yet. A plain text turn is the acceptance test.
 
-### 2.3 Fake upstream for CI
+### 2.3 Fake upstream for CI (`DC3`)
 
 The desktop tests must **not** hit a real Synaplan. Ship
 `tests/fixtures/messages-gateway` (or a tiny mock server) that:
@@ -102,11 +120,22 @@ The desktop tests must **not** hit a real Synaplan. Ship
 
 Same idea as `synaplan/_devextras/testing/messages-gateway/`.
 
-### 2.4 Synaplan docs touch (tiny, own PR if needed)
+**Copy the pair / job fixtures from Phase A instead of inventing them.**
+`synaplan/_devextras/testing/desktop/fixtures/` (`DS18`) is the frozen
+contract; vendor those JSON files into `tests/fixtures/` with a note naming
+the source commit. If a fixture does not match what the client wants, the
+client is wrong — or it is a `protocol: 2` conversation with the server (C9).
 
-`docs/DESKTOP.md` (new, short): what it is, pairing, flag, “not Claude
-Code”. Link from `docs/ANTHROPIC_COMPATIBLE_API.md` “Related”.
+### 2.4 Synaplan docs touch (`DC5`, docs-only PR in `synaplan/`)
 
+`docs/DESKTOP.md` already exists (`DS18`). This step only adds what could not
+be written before the client existed:
+
+- how to install / run a local build,
+- the pairing walkthrough with real screenshots,
+- removal of the “the client is not released yet” sentence.
+
+This is the **only** kind of `synaplan/` change a Phase B step may make.
 Do not add a download URL until binaries exist.
 
 ---
@@ -136,5 +165,6 @@ On a dev machine with Synaplan + flag on:
 3. One streaming chat turn works against a real instance (manual evidence).
 4. No Synaplan SPA code was copied in. No Claude Code dependency in
    `package.json` / Cargo.toml.
-5. The Synaplan gate was not required unless `docs/DESKTOP.md` landed there
-   (docs-only path is fine).
+5. No `synaplan/` PR in this sprint except the `DC5` docs update.
+6. Vendored contract fixtures are byte-identical to the Phase A originals and
+   name the source commit (C9).

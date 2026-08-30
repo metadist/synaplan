@@ -1,11 +1,16 @@
-# Sprint 1 — Pair this computer
+# Sprint A2 — Pair this computer
+
+**Phase A (`synaplan/`), sprint 2 of 3.** Steps `DS5`–`DS10`.
 
 **Goal:** A signed-in user can mint a one-time pairing code and a future
 desktop client can exchange it for a **scoped** API key bound to a device
 row. Web UI lists and revokes devices.
-**Depends on:** Sprint 0 (D0–D3). Checklist rows 3, 7, 8, 14, 18.
-**Unlocks:** Sprint 2 (the extra client has something to call).
-**Repos:** `synaplan/` only. The client is still a `curl` script in tests.
+**Depends on:** Sprint A1 (`DS1`–`DS4`). Checklist rows 3, 7, 8, 14, 18.
+**Unlocks:** Sprint A3 (a job needs a device to belong to) and, later,
+Sprint B1 (the client has something to call).
+**Repos:** `synaplan/` only. **The “client” in this sprint and the next one is
+a shell script** (`DS10`, extended in Sprint A3) — the real client does not
+exist until Phase B.
 **Flag:** all new routes 404 when `DESKTOP_AGENT.ENABLED` is off.
 
 ---
@@ -14,7 +19,7 @@ row. Web UI lists and revokes devices.
 
 Hand-pasting a full-access API key into a daemon is how this product fails.
 Pairing is the only supported way to get a desktop key. The key is shown
-once, stored later in the OS keychain by the client (Sprint 2).
+once, stored later in the OS keychain by the client (Sprint B1).
 
 ---
 
@@ -36,7 +41,7 @@ once, stored later in the OS keychain by the client (Sprint 2).
 
 ### 2.1 Migration — `BDESKTOPDEVICES`
 
-Galera-safe, own PR (D4):
+Galera-safe, own PR (`DS5`):
 
 ```sql
 CREATE TABLE IF NOT EXISTS BDESKTOPDEVICES (
@@ -55,7 +60,9 @@ CREATE TABLE IF NOT EXISTS BDESKTOPDEVICES (
 ```
 
 No foreign key to `BAPIKEYS` required in v1 (delete key then mark device
-`revoked`). No Schema API. Children-before-parent only if we later add jobs.
+`revoked`). No Schema API. `BDESKTOPJOBS` arrives one sprint later
+(`DS11`) and references `BDEVICEID` — when a migration deletes devices,
+delete job rows first (no `ON DELETE CASCADE`).
 
 ### 2.2 Pairing codes (Redis, not a table)
 
@@ -89,7 +96,7 @@ No foreign key to `BAPIKEYS` required in v1 (delete key then mark device
 - `GET /api/v1/desktop/devices` — owner only; no key material; `keyPrefix`.
 - `DELETE /api/v1/desktop/devices/{id}` — revoke key + `status=revoked`.
 - `POST /api/v1/desktop/devices/{id}/heartbeat` — optional in this sprint;
-  otherwise first check-in in Sprint 6 updates `BLASTSEEN`.
+  otherwise the first check-in in Sprint A3 updates `BLASTSEEN`.
 
 Full OpenAPI. Generate Zod schemas. 404 for another user’s id (not 403),
 same as Saved Tasks.
@@ -100,20 +107,23 @@ same as Saved Tasks.
 - Nav: child of Channels via `useNavItems` **and** router. Hidden when
   flag off (`/api/v1/config/runtime` or capabilities endpoint — add a
   boolean `desktopAgentEnabled` on runtime config, default false).
-- Page: short explanation (copy from [`11_ux_and_i18n.md`](./11_ux_and_i18n.md)),
+- Page: short explanation (copy from [`12_ux_and_i18n.md`](./12_ux_and_i18n.md)),
   **Pair this computer** button → dialog shows code + expiry + “open
   Synaplan Desktop and enter this code”.
 - Device table: name, last seen, status, **Revoke**.
 - Four locales in the same PR as the Vue. Dark + V2 + 320px.
 - Tokens only. `useDialog` for revoke.
 
-No download button that pretends the extra repo already ships binaries
-until Sprint 2 exists; a “the desktop app is a separate install” sentence
-is enough.
+**No download button.** In the server-first order the client does not exist
+yet, so the page must not imply a binary is available: one sentence that
+Synaplan Desktop is a separate install, plus (until Phase B ships) the
+“not available yet” variant in [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) §3.1.
+Do not link to a release page that 404s.
 
-### 2.5 Manual stand-in (until Sprint 2)
+### 2.5 Harness, not a client (`DS10`)
 
-A `_devextras/testing/desktop/pair.sh` that:
+The whole of Phase A is verified by a script, because there is no client to
+verify with. `_devextras/testing/desktop/pair.sh`:
 
 1. Logs in as demo / uses a session cookie **or** calls pairing-codes via
    an existing test helper.
@@ -121,7 +131,9 @@ A `_devextras/testing/desktop/pair.sh` that:
 3. Calls `GET /v1/models` with the new key (200).
 4. Calls an admin route (403).
 
-This is the Sprint 1 acceptance demo. It is not the product.
+This is the Sprint A2 acceptance demo. Sprint A3 extends the same folder
+into `fake-device.sh` (check-in + report). It is a test tool, not a shipped
+reference daemon (master plan §12).
 
 ---
 
@@ -142,6 +154,6 @@ This is the Sprint 1 acceptance demo. It is not the product.
 
 1. Flag off: no nav item, pairing routes 404.
 2. Flag on: user can create a code, exchange it, see the device, revoke it.
-3. The minted key is restricted (Sprint 0 tests still pass with this key).
+3. The minted key is restricted (Sprint A1 tests still pass with this key).
 4. OpenAPI → Zod regenerated.
 5. Invariants C1–C7 that this sprint can touch are named in the PR.

@@ -1,10 +1,12 @@
-# Sprint 4 — Skills manager
+# Sprint B3 — Skills manager
+
+**Phase B (`synaplan-desktop`), sprint 3 of 5.** Steps `DC11`–`DC14`.
 
 **Goal:** Users can see, enable, disable, install, and remove Agent Skills
 without touching a terminal. Install sources: local folder, zip, git/GitHub
 URL. No Synaplan-operated marketplace.
-**Depends on:** Sprint 3 loader.
-**Unlocks:** Sprint 5 (bundled pptx appears in this UI).
+**Depends on:** Sprint B2 loader.
+**Unlocks:** Sprint B4 (bundled pptx appears in this UI).
 **Repos:** `synaplan-desktop`. Optional later: a read-only “recommended
 skills” JSON on docs — not required.
 
@@ -25,7 +27,7 @@ Agent37, scrape it in the client, or call Agent37 Cloud.
 List rows: name, description (one line), source (`bundled` / `user`),
 enabled toggle, license if present, **Remove** (hidden for bundled).
 
-Empty state copy from [`11_ux_and_i18n.md`](./11_ux_and_i18n.md).
+Empty state copy from [`12_ux_and_i18n.md`](./12_ux_and_i18n.md).
 Compatibility warning when `compatibility` mentions Claude Code only —
 still installable; show “written for another assistant; it may not work”.
 
@@ -67,7 +69,7 @@ Enable only after confirm.
 }
 ```
 
-The loader in Sprint 3 already scans disks; this file is enablement +
+The loader in Sprint B2 already scans disks; this file is enablement +
 provenance. Disable = leave files, drop from the model catalog.
 
 ### 1.4 Trust copy (required)

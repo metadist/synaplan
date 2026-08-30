@@ -1,16 +1,22 @@
-# Sprint 0 — API key scopes and the Desktop flag
+# Sprint A1 — API key scopes and the Desktop flag
+
+**Phase A (`synaplan/`), sprint 1 of 3.** Steps `DS1`–`DS4`.
 
 **Goal:** Make `BAPIKEYS.BSCOPES` real, and add a kill switch for everything
 that follows. No desktop UI. No new repo. No pairing.
-**Depends on:** checklist rows 7, 13, 16.
-**Unlocks:** Sprint 1 (pairing must mint a *narrow* key).
-**Repos:** `synaplan/` only.
+**Depends on:** checklist rows 7, 13, 16, 19, 21.
+**Unlocks:** Sprint A2 (pairing must mint a *narrow* key).
+**Repos:** `synaplan/` only — as in all of Phase A.
 **Flag:** `DESKTOP_AGENT.ENABLED` (off). Scope enforcement is **not** behind
 the Desktop flag — it is CORE-3 and stays on.
 
 This sprint is independently valuable. Hosting-partner CORE-3 and the July
 local-agent research both call unenforced scopes a blocker. Do it first so
 a later pairing key cannot silently be god-mode.
+
+It is also the first sprint of the server-first order (master plan §0.1):
+the whole `synaplan/` side ships before `synaplan-desktop` is created, and
+each PR merges to `main` with the flag off.
 
 ---
 
@@ -54,7 +60,7 @@ Add `App\Security\ApiKeyScope` (final class of string constants + helpers):
 | `desktop:messages` | `/v1/messages`, `/v1/models`, `/v1/messages/count_tokens` |
 | `desktop:mcp` | `/mcp` |
 | `desktop:files` | `/api/v1/files*` upload/list/download the owner already may |
-| `desktop:jobs` | Sprint 6 check-in / report (declare now, unused until D-steps in Sprint 6) |
+| `desktop:jobs` | Check-in / report (declare now, first enforced in Sprint A3) |
 | `desktop:*` | All `desktop:` scopes |
 
 Admin scopes from CORE-3 (`admin:*`) are **not** minted here. Do not invent
@@ -108,13 +114,15 @@ Use the existing kernel-boot test style. No live LLM.
 `MultitaskRoutingConfig::isFeatureEnabled`).
 
 No consumer yet except a unit test of the resolver and a tiny
-`DesktopAgentConfig` service. Sprint 1 reads it.
+`DesktopAgentConfig` service. Sprint A2 reads it.
 
 ### 2.5 Do not do in this sprint
 
-- Change the API Keys UI (optional hint only if cheap; prefer Sprint 1).
+- Change the API Keys UI (optional hint only if cheap; prefer Sprint A2).
 - Migration that rewrites existing `BSCOPES` JSON.
-- Pairing, devices, client repo.
+- Pairing, devices, jobs.
+- Anything in `synaplan-desktop` — that repo does not exist yet and must not
+  be created before Phase A is merged (decision 23).
 
 ---
 
@@ -143,5 +151,5 @@ No consumer yet except a unit test of the resolver and a tiny
 1. A `desktop:messages` key cannot call admin or `/mcp`.
 2. Empty-scope keys behave as today.
 3. Flag resolver exists and defaults off.
-4. Invariants C1, C2, C3, C6 green ([`08_testing_and_documentation.md`](./08_testing_and_documentation.md)).
+4. Invariants C1, C2, C3, C6, C8 green ([`09_testing_and_documentation.md`](./09_testing_and_documentation.md)).
 5. Mobile policy: new PHP files listed `backend-only`.

@@ -1,12 +1,14 @@
-# Sprint 3 — Agent Skills runtime
+# Sprint B2 — Agent Skills runtime
+
+**Phase B (`synaplan-desktop`), sprint 2 of 5.** Steps `DC6`–`DC10`.
 
 **Goal:** The desktop client loads installed `SKILL.md` folders, puts name +
 description in the model context, and when the model asks for tools, runs
 **Read / Write / Bash** only inside the user allowlist and the skill
 directory.
-**Depends on:** Sprint 2 chat. Checklist rows 4, 8, 10.
-**Unlocks:** Sprint 4 (manager) and Sprint 5 (bundled pptx).
-**Repos:** `synaplan-desktop` only.
+**Depends on:** Sprint B1 chat. Checklist rows 4, 8, 10.
+**Unlocks:** Sprint B3 (manager) and Sprint B4 (bundled pptx).
+**Repos:** `synaplan-desktop` only — no `synaplan/` PR belongs in this sprint.
 
 This is the first sprint that can execute local programs. Treat it as a
 security sprint that happens to enable skills.
@@ -58,7 +60,7 @@ dir = "~/.synaplan-desktop/skills"
 
 [process]
 timeout_seconds = 120
-# no unrestricted PATH later — Sprint 5 adds python/node/soffice allowlist
+# no unrestricted PATH later — Sprint B4 adds python/node/soffice allowlist
 ```
 
 Defaults: write = `~/Synaplan/out` created on first run; read empty until
@@ -86,7 +88,7 @@ Scan `{skills.dir}/*/SKILL.md` + `skills/bundled/*/SKILL.md`.
 - `name` must match directory name (spec).
 - Validate with the same rules as agentskills.io (length, charset).
 - Invalid skill: skip + visible error on the Skills page, do not crash.
-- Enabled flag in a local `skills.json` (Sprint 4 writes this; Sprint 3
+- Enabled flag in a local `skills.json` (Sprint B3 writes this; Sprint B2
   treats all valid bundled + scanned skills as enabled).
 
 ### 2.4 Tool loop
@@ -115,7 +117,7 @@ tool that the model cannot satisfy.
 ### 2.5 Bash policy (v1)
 
 `Bash` is how Agent Skills call `python scripts/thumbnail.py`. It is
-**not** a Sprint 6 job type.
+**not** a `skill.run` job type (that is Sprint B5, running the same loop).
 
 v1 rules:
 
@@ -125,8 +127,8 @@ v1 rules:
 - Timeout + max output bytes.
 - Env: pass a cleaned environment; do **not** pass the Synaplan API key
   into subprocesses.
-- Sprint 5 tightens the binary allowlist (`python`, `node`, `soffice`,
-  `markitdown`). In Sprint 3, tests use a fixture script `echo` / `python -c`.
+- Sprint B4 tightens the binary allowlist (`python`, `node`, `soffice`,
+  `markitdown`). In Sprint B2, tests use a fixture script `echo` / `python -c`.
 
 A confirmation dialog for the **first** Bash in a turn is recommended
 (“This skill wants to run a program”). Remember-for-this-skill is OK.
@@ -134,11 +136,12 @@ Never auto-allow across all skills.
 
 ### 2.6 Do not do in this sprint
 
-- Install from zip/git (Sprint 4).
-- Vendor `pptx` (Sprint 5) — use a **tiny fixture skill**
+- Install from zip/git (Sprint B3).
+- Vendor `pptx` (Sprint B4) — use a **tiny fixture skill**
   `skills/bundled/hello-files` that writes `hello.txt` via Write or a
   5-line Python script.
-- Check-in / web jobs.
+- Check-in / web jobs (Sprint B5 — the server side already exists, which is
+  not a reason to pull it forward).
 - Prompt-pack seeding on the PHP server.
 
 ---
