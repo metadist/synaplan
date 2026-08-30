@@ -67,30 +67,6 @@ in the middle of the epic and the job queue came last.
 
 If a row is rejected, update every sprint file that assumed the old default.
 
-### 0.3 Cross-platform decisions (added 2026-08-30)
-
-The first draft was written Linux-first: `~/.synaplan-desktop`, `python3`,
-`soffice`, POSIX symlink tests, and a CI matrix where Windows and macOS were
-`workflow_dispatch`. The product promise is three desktops. These rows close
-that gap; the implementation detail is
-[`13_cross_platform.md`](./13_cross_platform.md), which is **binding for every
-`DC*` step**.
-
-| # | Decision | Answer | Agree? |
-| - | -------- | ------ | ------ |
-| 25 | **Three Tier-1 platforms.** Windows 10 22H2+, macOS 13+, Linux glibc 2.31+. A platform that cannot meet the bar is removed from the promise, not silently degraded. | Win = Mac = Linux | Decided |
-| 26 | **Unit tests, including the path-confinement corpus, run on all three OSes in every PR** — not `workflow_dispatch`. Confinement behaviour differs most exactly where the old plan tested least. | 3 runners per PR | Decided |
-| 27 | **No `~` in code.** One `app_dirs` module owns config / skills / out-box / audit paths per OS. Sprint files use `~/…` only as shorthand. The out-box stays in the user's home on all three so people can find their files. | `app_dirs` (`DC22`) | Decided |
-| 28 | **Confinement is per-OS, not "canonicalize and hope".** Windows junctions and reparse points, UNC and device namespaces, drive-relative paths, 8.3 short names, alternate data streams, reserved device names, trailing dot/space, long paths; macOS firmlinks (`/var` → `/private/var`), NFC/NFD, case-insensitive-by-default volumes; Linux byte-exact and `/proc` denial. One shared, table-driven corpus. | `DC6` + `DC24` | Decided |
-| 29 | **No shell, on any platform.** Tools take `{program, args[], workdir}`. `sh -c`, `cmd /c`, and `powershell -Command` are never constructed. Timeouts kill the whole process tree (Windows Job Object, POSIX process group). The child environment is constructed, never inherited. | argv only | Decided |
-| 30 | **Secrets go to the OS store on all three** (Credential Manager / Keychain / Secret Service) behind one `SecretStore` abstraction. Headless Linux gets a named, opt-in, warned plaintext fallback that the unattended poll loop refuses — never a silent downgrade. | `DC23` | Decided |
-| 31 | **The doctor is platform-aware or it is a lie.** Microsoft Store `python.exe` placeholder, the `py` launcher, `PATHEXT`, `soffice.exe` in Program Files, the macOS Command Line Tools shim, both Homebrew prefixes, LibreOffice inside an `.app` bundle, and PEP 668 externally-managed Python are named cases with tests. | `DC16` + `DC26` | Decided |
-| 32 | **Signing and notarization are a GA release blocker**, deferred only within Sprint B1. Unsigned on Windows means a SmartScreen wall; unnotarized on macOS means the app will not open at all. Certificate procurement starts **during Phase A** because the lead time is weeks. | `DC28`, procure early | Decided |
-
-**Cost accepted.** Three CI runners per PR and two code-signing identities are
-the price of the three-platform promise. The alternative is discovering on a
-user's Windows machine that a junction walked out of the allowlist.
-
 ---
 
 ## 0.2 Phase order (binding)
@@ -114,6 +90,37 @@ server changes under deadline, which is how a job queue grows a
 
 Phase B PRs never touch `synaplan/` except for documentation
 (`docs/DESKTOP.md` install section, once binaries exist).
+
+---
+
+## 0.3 Cross-platform decisions (added 2026-08-30)
+
+The first draft was written Linux-first: `~/.synaplan-desktop`, `python3`,
+`soffice`, POSIX symlink tests, and a CI matrix where Windows and macOS were
+`workflow_dispatch`. The product promise is three desktops. These rows close
+that gap; the implementation detail is
+[`13_cross_platform.md`](./13_cross_platform.md), which is **binding for every
+`DC*` step**.
+
+| # | Decision | Answer | Agree? |
+| - | -------- | ------ | ------ |
+| 25 | **Three Tier-1 platforms.** Windows 10 22H2+, macOS 13+, Linux glibc 2.31+. A platform that cannot meet the bar is removed from the promise, not silently degraded. | Win = Mac = Linux | Decided |
+| 26 | **Unit tests, including the path-confinement corpus, run on all three OSes in every PR** — not `workflow_dispatch`. Confinement behaviour differs most exactly where the old plan tested least. | 3 runners per PR | Decided |
+| 27 | **No `~` in code.** One `app_dirs` module owns config / skills / out-box / audit paths per OS. Sprint files use `~/…` only as shorthand. The out-box stays in the user's home on all three so people can find their files. | `app_dirs` (`DC22`) | Decided |
+| 28 | **Confinement is per-OS, not "canonicalize and hope".** Windows junctions and reparse points, UNC and device namespaces, drive-relative paths, 8.3 short names, alternate data streams, reserved device names, trailing dot/space, long paths; macOS firmlinks (`/var` → `/private/var`), NFC/NFD, case-insensitive-by-default volumes; Linux byte-exact and `/proc` denial. One shared, table-driven corpus. | `DC6` + `DC24` | Decided |
+| 29 | **No shell, on any platform.** Tools take `{program, args[], workdir}`. `sh -c`, `cmd /c`, and `powershell -Command` are never constructed. Timeouts kill the whole process tree (Windows Job Object, POSIX process group). The child environment is constructed, never inherited. | argv only | Decided |
+| 30 | **Secrets go to the OS store on all three** (Credential Manager / Keychain / Secret Service) behind one `SecretStore` abstraction. Headless Linux gets a named, opt-in, warned plaintext fallback that the unattended poll loop refuses — never a silent downgrade. | `DC23` | Decided |
+| 31 | **The doctor is platform-aware or it is a lie.** Microsoft Store `python.exe` placeholder, the `py` launcher, `PATHEXT`, `soffice.exe` in Program Files, the macOS Command Line Tools shim, both Homebrew prefixes, LibreOffice inside an `.app` bundle, and PEP 668 externally-managed Python are named cases with tests. | `DC16` + `DC26` | Decided |
+| 32 | **Signing and notarization are a GA release blocker**, deferred only within Sprint B1. Unsigned on Windows means a SmartScreen wall; unnotarized on macOS means the app will not open at all. Certificate procurement starts **during Phase A** because the lead time is weeks. | `DC28`, procure early | Decided |
+
+**Cost accepted.** Three CI runners per PR and two code-signing identities are
+the price of the three-platform promise. The alternative is discovering on a
+user's Windows machine that a junction walked out of the allowlist.
+
+**What this costs in schedule:** Phase B grows from five weeks to six
+([`10_work_breakdown.md`](./10_work_breakdown.md) §11) — the confinement corpus
+(`DC24`) and platform discovery (`DC26`) are real work, and a signed installer
+(`DC28`) is its own step. Phase A is unchanged.
 
 ---
 
