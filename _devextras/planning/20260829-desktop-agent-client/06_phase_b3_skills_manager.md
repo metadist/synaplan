@@ -163,7 +163,7 @@ on **all three runners**.
 - Remove user skill: directory gone; bundled cannot be removed.
 - Git URL parser: extracts owner/repo/subdir; rejects `file://`, `git://`, SSH
   remotes, and non-https (except the test fixture); no `git` binary is spawned.
-- i18n: install dialog keys in all four locales.
+- i18n: install dialog keys in all five locales.
 
 ---
 

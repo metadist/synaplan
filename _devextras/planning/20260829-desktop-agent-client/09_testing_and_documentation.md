@@ -25,8 +25,8 @@ file’s gate is green and the sprint’s documentation table is updated.
 5. **Widget invariant.** No Desktop UI, job hooks, or new i18n keys under
    `widget.*`. Value-only edits to shared keys follow the streamlining
    compatibility rules.
-6. **Four locales.** Any user-visible string: `en`, `de`, `es`, `tr` in
-   the **same** change, in whichever repo owns the UI.
+6. **Five locales.** Any user-visible string: `en`, `de`, `es`, `fr`, `tr`
+   in the **same** change, in whichever repo owns the UI.
 7. **OpenAPI → Zod** on every new `/api/v1/desktop` field, then `vue-tsc`.
 8. **Mobile impact.** New `synaplan/` paths go in
    `.github/mobile-impact-policy.json`. Default: PHP = `backend-only`;
@@ -215,7 +215,7 @@ User-facing `docs/**` rides with the code PR. Do not “document in a follow-up�
 1. Gate of the touched repo is green (unfiltered).
 2. New branches have tests; security fixes have a regression test.
 3. OpenAPI + schemas if HTTP changed.
-4. Four locales if copy changed.
+4. Five locales if copy changed.
 5. PR lists which invariants the diff can touch.
 6. Characterization diff is empty.
 7. Docs in the same PR.

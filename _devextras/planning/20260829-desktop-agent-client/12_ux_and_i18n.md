@@ -23,7 +23,7 @@ If a design needs a sixth primary control, cut scope.
 
 ---
 
-## 2. Canonical terminology — all four locales
+## 2. Canonical terminology — all five locales
 
 Proposed translations for native-speaker review (row L1 in the breakdown).
 Do not treat DE/ES/TR as final until that review.
@@ -100,7 +100,7 @@ pretend otherwise, and must not link a release page that 404s:
 | State | EN copy intent |
 | ----- | -------------- |
 | Flag on, no client released | “Synaplan Desktop is a separate app for your computer. It is not available for download yet.” Pairing controls stay visible for testers (a code is harmless without a client) |
-| Flag on, client released (`DC5`) | Replace with the install sentence + link. Same key, new value — a value-only i18n change in all four locales |
+| Flag on, client released (`DC5`) | Replace with the install sentence + link. Same key, new value — a value-only i18n change in all five locales |
 
 Never ship a **Download** button before a binary exists. A dead button is the
 one UX bug this ordering could have introduced.

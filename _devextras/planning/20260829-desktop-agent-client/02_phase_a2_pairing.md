@@ -111,7 +111,7 @@ same as Saved Tasks.
   **Pair this computer** button → dialog shows code + expiry + “open
   Synaplan Desktop and enter this code”.
 - Device table: name, last seen, status, **Revoke**.
-- Four locales in the same PR as the Vue. Dark + V2 + 320px.
+- Five locales in the same PR as the Vue. Dark + V2 + 320px.
 - Tokens only. `useDialog` for revoke.
 
 **No download button.** In the server-first order the client does not exist

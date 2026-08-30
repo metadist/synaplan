@@ -202,7 +202,7 @@ GitHub image.
 3. **Every row of the §1.5 manual matrix is filled in**, including the two
    negative rows — a readable deck on Windows, macOS, and Linux.
 4. Doctor reports honestly on a machine without the runtimes, with a
-   platform-correct hint in four locales.
+   platform-correct hint in five locales.
 5. UI and docs never claim “Outlook automation” for the desktop app on any
    platform.
 6. `make ci-local` green on all three runners.

@@ -109,7 +109,7 @@ mitigations are invariant **C8** (flag off is inert) and the harness
 | [`09_testing_and_documentation.md`](./09_testing_and_documentation.md) | Gates for **both** repos. Binding. |
 | [`10_work_breakdown.md`](./10_work_breakdown.md) | PR-sized steps (`DS*` server, `DC*` client). This is the implementation order. |
 | [`11_security_and_compatibility.md`](./11_security_and_compatibility.md) | Allowlist, scopes, invariants, mobile classification. |
-| [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) | Canonical terms in EN/DE/ES/TR. Copy before UI. |
+| [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) | Canonical terms in EN/DE/ES/FR/TR. Copy before UI. |
 | [`13_cross_platform.md`](./13_cross_platform.md) | **Windows / macOS / Linux parity.** Directories, per-OS path confinement, secret stores, tool discovery, process execution, autostart, packaging, CI matrix. Binding for every `DC*`. |
 
 **Execute from [`10_work_breakdown.md`](./10_work_breakdown.md).** The sprint

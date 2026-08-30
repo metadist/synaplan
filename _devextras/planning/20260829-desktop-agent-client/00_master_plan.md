@@ -33,7 +33,7 @@ from [`10_work_breakdown.md`](./10_work_breakdown.md).
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
 | 1 | **New private repo `synaplan-desktop`.** Sibling of `synaplan-apps`. Not a Capacitor app. Not an Electron wrap of the Vue SPA. | **New repo** | |
-| 2 | **Stack: Tauri 2 + Vue 3 + TypeScript + Rust sidecar** for path confinement and process spawn. UI conventions follow Synaplan frontend (script setup, four locales, no hardcoded copy). | **Tauri 2** | |
+| 2 | **Stack: Tauri 2 + Vue 3 + TypeScript + Rust sidecar** for path confinement and process spawn. UI conventions follow Synaplan frontend (script setup, five locales, no hardcoded copy). | **Tauri 2** | |
 | 3 | **User-facing name: Synaplan Desktop.** Internal code: `desktop`. Never “Claude client”, “local agent”, or “brogent” in UI. | Locked | |
 | 4 | **“Skill” in the desktop means an Agent Skills folder** (`SKILL.md`). DAG `SkillDescriptor` and plugin prompt-packs keep their current names in code and stay out of this UI. | Locked | |
 | 5 | **No Claude products required.** The client calls Synaplan only (`/v1/messages`, `/mcp`, `/api/v1/*`). Models are whatever the account already has. | Locked | |
@@ -274,7 +274,7 @@ client.
 
 ## 7. Server product shape (v1) — Phase A
 
-**Channels → Desktop** (new child of Channels, four locales):
+**Channels → Desktop** (new child of Channels, five locales):
 
 - Flag off: page explains the feature is off (admin) or hidden.
 - Pair this computer (code + expiry).

@@ -220,7 +220,7 @@ allowlist a bare name — `PATH` is attacker-influenced.
 
 The **Check this computer** screen reports, per tool: found / missing / wrong
 version, the resolved absolute path, the detected version string, and a
-platform-correct install hint in all four locales. A skill whose
+platform-correct install hint in all five locales. A skill whose
 `compatibility` requires a missing tool is shown as **blocked** and is excluded
 from the model's skill catalog preface — never offered and then failed halfway
 through a tool loop.

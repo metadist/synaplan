@@ -71,7 +71,7 @@ synaplan-desktop/
 House rules to copy in spirit (not files) from `synaplan/AGENTS.md` and
 `Synamail/AGENTS.md`:
 
-- Four locales, same commit.
+- Five locales, same commit.
 - `make ci-local` is the gate (lint, types, unit tests, production build).
 - No `VITE_*` for the Synaplan URL — runtime, from pairing.
 - Never commit `sk_*`, keychain dumps, or pairing codes.
@@ -231,7 +231,7 @@ developer's real installation is never touched.
 - `app_dirs` returns the documented path on each OS (three expectations, one
   test) and honours `XDG_*` overrides on Linux.
 - Chat: mock SSE is rendered; 401 shows the disconnected copy.
-- i18n key parity (en/de/es/tr).
+- i18n key parity (en/de/es/fr/tr).
 - Hostname sanitization for the pre-filled computer name.
 - `make ci-local` green on Linux, Windows, and macOS.
 

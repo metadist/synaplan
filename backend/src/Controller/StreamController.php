@@ -73,6 +73,16 @@ class StreamController extends AbstractController
     private const MAX_INCOGNITO_HISTORY_MESSAGES = MessageProcessor::HISTORY_MAX_MESSAGES;
     private const MAX_INCOGNITO_HISTORY_CHARS = MessageProcessor::HISTORY_MAX_CHARS;
 
+    /**
+     * UI locales accepted as a BLANG seed, mirroring the SPA's
+     * `supportedLanguages` (frontend/src/i18n/index.ts) and
+     * {@see User::getLocale()}. Anything else falls back to `en` so a crafted
+     * value cannot poison BMESSAGES.BLANG (varchar(2)).
+     *
+     * @var list<string>
+     */
+    private const SUPPORTED_UI_LANGUAGES = ['de', 'en', 'es', 'fr', 'tr'];
+
     public function __construct(
         private EntityManagerInterface $em,
         private AiFacade $aiFacade,
@@ -244,7 +254,7 @@ class StreamController extends AbstractController
                     new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
                     new OA\Property(property: 'reasoning', type: 'string', enum: ['0', '1'], example: '0'),
                     new OA\Property(property: 'webSearch', type: 'string', enum: ['0', '1'], example: '0'),
-                    new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
+                    new OA\Property(property: 'language', type: 'string', enum: ['de', 'en', 'es', 'fr', 'tr'], example: 'de', description: 'Active UI locale from the client. Seeds BLANG on the inbound message so the sorter / Brave search / reply language prefer the interface language when the message language cannot be detected.'),
                     new OA\Property(property: 'modelId', type: 'string', example: '53'),
                     new OA\Property(property: 'fileIds', type: 'string', example: '1,2,3'),
                     new OA\Property(property: 'guestSession', type: 'string', example: 'gs_abc123'),
@@ -306,7 +316,7 @@ class StreamController extends AbstractController
         in: 'query',
         required: false,
         description: 'Active UI locale from the client (de/en/es/tr). Seeds inbound BLANG for sorting, Brave search_lang/ui_lang, and the reply language directive.',
-        schema: new OA\Schema(type: 'string', enum: ['de', 'en', 'es', 'tr'], example: 'de')
+        schema: new OA\Schema(type: 'string', enum: ['de', 'en', 'es', 'fr', 'tr'], example: 'de')
     )]
     #[OA\Parameter(
         name: 'modelId',
@@ -3739,7 +3749,7 @@ class StreamController extends AbstractController
      */
     private function resolveUiLanguage(mixed $requested, ?User $user): string
     {
-        $supported = ['de', 'en', 'es', 'tr'];
+        $supported = self::SUPPORTED_UI_LANGUAGES;
 
         if (is_string($requested)) {
             $normalized = strtolower(trim($requested));

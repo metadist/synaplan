@@ -109,9 +109,9 @@ describe('i18n locale parity (Saved Tasks / Connections)', () => {
   it('uses the same interpolation placeholders across locales', () => {
     const mismatches: string[] = []
     for (const key of unionKeys) {
-      const expected = placeholders(flats.en[key] ?? '')
+      const expected = placeholderSet(flats.en[key] ?? '')
       for (const locale of ['de', 'es', 'fr', 'tr'] as const) {
-        const actual = placeholders(flats[locale][key] ?? '')
+        const actual = placeholderSet(flats[locale][key] ?? '')
         if (expected.join(',') !== actual.join(',')) {
           mismatches.push(`${key}: en={${expected.join(',')}} ${locale}={${actual.join(',')}}`)
         }

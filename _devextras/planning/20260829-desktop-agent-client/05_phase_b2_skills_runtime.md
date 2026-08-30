@@ -290,7 +290,7 @@ byte-exact while Windows and macOS case-fold.
 2. The escape corpus runs on Linux, Windows, and macOS in CI and fails the PR
    if someone “simplifies” canonicalization (C11).
 3. No shell is constructed anywhere; the CI grep guard is in place (C12).
-4. User can add a read folder in the UI (four locales), and the UI shows the
+4. User can add a read folder in the UI (five locales), and the UI shows the
    platform-native path.
 5. Chat without skills still works (empty catalog).
 6. `make ci-local` green on all three runners.

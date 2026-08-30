@@ -117,7 +117,7 @@ holds; flag exists and is off.
 | **DS6** | Pairing-code service (Redis TTL 10 min, rate limits) + `POST /pairing-codes` | BE | M | `DS3`, `DS5` | Flag off → 404; reuse after consume fails; codes not logged at info |
 | **DS7** | `POST /pair` mints restricted key + device row; `GET/DELETE /devices` | BE | M | `DS2`, `DS6` | Key scopes exactly the four `desktop:*`; revoke → 401 on `/v1/models`; 404 other user’s id |
 | **DS8** | Runtime config boolean `desktopAgentEnabled` + OpenAPI + generate-schemas | BE | S | `DS3` | False by default; true only when resolver says so |
-| **DS9** | Channels → Desktop Vue: pair dialog, device table, revoke, nav child | FE | M | `DS7`, `DS8`, `L1`, `M0` | Hidden when flag off; four locales; dark + V2 + 320px; `useDialog`; **no download link** |
+| **DS9** | Channels → Desktop Vue: pair dialog, device table, revoke, nav child | FE | M | `DS7`, `DS8`, `L1`, `M0` | Hidden when flag off; five locales; dark + V2 + 320px; `useDialog`; **no download link** |
 | **DS10** | `_devextras/testing/desktop/pair.sh` against the local stack | Test | S | `DS7` | Script documented; 200 on `/v1/models`, 403 on admin |
 
 **Sprint A2 exit:** pair → scoped key → list → revoke, all flag-gated, proved
@@ -137,7 +137,7 @@ without client deadline pressure (master plan §0.1, decision 22).
 | **DS13** | `POST /api/v1/desktop/jobs` + OpenAPI + schemas | BE | M | `DS7`, `DS12` | Flag off 404; foreign device 404; closed `type` enum |
 | **DS14** | MCP `agent_checkin` + `agent_report_result` (`desktop:jobs`) | BE | M | `DS12`, `DS2` | `tools/list` superset with flag on, **unchanged** with flag off; bad lease 400; result size cap |
 | **DS15** | `app:desktop:reap-jobs` + Redis lock | BE | S | `DS12` | Concurrent ticks: one runner; flag off → immediate no-op |
-| **DS16** | Web: “Run on this computer” + waiting card + honest failed state (no planner hook) | FE | M | `DS13`, `DS9` | Hidden without devices; four locales; expired job shows failed, not a forever spinner |
+| **DS16** | Web: “Run on this computer” + waiting card + honest failed state (no planner hook) | FE | M | `DS13`, `DS9` | Hidden without devices; five locales; expired job shows failed, not a forever spinner |
 | **DS17** | `fake-device.sh` harness: pair → check-in → lease → report, plus every refusal path in sprint A3 §2.6 | Test | M | `DS14`, `DS10` | All rows of the §2.6 table asserted; runs against local Docker |
 | **DS18** | Contract freeze: `protocol: 1`, error-code enum, committed fixtures, `docs/DESKTOP.md` + Messages-gateway “Related” link | BE + Docs | M | `DS14`, `DS17` | Fixtures asserted against live OpenAPI/MCP schema; doc states the client is not released yet |
 
@@ -172,7 +172,7 @@ runners**; secret in the OS store on each OS; SPA not vendored.
 | **DC6** | Rust path confinement (canonicalize → normalize → component contain → deny) + `config.toml` defaults | Client | M | `DC22` | Escape and deny-glob tests fail the PR if confinement is weakened |
 | **DC24** | **Per-OS confinement corpus** `tests/confinement/cases.toml` + the platform normalizations behind it (junctions, UNC, drive-relative, 8.3, ADS, reserved names, trailing dot, long paths, firmlinks, NFC/NFD, case folding vs byte-exact, TOCTOU) | Client | **M–L** | `DC6` | Every row of B2 §2.2 green on three runners; removing a normalization reddens a named case |
 | **DC7** | SKILL.md scanner + frontmatter validation + case-collision detection + fixture `hello-files` | Client | S | `DC6` | Bad name/dir skipped; case-colliding names refused on every OS |
-| **DC8** | This-computer UI: add/remove read/write folders, platform-native path display (four locales) | Client | M | `DC22`, `L1` | Roots stored canonicalized at pick time; deny list not user-removable in v1 |
+| **DC8** | This-computer UI: add/remove read/write folders, platform-native path display (five locales) | Client | M | `DC22`, `L1` | Roots stored canonicalized at pick time; deny list not user-removable in v1 |
 | **DC25** | Known-folder resolution (Windows Known Folder API incl. OneDrive redirection, macOS iCloud-relocated Documents, `user-dirs.dirs`) + honest handling of cloud placeholder files | Client | S | `DC8` | Defaults resolve via the OS API, never by string; a placeholder read explains itself instead of failing |
 | **DC9** | Messages tool definitions `Read` / `Write` / `Bash` → `{program, args[], workdir}`, no shell, process-tree timeout, constructed env, iteration cap | Client | M | `DC4`, `DC6`, `DC7` | Mock `tool_use` Write creates a file in the out-box; metacharacter command refused; CI grep guard for `sh -c` / `cmd /c` / `powershell -Command` (C12) |
 | **DC10** | First-program confirm dialog; key and injection env vars absent from subprocess env | Client | S | `DC9` | Env test incl. `PYTHONPATH` / `LD_PRELOAD` / `NODE_OPTIONS`; cancel → no process |
@@ -202,7 +202,7 @@ three OSes; the escape corpus is green on all three and red when weakened
 | -- | ---- | ----- | ---- | ------- | ---------- |
 | **DC15** | Vendor official `pptx` at a pinned SHA + `docs/BUNDLED_SKILLS.md` + NOTICE | Client | M | `DC11` | Parses; license present; not live-fetched |
 | **DC16** | Doctor v1: probe-based detection of Python / Node / LibreOffice; block a skill whose runtime is missing | Client | S | `DC15` | Missing python → skill blocked, not offered to the model; found-but-silent binary counts as missing |
-| **DC26** | **Platform discovery rules**: Store-stub detection, `py -3`, `PATHEXT`, Program Files and per-user Python, `.app` bundle `soffice`, both Homebrew prefixes, CLT shim, PEP 668 / missing `venv`, Flatpak honesty | Client | M | `DC16` | Fixture-filesystem tests per OS (B4 §1.2.1); hints correct in four locales |
+| **DC26** | **Platform discovery rules**: Store-stub detection, `py -3`, `PATHEXT`, Program Files and per-user Python, `.app` bundle `soffice`, both Homebrew prefixes, CLT shim, PEP 668 / missing `venv`, Flatpak honesty | Client | M | `DC16` | Fixture-filesystem tests per OS (B4 §1.2.1); hints correct in five locales |
 | **DC17** | Binary allowlist from resolved absolute paths (python, node, soffice, skill scripts); deny curl, shells, script hosts | Client | S | `DC9`, `DC26` | Fixture `curl` denied; a program not produced by the doctor is refused before spawn |
 | **DC18** | Hermetic “write minimal pptx” CI script on three runners + filled manual matrix | Client | M | `DC15`, `DC26`, `P1` | Green on Linux, Windows, macOS without LibreOffice; §1.5 matrix filled including the two negative rows |
 
