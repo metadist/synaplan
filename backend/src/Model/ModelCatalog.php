@@ -3133,9 +3133,9 @@ class ModelCatalog
             'quality' => 7,
             'rating' => 0.8,
             'json' => [
-                'description' => 'Self-hosted Piper TTS via synaplan-tts. Multi-language (en, de, es, tr, ru, fa). Free, no API key required.',
+                'description' => 'Self-hosted Piper TTS via synaplan-tts. Multi-language (en, de, es, fr, tr, ru, fa). Free, no API key required.',
                 'params' => [
-                    'voices' => ['en_US-lessac-medium', 'de_DE-thorsten-medium', 'es_ES-davefx-medium', 'tr_TR-dfki-medium', 'ru_RU-irina-medium', 'fa_IR-reza_ibrahim-medium'],
+                    'voices' => ['en_US-lessac-medium', 'de_DE-kerstin-low', 'es_ES-davefx-medium', 'fr_FR-siwis-medium', 'tr_TR-dfki-medium', 'ru_RU-irina-medium', 'fa_IR-reza_ibrahim-medium'],
                 ],
                 'features' => ['multilingual', 'self-hosted', 'free'],
             ],
