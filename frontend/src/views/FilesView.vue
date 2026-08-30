@@ -810,7 +810,7 @@
                     />
                     <div
                       class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
-                      :class="getFileColorClass(file.filename)"
+                      :class="getFileColorClass()"
                     >
                       <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                     </div>
@@ -948,7 +948,7 @@
                         <div class="flex items-center gap-3 min-w-0">
                           <div
                             class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            :class="getFileColorClass(file.filename)"
+                            :class="getFileColorClass()"
                           >
                             <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                           </div>
@@ -1215,7 +1215,7 @@
                   />
                   <div
                     class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shrink-0"
-                    :class="getFileColorClass(file.filename)"
+                    :class="getFileColorClass()"
                   >
                     <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                   </div>
@@ -1347,7 +1347,7 @@
                       <div class="flex items-center gap-3 min-w-0">
                         <div
                           class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          :class="getFileColorClass(file.filename)"
+                          :class="getFileColorClass()"
                         >
                           <Icon :icon="getFileIcon(file.filename)" class="w-4 h-4" />
                         </div>
@@ -1614,6 +1614,7 @@ import filesService, {
   type UploadProgress,
   UploadBlockedError,
 } from '@/services/filesService'
+import { previewBadgeClass, previewIconForName } from '@/services/filePreview'
 import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
@@ -2004,23 +2005,10 @@ const closeFolderMenu = (e: MouseEvent) => {
   }
 }
 
-const getFileColorClass = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase() || ''
-  const colorMap: Record<string, string> = {
-    pdf: 'bg-red-500/10 text-red-500',
-    docx: 'bg-blue-500/10 text-blue-500',
-    doc: 'bg-blue-500/10 text-blue-500',
-    txt: 'bg-gray-500/10 text-gray-500',
-    jpg: 'bg-purple-500/10 text-purple-500',
-    jpeg: 'bg-purple-500/10 text-purple-500',
-    png: 'bg-purple-500/10 text-purple-500',
-    mp3: 'bg-pink-500/10 text-pink-500',
-    mp4: 'bg-pink-500/10 text-pink-500',
-    xlsx: 'bg-emerald-500/10 text-emerald-500',
-    csv: 'bg-emerald-500/10 text-emerald-500',
-  }
-  return colorMap[ext] || 'bg-[var(--brand)]/10 text-[var(--brand)]'
-}
+// Neutral, token-based badge shared with the Generated grid (#1499). Replaces
+// the previous per-extension Tailwind rainbow (bg-red-500/10, bg-purple-500/10,
+// …), which was visually noisy and off-token.
+const getFileColorClass = (): string => previewBadgeClass()
 
 // Drag & Drop handlers
 const handleDragEnter = (event: DragEvent) => {
@@ -2111,27 +2099,9 @@ const onFolderDrop = async (event: DragEvent, folderName: string) => {
   }
 }
 
-const getFileIcon = (filename: string): string => {
-  const ext = filename.split('.').pop()?.toLowerCase() || ''
-
-  const iconMap: Record<string, string> = {
-    pdf: 'heroicons:document-text',
-    docx: 'heroicons:document-text',
-    doc: 'heroicons:document-text',
-    txt: 'heroicons:document-text',
-    jpg: 'heroicons:photo',
-    jpeg: 'heroicons:photo',
-    png: 'heroicons:photo',
-    gif: 'heroicons:photo',
-    webp: 'heroicons:photo',
-    mp3: 'heroicons:musical-note',
-    mp4: 'heroicons:film',
-    xlsx: 'heroicons:table-cells',
-    csv: 'heroicons:table-cells',
-  }
-
-  return iconMap[ext] || 'heroicons:document'
-}
+// Icon set shared with the Generated grid via the common preview helper (#1499)
+// so both surfaces stay consistent (no divergent second icon map).
+const getFileIcon = (filename: string): string => previewIconForName(filename)
 
 const uploadFiles = async () => {
   if (selectedFiles.value.length === 0) {

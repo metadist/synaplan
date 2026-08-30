@@ -1293,6 +1293,9 @@
       "retry": "Retry",
       "provenance": "from {source} · {time}"
     },
+    "preview": {
+      "play": "Play"
+    },
     "generated": {
       "title": "Generated",
       "subtitle": "Images, videos, audio, documents and calendar invites created in your chats and tasks.",

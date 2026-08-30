@@ -138,6 +138,7 @@ final class AsyncMediaJobLifecycleIntegrationTest extends KernelTestCase
             new MediaJobRealtimeNotifier($this->realtimePublisher, $this->jobService, $jobLogger),
             $usageRecorder,
             $container->get(\App\Service\Multitask\TaskPlanStore::class),
+            $container->get(\App\Service\File\ThumbnailService::class),
             $this->em,
             $jobLogger,
         );

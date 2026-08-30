@@ -2467,6 +2467,9 @@
       "retry": "Yeniden dene",
       "provenance": "{source} · {time}"
     },
+    "preview": {
+      "play": "Oynat"
+    },
     "generated": {
       "title": "Üretilen",
       "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",

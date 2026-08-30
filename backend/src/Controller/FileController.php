@@ -528,6 +528,64 @@ class FileController extends AbstractController
         return $response;
     }
 
+    #[Route('/{id}/thumb', name: 'thumb', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/thumb',
+        summary: 'Serve a file thumbnail (e.g. a video poster frame)',
+        description: 'Returns the generated thumbnail image for a file (currently video poster frames produced by ThumbnailService). Responds 404 when the file has no thumbnail, letting the client fall back to a type icon.',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Thumbnail image'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File or thumbnail not found'),
+        ]
+    )]
+    public function thumbnail(int $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        // Same read-only media-token path as downloadFile(): an <img> poster
+        // carries the token in the URL because it cannot send an auth header.
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        $thumbPath = $file->getThumbPath();
+        if (null === $thumbPath || '' === $thumbPath) {
+            return $this->json(['error' => 'No thumbnail'], Response::HTTP_NOT_FOUND);
+        }
+
+        $absolutePath = $this->uploadDir.'/'.ltrim($thumbPath, '/');
+        if (!FileHelper::fileExistsNfs($absolutePath)) {
+            return $this->json(['error' => 'Thumbnail not found on disk'], Response::HTTP_NOT_FOUND);
+        }
+
+        $response = new BinaryFileResponse($absolutePath);
+        $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_INLINE);
+        $response->setPrivate();
+        // A poster frame is immutable for the life of the file, so it is safe to
+        // cache briefly in the browser to avoid re-fetching on every grid render.
+        $response->headers->set('Cache-Control', 'private, max-age=3600');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
+    }
+
     /**
      * Rebuild a missing on-disk binary from the file's stored text source
      * (BFILETEXT) and return it as a one-shot download. Used as a safety net

@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
@@ -922,7 +923,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // it here too, otherwise users on inline rendering never see their
             // chat-generated media in the file world. Best-effort + idempotent.
             // Incognito sessions mark it ephemeral for post-session cleanup.
-            $this->generatedFileRegistrar->register(
+            $registeredFile = $this->generatedFileRegistrar->register(
                 $message->getUserId(),
                 $localPath,
                 $mediaType,
@@ -941,6 +942,15 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         'video' => $localPath,
                         'thumbnail' => $thumbnailPath,
                     ]);
+
+                    // Persist the poster on the file row so the Generated grid can
+                    // serve it via GET /api/v1/files/{id}/thumb (#1499). Without this
+                    // the frame is written to disk but BTHUMBPATH stays null, so the
+                    // frontend's thumb_url is always null and no poster ever shows.
+                    if ($registeredFile instanceof File) {
+                        $registeredFile->setThumbPath($thumbnailPath);
+                        $this->em->flush();
+                    }
                 }
             }
 
@@ -1035,7 +1045,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
             // Stop-then-restart loop can't be used to bypass billing. The cost
             // is deterministic from the requested duration/resolution (video) or
             // a single image, mirroring the success-path media_usage shape.
-            $cancelledMediaUsage = $this->buildCancelledMediaUsage($mediaType, $options, $classification, $result ?? null);
+            // $result is initialised to null before the try, so it is always
+            // defined here (null when the abort happened before the provider call
+            // returned, the provider array otherwise) — `?? null` was redundant.
+            $cancelledMediaUsage = $this->buildCancelledMediaUsage($mediaType, $options, $classification, $result);
             $recordedMediaUsage = $this->maybeRecordMediaUsage($user, $options, $mediaAction, $modelId, $provider, $modelName, $cancelledMediaUsage);
 
             return [
