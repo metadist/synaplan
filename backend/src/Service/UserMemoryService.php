@@ -494,7 +494,7 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $memories;
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories);
         } catch (\Throwable $e) {
             $this->logger->error('searchMemoriesByVector failed', [
                 'user_id' => $userId,
@@ -645,12 +645,68 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $memories;
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories);
         } catch (\Throwable $e) {
             $this->logger->error('Memory search failed', ['error' => $e->getMessage()]);
 
             return [];
         }
+    }
+
+    /**
+     * Drop retrieval hits that have no active SQL row (#1570).
+     *
+     * The Qdrant `user_memories` index and the BUSERMEMORIES catalog can
+     * diverge: a point can outlive its SQL row when rows are removed/reset
+     * without a successful Qdrant purge. Such orphans were still returned and
+     * used in chat replies, yet the Memories list/dialog — which reads SQL —
+     * never showed them, so they were invisible and unmanageable. SQL is the
+     * source of truth for what the user can see and manage, so a hit that is
+     * not an active SQL row must not be used in a reply either. This keeps the
+     * "X memories used" line consistent with the Memories UI.
+     *
+     * Only applied to the user-facing memory load; hidden feedback namespaces
+     * (searched with includeHidden=true) are internal and intentionally not
+     * surfaced in the list, so they are left untouched.
+     *
+     * @param list<array<string, mixed>> $memories
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function reconcileWithSqlCatalog(int $userId, array $memories): array
+    {
+        if ([] === $memories) {
+            return $memories;
+        }
+
+        $ids = [];
+        foreach ($memories as $memory) {
+            $id = $memory['id'] ?? null;
+            if (is_int($id)) {
+                $ids[] = $id;
+            }
+        }
+
+        $activeIds = array_flip($this->memoryRepository->filterActiveIds($userId, $ids));
+
+        $reconciled = [];
+        foreach ($memories as $memory) {
+            $id = $memory['id'] ?? null;
+            if (is_int($id) && isset($activeIds[$id])) {
+                $reconciled[] = $memory;
+            }
+        }
+
+        $dropped = count($memories) - count($reconciled);
+        if ($dropped > 0) {
+            $this->logger->info('Dropped orphaned Qdrant memory hits without an active SQL row', [
+                'user_id' => $userId,
+                'dropped' => $dropped,
+                'kept' => count($reconciled),
+            ]);
+        }
+
+        return $reconciled;
     }
 
     /**

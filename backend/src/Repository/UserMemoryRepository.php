@@ -75,6 +75,35 @@ final class UserMemoryRepository extends ServiceEntityRepository
         return $memories;
     }
 
+    /**
+     * Of the given memory ids, return the subset that are active rows of the
+     * user. Used to reconcile Qdrant retrieval hits against the SQL catalog so
+     * a memory the UI cannot show is never used in a reply (#1570).
+     *
+     * @param list<int> $ids
+     *
+     * @return list<int>
+     */
+    public function filterActiveIds(int $userId, array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<array{id: int|string}> $rows */
+        $rows = $this->createQueryBuilder('m')
+            ->select('m.id AS id')
+            ->where('m.userId = :userId')
+            ->andWhere('m.active = true')
+            ->andWhere('m.id IN (:ids)')
+            ->setParameter('userId', $userId)
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
     public function countActiveForUser(int $userId): int
     {
         return (int) $this->createQueryBuilder('m')
