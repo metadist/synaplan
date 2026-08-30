@@ -1,0 +1,7 @@
+{
+  "protocol": 1,
+  "agentKind": "synaplan-desktop",
+  "capabilities": ["skill.run"],
+  "enabledSkills": ["hello-files", "pptx"],
+  "status": "idle"
+}

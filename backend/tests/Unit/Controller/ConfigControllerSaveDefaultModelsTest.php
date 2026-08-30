@@ -101,6 +101,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             $this->createStub(GuestChatConfig::class),
             $this->createStub(WebSpeechConfig::class),
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
+            $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
             $this->createStub(ChatReadinessService::class),
             new DemoLoginHint(
                 $this->createStub(UserRepository::class),

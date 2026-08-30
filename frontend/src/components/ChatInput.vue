@@ -49,6 +49,17 @@
         </div>
       </div>
 
+      <!-- DS16: waiting/failed cards for jobs dispatched to a paired computer. -->
+      <div v-if="desktopJobs.length > 0" class="mb-3 flex flex-col gap-2">
+        <DesktopJobCard
+          v-for="job in desktopJobs"
+          :key="job.id"
+          :job-id="job.id"
+          :device-name="job.deviceName"
+          @dismiss="dismissDesktopJob(job.id)"
+        />
+      </div>
+
       <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
       <slot name="banner" />
 
@@ -269,6 +280,7 @@
                     @toggle-thinking="toggleThinking"
                     @toggle-voice-reply="toggleVoiceReply"
                     @toggle-enhance="toggleEnhance"
+                    @run-on-device="handleRunOnDevice"
                   />
                   <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
                 </template>
@@ -400,6 +412,7 @@ import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
+import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
@@ -422,6 +435,8 @@ import { useAutoPersist, useAttachmentPersist } from '@/composables/useInputPers
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useDialog } from '@/composables/useDialog'
+import { desktopApi } from '@/services/api/desktopApi'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 
@@ -549,7 +564,59 @@ const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const incognitoStore = useIncognitoStore()
+const dialog = useDialog()
 const { warning, error: showError, success } = useNotification()
+
+// DS16: jobs dispatched to a paired computer via "Run on this computer".
+// Rendered as waiting/failed cards above the composer until dismissed.
+const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
+
+/**
+ * Send the typed instruction to a paired computer as a `skill.run` job. There is
+ * deliberately no planner hook (prompt-injection risk, §2.3): the user picks the
+ * skill explicitly. The server never verifies the skill exists — an uninstalled
+ * skill fails honestly on the device, surfaced by the waiting/failed card.
+ */
+const handleRunOnDevice = async (device: { id: number; name: string }) => {
+  const prompt = message.value.trim()
+  if (!prompt) {
+    warning(t('config.desktop.run.needPrompt'))
+    return
+  }
+
+  const skill = (
+    await dialog.prompt({
+      title: t('config.desktop.run.skillTitle'),
+      message: t('config.desktop.run.skillMessage', { name: device.name }),
+      placeholder: t('config.desktop.run.skillPlaceholder'),
+      confirmText: t('config.desktop.run.action'),
+    })
+  )?.trim()
+  if (!skill) return
+
+  if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
+    showError(t('config.desktop.run.invalidSkill'))
+    return
+  }
+
+  try {
+    const { jobId } = await desktopApi.enqueueJob({
+      deviceId: device.id,
+      skill,
+      prompt,
+      chatId: chatsStore.activeChatId,
+    })
+    desktopJobs.value.push({ id: jobId, deviceName: device.name })
+    message.value = ''
+    success(t('config.desktop.run.sent', { name: device.name }))
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('config.desktop.run.enqueueFailed'))
+  }
+}
+
+const dismissDesktopJob = (jobId: number) => {
+  desktopJobs.value = desktopJobs.value.filter((j) => j.id !== jobId)
+}
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()

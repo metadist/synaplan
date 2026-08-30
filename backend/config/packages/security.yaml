@@ -127,6 +127,13 @@ security:
         - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/mcp-servers/oauth/callback, roles: PUBLIC_ACCESS }
 
+        # Desktop pairing exchange: a fresh Synaplan Desktop client has no
+        # session yet, so it swaps a (rate-limited, one-time, TTL'd) pairing
+        # code for its scoped key here. Anchored exactly so it never exposes the
+        # other /api/v1/desktop/* routes, which stay behind the catch-all below.
+        # When DESKTOP_AGENT.ENABLED is off the controller still 404s (C8).
+        - { path: ^/api/v1/desktop/pair$, roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 

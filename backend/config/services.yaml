@@ -604,6 +604,12 @@ services:
         arguments:
             $appUrl: '%env(APP_URL)%'
 
+    # Synaplan Desktop: pairing mints a scoped key + device row; the returned
+    # apiBaseUrl is the public app URL the client will call.
+    App\Service\Desktop\PairingService:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
     # Message Processing Services
     App\Service\Message\MessagePreProcessor:
         arguments:

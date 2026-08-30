@@ -171,6 +171,26 @@
         </div>
         <ArrowTopRightOnSquareIcon class="w-4 h-4 flex-shrink-0 txt-secondary" />
       </button>
+
+      <!-- DS16: dispatch the typed instruction to a paired computer. Only shown
+           when the flag is on AND the user has ≥1 active device — otherwise the
+           row is meaningless (nothing could answer). -->
+      <button
+        v-if="showRunOnDevice"
+        ref="itemRefs"
+        class="dropdown-item"
+        type="button"
+        data-testid="btn-tool-run-on-device"
+        @click="handleRunOnDevice"
+        @keydown.down.prevent="focusNext"
+        @keydown.up.prevent="focusPrevious"
+      >
+        <Icon icon="mdi:monitor-arrow-down" class="w-5 h-5 flex-shrink-0" />
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium">{{ $t('config.desktop.run.action') }}</span>
+          <div class="text-xs txt-secondary truncate">{{ runOnDeviceSubtext }}</div>
+        </div>
+      </button>
     </div>
   </div>
 </template>
@@ -184,11 +204,14 @@ import {
   CheckIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
+import { useI18n } from 'vue-i18n'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAuthStore } from '@/stores/auth'
 import { getFeaturesStatus, type Feature } from '@/services/featuresService'
 import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
+import { useDesktopDevices } from '@/composables/useDesktopDevices'
 
 interface Props {
   activeCommand?: string | null
@@ -208,6 +231,7 @@ const emit = defineEmits<{
   toggleThinking: []
   toggleVoiceReply: []
   toggleEnhance: []
+  runOnDevice: [device: { id: number; name: string }]
 }>()
 
 /** Feature-gated tools that toggle a removable badge in the chat input. */
@@ -236,8 +260,27 @@ const commandTools = [
 ] as const
 
 const router = useRouter()
+const { t } = useI18n()
 const authStore = useAuthStore()
 const commandsStore = useCommandsStore()
+const { activeDevices, hasActiveDevices, ensureLoaded } = useDesktopDevices()
+
+// DS16: the composer action is only meaningful with a live target. Gated on the
+// feature flag AND at least one active device (revoking the last one hides it).
+const showRunOnDevice = computed(() => isDesktopAgentEnabled() && hasActiveDevices.value)
+
+const runOnDeviceSubtext = computed(() => {
+  const list = activeDevices.value
+  if (list.length === 1) return list[0].name
+  return t('config.desktop.run.multiple', { count: list.length })
+})
+
+const handleRunOnDevice = () => {
+  const device = activeDevices.value[0]
+  if (!device) return
+  emit('runOnDevice', { id: device.id, name: device.name })
+  closeDropdown()
+}
 const isOpen = ref(false)
 const itemRefs = ref<HTMLElement[]>([])
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -368,6 +411,9 @@ const handleClickOutside = (e: MouseEvent) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   mobileMq.addEventListener('change', onMobileMqChange)
+  // Know whether to offer "Run on this computer" without waiting for the menu to
+  // open. No-op (and no request) when the Desktop flag is off.
+  if (isDesktopAgentEnabled()) ensureLoaded()
 })
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)

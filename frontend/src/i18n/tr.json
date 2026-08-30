@@ -101,6 +101,7 @@
     "poweredBy": "Sunan"
   },
   "pageTitles": {
+    "desktop": "Masaüstü",
     "login": "Giriş",
     "register": "Kayıt Ol",
     "forgotPassword": "Şifremi Unuttum",
@@ -644,6 +645,7 @@
     "upgrade": "Yükselt"
   },
   "nav": {
+    "desktop": "Masaüstü",
     "chat": "Sohbet",
     "new": "Yeni",
     "newDescription": "Yeni bir sohbet başlat",
@@ -3105,6 +3107,62 @@
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "usageCount": "istek"
+    },
+    "desktop": {
+      "title": "Masaüstü",
+      "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
+      "notAvailableYet": "Synaplan Desktop henüz indirilebilir değil. Bağlantıyı test etmek için şimdiden bir eşleme kodu oluşturabilirsiniz.",
+      "pairButton": "Bu bilgisayarı bağla",
+      "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
+      "disconnect": "Bağlantıyı kes",
+      "confirmDisconnectTitle": "Bu bilgisayarın bağlantısını kes",
+      "confirmDisconnect": "„{name}” artık hesabınıza erişemeyecek. Daha sonra yeni bir kodla tekrar bağlayabilirsiniz.",
+      "disconnected": "Bilgisayarın bağlantısı kesildi.",
+      "disconnectFailed": "Bilgisayarın bağlantısı kesilemedi.",
+      "pairing": {
+        "title": "Bu bilgisayarı bağla",
+        "intro": "Bağlamak istediğiniz bilgisayarda Synaplan Desktop'ı açın, ardından bu adresi ve kodu girin.",
+        "addressLabel": "Sunucu adresi",
+        "codeLabel": "Eşleme kodu",
+        "expiresIn": "{time} içinde sona erer",
+        "expired": "Bu kodun süresi doldu.",
+        "newCode": "Yeni kod oluştur",
+        "copyAddress": "Adresi kopyala",
+        "copyCode": "Kodu kopyala",
+        "createFailed": "Eşleme kodu oluşturulamadı.",
+        "copyFailed": "Panoya kopyalanamadı."
+      },
+      "devices": {
+        "empty": "Henüz bağlı bilgisayar yok.",
+        "name": "Bilgisayar",
+        "status": "Durum",
+        "lastSeen": "Son görülme",
+        "waitingJobs": "Bekleyen işler",
+        "actions": "İşlemler",
+        "never": "hiç",
+        "statusActive": "Bağlı",
+        "statusRevoked": "Bağlantı kesildi"
+      },
+      "run": {
+        "action": "Bu bilgisayarda çalıştır",
+        "multiple": "{count} bilgisayar",
+        "needPrompt": "Önce bilgisayarın ne yapması gerektiğini yazın.",
+        "skillTitle": "Bu bilgisayarda çalıştır",
+        "skillMessage": "„{name}” üzerinde hangi skill çalıştırılsın?",
+        "skillPlaceholder": "örn. pptx",
+        "invalidSkill": "Yalnızca küçük harf, rakam ve kısa çizgi kullanın.",
+        "sent": "„{name}” gönderildi.",
+        "enqueueFailed": "İş gönderilemedi."
+      },
+      "jobCard": {
+        "waiting": "{name} bekleniyor",
+        "done": "{name} tamamlandı",
+        "failed": "{name} tamamlayamadı",
+        "noAnswer": "Bu bilgisayar yanıt vermedi.",
+        "unknownSkill": "Bu bilgisayarda bu skill yok.",
+        "skillDisabled": "Bu skill bu bilgisayarda kapalı.",
+        "localError": "Skill bu bilgisayarda başarısız oldu."
+      }
     },
     "phoneVerification": {
       "title": "Telefon Doğrulama",

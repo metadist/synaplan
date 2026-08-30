@@ -101,6 +101,7 @@
     "poweredBy": "Propulsé par"
   },
   "pageTitles": {
+    "desktop": "Ordinateur",
     "login": "Connexion",
     "register": "Inscription",
     "forgotPassword": "Mot de passe oublié",
@@ -655,6 +656,7 @@
     "upgrade": "Passer à une formule supérieure"
   },
   "nav": {
+    "desktop": "Ordinateur",
     "chat": "Chat",
     "new": "Nouveau",
     "newDescription": "Démarrer un nouveau chat",
@@ -2249,6 +2251,62 @@
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "usageCount": "requêtes"
+    },
+    "desktop": {
+      "title": "Ordinateur",
+      "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
+      "notAvailableYet": "Synaplan Desktop n'est pas encore disponible au téléchargement. Vous pouvez déjà créer un code d'association pour tester la connexion.",
+      "pairButton": "Associer cet ordinateur",
+      "loadFailed": "Impossible de charger les ordinateurs connectés.",
+      "disconnect": "Déconnecter",
+      "confirmDisconnectTitle": "Déconnecter cet ordinateur",
+      "confirmDisconnect": "« {name} » ne pourra plus accéder à votre compte. Vous pourrez l'associer à nouveau plus tard avec un nouveau code.",
+      "disconnected": "Ordinateur déconnecté.",
+      "disconnectFailed": "Impossible de déconnecter l'ordinateur.",
+      "pairing": {
+        "title": "Associer cet ordinateur",
+        "intro": "Ouvrez Synaplan Desktop sur l'ordinateur à connecter, puis saisissez cette adresse et ce code.",
+        "addressLabel": "Adresse du serveur",
+        "codeLabel": "Code d'association",
+        "expiresIn": "Expire dans {time}",
+        "expired": "Ce code a expiré.",
+        "newCode": "Créer un nouveau code",
+        "copyAddress": "Copier l'adresse",
+        "copyCode": "Copier le code",
+        "createFailed": "Impossible de créer le code d'association.",
+        "copyFailed": "Impossible de copier dans le presse-papiers."
+      },
+      "devices": {
+        "empty": "Aucun ordinateur n'est encore connecté.",
+        "name": "Ordinateur",
+        "status": "Statut",
+        "lastSeen": "Vu pour la dernière fois",
+        "waitingJobs": "Tâches en attente",
+        "actions": "Actions",
+        "never": "jamais",
+        "statusActive": "Connecté",
+        "statusRevoked": "Déconnecté"
+      },
+      "run": {
+        "action": "Exécuter sur cet ordinateur",
+        "multiple": "{count} ordinateurs",
+        "needPrompt": "Saisissez d'abord ce que l'ordinateur doit faire.",
+        "skillTitle": "Exécuter sur cet ordinateur",
+        "skillMessage": "Quel skill exécuter sur « {name} » ?",
+        "skillPlaceholder": "p. ex. pptx",
+        "invalidSkill": "Utilisez uniquement des minuscules, des chiffres et des traits d'union.",
+        "sent": "Envoyé à « {name} ».",
+        "enqueueFailed": "Impossible d'envoyer la tâche."
+      },
+      "jobCard": {
+        "waiting": "En attente de {name}",
+        "done": "{name} a terminé",
+        "failed": "{name} n'a pas pu terminer",
+        "noAnswer": "Cet ordinateur n'a pas répondu.",
+        "unknownSkill": "Cet ordinateur n'a pas ce skill.",
+        "skillDisabled": "Ce skill est désactivé sur cet ordinateur.",
+        "localError": "Le skill a échoué sur cet ordinateur."
+      }
     },
     "phoneVerification": {
       "title": "Vérification du téléphone",

@@ -276,6 +276,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.aiAgents' },
     },
     {
+      path: '/channels/desktop',
+      name: 'channels-desktop',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.desktop' },
+    },
+    {
       path: '/channels/api',
       name: 'channels-api',
       component: () => import('@/views/ConfigView.vue'),

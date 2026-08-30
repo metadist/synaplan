@@ -278,6 +278,20 @@ Two methods are supported:
 
 Both use the same Synaplan API keys. Create keys at **Settings > API Keys** in the Synaplan UI.
 
+### Scoped vs. legacy keys
+
+Synaplan API keys can carry **scopes** that limit what a key may do. This does
+**not** change existing keys: a key with no scopes (every key created before
+scopes existed, and any key you create without choosing scopes) keeps **full
+access**, exactly as before, and so does a webhook-only key. Your current
+integrations are unaffected — nothing that worked yesterday stops working.
+
+The only keys that are restricted today are the ones minted when a user pairs a
+[Synaplan Desktop](./DESKTOP.md) computer: those are limited to a small
+`desktop:*` scope set (chat, MCP, files, jobs) so a lost laptop can be revoked
+without exposing the whole account. If you never pair a desktop computer, you
+never see a scoped key.
+
 ## Error Format
 
 Errors follow the OpenAI error format:

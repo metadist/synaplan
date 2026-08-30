@@ -1,0 +1,8 @@
+{
+  "leaseToken": "lt_0000000000000000000000000000000000000000000000000000",
+  "status": "failed",
+  "errorCode": "unknown_skill",
+  "result": {
+    "message": "This computer does not have a skill named 'pptx'."
+  }
+}
