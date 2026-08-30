@@ -79,15 +79,59 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
     }
 
     /**
-     * The default. A byte-identical request to before the feature existed.
+     * With the flag off no pixels are sent (the token-costly opt-in stays off),
+     * but the assistant turn must still carry a cheap text reference to the
+     * media it produced — otherwise the model denies it exists on a follow-up
+     * (#1596).
      */
-    public function testNothingChangesWhileTheFlagIsOff(): void
+    public function testGeneratedMediaIsReferencedInTextWhileTheFlagIsOff(): void
     {
         $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
 
-        $messages = $this->buildStreamingMessages($handler, []);
+        $content = $this->firstAssistantMessage($this->buildStreamingMessages($handler, []))['content'];
 
-        $this->assertIsString($this->firstAssistantMessage($messages)['content']);
+        $this->assertIsString($content, 'No image bytes may be sent while the flag is off');
+        $this->assertStringContainsString('cat.png', $content);
+        $this->assertStringContainsString('do not claim otherwise', $content);
+    }
+
+    /**
+     * The async media path clears the assistant text
+     * ({@see \App\Service\Media\MediaJobMessageSync}); the generated-media
+     * reference gives the turn non-empty content so it is not dropped by the
+     * empty-assistant filter (#1115) and the media stays visible (#1596).
+     */
+    public function testGeneratedMediaTurnWithClearedTextSurvivesAsAReference(): void
+    {
+        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+
+        $assistantTurn = $this->message(500, 'OUT', ''); // text cleared by async sync
+        $current = $this->message(501, 'IN', 'What breed is it?');
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
+        $messages = $method->invoke($handler, null, [$assistantTurn, $current], $current, []);
+
+        $content = $this->firstAssistantMessage($messages)['content'];
+        $this->assertIsString($content);
+        $this->assertStringContainsString('cat.png', $content);
+    }
+
+    /**
+     * With the flag on the pixels ride along AND the text reference is present,
+     * so the media is both visible and unambiguously acknowledged.
+     */
+    public function testGeneratedImageCarriesBothPixelsAndTextReferenceWithFlagOn(): void
+    {
+        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+
+        $content = $this->firstAssistantMessage(
+            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
+        )['content'];
+
+        $this->assertIsArray($content);
+        $this->assertSame('text', $content[0]['type']);
+        $this->assertStringContainsString('cat.png', $content[0]['text']);
+        $this->assertStringStartsWith('data:image/png;base64,', $content[1]['image_url']['url']);
     }
 
     public function testOnlyTheNewestImagesFitTheBudget(): void
