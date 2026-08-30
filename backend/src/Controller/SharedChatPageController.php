@@ -150,8 +150,8 @@ class SharedChatPageController extends AbstractController
 
                 // Get first sentence or first 60 chars
                 $firstSentence = preg_split('/[.!?]/', $text, 2)[0] ?? $text;
-                if (strlen($firstSentence) > 60) {
-                    $firstSentence = substr($firstSentence, 0, 57).'...';
+                if (mb_strlen($firstSentence) > 60) {
+                    $firstSentence = mb_substr($firstSentence, 0, 57).'...';
                 }
                 if (!empty(trim($firstSentence))) {
                     return trim($firstSentence).' | '.$this->titleBrand();
@@ -183,8 +183,8 @@ class SharedChatPageController extends AbstractController
                 // Remove slash commands from description
                 $text = $this->cleanSlashCommands($text);
 
-                if (strlen($text) > 160) {
-                    return substr($text, 0, 157).'...';
+                if (mb_strlen($text) > 160) {
+                    return mb_substr($text, 0, 157).'...';
                 }
 
                 if (!empty(trim($text))) {
