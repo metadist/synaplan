@@ -65,6 +65,7 @@ describe('filePreview helpers', () => {
   it('returns a token-based neutral badge (no raw tailwind colors)', () => {
     const badge = previewBadgeClass()
     expect(badge).not.toMatch(/bg-(red|blue|purple|pink|emerald|gray|green|yellow|orange)-\d/)
+    expect(badge).toContain('var(--bg-chip)')
     expect(badge).toContain('txt-secondary')
   })
 

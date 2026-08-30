@@ -101,7 +101,7 @@ export const previewIconForName = (name: string): string =>
  * violated the styling convention and was visually noisy (#1499). One uniform
  * treatment, readable in light, dark, and V2.
  */
-export const previewBadgeClass = (): string => 'bg-black/5 dark:bg-white/5 txt-secondary'
+export const previewBadgeClass = (): string => 'bg-[var(--bg-chip)] txt-secondary'
 
 /** Trimmed text snippet from the already-serialized `text_preview` field. */
 export const previewSnippet = (file: FileItem): string => (file.text_preview ?? '').trim()

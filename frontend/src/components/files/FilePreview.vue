@@ -1,6 +1,6 @@
 <template>
   <div
-    class="w-full aspect-video overflow-hidden bg-black/5 dark:bg-white/5 relative flex items-center justify-center"
+    class="w-full aspect-video overflow-hidden bg-[var(--bg-chip)] relative flex items-center justify-center"
     data-testid="file-preview"
   >
     <!-- Image: inline thumbnail (unchanged behavior) -->
