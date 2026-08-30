@@ -344,7 +344,8 @@ class ModelCatalog
         'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
         'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
         'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
-        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        // Price cut 2026-08-21 (see the chat row below): long-context tier fell 10/45 -> 8/30.
+        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 8.0, 'price_out_above' => 30.0],
         'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
         'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.40, 'price_out_above' => 1.80],
         'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
@@ -1468,9 +1469,13 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-sol',
-            'priceIn' => 5,
+            // Price cut 2026-08-21: OpenAI dropped Sol from 5/30 to 4/20 (cached 0.50->0.40,
+            // long-context 10/45->8/30). Verified against the official OpenAI pricing page
+            // (https://openai.com/api/pricing/) on 2026-08-30; #1561. Marked promotional
+            // "at least through 2026-11-21" — see the reminder in docs/PRICING_MAINTENANCE.md.
+            'priceIn' => 4,
             'inUnit' => 'per1M',
-            'priceOut' => 30,
+            'priceOut' => 20,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
@@ -1495,9 +1500,10 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'gpt-5.6-sol',
-            'priceIn' => 5,
+            // Price cut 2026-08-21, same as the chat row above (#1561).
+            'priceIn' => 4,
             'inUnit' => 'per1M',
-            'priceOut' => 30,
+            'priceOut' => 20,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 1,
