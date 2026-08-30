@@ -23,7 +23,7 @@ If a design needs a sixth primary control, cut scope.
 
 ---
 
-## 2. Canonical terminology — all four locales
+## 2. Canonical terminology — all five locales
 
 Proposed translations for native-speaker review (row L1 in the breakdown).
 Do not treat DE/ES/TR as final until that review.
@@ -88,10 +88,22 @@ One page. No new rail item.
 - Button: **Pair this computer** → dialog with code, minutes left,
   “Open Synaplan Desktop and enter this address and code.”
 - Table of computers: name, last seen (relative), **Disconnect**.
-- Sprint 6: count of waiting jobs.
+- Sprint A3: count of waiting jobs.
 
 Flag off (admin): “Desktop access is turned off for this instance.”
 Flag off (user, global on): hide nav.
+
+**While Phase B does not exist (Sprints A2–A3).** The server ships first, so
+for several weeks the page describes an app nobody can download. Copy must not
+pretend otherwise, and must not link a release page that 404s:
+
+| State | EN copy intent |
+| ----- | -------------- |
+| Flag on, no client released | “Synaplan Desktop is a separate app for your computer. It is not available for download yet.” Pairing controls stay visible for testers (a code is harmless without a client) |
+| Flag on, client released (`DC5`) | Replace with the install sentence + link. Same key, new value — a value-only i18n change in all five locales |
+
+Never ship a **Download** button before a binary exists. A dead button is the
+one UX bug this ordering could have introduced.
 
 ### 3.2 Desktop app — pair
 
@@ -114,16 +126,44 @@ Python stderr (stderr behind “Details”).
 ### 3.4 Desktop app — skills
 
 List + install. Install confirm must include the supply-chain sentence
-from Sprint 4. Bundled `pptx`: readiness (Python found/missing).
+from Sprint B3. Bundled `pptx`: readiness (Python found/missing).
 
 Outlook: a help link “Mail and calendar stay in Synaplan” — not a
 fake Outlook skill row.
 
 ### 3.5 Desktop app — this computer
 
-Allowlisted folders, out folder, last check-in, “Disconnect from the
-Synaplan website.” Do not put Revoke in the client only (client cannot
-delete the server key if already stolen).
+Allowlisted folders, out folder, readiness (**Check this computer**), last
+check-in, “Disconnect from the Synaplan website.” Do not put Revoke in the
+client only (client cannot delete the server key if already stolen).
+
+### 3.6 Platform-correct copy (all screens)
+
+The app runs on Windows, macOS, and Linux, and the copy must not sound like it
+was written for one of them.
+
+- **Show real, platform-native paths.** `C:\Users\anna\Synaplan\out`, not
+  `~/Synaplan/out`, and never `%LOCALAPPDATA%` as literal text in the UI.
+  Paths come from `app_dirs`, so the UI never builds one itself.
+- **Use the platform's word for its own concepts**: *Explorer* / *Finder* /
+  *file manager*; *Task Manager* / *Activity Monitor*. Where a locale has an
+  established translation for an OS term, use the OS vendor's wording, not a
+  literal translation.
+- **Install hints are per OS.** "Install Python" means python.org or the Store
+  on Windows, Homebrew or python.org on macOS, and the distribution package on
+  Linux. One generic sentence is wrong on at least two platforms.
+- **Never claim a platform capability we do not have.** No "controls Outlook"
+  anywhere, and nothing that implies a signed installer before Sprint B6
+  ships one.
+- **Placeholders carry the path**, e.g. `{path}` and `{app}`, so translators
+  never concatenate a path themselves — and so a Windows backslash cannot be
+  mangled by a locale string.
+- The **Reveal in Explorer / Show in Finder** action is one key with a
+  platform-resolved label, not three hardcoded strings in the view.
+
+All of this still obeys §2.1: the forbidden-word list applies on every
+platform. "Junction", "reparse point", "Job Object", and "Keychain ACL" are
+engineering terms — they belong in the log and the docs, never in a dialog.
 
 ---
 
@@ -131,7 +171,10 @@ delete the server key if already stolen).
 
 - Do not say “works with every skill on the internet.”
 - Do not say “Outlook” unless the sentence points at M365 / Synamail.
-- Do not say Linux can control the Outlook application.
+- Do not claim OS application control on any platform — not Windows COM, not
+  macOS AppleScript, and obviously not Linux, which has no Outlook application.
+- Do not imply a platform is supported at a level it is not: ARM builds are
+  not manually verified, and an unsigned build is not a release.
 - Queued jobs: “Waiting for this computer”, never “the assistant is
   typing” as if the web turn were still generating the file.
 
@@ -149,7 +192,7 @@ delete the server key if already stolen).
 
 ---
 
-## 6. Comprehension gate (manual, before Sprint 5 ships)
+## 6. Comprehension gate (manual, before Sprint B4 ships)
 
 Give a non-engineer the pairing page + Skills page in DE or ES. They
 must answer §1 without help. If they cannot, fix copy, not the user.
