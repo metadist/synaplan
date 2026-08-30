@@ -83,7 +83,7 @@
     "@vitest/ui": "4.1.11",
     "@vue/eslint-config-prettier": "10.2.0",
     "@vue/eslint-config-typescript": "14.9.0",
-    "@vue/test-utils": "2.4.11",
+    "@vue/test-utils": "2.5.0",
     "autoprefixer": "10.5.4",
     "dotenv": "17.4.2",
     "eslint": "10.9.1",
