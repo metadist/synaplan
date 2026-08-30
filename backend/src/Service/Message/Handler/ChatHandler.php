@@ -1439,6 +1439,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
         $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
+        $mediaReferences = $this->generatedMediaReferences($currentMessage, $thread);
 
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
@@ -1479,6 +1480,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $content .= "\n\n\n---\n\n\n$label\n\n".
                            substr($allFilesText, 0, 10000). // Increased limit for multiple files
                            "\n\n";
+            }
+
+            // Generated image/video/audio has no file text, so without this the
+            // assistant turn looks text-only and the model denies the media
+            // exists on a follow-up (#1596).
+            if ('assistant' === $role && isset($mediaReferences[$msg->getId()])) {
+                $content = '' === trim($content)
+                    ? $mediaReferences[$msg->getId()]
+                    : $content."\n\n".$mediaReferences[$msg->getId()];
             }
 
             // For user messages, include images as multimodal content (only if enabled)
@@ -1738,11 +1748,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
         $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
+        $mediaReferences = $this->generatedMediaReferences($currentMessage, $thread);
 
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $this->humanizeFileMarkersForModel($msg->getText());
+
+            // See buildStreamingMessages(): keep generated media visible so the
+            // model does not deny it exists on a later turn (#1596).
+            if ('assistant' === $role && isset($mediaReferences[$msg->getId()])) {
+                $content = '' === trim($content)
+                    ? $mediaReferences[$msg->getId()]
+                    : $content."\n\n".$mediaReferences[$msg->getId()];
+            }
+
             $stamped = '['.$msg->getDateTime().']: '.$content;
 
             // For user messages in thread, include images for vision (if enabled)
@@ -2131,11 +2151,64 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * vision-capable, and capped at MAX_GENERATED_IMAGES — every image rides
      * along as a base64 payload on each following request of the conversation.
      *
-     * @param array<int, Message>  $thread
-     * @param array<string, mixed> $options
+     * @param array<int, Message> $thread
      *
      * @return array<int, list<string>>
      */
+    /**
+     * Always-on prose references for media the assistant produced in earlier
+     * turns of this conversation.
+     *
+     * Generated images, videos and audio carry no BFILETEXT, so replaying the
+     * thread as plain text leaves no trace of them: a follow-up such as "was ist
+     * da zu sehen?" is then answered from text-only history and the model denies
+     * the media exists (#1596). Sending the actual pixels is a separate,
+     * opt-in/token-costly path ({@see generatedImagesForVision()}); this cheap
+     * text reference is unconditional so the model at least knows the media is
+     * real. It also gives async media turns whose text was cleared
+     * ({@see \App\Service\Media\MediaJobMessageSync}) non-empty content, so they
+     * survive the empty-assistant filter (#1115) instead of vanishing entirely.
+     *
+     * Documents are intentionally excluded — they already ride along as
+     * extracted text / the __FILE_GENERATED__ marker.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return array<int, string> assistant messageId => reference sentence
+     */
+    private function generatedMediaReferences(Message $currentMessage, array $thread): array
+    {
+        $catalog = $this->conversationFileCatalog->build($currentMessage, $thread);
+
+        $labelsByMessage = [];
+        foreach ($catalog as $file) {
+            if (!$file->isGenerated() || null === $file->messageId) {
+                continue;
+            }
+
+            $noun = match ($file->category) {
+                ConversationFile::CATEGORY_IMAGE => 'an image',
+                ConversationFile::CATEGORY_VIDEO => 'a video',
+                ConversationFile::CATEGORY_AUDIO => 'an audio file',
+                default => null, // documents already have a textual trace
+            };
+            if (null === $noun) {
+                continue;
+            }
+
+            $labelsByMessage[$file->messageId][] = $noun.' ("'.$file->displayName.'")';
+        }
+
+        $references = [];
+        foreach ($labelsByMessage as $messageId => $labels) {
+            $labels = array_slice($labels, 0, 4);
+            $references[$messageId] = '(For reference: earlier in this conversation you generated and delivered the following media to the user, which is shown in the chat: '
+                .implode(', ', $labels).'. These files exist — do not claim otherwise.)';
+        }
+
+        return $references;
+    }
+
     private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
     {
         if (true !== ($options['include_generated_images'] ?? false)) {
