@@ -5,6 +5,7 @@ import ChatMessage from '@/components/ChatMessage.vue'
 import en from '@/i18n/en.json'
 import de from '@/i18n/de.json'
 import es from '@/i18n/es.json'
+import fr from '@/i18n/fr.json'
 import tr from '@/i18n/tr.json'
 
 // The backend now narrates the phases that run before the first token, so the
@@ -103,6 +104,7 @@ describe('pre-answer progress copy', () => {
   it.each([
     ['de', de],
     ['es', es],
+    ['fr', fr],
     ['tr', tr],
   ])('is translated in %s', (_locale, messages) => {
     const english = processingCopy(en)

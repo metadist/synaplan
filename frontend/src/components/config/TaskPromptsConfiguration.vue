@@ -1297,6 +1297,7 @@ const PROMPT_LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'de', label: 'Deutsch' },
   { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
   { value: 'tr', label: 'Türkçe' },
 ]
 

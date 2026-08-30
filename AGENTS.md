@@ -214,17 +214,19 @@ Every UI surface must be readable in **both light and dark theme** (and in the V
 ### i18n
 
 - All UI text through `vue-i18n` — never hardcode user-facing strings.
-- **Always update ALL four locales**: `en.json`, `de.json`, `es.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'tr']`). A missing key silently falls back to English.
+- **Always update ALL five locales**: `en.json`, `de.json`, `es.json`, `fr.json`, `tr.json` (`frontend/src/i18n/`, registered as `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`). A missing key silently falls back to English.
+- **This is enforced.** `tests/unit/i18n/localeParity.spec.ts` gates full-file key parity against `localeParityBaseline.json`, a frozen ledger of the drift that predates the gate (`es`/`tr` ~78% translated, `de` ~93%, `fr` 100%). An English-only key added to a namespace fails the suite. The ledger is compared exactly, so it can only shrink: translate a listed key ⇒ delete its ledger entry in the same change. Only add to the ledger for a genuine exception, never to silence the gate.
+- Placeholder names (`{count}`, `{folder}`) must match English in every locale — a dropped one renders as literal text. Plural **branch counts** may differ legitimately (Turkish uses one form after a numeral), so only the placeholder names are compared.
 
 ### UI copy & wording (UX clarity)
 
 User-facing text must be **clean, consistent, and crystal clear for a non-technical user**. Chaotic or contradictory wording is a bug.
 
 - **Write for the average user, not the developer.** No implementation jargon ("interview", "prompt topic", "node") in primary copy.
-- **ONE canonical term per concept**, applied in all four locales:
-  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, tr: *sohbet widget'ı*)
-  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, tr: *AI asistanı*)
-  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, tr: *AI Kurulum Asistanı*)
+- **ONE canonical term per concept**, applied in all five locales:
+  - **chat widget** (short: **widget**) — the embeddable product. (de: *Chat-Widget*, es: *widget de chat*, fr: *widget de chat*, tr: *sohbet widget'ı*)
+  - **AI assistant** — the AI that answers inside a widget. (de: *KI-Assistent*, es: *asistente de IA*, fr: *assistant IA*, tr: *AI asistanı*)
+  - **AI Setup Assistant** — the guided chat that configures a widget. (de: *KI-Setup-Assistent*, es: *Asistente de Configuración IA*, fr: *Assistant de configuration IA*, tr: *AI Kurulum Asistanı*)
 - **Copy must be CORRECT.** When renaming a tab/button/route, grep for every string referencing the old name (breadcrumbs, "the 'X' tab") and update them in the same change.
 
 ### Widget Development

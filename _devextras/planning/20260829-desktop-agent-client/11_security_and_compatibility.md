@@ -25,13 +25,15 @@ both.
 | ---- | ------ |
 | Grandfather | Empty scopes and legacy `webhooks:*` lists remain full access |
 | Desktop keys | Pairing mints only `desktop:messages`, `desktop:mcp`, `desktop:files`, `desktop:jobs` |
-| Enforcement | Central listener (Sprint 0). Desktop key cannot hit `/api/v1/admin/*`, user admin, webhooks |
+| Enforcement | Central listener (Sprint A1). Desktop key cannot hit `/api/v1/admin/*`, user admin, webhooks |
 | Revoke | Deleting a device revokes the key. 401 on next call |
 | Storage | OS keychain on the client. Never log the secret. Shown once at pair |
-| Scopes unused today | `hasScope()` is dead code until Sprint 0 — **that sprint is a security fix**, not a feature |
+| Scopes unused today | `hasScope()` is dead code until Sprint A1 — **that sprint is a security fix**, not a feature |
 
 Stolen laptop: user revokes the device on the web. That is the recovery
-story. Do not ship pairing before Sprint 0.
+story. Do not ship pairing before Sprint A1 — and note that the server-first
+order makes this automatic: scopes are the first steps of the epic, and no
+key can reach a laptop for weeks afterwards because no laptop client exists.
 
 ---
 
@@ -45,7 +47,7 @@ story. Do not ship pairing before Sprint 0.
    roots) only.
 6. Zip/git install: reject `..`, symlinks, bare SKILL.md at zip root.
 
-Tests for symlink escape and zip slip are mandatory (Sprint 3–4).
+Tests for symlink escape and zip slip are mandatory (Sprints B2–B3).
 
 ---
 
@@ -53,16 +55,21 @@ Tests for symlink escape and zip slip are mandatory (Sprint 3–4).
 
 | Source | Allowed? |
 | ------ | -------- |
-| User-typed chat + installed skill + model-emitted `Bash` | Yes, after Sprint 3 policy / confirm |
-| `skill.run` job with `{skill, prompt}` for an enabled skill | Yes, Sprint 6, unattended opt-in per skill |
+| User-typed chat + installed skill + model-emitted `Bash` | Yes, after Sprint B2 policy / confirm |
+| `skill.run` job with `{skill, prompt}` for an enabled skill | Yes, Sprint B5, unattended opt-in per skill |
 | Server field `command` / `script` / `argv` | **Never.** Ignore extra keys |
 | Job type other than `skill.run` | Refuse |
 | Skill name not installed / disabled | Refuse, report `unknown_skill` |
 | Community skill `install.sh` | Never auto-run |
 | Subprocess environment | No `sk_`, no pairing code |
 
-Sprint 5 binary allowlist: `python3`, `node`, `soffice`, skill scripts.
+Sprint B4 binary allowlist: `python3`, `node`, `soffice`, skill scripts.
 Default deny everything else (including `curl`, PowerShell, `cmd`).
+
+**Server-first consequence:** the “never execute a server-supplied command”
+rule is written into the frozen contract in Sprint A3 (`DS18`) and asserted by
+the harness before a device exists, so the client inherits it as a
+specification rather than discovering it during review.
 
 ---
 
@@ -126,3 +133,6 @@ Default deny everything else (including `curl`, PowerShell, `cmd`).
 - [ ] Mobile policy updated if new `synaplan/` paths
 - [ ] No secrets in the diff
 - [ ] Docs updated in this PR
+- [ ] `DS*`: flag-off behaviour asserted; harness updated if device-facing
+- [ ] `DC*`: no `synaplan/` files (except `DC5` / `DC21` docs) and no frozen
+  fixture was edited

@@ -61,7 +61,11 @@ Always use `<MainLayout>` with a standard container:
 
 ## i18n (Internationalization)
 
-**Always update ALL four locales: `en.json`, `de.json`, `es.json`, AND `tr.json`!** (See `frontend/src/i18n/index.ts` → `supportedLanguages = ['de', 'en', 'es', 'tr']`. A missing key silently falls back to English.)
+**Always update ALL five locales: `en.json`, `de.json`, `es.json`, `fr.json`, AND `tr.json`!** (See `frontend/src/i18n/index.ts` → `supportedLanguages = ['de', 'en', 'es', 'fr', 'tr']`. A missing key silently falls back to English.)
+
+`tests/unit/i18n/localeParity.spec.ts` enforces this: it compares full-file key parity against `localeParityBaseline.json`, a frozen ledger of pre-existing drift. Add an English-only key and the suite fails, naming the key. When you translate a key that is listed in the ledger, remove it from the ledger in the same change — the comparison is exact, so the debt can only shrink.
+
+Never add a new language by editing a picker by hand. `supportedLanguages` and `languageOptions` in `frontend/src/i18n/index.ts` are the single source of truth; every locale switcher derives from them.
 
 ```vue
 <!-- In templates -->

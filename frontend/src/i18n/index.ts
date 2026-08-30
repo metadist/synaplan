@@ -4,12 +4,25 @@ import type { MessageCompiler, MessageFunction } from '@intlify/core-base'
 import de from './de.json'
 import en from './en.json'
 import es from './es.json'
+import fr from './fr.json'
 import tr from './tr.json'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 
 // Supported languages in alphabetical order (EN is default)
-export const supportedLanguages = ['de', 'en', 'es', 'tr'] as const
+export const supportedLanguages = ['de', 'en', 'es', 'fr', 'tr'] as const
 export type SupportedLanguage = (typeof supportedLanguages)[number]
+
+export const languageOptions: ReadonlyArray<{
+  value: SupportedLanguage
+  label: string
+  flag: string
+}> = [
+  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
+  { value: 'en', label: 'English', flag: '🇬🇧' },
+  { value: 'es', label: 'Español', flag: '🇪🇸' },
+  { value: 'fr', label: 'Français', flag: '🇫🇷' },
+  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
+]
 
 // Check for language from URL query parameter first, then localStorage
 function getInitialLanguage(): SupportedLanguage {
@@ -106,6 +119,7 @@ export const i18n = createI18n({
     de,
     en,
     es,
+    fr,
     tr,
   },
 })

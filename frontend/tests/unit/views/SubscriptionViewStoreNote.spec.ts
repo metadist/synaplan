@@ -137,7 +137,7 @@ describe('SubscriptionView — store note names one store only (App Review 2.3.1
     for (const platform of ['ios', 'android'] as const) {
       mockPlatform.mockReturnValue(platform)
 
-      for (const locale of ['de', 'en', 'es', 'tr'] as const) {
+      for (const locale of ['de', 'en', 'es', 'fr', 'tr'] as const) {
         i18n.global.locale.value = locale
 
         const note = await mountAndReadStoreNote()

@@ -43,10 +43,9 @@
                   class="appearance-none px-3 py-2 rounded-lg surface-chip txt-primary text-sm font-medium cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   @change="switchLanguage"
                 >
-                  <option value="de">DE</option>
-                  <option value="en">EN</option>
-                  <option value="es">ES</option>
-                  <option value="tr">TR</option>
+                  <option v-for="lang in supportedLanguages" :key="lang" :value="lang">
+                    {{ lang.toUpperCase() }}
+                  </option>
                 </select>
               </div>
               <a

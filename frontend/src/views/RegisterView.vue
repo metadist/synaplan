@@ -422,6 +422,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { supportedLanguages } from '@/i18n'
 import {
   SunIcon,
   MoonIcon,
@@ -470,9 +471,10 @@ const focusedField = ref<string | null>(null)
 const currentLanguage = computed(() => locale.value)
 
 const cycleLanguage = () => {
-  const languages = ['de', 'en', 'es', 'tr']
-  const currentIndex = languages.indexOf(locale.value)
-  locale.value = languages[(currentIndex + 1) % languages.length]
+  const currentIndex = supportedLanguages.indexOf(
+    locale.value as (typeof supportedLanguages)[number]
+  )
+  locale.value = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
   localStorage.setItem('language', locale.value)
 }
 

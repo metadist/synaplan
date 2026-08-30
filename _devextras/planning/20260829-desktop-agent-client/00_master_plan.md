@@ -285,7 +285,7 @@ MCP check-in / report so it stays a machine client.
 
 ## 10. Compatibility invariants
 
-Named tests in [`09_testing_and_documentation.md`](./09_testing_and_documentation.md) §3.0.
+Named tests in [`09_testing_and_documentation.md`](./09_testing_and_documentation.md) §3.
 
 | # | Invariant | Risk |
 | - | --------- | ---- |
