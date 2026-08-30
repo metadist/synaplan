@@ -133,9 +133,37 @@ fake Outlook skill row.
 
 ### 3.5 Desktop app — this computer
 
-Allowlisted folders, out folder, last check-in, “Disconnect from the
-Synaplan website.” Do not put Revoke in the client only (client cannot
-delete the server key if already stolen).
+Allowlisted folders, out folder, readiness (**Check this computer**), last
+check-in, “Disconnect from the Synaplan website.” Do not put Revoke in the
+client only (client cannot delete the server key if already stolen).
+
+### 3.6 Platform-correct copy (all screens)
+
+The app runs on Windows, macOS, and Linux, and the copy must not sound like it
+was written for one of them.
+
+- **Show real, platform-native paths.** `C:\Users\anna\Synaplan\out`, not
+  `~/Synaplan/out`, and never `%LOCALAPPDATA%` as literal text in the UI.
+  Paths come from `app_dirs`, so the UI never builds one itself.
+- **Use the platform's word for its own concepts**: *Explorer* / *Finder* /
+  *file manager*; *Task Manager* / *Activity Monitor*. Where a locale has an
+  established translation for an OS term, use the OS vendor's wording, not a
+  literal translation.
+- **Install hints are per OS.** "Install Python" means python.org or the Store
+  on Windows, Homebrew or python.org on macOS, and the distribution package on
+  Linux. One generic sentence is wrong on at least two platforms.
+- **Never claim a platform capability we do not have.** No "controls Outlook"
+  anywhere, and nothing that implies a signed installer before Sprint B6
+  ships one.
+- **Placeholders carry the path**, e.g. `{path}` and `{app}`, so translators
+  never concatenate a path themselves — and so a Windows backslash cannot be
+  mangled by a locale string.
+- The **Reveal in Explorer / Show in Finder** action is one key with a
+  platform-resolved label, not three hardcoded strings in the view.
+
+All of this still obeys §2.1: the forbidden-word list applies on every
+platform. "Junction", "reparse point", "Job Object", and "Keychain ACL" are
+engineering terms — they belong in the log and the docs, never in a dialog.
 
 ---
 
@@ -143,7 +171,10 @@ delete the server key if already stolen).
 
 - Do not say “works with every skill on the internet.”
 - Do not say “Outlook” unless the sentence points at M365 / Synamail.
-- Do not say Linux can control the Outlook application.
+- Do not claim OS application control on any platform — not Windows COM, not
+  macOS AppleScript, and obviously not Linux, which has no Outlook application.
+- Do not imply a platform is supported at a level it is not: ARM builds are
+  not manually verified, and an unsigned build is not a release.
 - Queued jobs: “Waiting for this computer”, never “the assistant is
   typing” as if the web turn were still generating the file.
 

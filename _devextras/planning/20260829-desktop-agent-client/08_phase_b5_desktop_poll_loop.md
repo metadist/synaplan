@@ -1,141 +1,187 @@
-# Sprint B5 — Desktop poll loop and web-queued jobs
+# Sprint B5 — Poll loop and unattended runs
 
-**Phase B (`synaplan-desktop`), sprint 5 of 5 — the last sprint of the epic.**
-Steps `DC19`–`DC21`.
+**Phase B (`synaplan-desktop`), sprint 5 of 5.** Steps `DC19`–`DC21`,
+plus `DC27` (autostart).
 
-**Goal:** The desktop polls the check-in endpoint that already shipped in
-Sprint A3, runs only a **named, installed, enabled** skill, and reports a
-result. The web turn does **not** wait.
-**Depends on:** Sprint B4 (a real skill to run) and the frozen A3 contract.
-Checklist rows 9, 10, 22. July research §1 and §4 (why pull; why not in-turn).
-**Repos:** `synaplan-desktop` only. **No server PR belongs in this sprint** —
-if you feel one coming, see §0.1.
-**Server side:** [`03_phase_a3_jobs_and_checkin.md`](./03_phase_a3_jobs_and_checkin.md).
-
----
-
-## 0. Why this sprint is small
-
-Because the server-first order already paid for most of it. The queue, the
-lease, the reaper, the enqueue endpoint, the “Waiting for this computer” card,
-and the two MCP tools are live on `main` and covered by the fake-device
-harness. What is left is the client loop and the local refusal rules.
-
-### 0.1 The contract is input, not negotiable
-
-`protocol: 1` and the fixtures in
-`synaplan/_devextras/testing/desktop/fixtures/` (`DS18`) are the specification.
-Invariant **C9** says Phase B does not change them.
-
-| Situation | Do |
-| --------- | -- |
-| A field is awkward to consume | Adapt in the client |
-| A field is missing for a v1 feature | Check the fixtures again; it is probably there under another name |
-| A field is genuinely absent and needed | Stop. Write it up as `protocol: 2` with a server migration plan, get it agreed, then implement — in a **server** PR, in a **separate** sprint |
-| The server sends something unexpected | Ignore it. Never execute it. Report a clean error |
-
-“I edited the server a little to make the client simpler” is how this epic
-gets a `command` field. That is exactly what the ordering exists to prevent.
+**Goal:** A job queued from Synaplan web is picked up by the paired computer on
+its next check-in, runs **only** if the named skill is installed and enabled,
+and reports back — against the contract that Sprint A3 already shipped and
+froze. Nothing in this sprint changes the server (C9).
+**Depends on:** Sprint B4 (a real skill is worth polling for) and `DS14`, which
+has been on `main` since Phase A.
+**Unlocks:** the "Waiting for this computer" experience end to end.
+**Repos:** `synaplan-desktop`, plus one docs-only `synaplan/` PR (`DC21`).
+**Platform rules:** [`13_cross_platform.md`](./13_cross_platform.md) §8
+(autostart) and §4 (the plaintext-key restriction) are binding here.
 
 ---
 
-## 1. Code / specs to read first
+## 0. Why this sprint exists — and why it is last
 
-| Source | Why |
-| ------ | --- |
-| `07-AGENT-SCHEDULING.md` §4 | Response shape, lease, idempotency, backoff |
-| `synaplan/docs/DESKTOP.md` (`DS18`) | The shipped contract, in prose |
-| `synaplan/_devextras/testing/desktop/fixtures/` | The bytes your tests assert |
-| `synaplan/_devextras/testing/desktop/fake-device.sh` (`DS17`) | The reference sequence, already proven green |
-| Sprint B2 tool loop | Reuse; do not fork a second executor |
+The server half of this loop shipped in Sprint A3 and was proved by the
+fake-device harness (`DS17`). This sprint replaces the harness with a real
+device. That ordering is the whole point of the server-first decision: the
+contract was designed once, in review, and the client conforms to it. A client
+wish is a `protocol: 2` conversation, not an edit (master plan decision 22).
 
-Read the harness before writing the loop. It is a working client in 200 lines
-of shell; the Tauri version should make the same calls in the same order.
+It is last inside Phase B because unattended execution is the highest-trust
+feature in the product. It should be built on a runtime whose confinement
+corpus, doctor, and install flow have already been reviewed and shipped.
+
+**This is also the cut line.** If scope slips, this sprint and `DS11`–`DS18`
+are what get cut (decision 24). Pair, chat, install a skill, make a deck —
+that is a coherent product without polling.
+
+---
+
+## 1. What already exists (do not re-negotiate)
+
+| From | What |
+| ---- | ---- |
+| `DS14` | MCP `agent_checkin` and `agent_report_result`, requiring `desktop:jobs` |
+| `DS18` | `protocol: 1`, closed `type` and error-code enums, committed fixtures |
+| `DS12`/`DS15` | Lease, expiry, attempt budget, reaper |
+| `DS16` | The web-side "Run on this computer" action and waiting card |
+| `DC3` | Those same fixtures, vendored into the client's tests |
+
+The client's unit tests are built from the vendored fixtures. If a fixture does
+not match what the client wants, the client is wrong (C9).
 
 ---
 
 ## 2. Developer steps
 
-### 2.1 Poll loop (`DC19`)
+### 2.1 The poll loop (`DC19`)
 
-Background task (window open in v1; tray is a follow-up):
+```
+check-in  →  jobs + next_call_at  →  run  →  report  →  sleep until next_call_at
+```
 
-1. Sleep until `next_call_at` (or 30 s the first time). Respect jitter.
-2. Call `agent_checkin` with `protocol: 1`, `agent_kind: "synaplan-desktop"`,
-   `capabilities: ["skill.run"]`, and the enabled skill names.
-3. For each job: if `type != skill.run`, or the skill is not installed, or it
-   is installed but disabled → `agent_report_result` failed with
-   `unknown_type` / `unknown_skill` / `skill_disabled`. **No subprocess.**
-4. Else run the **same** tool loop as interactive chat, with the job prompt as
-   the user message and that skill forced into context.
-5. Report success or failure, with a `fileId` if the skill produced a file
-   (upload through the existing files API first).
-6. On network failure: exponential backoff, never a tight retry loop. A
-   revoked key (401) stops the loop and shows the disconnected state.
+1. Call `agent_checkin` with `protocol: 1`, `agent_kind: "synaplan-desktop"`,
+   `capabilities: ["skill.run"]`, and the list of **enabled** skill names.
+2. Honour `schedule.next_call_at` exactly. Do not invent a shorter interval;
+   add jitter only within the window the server allows.
+3. For each leased job, validate **locally** before doing anything:
 
-**Read only `{skill, prompt, fileIds}` from `input`.** Ignore every other key,
-including one named `command`, `script`, or `argv` — even if a future server
-bug sends it (`11_security_and_compatibility.md` §4).
+   | Check | Failure |
+   | ----- | ------- |
+   | `type == "skill.run"` | `unknown_type` |
+   | skill installed | `unknown_skill` |
+   | skill enabled | `skill_disabled` |
+   | skill's required runtimes present (doctor, B4) | `local_error` with the missing tool named |
+   | `allowUnattended` for this skill (§2.2) | `skill_disabled` |
 
-### 2.2 Unattended policy (`DC20`)
+4. **Read only `{skill, prompt, fileIds}` out of `input`.** Every other key is
+   ignored by construction — the payload is parsed into a typed struct with
+   those three fields, so an unexpected `command` or `argv` is not "filtered
+   out", it is never read. This is the single rule that keeps a compromised or
+   prompt-injected server from becoming remote code execution.
+5. Run the job through **the same tool loop as Sprint B2**, with the same
+   confinement, the same binary allowlist, and the same process controls. There
+   is no second execution path for jobs.
+6. Report with `agent_report_result`: status, optional `fileId` (upload through
+   the files API first), and an error code from the frozen enum.
+7. Network failures are retried with backoff and never crash the loop; a lease
+   the client cannot report is left to expire server-side.
 
-A queued job runs while the user is not looking. That deserves its own
-consent, separate from “I installed this skill”:
+Refusals are **loud on the device and honest on the server**: the job is marked
+failed with the right code, and the user sees why in the chat card.
 
-- `allowUnattended` per skill in `skills.json`, **default false**.
-- Default false means a queued job for that skill waits for a click
-  (notification → approve) rather than failing.
+### 2.2 Unattended opt-in (`DC20`)
+
+Running a program while nobody is watching is a different consent level from
+running one in response to a message the user just typed.
+
+- `allowUnattended` is **per skill**, default **false**, stored in
+  `skills.json`.
+- Turning it on requires an explicit confirm that names the skill and says the
+  program may run without anyone at the keyboard.
+- There is no global "allow all skills unattended" switch.
 - The first unattended run of a skill raises an OS notification naming the
-  skill and the out-box folder.
-- Never a global “allow everything unattended” switch.
+  skill and the file it produced.
+- The per-turn "this skill wants to run a program" dialog (B2 §2.5) is what
+  `allowUnattended` replaces — so the confirm text must carry the same weight.
+- **Unattended is refused when the key is in the plaintext fallback**
+  ([`13_cross_platform.md`](./13_cross_platform.md) §4): a headless machine
+  with a plaintext key that also runs programs unsupervised is not a
+  configuration we ship.
 
-### 2.3 End-to-end evidence and docs (`DC21`)
+### 2.3 Background operation and autostart (`DC27`)
 
-1. Manual run against a real instance: queue from web chat → the desktop
-   picks it up → a `.pptx` lands in the out-box → the chat shows the file.
-2. Screenshot both ends. Note the OS and which model answered.
-3. Repeat the refusal case with an uninstalled name; screenshot the failed
-   card in web chat.
-4. Docs: extend `synaplan/docs/DESKTOP.md` with the queue walkthrough
-   (docs-only `synaplan/` PR — the one allowed exception, as in `DC5`).
+For the loop to be useful the app has to be running. It must not become
+something the user cannot see or stop.
 
-### 2.4 What we still will not do
+| Platform | Mechanism |
+| -------- | --------- |
+| Windows | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, or a Task Scheduler logon task if we need delay/retry. No service, no `HKLM`, no elevation |
+| macOS | `SMAppService` login item (LaunchAgent inside the bundle). The user can disable it in System Settings → Login Items, and the app must handle being disabled there without complaining |
+| Linux | XDG autostart `.desktop` in `~/.config/autostart`, or a `systemd --user` unit. An AppImage path changes on update: write the resolved path at enable time and re-validate at start |
 
-- Resume a mid-flight `DagExecutor` plan.
-- Accept a `shell.exec` type or any server-authored command string.
-- Push-only delivery (Centrifugo may *hint*; check-in remains required).
-- Tray-only daemon, planner-emitted jobs, `browser.*` jobs. Follow-ups.
+Rules on all three:
+
+1. **Opt-in.** Never enabled by the installer.
+2. Disabling it in the app removes the OS entry in the same action, and
+   uninstalling removes it too. No orphaned autostart entries — that is how a
+   desktop app earns a reputation as malware.
+3. Single instance: a named mutex on Windows, `flock` on POSIX. Two poll loops
+   would double-lease and double-run.
+4. A tray/menu-bar item shows: connected or not, last check-in, jobs waiting,
+   and **Quit**. Quit means quit — the loop does not resurrect itself until the
+   next login.
+5. Respect the OS: no console window on Windows, no dock icon when running
+   background-only on macOS (`LSUIElement` when appropriate).
+6. Sleep, hibernate, and network loss are normal. On resume, re-check in rather
+   than assuming the schedule survived.
+
+### 2.4 Do not do in this sprint
+
+- Change anything under `synaplan/backend` (C9). `DC21` is docs only.
+- Add a `protocol: 2` field "while we are in here".
+- Push delivery. Centrifugo may later *hint* that work exists; check-in stays
+  the source of truth.
+- Job types beyond `skill.run`.
+- Auto-install a skill named by a job. An unknown name fails, always.
+- Run as a Windows service, a macOS daemon, or a system-wide systemd unit.
 
 ---
 
-## 3. Tests (client repo, all offline)
+## 3. Tests
 
-Build these from the vendored Phase A fixtures, not from hand-written JSON.
+Offline, fixed clock, temp home, **all three runners**. The upstream is the
+vendored `DS18` fixture set.
 
 | Case | Expected |
 | ---- | -------- |
-| Mock check-in with `skill.run` / `pptx` enabled | Loop invoked with that prompt, one report call |
-| `skill.run` / `not-installed` | Report `unknown_skill`, **no Bash** |
-| `skill.run` / installed but disabled | Report `skill_disabled`, no Bash |
-| Unknown `type` | Report `unknown_type`, no subprocess |
-| `input` contains `command: "rm -rf /"` | Key ignored; assert the spawned argv never contains it |
-| `allowUnattended: false` | Job waits for approval; no silent run |
-| 401 during check-in | Loop stops, disconnected copy shown |
-| Malformed / unknown `protocol` in the response | Back off, do not guess |
-| Report upload failure | Job reported failed with `local_error`, no crash |
+| Job for an uninstalled skill | `unknown_skill`, no process spawned |
+| Job for a disabled skill | `skill_disabled`, no process spawned |
+| Job with `type: "shell.exec"` | `unknown_type` |
+| Job whose `input` carries `command` / `argv` / `script` | fields never read; assert the spawned argv |
+| Job for a skill whose runtime is missing | `local_error` naming the tool, no doomed loop |
+| `allowUnattended` false | refused with `skill_disabled` |
+| Plaintext-key fallback active | unattended refused before check-in |
+| `next_call_at` honoured | no early poll |
+| Check-in HTTP 500, then 200 | backoff, loop survives |
+| Two instances started | second exits, single-instance guard |
+| Autostart enable then disable | OS entry created then removed (per-OS assertion) |
+| Report fails to send | lease left to expire, no duplicate run |
+
+### 3.1 Manual (PR evidence)
+
+On each OS, at least once: queue from web → file appears → chat shows the
+completion. Plus one screenshotted refusal (uninstalled skill) so the failure
+copy is reviewed, not assumed. Rows go into the
+[`13_cross_platform.md`](./13_cross_platform.md) §11 table.
 
 ---
 
-## 4. Exit criteria (and the epic’s)
+## 4. Exit criteria
 
-1. Manual evidence: web queue → desktop run → file in chat.
-2. Uninstalled and disabled skill names fail closed on the device, with the
-   error codes the A3 contract defines.
-3. Ignored-extra-key test is in CI.
-4. Unattended default is false and the first run notifies.
-5. Revoked device stops polling.
-6. `make ci-local` green; no `synaplan/` change except the `DC21` docs PR.
-7. Invariants C2, C3, C4, C5, C9 named in the PRs.
-
-After this sprint the epic is feature-complete; the remaining work is the GA
-flag decision in master plan §11.
+1. Web queue → desktop run → file in chat, demonstrated on all three OSes.
+2. A job naming an uninstalled or disabled skill fails closed, with no process
+   spawned, and the server records the frozen error code.
+3. No `synaplan/` code changed; the vendored fixtures still match Phase A byte
+   for byte (C9).
+4. Unattended is per-skill, default off, and refused with a plaintext key.
+5. Autostart is opt-in and leaves nothing behind when disabled or uninstalled,
+   on each platform.
+6. `make ci-local` green on all three runners.

@@ -1,11 +1,14 @@
 # Synaplan Desktop — Agent Skills client
 
-**Status:** Plan drafted 2026-08-29, **reordered 2026-08-30 to server-first**.
+**Status:** Plan drafted 2026-08-29, **reordered 2026-08-30 to server-first**
+and **extended the same day with cross-platform parity**
+([`13_cross_platform.md`](./13_cross_platform.md), master plan §0.3).
 Research only until the decision checklist in
 [`00_master_plan.md`](./00_master_plan.md) is ticked. No product code in this
 change.
-**Product:** a **separate desktop client** (Windows, macOS, Linux) that signs in
-with a Synaplan account, runs open [Agent Skills](https://agentskills.io/specification)
+**Product:** a **separate desktop client** (Windows, macOS, Linux — **all three
+Tier 1**) that signs in with a Synaplan account, runs open
+[Agent Skills](https://agentskills.io/specification)
 (`SKILL.md` folders) on the local machine, and talks **only** to Synaplan APIs.
 No Claude.ai, Claude Code, or Agent37 Cloud.
 **Builds on:** [`20260731-local-agent-client`](../20260731-local-agent-client/README.md)
@@ -57,15 +60,22 @@ merged **before** the `synaplan-desktop` repository is created.
    computer” in web chat — proved by a **fake-device harness** in
    `_devextras/testing/desktop/`, then **frozen** as `protocol: 1`.
 
-**Phase B — `synaplan-desktop` (Sprints B1–B5)**
+**Phase B — `synaplan-desktop` (Sprints B1–B6)**
 
-1. **Create the repo** and get a signed-in chat that uses `/v1/messages`.
-2. **Load and run Agent Skills** behind a local directory allowlist.
+1. **Create the repo** with three-OS CI, platform directories, and the OS
+   secret store; get a signed-in chat that uses `/v1/messages`.
+2. **Load and run Agent Skills** behind a local directory allowlist, with a
+   per-OS confinement corpus and no shell anywhere.
 3. **Skills manager** (zip / git / GitHub URL). Agent37 is a catalog, not a host.
-4. **First vertical:** official `pptx` skill (no PowerPoint app; Win/Mac/Linux).
+4. **First vertical:** official `pptx` skill (no PowerPoint app), demonstrated
+   on Windows, macOS, **and** Linux, with a platform-aware readiness check.
 5. **Poll `agent_checkin`** against the already-shipped contract, so web chat
    can queue a **named, installed** skill. Never free-form shell from the
    planner.
+6. **Release engineering:** signed and notarized installers — the GA gate.
+
+Certificate procurement (`P0`) starts during **Phase A**: it has weeks of lead
+time and must not be what delays the release.
 
 ### Why this order
 
@@ -75,6 +85,7 @@ merged **before** the `synaplan-desktop` repository is created.
 | The queue contract is designed once, with no client deadline pressure | No `command` field sneaks into `BINPUT` to unblock a client sprint |
 | Every Phase A PR merges to `main` with the flag off | Small reviewable PRs; the surface is 404 / hidden until GA |
 | The client is written against a frozen, documented contract | Phase B is client work only, not cross-repo negotiation |
+| Three OSes are gated from the first client commit | A confinement bug is found by CI, not by a user's Windows machine |
 
 **Trade-off accepted:** Phase A ships a feature nothing consumes yet. The
 mitigations are invariant **C8** (flag off is inert) and the harness
@@ -99,6 +110,7 @@ mitigations are invariant **C8** (flag off is inert) and the harness
 | [`10_work_breakdown.md`](./10_work_breakdown.md) | PR-sized steps (`DS*` server, `DC*` client). This is the implementation order. |
 | [`11_security_and_compatibility.md`](./11_security_and_compatibility.md) | Allowlist, scopes, invariants, mobile classification. |
 | [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) | Canonical terms in EN/DE/ES/TR. Copy before UI. |
+| [`13_cross_platform.md`](./13_cross_platform.md) | **Windows / macOS / Linux parity.** Directories, per-OS path confinement, secret stores, tool discovery, process execution, autostart, packaging, CI matrix. Binding for every `DC*`. |
 
 **Execute from [`10_work_breakdown.md`](./10_work_breakdown.md).** The sprint
 files say why. The breakdown says how big and what “done” means.
@@ -110,7 +122,7 @@ files say why. The breakdown says how big and what “done” means.
 | Repo | What it owns | Touched in |
 | ---- | ------------ | ---------- |
 | `synaplan/` (this repo) | Scopes, flag, pairing API, device registry, job queue, MCP check-in, Channels page, harness, docs | **All of Phase A** (`DS1`–`DS18`); afterwards docs only |
-| **`synaplan-desktop`** (new, private sibling of `synaplan-apps`) | Tauri 2 + Vue 3 client, skill loader, sandbox, poll loop, local audit | **Phase B** (`DC1`–`DC21`); created at `DC1`, never earlier |
+| **`synaplan-desktop`** (new, private sibling of `synaplan-apps`) | Tauri 2 + Vue 3 client, skill loader, per-OS sandbox, poll loop, local audit, installers | **Phase B** (`DC1`–`DC29`); created at `DC1`, never earlier |
 
 Do **not** put this in `synaplan-apps` (Capacitor / store / OTA). Do **not**
 vendor Agent37 or Claude Code. Do **not** create the client repo — not even an
@@ -146,9 +158,14 @@ A Synaplan user on Windows, macOS, or Linux can:
 5. From **web** chat, queue “make slides from this outline” and have the
    paired computer pick it up on the next check-in. The web reply is
    “queued for this computer”, not a same-turn file.
+6. Install the app from a **signed** (Windows) or **notarized** (macOS)
+   installer without a security warning they cannot pass.
 
-Linux is first-class for portable skills (`pptx`, Graph). Skills that drive
-the Outlook **application** are marked incompatible on Linux and are out of v1.
+**All three platforms are Tier 1** for portable skills (`pptx`, Graph): the
+same features, the same tests, the same release gate. Skills that drive a
+desktop **application** — Outlook via COM or AppleScript — are out of v1 on
+every platform, not just Linux; mail and calendar stay on the server path,
+which behaves identically everywhere.
 
 ---
 
@@ -159,10 +176,12 @@ the Outlook **application** are marked incompatible on Linux and are out of v1.
 - Requiring Anthropic or Claude Code.
 - Installing arbitrary PHP plugins from the desktop.
 - Same-turn DAG suspension (web chat waiting on the laptop).
-- Outlook COM / AppleScript automation.
-- `shell.exec` job type from the server.
+- Outlook COM / AppleScript automation, on any platform.
+- `shell.exec` job type from the server — and any shell at all in the client.
 - A public skills marketplace operated by Synaplan.
 - A shipped reference daemon inside `synaplan/` (the harness is a test script).
+- Flatpak / Snap / winget / Store distribution, client auto-update, and
+  manually verified ARM builds ([`13_cross_platform.md`](./13_cross_platform.md) §12).
 
 ---
 

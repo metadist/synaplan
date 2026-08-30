@@ -3,6 +3,12 @@
 Binding for every sprint. The July 2026 local-agent research is the
 threat-model source; this file is the checklist used in PR review.
 
+**Platform-specific controls live in
+[`13_cross_platform.md`](./13_cross_platform.md)** (§3 confinement, §4 secret
+storage, §6 process execution). This file states *what* must hold; that file
+states *how* it holds on each OS. A control that only holds on Linux does not
+hold.
+
 ---
 
 ## 1. Threat directions
@@ -26,8 +32,8 @@ both.
 | Grandfather | Empty scopes and legacy `webhooks:*` lists remain full access |
 | Desktop keys | Pairing mints only `desktop:messages`, `desktop:mcp`, `desktop:files`, `desktop:jobs` |
 | Enforcement | Central listener (Sprint A1). Desktop key cannot hit `/api/v1/admin/*`, user admin, webhooks |
-| Revoke | Deleting a device revokes the key. 401 on next call |
-| Storage | OS keychain on the client. Never log the secret. Shown once at pair |
+| Revoke | Deleting a device revokes the key. 401 on next call; the client **deletes** its stored copy |
+| Storage | The OS secret store — Windows Credential Manager, macOS Keychain, Linux Secret Service. Never log the secret. Shown once at pair. Headless Linux: opt-in, warned plaintext fallback only, and the unattended poll loop refuses to run with it |
 | Scopes unused today | `hasScope()` is dead code until Sprint A1 — **that sprint is a security fix**, not a feature |
 
 Stolen laptop: user revokes the device on the web. That is the recovery
@@ -41,13 +47,23 @@ key can reach a laptop for weeks afterwards because no laptop client exists.
 
 1. Config file / UI on the machine is the source of truth.
 2. Server cannot add roots.
-3. `realpath` / canonicalize **then** contain.
-4. Deny globs always apply (`.ssh`, `.env`, keys, `.git/config`).
-5. Skill dir is readable; writes go to `~/Synaplan/out` (or user write
+3. Canonicalize **then** contain — by path component, never string prefix —
+   and re-canonicalize at use, not only at intake (TOCTOU).
+4. Deny globs always apply (`.ssh`, `.env`, keys, `.git/config`, `.aws`,
+   `.kube`, `AppData`, `Library/Keychains`).
+5. Skill dir is readable; writes go to the out-box (or user write
    roots) only.
-6. Zip/git install: reject `..`, symlinks, bare SKILL.md at zip root.
+6. Archive/git install: reject `..`, **backslash separators**, symlinks and
+   hardlinks, alternate data streams, reserved device names, case-colliding
+   entries, zip bombs, and a bare SKILL.md at archive root. Extraction is
+   atomic (temp → validate → rename).
 
-Tests for symlink escape and zip slip are mandatory (Sprints B2–B3).
+**Escape tests are mandatory and run on all three OSes** (C11, Sprints B2–B3).
+The POSIX symlink case alone covers roughly a third of the surface and none of
+the Windows part: junctions and reparse points need no admin rights, `..\` is
+inert on Linux and an escape on Windows, and on macOS a root stored as `/tmp/x`
+never matches the canonical `/private/tmp/x`. Full corpus and expected
+verdicts: [`13_cross_platform.md`](./13_cross_platform.md) §3.
 
 ---
 
@@ -61,10 +77,24 @@ Tests for symlink escape and zip slip are mandatory (Sprints B2–B3).
 | Job type other than `skill.run` | Refuse |
 | Skill name not installed / disabled | Refuse, report `unknown_skill` |
 | Community skill `install.sh` | Never auto-run |
-| Subprocess environment | No `sk_`, no pairing code |
+| A shell — `sh -c`, `cmd /c`, `powershell -Command`, `osascript -e` | **Never constructed, on any platform** (C12) |
+| Subprocess environment | No `sk_`, no pairing code, and none of `LD_PRELOAD`, `LD_LIBRARY_PATH`, `DYLD_INSERT_LIBRARIES`, `PYTHONPATH`, `PYTHONSTARTUP`, `NODE_OPTIONS`, `PSModulePath` |
 
-Sprint B4 binary allowlist: `python3`, `node`, `soffice`, skill scripts.
-Default deny everything else (including `curl`, PowerShell, `cmd`).
+Sprint B4 binary allowlist: the doctor's **resolved absolute paths** for
+Python, Node, and LibreOffice, plus the invoking skill's own scripts launched
+by one of those. A bare name is never allowlistable, because `PATH` is
+attacker-influenced. Default deny everything else, including `curl`, `wget`,
+`ssh`, PowerShell, `cmd`, `wscript`/`cscript`, `mshta`, `rundll32`,
+`regsvr32`, and `osascript`.
+
+Two execution rules that only become visible on a non-Linux box, and are
+therefore easy to miss in review:
+
+- **Timeouts must kill the process tree**, not the direct child. A Windows Job
+  Object or a POSIX process group — otherwise a "killed" skill leaves
+  grandchildren running with access to the out-box.
+- **`npm`/`npx` on Windows are `.cmd` scripts**, i.e. shell scripts. Launching
+  them as a bare executable reintroduces the shell the policy just banned.
 
 **Server-first consequence:** the “never execute a server-supplied command”
 rule is written into the frozen contract in Sprint A3 (`DS18`) and asserted by
@@ -114,11 +144,15 @@ specification rather than discovering it during review.
 
 - Do not log file contents, prompts, or pairing codes at info.
 - Local audit (July §2.7): device-side log of paths touched and
-  commands run (hashes / argv, not file bodies). Survives in
-  `~/.synaplan-desktop/audit.log` with rotation. Server-side: job
-  id, device, skill name, status — not the deck contents.
+  commands run (hashes / argv, not file bodies), at the platform log path
+  from [`13_cross_platform.md`](./13_cross_platform.md) §2, with rotation.
+  Server-side: job id, device, skill name, status — not the deck contents.
+- The audit log is written with user-only permissions (`0600` on POSIX, the
+  user's ACL on Windows) — it records which files a skill touched, which is
+  itself sensitive.
 - GDPR: revoke + delete device row; local files stay on the user’s
-  disk (they own them).
+  disk (they own them). Uninstalling removes the app and its autostart entry,
+  never the user's out-box.
 
 ---
 
@@ -136,3 +170,9 @@ specification rather than discovering it during review.
 - [ ] `DS*`: flag-off behaviour asserted; harness updated if device-facing
 - [ ] `DC*`: no `synaplan/` files (except `DC5` / `DC21` docs) and no frozen
   fixture was edited
+- [ ] `DC*`: green on **all three** runners (C10, C11)
+- [ ] `DC*`: no shell constructed; the grep guard still passes (C12)
+- [ ] `DC*`: any platform branch is inside `src-tauri/src/platform/`, and any
+  deliberate platform difference is named with its reason
+- [ ] `DC*`: new I/O added a case to `tests/confinement/cases.toml` with a
+  per-platform expected verdict

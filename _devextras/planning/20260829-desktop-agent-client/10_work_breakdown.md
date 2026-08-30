@@ -13,8 +13,13 @@ never be ambiguous about where it lands:
 | Prefix | Repo | Range |
 | ------ | ---- | ----- |
 | `DS` (Desktop Server) | `synaplan/` | `DS1`–`DS18` — **all of Phase A** |
-| `DC` (Desktop Client) | `synaplan-desktop` | `DC1`–`DC21` — Phase B |
-| `L`, `M`, `X` | cross-cutting | see §2 |
+| `DC` (Desktop Client) | `synaplan-desktop` | `DC1`–`DC29` — Phase B |
+| `L`, `M`, `P`, `X` | cross-cutting | see §2 |
+
+**`DC22`–`DC29` were added on 2026-08-30** with the cross-platform decisions
+(master plan §0.3). They are appended rather than renumbered so existing
+references stay valid: **ID order is not execution order** — the `Depends`
+column is. Each new step is listed inside the sprint it belongs to.
 
 The old flat `D0`–`D35` numbering is retired. If you find a `D12`-style
 reference in a stale doc or PR, map it through §12.
@@ -31,12 +36,13 @@ Nothing implemented. Tick rows here when a step merges.
 | A | Sprint A2 — pairing | `DS5`–`DS10` | Blocked on `DS1`–`DS4` |
 | A | Sprint A3 — jobs, check-in, freeze | `DS11`–`DS18` | Blocked on `DS7` |
 | — | **Phase A gate** | all `DS*` merged | **Blocks every `DC*`** |
-| B | Sprint B1 — client repo + chat | `DC1`–`DC5` | Blocked on Phase A gate |
-| B | Sprint B2 — skills runtime | `DC6`–`DC10` | Blocked on `DC4` |
+| B | Sprint B1 — client repo + chat | `DC1`–`DC5`, `DC22`, `DC23` | Blocked on Phase A gate |
+| B | Sprint B2 — skills runtime | `DC6`–`DC10`, `DC24`, `DC25` | Blocked on `DC4` |
 | B | Sprint B3 — skills manager | `DC11`–`DC14` | Blocked on `DC7` |
-| B | Sprint B4 — bundled pptx | `DC15`–`DC18` | Blocked on `DC11` |
-| B | Sprint B5 — poll loop | `DC19`–`DC21` | Blocked on `DC15` + `DS14` |
-| — | Cross-cutting | `L1`, `M0` | `L1` before `DS9` copy freezes |
+| B | Sprint B4 — bundled pptx | `DC15`–`DC18`, `DC26` | Blocked on `DC11` |
+| B | Sprint B5 — poll loop | `DC19`–`DC21`, `DC27` | Blocked on `DC15` + `DS14` |
+| B | Sprint B6 — release engineering | `DC28` | Blocked on `DC18`; GA gate |
+| — | Cross-cutting | `L1`, `M0`, `P0`, `P1` | `L1` before `DS9` copy freezes; `P0` before `DC1` |
 
 ---
 
@@ -80,7 +86,12 @@ documentation steps `DC5` and `DC21`.
 | -- | ---- | ----- | ---- | ------- | ---------- |
 | **L1** | Native-speaker pass on [`12_ux_and_i18n.md`](./12_ux_and_i18n.md) §2 | Docs | S | — | DE/ES/TR table ticked or corrected in that file |
 | **M0** | Add Desktop paths to `.github/mobile-impact-policy.json` (`backend-only` for PHP, `ota-candidate` for Channels Vue) when the first file is added | synaplan | S | `DS2` or `DS9` | `node scripts/mobile-impact.mjs` would classify correctly; policy test green |
+| **P0** | **Order the code-signing identities**: Authenticode (OV or EV) and an Apple Developer ID. Record ownership, renewal date, and where the CI secrets will live | Ops | S | — | Certificates in hand (or ordered with a date) **before `DC1`**; not on the critical path at `DC28` |
+| **P1** | Per-release manual platform checklist as a PR template, from [`13_cross_platform.md`](./13_cross_platform.md) §11 | Docs | S | — | Template exists in the client repo; first filled at `DC18` |
 | **X1** | Retire the old `D0`–`D35` IDs anywhere they leaked (PR templates, issue tracker, other planning docs) | Docs | S | — | `rg -n "\bD[0-9]+\b"` in `_devextras/planning/20260829-*` returns nothing stale |
+
+`P0` is deliberately a Phase A-era task with no code: certificate procurement
+takes weeks and must not be discovered at `DC28` (master plan decision 32).
 
 ---
 
@@ -141,13 +152,16 @@ harness; refusals fail closed; flag off is inert (C8); contract frozen (C9).
 
 | ID | Step | Layer | Size | Depends | Acceptance |
 | -- | ---- | ----- | ---- | ------- | ---------- |
-| **DC1** | **Create the repo**: Tauri 2 + Vue 3 + Makefile `ci-local` + CI on Linux + `AGENTS.md` + `docs/DEVELOPMENT.md`. Empty window | Client | M | **Phase A gate**, checklist 1–2, 23 | `make ci-local` green; `main` protected; no secrets |
-| **DC2** | Pairing screen + keychain storage + host pin | Client | M | `DC1` | Reject non-https (except loopback); key not in plaintext fixture; wrong-code copy |
+| **DC1** | **Create the repo**: Tauri 2 + Vue 3 + Makefile `ci-local` + **CI on Linux, Windows, and macOS** + `AGENTS.md` + `docs/DEVELOPMENT.md` + `docs/PLATFORMS.md`. Empty window | Client | M | **Phase A gate**, checklist 1–2, 23, 25–26 | `make ci-local` green on all three runners; `main` protected; bundle id and vendor dirs fixed; no secrets |
+| **DC22** | `app_dirs`: config / skills / out-box / audit paths per OS, XDG-aware, temp-home-testable | Client | S | `DC1` | Three-OS expectations asserted; grep finds no hardcoded `~/.synaplan-desktop` elsewhere |
+| **DC23** | `SecretStore`: Credential Manager / Keychain / Secret Service + in-memory double + opt-in plaintext fallback | Client | M | `DC1` | Fallback refused unless the env flag is set and warns; key deleted on 401 |
+| **DC2** | Pairing screen + host pin, storing through `DC23` | Client | M | `DC22`, `DC23` | Reject non-https (except loopback); key not in plaintext fixture; wrong-code copy; hostname sanitized |
 | **DC3** | Fixture Messages / pair server; vendor the frozen `DS18` fixtures | Client | S | `DC1` | Tests never call a real host; vendored fixtures byte-identical + source commit noted |
 | **DC4** | Chat UI: stream `POST /v1/messages`, default model, 401/404 copy | Client | M | `DC2`, `DC3` | Mock SSE renders tokens; 401 → pair again |
-| **DC5** | `docs/DESKTOP.md` install / pairing walkthrough (docs-only PR in **synaplan**) | Docs | S | `DC4` | Removes “not released yet”; still no download URL |
+| **DC5** | `docs/DESKTOP.md` install / pairing walkthrough (docs-only PR in **synaplan**) | Docs | S | `DC4` | Removes “not released yet”; states per-OS status honestly; still no download URL |
 
-**Sprint B1 exit:** human evidence of one real turn; CI green; SPA not vendored.
+**Sprint B1 exit:** human evidence of one real turn; CI green **on three
+runners**; secret in the OS store on each OS; SPA not vendored.
 
 ---
 
@@ -155,14 +169,17 @@ harness; refusals fail closed; flag off is inert (C8); contract frozen (C9).
 
 | ID | Step | Layer | Size | Depends | Acceptance |
 | -- | ---- | ----- | ---- | ------- | ---------- |
-| **DC6** | Rust path confinement + `config.toml` defaults + deny globs | Client | M | `DC1` | Symlink-escape and `~/.ssh` tests fail the PR if confinement is removed |
-| **DC7** | SKILL.md scanner + frontmatter validation + fixture `hello-files` | Client | S | `DC6` | Bad name/dir skipped; valid skill listed |
-| **DC8** | This-computer UI: add/remove read/write folders (four locales) | Client | M | `DC6`, `L1` | Deny list not user-removable in v1 (or confirm if we allow) |
-| **DC9** | Messages tool definitions `Read` / `Write` / `Bash` + iteration cap | Client | M | `DC4`, `DC6`, `DC7` | Mock `tool_use` Write creates a file in the out-box |
-| **DC10** | First-Bash confirm dialog; API key absent from subprocess env | Client | S | `DC9` | Env test; cancel → no process |
+| **DC6** | Rust path confinement (canonicalize → normalize → component contain → deny) + `config.toml` defaults | Client | M | `DC22` | Escape and deny-glob tests fail the PR if confinement is weakened |
+| **DC24** | **Per-OS confinement corpus** `tests/confinement/cases.toml` + the platform normalizations behind it (junctions, UNC, drive-relative, 8.3, ADS, reserved names, trailing dot, long paths, firmlinks, NFC/NFD, case folding vs byte-exact, TOCTOU) | Client | **M–L** | `DC6` | Every row of B2 §2.2 green on three runners; removing a normalization reddens a named case |
+| **DC7** | SKILL.md scanner + frontmatter validation + case-collision detection + fixture `hello-files` | Client | S | `DC6` | Bad name/dir skipped; case-colliding names refused on every OS |
+| **DC8** | This-computer UI: add/remove read/write folders, platform-native path display (four locales) | Client | M | `DC22`, `L1` | Roots stored canonicalized at pick time; deny list not user-removable in v1 |
+| **DC25** | Known-folder resolution (Windows Known Folder API incl. OneDrive redirection, macOS iCloud-relocated Documents, `user-dirs.dirs`) + honest handling of cloud placeholder files | Client | S | `DC8` | Defaults resolve via the OS API, never by string; a placeholder read explains itself instead of failing |
+| **DC9** | Messages tool definitions `Read` / `Write` / `Bash` → `{program, args[], workdir}`, no shell, process-tree timeout, constructed env, iteration cap | Client | M | `DC4`, `DC6`, `DC7` | Mock `tool_use` Write creates a file in the out-box; metacharacter command refused; CI grep guard for `sh -c` / `cmd /c` / `powershell -Command` (C12) |
+| **DC10** | First-program confirm dialog; key and injection env vars absent from subprocess env | Client | S | `DC9` | Env test incl. `PYTHONPATH` / `LD_PRELOAD` / `NODE_OPTIONS`; cancel → no process |
 
-**Sprint B2 exit:** fixture skill writes a file through the mock loop; escape
-tests on.
+**Sprint B2 exit:** fixture skill writes a file through the mock loop on all
+three OSes; the escape corpus is green on all three and red when weakened
+(C11); no shell exists anywhere (C12).
 
 ---
 
@@ -171,8 +188,8 @@ tests on.
 | ID | Step | Layer | Size | Depends | Acceptance |
 | -- | ---- | ----- | ---- | ------- | ---------- |
 | **DC11** | Skills page + `skills.json` enable/disable + bundled immutable | Client | M | `DC7` | Disable drops skill from catalog preface |
-| **DC12** | Install from folder + zip (zip-slip, symlink, root SKILL.md rejected) | Client | M | `DC11` | Malicious zip tests in CI |
-| **DC13** | Install from https Git/GitHub URL, pin SHA, reject `file://` | Client | M | `DC12` | SHA stored; no auto-update |
+| **DC12** | Install from folder + zip: atomic extract-validate-rename, and the full archive corpus (`../`, **backslash entries**, symlink/hardlink, ADS, reserved names, case collisions, zip bomb, long paths, no execute bits) | Client | M | `DC11`, `DC24` | Malicious archive tests green on three runners; failed install leaves the skills dir untouched; macOS quarantine stripped only after confirm |
+| **DC13** | Install from https Git/GitHub URL as a **zipball over HTTPS** (no `git` binary, no shell), pin SHA, reject `file://`, `git://`, and SSH remotes | Client | M | `DC12` | SHA stored; works on a machine without `git`; no auto-update |
 | **DC14** | Supply-chain confirm copy ×4 | Client | S | `DC11`, `L1` | Dialog required before enable |
 
 **Sprint B3 exit:** reviewer installs the fixture from a zip in the UI.
@@ -184,12 +201,15 @@ tests on.
 | ID | Step | Layer | Size | Depends | Acceptance |
 | -- | ---- | ----- | ---- | ------- | ---------- |
 | **DC15** | Vendor official `pptx` at a pinned SHA + `docs/BUNDLED_SKILLS.md` + NOTICE | Client | M | `DC11` | Parses; license present; not live-fetched |
-| **DC16** | Doctor: detect python/node/soffice; block skill if python missing | Client | S | `DC15` | Missing python → not offered to the model |
-| **DC17** | Tighten Bash allowlist (python, node, soffice, skill scripts); deny curl | Client | S | `DC9`, `DC15` | Fixture `curl` denied |
-| **DC18** | Hermetic “write minimal pptx” CI script + manual evidence template | Client | M | `DC15`, `DC16` | Linux CI green without LibreOffice; PR template lists OS matrix |
+| **DC16** | Doctor v1: probe-based detection of Python / Node / LibreOffice; block a skill whose runtime is missing | Client | S | `DC15` | Missing python → skill blocked, not offered to the model; found-but-silent binary counts as missing |
+| **DC26** | **Platform discovery rules**: Store-stub detection, `py -3`, `PATHEXT`, Program Files and per-user Python, `.app` bundle `soffice`, both Homebrew prefixes, CLT shim, PEP 668 / missing `venv`, Flatpak honesty | Client | M | `DC16` | Fixture-filesystem tests per OS (B4 §1.2.1); hints correct in four locales |
+| **DC17** | Binary allowlist from resolved absolute paths (python, node, soffice, skill scripts); deny curl, shells, script hosts | Client | S | `DC9`, `DC26` | Fixture `curl` denied; a program not produced by the doctor is refused before spawn |
+| **DC18** | Hermetic “write minimal pptx” CI script on three runners + filled manual matrix | Client | M | `DC15`, `DC26`, `P1` | Green on Linux, Windows, macOS without LibreOffice; §1.5 matrix filled including the two negative rows |
 
-**Sprint B4 exit:** bundled pptx ready; Outlook COM not shipped; docs honest.
-This is also the gate for seeding `DESKTOP_AGENT.ENABLED = 1` on new installs.
+**Sprint B4 exit:** bundled pptx ready and demonstrated on all three OSes;
+the doctor is honest on a machine without runtimes; Outlook COM/AppleScript not
+shipped; docs honest. This is also the gate for seeding
+`DESKTOP_AGENT.ENABLED = 1` on new installs.
 
 ---
 
@@ -199,16 +219,30 @@ The server half shipped in Sprint A3. Nothing here changes it (C9).
 
 | ID | Step | Layer | Size | Depends | Acceptance |
 | -- | ---- | ----- | ---- | ------- | ---------- |
-| **DC19** | Poll loop: `protocol: 1` check-in, lease, run, report; ignore unknown input keys; `unknown_skill` / `unknown_type` / `skill_disabled` | Client | M | `DC9`, `DC15`, `DS14` | Mock job without installed skill → failed, no Bash; `command` key never reaches argv |
-| **DC20** | Per-skill `allowUnattended` + OS notification | Client | S | `DC19` | Default false; first unattended run notifies |
-| **DC21** | End-to-end evidence + `docs/DESKTOP.md` queue walkthrough (docs-only PR in **synaplan**) | Client + Docs | S | `DC20` | Screenshots of both ends, success and refusal |
+| **DC19** | Poll loop: `protocol: 1` check-in, lease, run, report; typed `{skill, prompt, fileIds}` parse; `unknown_skill` / `unknown_type` / `skill_disabled` / `local_error` | Client | M | `DC9`, `DC15`, `DS14` | Mock job without installed skill → failed, no process; `command` key never reaches argv |
+| **DC20** | Per-skill `allowUnattended` + OS notification; refused with a plaintext key | Client | S | `DC19`, `DC23` | Default false; first unattended run notifies; no global allow-all |
+| **DC27** | Autostart + single instance per OS (Run key / Task Scheduler, `SMAppService`, XDG autostart or `systemd --user`) + tray with Quit | Client | M | `DC19` | Opt-in; disabling and uninstalling remove the OS entry; second instance exits |
+| **DC21** | End-to-end evidence + `docs/DESKTOP.md` queue walkthrough (docs-only PR in **synaplan**) | Client + Docs | S | `DC20`, `DC27` | Screenshots per OS of both ends, success and refusal |
 
-**Sprint B5 exit:** web queue → desktop pptx → chat file message; uninstalled
-name fails closed.
+**Sprint B5 exit:** web queue → desktop pptx → chat file message on all three
+OSes; uninstalled name fails closed; autostart leaves nothing behind.
+
+---
+
+## 10.1 Phase B · Sprint B6 — release engineering (`synaplan-desktop`)
+
+Spec: [`13_cross_platform.md`](./13_cross_platform.md) §9. No separate sprint
+file. This is the **GA gate**: without it there is no honest download link.
+
+| ID | Step | Layer | Size | Depends | Acceptance |
+| -- | ---- | ----- | ---- | ------- | ---------- |
+| **DC28** | Installers (MSI/NSIS, `.dmg`, AppImage + `.deb`), Authenticode signing, macOS notarization + stapling, checksums, and the release workflow | Client | **L** | `DC18`, `P0` | A normal user installs on each OS with no unpassable warning; the macOS Keychain item still resolves after signing (`DC23` re-verified) |
 
 **Not in v1 (follow-ups, do not sneak in):** tray-only daemon, Centrifugo
 wake-up, planner-emitted jobs, `file.read` enum, brogent, platform cron
-script, git auto-update, pip install button, `protocol: 2`.
+script, git auto-update, pip install button, `protocol: 2`, **client
+auto-update (`DC29`, reserved)**, Flatpak/Snap/winget/Store distribution,
+ARM manual verification.
 
 ---
 
@@ -220,14 +254,19 @@ script, git auto-update, pip install button, `protocol: 2`.
 | 2 | `DS5`–`DS10` | synaplan | Pairing usable with `pair.sh` |
 | 3 | `DS11`–`DS15` | synaplan | Queue + MCP tools, flag off |
 | 4 | `DS16`–`DS18` | synaplan | Web action, harness, **freeze** → Phase A done |
-| 5 | `DC1`–`DC5` | desktop | Repo is born; first chat |
-| 6 | `DC6`–`DC10` | desktop | Runtime |
+| 1–4 | + `P0` | ops | Order the signing certificates **during Phase A** |
+| 5 | `DC1`, `DC22`, `DC23`, `DC2`–`DC5` | desktop | Repo is born on three runners; platform dirs; OS secret store; first chat |
+| 6 | `DC6`, `DC24`, `DC7`–`DC10`, `DC25` | desktop | Runtime + the per-OS confinement corpus |
 | 7 | `DC11`–`DC14` | desktop | Manager |
-| 8 | `DC15`–`DC18` | desktop | pptx vertical |
-| 9 | `DC19`–`DC21` | desktop | Poll loop against a queue that already works |
+| 8 | `DC15`, `DC16`, `DC26`, `DC17`, `DC18` | desktop | pptx vertical on three OSes |
+| 9 | `DC19`, `DC20`, `DC27`, `DC21` | desktop | Poll loop against a queue that already works |
+| 10 | `DC28` | desktop | Installers, signing, notarization — GA gate |
 
 Phase A is four weeks of `synaplan/` PRs that a reviewer can read without
-context-switching repos. Phase B is five weeks with no server dependency.
+context-switching repos. Phase B is now **six** weeks with no server
+dependency: weeks 6 and 8 grew because the confinement corpus (`DC24`) and
+platform discovery (`DC26`) are real work, and week 10 exists because a signed
+installer is not a footnote.
 
 **If scope slips, cut the queue** (`DS11`–`DS18` and `DC19`–`DC21`) before
 cutting scopes, pairing, or path confinement (decision 24). Because the queue
@@ -265,7 +304,12 @@ For PRs, notes, and links written before 2026-08-30.
 | `D17` | `DC8` | `D35` | `DC20` |
 
 New steps with no old equivalent: `DS17` (harness), `DS18` (contract freeze +
-docs), `DC21` (end-to-end evidence), `X1` (ID cleanup).
+docs), `DC21` (end-to-end evidence), `X1` (ID cleanup), and the cross-platform
+additions of 2026-08-30 — `DC22` (`app_dirs`), `DC23` (`SecretStore`), `DC24`
+(confinement corpus), `DC25` (known folders), `DC26` (platform discovery),
+`DC27` (autostart), `DC28` (installers + signing), `P0` (certificates), `P1`
+(manual matrix). `DC29` is **reserved** for client auto-update and is
+explicitly out of v1.
 
 ---
 
@@ -281,3 +325,6 @@ docs), `DC21` (end-to-end evidence), `X1` (ID cleanup).
 | “Scopes later” | Stolen laptop = full account | `DS1`–`DS2` first |
 | “Start the repo now, it is only a scaffold” | The scaffold becomes a reason to interleave; server PRs then land under client pressure | `DC1` after the Phase A gate |
 | “Tweak the queue while writing the client” | The frozen contract is the only thing stopping a `command` field | `protocol: 2` or nothing (C9) |
+| “Get it working on Linux, port to Windows later” | The port is where the confinement bugs are, and by then the API shape assumes POSIX | Three runners from `DC1` (C10, C11) |
+| “Ship a command string and quote it properly” | Quoting is the bug class; Windows has no Bash to quote for | `{program, args[]}` (C12) |
+| “Signing is a release chore” | Weeks of certificate lead time, and macOS Keychain ACLs change under a new identity | `P0` in Phase A, `DC28` re-verifies `DC23` |
