@@ -1176,8 +1176,8 @@ class PromptController extends AbstractController
     private function formatPromptName(string $topic, string $shortDescription, bool $isDefault = true): string
     {
         $prefix = $isDefault ? '(default)' : '(custom)';
-        $truncatedDesc = strlen($shortDescription) > 60
-            ? substr($shortDescription, 0, 57).'...'
+        $truncatedDesc = mb_strlen($shortDescription) > 60
+            ? mb_substr($shortDescription, 0, 57).'...'
             : $shortDescription;
 
         return "{$prefix} {$topic} - {$truncatedDesc}";
