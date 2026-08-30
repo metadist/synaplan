@@ -229,9 +229,15 @@ Full rules: [`11_security_and_compatibility.md`](./11_security_and_compatibility
    confirm-on-device. v1 `pptx` writes only inside the allowlisted out-box.
 5. **Results are untrusted** if they re-enter RAG or a prompt. Size-cap,
    MIME allowlist, provenance `source: desktop_skill`.
+6. **The sandbox is only as strong as its weakest platform.** Confinement, the
+   secret store, and process control are specified per OS
+   ([`13_cross_platform.md`](./13_cross_platform.md) §§3, 4, 6) and gated on
+   three runners (C11). A rule that holds on Linux and not on Windows is not a
+   rule.
 
 This is compatible with the July paper’s closed enum. The enum gains
-`skill.run`; it does not gain `shell.exec`.
+`skill.run`; it does not gain `shell.exec` — and the client never constructs a
+shell of its own either (decision 29, C12).
 
 **Server-first does not weaken this.** The enum, the ignored-extra-keys rule,
 and the “device refuses unknown skills” rule are written into the Phase A
