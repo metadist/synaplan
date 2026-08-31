@@ -96,7 +96,12 @@ export default {
       headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
       headers.set('Pragma', 'no-cache')
       headers.set('Expires', '0')
-    } else if (isHashedAsset(pathname)) {
+    } else if (isHashedAsset(pathname) && response.ok) {
+      // Only the real, existing hashed file is immutable. A missing hash after
+      // a deploy is answered by the origin with a no-store 404 (see the
+      // @frontend_missing / @widget_missing guards in the backend Caddyfile);
+      // caching that 404 as immutable would pin the failure at the edge for a
+      // year, so let its no-store header pass through untouched.
       headers.set('Cache-Control', 'public, max-age=31536000, immutable')
     } else if (isHtmlNavigation(request, pathname)) {
       headers.set('Cache-Control', 'no-cache')
