@@ -95,7 +95,7 @@
     "postcss": "8.5.26",
     "prettier": "3.9.6",
     "tailwindcss": "4.3.3",
-    "terser": "5.50.0",
+    "terser": "5.51.2",
     "typescript": "6.0.3",
     "vite": "8.2.2",
     "vitest": "4.1.11",
