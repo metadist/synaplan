@@ -26,6 +26,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminLogsController extends AbstractController
 {
     private const DEFAULT_SUMMARY_WINDOW_MINUTES = 60;
+
+    /**
+     * Longest queryable window, in minutes. Matches the ring's 7-day TTL, so a
+     * larger value could not surface anything anyway, and keeps the derived
+     * `time() - $minutes * 60` inside the integer range that
+     * {@see EventRingStore} declares.
+     */
+    private const MAX_WINDOW_MINUTES = 10080;
+
     private const MAX_LIMIT = 500;
 
     public function __construct(
@@ -46,7 +55,7 @@ final class AdminLogsController extends AbstractController
         parameters: [
             new OA\Parameter(name: 'mode', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['recent', 'summary'], default: 'recent')),
             new OA\Parameter(name: 'level', in: 'query', required: false, description: 'Filter by exact level (recent mode).', schema: new OA\Schema(type: 'string', enum: EventRingStore::LEVELS)),
-            new OA\Parameter(name: 'since_minutes', in: 'query', required: false, description: 'Only events from the last N minutes.', schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(name: 'since_minutes', in: 'query', required: false, description: 'Only events from the last N minutes (capped at 7 days, the ring retention).', schema: new OA\Schema(type: 'integer', maximum: self::MAX_WINDOW_MINUTES, minimum: 1)),
             new OA\Parameter(name: 'q', in: 'query', required: false, description: 'Case-insensitive substring match across event/message/exception/route/provider/model (recent mode).', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'request_id', in: 'query', required: false, description: 'Filter by correlation id (recent mode).', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'limit', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1, maximum: self::MAX_LIMIT, default: 50)),
@@ -74,7 +83,7 @@ final class AdminLogsController extends AbstractController
                             new OA\Property(property: 'event', type: 'string', example: 'exception'),
                             new OA\Property(property: 'message', type: 'string', nullable: true, example: 'RAG context loading failed'),
                             new OA\Property(property: 'exception_class', type: 'string', nullable: true, example: 'RuntimeException'),
-                            new OA\Property(property: 'exception_message', type: 'string', nullable: true),
+                            new OA\Property(property: 'exception_message', type: 'string', nullable: true, description: 'Scrubbed exception message, or the log context\'s `error` detail when no exception object was attached.'),
                             new OA\Property(property: 'stack', type: 'array', items: new OA\Items(type: 'string'), description: 'Compact file:line frames (max 15).'),
                             new OA\Property(property: 'request_id', type: 'string', nullable: true, example: 'trace-abc123'),
                             new OA\Property(property: 'host', type: 'string', nullable: true, description: 'Cluster node that produced the event.', example: 'web2'),
@@ -112,7 +121,7 @@ final class AdminLogsController extends AbstractController
         $mode = 'summary' === $request->query->get('mode') ? 'summary' : 'recent';
 
         $sinceMinutes = $request->query->getInt('since_minutes', 0);
-        $sinceMinutes = $sinceMinutes > 0 ? $sinceMinutes : null;
+        $sinceMinutes = $sinceMinutes > 0 ? min($sinceMinutes, self::MAX_WINDOW_MINUTES) : null;
 
         if ('summary' === $mode) {
             $window = $sinceMinutes ?? self::DEFAULT_SUMMARY_WINDOW_MINUTES;

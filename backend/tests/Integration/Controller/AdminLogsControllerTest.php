@@ -31,8 +31,11 @@ final class AdminLogsControllerTest extends WebTestCase
         $this->store = $store;
         $this->store->clear();
 
-        $this->store->record(['event' => 'log', 'level' => 'warning', 'message' => 'slow query', 'route' => 'chat_send', 'ts' => 1000]);
-        $this->store->record(['event' => 'exception', 'level' => 'error', 'exception_class' => 'RuntimeException', 'exception_message' => 'failed for admin@synaplan.com', 'route' => 'chat_send', 'ts' => 2000]);
+        // Within the queryable window — the endpoint caps `since_minutes` at the
+        // ring's 7-day retention, so fixed epoch timestamps would never show up.
+        $now = time();
+        $this->store->record(['event' => 'log', 'level' => 'warning', 'message' => 'slow query', 'route' => 'chat_send', 'ts' => $now - 120]);
+        $this->store->record(['event' => 'exception', 'level' => 'error', 'exception_class' => 'RuntimeException', 'exception_message' => 'failed for admin@synaplan.com', 'route' => 'chat_send', 'ts' => $now - 60]);
     }
 
     protected function tearDown(): void
@@ -90,7 +93,7 @@ final class AdminLogsControllerTest extends WebTestCase
             self::markTestSkipped('admin@synaplan.com not found. Run fixtures first.');
         }
 
-        $this->client->request('GET', '/api/v1/admin/logs?mode=summary&since_minutes=999999999');
+        $this->client->request('GET', '/api/v1/admin/logs?mode=summary&since_minutes=60');
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
 
         $data = json_decode((string) $this->client->getResponse()->getContent(), true);
@@ -99,6 +102,28 @@ final class AdminLogsControllerTest extends WebTestCase
         self::assertSame(1, $data['summary']['by_level']['error']);
         self::assertSame(1, $data['summary']['by_level']['warning']);
         self::assertSame(2, $data['summary']['by_route']['chat_send']);
+    }
+
+    /**
+     * Regression: an unbounded window made `time() - $minutes * 60` overflow to
+     * a float, which under strict_types hit a TypeError in the store and turned
+     * the request into a 500. The window is clamped to the ring's retention.
+     */
+    public function testOversizedWindowIsClampedInsteadOfFailing(): void
+    {
+        if (!$this->authenticateAs('admin@synaplan.com')) {
+            self::markTestSkipped('admin@synaplan.com not found. Run fixtures first.');
+        }
+
+        foreach (['recent', 'summary'] as $mode) {
+            $this->client->request('GET', '/api/v1/admin/logs?mode='.$mode.'&since_minutes='.\PHP_INT_MAX);
+
+            self::assertSame(
+                Response::HTTP_OK,
+                $this->client->getResponse()->getStatusCode(),
+                "mode={$mode} should clamp the window, not fail.",
+            );
+        }
     }
 
     public function testNonAdminIsForbidden(): void
