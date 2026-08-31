@@ -281,8 +281,27 @@ jobs:
             exit 0
           fi
 
-          # Squash, to keep one commit per release on the default branch.
-          gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --squash
+          # Merged through the REST API rather than with `gh pr merge`, which
+          # refuses client-side as soon as GitHub reports mergeStateStatus
+          # BLOCKED — and GitHub reports exactly that here, permanently: the
+          # proposal carries no approval and never will, because the App merges
+          # it as a bypass actor of the review ruleset. `gh` does not make that
+          # distinction and so never even asks GitHub to merge. Everything it
+          # would have checked, the guards above established already.
+          #
+          # Squash, to keep one commit per release on the default branch, with
+          # the title GitHub's own squash merge would have produced.
+          title="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title)"
+          merged="$(
+            gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${NUMBER}/merge" \
+              -f merge_method=squash \
+              -f "commit_title=${title} (#${NUMBER})" \
+              --jq '.merged'
+          )"
+          if [ "$merged" != true ]; then
+            echo "::error::GitHub did not merge #${NUMBER}; it answered merged=${merged}."
+            exit 1
+          fi
 
           echo "merged=true" >> "$GITHUB_OUTPUT"
           {

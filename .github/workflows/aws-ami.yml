@@ -277,10 +277,15 @@ jobs:
     # Only the x86_64 image is launched. The two AMIs come out of the same
     # provisioner on the same base OS, so a second launch would re-test the
     # scripts rather than the architecture, for a second instance-hour.
+    # The trigger is spelled out rather than tested as `inputs.verify != false`.
+    # On a tag push the inputs context is empty, and GitHub compares an empty
+    # string to a boolean by casting both to a number — so `'' != false` is
+    # false, and the smoke test silently skipped every single release build. It
+    # only ever ran when someone dispatched the workflow by hand.
     if: >-
       needs.resolve.outputs.version != '' &&
       contains(fromJSON(needs.resolve.outputs.matrix), 'x86_64') &&
-      inputs.verify != false
+      (github.event_name != 'workflow_dispatch' || inputs.verify)
     # Same reasoning as on the build job: the AWS role trusts the environment.
     environment: ami-build
     permissions:
