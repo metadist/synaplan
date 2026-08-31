@@ -165,6 +165,22 @@
 		file_server
 	}
 
+	# Missing content-hashed frontend assets must NOT fall through to the SPA
+	# fallback, which would serve index.html as HTTP 200 with a text/html MIME
+	# type. The browser then refuses the response as a module script/stylesheet
+	# ("Failed to load module script", "Refused to apply style", "Unable to
+	# preload CSS") — the post-deploy stale-shell failure mode: an open tab on
+	# an old build imports hashes that no longer exist. A clean 404 (never
+	# cached) lets the SPA's router detect the chunk-load failure and reload
+	# into the fresh bundle. Mirrors the @widget_missing guard above.
+	@frontend_missing {
+		path /assets/*
+	}
+	handle @frontend_missing {
+		header Cache-Control "no-store"
+		respond 404
+	}
+
 	# Backend static files third (bundles, uploads)
 	@backend_file {
 		path /bundles/* /uploads/*
