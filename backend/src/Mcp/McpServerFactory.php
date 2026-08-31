@@ -10,6 +10,7 @@ use App\Entity\DesktopJob;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Observability\EventRingStore;
 use App\Repository\ChatRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Repository\MessageRepository;
@@ -89,6 +90,7 @@ final class McpServerFactory
         private readonly DesktopDeviceRepository $desktopDeviceRepository,
         private readonly DesktopJobResultNotifier $desktopJobResultNotifier,
         private readonly LoggerInterface $logger,
+        private readonly EventRingStore $eventRing,
     ) {
     }
 
@@ -219,6 +221,24 @@ final class McpServerFactory
                 'One of the authenticated user\'s stored long-term memories, addressed by memory id (JSON).',
                 'application/json',
             );
+
+        // Admin-only troubleshooting tool. The `mcp` firewall authenticates any
+        // valid API key (ROLE_USER), so the admin gate lives here: the tool is
+        // invisible to non-admins in tools/list and refuses in the handler.
+        if (self::hasAdminRole($user)) {
+            $builder->addTool(
+                $this->recentErrorsHandler($user),
+                'recent_errors',
+                'Recent production errors',
+                'Query the redacted operational event ring for recent production errors and '
+                .'notable events (admin only). mode=summary returns counts by level/event/route '
+                .'for a time window; mode=recent returns the newest events with optional '
+                .'level/query/request_id filters. Every field is allow-listed and free text is '
+                .'scrubbed — no chat content, user emails, document text or secrets are returned.',
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
+                self::recentErrorsSchema(),
+            );
+        }
 
         if ($device instanceof DesktopDevice && $this->desktopAgentConfig->isEnabled((int) $user->getId())) {
             $this->registerDesktopAgentTools($builder, $device);
@@ -465,6 +485,61 @@ final class McpServerFactory
                 : $instruction;
 
             return [['role' => 'user', 'content' => $content]];
+        };
+    }
+
+    /**
+     * Mirrors the `ROLE_ADMIN` check the HTTP admin endpoints use. Deliberately
+     * not `User::isAdmin()`, which only looks at the internal user level and so
+     * would lock out an admin whose role comes from the OIDC role mapping.
+     */
+    private static function hasAdminRole(User $user): bool
+    {
+        return \in_array('ROLE_ADMIN', $user->getRoles(), true);
+    }
+
+    /**
+     * @return \Closure(string, ?string, int, ?string, ?string, int): array<string, mixed>
+     */
+    private function recentErrorsHandler(User $user): \Closure
+    {
+        return function (
+            string $mode = 'summary',
+            ?string $level = null,
+            int $since_minutes = 60,
+            ?string $query = null,
+            ?string $request_id = null,
+            int $limit = 50,
+        ) use ($user): array {
+            // Defence in depth: the tool is only registered for admins, but a
+            // handler must never assume its own visibility gate held.
+            if (!self::hasAdminRole($user)) {
+                throw new ToolCallException('recent_errors requires an admin account.');
+            }
+
+            $sinceMinutes = max(1, min(10080, $since_minutes)); // cap at 7 days
+            $sinceTs = time() - $sinceMinutes * 60;
+
+            if ('recent' === $mode) {
+                $level = null !== $level && \in_array($level, EventRingStore::LEVELS, true) ? $level : null;
+                $query = null !== $query && '' !== trim($query) ? $query : null;
+                $requestId = null !== $request_id && '' !== trim($request_id) ? $request_id : null;
+
+                $events = $this->eventRing->recent($level, $sinceTs, $query, $requestId, max(1, min(200, $limit)));
+
+                return [
+                    'mode' => 'recent',
+                    'window_minutes' => $sinceMinutes,
+                    'total' => \count($events),
+                    'events' => $events,
+                ];
+            }
+
+            return [
+                'mode' => 'summary',
+                'window_minutes' => $sinceMinutes,
+                'summary' => $this->eventRing->summary($sinceTs),
+            ];
         };
     }
 
@@ -934,6 +1009,51 @@ final class McpServerFactory
                 'memories' => $memories,
             ];
         };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function recentErrorsSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'mode' => [
+                    'type' => 'string',
+                    'enum' => ['summary', 'recent'],
+                    'default' => 'summary',
+                    'description' => 'summary = aggregate counts by level/event/route; recent = the newest individual events.',
+                ],
+                'level' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Filter recent events by exact level (debug, info, notice, warning, error, critical, alert, emergency).',
+                ],
+                'since_minutes' => [
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'maximum' => 10080,
+                    'default' => 60,
+                    'description' => 'Look back this many minutes (max 7 days).',
+                ],
+                'query' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Case-insensitive substring match across event/message/exception/route/provider/model (recent mode).',
+                ],
+                'request_id' => [
+                    'type' => ['string', 'null'],
+                    'description' => 'Filter recent events by correlation id (the X-Request-Id a user may report).',
+                ],
+                'limit' => [
+                    'type' => 'integer',
+                    'minimum' => 1,
+                    'maximum' => 200,
+                    'default' => 50,
+                    'description' => 'Maximum number of events to return in recent mode (1-200).',
+                ],
+            ],
+            'additionalProperties' => false,
+        ];
     }
 
     /**

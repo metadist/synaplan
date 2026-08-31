@@ -1080,6 +1080,11 @@ services:
         class: Monolog\Formatter\FormatterInterface
         factory: ['@App\Service\MonologFormatterFactory', 'createFormatter']
 
+    # Stamps the request correlation id onto every log record (see RequestIdSubscriber).
+    App\Monolog\RequestIdProcessor:
+        tags:
+            - { name: monolog.processor }
+
     # Plugin services are loaded dynamically by Kernel::loadPluginServices()
     # No manual plugin entries needed — drop plugin into /plugins/ and restart.
 
