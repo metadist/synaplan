@@ -77,6 +77,7 @@ final class AdminLogsController extends AbstractController
                             new OA\Property(property: 'exception_message', type: 'string', nullable: true),
                             new OA\Property(property: 'stack', type: 'array', items: new OA\Items(type: 'string'), description: 'Compact file:line frames (max 15).'),
                             new OA\Property(property: 'request_id', type: 'string', nullable: true, example: 'trace-abc123'),
+                            new OA\Property(property: 'host', type: 'string', nullable: true, description: 'Cluster node that produced the event.', example: 'web2'),
                             new OA\Property(property: 'route', type: 'string', nullable: true, example: 'chat_send'),
                             new OA\Property(property: 'method', type: 'string', nullable: true, example: 'POST'),
                             new OA\Property(property: 'status_code', type: 'integer', nullable: true, example: 500),

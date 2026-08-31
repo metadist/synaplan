@@ -56,6 +56,7 @@ final class EventRingHandlerTest extends KernelTestCase
         self::assertStringNotContainsString('@synaplan.com', (string) $events[0]['exception_message']);
         self::assertStringNotContainsString('@example.com', (string) $events[0]['message']);
         self::assertNotEmpty($events[0]['stack']);
+        self::assertSame(gethostname() ?: null, $events[0]['host']);
     }
 
     public function testIgnoresRecordsBelowWarning(): void

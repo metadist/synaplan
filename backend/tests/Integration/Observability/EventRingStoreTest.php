@@ -57,6 +57,16 @@ final class EventRingStoreTest extends KernelTestCase
         self::assertStringContainsString('[email]', (string) $recent[0]['exception_message']);
     }
 
+    public function testHostRoundTrips(): void
+    {
+        $this->store->record(['event' => 'boom', 'level' => 'error', 'host' => 'web2', 'ts' => 4000]);
+
+        $recent = $this->store->recent(level: 'error');
+
+        self::assertCount(1, $recent);
+        self::assertSame('web2', $recent[0]['host']);
+    }
+
     public function testFilterByLevelAndRequestId(): void
     {
         $this->store->record(['event' => 'a', 'level' => 'info', 'request_id' => 'req-1', 'ts' => 10]);

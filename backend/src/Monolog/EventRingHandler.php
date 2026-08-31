@@ -52,6 +52,10 @@ final class EventRingHandler extends AbstractProcessingHandler
             $stack = $this->stackFrames($exception);
         }
 
+        // Which cluster node produced the event — the first thing you want to
+        // know on a multi-server deployment. Non-PII, cheap.
+        $host = gethostname();
+
         $this->store->record([
             'ts' => $record->datetime->getTimestamp(),
             'level' => strtolower($record->level->getName()),
@@ -62,6 +66,7 @@ final class EventRingHandler extends AbstractProcessingHandler
             'exception_message' => $exceptionMessage,
             'stack' => $stack,
             'request_id' => $requestId,
+            'host' => false !== $host ? $host : null,
             'route' => \is_string($route) ? $route : null,
             'method' => $request?->getMethod(),
         ]);
