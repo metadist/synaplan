@@ -31,8 +31,8 @@ final class EventRingStoreTest extends KernelTestCase
 
     public function testRecordAndReadBackNewestFirst(): void
     {
-        $this->store->record(['event' => 'first', 'level' => 'info', 'ts' => 1000]);
-        $this->store->record(['event' => 'second', 'level' => 'error', 'ts' => 2000]);
+        self::assertTrue($this->store->record(['event' => 'first', 'level' => 'info', 'ts' => 1000]));
+        self::assertTrue($this->store->record(['event' => 'second', 'level' => 'error', 'ts' => 2000]));
 
         $recent = $this->store->recent();
 

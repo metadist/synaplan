@@ -89,18 +89,21 @@ final readonly class EventRingStore
      * unavailable — recording an event must never break the request it describes.
      *
      * @param EventInput $event
+     *
+     * @return bool whether the event reached Redis; `false` lets the caller back
+     *              off instead of paying the connection timeout on every event
      */
-    public function record(array $event): void
+    public function record(array $event): bool
     {
         $normalized = $this->normalize($event);
 
         $encoded = json_encode($normalized, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
         if (false === $encoded) {
-            return;
+            return false;
         }
 
         if (!$this->redis->zAdd(self::RING_KEY, (float) $normalized['ts'], $encoded)) {
-            return;
+            return false;
         }
 
         // Trim oldest entries down to the cap, then refresh the TTL.
@@ -109,6 +112,8 @@ final readonly class EventRingStore
             $this->redis->zRemRangeByRank(self::RING_KEY, 0, $overflow - 1);
         }
         $this->redis->expire(self::RING_KEY, self::TTL_SECONDS);
+
+        return true;
     }
 
     /**
@@ -218,11 +223,23 @@ final readonly class EventRingStore
     }
 
     /**
+     * Shape an incoming event and redact its free text. Write path only.
+     *
      * @param EventInput $event
      *
      * @return Event
      */
     private function normalize(array $event): array
+    {
+        return $this->shape($event, scrub: true);
+    }
+
+    /**
+     * @param EventInput $event
+     *
+     * @return Event
+     */
+    private function shape(array $event, bool $scrub): array
     {
         $level = \is_string($event['level'] ?? null) && \in_array($event['level'], self::LEVELS, true)
             ? $event['level']
@@ -235,15 +252,18 @@ final readonly class EventRingStore
             }
         }
 
+        $message = $this->str($event['message'] ?? null);
+        $exceptionMessage = $this->str($event['exception_message'] ?? null);
+
         return [
             'id' => \is_string($event['id'] ?? null) && '' !== $event['id'] ? $event['id'] : bin2hex(random_bytes(8)),
             'ts' => \is_int($event['ts'] ?? null) && $event['ts'] > 0 ? $event['ts'] : time(),
             'level' => $level,
             'channel' => $this->str($event['channel'] ?? null) ?? 'app',
             'event' => $this->str($event['event'] ?? null) ?? 'log',
-            'message' => $this->scrubber->scrub($this->str($event['message'] ?? null)),
+            'message' => $scrub ? $this->scrubber->scrub($message) : $message,
             'exception_class' => $this->str($event['exception_class'] ?? null),
-            'exception_message' => $this->scrubber->scrub($this->str($event['exception_message'] ?? null)),
+            'exception_message' => $scrub ? $this->scrubber->scrub($exceptionMessage) : $exceptionMessage,
             'stack' => $stack,
             'request_id' => $this->str($event['request_id'] ?? null),
             'host' => $this->str($event['host'] ?? null),
@@ -283,10 +303,12 @@ final readonly class EventRingStore
             return null;
         }
 
-        // Re-run through the normalizer so a stored record always has the full
-        // shape even if the schema grew since it was written.
+        // Re-shape so a stored record always has the full field set even if the
+        // schema grew since it was written. No scrubbing: the free text was
+        // already masked on the way in, and re-running the patterns over every
+        // decoded entry would cost a full regex pass per event per query.
         /* @var EventInput $decoded */
-        return $this->normalize($decoded);
+        return $this->shape($decoded, scrub: false);
     }
 
     /**

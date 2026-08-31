@@ -6,7 +6,7 @@ namespace App\Monolog;
 
 use App\Observability\EventRingStore;
 use App\Observability\RequestIdGenerator;
-use Monolog\Handler\AbstractProcessingHandler;
+use Monolog\Handler\AbstractHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -20,10 +20,22 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * and correlation id when a request is in scope (absent on worker/CLI runs).
  *
  * All free-text goes through the store's scrubber, and only the allow-listed
- * structured fields are ever persisted — no log message reaches the ring raw.
+ * structured fields are ever persisted. The Monolog context is NEVER copied
+ * wholesale — six keys are read by name (`provider`, `model`, `worker`,
+ * `user_id`, `status_code`, `duration_ms`, plus `error` as the reason text),
+ * because contexts across the app also carry `email`, `to` and free-form
+ * payloads that must never reach the AI-facing feed.
+ *
+ * Extends {@see AbstractHandler} rather than `AbstractProcessingHandler`: the
+ * latter renders every record through a `LineFormatter` before calling
+ * `write()`, and this handler serialises the event itself, so that work would
+ * be thrown away on every single warning.
  */
-final class EventRingHandler extends AbstractProcessingHandler
+final class EventRingHandler extends AbstractHandler
 {
+    /** How long to stop writing after Redis refused an event. */
+    private const MUTE_SECONDS = 60.0;
+
     /**
      * Reentrancy guard. Writing an event can itself emit a `warning+` log — the
      * shared {@see \App\Service\Infrastructure\RedisService} logs "Redis command
@@ -34,6 +46,15 @@ final class EventRingHandler extends AbstractProcessingHandler
      */
     private bool $handling = false;
 
+    /**
+     * Circuit breaker. The guard above stops the recursion but not the cost: a
+     * Predis command against a dead Redis blocks for the connection timeout,
+     * and it reconnects per command, so every logged warning would add seconds
+     * of latency on the error path. After a refused write we stay quiet for a
+     * minute instead.
+     */
+    private float $mutedUntil = 0.0;
+
     public function __construct(
         private readonly EventRingStore $store,
         private readonly RequestStack $requestStack,
@@ -41,21 +62,28 @@ final class EventRingHandler extends AbstractProcessingHandler
         parent::__construct(Level::Warning, true);
     }
 
-    protected function write(LogRecord $record): void
+    public function handle(LogRecord $record): bool
     {
-        if ($this->handling) {
-            return;
+        if (!$this->isHandling($record) || $this->handling) {
+            return false;
+        }
+
+        $now = microtime(true);
+        if ($now < $this->mutedUntil) {
+            return false;
         }
 
         $this->handling = true;
         try {
-            $this->record($record);
+            $this->mutedUntil = $this->record($record) ? 0.0 : $now + self::MUTE_SECONDS;
         } finally {
             $this->handling = false;
         }
+
+        return false;
     }
 
-    private function record(LogRecord $record): void
+    private function record(LogRecord $record): bool
     {
         $request = $this->requestStack->getMainRequest();
 
@@ -74,13 +102,19 @@ final class EventRingHandler extends AbstractProcessingHandler
             $exceptionClass = $exception::class;
             $exceptionMessage = $exception->getMessage();
             $stack = $this->stackFrames($exception);
+        } else {
+            // By far the most common shape in this codebase is
+            // `$logger->error('X failed', ['error' => $e->getMessage()])` with no
+            // exception object. Without this the event would carry the bare
+            // template and no reason at all.
+            $exceptionMessage = $this->contextString($record, 'error');
         }
 
         // Which cluster node produced the event — the first thing you want to
         // know on a multi-server deployment. Non-PII, cheap.
         $host = gethostname();
 
-        $this->store->record([
+        return $this->store->record([
             'ts' => $record->datetime->getTimestamp(),
             'level' => strtolower($record->level->getName()),
             'channel' => $record->channel,
@@ -93,7 +127,30 @@ final class EventRingHandler extends AbstractProcessingHandler
             'host' => false !== $host ? $host : null,
             'route' => \is_string($route) ? $route : null,
             'method' => $request?->getMethod(),
+            'status_code' => $this->contextInt($record, 'status_code'),
+            'user_id' => $this->contextInt($record, 'user_id'),
+            'provider' => $this->contextString($record, 'provider'),
+            'model' => $this->contextString($record, 'model'),
+            'worker' => $this->contextString($record, 'worker'),
+            'duration_ms' => $this->contextInt($record, 'duration_ms'),
         ]);
+    }
+
+    private function contextString(LogRecord $record, string $key): ?string
+    {
+        $value = $record->context[$key] ?? null;
+
+        return \is_string($value) ? $value : null;
+    }
+
+    private function contextInt(LogRecord $record, string $key): ?int
+    {
+        $value = $record->context[$key] ?? null;
+        if (\is_int($value)) {
+            return $value;
+        }
+
+        return is_numeric($value) ? (int) $value : null;
     }
 
     /**
