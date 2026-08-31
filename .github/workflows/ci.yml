@@ -1452,12 +1452,12 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Push with the release App so the branch starts workflow runs
-      # (GITHUB_TOKEN-created refs do not). Opening the pull request uses
-      # GITHUB_TOKEN, which already has `pull-requests: write` on this job —
-      # the App is Contents-only and cannot createPullRequest (v4.4.1's pin
-      # sat on the branch for two days with no PR because that call was
-      # made with the App token and the job stayed green).
+      # CI runs on `pull_request` only, so the token that OPENS the proposal
+      # decides whether it carries checks: a pull request created with
+      # GITHUB_TOKEN starts no workflow run. The App is therefore tried first
+      # and GITHUB_TOKEN is the fallback, because the App is currently scoped
+      # to Contents and cannot createPullRequest — that is why v4.4.1's pin sat
+      # on the branch for two days with no proposal at all.
       - name: Create pull request token
         id: app-token
         if: steps.config.outputs.configured == 'true'
@@ -1510,9 +1510,8 @@ jobs:
           git checkout -q -B "$BRANCH"
           git commit -qam "chore(release): install ${VERSION} in new deployments"
 
-          # Prefer the App token so the force-push starts checks. Fall back to
-          # GITHUB_TOKEN when the App is not configured — the PR would then
-          # open unchecked, which is still better than no proposal at all.
+          # Either token may push this branch; GITHUB_TOKEN keeps the job
+          # working when the release App is not configured at all.
           PUSH_TOKEN="${APP_TOKEN:-$GH_TOKEN}"
 
           # Force-push the fixed branch: if an earlier release's proposal is
@@ -1556,8 +1555,10 @@ jobs:
           and verified.
           EOF
 
+          # Takes the NAME of the variable holding the token, so no secret is
+          # ever passed through argv.
           open_pr() {
-            GH_TOKEN="$1" gh pr create \
+            GH_TOKEN="${!1}" gh pr create \
               --base "$BASE" \
               --head "$BRANCH" \
               --title "chore(release): install ${VERSION} in new deployments" \
@@ -1565,29 +1566,35 @@ jobs:
           }
 
           error_file="$(mktemp)"
-          if url="$(open_pr "$GH_TOKEN" 2>"$error_file")"; then
-            echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
 
-          github_token_error="$(tr '\n' ' ' < "$error_file")"
-
-          # Org policy sometimes blocks GITHUB_TOKEN from opening PRs. The App
-          # is the documented fallback; it failed for v4.4.1 (Contents only),
-          # but it is still the right second try if the App later gains
-          # pull-requests: write.
-          app_token_error="not configured"
+          app_error="the release App is not configured"
           if [ -n "${APP_TOKEN:-}" ]; then
-            if url="$(open_pr "$APP_TOKEN" 2>"$error_file")"; then
+            if url="$(open_pr APP_TOKEN 2>"$error_file")"; then
               echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-            app_token_error="$(tr '\n' ' ' < "$error_file")"
+            app_error="$(tr '\n' ' ' < "$error_file")"
           fi
 
-          echo "::error::Could not open the default-version pull request (GITHUB_TOKEN: ${github_token_error}; App token: ${app_token_error})"
+          # Second best: the proposal exists and is reviewable, but GitHub
+          # starts no workflow run for it. Say so, because merging a pin
+          # without the deployment-template checks is not the intent.
+          if url="$(open_pr GH_TOKEN 2>"$error_file")"; then
+            echo "::warning::Opened ${url} with GITHUB_TOKEN, so it carries no checks (the release App could not: ${app_error})"
+            {
+              echo "Opened ${url} for \`${VERSION}\`, but **without checks** — GitHub starts no workflow run for a pull request created with \`GITHUB_TOKEN\`."
+              echo ""
+              echo "Close and reopen it to run CI before merging, or grant the release App \`Pull requests: write\` so future proposals are checked from the start."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The release itself is published and verified at this point; only the
+          # proposal failed. Still a failure: a silent one left 4.4.1 unpinned
+          # for two days.
+          echo "::error::Could not open the default-version pull request for ${VERSION} (release App: ${app_error}; GITHUB_TOKEN: $(tr '\n' ' ' < "$error_file"))"
           {
-            echo "Branch \`${BRANCH}\` was updated to \`${VERSION}\`, but its pull request could not be opened automatically."
+            echo "Release \`${VERSION}\` is published. Branch \`${BRANCH}\` carries the raised pins, but its pull request could not be opened automatically."
             echo ""
             echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)."
           } >> "$GITHUB_STEP_SUMMARY"
