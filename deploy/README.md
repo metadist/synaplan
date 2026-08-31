@@ -277,5 +277,26 @@ absent local-AI services and the missing consistent-backup hook, are listed in
 The release pin for that package (store `version`, `APP_VERSION`, and the
 `tag@sha256:…` image) is raised automatically together with `elestio.yml` and
 `deploy/selfhost.env.example` by `scripts/set-release-version.mjs` after every
-published release. Submitting the raised package to the Umbrel App Store remains
-a separate, manual pull request against `getumbrel/umbrel-apps`.
+published release. `.github/workflows/umbrel-store-sync.yml` then carries the
+raised package into `getumbrel/umbrel-apps`; Umbrel reviews and merges it.
+
+## What "automatically updated" covers, and what it does not
+
+Every release raises the version pins in this directory, and
+`.github/workflows/release-rollout.yml` merges that change in a nightly
+maintenance window. The effect is precise and worth stating plainly:
+
+- **New deployments** install the current release. Whoever clicks the Elestio
+  template, copies `selfhost.env.example`, installs from the Umbrel App Store, or
+  launches the AWS AMI tomorrow gets what was released today.
+- **Existing installations are never touched.** They keep the version their
+  operator pinned. Nothing here reaches into a running deployment, and nothing
+  here should: an update runs database migrations, and the backup that makes those
+  survivable is the operator's to take. `validate_release_pin()` in
+  `scripts/lib.sh` rejects a mutable tag for the same reason.
+
+Updating a running installation is the operator's decision, documented per
+platform in [`../docs/UPDATE_ELESTIO.md`](../docs/UPDATE_ELESTIO.md) and
+[`../docs/UPDATE_SELFHOST.md`](../docs/UPDATE_SELFHOST.md). The application says
+the same thing in the admin area: it reports a newer version and never installs
+one.
