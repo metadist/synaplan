@@ -24,6 +24,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BOWNERID'], name: 'idx_desktop_job_owner')]
 #[ORM\Index(columns: ['BDEVICEID'], name: 'idx_desktop_job_device')]
 #[ORM\Index(columns: ['BSTATUS', 'BDEVICEID'], name: 'idx_desktop_job_lease')]
+#[ORM\UniqueConstraint(name: 'uniq_desktop_job_idem', columns: ['BOWNERID', 'BIDEMPOTENCY'])]
 class DesktopJob
 {
     public const TYPE_SKILL_RUN = 'skill.run';
