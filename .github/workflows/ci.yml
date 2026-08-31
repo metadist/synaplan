@@ -1521,10 +1521,22 @@ jobs:
             "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             "HEAD:refs/heads/${BRANCH}"
 
-          existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')"
-          if [ -n "$existing" ]; then
-            echo "Updated [pull request #${existing}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${existing}) to \`${VERSION}\`." |
+          # Non-fatal on purpose: under `set -e` a bare assignment from a
+          # failing lookup would end the step right here — after the push, but
+          # before any of the reporting below — leaving a red job with no
+          # explanation of what to do.
+          find_open_pr() {
+            gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""' || true
+          }
+
+          report_existing_pr() {
+            echo "Updated [pull request #${1}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${1}) to \`${VERSION}\`." |
               tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
             exit 0
           fi
 
@@ -1589,10 +1601,35 @@ jobs:
             exit 0
           fi
 
+          github_token_error="$(tr '\n' ' ' < "$error_file")"
+
+          # Reaching this point can also mean the lookup above could not reach
+          # the API while a proposal does exist — both creates then fail with
+          # "already exists". The force-push already carried this version into
+          # it, so that is the intended outcome and not a failure. Ask once
+          # more, and otherwise believe what the create said.
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
+            exit 0
+          fi
+
+          case "${app_error} ${github_token_error}" in
+            *'already exists'*)
+              url="$(
+                printf '%s %s' "$app_error" "$github_token_error" |
+                  grep -oE 'https://[^ ]+/pull/[0-9]+' | head -n1 || true
+              )"
+              echo "The proposal for \`${VERSION}\` already exists${url:+ (${url})}; the force-push carried this version into it." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
           # The release itself is published and verified at this point; only the
           # proposal failed. Still a failure: a silent one left 4.4.1 unpinned
           # for two days.
-          echo "::error::Could not open the default-version pull request for ${VERSION} (release App: ${app_error}; GITHUB_TOKEN: $(tr '\n' ' ' < "$error_file"))"
+          echo "::error::Could not open the default-version pull request for ${VERSION} (release App: ${app_error}; GITHUB_TOKEN: ${github_token_error})"
           {
             echo "Release \`${VERSION}\` is published. Branch \`${BRANCH}\` carries the raised pins, but its pull request could not be opened automatically."
             echo ""
