@@ -121,8 +121,10 @@ one shows up as `AccessDenied` in the verification stack, after the AMI it was
 meant to verify has already been built.
 
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
-  its own account for the security scan. Name it in the Management Portal under
-  Settings.
+  its own account for the security scan. Every submitted version names it, in the
+  Add Version form's *IAM access role ARN* field or, when the submit job does the
+  submitting, in the `AmiSource` it sends. Store its ARN as the repository secret
+  `AWS_MARKETPLACE_INGESTION_ROLE_ARN`.
 - **The build role** is assumed by this repository's release workflow through
   GitHub OIDC — there is no access key anywhere in this repository, and there
   must never be. Store its ARN as the repository secret
@@ -148,7 +150,9 @@ later and slower.
    scan that reports exactly what the review would otherwise reject: password
    authentication, root login, known CVEs, credentials left in the image.
    `deploy/aws/scripts/harden.sh` fails the Packer build on the first three, so
-   this should be a formality.
+   this should be a formality. Only needed while the listing is new — once the
+   secrets below are set, the `submit` job offers each release's version by
+   itself.
 3. **Create the product** as a Limited listing — published, but visible only to
    the seller account and any account we allowlist. Subscribe and launch it the
    way a customer will, including one-click "Launch from Website". This is the
@@ -158,6 +162,55 @@ later and slower.
    three regions. Each region is real instance time for no extra signal beyond
    the third.
 5. **Request public visibility.**
+
+## Submitting a version automatically
+
+Once the listing exists, the `submit` job in
+[`aws-ami.yml`](../.github/workflows/aws-ami.yml) offers each release to it
+through the Marketplace Catalog API, after the AMI has been built, shared and
+verified by a real launch. It needs three settings, and skips itself with a
+notice while any of them is missing:
+
+| Setting | Kind | Value |
+| --- | --- | --- |
+| `AWS_MARKETPLACE_PRODUCT_ID` | secret | the listing's product ID, `prod-…` |
+| `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | secret | the `IngestionRoleArn` output of the roles stack |
+| `AWS_MARKETPLACE_SUBMIT` | variable | `apply` to submit for real; anything else validates only |
+
+**The default is validation, not submission.** Without
+`AWS_MARKETPLACE_SUBMIT=apply` the job sends the same change set with
+`Intent=VALIDATE`, which checks the document against the listing and changes
+nothing. Look at one validated run before switching it over: a submitted version
+sits in AWS review for days, so a wrong one is expensive to take back.
+
+Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
+`<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
+version must share the same `AmiSource`, so one version can carry only one AMI.
+They are submitted one after the other because a running change set locks the
+entity.
+
+### Finding the product ID
+
+Management Portal → **Products** → **Server**. Open the listing; the ID is in the
+detail view and in the URL:
+
+```text
+https://aws.amazon.com/marketplace/management/products/server/prod-xxxxxxxxxxxxx
+```
+
+Or ask the API, with the build role's new catalog permissions:
+
+```bash
+aws marketplace-catalog list-entities \
+  --region us-east-1 \
+  --catalog AWSMarketplace \
+  --entity-type AmiProduct \
+  --query 'EntitySummaryList[].{Id:EntityId,Name:Name,Visibility:Visibility}'
+```
+
+An empty list means the listing has not been created yet — do the steps above
+first. The `submit` job stays skipped until the secret is set, so releases keep
+working in the meantime.
 
 ## Usage Instructions
 
