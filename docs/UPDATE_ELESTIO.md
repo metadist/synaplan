@@ -40,3 +40,11 @@ before anything starts.
 Your pipeline may restart by itself when the Synaplan repository receives a new
 commit. That is a restart, not an update: it reuses the version and the settings
 your pipeline already has.
+
+This includes the commit that raises the version for **new** installations. Every
+release, an automation updates the version that the one-click template installs,
+so someone deploying Synaplan tomorrow gets the current release without asking.
+Your pipeline is not touched by it: Elestio copied the environment variables into
+your pipeline when it was created and reads them from there ever after, so
+`SYNAPLAN_VERSION` stays exactly what you set. Updating is still the four steps
+above, and still yours to start.
