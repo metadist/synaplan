@@ -1452,10 +1452,12 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Refs created with the default GITHUB_TOKEN do not start workflow runs,
-      # so a pull request opened with it would carry no checks at all. The same
-      # app that creates release tags is used here for the same reason; without
-      # it the proposal is still opened, just unchecked.
+      # CI runs on `pull_request` only, so the token that OPENS the proposal
+      # decides whether it carries checks: a pull request created with
+      # GITHUB_TOKEN starts no workflow run. The App is therefore tried first
+      # and GITHUB_TOKEN is the fallback, because the App is currently scoped
+      # to Contents and cannot createPullRequest — that is why v4.4.1's pin sat
+      # on the branch for two days with no proposal at all.
       - name: Create pull request token
         id: app-token
         if: steps.config.outputs.configured == 'true'
@@ -1466,7 +1468,8 @@ jobs:
 
       - name: Propose the new default version
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.docker-manifest.outputs.version }}
           DIGEST: ${{ needs.docker-manifest.outputs.digest }}
           BRANCH: automation/default-release-version
@@ -1507,17 +1510,33 @@ jobs:
           git checkout -q -B "$BRANCH"
           git commit -qam "chore(release): install ${VERSION} in new deployments"
 
+          # Either token may push this branch; GITHUB_TOKEN keeps the job
+          # working when the release App is not configured at all.
+          PUSH_TOKEN="${APP_TOKEN:-$GH_TOKEN}"
+
           # Force-push the fixed branch: if an earlier release's proposal is
           # still open, it is carried forward to the newest release rather than
           # leaving two competing pull requests behind.
           git push -q --force \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             "HEAD:refs/heads/${BRANCH}"
 
-          existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')"
-          if [ -n "$existing" ]; then
-            echo "Updated [pull request #${existing}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${existing}) to \`${VERSION}\`." |
+          # Non-fatal on purpose: under `set -e` a bare assignment from a
+          # failing lookup would end the step right here — after the push, but
+          # before any of the reporting below — leaving a red job with no
+          # explanation of what to do.
+          find_open_pr() {
+            gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""' || true
+          }
+
+          report_existing_pr() {
+            echo "Updated [pull request #${1}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${1}) to \`${VERSION}\`." |
               tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
             exit 0
           fi
 
@@ -1548,30 +1567,75 @@ jobs:
           and verified.
           EOF
 
-          # The branch above already carries the change, so the release itself is
-          # complete and verified at this point. Opening the proposal needs
-          # `Pull requests: write` on top of that, which the token does not
-          # necessarily carry: the release App is scoped to Contents, and
-          # GITHUB_TOKEN cannot open pull requests while the organization
-          # forbids it. Report the branch instead of marking a published release
-          # as failed — this step proposes a convenience, it does not gate.
+          # Takes the NAME of the variable holding the token, so no secret is
+          # ever passed through argv.
+          open_pr() {
+            GH_TOKEN="${!1}" gh pr create \
+              --base "$BASE" \
+              --head "$BRANCH" \
+              --title "chore(release): install ${VERSION} in new deployments" \
+              --body-file "$body_file"
+          }
+
           error_file="$(mktemp)"
-          if url="$(gh pr create \
-            --base "$BASE" \
-            --head "$BRANCH" \
-            --title "chore(release): install ${VERSION} in new deployments" \
-            --body-file "$body_file" 2>"$error_file")"; then
-            echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          app_error="the release App is not configured"
+          if [ -n "${APP_TOKEN:-}" ]; then
+            if url="$(open_pr APP_TOKEN 2>"$error_file")"; then
+              echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            app_error="$(tr '\n' ' ' < "$error_file")"
+          fi
+
+          # Second best: the proposal exists and is reviewable, but GitHub
+          # starts no workflow run for it. Say so, because merging a pin
+          # without the deployment-template checks is not the intent.
+          if url="$(open_pr GH_TOKEN 2>"$error_file")"; then
+            echo "::warning::Opened ${url} with GITHUB_TOKEN, so it carries no checks (the release App could not: ${app_error})"
+            {
+              echo "Opened ${url} for \`${VERSION}\`, but **without checks** — GitHub starts no workflow run for a pull request created with \`GITHUB_TOKEN\`."
+              echo ""
+              echo "Close and reopen it to run CI before merging, or grant the release App \`Pull requests: write\` so future proposals are checked from the start."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          echo "::warning::Could not open the default-version pull request: $(tr '\n' ' ' < "$error_file")"
+          github_token_error="$(tr '\n' ' ' < "$error_file")"
+
+          # Reaching this point can also mean the lookup above could not reach
+          # the API while a proposal does exist — both creates then fail with
+          # "already exists". The force-push already carried this version into
+          # it, so that is the intended outcome and not a failure. Ask once
+          # more, and otherwise believe what the create said.
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
+            exit 0
+          fi
+
+          case "${app_error} ${github_token_error}" in
+            *'already exists'*)
+              url="$(
+                printf '%s %s' "$app_error" "$github_token_error" |
+                  grep -oE 'https://[^ ]+/pull/[0-9]+' | head -n1 || true
+              )"
+              echo "The proposal for \`${VERSION}\` already exists${url:+ (${url})}; the force-push carried this version into it." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
+          # The release itself is published and verified at this point; only the
+          # proposal failed. Still a failure: a silent one left 4.4.1 unpinned
+          # for two days.
+          echo "::error::Could not open the default-version pull request for ${VERSION} (release App: ${app_error}; GITHUB_TOKEN: ${github_token_error})"
           {
-            echo "Branch \`${BRANCH}\` was updated to \`${VERSION}\`, but its pull request could not be opened automatically."
+            echo "Release \`${VERSION}\` is published. Branch \`${BRANCH}\` carries the raised pins, but its pull request could not be opened automatically."
             echo ""
-            echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)," \
-              "or grant the release App \`Pull requests: write\` so the proposal opens by itself."
+            echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)."
           } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
