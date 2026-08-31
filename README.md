@@ -382,6 +382,7 @@ In-repo guides (for developers working on this codebase):
 | [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
 | [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
+| [Observability](docs/OBSERVABILITY.md) | Request correlation ids, redacted event ring, admin logs API |
 | [RAG System](docs/RAG.md) | Document search and processing |
 | [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |

@@ -164,6 +164,12 @@ curl -i -H "X-API-Key: sk_your-health-monitor-api-key" https://your-domain.com/a
 
 See [Health Monitoring](HEALTH_MONITORING.md) for full setup: monitor user creation, API-Key generation, Uptime Robot configuration.
 
+### Recent Errors
+
+`GET /api/v1/admin/logs` returns a redacted feed of recent `warning`-and-above events (`mode=summary` for counts by level/route, `mode=recent` for individual events). Every field is allow-listed and free text is scrubbed, so it never carries chat content, user emails, document text or secrets.
+
+The same feed is available to the in-chat AI through the admin-only `recent_errors` MCP tool. See [Observability](OBSERVABILITY.md) for the field list, retention and the `X-Request-Id` correlation flow.
+
 ### Recommended Uptime Robot Settings
 
 | Setting | Value |
