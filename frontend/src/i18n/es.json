@@ -101,6 +101,7 @@
     "poweredBy": "Desarrollado por"
   },
   "pageTitles": {
+    "desktop": "Escritorio",
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "forgotPassword": "Olvidé mi contraseña",
@@ -644,6 +645,7 @@
     "upgrade": "Mejorar"
   },
   "nav": {
+    "desktop": "Escritorio",
     "chat": "Chat",
     "new": "Nuevo",
     "newDescription": "Iniciar un nuevo chat",
@@ -3104,6 +3106,62 @@
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "usageCount": "solicitudes"
+    },
+    "desktop": {
+      "title": "Escritorio",
+      "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
+      "notAvailableYet": "Synaplan Desktop aún no está disponible para descargar. Ya puedes crear un código de vinculación para probar la conexión.",
+      "pairButton": "Vincular este equipo",
+      "loadFailed": "No se pudieron cargar los equipos conectados.",
+      "disconnect": "Desconectar",
+      "confirmDisconnectTitle": "Desconectar este equipo",
+      "confirmDisconnect": "«{name}» ya no podrá acceder a tu cuenta. Podrás volver a vincularlo más tarde con un nuevo código.",
+      "disconnected": "Equipo desconectado.",
+      "disconnectFailed": "No se pudo desconectar el equipo.",
+      "pairing": {
+        "title": "Vincular este equipo",
+        "intro": "Abre Synaplan Desktop en el equipo que quieres conectar e introduce esta dirección y este código.",
+        "addressLabel": "Dirección del servidor",
+        "codeLabel": "Código de vinculación",
+        "expiresIn": "Caduca en {time}",
+        "expired": "Este código ha caducado.",
+        "newCode": "Crear un código nuevo",
+        "copyAddress": "Copiar dirección",
+        "copyCode": "Copiar código",
+        "createFailed": "No se pudo crear el código de vinculación.",
+        "copyFailed": "No se pudo copiar al portapapeles."
+      },
+      "devices": {
+        "empty": "Aún no hay equipos conectados.",
+        "name": "Equipo",
+        "status": "Estado",
+        "lastSeen": "Última conexión",
+        "waitingJobs": "Trabajos en espera",
+        "actions": "Acciones",
+        "never": "nunca",
+        "statusActive": "Conectado",
+        "statusRevoked": "Desconectado"
+      },
+      "run": {
+        "action": "Ejecutar en este equipo",
+        "multiple": "{count} equipos",
+        "needPrompt": "Escribe primero qué debe hacer el equipo.",
+        "skillTitle": "Ejecutar en este equipo",
+        "skillMessage": "¿Qué skill debe ejecutarse en «{name}»?",
+        "skillPlaceholder": "p. ej. pptx",
+        "invalidSkill": "Usa solo minúsculas, números y guiones.",
+        "sent": "Enviado a «{name}».",
+        "enqueueFailed": "No se pudo enviar el trabajo."
+      },
+      "jobCard": {
+        "waiting": "Esperando a {name}",
+        "done": "{name} ha terminado",
+        "failed": "{name} no pudo terminar",
+        "noAnswer": "Este equipo no respondió.",
+        "unknownSkill": "Este equipo no tiene ese skill.",
+        "skillDisabled": "Ese skill está desactivado en este equipo.",
+        "localError": "El skill falló en este equipo."
+      }
     },
     "phoneVerification": {
       "title": "Verificación de Teléfono",

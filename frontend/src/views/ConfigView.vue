@@ -48,6 +48,10 @@
           <MessagesGatewayConfiguration />
         </div>
 
+        <div v-else-if="currentPage === 'desktop'" data-testid="section-desktop">
+          <DesktopConfiguration />
+        </div>
+
         <div
           v-else-if="currentPage === 'api-documentation'"
           data-testid="section-api-documentation"
@@ -74,6 +78,7 @@ import McpServersConfiguration from '@/components/config/McpServersConfiguration
 import ConnectionsConfiguration from '@/components/config/ConnectionsConfiguration.vue'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import MessagesGatewayConfiguration from '@/components/config/MessagesGatewayConfiguration.vue'
+import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
 
 const route = useRoute()
 
@@ -87,6 +92,7 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels/mcp')) return 'mcp-servers'
   if (path.startsWith('/channels/connections')) return 'connections'
   if (path.startsWith('/channels/tasks')) return 'saved-tasks'
+  if (path.startsWith('/channels/desktop')) return 'desktop'
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'

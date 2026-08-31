@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Seed\BrandingConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
+use App\Seed\DesktopAgentConfigSeeder;
 use App\Seed\FileContextConfigSeeder;
 use App\Seed\MarketingNewsConfigSeeder;
 use App\Seed\McpConfigSeeder;
@@ -52,7 +53,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  14. messages-gateway (BCONFIG: MESSAGES_GATEWAY Anthropic-compatible API flags, ownerId=0 — default OFF)
  *  15. saved-tasks   (BCONFIG: SAVEDTASKS.ENABLED, ownerId=0 — default ON for new/local installs)
  *  16. file-context  (BCONFIG: FILE_CONTEXT conversation-file flags, ownerId=0 — default OFF)
- *  17. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default OFF until GA)
+ *  18. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -82,6 +84,7 @@ final class SeedAllCommand extends Command
         private readonly MessagesGatewayConfigSeeder $messagesGatewayConfigSeeder,
         private readonly SavedTaskConfigSeeder $savedTaskConfigSeeder,
         private readonly FileContextConfigSeeder $fileContextConfigSeeder,
+        private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -107,7 +110,8 @@ final class SeedAllCommand extends Command
             "  14. messages gateway flags     (BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF)\n".
             "  15. saved-tasks flag           (BCONFIG, group=SAVEDTASKS, ownerId=0 — default ON for new/local)\n".
             "  16. file-context flags         (BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF)\n".
-            "  17. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default OFF until GA)\n".
+            "  18. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -135,6 +139,7 @@ final class SeedAllCommand extends Command
             ['messages-gateway', fn (): SeedResult => $this->messagesGatewayConfigSeeder->seed()],
             ['saved-tasks', fn (): SeedResult => $this->savedTaskConfigSeeder->seed()],
             ['file-context', fn (): SeedResult => $this->fileContextConfigSeeder->seed()],
+            ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

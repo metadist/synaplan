@@ -101,6 +101,7 @@
     "poweredBy": "Bereitgestellt von"
   },
   "pageTitles": {
+    "desktop": "Desktop",
     "login": "Anmelden",
     "register": "Registrieren",
     "forgotPassword": "Passwort vergessen",
@@ -650,6 +651,7 @@
     "upgrade": "Upgrade"
   },
   "nav": {
+    "desktop": "Desktop",
     "chat": "Chat",
     "new": "Neu",
     "newDescription": "Neuen Chat starten",
@@ -2326,6 +2328,62 @@
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
       "usageCount": "Anfragen"
+    },
+    "desktop": {
+      "title": "Desktop",
+      "description": "Synaplan Desktop ist eine separate App für diesen Computer. Sie nutzt dein Synaplan-Konto und kann Skills ausführen, die du installierst.",
+      "notAvailableYet": "Synaplan Desktop steht noch nicht zum Download bereit. Du kannst aber schon einen Verbindungscode erstellen, um die Verbindung zu testen.",
+      "pairButton": "Diesen Computer verbinden",
+      "loadFailed": "Die verbundenen Computer konnten nicht geladen werden.",
+      "disconnect": "Trennen",
+      "confirmDisconnectTitle": "Diesen Computer trennen",
+      "confirmDisconnect": "„{name}“ kann dein Konto dann nicht mehr erreichen. Du kannst den Computer später mit einem neuen Code erneut verbinden.",
+      "disconnected": "Computer getrennt.",
+      "disconnectFailed": "Der Computer konnte nicht getrennt werden.",
+      "pairing": {
+        "title": "Diesen Computer verbinden",
+        "intro": "Öffne Synaplan Desktop auf dem Computer, den du verbinden möchtest, und gib diese Adresse und den Code ein.",
+        "addressLabel": "Serveradresse",
+        "codeLabel": "Verbindungscode",
+        "expiresIn": "Läuft ab in {time}",
+        "expired": "Dieser Code ist abgelaufen.",
+        "newCode": "Neuen Code erstellen",
+        "copyAddress": "Adresse kopieren",
+        "copyCode": "Code kopieren",
+        "createFailed": "Der Verbindungscode konnte nicht erstellt werden.",
+        "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen."
+      },
+      "devices": {
+        "empty": "Es sind noch keine Computer verbunden.",
+        "name": "Computer",
+        "status": "Status",
+        "lastSeen": "Zuletzt gesehen",
+        "waitingJobs": "Wartende Aufgaben",
+        "actions": "Aktionen",
+        "never": "nie",
+        "statusActive": "Verbunden",
+        "statusRevoked": "Getrennt"
+      },
+      "run": {
+        "action": "Auf diesem Computer ausführen",
+        "multiple": "{count} Computer",
+        "needPrompt": "Gib zuerst ein, was der Computer tun soll.",
+        "skillTitle": "Auf diesem Computer ausführen",
+        "skillMessage": "Welcher Skill soll auf „{name}“ ausgeführt werden?",
+        "skillPlaceholder": "z. B. pptx",
+        "invalidSkill": "Nur Kleinbuchstaben, Zahlen und Bindestriche verwenden.",
+        "sent": "An „{name}“ gesendet.",
+        "enqueueFailed": "Die Aufgabe konnte nicht gesendet werden."
+      },
+      "jobCard": {
+        "waiting": "Warten auf {name}",
+        "done": "{name} ist fertig",
+        "failed": "{name} konnte nicht abschließen",
+        "noAnswer": "Dieser Computer hat nicht geantwortet.",
+        "unknownSkill": "Dieser Computer hat diesen Skill nicht.",
+        "skillDisabled": "Dieser Skill ist auf diesem Computer deaktiviert.",
+        "localError": "Der Skill ist auf diesem Computer fehlgeschlagen."
+      }
     },
     "phoneVerification": {
       "title": "Telefon-Verifizierung",

@@ -151,6 +151,7 @@
     "aiAgents": "AI Agents",
     "connections": "Connections",
     "savedTasks": "Saved tasks",
+    "desktop": "Desktop",
     "setup": "Setup"
   },
   "adminModelStatus": {
@@ -698,6 +699,7 @@
     "moreDescription": "More sections and account",
     "menu": "Menu",
     "aiAgents": "AI Agents",
+    "desktop": "Desktop",
     "manage": "Manage",
     "manageDescription": "Assistants, channels and automations",
     "groupAssistants": "Assistants",
@@ -2249,6 +2251,62 @@
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests"
+    },
+    "desktop": {
+      "title": "Desktop",
+      "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
+      "notAvailableYet": "Synaplan Desktop is not available to download yet. You can already create a pairing code to test the connection.",
+      "pairButton": "Pair this computer",
+      "loadFailed": "The connected computers could not be loaded.",
+      "disconnect": "Disconnect",
+      "confirmDisconnectTitle": "Disconnect this computer",
+      "confirmDisconnect": "\"{name}\" will no longer be able to reach your account. You can pair it again later with a new code.",
+      "disconnected": "Computer disconnected.",
+      "disconnectFailed": "The computer could not be disconnected.",
+      "pairing": {
+        "title": "Pair this computer",
+        "intro": "Open Synaplan Desktop on the computer you want to connect, then enter this address and code.",
+        "addressLabel": "Server address",
+        "codeLabel": "Pairing code",
+        "expiresIn": "Expires in {time}",
+        "expired": "This code has expired.",
+        "newCode": "Create a new code",
+        "copyAddress": "Copy address",
+        "copyCode": "Copy code",
+        "createFailed": "The pairing code could not be created.",
+        "copyFailed": "Could not copy to clipboard."
+      },
+      "devices": {
+        "empty": "No computers are connected yet.",
+        "name": "Computer",
+        "status": "Status",
+        "lastSeen": "Last seen",
+        "waitingJobs": "Waiting jobs",
+        "actions": "Actions",
+        "never": "never",
+        "statusActive": "Connected",
+        "statusRevoked": "Disconnected"
+      },
+      "run": {
+        "action": "Run on this computer",
+        "multiple": "{count} computers",
+        "needPrompt": "Type what the computer should do first.",
+        "skillTitle": "Run on this computer",
+        "skillMessage": "Which skill should run on \"{name}\"?",
+        "skillPlaceholder": "e.g. pptx",
+        "invalidSkill": "Use only lowercase letters, numbers and hyphens.",
+        "sent": "Sent to \"{name}\".",
+        "enqueueFailed": "The job could not be sent."
+      },
+      "jobCard": {
+        "waiting": "Waiting for {name}",
+        "done": "{name} finished",
+        "failed": "{name} could not finish",
+        "noAnswer": "This computer did not answer.",
+        "unknownSkill": "This computer does not have that skill.",
+        "skillDisabled": "That skill is turned off on this computer.",
+        "localError": "The skill failed on this computer."
+      }
     },
     "phoneVerification": {
       "title": "Phone Verification",

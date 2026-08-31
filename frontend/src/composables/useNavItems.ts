@@ -13,6 +13,7 @@ import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
+import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -255,6 +256,16 @@ export function useNavItems() {
           label: t('nav.mcpServers'),
           ...grouped('connections', connections),
         },
+        ...(isDesktopAgentEnabled()
+          ? [
+              {
+                key: 'desktop',
+                path: '/channels/desktop',
+                label: t('nav.desktop'),
+                ...grouped('connections', connections),
+              },
+            ]
+          : []),
         {
           key: 'api-keys',
           path: '/channels/api',

@@ -19,6 +19,7 @@ use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -74,6 +75,7 @@ class ConfigController extends AbstractController
         private GuestChatConfig $guestChatConfig,
         private WebSpeechConfig $webSpeechConfig,
         private SavedTaskConfig $savedTaskConfig,
+        private DesktopAgentConfig $desktopAgentConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
         private SetupStateService $setupState,
@@ -167,6 +169,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
                         new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
+                        new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
                     ]
                 ),
                 new OA\Property(
@@ -463,6 +466,7 @@ class ConfigController extends AbstractController
             'help' => ($_ENV['FEATURE_HELP'] ?? 'false') === 'true',
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
             'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
+            'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration
