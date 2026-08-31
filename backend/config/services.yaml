@@ -1085,12 +1085,6 @@ services:
         tags:
             - { name: monolog.processor }
 
-    # Redacted operational event ring. Consumed by the Monolog handler (writer),
-    # the admin logs API and the recent_errors MCP tool (readers); public so
-    # integration tests can drive it directly.
-    App\Observability\EventRingStore:
-        public: true
-
     # Plugin services are loaded dynamically by Kernel::loadPluginServices()
     # No manual plugin entries needed — drop plugin into /plugins/ and restart.
 

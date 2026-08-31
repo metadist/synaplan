@@ -13,7 +13,7 @@ namespace App\Observability;
  *
  * Ids are opaque, non-sensitive tokens — never derived from user data.
  */
-final class RequestIdGenerator
+final readonly class RequestIdGenerator
 {
     /** Request attribute + response header carry the correlation id under this name. */
     public const ATTRIBUTE = '_correlation_id';
