@@ -224,6 +224,45 @@ interface QdrantClientInterface
      */
     public function getGlobalDocumentStats(int $topLimit = 10): array;
 
+    // --- Message Digest Operations ---
+
+    /**
+     * Add or update a message-digest point in the digests collection.
+     *
+     * The collection is created lazily on first upsert, like memories.
+     *
+     * @param string  $pointId Logical point ID (e.g., "dig_{userId}_{digestId}")
+     * @param float[] $vector  Embedding vector of the digest title
+     * @param array   $payload Metadata (user_id, message_id, chat_id, title, channel, source_date, active)
+     */
+    public function upsertDigest(string $pointId, array $vector, array $payload): void;
+
+    /**
+     * Search message digests by vector similarity for one user.
+     *
+     * @param float[] $queryVector Query embedding vector
+     *
+     * @return array Array of results: [['id' => string, 'score' => float, 'payload' => array], ...]
+     */
+    public function searchDigests(
+        array $queryVector,
+        int $userId,
+        int $limit = 5,
+        float $minScore = 0.5,
+    ): array;
+
+    /**
+     * Delete a single digest point.
+     */
+    public function deleteDigest(string $pointId): void;
+
+    /**
+     * Delete all digest points for a user.
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteAllDigestsForUser(int $userId): int;
+
     // --- Memory Collection Management ---
 
     /**

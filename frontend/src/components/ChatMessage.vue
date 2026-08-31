@@ -229,6 +229,20 @@
                   {{ processingMetadata?.customMessage || $t('processing.analyzingDesc') }}
                 </div>
               </template>
+              <template v-else-if="processingStatus === 'editing'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.editingImageTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    processingMetadata?.edit_source_name
+                      ? $t('processing.editingImageNamed', {
+                          filename: processingMetadata.edit_source_name,
+                        })
+                      : $t('processing.editingImageDesc')
+                  }}
+                </div>
+              </template>
               <template v-else-if="processingStatus === 'analyzing_prompt'">
                 <div class="font-medium animate-pulse">
                   {{ $t('processing.analyzingPromptTitle') }}
@@ -1140,6 +1154,8 @@ interface Props {
     /** Document generation progress (status === 'generating_file'). */
     stage?: string
     filename?: string
+    /** Picture of the conversation this turn edits (status === 'editing'). */
+    edit_source_name?: string
   } | null
   files?: MessageFile[] // Attached files
   searchResults?: Array<{
@@ -1534,6 +1550,7 @@ const isProcessing = computed(() => {
     'classifying',
     'analyzing',
     'analyzing_memories',
+    'editing',
     'saving_memories',
     'generating',
   ]

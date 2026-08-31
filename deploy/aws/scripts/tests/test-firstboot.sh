@@ -54,6 +54,32 @@ if [[ -n "$non_ascii_ami_metadata" ]]; then
     fail "The AMI name or description carries a character EC2 will reject: $non_ascii_ami_metadata"
 fi
 
+# Marketplace must copy the source AMI into its ingestion account before it can
+# scan and publish it. An encrypted EBS snapshot cannot be shared, even when it
+# uses the seller account's default KMS key. The 4.2.4 submission reached the
+# portal with exactly that combination and failed with Image access exception.
+packer_file="$DEPLOY_ROOT/aws/packer/synaplan.pkr.hcl"
+launch_mapping="$(
+    awk '
+        /launch_block_device_mappings[[:space:]]*\{/ { capture = 1 }
+        capture { print }
+        capture && /^[[:space:]]*\}/ { exit }
+    ' "$packer_file"
+)"
+grep -Eq 'encrypted[[:space:]]*=[[:space:]]*false' <<<"$launch_mapping" ||
+    fail "The Packer launch root is not explicitly unencrypted; AWS Marketplace cannot ingest or share the resulting AMI"
+
+repo_root="$(cd "$DEPLOY_ROOT/.." && pwd)"
+ami_workflow="$repo_root/.github/workflows/aws-ami.yml"
+grep -Fq 'get-ebs-encryption-by-default' "$ami_workflow" ||
+    fail "the AMI workflow does not reject account-level default EBS encryption before paying for a Marketplace-incompatible build"
+grep -Fq 'describe-snapshots' "$ami_workflow" ||
+    fail "the AMI workflow does not verify that every built snapshot is unencrypted"
+grep -Fq '679593333241' "$ami_workflow" ||
+    fail "the AMI workflow does not name the AWS Marketplace ingestion account"
+grep -Fq 'modify-image-attribute' "$ami_workflow" ||
+    fail "the AMI workflow does not share the built AMI with the AWS Marketplace ingestion account"
+
 # --------------------------------------------------------------------------
 # The boot order the units ask of systemd
 # --------------------------------------------------------------------------
@@ -155,6 +181,56 @@ awk '
     END { exit !(!minted || (removed_key > minted && removed_cert > minted)) }
 ' "$AWS_SCRIPTS_DIR/provision.sh" ||
     fail "provision.sh mints a certificate pair without deleting both files afterwards — the AMI would ship one private key to every customer"
+
+# --------------------------------------------------------------------------
+# The architecture-specific templates submitted to AWS Marketplace
+# --------------------------------------------------------------------------
+
+# A Marketplace AMI product has one architecture. The reusable source templates
+# deliberately support both x86_64 and arm64 for direct deployments, but
+# submitting them unchanged lets a buyer pair an x86 AMI with a Graviton
+# instance (or vice versa), which EC2 rejects only after the stack starts.
+# Generated listing templates expose only compatible instance types. Keep them
+# byte-for-byte reproducible so a source-template fix cannot miss the copies
+# already prepared for S3.
+for template in "$DEPLOY_ROOT/aws/cloudformation/synaplan-new-vpc.yaml" \
+    "$DEPLOY_ROOT/aws/cloudformation/synaplan-existing-vpc.yaml"; do
+    awk '
+        /^  AllowedWebCidr:/ { found = 1; in_parameter = 1; next }
+        in_parameter && /^  [A-Za-z0-9]+:/ { in_parameter = 0 }
+        in_parameter && /^[[:space:]]+Default:/ { has_default = 1 }
+        END { exit !(found && !has_default) }
+    ' "$template" ||
+        fail "$(basename "$template") gives AllowedWebCidr a default; Marketplace requires the buyer to choose the ingress range explicitly"
+done
+
+node "$repo_root/scripts/generate-aws-marketplace-templates.mjs" --check ||
+    fail "AWS Marketplace CloudFormation templates are stale; regenerate them before publishing"
+
+# Marketplace requires one current architecture diagram per CloudFormation
+# delivery option, and the self-service portal currently enforces 1560 x 878.
+# The SVGs are reproducible from the official AWS icons; the PNG header check
+# catches an export tool that pads, crops or resizes them.
+node "$repo_root/scripts/generate-aws-marketplace-diagrams.mjs" --check ||
+    fail "AWS Marketplace architecture diagram SVGs are stale; regenerate them before publishing"
+python3 - "$DEPLOY_ROOT/aws/marketplace/diagrams" <<'PY' ||
+import pathlib
+import struct
+import sys
+
+diagram_dir = pathlib.Path(sys.argv[1])
+for name in ("synaplan-new-vpc.png", "synaplan-existing-vpc.png"):
+    path = diagram_dir / name
+    data = path.read_bytes()[:24]
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"{path} is not a PNG")
+    width, height = struct.unpack(">II", data[16:24])
+    if (width, height) != (1560, 878):
+        raise SystemExit(
+            f"{path} is {width} x {height}; AWS Marketplace requires 1560 x 878"
+        )
+PY
+    fail "AWS Marketplace architecture diagram PNGs are missing or have invalid dimensions"
 
 # --------------------------------------------------------------------------
 # The XFS label firstboot writes on a blank data volume

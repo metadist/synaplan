@@ -339,10 +339,18 @@ fi
 # Important: doctrine:fixtures:load purges ALL entity tables before reloading.
 # We therefore run fixtures BEFORE app:seed so the idempotent seed step can
 # re-populate models/prompts/config/rate-limits afterwards.
+#
+# SEED_DEMO_DATA=false opts out inside dev/test and leaves the database without
+# a single user, which is the only way to reach the first-run setup wizard
+# locally (production never loads fixtures anyway). Default stays true, so
+# `docker compose up -d` and the E2E suite are unchanged.
 FIXTURES_MARKER="/var/www/backend/var/.fixtures_loaded"
 
 write_boot_status "seeding" "Loading starter data"
-if [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
+if [ "${SEED_DEMO_DATA:-true}" != "true" ]; then
+    echo "⏭️  SEED_DEMO_DATA=${SEED_DEMO_DATA} → skipping demo user fixtures."
+    echo "   🧭 An empty database starts in first-run setup: open http://localhost:5173/setup"
+elif [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     # If marker exists but DB is empty (e.g. tmpfs wipe, or marker on host volume after down/up), remove stale marker so we load fixtures
     if [ -f "$FIXTURES_MARKER" ]; then
         _uc=$(php bin/console dbal:run-sql "SELECT COUNT(*) as count FROM BUSER" 2>/dev/null | grep -oE '[0-9]+' | tail -1)

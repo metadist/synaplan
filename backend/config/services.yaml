@@ -89,6 +89,7 @@ parameters:
     env(QDRANT_URL): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
+    env(QDRANT_DIGESTS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -228,9 +229,11 @@ services:
     App\Service\Multitask\Execution\Parallel\MediaNodeDispatcher:
         alias: App\Service\Multitask\Execution\Parallel\ProcessMediaNodeDispatcher
 
-    # Images a document turn may embed: attachments, upstream node output and
-    # the pictures of the conversation, validated against the uploads dir.
-    App\Service\File\DocumentImageCatalog:
+    # Every file a conversation has in hand — attachments, upstream node output
+    # and the artifacts generated earlier in the thread — validated against the
+    # uploads dir. Single resolver behind media edits, document embedding and
+    # the routing file inventory.
+    App\Service\File\ConversationFileCatalog:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
@@ -542,6 +545,11 @@ services:
     App\Realtime\Publisher\RealtimePublisherInterface:
         alias: App\Realtime\Publisher\CentrifugoPublisher
 
+    App\Service\Stt\SttSessionStore:
+        arguments:
+            $storageDir: '%kernel.project_dir%/var/stt'
+            $ttlSeconds: 7200
+
     # Whisper Service for Audio Transcription
     App\Service\WhisperService:
         arguments:
@@ -593,6 +601,12 @@ services:
 
     # MCP firewall entry point (401 + WWW-Authenticate → RFC 9728 metadata)
     App\Security\McpAuthenticationEntryPoint:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    # Synaplan Desktop: pairing mints a scoped key + device row; the returned
+    # apiBaseUrl is the public app URL the client will call.
+    App\Service\Desktop\PairingService:
         arguments:
             $appUrl: '%env(APP_URL)%'
 
@@ -700,6 +714,12 @@ services:
             $bootstrapAdminEmail: '%env(string:BOOTSTRAP_ADMIN_EMAIL)%'
             $bootstrapAdminPassword: '%env(string:BOOTSTRAP_ADMIN_PASSWORD)%'
             $bootstrapAdminForcePasswordChange: '%env(bool:BOOTSTRAP_ADMIN_FORCE_PASSWORD_CHANGE)%'
+
+    # Development aid: reopens the first-run setup wizard. Refuses to run outside
+    # dev/test, which is why it needs the environment injected.
+    App\Command\SetupResetCommand:
+        arguments:
+            $environment: '%kernel.environment%'
 
     # Encryption Service (for sensitive data like IMAP passwords)
     App\Service\EncryptionService:
@@ -1038,6 +1058,7 @@ services:
             $qdrantUrl: '%env(QDRANT_URL)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
+            $digestsCollection: '%env(default::QDRANT_DIGESTS_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect

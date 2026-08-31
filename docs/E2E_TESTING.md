@@ -59,7 +59,8 @@ backend reaches it container-to-container either way.
 ## 0. Tags & CI Matrix
 
 **`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
-(chromium 2 shards, one firefox cross-browser smoke, chromium-mobile) — a test
+(chromium 3 shards, one firefox cross-browser smoke, chromium-mobile,
+chromium-ollama) — a test
 without `@ci` in its title chain does not run in CI, period. Other tags:
 
 | Tag | Meaning |
@@ -69,6 +70,7 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 | `@layout` | Layout guard — runs in chromium desktop + chromium-mobile only. |
 | `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
 | `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
+| `@ollama` | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below. |
 | `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
@@ -95,6 +97,30 @@ firefox-only flake, without new signal.
 Do NOT tag browser-agnostic logic (chat rename/delete, memories, task prompts,
 profile, settings CRUD, …) — chromium already covers it. Keep the
 `@crossbrowser` set small and high-value; it is a required gate.
+
+### Tests that change installation-wide state need their own project
+
+The sharded chromium jobs run **four spec files at a time in one shared test
+stack**. A test that changes settings for the whole installation — anything
+posted with `global: true`, e.g. the default CHAT model — therefore changes them
+under every test running beside it, which then talks to the wrong model and
+fails.
+
+Playwright decides *which* files share a shard, and it does so by file (the
+config sets no `fullyParallel`). So "it passes today" only means the collision
+has not been scheduled yet: adding a spec file or changing the shard count
+reshuffles the assignment. This is not theoretical — it took down four tests at
+once when the suite went from two shards to three, and the failures stopped the
+moment the offending spec finished and restored the default.
+
+If your test must change global state, give it its own project in
+`playwright.config.ts` plus its own entry in the `e2e` matrix in
+`.github/workflows/ci.yml`, and exclude its tag from the `chromium` project's
+`grepInvert`. Every matrix entry starts its own stack, so the change stays
+inside that job. `chromium-ollama` is the worked example.
+
+Prefer not needing it: scope the change to the test's own user or workspace when
+the API allows it. A dedicated job costs a runner and ~2 min.
 
 ---
 

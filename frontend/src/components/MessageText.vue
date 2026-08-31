@@ -28,6 +28,8 @@ import { renderMermaidBlocks, hasMermaidBlocks } from '@/composables/useMarkdown
 import { hasMathFormulas } from '@/composables/useMarkdownKatex'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
+import { useMessageDigestsStore } from '@/stores/messageDigests'
+import type { MessageDigestReference } from '@/services/api/messageDigestsApi'
 import { useConfigStore } from '@/stores/config'
 import { useNotification } from '@/composables/useNotification'
 import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
@@ -88,6 +90,7 @@ function applyHtml(html: string): void {
 }
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const messageDigestsStore = useMessageDigestsStore()
 
 // Counter to prevent race conditions in async rendering
 let renderVersion = 0
@@ -169,6 +172,26 @@ function extractReferencedMemoryIds(content: string): number[] {
 }
 
 const referencedMemoryIds = computed(() => extractReferencedMemoryIds(props.content))
+
+// [Message:ID] deep-memory references (digest badges)
+function extractReferencedMessageIds(content: string): number[] {
+  const ids: number[] = []
+  const regex = /\[Message\s*:\s*(\d+)\.{0,3}\]/gi
+  let match
+  while ((match = regex.exec(content)) !== null) {
+    const id = parseInt(match[1] || '', 10)
+    if (Number.isFinite(id) && id > 0) ids.push(id)
+  }
+  return Array.from(new Set(ids))
+}
+
+const referencedMessageIds = computed(() => extractReferencedMessageIds(props.content))
+
+function resolveMessageReferencesBestEffort(): void {
+  if (props.readonly) return
+  if (referencedMessageIds.value.length === 0) return
+  void messageDigestsStore.resolveMissing(referencedMessageIds.value)
+}
 
 const missingReferencedMemoryIds = computed(() => {
   if (referencedMemoryIds.value.length === 0) return []
@@ -323,6 +346,24 @@ const handleSetupCtaClick = (event: MouseEvent) => {
   window.dispatchEvent(new CustomEvent('open-first-run-setup'))
 }
 
+// Handle [Message:ID] digest badge clicks — navigate to the source chat
+const handleMessageRefBadgeClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+  const badge = target.closest('.message-ref[data-digest-message-id]')
+  if (!badge) return
+
+  event.preventDefault()
+
+  const messageId = parseInt(badge.getAttribute('data-digest-message-id') || '-1')
+  const chatId = parseInt(badge.getAttribute('data-digest-chat-id') || '-1')
+  if (messageId > 0 && chatId > 0) {
+    // ChatView owns chat switching; widget/shared views ignore this.
+    window.dispatchEvent(
+      new CustomEvent('open-message-reference', { detail: { messageId, chatId } })
+    )
+  }
+}
+
 // Handle feedback badge clicks (feedback badges use .memory-ref class but have data-feedback-id attribute)
 const handleFeedbackBadgeClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement
@@ -367,6 +408,56 @@ function buildReadonlyMemoryBadgeHtml(): string {
   const brainIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M21.33 12.91c.09 1.55-.62 3.04-1.89 3.95l.77 1.49c.23.45.26.98.06 1.45c-.19.47-.58.84-1.06 1l-.79.25a1.69 1.69 0 0 1-1.86-.55L14.44 18c-.89-.15-1.73-.53-2.44-1.10c-.5.15-1 .23-1.5.23c-.88 0-1.76-.27-2.5-.79c-.53.16-1.07.23-1.62.22c-.79.01-1.57-.15-2.3-.45a4.1 4.1 0 0 1-2.43-3.61c-.08-.72.04-1.45.35-2.11c-.29-.75-.32-1.57-.07-2.33C2.3 7.11 3 6.32 3.87 5.82c.58-1.69 2.21-2.82 4-2.7c1.6-1.5 4.05-1.66 5.83-.37c.42-.11.86-.17 1.3-.17c1.36-.03 2.65.57 3.5 1.64c2.04.53 3.5 2.35 3.58 4.47c.05 1.11-.25 2.20-.86 3.13c.07.36.11.72.11 1.09m-5-1.41c.57.07 1.02.5 1.02 1.07a1 1 0 0 1-1 1h-.63c-.32.9-.88 1.69-1.62 2.29c.25.09.51.14.77.21c5.13-.07 4.53-3.2 4.53-3.25a2.59 2.59 0 0 0-2.69-2.49a1 1 0 0 1-1-1a1 1 0 0 1 1-1c1.23.03 2.41.49 3.33 1.30c.05-.29.08-.59.08-.89c-.06-1.24-.62-2.32-2.87-2.53c-1.25-2.96-4.4-1.32-4.4-.4c-.03.23.21.72.25.75a1 1 0 0 1 1 1c0 .55-.45 1-1 1c-.53-.02-1.03-.22-1.43-.56c-.48.31-1.03.5-1.6.56c-.57.05-1.04-.35-1.07-.90a.97.97 0 0 1 .88-1.10c.16-.02.94-.14.94-.77c0-.66.25-1.29.68-1.79c-.92-.25-1.91.08-2.91 1.29C6.75 5 6 5.25 5.45 7.2C4.5 7.67 4 8 3.78 9c1.08-.22 2.19-.13 3.22.25c.5.19.78.75.59 1.29c-.19.52-.77.78-1.29.59c-.73-.32-1.55-.34-2.30-.06c-.32.27-.32.83-.32 1.27c0 .74.37 1.43 1 1.83c.53.27 1.12.41 1.71.40q-.225-.39-.39-.81a1.038 1.038 0 0 1 1.96-.68c.4 1.14 1.42 1.92 2.62 2.05c1.37-.07 2.59-.88 3.19-2.13c.23-1.38 1.34-1.5 2.56-1.5m2 7.47l-.62-1.3-.71.16l1 1.25zm-4.65-8.61a1 1 0 0 0-.91-1.03c-.71-.04-1.4.20-1.93.67c-.57.58-.87 1.38-.84 2.19a1 1 0 0 0 1 1c.57 0 1-.45 1-1c0-.27.07-.54.23-.76c.12-.10.27-.15.43-.15c.55.03 1.02-.38 1.02-.92"></path></svg>'
   return `<span class="memory-badge-wrapper inline relative group"><a href="${loginUrl}" class="memory-ref memory-ref--readonly inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle no-underline" title="${escapeHtmlForBadge(t('memories.loginToView'))}">${brainIcon}<span class="font-medium">${escapeHtmlForBadge(t('memories.memoryUsed'))}</span></a></span>`
+}
+
+// Build a [Message:ID] digest badge — a reference to a key message from an
+// older conversation, clickable to open the source chat.
+function buildMessageRefBadgeHtml(reference: MessageDigestReference): string {
+  const escapedTitle = escapeHtmlForBadge(reference.title)
+  const shortTitle = escapeHtmlForBadge(
+    reference.title.length > 40 ? reference.title.substring(0, 40) + '...' : reference.title
+  )
+  const dateLabel =
+    reference.sourceDate > 0
+      ? escapeHtmlForBadge(new Date(reference.sourceDate * 1000).toLocaleDateString())
+      : ''
+  const historyIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="flex-shrink-0"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 7 7v2a9 9 0 0 0 0-18m-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>'
+
+  return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--brand-alpha-light)] text-[var(--brand)] text-xs font-medium hover:bg-[var(--brand)] hover:text-white transition-all border border-[var(--brand)]/20 hover:border-[var(--brand)] cursor-pointer align-middle" data-digest-message-id="${reference.messageId}" data-digest-chat-id="${reference.chatId}" onclick="event.preventDefault()">${historyIcon}<span class="font-medium max-w-[160px] truncate">${shortTitle}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-3 py-2 rounded-lg" style="display:block"><span class="flex items-center gap-2"><span class="pill text-[10px] px-1.5 py-0.5">${escapeHtmlForBadge(t('messageRefs.olderConversation'))}</span>${dateLabel ? `<span class="text-[10px] txt-secondary">${dateLabel}</span>` : ''}</span><span class="text-xs txt-primary mt-1 leading-relaxed" style="display:block">${escapedTitle}</span><span class="text-[11px] txt-secondary mt-1" style="display:block">${escapeHtmlForBadge(t('messageRefs.clickToOpen'))}</span></span></span></span>`
+}
+
+// Process [Message:ID] digest badges in the content
+function processMessageReferenceBadges(html: string): string {
+  if (!html.includes('[Message') && !html.includes('[message')) {
+    return html
+  }
+
+  const messageRefPattern = /\[Message\s*:\s*(\d+)\.{0,3}\]/gi
+
+  // Shared/anonymous views cannot resolve or navigate — show a neutral label.
+  if (props.readonly) {
+    return html.replace(messageRefPattern, () => {
+      return `<span class="memory-badge-wrapper inline relative group"><span class="memory-ref message-ref--readonly inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 align-middle"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.olderConversation'))}</span></span></span>`
+    })
+  }
+
+  return html.replace(messageRefPattern, (_match, id) => {
+    const messageId = parseInt(id, 10)
+    const reference = messageDigestsStore.getByMessageId(messageId)
+
+    if (reference) {
+      return buildMessageRefBadgeHtml(reference)
+    }
+
+    if (!messageDigestsStore.isUnresolvable(messageId)) {
+      // Still resolving (SSE not arrived yet / fetch in flight) — loading pill.
+      return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs font-medium border border-gray-200 dark:border-gray-700 align-middle"><svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></span>`
+    }
+
+    // Invented / deleted / foreign id — muted, non-clickable badge.
+    return `<span class="memory-badge-wrapper inline relative group"><button type="button" class="memory-ref message-ref--missing inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-medium border border-gray-200 dark:border-gray-700 cursor-not-allowed align-middle" data-disabled="true" onclick="event.preventDefault()"><span class="font-medium">${escapeHtmlForBadge(t('messageRefs.missing.badge'))}</span></button><span class="memory-tooltip absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999] whitespace-normal" style="display:block;max-width:280px"><span class="surface-elevated px-4 py-3 rounded-lg" style="display:block"><span class="text-xs txt-primary leading-relaxed" style="display:block">${escapeHtmlForBadge(t('messageRefs.missing.tooltip'))}</span></span></span></span>`
+  })
 }
 
 // Process memory badges in the content
@@ -548,8 +639,8 @@ function normalizeInlineReferences(text: string): string {
   // does not wrap them in separate <p> blocks.
   // Handles both numeric IDs ([Memory:12345]) and named keys ([Memory:hobby]).
   return text
-    .replace(/\n+(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])/gi, ' $1')
-    .replace(/(\[(?:Feedback|Memory)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
+    .replace(/\n+(\[(?:Feedback|Memory|Message)\s*:\s*[\w.-]+\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory|Message)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
 }
 
 // Normalize special file markers + reference markers + apply badge / table
@@ -579,7 +670,7 @@ function normalizeContentForRender(input: string): string {
 }
 
 function postProcessHtml(html: string): string {
-  html = processFeedbackBadges(processMemoryBadges(html))
+  html = processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(html)))
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
   // Demo-mode CTA from TestProvider. A <button> (not an <a>) so ChatView
@@ -675,7 +766,7 @@ function renderStreamingIncremental(content: string): string {
   let tailHtml = ''
   if (trailingTail.length > 0) {
     tailHtml = renderStreamingTail(trailingTail)
-    tailHtml = processFeedbackBadges(processMemoryBadges(tailHtml))
+    tailHtml = processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(tailHtml)))
   }
 
   // Concatenation is fine now: morphdom diffs the combined HTML against the
@@ -891,6 +982,7 @@ onBeforeUnmount(() => {
   if (containerRef.value) {
     containerRef.value.removeEventListener('click', handleMemoryBadgeClick)
     containerRef.value.removeEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.removeEventListener('click', handleMessageRefBadgeClick)
     containerRef.value.removeEventListener('click', handleSetupCtaClick)
   }
 })
@@ -907,11 +999,13 @@ onMounted(() => {
   if (containerRef.value) {
     containerRef.value.addEventListener('click', handleMemoryBadgeClick)
     containerRef.value.addEventListener('click', handleFeedbackBadgeClick)
+    containerRef.value.addEventListener('click', handleMessageRefBadgeClick)
     containerRef.value.addEventListener('click', handleSetupCtaClick)
   }
 
   // Fetch memories if needed
   void fetchMemoriesWithRetryBestEffort()
+  resolveMessageReferencesBestEffort()
 
   // Schedule mermaid processing
   scheduleMermaidProcessing()
@@ -937,6 +1031,7 @@ watch(
     slowRetryAttempt.value = 0
     gaveUp.value = false
     void fetchMemoriesWithRetryBestEffort()
+    resolveMessageReferencesBestEffort()
   }
 )
 
@@ -988,6 +1083,22 @@ watch(
     }
   },
   { deep: true }
+)
+
+// Re-render content when digest references resolve (SSE push or lazy fetch),
+// so [Message:ID] loading pills turn into clickable badges.
+watch(
+  () => [messageDigestsStore.references, messageDigestsStore.unresolvable],
+  async () => {
+    if (props.content.includes('[Message:') || props.content.includes('[message:')) {
+      invalidateStreamingCache()
+      const currentVersion = ++renderVersion
+      const result = await processContent(props.content, currentVersion)
+      if (result !== null) {
+        applyHtml(result)
+      }
+    }
+  }
 )
 </script>
 

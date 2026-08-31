@@ -37,6 +37,12 @@ Same Synaplan API keys as the OpenAI-compatible API:
 - `x-api-key: sk_…`
 - `Authorization: Bearer sk_…`
 
+Keys can carry **scopes**, but this does not affect existing keys: an unscoped
+key (the default) and a webhook-only key both keep **full access** exactly as
+before. The only restricted keys today are those minted by
+[Synaplan Desktop](./DESKTOP.md) pairing, which are limited to a small
+`desktop:*` set. See [scoped vs. legacy keys](./OPENAI_COMPATIBLE_API.md#scoped-vs-legacy-keys).
+
 ## Feature flags (`BCONFIG` group `MESSAGES_GATEWAY`)
 
 Defaults are **off** except budget notices, session summaries (both only take
@@ -176,3 +182,4 @@ Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped befor
 - OpenAI-compatible sibling: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
 - UI: **Channels → AI Agents**
 - Smoke scripts: `_devextras/testing/messages-gateway/`
+- Synaplan Desktop (agent client, server side): [DESKTOP.md](./DESKTOP.md)

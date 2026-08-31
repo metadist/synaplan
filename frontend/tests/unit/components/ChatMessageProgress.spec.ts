@@ -5,6 +5,7 @@ import ChatMessage from '@/components/ChatMessage.vue'
 import en from '@/i18n/en.json'
 import de from '@/i18n/de.json'
 import es from '@/i18n/es.json'
+import fr from '@/i18n/fr.json'
 import tr from '@/i18n/tr.json'
 
 // The backend now narrates the phases that run before the first token, so the
@@ -37,7 +38,10 @@ const mountOptions = {
   },
 }
 
-const indicatorText = (processingStatus: string): string =>
+const indicatorText = (
+  processingStatus: string,
+  processingMetadata: Record<string, unknown> = {}
+): string =>
   mount(ChatMessage, {
     ...mountOptions,
     props: {
@@ -46,6 +50,7 @@ const indicatorText = (processingStatus: string): string =>
       timestamp: new Date(),
       isStreaming: true,
       processingStatus,
+      processingMetadata,
     },
   })
     .get('[data-testid="loading-typing-indicator"]')
@@ -71,6 +76,23 @@ describe('ChatMessage pre-answer progress indicator', () => {
   it('does not fall back to the generic generating copy', () => {
     expect(indicatorText('planning')).not.toContain('processing.generatingTitle')
   })
+
+  // "Make the car blue" now edits the picture from earlier in the conversation
+  // instead of drawing a new one. Saying so is what tells the user the edit
+  // actually landed on the file they meant.
+  it('names the image being edited when the backend reports one', () => {
+    const text = indicatorText('editing', { edit_source_name: 'car-sunset.png' })
+
+    expect(text).toContain('processing.editingImageTitle')
+    expect(text).toContain('processing.editingImageNamed')
+  })
+
+  it('falls back to generic editing copy without a filename', () => {
+    const text = indicatorText('editing')
+
+    expect(text).toContain('processing.editingImageTitle')
+    expect(text).toContain('processing.editingImageDesc')
+  })
 })
 
 const processingCopy = (messages: unknown): Record<string, string> =>
@@ -82,6 +104,7 @@ describe('pre-answer progress copy', () => {
   it.each([
     ['de', de],
     ['es', es],
+    ['fr', fr],
     ['tr', tr],
   ])('is translated in %s', (_locale, messages) => {
     const english = processingCopy(en)
@@ -90,11 +113,12 @@ describe('pre-answer progress copy', () => {
         key.startsWith('analyzingPrompt') ||
         key.startsWith('planning') ||
         key.startsWith('searchingFiles') ||
-        key.startsWith('checkingMemories')
+        key.startsWith('checkingMemories') ||
+        key.startsWith('editingImage')
     )
     const locale = processingCopy(messages)
 
-    expect(keys).toHaveLength(8)
+    expect(keys).toHaveLength(11)
     for (const key of keys) {
       expect(locale[key], `missing processing.${key}`).toBeTruthy()
       expect(locale[key], `processing.${key} is still the English string`).not.toBe(english[key])

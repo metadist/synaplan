@@ -5,6 +5,13 @@
 > locally, as a safe extension with access to certain directories and functions
 > like email?"*
 >
+> **Implementation plan (2026-08-29):** Agent Skills + extra client repo —
+> [`../20260829-desktop-agent-client/README.md`](../20260829-desktop-agent-client/README.md).
+> That epic uses this file as the safety input (scopes, allowlist, no
+> server-authored `shell.exec`). It does **not** replace this paper’s
+> closed job-enum companion; it adds `skill.run` after the user installed
+> a skill folder.
+>
 > **Scope reviewed:** `backend/src/Mcp/`, `backend/src/Service/Mcp/`,
 > `backend/src/Security/`, `backend/config/packages/security.yaml`,
 > `backend/src/Service/Multitask/`, `backend/src/Service/Media/`,

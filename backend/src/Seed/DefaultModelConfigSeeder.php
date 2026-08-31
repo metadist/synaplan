@@ -32,6 +32,13 @@ final readonly class DefaultModelConfigSeeder
     private const PROD_MODEL_DEFAULTS = [
         ['group' => 'DEFAULTMODEL', 'setting' => 'CHAT',       'modelKey' => 'anthropic:claude-sonnet-5:chat'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'TOOLS',      'modelKey' => 'anthropic:claude-sonnet-5:chat'],
+        // The routing prompts in PromptCatalog (tools:sort and the multitask
+        // planner) are written and regression-tested against gpt-oss-120b: it
+        // returns the strict JSON contract reliably and fast. Heavier chat
+        // models reason past the format and degrade routing install-wide, so
+        // this binding is a tuned pair with the prompt, not a taste. Changing
+        // it needs the prompts re-validated AND a migration — an existing
+        // install keeps its stored row (see Version20260828120000).
         ['group' => 'DEFAULTMODEL', 'setting' => 'SORT',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Multi-task routing planner. Same fast/cheap tier as SORT but a
         // dedicated binding so it can be tuned without touching the legacy

@@ -138,6 +138,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { supportedLanguages } from '@/i18n'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
@@ -246,11 +247,12 @@ const redirectTarget = computed(() => {
 })
 
 function cycleLanguage(): void {
-  const languages = ['de', 'en', 'es', 'tr']
-  const currentIndex = languages.indexOf(locale.value)
-  const nextIndex = (currentIndex + 1) % languages.length
-  locale.value = languages[nextIndex]
-  localStorage.setItem('language', languages[nextIndex])
+  const currentIndex = supportedLanguages.indexOf(
+    locale.value as (typeof supportedLanguages)[number]
+  )
+  const next = supportedLanguages[(currentIndex + 1) % supportedLanguages.length]
+  locale.value = next
+  localStorage.setItem('language', next)
 }
 
 /**

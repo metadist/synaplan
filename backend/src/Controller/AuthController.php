@@ -522,6 +522,38 @@ class AuthController extends AbstractController
         $result = $this->impersonationService->issueRefreshedImpersonationAccessToken($request);
 
         if (!$result) {
+            // A refresh that raced the cookie-swap can leave a valid admin stash
+            // next to a plain admin access token. Recover the admin session
+            // instead of wiping cookies (which logged the admin out).
+            $recovered = $this->impersonationService->recoverAdminSessionFromStash($request);
+            if ($recovered) {
+                /** @var User $admin */
+                $admin = $recovered['user'];
+
+                $this->logger->info('Impersonation refresh recovered admin session', [
+                    'admin_id' => $admin->getId(),
+                ]);
+
+                $response = new JsonResponse([
+                    'success' => true,
+                    'user' => [
+                        'id' => $admin->getId(),
+                        'email' => $admin->getMail(),
+                        'level' => $admin->getUserLevel(),
+                        'emailVerified' => $admin->isEmailVerified(),
+                        'isAdmin' => $admin->isAdmin(),
+                        'memoriesEnabled' => $admin->isMemoriesEnabled(),
+                        'firstName' => $this->extractFirstName($admin),
+                    ],
+                ]);
+
+                $response->headers->setCookie(
+                    $this->tokenService->createAccessCookie($recovered['access_token'])
+                );
+
+                return $response;
+            }
+
             $response = new JsonResponse([
                 'error' => 'Impersonation session expired',
                 'code' => 'IMPERSONATION_EXPIRED',
@@ -672,6 +704,12 @@ class AuthController extends AbstractController
         if ($refreshTokenString) {
             $this->tokenService->revokeRefreshToken($refreshTokenString);
         }
+
+        // During impersonation the regular refresh cookie is cleared and the
+        // admin's real refresh token sits in the stash. Revoke it too so logging
+        // out mid-impersonation actually kills the admin session in the DB, not
+        // just the cleared cookie.
+        $this->impersonationService->revokeStashedAdminRefreshToken($request);
 
         $responseData = [
             'success' => true,
@@ -1068,16 +1106,23 @@ class AuthController extends AbstractController
         description: 'Logout from all devices by revoking all refresh tokens',
         tags: ['Authentication']
     )]
-    public function revokeAll(#[CurrentUser] ?User $user): Response
+    public function revokeAll(Request $request, #[CurrentUser] ?User $user): Response
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $count = $this->tokenService->revokeAllUserTokens($user);
+        // During impersonation `#[CurrentUser]` resolves to the impersonated
+        // target. "Log out everywhere" must act on the real operator — the admin
+        // whose refresh token is stashed — never on the impersonated victim, and
+        // it must revoke the admin's stashed token which a target-scoped revoke
+        // would leave alive.
+        $sessionOwner = $this->impersonationService->resolveStashedAdmin($request) ?? $user;
+
+        $count = $this->tokenService->revokeAllUserTokens($sessionOwner);
 
         $this->logger->info('All sessions revoked', [
-            'user_id' => $user->getId(),
+            'user_id' => $sessionOwner->getId(),
             'sessions_revoked' => $count,
         ]);
 

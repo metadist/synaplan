@@ -140,6 +140,16 @@ export const authService = {
   },
 
   /**
+   * Take over a session the server already opened. Used by the setup wizard
+   * after POST /admin, which sets the auth cookies (and native Bearer tokens)
+   * itself — there is no typed login to go through.
+   */
+  adoptSession(sessionUser: AuthUser): void {
+    user.value = sessionUser
+    impersonator.value = null
+  },
+
+  /**
    * Register User
    */
   async register(
@@ -233,6 +243,13 @@ export const authService = {
     try {
       const response = await authFetch('/api/v1/auth/me')
 
+      // SETUP_REQUIRED and other 5xx must not look like "logged out". The
+      // wizard signs the administrator in while the rest of the API is still
+      // closed; wiping the session here would send them to /login at the end.
+      if (response.status >= 500) {
+        return user.value
+      }
+
       if (response.status === 401) {
         // Don't try to refresh if already logging out
         if (isLoggingOut.value) {
@@ -277,8 +294,10 @@ export const authService = {
 
       return data.user
     } catch {
-      // Network errors are expected (e.g., offline) - don't log
-      return null
+      // Network errors are expected (e.g., offline) - keep whoever we already
+      // are, the same way token refresh does. Returning null would let
+      // refreshUser() wipe a session the wizard just opened.
+      return user.value
     }
   },
 

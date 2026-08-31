@@ -8,14 +8,17 @@
       @dragleave="handleDragLeave"
       @drop.prevent="handleDrop"
     >
-      <!-- Incognito toggle (desktop): there is no chat header, so the button
-           floats over the top-right of the message area. The mobile instance
-           lives in MainLayout (fixed top-right, mirroring the menu button). -->
+      <!-- Incognito toggle + collapsed speed config (desktop): there is no
+           chat header, so the buttons float over the top-right of the message
+           area. The mobile instances live in MainLayout (fixed top-right,
+           mirroring the menu button). The mix button hides itself while the
+           expanded card is showing in the empty state below. -->
       <div
         v-if="authStore.isAuthenticated && !needsProviderSetup"
-        class="hidden md:block absolute top-3 right-3 z-30"
+        class="v2-desktop-chrome items-center gap-2 absolute top-3 right-3 z-30"
         data-testid="section-incognito-toggle-desktop"
       >
+        <ModelMixControl />
         <IncognitoToggle />
       </div>
 
@@ -78,7 +81,7 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            <span class="ml-2 txt-secondary text-sm">Loading messages...</span>
+            <span class="ml-2 txt-secondary text-sm">{{ $t('common.loadingMessages') }}</span>
           </div>
 
           <div
@@ -173,10 +176,19 @@
               </p>
             </div>
 
-            <ExamplePrompts
-              v-if="!authStore.isAuthenticated && !configStore.marketingNews.enabled"
-              @pick="handleExamplePick"
-            />
+            <!-- Speed config: the expanded mix card greets the user on every
+                 fresh chat and collapses into the round top-right button on
+                 the first tap, click, or keystroke elsewhere. -->
+            <div
+              v-if="showInlineMixPanel"
+              ref="inlineMixPanelEl"
+              class="w-full max-w-sm"
+              data-testid="section-model-mix-inline"
+            >
+              <ModelMixPanel @select="dismissInlineMixPanel" />
+            </div>
+
+            <ExamplePrompts v-if="showExamplePrompts" @pick="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -266,10 +278,11 @@
       />
 
       <!-- Single composer, always docked at the bottom. On the empty landing
-           the messages area shows only the welcome hero + example prompts;
-           keeping the input at the bottom (instead of a centered hero composer)
-           means the "+" menu and its dropdowns always open upward with room and
-           are never clipped by the chat container's overflow (issue #1285). -->
+           the messages area shows the welcome hero (plus example prompts for
+           anonymous users); keeping the input at the bottom (instead of a
+           centered hero composer) means the "+" menu and its dropdowns always
+           open upward with room and are never clipped by the chat container's
+           overflow (issue #1285). -->
       <ChatInput
         v-if="!needsProviderSetup"
         ref="chatInputRef"
@@ -484,8 +497,12 @@ import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
+import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
+import ModelMixControl from '@/components/chat/ModelMixControl.vue'
+import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
+import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
@@ -584,6 +601,7 @@ const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
+const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
@@ -669,12 +687,70 @@ const isEmptyLanding = computed(
     !historyStore.isLoadingMessages
 )
 
+// Guest landing only — signed-in empty chats keep the greeting, no teaser cards.
+const showExamplePrompts = computed(
+  () => !authStore.isAuthenticated && !incognitoStore.active && !configStore.marketingNews.enabled
+)
+
 // Runtime-config first-run signal: the default chat model has no usable
 // provider. Replace the composer with a tombstone so a fresh install cannot
 // produce the cryptic HTTP 500 the old banner still allowed.
 const needsProviderSetup = computed(
   () => authStore.isAuthenticated && configStore.setup.chatReady === false
 )
+
+// --- Speed config (model mixes) -------------------------------------------
+// The expanded card shows on every fresh, non-incognito chat until the user
+// interacts anywhere (tap, click, or typing); it then collapses into the
+// round ModelMixControl button next to the incognito toggle. The store flag
+// keeps that button hidden while the card is up, on desktop AND mobile.
+const modelMixStore = useModelMixStore()
+const mixPanelDismissed = ref(false)
+const inlineMixPanelEl = ref<HTMLElement | null>(null)
+
+const showInlineMixPanel = computed(() => false)
+
+watch(showInlineMixPanel, (visible) => {
+  modelMixStore.inlinePanelVisible = visible
+})
+
+const dismissInlineMixPanel = () => {
+  mixPanelDismissed.value = true
+}
+
+// A fresh chat gets the card back.
+watch(
+  () => chatsStore.activeChatId,
+  () => {
+    mixPanelDismissed.value = false
+  }
+)
+
+// "Once tapped, clicked or text is entered, the popup closes": any pointer
+// press outside the card and any keystroke (the composer is focused on load,
+// so typing lands there) collapse it.
+const collapseMixPanelOnPointer = (event: PointerEvent) => {
+  if (!showInlineMixPanel.value) return
+  if (inlineMixPanelEl.value?.contains(event.target as Node)) return
+  dismissInlineMixPanel()
+}
+
+const collapseMixPanelOnKeydown = () => {
+  if (!showInlineMixPanel.value) return
+  dismissInlineMixPanel()
+}
+
+onMounted(() => {
+  modelMixStore.inlinePanelVisible = showInlineMixPanel.value
+  document.addEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.addEventListener('keydown', collapseMixPanelOnKeydown)
+})
+
+onBeforeUnmount(() => {
+  modelMixStore.inlinePanelVisible = false
+  document.removeEventListener('pointerdown', collapseMixPanelOnPointer)
+  document.removeEventListener('keydown', collapseMixPanelOnKeydown)
+})
 
 function handleGuestFeatureGate(key: string) {
   featureGateKey.value = key
@@ -837,6 +913,7 @@ onMounted(async () => {
     window.addEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
     window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
     window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+    window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
     maybeRemindAboutUpgrade()
     return
   }
@@ -902,6 +979,7 @@ onMounted(async () => {
   // Setup window event listener for feedback dialog (used by MessageText.vue)
   window.addEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.addEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.addEventListener('open-message-reference', handleOpenMessageReferenceEvent)
 
   // Phase 1d: keep the SSE token cache warm.
   //   - Prefetch on mount so the first message of a session never waits.
@@ -982,6 +1060,18 @@ const handleOpenFirstRunSetupEvent = () => {
   void goToProviderSetup()
 }
 
+// Window event handler for [Message:ID] digest badges (used by MessageText.vue):
+// open the older conversation the reference points into.
+const handleOpenMessageReferenceEvent = (event: Event) => {
+  const customEvent = event as CustomEvent<{ messageId: number; chatId: number }>
+  const chatId = customEvent.detail?.chatId
+  if (!chatId || chatId <= 0) return
+  if (chatsStore.activeChatId === chatId) return
+
+  chatsStore.setActiveChat(chatId)
+  void historyStore.loadMessages(chatId)
+}
+
 // Detach (do NOT cancel) a running turn when the user navigates away or
 // switches chats (issues #1142 / #1223 / #1225). Closes the SSE connection and
 // clears local streaming state WITHOUT telling the backend to stop — the turn
@@ -1014,6 +1104,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
+  window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
@@ -2182,6 +2273,11 @@ const streamAIResponse = async (
           } else if (data.status === 'analyzing') {
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}
@@ -2686,6 +2782,11 @@ const streamAIResponse = async (
             // Analyzing phase (e.g., understanding media generation request)
             processingStatus.value = 'analyzing'
             processingMetadata.value = { customMessage: data.message }
+          } else if (data.status === 'editing') {
+            // Media edit of a picture from earlier in the conversation — name
+            // the source so the user can see WHICH image is being changed.
+            processingStatus.value = 'editing'
+            processingMetadata.value = data.metadata || {}
           } else if (isPipelineProgressStatus(data.status)) {
             processingStatus.value = data.status
             processingMetadata.value = {}
@@ -3143,6 +3244,22 @@ const streamAIResponse = async (
               if (streamingMessage && feedbackIds.length > 0) {
                 streamingMessage.feedbackIds = feedbackIds
               }
+            }
+          } else if (data.status === 'digests_loaded') {
+            // Deep-memory references loaded - store for [Message:ID] badge rendering
+            const digests = data.metadata?.digests
+            if (digests && Array.isArray(digests)) {
+              messageDigestsStore.addReferences(
+                digests
+                  .filter((d) => d && typeof d.message_id === 'number')
+                  .map((d) => ({
+                    messageId: d.message_id,
+                    chatId: d.chat_id ?? 0,
+                    title: d.title ?? '',
+                    channel: d.channel ?? '',
+                    sourceDate: d.source_date ?? 0,
+                  }))
+              )
             }
           } else if (data.status === 'memory_deleted') {
             // Legacy backend event - remove from local store only

@@ -46,6 +46,7 @@ env:
   # The Marketplace ingests from us-east-1 only; other regions are produced by
   # copying the published AMI.
   AWS_REGION: us-east-1
+  AWS_MARKETPLACE_INGESTION_ACCOUNT_ID: '679593333241'
   IMAGE_REPOSITORY: ghcr.io/metadist/synaplan
 
 jobs:
@@ -164,6 +165,19 @@ jobs:
           role-session-name: synaplan-ami-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Check Marketplace encryption compatibility
+        run: |
+          set -euo pipefail
+          encryption_by_default="$(
+            aws ec2 get-ebs-encryption-by-default \
+              --query EbsEncryptionByDefault \
+              --output text
+          )"
+          if [ "$encryption_by_default" != False ]; then
+            echo "::error::EBS encryption by default is enabled in ${AWS_REGION}. AWS Marketplace cannot ingest the encrypted AMI this build would produce."
+            exit 1
+          fi
+
       - name: Install Packer
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3
         with:
@@ -200,10 +214,53 @@ jobs:
             echo ""
             echo "AMI: \`${ami}\` in \`${AWS_REGION}\`"
             echo ""
-            echo "Next: run **Test Add Version** in the AWS Marketplace Management Portal"
-            echo "for the free compliance scan, then verify a launch from"
-            echo "\`deploy/aws/cloudformation/synaplan-new-vpc.yaml\` before submitting."
+            echo "The submit job below offers this AMI to the listing once the"
+            echo "verification launch has passed."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate and share the AMI with AWS Marketplace
+        env:
+          AMI_ID: ${{ steps.ami.outputs.ami }}
+        run: |
+          set -euo pipefail
+          read -r -a snapshot_ids <<< "$(
+            aws ec2 describe-images \
+              --image-ids "$AMI_ID" \
+              --query 'Images[0].BlockDeviceMappings[].Ebs.SnapshotId' \
+              --output text
+          )"
+          if [ "${#snapshot_ids[@]}" -eq 0 ]; then
+            echo "::error::${AMI_ID} has no EBS snapshots."
+            exit 1
+          fi
+
+          encrypted_snapshots="$(
+            aws ec2 describe-snapshots \
+              --snapshot-ids "${snapshot_ids[@]}" \
+              --query 'Snapshots[?Encrypted].SnapshotId' \
+              --output text
+          )"
+          if [ -n "$encrypted_snapshots" ]; then
+            echo "::error::${AMI_ID} uses encrypted snapshots (${encrypted_snapshots}); AWS Marketplace cannot ingest it."
+            exit 1
+          fi
+
+          aws ec2 modify-image-attribute \
+            --image-id "$AMI_ID" \
+            --launch-permission \
+            "Add=[{UserId=${AWS_MARKETPLACE_INGESTION_ACCOUNT_ID}}]"
+
+          shared_account="$(
+            aws ec2 describe-image-attribute \
+              --image-id "$AMI_ID" \
+              --attribute launchPermission \
+              --query "LaunchPermissions[?UserId=='${AWS_MARKETPLACE_INGESTION_ACCOUNT_ID}'].UserId | [0]" \
+              --output text
+          )"
+          if [ "$shared_account" != "$AWS_MARKETPLACE_INGESTION_ACCOUNT_ID" ]; then
+            echo "::error::${AMI_ID} was not shared with the AWS Marketplace ingestion account."
+            exit 1
+          fi
 
       - name: Upload the build manifest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -219,10 +276,15 @@ jobs:
     # Only the x86_64 image is launched. The two AMIs come out of the same
     # provisioner on the same base OS, so a second launch would re-test the
     # scripts rather than the architecture, for a second instance-hour.
+    # The trigger is spelled out rather than tested as `inputs.verify != false`.
+    # On a tag push the inputs context is empty, and GitHub compares an empty
+    # string to a boolean by casting both to a number — so `'' != false` is
+    # false, and the smoke test silently skipped every single release build. It
+    # only ever ran when someone dispatched the workflow by hand.
     if: >-
       needs.resolve.outputs.version != '' &&
       contains(fromJSON(needs.resolve.outputs.matrix), 'x86_64') &&
-      inputs.verify != false
+      (github.event_name != 'workflow_dispatch' || inputs.verify)
     # Same reasoning as on the build job: the AWS role trusts the environment.
     environment: ami-build
     permissions:
@@ -279,6 +341,7 @@ jobs:
               "ParameterKey=ImageId,ParameterValue=${AMI_ID}" \
               ParameterKey=InstanceType,ParameterValue=c7i.xlarge \
               ParameterKey=DataVolumeSize,ParameterValue=20 \
+              ParameterKey=AllowedWebCidr,ParameterValue=0.0.0.0/0 \
               ParameterKey=EnableDailySnapshots,ParameterValue=false \
               ParameterKey=AdminEmail,ParameterValue=verify@example.com
           aws cloudformation wait stack-create-complete --stack-name "$STACK_NAME"
@@ -522,4 +585,216 @@ jobs:
           for snapshot in $snapshots; do
             echo "Deleting the leftover snapshot ${snapshot}."
             aws ec2 delete-snapshot --snapshot-id "$snapshot" || true
+          done
+
+  submit:
+    name: Offer the version to the Marketplace listing
+    runs-on: ubuntu-latest
+    needs: [resolve, build, verify]
+    # Verification is not optional here. The build job proves an AMI exists and
+    # is ingestible; only the launch proves it boots and serves. Offering an
+    # unverified image to customers is the one mistake this listing cannot take
+    # back cheaply, so a run that skipped the launch skips the submission too.
+    if: >-
+      needs.resolve.outputs.version != '' &&
+      needs.resolve.outputs.configured == 'true' &&
+      needs.verify.result == 'success'
+    # Same trust path as the other AWS jobs: the role trusts this environment's
+    # subject claim, not a branch.
+    environment: ami-build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # The listing is created by hand in the Management Portal, and until it
+      # exists there is no entity to change. Skipped rather than failed, exactly
+      # like the missing build role above.
+      - name: Check the listing
+        id: listing
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          INGESTION_ROLE_ARN: ${{ secrets.AWS_MARKETPLACE_INGESTION_ROLE_ARN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PRODUCT_ID:-}" ] || [ -z "${INGESTION_ROLE_ARN:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### AWS Marketplace"
+              echo ""
+              echo "No \`AWS_MARKETPLACE_PRODUCT_ID\` and \`AWS_MARKETPLACE_INGESTION_ROLE_ARN\`;"
+              echo "the version was not offered to a listing. See docs/AWS_MARKETPLACE_LISTING.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: steps.listing.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Assume the build role
+        if: steps.listing.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-submit-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download the build manifests
+        if: steps.listing.outputs.configured == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: packer-manifest-*
+          path: manifests
+
+      - name: Offer each architecture as a version
+        if: steps.listing.outputs.configured == 'true'
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          INGESTION_ROLE_ARN: ${{ secrets.AWS_MARKETPLACE_INGESTION_ROLE_ARN }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+          ARCHITECTURES: ${{ needs.resolve.outputs.matrix }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.resolve.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "### AWS Marketplace"
+            echo ""
+            echo "Offering \`${VERSION}\` to the listing, one version per architecture."
+            echo "Each is validated before it is submitted, and AWS reviews a submitted version"
+            echo "before it becomes available."
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # One AMI per version, by AWS's rule that every delivery option of a
+          # version shares the same AmiSource. Two architectures are therefore
+          # two versions, and they have to go one after another: a running change
+          # set locks the entity and the second call would fail with
+          # ResourceInUseException.
+          for architecture in $(printf '%s' "$ARCHITECTURES" | jq -r '.[]'); do
+            manifest="manifests/packer-manifest-${architecture}/packer-manifest.json"
+            if [ ! -f "$manifest" ]; then
+              echo "::error::No build manifest for ${architecture}; refusing to guess an AMI id."
+              exit 1
+            fi
+
+            ami="$(jq -r '.builds[-1].artifact_id' "$manifest" | cut -d: -f2)"
+            if [ -z "$ami" ] || [ "$ami" = null ]; then
+              echo "::error::${manifest} carries no AMI id."
+              exit 1
+            fi
+
+            case "$architecture" in
+              arm64) instance_type=m7g.xlarge ;;
+              *)     instance_type=m7i.xlarge ;;
+            esac
+
+            # Mirrors deploy/aws/packer/synaplan.pkr.hcl's source_ami_filter and
+            # deploy/aws/scripts/harden.sh: Amazon Linux 2023, ec2-user, sshd
+            # listening but password and root login refused.
+            details="$(jq -n \
+              --arg title "${VERSION} (${architecture})" \
+              --arg notes "Synaplan ${VERSION}. Release notes: ${RELEASE_URL}" \
+              --arg ami "$ami" \
+              --arg role "$INGESTION_ROLE_ARN" \
+              --arg instance_type "$instance_type" \
+              '{
+                Version: { VersionTitle: $title, ReleaseNotes: $notes },
+                DeliveryOptions: [{
+                  Details: {
+                    AmiDeliveryOptionDetails: {
+                      AmiSource: {
+                        AmiId: $ami,
+                        AccessRoleArn: $role,
+                        UserName: "ec2-user",
+                        ScanningPort: 22,
+                        OperatingSystemName: "AMAZONLINUX",
+                        OperatingSystemVersion: "2023"
+                      },
+                      UsageInstructions: "Launch the instance, then open https://<public IP or your domain>. Sign in with the administrator address shown in the CloudFormation outputs; the single-use password is stored in SSM Parameter Store under /synaplan/<instance-id>/admin-password and must be replaced at first sign-in. Add an AI provider key under Admin, AI Providers. Full guide: https://github.com/metadist/synaplan/blob/main/deploy/aws/README.md",
+                      RecommendedInstanceType: $instance_type,
+                      SecurityGroups: [
+                        { IpProtocol: "tcp", FromPort: 443, ToPort: 443, IpRanges: ["0.0.0.0/0"] },
+                        { IpProtocol: "tcp", FromPort: 80, ToPort: 80, IpRanges: ["0.0.0.0/0"] }
+                      ]
+                    }
+                  }
+                }]
+              }')"
+
+            change_set="$(jq -n \
+              --arg product "$PRODUCT_ID" \
+              --argjson details "$details" \
+              '[{
+                ChangeType: "AddDeliveryOptions",
+                Entity: { Identifier: $product, Type: "AmiProduct@1.0" },
+                DetailsDocument: $details
+              }]')"
+
+            # Validated first, then submitted, both inside this run. VALIDATE
+            # asks AWS whether it would accept the document without creating
+            # anything, which is how a wrong product id or a role AWS cannot
+            # assume is caught before a real version exists. This used to be a
+            # separate dry run, requested through a repository variable that a
+            # maintainer had to flip after reading a job summary — a step
+            # between two releases that nobody remembers.
+            echo "::group::${architecture}: validate ${ami}"
+            aws marketplace-catalog start-change-set \
+              --catalog AWSMarketplace \
+              --intent VALIDATE \
+              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
+              --change-set "$change_set" > /dev/null
+            echo "Accepted."
+            echo "::endgroup::"
+
+            echo "::group::${architecture}: submit ${ami}"
+            id="$(
+              aws marketplace-catalog start-change-set \
+                --catalog AWSMarketplace \
+                --intent APPLY \
+                --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
+                --change-set "$change_set" \
+                --query ChangeSetId --output text
+            )"
+            echo "Change set ${id}."
+            echo "::endgroup::"
+
+            # Waited out rather than fired and forgotten, for two reasons: the
+            # next architecture cannot start while this change set holds the
+            # entity, and a rejected document has to fail this job rather than
+            # sit unnoticed in the portal.
+            for _ in $(seq 1 60); do
+              status="$(
+                aws marketplace-catalog describe-change-set \
+                  --catalog AWSMarketplace --change-set-id "$id" \
+                  --query Status --output text
+              )"
+              case "$status" in
+                SUCCEEDED)
+                  echo "- \`${architecture}\`: \`${ami}\` submitted (change set \`${id}\`)" >> "$GITHUB_STEP_SUMMARY"
+                  break
+                  ;;
+                FAILED|CANCELLED)
+                  reason="$(
+                    aws marketplace-catalog describe-change-set \
+                      --catalog AWSMarketplace --change-set-id "$id" \
+                      --query 'ChangeSet[].ErrorDetailList' --output json
+                  )"
+                  echo "::error::Change set ${id} for ${architecture} ended as ${status}: ${reason}"
+                  exit 1
+                  ;;
+                *)
+                  sleep 30
+                  ;;
+              esac
+            done
+
+            if [ "$status" != SUCCEEDED ]; then
+              echo "::error::Change set ${id} for ${architecture} was still ${status} after thirty minutes."
+              exit 1
+            fi
           done

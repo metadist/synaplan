@@ -40,10 +40,8 @@ test.describe('@ci Files tabs', () => {
       await expect(page.locator(selectors.rag.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
-    await test.step('Vectors tab navigates to /files/vectors', async () => {
-      await page.locator(FILES.tabVectors).click()
-      await expect(page).toHaveURL(/\/files\/vectors/, { timeout: TIMEOUTS.STANDARD })
-      await expect(page.locator(FILES.pageVectors)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await test.step('Vectors tab is admin-only (hidden for the worker user)', async () => {
+      await expect(page.locator(FILES.tabVectors)).toHaveCount(0)
     })
 
     await test.step('Browse tab navigates back to /files', async () => {

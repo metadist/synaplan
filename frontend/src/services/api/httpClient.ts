@@ -163,7 +163,8 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           ip: 'dev',
         },
       }
-      runtimeConfigRef.value = defaultConfig
+      // Do not cache the fallback. A failed load after `app:setup:reset` (backend
+      // briefly unreachable) must not permanently hide `setup.wizardRequired`.
       return defaultConfig
     } finally {
       configPromise = null
@@ -302,6 +303,19 @@ function forceReleaseAuthMutation(): void {
  */
 function getInFlightRefresh(): Promise<RefreshResult> | null {
   return refreshPromise
+}
+
+/**
+ * Await the open auth-mutation critical section, if any. Independent
+ * `/auth/refresh` pools (chatApi's SSE warmer, authService, legacy apiService)
+ * call this before their raw refresh so they don't fire with pre-swap cookies
+ * during an impersonation swap and clobber the new session. Resolves
+ * immediately when no swap is in progress.
+ */
+async function awaitAuthMutation(): Promise<void> {
+  if (authMutationPromise) {
+    await authMutationPromise
+  }
 }
 
 // Track auth failures to prevent redirect loops
@@ -482,10 +496,21 @@ async function handleAuthFailure(): Promise<never> {
     `${basePath}/forgot-password`,
     `${basePath}/reset-password`,
     `${basePath}/logged-out`,
+    `${basePath}/setup`,
   ]
   const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
 
-  if (!isOnPublicAuthPage) {
+  let sendToSetup = true === getConfigSync().setup?.wizardRequired
+  try {
+    const { ensureWizardRequired } = await import('@/router/setupGate')
+    sendToSetup = await ensureWizardRequired({ fresh: true, probe: true })
+  } catch {
+    // Keep the runtime-config answer when the dedicated probe cannot run.
+  }
+
+  if (sendToSetup) {
+    await redirectToSetupWizard()
+  } else if (!isOnPublicAuthPage) {
     try {
       const { default: router } = await import('@/router')
       router.push({ name: 'login', query: { reason: 'session_expired' } })
@@ -496,6 +521,35 @@ async function handleAuthFailure(): Promise<never> {
 
   // Throw error to stop the request chain
   throw new Error('Authentication required')
+}
+
+/**
+ * A 503 SETUP_REQUIRED means the backend has closed the whole API because this
+ * installation has never had an administrator. Every call except the wizard's own
+ * endpoints answers that way, so the only useful reaction is to go to the wizard.
+ *
+ * Not treated as an auth failure on purpose: there is no session to tear down,
+ * and running the logout path would clear the native token store of an app that
+ * is merely pointed at a fresh server.
+ *
+ * Exported because not every call site goes through this client: the guest store
+ * talks to the API with a raw `fetch` and would otherwise turn SETUP_REQUIRED
+ * into its own "trial unavailable" card — a dead end on the one installation
+ * where reaching the wizard matters most.
+ */
+export async function redirectToSetupWizard(): Promise<void> {
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+
+  if (window.location.pathname.startsWith(`${basePath}/setup`)) {
+    return
+  }
+
+  try {
+    const { default: router } = await import('@/router')
+    await router.push({ name: 'setup' })
+  } catch {
+    window.location.href = `${basePath}/setup`
+  }
 }
 
 // Overload: with schema
@@ -606,6 +660,11 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
       if (typeof errorData.error === 'string') {
         errorCode = errorData.error
       }
+      // Machine-readable `code` wins when the backend sends both, so callers can
+      // switch on SETUP_REQUIRED instead of matching prose.
+      if (typeof errorData.code === 'string') {
+        errorCode = errorData.code
+      }
       if (errorData && typeof errorData === 'object') {
         errorDetails = errorData as Record<string, unknown>
       }
@@ -614,6 +673,10 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     } catch {
       // Use default error message
     }
+    if (response.status === 503 && errorCode === 'SETUP_REQUIRED') {
+      await redirectToSetupWizard()
+    }
+
     // Include debug info in error message if present
     const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
     throw new ApiError(response.status, fullMessage, errorCode, errorDetails, debugInfo)
@@ -672,4 +735,5 @@ export {
   beginAuthMutation,
   endAuthMutation,
   getInFlightRefresh,
+  awaitAuthMutation,
 }

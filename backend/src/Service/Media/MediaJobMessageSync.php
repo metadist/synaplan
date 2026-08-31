@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Media;
 
 use App\Repository\MessageRepository;
+use App\Service\File\ThumbnailService;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -40,6 +41,7 @@ final readonly class MediaJobMessageSync
         private MediaJobRealtimeNotifier $realtimeNotifier,
         private MediaJobUsageRecorder $usageRecorder,
         private TaskPlanStore $taskPlanStore,
+        private ThumbnailService $thumbnailService,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {
@@ -333,6 +335,20 @@ final readonly class MediaJobMessageSync
         }
 
         $message->addFile($file);
+
+        // Video poster: generate the ffmpeg frame and persist it on the file row
+        // so the Generated grid can serve it via GET /api/v1/files/{id}/thumb
+        // (#1499). The inline MediaGenerationHandler path already does this; the
+        // detached worker path must mirror it or async-generated videos (the
+        // common case for video) never get a poster. Best-effort — a missing
+        // poster degrades gracefully to a type icon in the grid. The flush at the
+        // end of syncTerminalState() persists BTHUMBPATH.
+        if (MediaJob::TYPE_VIDEO === $job->getType() && null === $file->getThumbPath()) {
+            $thumbnailPath = $this->thumbnailService->generateThumbnail($relativePath);
+            if (null !== $thumbnailPath) {
+                $file->setThumbPath($thumbnailPath);
+            }
+        }
 
         // Mirror the synchronous media path (StreamController) by also setting
         // the legacy file columns. The history formatter exposes generated

@@ -91,8 +91,16 @@ passes in as environment variables are used exactly as given.
 The bootstrap administrator is created only when no administrator exists. A
 restart must not rotate this account. `BOOTSTRAP_ADMIN_EMAIL` and
 `BOOTSTRAP_ADMIN_PASSWORD` must be set together or left empty together; leaving
-both empty is valid and simply skips the bootstrap, so an administrator can be
-promoted later. The email must be a valid address of at most 128 characters. The
+both empty is valid and skips the bootstrap, in which case the stack serves the
+first-run setup wizard at `/setup` and the first visitor creates the
+administrator there. On a publicly reachable host, either finish that wizard
+right after deploying or set the bootstrap pair, so the claim window never
+exists; `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
+[First-Run Setup](../docs/CONFIGURATION.md#first-run-setup), and
+[SSO-only instances](../docs/CONFIGURATION.md#sso-only-instances-no-local-accounts)
+for a deployment whose administrator comes from an identity provider instead.
+
+The email must be a valid address of at most 128 characters. The
 password must be 8 to 64 characters, and below 16 characters it must also contain
 an uppercase letter, a lowercase letter, and a number; from 16 characters there is
 no character requirement. `validate-release.sh` checks both values before the
@@ -269,5 +277,26 @@ absent local-AI services and the missing consistent-backup hook, are listed in
 The release pin for that package (store `version`, `APP_VERSION`, and the
 `tag@sha256:…` image) is raised automatically together with `elestio.yml` and
 `deploy/selfhost.env.example` by `scripts/set-release-version.mjs` after every
-published release. Submitting the raised package to the Umbrel App Store remains
-a separate, manual pull request against `getumbrel/umbrel-apps`.
+published release. `.github/workflows/umbrel-store-sync.yml` then carries the
+raised package into `getumbrel/umbrel-apps`; Umbrel reviews and merges it.
+
+## What "automatically updated" covers, and what it does not
+
+Every release raises the version pins in this directory, and
+`.github/workflows/release-rollout.yml` merges that change as soon as the
+proposal's checks are green. The effect is precise and worth stating plainly:
+
+- **New deployments** install the current release. Whoever clicks the Elestio
+  template, copies `selfhost.env.example`, installs from the Umbrel App Store, or
+  launches the AWS AMI after that merge gets what was just released.
+- **Existing installations are never touched.** They keep the version their
+  operator pinned. Nothing here reaches into a running deployment, and nothing
+  here should: an update runs database migrations, and the backup that makes those
+  survivable is the operator's to take. `validate_release_pin()` in
+  `scripts/lib.sh` rejects a mutable tag for the same reason.
+
+Updating a running installation is the operator's decision, documented per
+platform in [`../docs/UPDATE_ELESTIO.md`](../docs/UPDATE_ELESTIO.md) and
+[`../docs/UPDATE_SELFHOST.md`](../docs/UPDATE_SELFHOST.md). The application says
+the same thing in the admin area: it reports a newer version and never installs
+one.

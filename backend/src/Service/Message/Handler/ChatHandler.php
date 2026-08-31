@@ -11,14 +11,20 @@ use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Digest\DigestSearchService;
+use App\Service\Digest\MessageDigestConfig;
+use App\Service\Exception\VisionImageUnprocessableException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
 use App\Service\FeedbackConstants;
+use App\Service\File\ConversationFile;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
+use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -58,6 +64,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private const MAX_VISION_BASE64_LENGTH = 450000;
 
+    /**
+     * Hard upper bound on the raw file size read for inline vision. Oversized
+     * files below this cap are downscaled to the base64 budget; above it we
+     * refuse to read the bytes at all. Deliberately generous — phone photos
+     * are routinely 10-20 MB and must survive this guard.
+     */
+    private const MAX_VISION_FILE_BYTES = 50 * 1024 * 1024;
+
     /** @var iterable<PluginContextProviderInterface> */
     private iterable $pluginContextProviders;
 
@@ -83,6 +97,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private TimeContextBuilder $timeContextBuilder,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
         private VisionModelResolver $visionModelResolver,
+        private DigestSearchService $digestSearchService,
+        private MessageDigestConfig $digestConfig,
+        private ConversationFileCatalog $conversationFileCatalog,
+        private GeneratedImageVisionFlag $generatedImageVisionFlag,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -178,6 +196,39 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Tell the mediamaker prompt that this turn EDITS a picture that already
+     * exists in the conversation.
+     *
+     * Without it the prompt sees a bare "make the car blue", assumes a new
+     * scene and writes a full description ("a blue sports car, photorealistic,
+     * …") — which sends the image model off in its own direction even though a
+     * reference image is attached. The instruction keeps the enhanced prompt on
+     * the CHANGE. Only the mediamaker topic is affected; every other topic
+     * keeps its prompt shape unchanged.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function buildMediaEditContext(string $topic, array $options): string
+    {
+        if ('mediamaker' !== $topic) {
+            return '';
+        }
+
+        $sourceName = $options['media_edit_source_name'] ?? null;
+        if (!is_string($sourceName) || '' === trim($sourceName)) {
+            return '';
+        }
+
+        return "\n\n## You are editing an existing image\n\n"
+            .'This request modifies "'.trim($sourceName).'", an image from earlier in this conversation. '
+            ."It is attached to the generation call as a reference image, so the image model can already see it.\n"
+            ."- Write ONLY the requested CHANGE, in the user's words.\n"
+            ."- Do NOT describe the existing scene, its subject, or its style — you cannot see the picture.\n"
+            ."- Do NOT invent details that were not asked for.\n"
+            ."- Add \"keep everything else unchanged\" so the rest of the composition survives.\n";
+    }
+
+    /**
      * @param array<int, array{role: string, content: string}|Message> $thread
      * @param array<string, mixed>                                     $classification
      * @param array<string, mixed>                                     $options        forwarded by InferenceRouter (channel, disable_memories, …)
@@ -248,6 +299,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         );
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
+
+        $digestResult = $this->loadDigestContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $digestContext = $digestResult['context'];
+        $loadedDigests = $digestResult['digests'];
 
         // Determine model: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
@@ -332,6 +395,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
+
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
         if ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
@@ -368,6 +433,28 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Deep-memory digest block (references to key messages from older
+        // conversations) — same position as the streaming path.
+        if (!empty($digestContext)) {
+            $systemPrompt .= $digestContext;
+            $this->logger->info('ChatHandler: Digest context appended to system prompt', [
+                'digest_count' => count($loadedDigests),
+                'digest_context_length' => strlen($digestContext),
+            ]);
+        }
+
+        // Append the rolling conversation summary exactly like handleStream()
+        // does, so long email / MCP / webhook threads keep their topic and the
+        // user's position while the verbatim thread stays inside the window
+        // (channel parity — the non-streaming half of issue #615's promise).
+        $conversationSummary = $options['conversation_summary'] ?? '';
+        if (is_string($conversationSummary) && '' !== trim($conversationSummary)) {
+            $systemPrompt .= $this->formatConversationSummaryForPrompt($conversationSummary);
+            $this->logger->info('ChatHandler: Conversation summary appended to system prompt', [
+                'summary_length' => \strlen($conversationSummary),
+            ]);
+        }
+
         // Append plugin context (external data sources like casting platforms)
         $systemPrompt = $this->appendPluginContext($systemPrompt, $message, $classification, [
             'channel' => $classification['source'] ?? null,
@@ -401,6 +488,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Images this document may embed (officemaker only).
         $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
+
+        // The picture this turn edits (mediamaker only).
+        $systemPrompt .= $this->buildMediaEditContext($topic, $options);
 
         $modelMaxTokens = null;
         $systemPromptFallback = null;
@@ -452,6 +542,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'search_results' => $searchResults,
             'rag_context' => $ragContext,
             'include_images' => $includeImagesInMessages,
+            'include_generated_images' => $options['include_generated_images'],
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
         ]);
@@ -617,6 +708,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId, // Include resolved model_id for storage
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'digests' => $loadedDigests,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
@@ -814,6 +906,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $feedbackContext = $feedbackResult['context'];
         $loadedFeedbacks = $feedbackResult['feedbacks'];
 
+        $digestResult = $this->loadDigestContext(
+            $message,
+            $user,
+            $options,
+            $classification,
+            $progressCallback,
+            $resolveMemoryVector,
+            $perfTimer,
+        );
+        $digestContext = $digestResult['context'];
+        $loadedDigests = $digestResult['digests'];
+
         // Get model - Priority: Again > Widget config override > Prompt Metadata > DB default
         $modelId = null;
         $provider = null;
@@ -891,6 +995,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
+
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
@@ -926,6 +1032,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $systemPrompt .= $feedbackContext;
             $this->logger->info('ChatHandler: Feedback context appended to system prompt', [
                 'feedback_context_length' => strlen($feedbackContext),
+            ]);
+        }
+
+        // Deep-memory digest block (references to key messages from older
+        // conversations) — same position as the non-streaming path.
+        if (!empty($digestContext)) {
+            $systemPrompt .= $digestContext;
+            $this->logger->info('ChatHandler: Digest context appended to system prompt', [
+                'digest_count' => count($loadedDigests),
+                'digest_context_length' => strlen($digestContext),
             ]);
         }
 
@@ -986,6 +1102,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Images this document may embed (officemaker only).
         $systemPrompt .= $this->buildDocumentImageContext($message, $thread, $topic, $options);
+
+        // The picture this turn edits (mediamaker only).
+        $systemPrompt .= $this->buildMediaEditContext($topic, $options);
 
         // Check if model supports system messages (o1 models don't)
         $systemPromptFallback = null;
@@ -1228,6 +1347,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'response_id' => $metadata['response_id'] ?? null,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
+                'digests' => $loadedDigests,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
         ];
@@ -1318,6 +1438,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
+        $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
+        $mediaReferences = $this->generatedMediaReferences($currentMessage, $thread);
 
         // Add system message if supported (o1 models don't support it)
         if (null !== $systemPrompt) {
@@ -1360,10 +1482,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
                            "\n\n";
             }
 
+            // Generated image/video/audio has no file text, so without this the
+            // assistant turn looks text-only and the model denies the media
+            // exists on a follow-up (#1596).
+            if ('assistant' === $role && isset($mediaReferences[$msg->getId()])) {
+                $content = '' === trim($content)
+                    ? $mediaReferences[$msg->getId()]
+                    : $content."\n\n".$mediaReferences[$msg->getId()];
+            }
+
             // For user messages, include images as multimodal content (only if enabled)
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($content, $imageUrls);
+            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
+                $messageContent = $this->buildMultimodalContent($content, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $content;
             }
@@ -1473,6 +1606,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         if ($includeImages) {
             $imageUrls = $this->extractImageDataUrls($currentMessage);
+
+            // Every attached image failed conversion (unreadable, or too large
+            // even after downscaling). Fail loudly instead of sending a
+            // text-only request the model would answer with "I see no image".
+            if ([] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
+                throw new VisionImageUnprocessableException();
+            }
 
             return $this->buildMultimodalContent($content, $imageUrls);
         }
@@ -1607,18 +1747,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         // Check if we should include images (only if vision model is available)
         $includeImages = $options['include_images'] ?? false;
+        $generatedImages = $this->generatedImagesForVision($currentMessage, $thread, $options);
+        $mediaReferences = $this->generatedMediaReferences($currentMessage, $thread);
 
         // Thread Messages (JSON encoded wie im alten System)
         foreach ($thread as $msg) {
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
             $content = $this->humanizeFileMarkersForModel($msg->getText());
 
+            // See buildStreamingMessages(): keep generated media visible so the
+            // model does not deny it exists on a later turn (#1596).
+            if ('assistant' === $role && isset($mediaReferences[$msg->getId()])) {
+                $content = '' === trim($content)
+                    ? $mediaReferences[$msg->getId()]
+                    : $content."\n\n".$mediaReferences[$msg->getId()];
+            }
+
+            $stamped = '['.$msg->getDateTime().']: '.$content;
+
             // For user messages in thread, include images for vision (if enabled)
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
-                $messageContent = $this->buildMultimodalContent('['.$msg->getDateTime().']: '.$content, $imageUrls);
+                $messageContent = $this->buildMultimodalContent($stamped, $imageUrls);
+            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
+                $messageContent = $this->buildMultimodalContent($stamped, $generatedImages[$msg->getId()]);
             } else {
-                $messageContent = '['.$msg->getDateTime().']: '.$content;
+                $messageContent = $stamped;
             }
 
             // #1115 — same empty-assistant filter as buildStreamingMessages.
@@ -1866,9 +2020,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $absolutePath = $resolvedPath;
 
-        // Check file size - skip very large images (>10MB)
+        // Sanity cap only — anything below it is read and downscaled to fit the
+        // inline budget further down. The old 10 MB cutoff silently dropped
+        // ordinary phone photos (routinely 10-20 MB) BEFORE the downscaler ever
+        // ran, so the model answered without seeing the image.
         $fileSize = filesize($absolutePath);
-        if ($fileSize > 10 * 1024 * 1024) {
+        if ($fileSize > self::MAX_VISION_FILE_BYTES) {
             $this->logger->warning('ChatHandler: Image too large for vision API', [
                 'path' => $relativePath,
                 'size_mb' => round($fileSize / 1024 / 1024, 2),
@@ -1984,10 +2141,137 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Build multimodal content array with text and images.
+     * Base64 data URLs for images the ASSISTANT generated earlier in this
+     * conversation, keyed by the message that produced them.
      *
-     * @param string $textContent The text content
-     * @param array  $imageUrls   Array of base64 data URLs for images
+     * Without this, "draw a cat" → "what breed is it?" is answered from the
+     * text prompt alone: only user turns ever contributed image content, so the
+     * model could not see its own picture. Off unless
+     * FILE_CONTEXT.VISION_INCLUDE_GENERATED is set and the chosen model is
+     * vision-capable, and capped at MAX_GENERATED_IMAGES — every image rides
+     * along as a base64 payload on each following request of the conversation.
+     *
+     * @param array<int, Message> $thread
+     *
+     * @return array<int, list<string>>
+     */
+    /**
+     * Always-on prose references for media the assistant produced in earlier
+     * turns of this conversation.
+     *
+     * Generated images, videos and audio carry no BFILETEXT, so replaying the
+     * thread as plain text leaves no trace of them: a follow-up such as "was ist
+     * da zu sehen?" is then answered from text-only history and the model denies
+     * the media exists (#1596). Sending the actual pixels is a separate,
+     * opt-in/token-costly path ({@see generatedImagesForVision()}); this cheap
+     * text reference is unconditional so the model at least knows the media is
+     * real. It also gives async media turns whose text was cleared
+     * ({@see \App\Service\Media\MediaJobMessageSync}) non-empty content, so they
+     * survive the empty-assistant filter (#1115) instead of vanishing entirely.
+     *
+     * Documents are intentionally excluded — they already ride along as
+     * extracted text / the __FILE_GENERATED__ marker.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return array<int, string> assistant messageId => reference sentence
+     */
+    private function generatedMediaReferences(Message $currentMessage, array $thread): array
+    {
+        $catalog = $this->conversationFileCatalog->build($currentMessage, $thread);
+
+        $labelsByMessage = [];
+        foreach ($catalog as $file) {
+            if (!$file->isGenerated() || null === $file->messageId) {
+                continue;
+            }
+
+            $noun = match ($file->category) {
+                ConversationFile::CATEGORY_IMAGE => 'an image',
+                ConversationFile::CATEGORY_VIDEO => 'a video',
+                ConversationFile::CATEGORY_AUDIO => 'an audio file',
+                default => null, // documents already have a textual trace
+            };
+            if (null === $noun) {
+                continue;
+            }
+
+            $labelsByMessage[$file->messageId][] = $noun.' ("'.$file->displayName.'")';
+        }
+
+        $references = [];
+        foreach ($labelsByMessage as $messageId => $labels) {
+            $labels = array_slice($labels, 0, 4);
+            $references[$messageId] = '(For reference: earlier in this conversation you generated and delivered the following media to the user, which is shown in the chat: '
+                .implode(', ', $labels).'. These files exist — do not claim otherwise.)';
+        }
+
+        return $references;
+    }
+
+    private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
+    {
+        if (true !== ($options['include_generated_images'] ?? false)) {
+            return [];
+        }
+
+        $catalog = $this->conversationFileCatalog->build(
+            $currentMessage,
+            $thread,
+            [],
+            ConversationFile::CATEGORY_IMAGE,
+        );
+
+        $byMessage = [];
+        $included = 0;
+
+        foreach ($catalog as $file) {
+            if ($included >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
+                break;
+            }
+            if (!$file->isGenerated() || null === $file->messageId) {
+                continue;
+            }
+            if (!$this->isVisionSupportedImage($file->relativePath)) {
+                continue;
+            }
+
+            $dataUrl = $this->imageToBase64DataUrl($file->relativePath);
+            if (null === $dataUrl) {
+                continue;
+            }
+
+            $byMessage[$file->messageId][] = $dataUrl;
+            ++$included;
+        }
+
+        if ($included > 0) {
+            $this->logger->info('ChatHandler: Including generated images for vision', [
+                'message_id' => $currentMessage->getId(),
+                'image_count' => $included,
+            ]);
+        }
+
+        return $byMessage;
+    }
+
+    /**
+     * Whether generated images may be shown to the model: the operator flag is
+     * on and the model that will actually answer can read images.
+     */
+    private function shouldIncludeGeneratedImages(?int $modelId, ?int $effectiveUserId): bool
+    {
+        if (!$this->generatedImageVisionFlag->isEnabled($effectiveUserId)) {
+            return false;
+        }
+
+        $model = $modelId ? $this->modelRepository->find($modelId) : null;
+
+        return null !== $model && $model->hasFeature('vision');
+    }
+
+    /**
+     * Build multimodal content array with text and images.
      *
      * @return array|string Content as multimodal array or plain string if no images
      */
@@ -2708,6 +2992,103 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'disabledByUser' => $disabledByUser,
             'requestDisableContext' => $requestDisableContext,
         ];
+    }
+
+    /**
+     * Deep-memory retrieval over the message digest index: find key messages
+     * from OLDER conversations that are relevant to the current prompt and
+     * inject them (plus verbatim excerpts for the top hits) into the system
+     * prompt — so "what did the realtor write about the rent?" finds the
+     * letter from three months ago.
+     *
+     * Shared between streaming and non-streaming paths (channel parity), and
+     * gated by exactly the same request/user levers as memories: a widget or
+     * guest visitor must never see the account owner's message history.
+     *
+     * Reuses the per-turn memory embedding (digest titles are embedded with
+     * the same memory embedding model), so this adds no extra embed call.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
+     *
+     * @return array{context: string, digests: list<array<string, mixed>>}
+     */
+    private function loadDigestContext(
+        Message $message,
+        ?User $user,
+        array $options,
+        array $classification,
+        ?callable $progressCallback,
+        \Closure $resolveMemoryVector,
+        PerfTimer $perfTimer,
+    ): array {
+        $disabledByRequest = !empty($options['disable_memories'])
+            || ('WIDGET' === ($options['channel'] ?? null))
+            || ('widget' === ($classification['source'] ?? null));
+        $disabledByUser = !($user?->isMemoriesEnabled() ?? true);
+
+        if ($disabledByRequest || $disabledByUser || !$this->digestConfig->isEnabled()) {
+            return ['context' => '', 'digests' => []];
+        }
+
+        $digests = [];
+
+        try {
+            $perfTimer->start('digests_search');
+            $memoryVector = $resolveMemoryVector();
+            if (null !== $memoryVector) {
+                $digests = $this->digestSearchService->search(
+                    $message->getUserId(),
+                    $memoryVector,
+                    excludeChatId: $message->getChatId(),
+                );
+            }
+            $perfTimer->stop('digests_search');
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatHandler: Failed to load message digests, continuing without', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['context' => '', 'digests' => []];
+        }
+
+        if ([] === $digests) {
+            return ['context' => '', 'digests' => []];
+        }
+
+        $context = $this->knowledgeContextFormatter->formatDigestContext(
+            $digests,
+            $this->digestConfig->getBlockMaxChars(),
+        );
+
+        $this->logger->info('ChatHandler: Message digests loaded', [
+            'user_id' => $message->getUserId(),
+            'digest_count' => count($digests),
+            'context_length' => strlen($context),
+        ]);
+
+        if ($progressCallback && '' !== $context) {
+            // Excerpts stay backend-only: the frontend needs the reference
+            // list (id, chat, title) for [Message:ID] badges, not the pulled
+            // message bodies.
+            $progressCallback([
+                'status' => 'digests_loaded',
+                'message' => 'Older conversations loaded',
+                'metadata' => [
+                    'digests' => array_map(static fn (array $d): array => [
+                        'message_id' => $d['message_id'],
+                        'chat_id' => $d['chat_id'],
+                        'title' => $d['title'],
+                        'channel' => $d['channel'],
+                        'source_date' => $d['source_date'],
+                    ], $digests),
+                    'count' => count($digests),
+                ],
+                'timestamp' => time(),
+            ]);
+        }
+
+        return ['context' => $context, 'digests' => $digests];
     }
 
     /**

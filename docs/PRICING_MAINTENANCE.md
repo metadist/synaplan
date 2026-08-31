@@ -182,7 +182,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
-| **TrustedTokens** | ✅ verified 2026-07-27 | https://trustedtokens.eu/api/billing/models |
+| **TrustedTokens** | ✅ verified 2026-08-29 | https://trustedtokens.eu/api/billing/models |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
@@ -222,17 +222,23 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **The realtime Speech-to-Speech API is deliberately not wired up.** It bills per session minute ($0.05/min, plus $0.004 per text input message) over a WebSocket, and this application has no realtime-voice capability to attach it to. Adding it would need a new capability, a new pricing mode, and session-duration metering.
 - **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
-### TrustedTokens (verified 2026-07-27)
+### TrustedTokens (verified 2026-08-29)
 
 German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
 
 | BID | Model | Catalog in/out | Official (×1e6) | Context |
 | --- | ----- | -------------- | --------------- | ------- |
 | 309 | `zai-org/GLM-5.2` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 230k |
+| 331 | `zai-org/GLM-5.3` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 1M |
+| 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
+| 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
+| 335 | `deepseek-ai/DeepSeek-V4-Flash` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
+| 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
+| 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | $2.25 / $6.75 | $2.25 / $6.75 (cache $0.45) | 200k |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
 | 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
 
-Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`.
+Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`. New BIDs land on existing installs through `ModelSeeder` (`app:seed` on container start) — no data migration is required for additive catalog rows.
 
 ### TheHive (verified 2026-07-13)
 
@@ -320,6 +326,8 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 
 You can run the same check locally: `docker compose exec -T backend php bin/console app:sync-model-prices --dry-run --fail-on-drift; echo $?` (0 = no drift, 2 = drift).
 
+> Resolved drift (2026-08-30, #1561): the weekly check flagged `gpt-5.6-sol` (twice — chat + vision, in 5.00 → 4.00, out 30.00 → 20.00). Verified against the [official OpenAI pricing](https://openai.com/api/pricing/): OpenAI cut Sol on 2026-08-21 — input −20% (5 → 4), output −33% (30 → 20), cached input 0.50 → 0.40, long-context (>272k) 10/45 → 8/30. Not a LiteLLM error; keeping the old (higher) rate overcharged every Sol call. Applied to `ModelCatalog.php` (base rows 251/252 + `CONTEXT_PRICING` long-context tier) and rolled out to existing installs by `Version20260830190000`. Terra/Luna and the other GPT-5.x rows did not move.
+
 > No-drift note (2026-08-12): Anthropic made Claude Sonnet 5's $2/$10 rate **permanent** and cancelled the $3/$15 increase that was scheduled for 2026-09-01. The catalog already read $2/$10, so no price change and no migration were needed; we only dropped the stale "revert to $3/$15" TODO (BID 249/250/222). The weekly drift check never surfaced this — it only diffs the current catalog number against LiteLLM (both $2/$10), and is blind to time-boxed manual reverts.
 
 > Resolved drift (2026-08-03): the weekly check flagged `gpt-5.6-terra` and `gpt-5.6-luna` (each twice — chat + vision row). Verified against the [official OpenAI pricing](https://developers.openai.com/api/docs/pricing): OpenAI cut GPT-5.6 prices on 2026-07-30 — Terra 2.50/15 → **2.00/12** (−20%), Luna 1.00/6 → **0.20/1.20** (−80%), Sol unchanged. Not a LiteLLM error; keeping the old (higher) rate overcharged every Terra/Luna call. Applied to `ModelCatalog.php` (base rows + `CONTEXT_PRICING` long-context tiers: Terra 4.00/18, Luna 0.40/1.80) and rolled out to existing installs by `Version20260803120000`.
@@ -328,7 +336,8 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 
 ## Time-boxed / reminders
 
-- _(none active)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
+- **GPT-5.6 Sol — re-verify on/after 2026-11-22 (#1561).** OpenAI's 2026-08-21 cut to $4/$20 (long-context $8/$30, cached $0.40) is labelled promotional "at least through 2026-11-21"; OpenAI has published no rate for after that, and third-party trackers flag a possible lapse back to $5/$30. On or after 2026-11-22, re-check the [official pricing page](https://openai.com/api/pricing/): if it reverted, roll the old rate back into `ModelCatalog.php` (rows 251/252 + `CONTEXT_PRICING`) + a data migration; if the promo was extended/made permanent, just refresh this note. The weekly drift check is blind to a time-boxed revert (it only diffs against LiteLLM), so this reminder is the only guard.
+- _(cancelled)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
 
 ## Anthropic catalog generations (snapshot 2026-07-27)
 

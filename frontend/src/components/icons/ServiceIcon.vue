@@ -5,7 +5,7 @@
     <MistralIcon v-else-if="isMistral" :size="size" />
     <Icon v-else :icon="providerIcon" :style="rootStyle" />
     <Icon
-      v-if="hasService"
+      v-if="hasService && showFlag"
       :icon="flagIcon"
       class="service-icon__flag"
       :class="{ 'service-icon__flag--local': isLocal }"
@@ -26,10 +26,17 @@ import { getProviderIcon, getProviderFlag, isLocalSelfHostedProvider } from '@/u
 interface Props {
   service: string
   size?: number
+  /**
+   * The jurisdiction badge earns its place next to a model name, where the
+   * question is where the data goes. On a surface that is nothing but logos —
+   * the setup wizard's provider grid — it reads as visual noise on every tile.
+   */
+  showFlag?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 20,
+  showFlag: true,
 })
 
 const hasService = computed(() => props.service.trim().length > 0)

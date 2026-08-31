@@ -165,6 +165,17 @@
 		file_server
 	}
 
+	# Missing hashed assets return a clean 404 instead of the SPA index.html
+	# (text/html), which the browser rejects as a module script/stylesheet.
+	# Mirrors the @widget_missing guard above.
+	@frontend_missing {
+		path /assets/*
+	}
+	handle @frontend_missing {
+		header Cache-Control "no-store"
+		respond 404
+	}
+
 	# Backend static files third (bundles, uploads)
 	@backend_file {
 		path /bundles/* /uploads/*

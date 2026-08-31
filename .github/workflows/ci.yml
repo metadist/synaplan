@@ -10,10 +10,11 @@ on:
 permissions:
   contents: read
 
-# Superseded runs on the same PR just burn runner capacity (and delay other
-# runs waiting for the limited ubuntu-latest-m pool). Push/tag runs get a
-# unique group (run_id) so main runs neither serialize nor cancel each other —
-# docker-push and cloudflare-deploy must never be interrupted or skipped.
+# Superseded runs on the same PR just burn runner capacity, which is shared
+# across the organization (the plan allows 60 concurrent standard-runner jobs
+# and one run peaks at ~7). Push/tag runs get a unique group (run_id) so main
+# runs neither serialize nor cancel each other — the publish jobs and
+# cloudflare-deploy must never be interrupted or skipped.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -126,12 +127,9 @@ jobs:
 
   backend:
     name: Backend (PHP/Symfony)
-    # Free runner on purpose: this job is off the critical path (done around
-    # minute 2-3 while e2e runs until ~minute 7), PHPUnit is single-process
-    # anyway, and free runners start instantly (queue p90 ~4s vs up to ~80s
-    # provisioning on the ubuntu-latest-m pool). Keeping it off the -m pool
-    # also leaves the warm -m runner to frontend-build, which IS the
-    # critical path. Revisit if this job ever becomes the longest one.
+    # Off the critical path (done around minute 2-3 while e2e runs until
+    # ~minute 7) and PHPUnit is single-process anyway, so more cores would not
+    # shorten the run. Revisit if this job ever becomes the longest one.
     runs-on: ubuntu-latest
 
     env:
@@ -140,7 +138,7 @@ jobs:
 
     services:
       mysql:
-        image: mariadb:12.3@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
+        image: mariadb:12.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: synaplan_test
@@ -294,17 +292,28 @@ jobs:
     # Head of the critical path (frontend-build → docker-build → e2e), so it
     # starts at t=0 with no `needs`: it dumps the OpenAPI spec itself (PHP
     # setup costs ~35s from caches) instead of waiting for a separate job —
-    # a mid-run job hop costs ~40-50s runner-provisioning latency on the
-    # ubuntu-latest-m pool. The spec is uploaded as the `openapi-spec`
-    # artifact for frontend-checks and mobile-release-artifacts.yml.
-    # nelmio:apidoc:dump compiles the container but never touches the DB
-    # (Doctrine connects lazily), so no MariaDB service is needed here.
+    # a mid-run job hop costs runner-provisioning latency. The spec is
+    # uploaded as the `openapi-spec` artifact for frontend-checks and
+    # mobile-release-artifacts.yml. nelmio:apidoc:dump compiles the container
+    # but never touches the DB (Doctrine connects lazily), so no MariaDB
+    # service is needed here.
     #
-    # This is the ONLY job on the paid 16-core pool: the parallel Vite builds
-    # are the one workload where the cores shorten the critical path. All
-    # other former -m jobs moved to free runners so the warm -m runner is
-    # reliably available for this job at t=0.
-    runs-on: ubuntu-latest-m
+    # Free runner, and it must stay one. This was the last job on the paid
+    # 16-core pool until the move was measured against it, job for job:
+    #
+    #   - `Build app and widget (parallel)`: 62s on 16 cores vs 69s on 4.
+    #     Rollup is largely single-thread-bound, so the extra cores buy ~7s.
+    #   - Runner provisioning: 18s on the paid pool vs 3s on the free one,
+    #     which more than cancels those 7s out.
+    #   - The paid pool has a limited number of slots and queues under load:
+    #     during a six-run PR burst three runs waited 30-59s for a -m runner
+    #     while every free-runner job in the same runs started in 2-5s.
+    #
+    # So the paid pool was slower in the only dimension that matters here
+    # (time to a green PR) and cost roughly $112/month at ~734 runs. Do not
+    # move this back to `ubuntu-latest-m` without re-measuring those three
+    # numbers first.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -414,9 +423,8 @@ jobs:
     # Format check, lint, vue-tsc and Vitest — everything that gates merging
     # but that docker-build/e2e don't need to wait for. Consumes the
     # openapi-spec artifact from frontend-build; runs off the critical path
-    # (plenty of slack before the e2e jobs finish), so a free instant-start
-    # runner beats the paid pool: vue-tsc is single-threaded anyway and the
-    # -m pool has up to ~80s provisioning latency for mid-run job requests.
+    # (plenty of slack before the e2e jobs finish) and vue-tsc is
+    # single-threaded anyway, so more cores would not shorten the run.
     runs-on: ubuntu-latest
     needs: [frontend-build]
 
@@ -481,6 +489,12 @@ jobs:
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-labels: ${{ steps.meta.outputs.labels }}
+      # The version baked into the image this job builds and every downstream
+      # job publishes. Resolved once, here, so the amd64 image, the arm64
+      # image and the version advertised to deployments can never disagree —
+      # independent resolutions would drift the moment a tag lands between
+      # them.
+      app-version: ${{ steps.app-version.outputs.version }}
 
     steps:
       - name: Checkout
@@ -541,8 +555,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             APP_VERSION=${{ steps.app-version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scoped per architecture: the arm64 build in docker-push-arm64 has
+          # entirely different layers, and sharing one scope means the two
+          # builds evict each other from the 10 GB Actions cache.
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
           # Export to tar file for sharing between jobs
           outputs: type=docker,dest=/tmp/docker-image.tar
 
@@ -555,32 +572,57 @@ jobs:
 
   e2e:
     name: E2E Tests (${{ matrix.browser }}${{ matrix.variant && format(' {0}', matrix.variant) || '' }}${{ matrix.auth_method == 'oidc' && ' OIDC' || matrix.auth_method == 'oidc-redirect' && ' OIDC Redirect' || '' }}${{ matrix.shard && format(' [{0}]', matrix.shard) || '' }})
-    # E2E jobs run on free ubuntu-latest runners (unlimited capacity for public
-    # repos) to avoid queue contention from the limited ubuntu-latest-m pool.
-    # Chromium runs the full @ci suite sharded (--shard=N/M) so each half
-    # finishes in ~50% of the time; the free runner pool ensures all shards
-    # start instantly. Firefox is a single unsharded @crossbrowser smoke.
+    # E2E jobs run on free ubuntu-latest runners, which are unlimited for
+    # public repositories: an extra shard costs nothing, so sharding trades
+    # runner count for wall-clock time at no price. Chromium runs the full
+    # @ci suite sharded (--shard=N/M), and the free pool starts every shard
+    # immediately instead of queueing it. Firefox is a single unsharded
+    # @crossbrowser smoke.
+    #
+    # Three shards, not more. Measured, slowest chromium job end to end: two
+    # shards 4.2 min, three shards 3.3 min.
+    #
+    # What is left is no longer test time, which is the only thing a shard can
+    # divide. Of that slowest job, ~55s was running tests and ~145s was fixed
+    # setup — image download, stack start, browser install — paid once per job
+    # whatever it then runs. And the config sets no `fullyParallel`, so
+    # Playwright assigns whole FILES to shards: layout.spec.ts alone runs ~75s
+    # and cannot be split at all. A fourth shard cannot shorten either term, so
+    # it would add a full test stack for nothing.
+    #
+    # If the E2E tail has to shrink again, the levers are those two terms: make
+    # the per-job setup cheaper, split the slowest spec file, or set
+    # `fullyParallel: true` in playwright.config.ts to shard per test rather
+    # than per file (that changes isolation semantics inside a file, so it needs
+    # its own flake review).
     runs-on: ubuntu-latest
     needs: [docker-build]
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Standard password auth — chromium sharded into 2 parallel jobs
+          # Standard password auth — chromium sharded into 3 parallel jobs
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
-            shard: "1/2"
+            shard: "1/3"
           - browser: chromium
             variant: ""
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e"
             grep_filter: "@ci"
-            shard: "2/2"
+            shard: "2/3"
+          - browser: chromium
+            variant: ""
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e"
+            grep_filter: "@ci"
+            shard: "3/3"
           # Firefox cross-browser SMOKE — a single unsharded job. The firefox
           # project only runs @crossbrowser-tagged tests (engine-divergent flows:
           # SSE, widget Shadow DOM, upload), so the lean set needs no sharding.
@@ -599,6 +641,18 @@ jobs:
             auth_method: password
             compose_profiles: ""
             npm_script: "test:e2e:mobile"
+            grep_filter: "@ci"
+            shard: ""
+          # Ollama stub smoke — its own job because the spec repoints the CHAT
+          # default model for the whole installation while it runs. Every job in
+          # this matrix gets its own test stack, so running it here is what
+          # keeps that mutation from reaching the sharded chromium jobs.
+          # See frontend/tests/e2e/playwright.config.ts (chromium-ollama).
+          - browser: chromium
+            variant: "Ollama"
+            auth_method: password
+            compose_profiles: ""
+            npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
@@ -948,12 +1002,15 @@ jobs:
         run: |
           docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml down -v
 
-  docker-push:
-    name: Publish Multi-Arch Docker Image
+  docker-push-amd64:
+    name: Publish amd64 Image
     runs-on: ubuntu-latest
-    # The amd64 tar produced by docker-build is the exact image consumed by E2E
-    # and later published. Only arm64 is built after the gates pass; the final
-    # manifest combines that build with the tested amd64 digest.
+    # The amd64 tar produced by docker-build is the exact image E2E ran
+    # against, so publishing that tar — rather than rebuilding — is what makes
+    # the released image the tested one. Nothing is built here, which is why
+    # the job needs neither a checkout nor the frontend artifacts.
+    #
+    # Runs in parallel with docker-push-arm64; docker-manifest joins the two.
     needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
     # Only publish green main pushes and release tags.
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
@@ -961,72 +1018,21 @@ jobs:
       contents: read
       packages: write
     outputs:
-      # The version release-manifest advertises. Taken from the same resolver that
-      # bakes APP_VERSION into the image, so the manifest can only ever name a
-      # SemVer this job actually published — never the mutable `latest` tag.
-      version: ${{ steps.app-version.outputs.version }}
-      # Multi-arch manifest digest of the tags that were just published and
-      # verified. The Umbrel package pins tag@digest; the release-version-pin
-      # job writes this value into deploy/umbrel/ so a new store submission
-      # never invents a digest of its own.
-      digest: ${{ steps.release.outputs.digest }}
+      # Digest-pinned reference to the temporary tag, consumed by
+      # docker-manifest so the release manifest can only ever be built from
+      # the image this job actually pushed.
+      ref: ${{ steps.amd64.outputs.ref }}
+      digest: ${{ steps.amd64.outputs.digest }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-
-      - name: Download widget build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: widget-dist
-          path: frontend/dist-widget/
-
       - name: Download tested amd64 image artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: docker-image
           path: /tmp
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
-
-      - name: Extract release metadata
-        id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # Prevent metadata-action's SemVer flavor from moving latest on tags.
-          flavor: latest=false
-          tags: |
-            # Only the default branch moves latest.
-            type=raw,value=latest,enable={{is_default_branch}}
-            # Release tags vX.Y.Z publish the immutable version and aliases.
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-
-      # Same resolution as docker-build: the registry may still move the `latest`
-      # tag, but APP_VERSION inside that image must stay a SemVer so the UI never
-      # shows the word "latest" as the running release.
-      - name: Resolve application version
-        id: app-version
-        env:
-          META_VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          set -euo pipefail
-          git fetch --tags --force 2>/dev/null || true
-          version="$(node scripts/resolve-app-version.mjs --meta "$META_VERSION" --ref "$GITHUB_REF_NAME")"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Application version for this image: ${version} (metadata was ${META_VERSION:-empty})"
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -1059,27 +1065,153 @@ jobs:
           echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
+  docker-push-arm64:
+    name: Publish arm64 Image
+    # A native arm64 runner, not linux/arm64 under QEMU on an x86 host: the
+    # emulated build took 157-173s and was the single longest step of the
+    # release path.
+    #
+    # These runners are free and unlimited for PUBLIC repositories only. If
+    # this repository ever becomes private the label stops resolving and the
+    # job queues indefinitely — switch to an arm64 larger runner then.
+    runs-on: ubuntu-24.04-arm
+    # The same gates and the same publish condition as the amd64 job: arm64 is
+    # still built only once every check is green, and only for main pushes and
+    # release tags.
+    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.arm64.outputs.digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The Dockerfile COPYs both into the image. They are plain JS/CSS and
+      # therefore architecture independent, so the arm64 image ships exactly
+      # the assets the amd64 image was tested with instead of a second build.
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Download widget build artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only the labels are consumed here — the release tags are applied by
+      # docker-manifest, which is the one job allowed to move them.
+      - name: Extract release metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Prevent metadata-action's SemVer flavor from moving latest on tags.
+          flavor: latest=false
+          tags: |
+            # Only the default branch moves latest.
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags vX.Y.Z publish the immutable version and aliases.
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
       - name: Build and push arm64 image
         id: arm64
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: _docker/backend/Dockerfile
+          # Native on this runner, so there is no setup-qemu-action above.
           platforms: linux/arm64
           push: true
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}-arm64
           labels: ${{ steps.meta.outputs.labels }}
+          # Resolved once by docker-build, so both architectures report the
+          # same APP_VERSION even if a tag lands mid-run.
           build-args: |
-            APP_VERSION=${{ steps.app-version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            APP_VERSION=${{ needs.docker-build.outputs.app-version }}
+          # Separate scope from the amd64 build: the layer sets share nothing,
+          # so one scope would just evict the other from the 10 GB cache.
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+
+  docker-manifest:
+    name: Publish Multi-Arch Manifest
+    runs-on: ubuntu-latest
+    # Joins the tested amd64 image and the native arm64 build under the release
+    # tags. This is the only job that moves a release tag, and it is also the
+    # one that proves the result: the verification below refuses any tag that
+    # does not resolve to exactly the two digests published above.
+    needs: [docker-build, docker-push-amd64, docker-push-arm64]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      # The version release-manifest advertises. Resolved by docker-build and
+      # baked into both images, so the manifest can only ever name the version
+      # that was actually published — never the mutable `latest` tag.
+      version: ${{ needs.docker-build.outputs.app-version }}
+      # Multi-arch manifest digest of the tags that were just published and
+      # verified. The Umbrel package pins tag@digest; the release-version-pin
+      # job writes this value into deploy/umbrel/ so a new store submission
+      # never invents a digest of its own.
+      digest: ${{ steps.release.outputs.digest }}
+
+    steps:
+      # Only for scripts/resolve-manifest-digest.sh, which both steps below use.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+
+      - name: Extract release metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Prevent metadata-action's SemVer flavor from moving latest on tags.
+          flavor: latest=false
+          tags: |
+            # Only the default branch moves latest.
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Release tags vX.Y.Z publish the immutable version and aliases.
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish multi-arch manifest
         id: release
         env:
-          AMD64_REF: ${{ steps.amd64.outputs.ref }}
-          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+          AMD64_REF: ${{ needs.docker-push-amd64.outputs.ref }}
+          TESTED_AMD64_DIGEST: ${{ needs.docker-push-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.docker-push-arm64.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
           REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         run: |
@@ -1093,9 +1225,12 @@ jobs:
               --tag "$image" \
               "$AMD64_REF" \
               "$arm64_ref"
+            # Not a plain tag lookup: GHCR can still answer a tag from cache
+            # right after the push, and this digest leaves the job as the
+            # release digest the Umbrel pin is built from.
             current_digest="$(
-              docker buildx imagetools inspect "$image" \
-                --format '{{ .Manifest.Digest }}'
+              scripts/resolve-manifest-digest.sh \
+                "$image" "$TESTED_AMD64_DIGEST" "$ARM64_DIGEST"
             )"
             if [ -z "$manifest_digest" ]; then
               manifest_digest="$current_digest"
@@ -1115,8 +1250,8 @@ jobs:
         env:
           IMAGE_DIGEST: ${{ steps.release.outputs.digest }}
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-          TESTED_AMD64_DIGEST: ${{ steps.amd64.outputs.digest }}
-          ARM64_DIGEST: ${{ steps.arm64.outputs.digest }}
+          TESTED_AMD64_DIGEST: ${{ needs.docker-push-amd64.outputs.digest }}
+          ARM64_DIGEST: ${{ needs.docker-push-arm64.outputs.digest }}
         run: |
           set -euo pipefail
           expected='["linux/amd64","linux/arm64"]'
@@ -1126,8 +1261,8 @@ jobs:
             echo "Verifying ${image}"
 
             resolved_digest="$(
-              docker buildx imagetools inspect "$image" \
-                --format '{{ .Manifest.Digest }}'
+              scripts/resolve-manifest-digest.sh \
+                "$image" "$TESTED_AMD64_DIGEST" "$ARM64_DIGEST"
             )"
             if [ "$resolved_digest" != "$IMAGE_DIGEST" ]; then
               echo "::error::${image} resolved to ${resolved_digest}, expected ${IMAGE_DIGEST}"
@@ -1174,11 +1309,11 @@ jobs:
     name: Publish Release Manifest
     runs-on: ubuntu-latest
     # An instance learns that a newer release exists from versions.json, so the
-    # manifest must never exist before the image it names. docker-push completes
-    # only after the multi-arch manifest was created AND verified to expose both
-    # platforms at the tested digests, which makes it the earliest point where
-    # advertising the version is honest.
-    needs: [docker-push]
+    # manifest must never exist before the image it names. docker-manifest
+    # completes only after the multi-arch manifest was created AND verified to
+    # expose both platforms at the tested digests, which makes it the earliest
+    # point where advertising the version is honest.
+    needs: [docker-manifest]
     # Release tags only. A main push publishes `latest`, which is not a release,
     # and a pull request publishes nothing at all.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -1198,7 +1333,7 @@ jobs:
       - name: Publish versions.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.docker-push.outputs.version }}
+          VERSION: ${{ needs.docker-manifest.outputs.version }}
           # NOT main, and this is the reason the branch exists: Elestio pipelines
           # track main and redeploy on every commit, so a manifest commit there
           # would restart every managed instance on every release. The branch
@@ -1280,9 +1415,9 @@ jobs:
     # elestio.yml, deploy/selfhost.env.example, deploy/umbrel/synaplan/ and the
     # AWS Packer template decide which version a NEW deployment installs, so
     # they may only ever name a release whose image is published and verified —
-    # which is what docker-push guarantees. Umbrel also needs the digest of that
-    # image.
-    needs: [docker-push]
+    # which is what docker-manifest guarantees. Umbrel also needs the digest of
+    # that image.
+    needs: [docker-manifest]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
@@ -1292,10 +1427,12 @@ jobs:
       # A pull request, deliberately, rather than a push to main. Elestio
       # pipelines redeploy on every commit to the branch they track, so pushing
       # here would restart every managed instance at an unpredictable moment.
-      # Merging is the maintainer's choice of when that happens. The Umbrel
-      # package lives in this same PR so a release bumps every catalog pin
-      # together; the getumbrel/umbrel-apps store submission stays a separate,
-      # manual step because it targets a foreign repository.
+      # release-rollout.yml merges this proposal instead, as soon as the checks
+      # here are green and its own guards agree that it is the release the
+      # published manifest advertises. The Umbrel package lives in this same PR so a
+      # release bumps every catalog pin together; carrying that package into
+      # getumbrel/umbrel-apps is umbrel-store-sync.yml's job, because a foreign
+      # repository cannot be pinned from here.
       - name: Checkout the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -1317,10 +1454,12 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Refs created with the default GITHUB_TOKEN do not start workflow runs,
-      # so a pull request opened with it would carry no checks at all. The same
-      # app that creates release tags is used here for the same reason; without
-      # it the proposal is still opened, just unchecked.
+      # CI runs on `pull_request` only, so the token that OPENS the proposal
+      # decides whether it carries checks: a pull request created with
+      # GITHUB_TOKEN starts no workflow run. The App is therefore tried first
+      # and GITHUB_TOKEN is the fallback, because the App is currently scoped
+      # to Contents and cannot createPullRequest — that is why v4.4.1's pin sat
+      # on the branch for two days with no proposal at all.
       - name: Create pull request token
         id: app-token
         if: steps.config.outputs.configured == 'true'
@@ -1331,9 +1470,10 @@ jobs:
 
       - name: Propose the new default version
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.docker-push.outputs.version }}
-          DIGEST: ${{ needs.docker-push.outputs.digest }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.docker-manifest.outputs.version }}
+          DIGEST: ${{ needs.docker-manifest.outputs.digest }}
           BRANCH: automation/default-release-version
           BASE: ${{ github.event.repository.default_branch }}
         run: |
@@ -1355,7 +1495,7 @@ jobs:
           fi
 
           if [ -z "$DIGEST" ]; then
-            echo "::error::docker-push did not provide the multi-arch manifest digest; Umbrel cannot be pinned without it"
+            echo "::error::docker-manifest did not provide the multi-arch manifest digest; Umbrel cannot be pinned without it"
             exit 1
           fi
 
@@ -1372,17 +1512,33 @@ jobs:
           git checkout -q -B "$BRANCH"
           git commit -qam "chore(release): install ${VERSION} in new deployments"
 
+          # Either token may push this branch; GITHUB_TOKEN keeps the job
+          # working when the release App is not configured at all.
+          PUSH_TOKEN="${APP_TOKEN:-$GH_TOKEN}"
+
           # Force-push the fixed branch: if an earlier release's proposal is
           # still open, it is carried forward to the newest release rather than
           # leaving two competing pull requests behind.
           git push -q --force \
-            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
             "HEAD:refs/heads/${BRANCH}"
 
-          existing="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""')"
-          if [ -n "$existing" ]; then
-            echo "Updated [pull request #${existing}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${existing}) to \`${VERSION}\`." |
+          # Non-fatal on purpose: under `set -e` a bare assignment from a
+          # failing lookup would end the step right here — after the push, but
+          # before any of the reporting below — leaving a red job with no
+          # explanation of what to do.
+          find_open_pr() {
+            gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // ""' || true
+          }
+
+          report_existing_pr() {
+            echo "Updated [pull request #${1}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${1}) to \`${VERSION}\`." |
               tee -a "$GITHUB_STEP_SUMMARY"
+          }
+
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
             exit 0
           fi
 
@@ -1401,47 +1557,99 @@ jobs:
           pinned and change it only by following the update guide, so a redeploy never
           moves a running installation to a different version.
 
-          Merging this restarts every Elestio instance that tracks \`${BASE}\`, because
-          Elestio redeploys on each commit to the branch it tracks. Merge when that is
-          convenient.
+          Nobody has to merge this: \`release-rollout.yml\` does it as soon as the
+          checks above are green, provided this is still the version the release
+          manifest advertises and it has not been yanked meanwhile.
 
-          The Umbrel pin lives in this repository only. Submitting the raised package
-          to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) remains
-          a separate, manual pull request.
+          Merging restarts every Elestio instance that tracks \`${BASE}\`, because
+          Elestio redeploys on each commit to the branch it tracks — as does every
+          other commit that branch receives, which is why this one is not held back
+          for it.
+
+          Once merged, \`umbrel-store-sync.yml\` carries the raised package into
+          [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps), and the
+          AWS Marketplace version is submitted from \`aws-ami.yml\`. Both are proposals
+          in someone else's queue: Umbrel merges its own store pull requests, and AWS
+          reviews a submitted version before it becomes available.
 
           Opened automatically after the image for \`${GITHUB_REF_NAME}\` was published
           and verified.
           EOF
 
-          # The branch above already carries the change, so the release itself is
-          # complete and verified at this point. Opening the proposal needs
-          # `Pull requests: write` on top of that, which the token does not
-          # necessarily carry: the release App is scoped to Contents, and
-          # GITHUB_TOKEN cannot open pull requests while the organization
-          # forbids it. Report the branch instead of marking a published release
-          # as failed — this step proposes a convenience, it does not gate.
+          # Takes the NAME of the variable holding the token, so no secret is
+          # ever passed through argv.
+          open_pr() {
+            GH_TOKEN="${!1}" gh pr create \
+              --base "$BASE" \
+              --head "$BRANCH" \
+              --title "chore(release): install ${VERSION} in new deployments" \
+              --body-file "$body_file"
+          }
+
           error_file="$(mktemp)"
-          if url="$(gh pr create \
-            --base "$BASE" \
-            --head "$BRANCH" \
-            --title "chore(release): install ${VERSION} in new deployments" \
-            --body-file "$body_file" 2>"$error_file")"; then
-            echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          app_error="the release App is not configured"
+          if [ -n "${APP_TOKEN:-}" ]; then
+            if url="$(open_pr APP_TOKEN 2>"$error_file")"; then
+              echo "Opened ${url}" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            app_error="$(tr '\n' ' ' < "$error_file")"
+          fi
+
+          # Second best: the proposal exists and is reviewable, but GitHub
+          # starts no workflow run for it. Say so, because merging a pin
+          # without the deployment-template checks is not the intent.
+          if url="$(open_pr GH_TOKEN 2>"$error_file")"; then
+            echo "::warning::Opened ${url} with GITHUB_TOKEN, so it carries no checks (the release App could not: ${app_error})"
+            {
+              echo "Opened ${url} for \`${VERSION}\`, but **without checks** — GitHub starts no workflow run for a pull request created with \`GITHUB_TOKEN\`."
+              echo ""
+              echo "Close and reopen it to run CI before merging, or grant the release App \`Pull requests: write\` so future proposals are checked from the start."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          echo "::warning::Could not open the default-version pull request: $(tr '\n' ' ' < "$error_file")"
+          github_token_error="$(tr '\n' ' ' < "$error_file")"
+
+          # Reaching this point can also mean the lookup above could not reach
+          # the API while a proposal does exist — both creates then fail with
+          # "already exists". The force-push already carried this version into
+          # it, so that is the intended outcome and not a failure. Ask once
+          # more, and otherwise believe what the create said.
+          existing="$(find_open_pr)"
+          if [ -n "$existing" ]; then
+            report_existing_pr "$existing"
+            exit 0
+          fi
+
+          case "${app_error} ${github_token_error}" in
+            *'already exists'*)
+              url="$(
+                printf '%s %s' "$app_error" "$github_token_error" |
+                  grep -oE 'https://[^ ]+/pull/[0-9]+' | head -n1 || true
+              )"
+              echo "The proposal for \`${VERSION}\` already exists${url:+ (${url})}; the force-push carried this version into it." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
+          # The release itself is published and verified at this point; only the
+          # proposal failed. Still a failure: a silent one left 4.4.1 unpinned
+          # for two days.
+          echo "::error::Could not open the default-version pull request for ${VERSION} (release App: ${app_error}; GITHUB_TOKEN: ${github_token_error})"
           {
-            echo "Branch \`${BRANCH}\` was updated to \`${VERSION}\`, but its pull request could not be opened automatically."
+            echo "Release \`${VERSION}\` is published. Branch \`${BRANCH}\` carries the raised pins, but its pull request could not be opened automatically."
             echo ""
-            echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)," \
-              "or grant the release App \`Pull requests: write\` so the proposal opens by itself."
+            echo "Open it from [this comparison](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/${BASE}...${BRANCH}?expand=1)."
           } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
   cloudflare-deploy:
     name: Deploy Cloudflare Worker
     runs-on: ubuntu-latest
-    # Same rationale as docker-push: never deploy while tests/checks fail.
+    # Same rationale as the publish jobs: never deploy while tests/checks fail.
     needs: [e2e, backend, frontend-checks]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
 
@@ -1498,7 +1706,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check]
+    needs: [lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check]
     if: always()
     steps:
       - name: Check for failures
@@ -1513,7 +1721,9 @@ jobs:
             needs.docker-build.result != 'success' ||
             needs.e2e.result != 'success' ||
             needs.e2e-visual.result != 'success' ||
-            (needs.docker-push.result != 'success' && needs.docker-push.result != 'skipped') ||
+            (needs.docker-push-amd64.result != 'success' && needs.docker-push-amd64.result != 'skipped') ||
+            (needs.docker-push-arm64.result != 'success' && needs.docker-push-arm64.result != 'skipped') ||
+            (needs.docker-manifest.result != 'success' && needs.docker-manifest.result != 'skipped') ||
             (needs.release-manifest.result != 'success' && needs.release-manifest.result != 'skipped') ||
             (needs.release-version-pin.result != 'success' && needs.release-version-pin.result != 'skipped') ||
             (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped') ||

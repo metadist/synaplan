@@ -54,8 +54,39 @@ downloads are disabled, and an AI provider key can be added after login under
 
 ### Create the First Administrator
 
-Before the first start, set a unique email and strong password in the deployment
-environment:
+There are three ways to get the first administrator, and you only need one of
+them.
+
+**In the browser.** Leave `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD`
+empty and open the instance in a browser after the first start. A production
+installation without an administrator serves a short setup wizard at `/setup`:
+create the administrator, optionally paste an AI provider key, and decide whether
+strangers may sign up or chat as guests. Everything else is closed while that is
+pending — the API answers `503 SETUP_REQUIRED` for every other route — so there
+is no half-configured state to stumble into.
+
+> **The window between the first start and the first administrator is open.** The
+> account belongs to whoever fills in that form first, exactly as in Open WebUI,
+> Immich or n8n. On a publicly reachable host, either complete the wizard right
+> after the deployment, or use the bootstrap variables below so the window never
+> exists.
+
+Set `SETUP_WIZARD_ENABLED=false` to switch the wizard off entirely. An instance
+without an administrator then has no way in through the browser, which is what
+you want when the account is only ever created by automation or by an identity
+provider.
+
+**Through an identity provider.** For an OIDC/SSO deployment there is no local
+administrator to create at all: accounts appear on first sign-in, and an
+administrator is whoever carries a matching role claim. Switch the wizard off,
+point the instance at the provider, and leave the bootstrap variables empty —
+the empty database is then a normal steady state, not a pending setup. See
+[SSO-only instances](CONFIGURATION.md#sso-only-instances-no-local-accounts) for
+the full variable set and how the admin role mapping behaves.
+
+**Through the deployment environment.** Preferable for automated and
+platform-managed installs, because no browser step is involved. Before the first
+start, set a unique email and strong password:
 
 ```dotenv
 BOOTSTRAP_ADMIN_EMAIL=admin@example.com
@@ -70,9 +101,8 @@ addresses can still be refused: the part before the `@` may not be longer than 6
 characters or contain a dot at the start, at the end, or twice in a row, and each
 part of the domain name may not be longer than 63 characters or start or end with
 a hyphen. If your own address is refused, put a different valid address in
-`BOOTSTRAP_ADMIN_EMAIL`, or leave both bootstrap variables empty, sign up in the
-app afterwards, and make that account the administrator (see
-[User Management](ADMIN.md#user-management)).
+`BOOTSTRAP_ADMIN_EMAIL`, or leave both bootstrap variables empty and use the
+setup wizard instead.
 
 The password must be 8 to 64 characters long; below 16 characters it must also
 contain at least one uppercase letter, one lowercase letter, and one number. A
@@ -101,9 +131,8 @@ rewrites it.
 > [Outgoing Email](EMAIL.md#outgoing-email-smtp).
 
 **Set both variables together, or leave both empty.** Leaving both empty is a
-valid choice: no administrator is created automatically, and you can promote one
-later (see [User Management](ADMIN.md#user-management)). Setting only one of the
-two is a configuration error.
+valid choice: no administrator is created automatically, and the setup wizard
+described above takes over. Setting only one of the two is a configuration error.
 
 > **A half-configured pair stops the container on purpose.** Each application
 > container checks the pair first and, when only one value is set, prints which

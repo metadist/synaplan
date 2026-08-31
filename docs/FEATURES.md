@@ -104,6 +104,15 @@ Extract content from:
 | Images (PNG, JPEG, etc.) | Tesseract OCR |
 | Audio (MP3, WAV, etc.) | Whisper.cpp |
 
+## External speech-to-text API
+
+Local programs can transcribe against any configured SOUND2TEXT model (whisper.cpp, Groq, OpenAI, Mistral, …) with a Synaplan API key:
+
+- **One-shot** — OpenAI-compatible `POST /v1/audio/transcriptions`
+- **Streaming sessions** — `client_id` + `api_key_id` so client 123 and client 321 on the same key stay isolated; audio chunks in, SSE or poll for transcripts
+
+→ [OpenAI-compatible API](OPENAI_COMPATIBLE_API.md)
+
 ## File Management
 
 - Upload and organize files
@@ -120,10 +129,11 @@ Extract content from:
 - Rate limiting
 - API keys for integrations
 
-## App Modes
+## Navigation
 
-- **Easy Mode**: Simplified interface for casual users
-- **Advanced Mode**: Full features for power users
+Everyday work lives on the rail (New, History, Sources). Assistants, channels
+and automations sit under **Manage**. Installation administration sits under
+**Operate** (administrators only). There is no Easy / Advanced mode toggle.
 
 ## AI Memories & Qdrant
 

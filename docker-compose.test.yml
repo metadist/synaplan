@@ -84,7 +84,7 @@ services:
 
   # MariaDB Test Database
   db_test:
-    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
+    image: mariadb:12.3.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979
     container_name: synaplan-db-test
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
     environment:
@@ -119,7 +119,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:075246f72d4109385b4a01c3ac8e9cbd26a0bcb21cd7aa30edbccd24e1b3180c
+    image: ollama/ollama:latest@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
     container_name: synaplan-ollama-test
     ports:
       - "11436:11434"
@@ -149,7 +149,7 @@ services:
   # Ollama API stub (deterministic responses for OllamaProvider integration tests).
   # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
   ollama-stub:
-    image: node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43
+    image: node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
     container_name: synaplan-ollama-stub
     user: node
     working_dir: /app
@@ -169,7 +169,7 @@ services:
   # Uses node:22-alpine directly instead of a Dockerfile build so that
   # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
-    image: node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43
+    image: node:24-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
     container_name: synaplan-whatsapp-stub
     user: node
     working_dir: /app
@@ -213,7 +213,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.7@sha256:831330513f55695572286e521f94fcd3c7e285250ed5b848090265a33192f669
+    image: quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -246,7 +246,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:831330513f55695572286e521f94fcd3c7e285250ed5b848090265a33192f669
+    image: quay.io/keycloak/keycloak:26.7@sha256:ff4257d0d64efbe99ed1ddfaf07765cc3c36dc7518bf8324d41961327f441c54
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:

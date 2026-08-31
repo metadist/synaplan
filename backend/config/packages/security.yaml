@@ -127,6 +127,13 @@ security:
         - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/mcp-servers/oauth/callback, roles: PUBLIC_ACCESS }
 
+        # Desktop pairing exchange: a fresh Synaplan Desktop client has no
+        # session yet, so it swaps a (rate-limited, one-time, TTL'd) pairing
+        # code for its scoped key here. Anchored exactly so it never exposes the
+        # other /api/v1/desktop/* routes, which stay behind the catch-all below.
+        # When DESKTOP_AGENT.ENABLED is off the controller still 404s (C8).
+        - { path: ^/api/v1/desktop/pair$, roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 
@@ -195,6 +202,16 @@ security:
 
         # Public subscription plans (no auth needed to view plans)
         - { path: ^/api/v1/subscription/plans, roles: PUBLIC_ACCESS }
+
+        # First-run setup. Public because on a virgin installation there is no
+        # account to authenticate with — that is the whole point. Both endpoints
+        # refuse with 409 as soon as SetupStateService says setup is done, so
+        # they are dead ends on every installation that has ever had a user.
+        # /complete is NOT listed: by then the wizard is signed in as the
+        # administrator it just created, so it goes through the catch-all below
+        # and its own ROLE_ADMIN check.
+        - { path: ^/api/v1/setup/state$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/setup/admin$, roles: PUBLIC_ACCESS }
 
         # All other API routes require authentication
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

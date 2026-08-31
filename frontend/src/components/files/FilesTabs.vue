@@ -22,6 +22,7 @@ import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import filesService from '@/services/filesService'
+import { useAuthStore } from '@/stores/auth'
 
 type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
 
@@ -31,6 +32,7 @@ defineProps<{
 
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const pathById: Record<FilesTab, string> = {
   files: '/files',
@@ -74,13 +76,17 @@ const tabNavItems = computed<TabNavItem[]>(() => [
     testid: 'tab-files-search',
     to: pathById.search,
   },
-  {
-    id: 'vectors',
-    label: t('files.tabVectors'),
-    icon: 'heroicons:circle-stack',
-    testid: 'tab-files-vectors',
-    to: pathById.vectors,
-  },
+  ...(authStore.isAdmin
+    ? [
+        {
+          id: 'vectors',
+          label: t('files.tabVectors'),
+          icon: 'heroicons:circle-stack',
+          testid: 'tab-files-vectors',
+          to: pathById.vectors,
+        } satisfies TabNavItem,
+      ]
+    : []),
 ])
 
 function onTabChange(id: string) {

@@ -149,6 +149,10 @@ final class ChatHandlerStaleModelFallbackTest extends TestCase
             new TimeContextBuilder(),
             new KnowledgeContextFormatter(),
             new VisionModelResolver($modelConfig, $repo),
+            $this->createMock(\App\Service\Digest\DigestSearchService::class),
+            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
 }

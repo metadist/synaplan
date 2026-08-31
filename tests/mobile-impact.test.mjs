@@ -217,6 +217,52 @@ test('classifies the model status surfaces as backend-only plus ota-candidate', 
   )
 })
 
+test('classifies the first-run setup wizard as backend-only plus ota-candidate', () => {
+  const backendPaths = [
+    'backend/src/Command/AdminResetPasswordCommand.php',
+    'backend/src/Command/SetupResetCommand.php',
+    'backend/src/Controller/SetupController.php',
+    'backend/src/DTO/SetupAdminRequest.php',
+    'backend/src/DTO/SetupCompleteRequest.php',
+    'backend/src/EventSubscriber/SetupLockdownSubscriber.php',
+    'backend/src/Service/Setup/SetupConstants.php',
+    'backend/src/Service/Setup/SetupStateService.php'
+  ]
+
+  for (const path of backendPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'backend-only', path)
+  }
+
+  // The wizard is the first screen a fresh install shows, so it has to stay
+  // fixable over the air. It touches no native seam on purpose: the router gate
+  // reads the setup flag straight from the runtime config instead of through
+  // `stores/config.ts`, and the server-switch escape hatch calls the existing
+  // native bridge rather than changing it.
+  const webPaths = [
+    'frontend/src/components/setup/SetupAccessStep.vue',
+    'frontend/src/components/setup/SetupAdminStep.vue',
+    'frontend/src/components/setup/SetupDoneStep.vue',
+    'frontend/src/components/setup/SetupProviderKeyForm.vue',
+    'frontend/src/components/setup/SetupProviderStep.vue',
+    'frontend/src/components/setup/SetupProviderTile.vue',
+    'frontend/src/composables/useSetupState.ts',
+    'frontend/src/router/setupGate.ts',
+    'frontend/src/services/api/setupApi.ts',
+    'frontend/src/views/SetupWizardView.vue'
+  ]
+
+  for (const path of webPaths) {
+    assert.equal(classifyFiles([entry(path, 'A')], policy).classification, 'ota-candidate', path)
+  }
+
+  // The demo-fixture opt-out that makes a virgin instance reproducible locally
+  // is container tooling and never reaches an installed app.
+  assert.equal(
+    classifyFiles([entry('_docker/backend/docker-entrypoint.sh', 'M')], policy).classification,
+    'no-app-impact'
+  )
+})
+
 test('uses the highest classification for mixed changes', () => {
   assert.equal(classifyFiles([
     entry('README.md'),

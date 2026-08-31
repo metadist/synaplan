@@ -101,6 +101,7 @@ Resources:
                 Resource: '*'
                 Action:
                   - ec2:DescribeImages
+                  - ec2:DescribeImageAttribute
                   - ec2:DescribeInstances
                   - ec2:DescribeInstanceStatus
                   - ec2:DescribeInstanceTypeOfferings
@@ -111,6 +112,7 @@ Resources:
                   - ec2:DescribeTags
                   - ec2:DescribeVolumes
                   - ec2:DescribeVpcs
+                  - ec2:GetEbsEncryptionByDefault
                   - ec2:RunInstances
                   - ec2:StopInstances
                   - ec2:TerminateInstances
@@ -227,6 +229,38 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/synaplan-verify-*'
                   - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:instance-profile/synaplan-verify-*'
 
+        # Offers a built and verified AMI to the listing as a new version, which
+        # is what the submit job in .github/workflows/aws-ami.yml does instead of
+        # a maintainer filling in the Add Version form.
+        - PolicyName: marketplace-catalog
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # The Catalog API takes the entity in the request body rather than
+              # in the resource ARN, so these cannot be narrowed to one product.
+              # Read plus a change set is the whole blast radius: none of them can
+              # publish anything, because AWS reviews a submitted version first.
+              - Effect: Allow
+                Action:
+                  - aws-marketplace:ListEntities
+                  - aws-marketplace:DescribeEntity
+                  - aws-marketplace:StartChangeSet
+                  - aws-marketplace:ListChangeSets
+                  - aws-marketplace:DescribeChangeSet
+                  - aws-marketplace:CancelChangeSet
+                Resource: '*'
+
+              # Handing the ingestion role to the Marketplace is part of the
+              # change set: the AmiSource names it as the role AWS assumes to
+              # copy the image. Restricted to that one role, and to the service
+              # that is allowed to use it.
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt AmiIngestionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: assets.marketplace.amazonaws.com
+
   # AWS Marketplace assumes this to copy a submitted AMI into its own account.
   # The managed policy is the one AWS documents for it; writing the permissions
   # out by hand here would go stale the next time they change it.
@@ -253,6 +287,8 @@ Outputs:
 
   IngestionRoleArn:
     Description: >-
-      Name this role in the AWS Marketplace Management Portal, under Settings,
-      so the AMI scan can read a submitted image.
+      Store this as the repository secret AWS_MARKETPLACE_INGESTION_ROLE_ARN. The
+      submit job names it in every version it offers, as the role AWS Marketplace
+      assumes to copy and scan the image. Submitting a version by hand asks for
+      the same ARN, in the Add Version form's IAM access role field.
     Value: !GetAtt AmiIngestionRole.Arn

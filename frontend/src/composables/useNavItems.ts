@@ -1,12 +1,11 @@
-import { computed, ref, type Component } from 'vue'
+import { computed, ref, watch, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   ClockIcon,
-  CpuChipIcon,
   FolderIcon,
   PuzzlePieceIcon,
   ShieldCheckIcon,
-  SignalIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
@@ -14,6 +13,7 @@ import { useConfigStore } from '../stores/config'
 import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
+import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -21,34 +21,56 @@ export interface NavChild {
   path: string
   label: string
   badge?: string
+  /** Translated group label shown in the first-level Manage flyout */
   group?: string
+  /** Stable group id (`assistants`, `channels`, …) for testids and nesting */
+  groupKey?: string
 }
 
 export interface NavChildGroup {
+  /** Stable group id, or null for a flat (ungrouped) list */
+  key: string | null
   group: string | null
   items: NavChild[]
 }
 
 /**
- * Splits a children list into consecutive sections by their `group` label so
- * both nav surfaces (desktop flyout, mobile drawer) render identical grouped
- * sub-menus. Ungrouped children form a header-less leading section.
+ * Splits a children list into consecutive sections by their `groupKey` (falling
+ * back to the translated `group` label) so both nav surfaces (desktop flyout,
+ * mobile drawer) render the same hierarchy. Ungrouped children form a
+ * header-less leading section.
  */
 export function groupNavChildren(children: NavChild[] | undefined): NavChildGroup[] {
   if (!children || children.length === 0) return []
-  if (!children.some((c) => c.group)) return [{ group: null, items: children }]
+  if (!children.some((c) => c.group || c.groupKey)) {
+    return [{ key: null, group: null, items: children }]
+  }
 
   const groups: NavChildGroup[] = []
-  let currentGroup: string | null = null
+  let currentKey: string | null = null
   for (const child of children) {
-    const group = child.group ?? null
-    if (group !== currentGroup || groups.length === 0) {
-      currentGroup = group
-      groups.push({ group, items: [] })
+    const key = child.groupKey ?? child.group ?? null
+    if (key !== currentKey || groups.length === 0) {
+      currentKey = key
+      groups.push({ key: child.groupKey ?? null, group: child.group ?? null, items: [] })
     }
     groups[groups.length - 1].items.push(child)
   }
   return groups
+}
+
+/** True when children should render as a two-level flyout / accordion. */
+export function hasNestedNavGroups(children: NavChild[] | undefined): boolean {
+  return !!children?.some((child) => !!child.groupKey)
+}
+
+/**
+ * Section-overview children share the parent's path (Inbound is `/channels`).
+ * Match those exactly so `/channels/widgets` does not light up Inbound;
+ * every other child uses prefix match.
+ */
+export function isNavChildActive(child: NavChild, sectionPath: string, routePath: string): boolean {
+  return child.path === sectionPath ? routePath === child.path : routePath.startsWith(child.path)
 }
 
 export interface NavItem {
@@ -71,8 +93,36 @@ const offlineModelsCount = ref(0)
 let featureStatusRequested = false
 
 /**
- * Single source of truth for the primary navigation (§4.4 target structure).
- * Consumed by the desktop rail (SidebarV2) and the mobile bottom nav so the
+ * Workspace seam — one named predicate per nav context
+ * (20260828-interface-streamlining-sprint / contract §6).
+ * When a real workspace capability exists later, only `canSeeManage` changes.
+ */
+export const canSeeWork = (): boolean => true
+export const canSeeManage = (signedIn: boolean): boolean => signedIn
+export const canSeeOperate = (isAdmin: boolean): boolean => isAdmin
+
+const LAST_MANAGE_KEY = 'synaplan.nav.lastManage'
+const LAST_OPERATE_KEY = 'synaplan.nav.lastOperate'
+
+export function rememberNavDestination(context: 'manage' | 'operate', path: string): void {
+  try {
+    localStorage.setItem(context === 'manage' ? LAST_MANAGE_KEY : LAST_OPERATE_KEY, path)
+  } catch {
+    // Private mode / storage blocked — last destination is optional.
+  }
+}
+
+export function lastNavDestination(context: 'manage' | 'operate'): string | null {
+  try {
+    return localStorage.getItem(context === 'manage' ? LAST_MANAGE_KEY : LAST_OPERATE_KEY)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Single source of truth for the primary navigation.
+ * Consumed by the desktop rail (SidebarV2) and the mobile drawer so the
  * two surfaces can never drift apart.
  */
 export function useNavItems() {
@@ -82,6 +132,7 @@ export function useNavItems() {
   const configStore = useConfigStore()
 
   const isGuestMode = computed(() => !authStore.isAuthenticated)
+  const signedIn = computed(() => authStore.isAuthenticated)
 
   const loadFeatureStatus = async () => {
     try {
@@ -123,113 +174,164 @@ export function useNavItems() {
       },
     ]
 
-    // §4.4: Search lives INSIDE the Files page (Browse | Search tabs since
-    // phase 5) — the rail item is just "Files".
-    items.push({
-      key: 'files',
-      path: '/files',
-      label: t('nav.files'),
-      description: t('nav.filesDescription'),
-      icon: FolderIcon,
-      requiresAuth: true,
-      gateFeature: 'files',
-    })
+    // Guests: Chat + Sign in only. Sources is everyday work for signed-in users.
+    if (canSeeManage(signedIn.value)) {
+      items.push({
+        key: 'files',
+        path: '/files',
+        label: t('nav.files'),
+        description: t('nav.filesDescription'),
+        icon: FolderIcon,
+        requiresAuth: true,
+        gateFeature: 'files',
+      })
+    }
 
-    // Channels + AI Setup are always present (Q6: easy mode shows them locked;
-    // guests see them gate-locked). Canonical §4.6 URLs.
-    //
-    // Channels = where messages come in and go out. Grouped sub-menu:
-    // Standard Inbound, Your Widgets, Connections (Configure + MCP), API.
-    const channelsChildren: NavChild[] = [
-      { key: 'inbound', path: '/channels', label: t('nav.configInbound') },
-      { key: 'chat-widget', path: '/channels/widgets', label: t('nav.toolsChatWidget') },
-      ...(isSavedTasksEnabled()
-        ? [
-            {
-              key: 'connections',
-              path: '/channels/connections',
-              label: t('nav.configConnections'),
-              group: t('nav.connections'),
-            },
-          ]
-        : []),
-      {
-        key: 'mcp-servers',
-        path: '/channels/mcp',
-        label: t('nav.mcpServers'),
-        group: t('nav.connections'),
-      },
-      {
-        key: 'api-keys',
-        path: '/channels/api',
-        label: t('nav.configApiKeys'),
-        group: t('nav.groupApi'),
-      },
-      {
-        key: 'api-docs',
-        path: '/channels/api/docs',
-        label: t('pageTitles.configApiDocs'),
-        group: t('nav.groupApi'),
-      },
-    ]
+    if (canSeeManage(signedIn.value)) {
+      const assistants = t('nav.groupAssistants')
+      const channels = t('nav.channels')
+      const automations = t('nav.groupAutomations')
+      const tools = t('nav.groupTools')
+      const connections = t('nav.connections')
+      const api = t('nav.groupApi')
 
-    items.push({
-      key: 'channels',
-      path: '/channels',
-      label: t('nav.channels'),
-      description: t('nav.channelsDescription'),
-      icon: SignalIcon,
-      requiresAuth: true,
-      gateFeature: 'channels',
-      children: isGuestMode.value ? undefined : channelsChildren,
-    })
+      const grouped = (groupKey: string, group: string) => ({ groupKey, group })
 
-    // AI Setup & Tools = how the AI behaves plus the automation tools that
-    // run on top of it (recurring tasks, agents, summarizer, email handler).
-    const aiSetupChildren: NavChild[] = [
-      { key: 'ai-models', path: '/ai/models', label: t('nav.configAiModels') },
-      { key: 'task-prompts', path: '/ai/instructions', label: t('nav.configTaskPrompts') },
-      { key: 'sorting-prompt', path: '/ai/routing', label: t('nav.configSortingPrompt') },
-      ...(isSavedTasksEnabled()
-        ? [{ key: 'saved-tasks', path: '/channels/tasks', label: t('nav.savedTasks') }]
-        : []),
-      { key: 'ai-agents', path: '/channels/agents', label: t('nav.aiAgents') },
-      // Transitional home (Q3): retires into the in-chat Tools dropdown later.
-      { key: 'doc-summary', path: '/ai/summarizer', label: t('nav.toolsDocSummary') },
-      { key: 'mail-handler', path: '/channels/email', label: t('nav.toolsMailHandler') },
-    ]
+      const manageChildren: NavChild[] = [
+        {
+          key: 'ai-models',
+          path: '/ai/models',
+          label: t('nav.configAiModels'),
+          ...grouped('assistants', assistants),
+        },
+        {
+          key: 'task-prompts',
+          path: '/ai/instructions',
+          label: t('nav.configTaskPrompts'),
+          ...grouped('assistants', assistants),
+        },
+        {
+          key: 'sorting-prompt',
+          path: '/ai/routing',
+          label: t('nav.configSortingPrompt'),
+          ...grouped('assistants', assistants),
+        },
+        {
+          key: 'inbound',
+          path: '/channels',
+          label: t('nav.configInbound'),
+          ...grouped('channels', channels),
+        },
+        {
+          key: 'chat-widget',
+          path: '/channels/widgets',
+          label: t('nav.toolsChatWidget'),
+          ...grouped('channels', channels),
+        },
+        {
+          key: 'mail-handler',
+          path: '/channels/email',
+          label: t('nav.toolsMailHandler'),
+          ...grouped('channels', channels),
+        },
+        {
+          key: 'live-support',
+          path: '/channels/widgets/live-support',
+          label: t('nav.liveSupport'),
+          ...grouped('channels', channels),
+        },
+        ...(isSavedTasksEnabled()
+          ? [
+              {
+                key: 'connections',
+                path: '/channels/connections',
+                label: t('nav.configConnections'),
+                ...grouped('connections', connections),
+              },
+            ]
+          : []),
+        {
+          key: 'mcp-servers',
+          path: '/channels/mcp',
+          label: t('nav.mcpServers'),
+          ...grouped('connections', connections),
+        },
+        ...(isDesktopAgentEnabled()
+          ? [
+              {
+                key: 'desktop',
+                path: '/channels/desktop',
+                label: t('nav.desktop'),
+                ...grouped('connections', connections),
+              },
+            ]
+          : []),
+        {
+          key: 'api-keys',
+          path: '/channels/api',
+          label: t('nav.configApiKeys'),
+          ...grouped('api', api),
+        },
+        {
+          key: 'api-docs',
+          path: '/channels/api/docs',
+          label: t('pageTitles.configApiDocs'),
+          ...grouped('api', api),
+        },
+        ...(isSavedTasksEnabled()
+          ? [
+              {
+                key: 'saved-tasks',
+                path: '/channels/tasks',
+                label: t('nav.savedTasks'),
+                ...grouped('automations', automations),
+              },
+            ]
+          : []),
+        {
+          key: 'ai-agents',
+          path: '/channels/agents',
+          label: t('nav.aiAgents'),
+          ...grouped('automations', automations),
+        },
+        {
+          key: 'doc-summary',
+          path: '/ai/summarizer',
+          label: t('nav.toolsDocSummary'),
+          ...grouped('tools', tools),
+        },
+      ]
 
-    items.push({
-      key: 'ai-setup',
-      path: '/ai/models',
-      label: t('nav.aiSetup'),
-      description: t('nav.aiSetupDescription'),
-      icon: CpuChipIcon,
-      requiresAuth: true,
-      gateFeature: 'aiSetup',
-      children: isGuestMode.value ? undefined : aiSetupChildren,
-    })
+      items.push({
+        key: 'manage',
+        path: '/channels',
+        label: t('nav.manage'),
+        description: t('nav.manageDescription'),
+        icon: WrenchScrewdriverIcon,
+        requiresAuth: true,
+        gateFeature: 'channels',
+        children: manageChildren,
+      })
+    }
 
-    if (configStore.plugins.length > 0) {
+    if (signedIn.value && configStore.plugins.length > 0) {
       items.push({
         key: 'plugins',
         path: '/plugins',
         label: t('nav.plugins'),
         icon: PuzzlePieceIcon,
         requiresAuth: true,
-        children: isGuestMode.value
-          ? undefined
-          : configStore.plugins.map((plugin: { name?: string }) => ({
-              key: `plugin-${plugin.name ?? 'unknown'}`,
-              path: `/plugins/${plugin.name}`,
-              label: plugin.name
-                ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-                : t('common.unknown'),
-            })),
+        children: configStore.plugins.map((plugin: { name?: string }) => ({
+          key: `plugin-${plugin.name ?? 'unknown'}`,
+          path: `/plugins/${plugin.name}`,
+          label: plugin.name
+            ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
+            : t('common.unknown'),
+        })),
       })
     }
 
-    if (authStore.isAdmin) {
+    if (canSeeOperate(authStore.isAdmin)) {
       const adminChildren: NavChild[] = [
         { key: 'admin-dashboard', path: '/admin', label: t('nav.adminDashboard') },
       ]
@@ -286,16 +388,26 @@ export function useNavItems() {
       return route.path.startsWith('/files')
     }
     if (item.children && item.children.length > 0) {
-      // The section-overview child shares the section's own path (e.g. the
-      // Channels "Standard Inbound" child lives at /channels). It must match
-      // exactly, otherwise it would claim every /channels/* page — including
-      // the ones that now belong to AI Setup & Tools (tasks, agents, email).
-      return item.children.some((child) =>
-        child.path === item.path ? route.path === child.path : route.path.startsWith(child.path)
-      )
+      return item.children.some((child) => isNavChildActive(child, item.path, route.path))
     }
     return route.path.startsWith(item.path)
   }
 
-  return { navItems, isItemActive, isGuestMode, loadFeatureStatus }
+  watch(
+    () => route.path,
+    (path) => {
+      const manage = navItems.value.find((item) => item.key === 'manage')
+      if (manage?.children?.some((child) => isNavChildActive(child, manage.path, path))) {
+        rememberNavDestination('manage', path)
+      }
+      const operate = navItems.value.find((item) => item.key === 'admin')
+      if (
+        operate?.children?.some((child) => path === child.path || path.startsWith(`${child.path}/`))
+      ) {
+        rememberNavDestination('operate', path)
+      }
+    }
+  )
+
+  return { navItems, isItemActive, isGuestMode, loadFeatureStatus, signedIn }
 }

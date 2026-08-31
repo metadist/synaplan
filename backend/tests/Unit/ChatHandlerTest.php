@@ -48,6 +48,8 @@ class ChatHandlerTest extends TestCase
     private RateLimitService&MockObject $rateLimitService;
     private MemoryExtractionDispatcher&MockObject $memoryExtractionDispatcher;
     private PerfPipelineFlag&MockObject $perfPipelineFlag;
+    private \App\Service\Digest\DigestSearchService&MockObject $digestSearchService;
+    private \App\Service\Digest\MessageDigestConfig&MockObject $digestConfig;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -66,6 +68,8 @@ class ChatHandlerTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
+        $this->digestSearchService = $this->createMock(\App\Service\Digest\DigestSearchService::class);
+        $this->digestConfig = $this->createMock(\App\Service\Digest\MessageDigestConfig::class);
 
         // Every resolved model is revalidated before it reaches the provider.
         // Unless a test says otherwise, the model it picked still works.
@@ -95,6 +99,10 @@ class ChatHandlerTest extends TestCase
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
 
@@ -592,6 +600,85 @@ class ChatHandlerTest extends TestCase
     }
 
     /**
+     * Channel parity: the non-streaming `handle()` path (email, MCP, generic
+     * webhook) must fold options['conversation_summary'] into the SYSTEM
+     * prompt exactly like handleStream() — long threads on slow channels are
+     * the main beneficiary of the rolling summary.
+     */
+    public function testHandleInjectsConversationSummaryIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('And what about the second point?');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured): array {
+                $captured = $messages;
+
+                return ['content' => 'ok', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            null,
+            ['conversation_summary' => 'Earlier: the user argued for option A and asked to compare prices.'],
+        );
+
+        self::assertNotNull($captured);
+        self::assertSame('system', $captured[0]['role'] ?? '');
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertStringContainsString('Summary of earlier conversation', $systemPrompt);
+        self::assertStringContainsString('option A', $systemPrompt);
+    }
+
+    public function testHandleWithoutConversationSummaryLeavesSystemPromptClean(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$captured): array {
+                $captured = $messages;
+
+                return ['content' => 'ok', 'provider' => 'test', 'model' => 'test'];
+            });
+
+        $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($captured);
+        self::assertStringNotContainsString('Summary of earlier conversation', $captured[0]['content'] ?? '');
+    }
+
+    /**
      * Issue #615: the non-streaming `handle()` path serves email
      * (`smart+...@synaplan.net`) and the generic API webhook. Before the
      * fix, neither loaded user memories nor extracted new ones. This
@@ -686,6 +773,213 @@ class ChatHandlerTest extends TestCase
         self::assertSame([
             ['id' => 42, 'key' => 'city', 'value' => 'Hamburg', 'score' => 0.91],
         ], $result['metadata']['memories']);
+    }
+
+    /**
+     * Sprint 4 (deep memory): when the digest index has relevant hits for
+     * the prompt, `handle()` must inject the "Older conversations" block
+     * into the system prompt and expose the reference list in metadata —
+     * on the non-streaming path too (email/MCP channel parity).
+     */
+    public function testHandleInjectsDigestContextIntoSystemPrompt(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(9000);
+        $message->method('getChatId')->willReturn(55);
+        $message->method('getText')->willReturn('What did the realtor write about the office rent?');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(true);
+        $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('embedQueryForMemorySearch')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('getMemoryEmbeddingModelId')->willReturn(10);
+        $this->userMemoryService->method('searchMemoriesByVector')->willReturn([]);
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestConfig->method('getBlockMaxChars')->willReturn(4000);
+
+        $digest = [
+            'message_id' => 1234,
+            'chat_id' => 11,
+            'title' => 'office rent letter to realtor about the increase of payments',
+            'channel' => 'web',
+            'source_date' => 1_777_636_800,
+            'score' => 0.9,
+            'effective_score' => 0.85,
+            'excerpt' => 'Dear Sir, the rent will increase to 1620 EUR.',
+        ];
+        $this->digestSearchService
+            ->expects($this->once())
+            ->method('search')
+            ->with(7, [0.1, 0.2, 0.3], excludeChatId: 55)
+            ->willReturn([$digest]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('openai');
+        $this->modelConfigService->method('getModelName')->willReturn('gpt-4.1');
+
+        $capturedMessages = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages) use (&$capturedMessages): array {
+                $capturedMessages = $messages;
+
+                return ['content' => 'ok', 'provider' => 'openai', 'model' => 'gpt-4.1'];
+            });
+
+        $result = $this->handler->handle($message, [], ['topic' => 'CHAT', 'language' => 'en']);
+
+        self::assertNotNull($capturedMessages);
+        $systemPrompt = $capturedMessages[0]['content'] ?? '';
+        self::assertStringContainsString('Older conversations', $systemPrompt);
+        self::assertStringContainsString('office rent letter to realtor', $systemPrompt);
+        self::assertStringContainsString('1620 EUR', $systemPrompt, 'pulled excerpt must reach the model');
+        self::assertStringContainsString('[Message:ID]', $systemPrompt, 'reference rules must ship with the block');
+        self::assertSame([$digest], $result['metadata']['digests']);
+    }
+
+    /**
+     * Streaming parity: handleStream() must inject the same digest block AND
+     * emit the digests_loaded progress event carrying the reference list
+     * (id, chat, title — no message bodies) for the frontend badges.
+     */
+    public function testHandleStreamInjectsDigestContextAndEmitsDigestsLoaded(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getId')->willReturn(9001);
+        $message->method('getChatId')->willReturn(55);
+        $message->method('getText')->willReturn('What did the realtor write about the office rent?');
+        $message->method('getFileText')->willReturn('');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('isMemoriesEnabled')->willReturn(true);
+
+        $userRepository = $this->createMock(UserRepository::class);
+        $userRepository->expects(self::any())->method('find')->with(7)->willReturn($user);
+        $this->em->expects(self::any())->method('getRepository')->with(User::class)->willReturn($userRepository);
+
+        $this->userMemoryService->method('isAvailable')->willReturn(true);
+        $this->userMemoryService->method('embedUserQuery')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('embedQueryForMemorySearch')->willReturn(['embedding' => [0.1, 0.2, 0.3]]);
+        $this->userMemoryService->method('getMemoryEmbeddingModelId')->willReturn(10);
+        $this->userMemoryService->method('searchMemoriesByVector')->willReturn([]);
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestConfig->method('getBlockMaxChars')->willReturn(4000);
+
+        $digest = [
+            'message_id' => 1234,
+            'chat_id' => 11,
+            'title' => 'office rent letter to realtor about the increase of payments',
+            'channel' => 'web',
+            'source_date' => 1_777_636_800,
+            'score' => 0.9,
+            'effective_score' => 0.85,
+            'excerpt' => 'Dear Sir, the rent will increase to 1620 EUR.',
+        ];
+        $this->digestSearchService->method('search')->willReturn([$digest]);
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $captured = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chatStream')
+            ->willReturnCallback(function ($messages, $cb) use (&$captured) {
+                $captured = $messages;
+                $cb('ok');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $progressEvents = [];
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en'],
+            static function (): void {},
+            static function (array $event) use (&$progressEvents): void {
+                $progressEvents[] = $event;
+            },
+        );
+
+        self::assertNotNull($captured);
+        $systemPrompt = $captured[0]['content'] ?? '';
+        self::assertStringContainsString('Older conversations', $systemPrompt);
+        self::assertStringContainsString('office rent letter to realtor', $systemPrompt);
+        self::assertStringContainsString('1620 EUR', $systemPrompt);
+
+        $digestEvents = array_values(array_filter(
+            $progressEvents,
+            static fn (array $e): bool => 'digests_loaded' === ($e['status'] ?? '')
+        ));
+        self::assertCount(1, $digestEvents);
+        self::assertSame(1234, $digestEvents[0]['metadata']['digests'][0]['message_id']);
+        self::assertSame(11, $digestEvents[0]['metadata']['digests'][0]['chat_id']);
+        self::assertArrayNotHasKey(
+            'excerpt',
+            $digestEvents[0]['metadata']['digests'][0],
+            'message bodies must stay backend-only'
+        );
+    }
+
+    /**
+     * A widget/guest visitor must never see the account owner's message
+     * history — the digest search is gated by the same levers as memories.
+     */
+    public function testHandleSkipsDigestSearchForWidgetChannel(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Hello');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->digestConfig->method('isEnabled')->willReturn(true);
+        $this->digestSearchService->expects($this->never())->method('search');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'ok', 'provider' => 'test', 'model' => 'test',
+        ]);
+
+        $result = $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'CHAT', 'language' => 'en', 'source' => 'widget'],
+            null,
+            ['channel' => 'WIDGET'],
+        );
+
+        self::assertSame([], $result['metadata']['digests']);
     }
 
     /**

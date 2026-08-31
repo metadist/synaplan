@@ -14,13 +14,15 @@ describe('taskPlan.searchSummary pluralization (#1137 follow-up)', () => {
     i18n.global.locale.value = originalLocale
   })
 
-  const cases: ReadonlyArray<['de' | 'en' | 'es' | 'tr', number, string]> = [
+  const cases: ReadonlyArray<['de' | 'en' | 'es' | 'fr' | 'tr', number, string]> = [
     ['en', 1, 'Searched the web · 1 source'],
     ['en', 3, 'Searched the web · 3 sources'],
     ['de', 1, 'Web durchsucht · 1 Quelle'],
     ['de', 3, 'Web durchsucht · 3 Quellen'],
     ['es', 1, 'Búsqueda web · 1 fuente'],
     ['es', 3, 'Búsqueda web · 3 fuentes'],
+    ['fr', 1, 'Recherche sur le Web · 1 source'],
+    ['fr', 3, 'Recherche sur le Web · 3 sources'],
     // Turkish has a single nominal form; the call still works without a pipe.
     ['tr', 1, 'Web arandı · 1 kaynak'],
     ['tr', 3, 'Web arandı · 3 kaynak'],
@@ -32,7 +34,7 @@ describe('taskPlan.searchSummary pluralization (#1137 follow-up)', () => {
   })
 
   it('never leaks raw ICU plural syntax', () => {
-    for (const locale of ['de', 'en', 'es', 'tr'] as const) {
+    for (const locale of ['de', 'en', 'es', 'fr', 'tr'] as const) {
       i18n.global.locale.value = locale
       const rendered = t('taskPlan.searchSummary', { count: 2 }, 2)
       expect(rendered).not.toContain('plural')

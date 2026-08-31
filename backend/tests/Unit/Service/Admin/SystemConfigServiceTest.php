@@ -8,9 +8,12 @@ use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
+use App\Service\Digest\MessageDigestConfig;
 use App\Service\EncryptionService;
+use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
+use App\Service\RegistrationConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -45,7 +48,51 @@ final class SystemConfigServiceTest extends TestCase
             defaultTtsUrl: 'http://localhost:10200',
             providerKeyStore: $providerKeyStore,
             encryption: $encryption,
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
         );
+    }
+
+    /**
+     * REGISTRATION_ENABLED is stored in BCONFIG but an explicit environment
+     * variable still wins. Without the marker the page would show a toggle the
+     * admin can move while nothing changes.
+     */
+    public function testAccessFlagIsReportedAsPinnedByTheEnvironment(): void
+    {
+        $envWasSet = \array_key_exists('REGISTRATION_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['REGISTRATION_ENABLED'] : null;
+        $_ENV['REGISTRATION_ENABLED'] = 'false';
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertTrue($values['REGISTRATION_ENABLED']['envOverride']);
+            $this->assertSame('false', $values['REGISTRATION_ENABLED']['effectiveValue']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['REGISTRATION_ENABLED'] = $original;
+            } else {
+                unset($_ENV['REGISTRATION_ENABLED']);
+            }
+        }
+    }
+
+    public function testAccessFlagWithoutAnEnvironmentVariableIsNotMarked(): void
+    {
+        $envWasSet = \array_key_exists('GUEST_CHAT_ENABLED', $_ENV);
+        $original = $envWasSet ? $_ENV['GUEST_CHAT_ENABLED'] : null;
+        unset($_ENV['GUEST_CHAT_ENABLED']);
+
+        try {
+            $values = $this->service->getValues();
+
+            $this->assertArrayNotHasKey('envOverride', $values['GUEST_CHAT_ENABLED']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['GUEST_CHAT_ENABLED'] = $original;
+            }
+        }
     }
 
     /**
@@ -251,6 +298,83 @@ final class SystemConfigServiceTest extends TestCase
         $result = $this->service->setValue('CONVERSATION_SUMMARY_TIERS', '0', 7);
 
         $this->assertFalse($result['success']);
+    }
+
+    /**
+     * The deep-memory knobs are exposed under flat DIGEST_* admin keys but
+     * must land in the BCONFIG rows MessageDigestConfig reads: group DIGEST
+     * with the bare setting name, ownerId 0.
+     */
+    public function testDigestKnobWritesToTheDigestGroupRow(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('setValue')
+            ->with(0, MessageDigestConfig::CONFIG_GROUP, 'RECENCY_HALF_LIFE_DAYS', '90');
+
+        $result = $this->service->setValue('DIGEST_RECENCY_HALF_LIFE_DAYS', '90', 7);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['requiresRestart']);
+    }
+
+    public function testDigestScoreKnobsRejectOutOfRangeValues(): void
+    {
+        $this->configRepository->expects($this->never())->method('setValue');
+
+        $this->assertFalse($this->service->setValue('DIGEST_MIN_SCORE', '1.5', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_PULL_MIN_SCORE', '-0.1', 7)['success']);
+    }
+
+    public function testDigestScoreKnobsAcceptFractions(): void
+    {
+        $this->configRepository->expects($this->exactly(2))->method('setValue');
+
+        $this->assertTrue($this->service->setValue('DIGEST_MIN_SCORE', '0.55', 7)['success']);
+        $this->assertTrue($this->service->setValue('DIGEST_PULL_MIN_SCORE', '0.7', 7)['success']);
+    }
+
+    public function testDigestCountKnobsRejectNonPositiveValuesButPullTopNAllowsZero(): void
+    {
+        $written = [];
+        $this->configRepository->method('setValue')
+            ->willReturnCallback(static function (int $ownerId, string $group, string $key, string $value) use (&$written): Config {
+                $written[] = $key;
+
+                return new Config();
+            });
+
+        $this->assertFalse($this->service->setValue('DIGEST_BATCH_SIZE', '0', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_MAX_PER_USER', '2.5', 7)['success']);
+        $this->assertFalse($this->service->setValue('DIGEST_PULL_TOP_N', '-1', 7)['success']);
+
+        // 0 is a valid PULL_TOP_N: it disables verbatim pulling.
+        $this->assertTrue($this->service->setValue('DIGEST_PULL_TOP_N', '0', 7)['success']);
+        $this->assertSame(['PULL_TOP_N'], $written);
+    }
+
+    public function testDigestDefaultsMirrorTheConfigClass(): void
+    {
+        $this->configRepository->method('getValue')->willReturn(null);
+
+        $values = $this->service->getValues();
+
+        $this->assertFalse($values['DIGEST_ENABLED']['isSet']);
+        $this->assertSame(
+            var_export(MessageDigestConfig::DEFAULT_ENABLED, true),
+            $values['DIGEST_ENABLED']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_MAX_PER_USER,
+            $values['DIGEST_MAX_PER_USER']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_MIN_SCORE,
+            $values['DIGEST_MIN_SCORE']['value'],
+        );
+        $this->assertSame(
+            (string) MessageDigestConfig::DEFAULT_RECENCY_HALF_LIFE_DAYS,
+            $values['DIGEST_RECENCY_HALF_LIFE_DAYS']['value'],
+        );
     }
 
     public function testConversationSummaryDefaultsMirrorTheConstants(): void

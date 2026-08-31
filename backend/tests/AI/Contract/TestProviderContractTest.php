@@ -67,4 +67,28 @@ class TestProviderContractTest extends ChatProviderContractTest
         $this->assertStringNotContainsString('](', $result['content']);
         $this->assertStringContainsString('Ollama', $result['content']);
     }
+
+    /**
+     * Vision requests deliver multimodal array content (text + image_url
+     * parts) — the same shape real providers receive. The mock must answer
+     * with a deterministic description instead of crashing on the string
+     * assumption (regression: strtolower(array) TypeError escaped as an
+     * HTTP 500 on the WhatsApp image webhook).
+     */
+    public function testChatAcceptsMultimodalVisionContent(): void
+    {
+        $result = $this->getProvider()->chat(
+            [[
+                'role' => 'user',
+                'content' => [
+                    ['type' => 'text', 'text' => 'Describe what you see in this image.'],
+                    ['type' => 'image_url', 'image_url' => ['url' => 'data:image/jpeg;base64,AAEC']],
+                ],
+            ]],
+            ['model' => 'test-model']
+        );
+
+        $this->assertStringContainsString('Test image analysis', $result['content']);
+        $this->assertStringContainsString('1 attached image', $result['content']);
+    }
 }

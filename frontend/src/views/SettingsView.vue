@@ -24,7 +24,10 @@
               {{ $t('settings.language.description') }}
             </p>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="grid-language-options">
+            <div
+              class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+              data-testid="grid-language-options"
+            >
               <button
                 v-for="lang in languages"
                 :key="lang.value"
@@ -114,7 +117,9 @@
                 <label class="block text-sm font-medium txt-secondary mb-1">{{
                   $t('settings.account.email')
                 }}</label>
-                <div class="txt-primary">{{ authStore.user?.email || 'Not logged in' }}</div>
+                <div class="txt-primary">
+                  {{ authStore.user?.email || $t('settings.notLoggedIn') }}
+                </div>
               </div>
               <div data-testid="text-account-level">
                 <label class="block text-sm font-medium txt-secondary mb-1">{{
@@ -136,6 +141,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { languageOptions } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import MainLayout from '@/components/MainLayout.vue'
@@ -148,12 +154,7 @@ const authStore = useAuthStore()
 const { theme, setTheme } = useTheme()
 const { locale } = useI18n()
 
-const languages = [
-  { value: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { value: 'en', label: 'English', flag: '🇬🇧' },
-  { value: 'es', label: 'Español', flag: '🇪🇸' },
-  { value: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-]
+const languages = languageOptions
 
 const selectedLanguage = computed({
   get: () => locale.value,

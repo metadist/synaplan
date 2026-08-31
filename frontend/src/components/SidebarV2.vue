@@ -1,13 +1,10 @@
 <template>
   <!--
-    Desktop navigation rail (§4.3 #1). On mobile the rail does not exist —
-    the bottom tab bar (MobileNav.vue) is the primary navigation there.
+    Desktop navigation rail (§4.3 #1). Hidden on phone chrome (narrow or
+    short / landscape-phone viewports — see usePhoneChrome.ts); the push-drawer
+    is the primary navigation there.
   -->
-  <aside
-    class="v2-sidebar-rail hidden md:flex flex-col"
-    style="width: 80px; min-width: 80px"
-    data-testid="comp-sidebar-v2"
-  >
+  <aside class="v2-sidebar-rail v2-desktop-chrome flex-col" data-testid="comp-sidebar-v2">
     <!-- Brand logo -->
     <div
       class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
@@ -57,10 +54,16 @@
         ]"
         :title="item.description || item.label"
         :data-testid="`btn-sidebar-v2-nav-${item.key}`"
+        :aria-haspopup="item.children?.length ? 'menu' : undefined"
+        :aria-expanded="
+          item.children?.length
+            ? activeFlyout === 'nav' && activeFlyoutItem?.key === item.key
+            : undefined
+        "
         @click="handleNavClick(item)"
       >
         <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
-        <!-- Two-line clamp instead of truncate: "AI Setup & Tools" (and its
+        <!-- Two-line clamp instead of truncate: longer rail labels (and their
              translations) would otherwise be cut off on the 72px rail. -->
         <span
           class="v2-rail-label text-[10px] font-medium leading-tight max-w-full px-0.5 text-center line-clamp-2 break-words"
@@ -327,72 +330,13 @@
       leave-from-class="opacity-100 scale-100"
       leave-to-class="opacity-0 scale-95"
     >
-      <div
+      <SidebarNavFlyout
         v-if="activeFlyout === 'nav' && activeFlyoutItem"
-        class="fixed inset-0 z-[200]"
-        data-testid="overlay-sidebar-v2-nav"
-        @click="closeFlyout"
-      >
-        <!-- w-64: wide enough for the longest child labels in all four
-             locales (e.g. de "Vordefinierte Anweisungen") without truncation. -->
-        <div
-          class="fixed w-64 dropdown-panel origin-top-left overflow-hidden"
-          :style="navDropdownStyle"
-          data-testid="dropdown-sidebar-v2-nav"
-          @click.stop
-        >
-          <!-- Header -->
-          <div class="px-3 py-2 border-b border-light-border/10 dark:border-dark-border/10">
-            <p class="text-xs font-semibold txt-secondary uppercase tracking-wider">
-              {{ activeFlyoutItem.label }}
-            </p>
-          </div>
-
-          <!-- Children Links (with optional group headers) -->
-          <div class="py-1 max-h-[60vh] overflow-y-auto scroll-thin">
-            <template v-for="(section, sIdx) in groupedChildren" :key="sIdx">
-              <div
-                v-if="section.group"
-                class="px-3 pt-2.5 pb-1"
-                :class="{
-                  'border-t border-light-border/10 dark:border-dark-border/10 mt-1': sIdx > 0,
-                }"
-              >
-                <p
-                  class="text-[10px] font-semibold txt-secondary uppercase tracking-wider opacity-60"
-                >
-                  {{ section.group }}
-                </p>
-              </div>
-              <router-link
-                v-for="child in section.items"
-                :key="child.path"
-                :to="child.path"
-                :data-testid="`link-sidebar-v2-${child.key}`"
-                class="flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-                :class="
-                  route.path === child.path
-                    ? 'text-[var(--brand)] bg-[var(--brand)]/[0.06] font-medium'
-                    : 'txt-secondary hover:txt-primary hover:bg-black/[0.03] dark:hover:bg-white/[0.03]'
-                "
-                @click="closeFlyout()"
-              >
-                <span
-                  class="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                  :class="route.path === child.path ? 'bg-[var(--brand)]' : 'bg-current opacity-20'"
-                />
-                <span class="flex-1 truncate">{{ child.label }}</span>
-                <span
-                  v-if="child.badge"
-                  class="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-200 font-medium"
-                >
-                  {{ child.badge }}
-                </span>
-              </router-link>
-            </template>
-          </div>
-        </div>
-      </div>
+        :item="activeFlyoutItem"
+        :panel-style="navDropdownStyle"
+        :current-path="route.path"
+        @close="closeFlyout"
+      />
     </Transition>
   </Teleport>
 
@@ -430,7 +374,7 @@
                   </h2>
                   <p class="text-xs txt-secondary mt-0.5">
                     {{ chatList.length }}
-                    {{ chatList.length === 1 ? 'conversation' : 'conversations' }}
+                    {{ chatList.length === 1 ? $t('chat.conversation') : $t('chat.conversations') }}
                   </p>
                 </div>
               </div>
@@ -693,7 +637,13 @@ import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { useAuth } from '../composables/useAuth'
-import { useNavItems, groupNavChildren, type NavItem } from '../composables/useNavItems'
+import {
+  useNavItems,
+  groupNavChildren,
+  hasNestedNavGroups,
+  type NavItem,
+} from '../composables/useNavItems'
+import SidebarNavFlyout from './SidebarNavFlyout.vue'
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
@@ -773,11 +723,18 @@ watch(
 onMounted(() => {
   loadFeatureStatus()
   document.addEventListener('keydown', handleEscape)
+  window.addEventListener('resize', handleViewportChange)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
+  window.removeEventListener('resize', handleViewportChange)
 })
+
+const handleViewportChange = () => {
+  closeFlyout()
+  userMenuOpen.value = false
+}
 
 const toggleUserMenu = () => {
   triggerHapticImpact('light')
@@ -842,8 +799,6 @@ watch(
   { immediate: true }
 )
 
-const groupedChildren = computed(() => groupNavChildren(activeFlyoutItem.value?.children))
-
 const handleQuickNewChat = async () => {
   if (isCreatingChat.value) return
   isCreatingChat.value = true
@@ -884,7 +839,9 @@ const handleNavClick = (item: NavItem) => {
       const btn = navBtnRefs.value[item.path]
       if (btn) {
         const rect = btn.getBoundingClientRect()
-        const estimatedHeight = (item.children.length + 1) * 36 + 16
+        const groups = groupNavChildren(item.children)
+        const rowCount = hasNestedNavGroups(item.children) ? groups.length : item.children.length
+        const estimatedHeight = (rowCount + 2) * 40 + 16
         const maxTop = window.innerHeight - estimatedHeight - 8
         navDropdownStyle.value = {
           left: `${rect.right + 8}px`,

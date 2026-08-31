@@ -12,7 +12,7 @@
  * project (via @layout). Visual snapshots (Layer 3) live in visual.spec.ts.
  */
 import AxeBuilder from '@axe-core/playwright'
-import { test, expect, type Page } from '../test-setup'
+import { test, expect, LOGGED_OUT, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
@@ -27,15 +27,16 @@ const CHAT = selectors.chat
 const MIN_TARGET_PX = 44
 
 /**
- * Tailwind `md` — the rail exists only at >= md; below it the mobile
- * push-drawer (MobileNav, opened via the top-left toggle) is the primary
- * navigation.
+ * Phone chrome — matches `isPhoneChromeSize` in usePhoneChrome.ts: the
+ * rail exists only when the viewport is both ≥768px wide AND ≥520px tall.
+ * Landscape phones (wide but short) keep the push-drawer.
  */
 const MOBILE_MAX_WIDTH = 768
+const PHONE_CHROME_MAX_HEIGHT = 520
 
 function isMobileViewport(page: Page): boolean {
   const size = page.viewportSize()
-  return size !== null && size.width < MOBILE_MAX_WIDTH
+  return size !== null && (size.width < MOBILE_MAX_WIDTH || size.height < PHONE_CHROME_MAX_HEIGHT)
 }
 
 /** App-mode switch, same mechanism navigation.spec.ts uses. */
@@ -101,8 +102,34 @@ async function expectInsideViewport(page: Page, selector: string, label: string)
  * test report and annotated, but NEVER fail the run. Flip to expect() per
  * surface once it is clean (target: blocking by end of phase 2).
  */
+/**
+ * axe composites ancestor opacity into the colors it measures, so scanning
+ * mid-fade-in reports the half-transparent frame instead of the resting one
+ * (the login entry animation alone produced seven phantom colour-contrast
+ * violations). Wait for every finite animation and transition to reach its end
+ * state first; infinite ones (background float, spinners) never finish and are
+ * skipped.
+ */
+async function waitForAnimationsSettled(page: Page) {
+  await page.evaluate(async () => {
+    const pending = document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map((animation) => animation.finished.catch(() => undefined))
+    await Promise.all(pending)
+  })
+}
+
+async function axeBlocking(page: Page, surface: string) {
+  await waitForAnimationsSettled(page)
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
+  const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  expect(severe, `${surface}: ${severe.map((v) => v.id).join(', ')}`).toEqual([])
+}
+
 async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' | 'dark') {
   await page.emulateMedia({ colorScheme })
+  await waitForAnimationsSettled(page)
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()
   const severe = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   await test.info().attach(`axe-${surface}-${colorScheme}.json`, {
@@ -117,6 +144,18 @@ async function axeReportOnly(page: Page, surface: string, colorScheme: 'light' |
 }
 
 test.describe('@ci @layout UI guard — chat surface', () => {
+  test('landscape phone keeps the drawer and hides the clipped rail', async ({ page }) => {
+    // iPhone 14 landscape CSS pixels — wide enough for Tailwind `md`, short
+    // enough that the 80px rail used to peek out from behind the chat card.
+    await page.setViewportSize({ width: 844, height: 390 })
+    await openApp(page)
+
+    await expect(page.locator(NAV.mobileDrawerToggle)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(page.locator(NAV.sidebar)).toBeHidden()
+    await expectNoHorizontalOverflow(page, 'landscape-phone chat')
+    await expectInsideViewport(page, CHAT.textInput, 'landscape-phone chat input')
+  })
+
   test('chat page has no overflow and input is reachable', async ({ page }) => {
     await openApp(page)
     await expectNoHorizontalOverflow(page, 'chat')
@@ -191,7 +230,7 @@ test.describe('@ci @layout UI guard — chat surface', () => {
   })
 
   test('More section expands with accordion sections and 44px rows (mobile)', async ({ page }) => {
-    test.skip(!isMobileViewport(page), 'the push-drawer exists only below md')
+    test.skip(!isMobileViewport(page), 'the push-drawer exists only on phone chrome')
 
     await openApp(page)
     await ensureAdvancedMode(page)
@@ -210,8 +249,12 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Channels expands its children inline (§4.3 #3).
-    await sheet.locator(NAV.mobileMoreChannels).click()
+    // Accordion: tapping Manage expands groups; Channels reveals Inbound.
+    await sheet.locator(NAV.mobileMoreManage).click()
+    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible({
+      timeout: TIMEOUTS.SHORT,
+    })
+    await sheet.locator(NAV.mobileMoreGroup('channels')).click()
     await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
@@ -346,20 +389,31 @@ test.describe('@ci @layout UI guard — key pages', () => {
     }
   })
 
-  test('login page has no overflow and reachable submit', async ({ page }) => {
-    await page.goto('/login')
-    await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expectNoHorizontalOverflow(page, 'login')
-    await expectInsideViewport(page, selectors.login.submit, 'login submit')
+  // The sign-in form only exists for a visitor who is not signed in: the
+  // guest-only route guard sends an authenticated one straight to the app, and
+  // every test context otherwise carries the worker's session.
+  test.describe('signed out', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page has no overflow and reachable submit', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expectNoHorizontalOverflow(page, 'login')
+      await expectInsideViewport(page, selectors.login.submit, 'login submit')
+    })
   })
 })
 
 test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () => {
-  test('login page — light and dark', async ({ page }) => {
-    await page.goto('/login')
-    await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await axeReportOnly(page, 'login', 'light')
-    await axeReportOnly(page, 'login', 'dark')
+  test.describe('signed out', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page — light and dark', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await axeReportOnly(page, 'login', 'light')
+      await axeReportOnly(page, 'login', 'dark')
+    })
   })
 
   test('chat and files — light and dark', async ({ page }) => {
@@ -371,6 +425,27 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
     await expect(page.locator(selectors.files.page)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     await axeReportOnly(page, 'files', 'light')
     await axeReportOnly(page, 'files', 'dark')
+  })
+
+  test('login, empty chat and Manage panel — axe blocking', async ({ page }) => {
+    await openApp(page)
+    await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    if (!isMobileViewport(page)) {
+      await axeBlocking(page, 'empty-chat')
+      await page.locator(NAV.sidebarV2Manage).click()
+      await expect(page.locator(NAV.navDropdown)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await axeBlocking(page, 'manage-panel')
+    }
+  })
+
+  test.describe('signed out axe blocking', () => {
+    test.use(LOGGED_OUT)
+
+    test('login page — axe blocking', async ({ page }) => {
+      await page.goto('/login')
+      await expect(page.locator(selectors.login.submit)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await axeBlocking(page, 'login')
+    })
   })
 
   test('AI models — light and dark', async ({ page }) => {

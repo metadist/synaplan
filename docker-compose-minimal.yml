@@ -118,7 +118,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
+    image: node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -155,7 +155,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:24@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584
+    image: node:24@sha256:be23f54a88d34e8824c741b19b91064094f92c1c97b194144bfc8b50d67258e2
     container_name: synaplan-frontend-widgets
     working_dir: /app
     command: sh -c "npm ci && npm run build:widget -- --watch"
@@ -421,7 +421,7 @@ services:
 
   # MariaDB 11.8 Database
   db:
-    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
+    image: mariadb:12.3.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979
     container_name: synaplan-db
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
@@ -492,7 +492,7 @@ services:
   # Optional Piper TTS — four baked voices (en, de, es, tr).
   #   docker compose -f docker-compose-minimal.yml --profile tts up -d
   tts:
-    image: ghcr.io/metadist/synaplan-tts:latest@sha256:f4cabd3fec77a682be1aa853ae7958e6369353abbd7b8b19e0162058eb98ff81
+    image: ghcr.io/metadist/synaplan-tts:latest@sha256:3c8ed60619be4ae1913e64ac35c28aa9b48da66e0e5006c972b91d0a5d278bb2
     container_name: synaplan-tts
     profiles: [tts]
     restart: unless-stopped

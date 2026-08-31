@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { computed } from 'vue'
-import { reloadConfig, getConfigSync } from '@/services/api/httpClient'
+import { reloadConfig, getConfig, getConfigSync } from '@/services/api/httpClient'
 
 /**
  * Regression guard for the in-chat usage taximeter (and every other
@@ -42,5 +42,26 @@ describe('httpClient runtime config reactivity', () => {
     await reloadConfig()
 
     expect(enabled.value).toBe(false)
+  })
+
+  it('retries after a failed load instead of keeping the fallback forever', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          setup: { wizardRequired: true },
+          usageTaximeter: { enabled: true },
+          unavailableProviders: [],
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await reloadConfig()
+    expect(getConfigSync().setup?.wizardRequired).toBeUndefined()
+
+    await getConfig()
+    expect(getConfigSync().setup?.wizardRequired).toBe(true)
   })
 })

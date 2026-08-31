@@ -52,9 +52,11 @@ Partner Network terms becomes the **alliance lead**.
    business days for the Seller Operations review of the listing itself. The
    automated AMI scan is usually under an hour.
 
-Fixed technical constraints, which the build already satisfies: the source AMI
-must live in **us-east-1**, unencrypted, EBS-backed and HVM, and every
-CloudFormation template needs an architecture diagram
+Fixed technical constraints, which the build enforces: the source AMI must live
+in **us-east-1**, be unencrypted, EBS-backed and HVM, and be shared with AWS
+Marketplace ingestion account `679593333241`. Marketplace encrypts its copy
+during ingestion; every buyer volume is also encrypted by the deployment
+templates. Every CloudFormation template needs an architecture diagram
 ([`deploy/aws/cloudformation/architecture.md`](../deploy/aws/cloudformation/architecture.md)).
 
 ## Who needs which access
@@ -119,8 +121,10 @@ one shows up as `AccessDenied` in the verification stack, after the AMI it was
 meant to verify has already been built.
 
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
-  its own account for the security scan. Name it in the Management Portal under
-  Settings.
+  its own account for the security scan. Every submitted version names it, in the
+  Add Version form's *IAM access role ARN* field or, when the submit job does the
+  submitting, in the `AmiSource` it sends. Store its ARN as the repository secret
+  `AWS_MARKETPLACE_INGESTION_ROLE_ARN`.
 - **The build role** is assumed by this repository's release workflow through
   GitHub OIDC — there is no access key anywhere in this repository, and there
   must never be. Store its ARN as the repository secret
@@ -138,14 +142,17 @@ Each step is cheap, and each one catches what the next would otherwise catch
 later and slower.
 
 1. **Build the AMI.** Push a release tag; the workflow builds x86_64 and arm64 in
-   us-east-1, then launches the x86_64 image through
+   us-east-1, verifies their snapshots are unencrypted, shares both source AMIs
+   with the Marketplace ingestion account, then launches the x86_64 image through
    `synaplan-new-vpc.yaml`, runs the smoke test on it over Session Manager, and
    deletes the stack. About 20 minutes and a few cents of instance time.
 2. **Test Add Version** in the Management Portal. A free automated compliance
    scan that reports exactly what the review would otherwise reject: password
    authentication, root login, known CVEs, credentials left in the image.
    `deploy/aws/scripts/harden.sh` fails the Packer build on the first three, so
-   this should be a formality.
+   this should be a formality. Only needed while the listing is new — once the
+   secrets below are set, the `submit` job offers each release's version by
+   itself.
 3. **Create the product** as a Limited listing — published, but visible only to
    the seller account and any account we allowlist. Subscribe and launch it the
    way a customer will, including one-click "Launch from Website". This is the
@@ -155,6 +162,64 @@ later and slower.
    three regions. Each region is real instance time for no extra signal beyond
    the third.
 5. **Request public visibility.**
+
+## Submitting a version automatically
+
+Once the listing exists, the `submit` job in
+[`aws-ami.yml`](../.github/workflows/aws-ami.yml) offers each release to it
+through the Marketplace Catalog API, after the AMI has been built, shared and
+verified by a real launch. It needs two secrets, and skips itself with a notice
+while either of them is missing:
+
+| Secret | Value |
+| --- | --- |
+| `AWS_MARKETPLACE_PRODUCT_ID` | the listing's product ID, `prod-…` |
+| `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | the `IngestionRoleArn` output of the roles stack |
+
+Nothing else has to be switched on, and nothing has to be switched over later.
+Every architecture is sent twice: first with `Intent=VALIDATE`, which asks AWS
+whether it would accept the document without creating anything, and then — only
+if that passed — with `Intent=APPLY`. That covers what a separate dry run used
+to cover, a wrong product ID or a role AWS cannot assume, without leaving a
+manual step between two releases for someone to forget.
+
+A submitted version still sits in AWS review for days, so it is not published by
+this job. If a submission turns out to be wrong, cancel its change set —
+`CancelChangeSet` is part of the build role's permissions:
+
+```bash
+aws marketplace-catalog cancel-change-set \
+  --catalog AWSMarketplace --change-set-id <id>
+```
+
+Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
+`<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
+version must share the same `AmiSource`, so one version can carry only one AMI.
+They are submitted one after the other because a running change set locks the
+entity.
+
+### Finding the product ID
+
+Management Portal → **Products** → **Server**. Open the listing; the ID is in the
+detail view and in the URL:
+
+```text
+https://aws.amazon.com/marketplace/management/products/server/prod-xxxxxxxxxxxxx
+```
+
+Or ask the API, with the build role's new catalog permissions:
+
+```bash
+aws marketplace-catalog list-entities \
+  --region us-east-1 \
+  --catalog AWSMarketplace \
+  --entity-type AmiProduct \
+  --query 'EntitySummaryList[].{Id:EntityId,Name:Name,Visibility:Visibility}'
+```
+
+An empty list means the listing has not been created yet — do the steps above
+first. The `submit` job stays skipped until the secret is set, so releases keep
+working in the meantime.
 
 ## Usage Instructions
 

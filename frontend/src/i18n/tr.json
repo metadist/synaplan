@@ -54,6 +54,23 @@
     "endConfirmMessage": "Konuşma kalıcı olarak silinecek ve bu oturumdaki dosyalar kaldırılacak.",
     "endConfirmButton": "Bitir ve sil"
   },
+  "modelMix": {
+    "title": "Hızlı model kurulumu",
+    "buttonLabel": "Model karışımı",
+    "activeLabel": "Etkin model karışımı: {name}",
+    "mixes": {
+      "default": "Varsayılan Model Karışımı",
+      "openai": "ChatGPT Sol Karışımı",
+      "anthropic": "Claude Fable Karışımı",
+      "google": "Google Gemini Karışımı",
+      "xai": "Grok Karışımı",
+      "europe": "Avrupa Karışımı"
+    },
+    "defaultDescription": "Bu kurulumun önerdiği modeller",
+    "unavailable": "Bu sunucuda uygun bir sağlayıcı yapılandırılmamış",
+    "applied": "{name} artık yeni yanıtlar için etkin",
+    "applyError": "Model karışımı değiştirilemedi. Lütfen tekrar deneyin."
+  },
   "jobs": {
     "kind": {
       "video": "video",
@@ -84,6 +101,7 @@
     "poweredBy": "Sunan"
   },
   "pageTitles": {
+    "desktop": "Masaüstü",
     "login": "Giriş",
     "register": "Kayıt Ol",
     "forgotPassword": "Şifremi Unuttum",
@@ -94,24 +112,24 @@
     "error": "Hata",
     "chat": "Sohbet",
     "tools": "Araçlar",
-    "chatWidget": "Widget'ların",
+    "chatWidget": "Sohbet widget'ları",
     "docSummary": "Özetleyici",
-    "mailHandler": "IMAP E-posta İşleyici",
+    "mailHandler": "E-posta işleyici",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "ragSearch": "Arama",
     "vectorStorage": "Vektör Deposu",
-    "configInbound": "Standart Gelen",
-    "configAiModels": "AI Model Yapılandırması",
+    "configInbound": "Gelen",
+    "configAiModels": "Modeller",
     "configProviderHiggsfield": "Higgsfield Bağlantısı",
-    "configTaskPrompts": "Hazır Talimatlar",
-    "configSortingPrompt": "Yönlendirme Yapılandırması",
+    "configTaskPrompts": "Talimatlar",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
     "configApiDocs": "API Dokümantasyonu",
-    "statistics": "İstatistikler",
+    "statistics": "Kullanım",
     "settings": "Tercihler",
     "profile": "Profil",
-    "admin": "Yönetici Paneli",
+    "admin": "İşlet",
     "adminFeatures": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
@@ -132,7 +150,8 @@
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Yapay zeka ajanları",
     "connections": "Bağlantılar",
-    "savedTasks": "Yinelenen görevler"
+    "savedTasks": "Kayıtlı görevler",
+    "setup": "Kurulum"
   },
   "adminModelStatus": {
     "title": "Model Durumu",
@@ -309,7 +328,9 @@
       "public": "Herkese Açık"
     },
     "fileOnlyDefaultMessage": "Lütfen ekteki dosyayı inceleyin.",
-    "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin."
+    "voiceMessageDefaultMessage": "Lütfen sesli mesajıma yanıt verin.",
+    "conversation": "sohbet",
+    "conversations": "sohbetler"
   },
   "moderation": {
     "report": {
@@ -360,7 +381,7 @@
     }
   },
   "admin": {
-    "title": "Yönetici Paneli",
+    "title": "İşlet",
     "description": "Sistem yönetimi ve yapılandırma",
     "tabs": {
       "overview": "Genel Bakış",
@@ -564,6 +585,7 @@
       "saveError": "Yapılandırma kaydedilemedi",
       "saved": "Yapılandırma kaydedildi",
       "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
+      "envOverridesDb": "{key} ortam değişkeni tarafından sabitlendi. Şu anda: {value}. Bu ayarı burada yönetmek için değişkeni ortamdan kaldırın.",
       "unsaved": "Kaydedilmemiş değişiklikler",
       "testConnection": "Bağlantıyı Test Et",
       "testFailed": "Bağlantı testi başarısız",
@@ -623,20 +645,21 @@
     "upgrade": "Yükselt"
   },
   "nav": {
+    "desktop": "Masaüstü",
     "chat": "Sohbet",
     "new": "Yeni",
     "newDescription": "Yeni bir sohbet başlat",
     "history": "Geçmiş",
     "historyDescription": "Sohbet geçmişi",
     "tools": "Araçlar",
-    "toolsChatWidget": "Widget'ların",
+    "toolsChatWidget": "Sohbet widget'ları",
     "toolsDocSummary": "Özetleyici",
-    "toolsMailHandler": "IMAP E-posta İşleyici",
+    "toolsMailHandler": "E-posta işleyici",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
     "configConnections": "Bağlantıları yapılandır",
     "groupApi": "API",
-    "savedTasks": "Yinelenen görevler",
+    "savedTasks": "Kayıtlı görevler",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
     "filesDescription": "Sohbetleriniz için kaynaklar",
@@ -647,16 +670,16 @@
     "preferences": "Tercihler",
     "account": "Hesap",
     "accountDescription": "Hesap ve tercihler",
-    "configInbound": "Standart Gelen",
-    "configAiModels": "AI Model Yapılandırması",
-    "configTaskPrompts": "Hazır Talimatlar",
-    "configSortingPrompt": "Yönlendirme Yapılandırması",
+    "configInbound": "Gelen",
+    "configAiModels": "Modeller",
+    "configTaskPrompts": "Talimatlar",
+    "configSortingPrompt": "Yönlendirme",
     "configApiKeys": "API Anahtarları",
-    "statistics": "İstatistikler",
+    "statistics": "Kullanım",
     "subscription": "Abonelik",
     "upgrade": "Yükselt",
-    "admin": "Yönetici",
-    "adminDashboard": "Kontrol Paneli",
+    "admin": "İşlet",
+    "adminDashboard": "Genel bakış",
     "adminFeatureStatus": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
@@ -665,7 +688,14 @@
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap",
     "menu": "Menü",
-    "aiAgents": "Yapay zeka ajanları"
+    "aiAgents": "Yapay zeka ajanları",
+    "manage": "Yönet",
+    "manageDescription": "Asistanlar, kanallar ve otomasyonlar",
+    "groupAssistants": "Asistanlar",
+    "groupAutomations": "Otomasyonlar",
+    "groupTools": "Araçlar",
+    "liveSupport": "Canlı destek",
+    "usage": "Kullanım"
   },
   "guest": {
     "disabledTitle": "Misafir sohbeti kullanılamıyor",
@@ -726,6 +756,7 @@
     "plusMenu": {
       "label": "Ekle",
       "attach": "Dosya ekle",
+      "photo": "Fotoğraf çek",
       "model": "Model",
       "tools": "Araçlar",
       "knowledge": "Bilgi klasörü"
@@ -746,6 +777,10 @@
     "voiceWhisper": "Kaydet ve Whisper ile yazıya dök",
     "listeningStarted": "🎙️ Dinleniyor... şimdi konuşun",
     "recordingStarted": "🎙️ Kayıt başladı...",
+    "voiceStatus": {
+      "recording": "Kaydediliyor...",
+      "transcribing": "Metne dönüştürülüyor..."
+    },
     "speechError": "Konuşma tanıma hatası: {error}",
     "recordingError": "Kayıt başarısız: {error}",
     "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
@@ -1047,7 +1082,7 @@
     "cloudProviders": "Bulut sağlayıcıları",
     "cloudProvidersHint": "Bir API anahtarı yapıştırın; canlı olarak test edilir ve şifrelenmiş saklanır. .env dosyanızdaki anahtarlar otomatik olarak alınır.",
     "recommended": "Önerilen",
-    "freeTier": "Ücretsiz kullanım mevcut",
+    "freeTier": "Bu sağlayıcıda ücretsiz API anahtarı",
     "connected": "Bağlı",
     "sourceEnv": ".env dosyasından içe aktarıldı",
     "sourceDbFromEnv": "DB'de saklandı (.env'den)",
@@ -1180,7 +1215,9 @@
     "disabled": "Devre Dışı",
     "reset": "Sıfırla",
     "expand": "Genişlet",
-    "noResults": "Sonuç bulunamadı"
+    "noResults": "Sonuç bulunamadı",
+    "skipToContent": "İçeriğe geç",
+    "loadingMessages": "Mesajlar yükleniyor…"
   },
   "search": {
     "sources": "Kaynaklar",
@@ -1204,6 +1241,7 @@
     "forgotPassword": "Şifrenizi mi unuttunuz?",
     "forgotPasswordDesc": "E-posta adresinizi girin, şifrenizi sıfırlamanız için size bir bağlantı göndereceğiz.",
     "noAccount": "Hesabınız yok mu?",
+    "registrationClosed": "Kayıt kapalı. Hesaba ihtiyacın varsa lütfen yöneticinle iletişime geç.",
     "hasAccount": "Zaten hesabınız var mı?",
     "signIn": "Giriş Yap",
     "signingIn": "Giriş yapılıyor...",
@@ -1246,6 +1284,8 @@
     "registrationCompleteDesc": "Size bir doğrulama bağlantısı gönderdik. Lütfen gelen kutunuzu ve spam klasörünüzü kontrol edin, ardından hesabınızı etkinleştirmek için bağlantıya tıklayın.",
     "passwordResetSuccess": "İstek Gönderildi!",
     "passwordResetSuccessDesc": "Bu e-posta adresiyle bir hesap varsa, şifre sıfırlama bağlantısı gönderdik. Lütfen gelen kutunuzu kontrol edin.",
+    "forgotPasswordNoMailerHint": "Bu şifreyi kaybedersen ve hiçbir e-posta iletilemiyorsa, sunucuya erişimi olan biri yenisini şöyle belirleyebilir:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password sen{'@'}ornek.com --generate",
     "recaptchaError": "reCAPTCHA doğrulaması başarısız. Lütfen tekrar deneyin.",
     "backToHomepage": "← www.synaplan.com'a geri dön",
     "hostingTermsNote": "Barındırma platformunun kullanım koşulları geçerlidir.",
@@ -1386,7 +1426,7 @@
       "knowledge": {
         "intro": "AI asistanının içeriğinizle ilgili soruları yanıtlayabilmesi için belgeler ekleyin. Bu adım isteğe bağlıdır.",
         "uploadLabel": "Dosya yükle",
-        "pickLabel": "Dosya Yöneticisinden seç",
+        "pickLabel": "Kaynaklardan seç",
         "uploadHint": "PDF, Word, metin, Markdown, CSV veya JSON. Dosyalar widget oluşturulduktan sonra işlenir.",
         "empty": "Henüz veri kaynağı yok — daha sonra da ekleyebilirsiniz."
       },
@@ -1566,7 +1606,9 @@
       "modelNotConfigured": "AI modeli yapılandırılmamış. Lütfen Gelişmiş Ayarlar → AI Kurulumu → Prompt ve Model altından bir model seçin.",
       "editHintTitle": "AI asistanınızı ince ayarlamak ister misiniz?",
       "editHintDescription": "Kaydettikten sonra, AI asistanınızı Gelişmiş Ayarlar → AI Kurulumu → Widget AI Sihirbazı altından istediğiniz zaman ince ayarlayabilirsiniz."
-    }
+    },
+    "listTitle": "Sohbet widget'ları",
+    "listEmpty": "Henüz widget yok. Başlamak için bir sohbet widget'ı oluşturun."
   },
   "profile": {
     "title": "Profil Ayarları",
@@ -1580,7 +1622,8 @@
       "email": "E-posta",
       "emailHint": "Giriş e-postanız (değiştirilemez)",
       "phone": "Telefon",
-      "phonePlaceholder": "İsteğe bağlı iletişim numarası"
+      "phonePlaceholder": "İsteğe bağlı iletişim numarası",
+      "managedBy": "Bu hesap {provider} tarafından yönetiliyor"
     },
     "companyInfo": {
       "title": "Şirket Bilgileri",
@@ -1620,7 +1663,10 @@
       "newPasswordHint": "En az 8 karakter",
       "confirmPassword": "Şifreyi Onayla",
       "confirmPasswordPlaceholder": "Yeni şifreyi onaylayın",
-      "confirmPasswordHint": "Yeni şifreyle eşleşmeli"
+      "confirmPasswordHint": "Yeni şifreyle eşleşmeli",
+      "externalAuth": "{provider} ile giriş yapıyorsunuz. Parola orada yönetilir.",
+      "mismatch": "Parolalar eşleşmiyor",
+      "tooShort": "Parola en az 8 karakter olmalı"
     },
     "appSecurity": {
       "title": "Uygulama güvenliği",
@@ -1855,6 +1901,9 @@
     "generatingFileWriting": "Belge içeriği yazılıyor…",
     "generatingFileWritingNamed": "{filename} için içerik yazılıyor…",
     "generatingFileConverting": "{filename} indirme için oluşturuluyor…",
+    "editingImageTitle": "Görseliniz düzenleniyor",
+    "editingImageDesc": "Değişiklikleriniz bu sohbetteki görsele uygulanıyor",
+    "editingImageNamed": "Değişiklikleriniz {filename} dosyasına uygulanıyor",
     "thinkingTitle": "Düşünüyor…",
     "thinkingDesc": "Model, yanıt vermeden önce düşünüyor",
     "topic": "Konu",
@@ -2155,7 +2204,8 @@
       "models": "model",
       "adminOnlyTitle": "Yönetici erişimi gerekli",
       "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
-    }
+    },
+    "notLoggedIn": "Oturum açılmadı"
   },
   "storage": {
     "title": "Depolama Kotası",
@@ -2312,7 +2362,7 @@
     "status_error": "Hata",
     "terms": {
       "vectorized": "yapay zekâ ile aranabilir",
-      "knowledgeGroup": "bilgi grubu",
+      "knowledgeGroup": "bilgi klasörü",
       "incoming": "gelen",
       "generated": "yapay zekâ üretimi",
       "notApplicable": "uygulanamaz"
@@ -2358,13 +2408,13 @@
     },
     "help": {
       "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
-      "group": "Bilgi grupları dosyaları bir araya getirir. Yapay zekâ bir grupta arama yaptığında içindeki tüm dosyaları kullanabilir.",
+      "group": "Bilgi klasörleri dosyaları bir araya getirir. AI bir klasörde arama yaptığında içindeki her dosyayı kullanabilir.",
       "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
       "incoming": "Diğer uygulamaların bilgi tabanınız için gönderdiği dosyalar. İnceleyin, sonra saklayın veya çıkarın.",
       "typeFilter": "Yalnızca tek bir dosya türünü göster — belgeler, görseller, video veya ses.",
       "vectorizedFilter": "Dosyaların yapay zekâ ile aranabilir olup olmadığına göre filtrele.",
       "reVectorize": "Bu dosyayı yeniden okuyup yapay zekânın ondan öğrendiklerini tazele. Düzenledikten sonra veya başarısız olduğunda kullan.",
-      "moveGroup": "Dosyaları başka bir bilgi grubuna taşı. Bu, yapay zekânın onları hangi grupta aradığını değiştirir; hiçbir şey silinmez.",
+      "moveGroup": "Dosyaları başka bir bilgi klasörüne taşıyın. AI'nın aradığı klasör değişir — hiçbir şey silinmez.",
       "storage": "Depolamanızın ne kadarını kullandığınız. Yapay zekâ üretimi içerik de sayılır ve ayrı gösterilir."
     },
     "empty": {
@@ -2418,6 +2468,9 @@
       "open": "Aç",
       "retry": "Yeniden dene",
       "provenance": "{source} · {time}"
+    },
+    "preview": {
+      "play": "Oynat"
     },
     "generated": {
       "title": "Üretilen",
@@ -3055,6 +3108,62 @@
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "usageCount": "istek"
     },
+    "desktop": {
+      "title": "Masaüstü",
+      "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
+      "notAvailableYet": "Synaplan Desktop henüz indirilebilir değil. Bağlantıyı test etmek için şimdiden bir eşleme kodu oluşturabilirsiniz.",
+      "pairButton": "Bu bilgisayarı bağla",
+      "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
+      "disconnect": "Bağlantıyı kes",
+      "confirmDisconnectTitle": "Bu bilgisayarın bağlantısını kes",
+      "confirmDisconnect": "„{name}” artık hesabınıza erişemeyecek. Daha sonra yeni bir kodla tekrar bağlayabilirsiniz.",
+      "disconnected": "Bilgisayarın bağlantısı kesildi.",
+      "disconnectFailed": "Bilgisayarın bağlantısı kesilemedi.",
+      "pairing": {
+        "title": "Bu bilgisayarı bağla",
+        "intro": "Bağlamak istediğiniz bilgisayarda Synaplan Desktop'ı açın, ardından bu adresi ve kodu girin.",
+        "addressLabel": "Sunucu adresi",
+        "codeLabel": "Eşleme kodu",
+        "expiresIn": "{time} içinde sona erer",
+        "expired": "Bu kodun süresi doldu.",
+        "newCode": "Yeni kod oluştur",
+        "copyAddress": "Adresi kopyala",
+        "copyCode": "Kodu kopyala",
+        "createFailed": "Eşleme kodu oluşturulamadı.",
+        "copyFailed": "Panoya kopyalanamadı."
+      },
+      "devices": {
+        "empty": "Henüz bağlı bilgisayar yok.",
+        "name": "Bilgisayar",
+        "status": "Durum",
+        "lastSeen": "Son görülme",
+        "waitingJobs": "Bekleyen işler",
+        "actions": "İşlemler",
+        "never": "hiç",
+        "statusActive": "Bağlı",
+        "statusRevoked": "Bağlantı kesildi"
+      },
+      "run": {
+        "action": "Bu bilgisayarda çalıştır",
+        "multiple": "{count} bilgisayar",
+        "needPrompt": "Önce bilgisayarın ne yapması gerektiğini yazın.",
+        "skillTitle": "Bu bilgisayarda çalıştır",
+        "skillMessage": "„{name}” üzerinde hangi skill çalıştırılsın?",
+        "skillPlaceholder": "örn. pptx",
+        "invalidSkill": "Yalnızca küçük harf, rakam ve kısa çizgi kullanın.",
+        "sent": "„{name}” gönderildi.",
+        "enqueueFailed": "İş gönderilemedi."
+      },
+      "jobCard": {
+        "waiting": "{name} bekleniyor",
+        "done": "{name} tamamlandı",
+        "failed": "{name} tamamlayamadı",
+        "noAnswer": "Bu bilgisayar yanıt vermedi.",
+        "unknownSkill": "Bu bilgisayarda bu skill yok.",
+        "skillDisabled": "Bu skill bu bilgisayarda kapalı.",
+        "localError": "Skill bu bilgisayarda başarısız oldu."
+      }
+    },
     "phoneVerification": {
       "title": "Telefon Doğrulama",
       "description": "Tam özellikleri ve daha yüksek limitleri WhatsApp üzerinden açmak için telefon numaranızı doğrulayın.",
@@ -3450,6 +3559,14 @@
     "deleteSelectedConfirm": "{count} seçili sohbeti silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "deleteSuccess": "{count} sohbet başarıyla silindi",
     "deleteFailed": "Sohbetler silinemedi"
+  },
+  "messageRefs": {
+    "olderConversation": "Önceki konuşma",
+    "clickToOpen": "Orijinal konuşmayı açmak için tıklayın",
+    "missing": {
+      "badge": "Önceki mesaj",
+      "tooltip": "Bu mesaj referansı çözümlenemedi. Mesaj silinmiş olabilir."
+    }
   },
   "memories": {
     "fullscreen": {
@@ -3953,6 +4070,82 @@
       "connect": "Bağlan",
       "connecting": "Bağlantı kontrol ediliyor…",
       "connectError": "Bu sunucuya ulaşılamıyor. Adresi kontrol edip tekrar dene."
+    }
+  },
+  "setup": {
+    "title": "{brand} kurulumu",
+    "subtitle": "Bu sunucunun henüz yöneticisi yok. Üç kısa adım ve kullanıma hazır.",
+    "subtitleProgress": "Adım {current} / {total}.",
+    "progressLabel": "Kurulum ilerlemesi",
+    "loading": "Sunucu kontrol ediliyor…",
+    "switchServer": "Başka bir sunucuya bağlan",
+    "toggleTheme": "Açık ve koyu tema arasında geçiş yap",
+    "switchLanguage": "Dili değiştir",
+    "footerHint": "Kurulum bitene kadar bu sunucuyu başka kimse kullanamaz.",
+    "steps": {
+      "admin": "Yönetici",
+      "provider": "AI sağlayıcısı",
+      "access": "Erişim"
+    },
+    "alreadyDone": {
+      "title": "Bu sunucu zaten kurulmuş",
+      "description": "Halihazırda bir yöneticisi var, burada yapılacak bir şey kalmadı. Devam etmek için giriş yap.",
+      "cta": "Girişe git"
+    },
+    "admin": {
+      "title": "Yönetici hesabını oluştur",
+      "description": "Giriş yapacağın hesap bu. Bu sunucudaki her şeyi yönetebilir.",
+      "emailLabel": "E-posta adresi",
+      "emailPlaceholder": "sen{'@'}ornek.com",
+      "passwordLabel": "Şifre",
+      "passwordHint": "En az 8 karakter; bir büyük harf, bir küçük harf ve bir rakam içermeli.",
+      "confirmLabel": "Şifreyi yeniden gir",
+      "togglePassword": "Şifreyi göster veya gizle",
+      "submit": "Hesap oluştur",
+      "submitting": "Hesap oluşturuluyor…",
+      "errorMismatch": "İki şifre birbiriyle aynı değil.",
+      "errorWeak": "Şifre en az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam gerektirir.",
+      "errorInProgress": "Bu hesap şu anda başka bir yerde oluşturuluyor. Biraz bekle ve sayfayı yeniden yükle.",
+      "errorAlreadyDone": "Bu sunucunun zaten bir yöneticisi var, burada oluşturulacak bir şey yok. Bunun yerine giriş yap.",
+      "errorDisabled": "Bu sunucuda tarayıcı üzerinden kurulum kapalı. İlk hesabı sunucuyu işleten kişi oluşturur.",
+      "errorGeneric": "Hesap oluşturulamadı. Lütfen tekrar dene."
+    },
+    "provider": {
+      "title": "Bir AI sağlayıcısı bağla",
+      "description": "Yanıt verebilmesi için AI bir sağlayıcıya ihtiyaç duyar. Birini seçip API anahtarını yapıştırın — anahtar hemen test edilir ve bu sunucuda şifreli olarak saklanır.",
+      "loading": "Sağlayıcılar yükleniyor…",
+      "loadFailed": "Sağlayıcı listesi yüklenemedi.",
+      "ready": "Bir sağlayıcı bağlı. AI artık yanıt verebilir.",
+      "continue": "Devam et",
+      "skipHint": "Bunu atlayıp sağlayıcıyı sonra Yönetici → AI Sağlayıcı Kurulumu altında bağlayabilirsin. O zamana kadar sohbet çalışmaz.",
+      "chooseProvider": "Bir AI sağlayıcısı seçin",
+      "pickHint": "Anahtarını girmek için yukarıdan bir sağlayıcı seçin. Biri yeterli, diğerlerini sonra ekleyebilirsiniz.",
+      "keyLabel": "{provider} için API anahtarı",
+      "freeKeyHint": "{provider} üzerinden API anahtarı almak ücretsizdir.",
+      "saving": "Test ediliyor…",
+      "willBecomeDefault": "Bu anahtarı kaydettiğinizde yanıtları varsayılan olarak {provider} verir.",
+      "alreadyDefault": "Yanıtları hâlihazırda varsayılan olarak {provider} veriyor."
+    },
+    "access": {
+      "title": "Bu sunucuyu kimin kullanabileceğine karar ver",
+      "description": "İkisini de dilediğin zaman Yönetici → Yapılandırma altında değiştirebilirsin.",
+      "registrationLabel": "Ziyaretçiler kendi hesaplarını oluşturabilsin",
+      "registrationHint": "Bu sunucuya erişebilen herkes kaydolabilir. Davetleri kendin yapmak istiyorsan kapat.",
+      "guestChatLabel": "Ziyaretçiler hesapsız olarak sohbeti deneyebilsin",
+      "guestChatHint": "Herkese açık bir demo için kullanışlı. Sunucu yalnızca ekibin içinse kapat.",
+      "lockedByEnv": "{key} ortam değişkeni tarafından belirlendiği için burada değiştirilemez.",
+      "noMailerWarning": "Yapılandırılmış bir posta sunucusu yok, bu yüzden yeni hesaplar e-posta adreslerini doğrulayamaz.",
+      "changeLaterHint": "Kurulumu tamamlamak bu sunucuyu kullanıma açar.",
+      "submit": "Kurulumu tamamla",
+      "submitting": "Tamamlanıyor…",
+      "errorGeneric": "Kurulum tamamlanamadı. Lütfen tekrar dene."
+    },
+    "done": {
+      "title": "Sunucun hazır",
+      "description": "Kurulum tamamlandı. Yönetici olarak giriş yaptın.",
+      "enter": "{brand} kullanmaya başla",
+      "entering": "Açılıyor…",
+      "enterFailed": "Uygulama açılamadı. Lütfen tekrar dene."
     }
   },
   "iap": {

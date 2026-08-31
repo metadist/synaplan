@@ -54,6 +54,23 @@
     "endConfirmMessage": "The conversation will be discarded permanently and files from this session will be deleted.",
     "endConfirmButton": "End and discard"
   },
+  "modelMix": {
+    "title": "Quick model setup",
+    "buttonLabel": "Model mix",
+    "activeLabel": "Active model mix: {name}",
+    "mixes": {
+      "default": "Default Model Mix",
+      "openai": "ChatGPT Sol Mix",
+      "anthropic": "Claude Fable Mix",
+      "google": "Google Gemini Mix",
+      "xai": "Grok Mix",
+      "europe": "Europe Mix"
+    },
+    "defaultDescription": "The models recommended by this installation",
+    "unavailable": "No matching provider is set up on this server",
+    "applied": "{name} is now active for new answers",
+    "applyError": "The model mix could not be switched. Please try again."
+  },
   "jobs": {
     "kind": {
       "video": "video",
@@ -94,26 +111,26 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Tools",
-    "chatWidget": "Your Widgets",
+    "chatWidget": "Chat widgets",
     "docSummary": "Summarizer",
-    "mailHandler": "IMAP Email Handler",
+    "mailHandler": "Email handler",
     "plugins": "Plugins",
     "files": "Sources",
     "memories": "Memories",
     "feedback": "Feedback",
     "ragSearch": "Search",
     "vectorStorage": "Vector Storage",
-    "configInbound": "Standard Inbound",
-    "configAiModels": "AI Model Config",
+    "configInbound": "Inbound",
+    "configAiModels": "Models",
     "configProviderHiggsfield": "Higgsfield Connection",
-    "configTaskPrompts": "Preconfigured Instructions",
-    "configSortingPrompt": "Routing Config",
+    "configTaskPrompts": "Instructions",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
     "configApiDocs": "API Documentation",
-    "statistics": "Statistics",
+    "statistics": "Usage",
     "settings": "Preferences",
     "profile": "Profile",
-    "admin": "Admin Panel",
+    "admin": "Operate",
     "adminFeatures": "Feature Status",
     "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
@@ -133,7 +150,9 @@
     "mcpServers": "MCP Servers",
     "aiAgents": "AI Agents",
     "connections": "Connections",
-    "savedTasks": "Saved Recurring Tasks"
+    "savedTasks": "Saved tasks",
+    "desktop": "Desktop",
+    "setup": "Setup"
   },
   "adminModelStatus": {
     "title": "Model Status",
@@ -316,7 +335,9 @@
       "public": "Public"
     },
     "fileOnlyDefaultMessage": "Please review the attached file.",
-    "voiceMessageDefaultMessage": "Please respond to my voice message."
+    "voiceMessageDefaultMessage": "Please respond to my voice message.",
+    "conversation": "conversation",
+    "conversations": "conversations"
   },
   "moderation": {
     "report": {
@@ -367,7 +388,7 @@
     }
   },
   "admin": {
-    "title": "Admin Panel",
+    "title": "Operate",
     "description": "System management and configuration",
     "tabs": {
       "overview": "Overview",
@@ -573,6 +594,7 @@
       "saved": "Configuration saved",
       "savedLive": "Saved — takes effect immediately",
       "dbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",
+      "envOverridesDb": "Locked by the environment variable {key}. It is currently {value}. Remove the variable from your environment to manage this setting here.",
       "unsaved": "Unsaved changes",
       "testConnection": "Test Connection",
       "testFailed": "Connection test failed",
@@ -641,14 +663,14 @@
     "historyDescription": "Chat history",
     "profile": "Profile",
     "tools": "Tools",
-    "toolsChatWidget": "Your Widgets",
+    "toolsChatWidget": "Chat widgets",
     "toolsDocSummary": "Summarizer",
-    "toolsMailHandler": "IMAP Email Handler",
+    "toolsMailHandler": "Email handler",
     "mcpServers": "MCP Servers",
     "connections": "Connections",
     "configConnections": "Configure Connections",
     "groupApi": "API",
-    "savedTasks": "Saved Recurring Tasks",
+    "savedTasks": "Saved tasks",
     "plugins": "Plugins",
     "files": "Sources",
     "filesDescription": "Sources for your chats",
@@ -659,24 +681,32 @@
     "preferences": "Preferences",
     "account": "Account",
     "accountDescription": "Account & preferences",
-    "configInbound": "Standard Inbound",
-    "configAiModels": "AI Model Config",
-    "configTaskPrompts": "Preconfigured Instructions",
-    "configSortingPrompt": "Routing Config",
+    "configInbound": "Inbound",
+    "configAiModels": "Models",
+    "configTaskPrompts": "Instructions",
+    "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
-    "statistics": "Statistics",
+    "statistics": "Usage",
     "subscription": "Subscription",
     "upgrade": "Upgrade",
-    "admin": "Admin",
-    "adminDashboard": "Dashboard",
+    "admin": "Operate",
+    "adminDashboard": "Overview",
     "adminFeatureStatus": "Feature Status",
     "adminModelStatus": "Model Status",
-    "adminSystemConfig": "System Config",
-    "adminProviderSetup": "AI Providers",
+    "adminSystemConfig": "System configuration",
+    "adminProviderSetup": "AI providers",
     "more": "More",
     "moreDescription": "More sections and account",
     "menu": "Menu",
-    "aiAgents": "AI Agents"
+    "aiAgents": "AI Agents",
+    "desktop": "Desktop",
+    "manage": "Manage",
+    "manageDescription": "Assistants, channels and automations",
+    "groupAssistants": "Assistants",
+    "groupAutomations": "Automations",
+    "groupTools": "Tools",
+    "liveSupport": "Live support",
+    "usage": "Usage"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -687,6 +717,7 @@
     "plusMenu": {
       "label": "Add",
       "attach": "Attach files",
+      "photo": "Take photo",
       "model": "Model",
       "tools": "Tools",
       "knowledge": "Knowledge folder"
@@ -710,6 +741,10 @@
     "voiceWhisper": "Record and transcribe with Whisper",
     "listeningStarted": "🎙️ Listening... speak now",
     "recordingStarted": "🎙️ Recording started...",
+    "voiceStatus": {
+      "recording": "Recording...",
+      "transcribing": "Transcribing..."
+    },
     "speechError": "Speech recognition error: {error}",
     "recordingError": "Recording failed: {error}",
     "transcribed": "🎙️ Transcribed{language}: \"{preview}\"",
@@ -1153,7 +1188,7 @@
     "useInChat": "Use in chat",
     "terms": {
       "vectorized": "searchable by AI",
-      "knowledgeGroup": "knowledge group",
+      "knowledgeGroup": "knowledge folder",
       "incoming": "incoming",
       "generated": "AI-generated",
       "notApplicable": "not applicable"
@@ -1199,13 +1234,13 @@
     },
     "help": {
       "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
-      "group": "Knowledge groups bundle files together. When the AI searches a group, it can use every file in it.",
+      "group": "Knowledge folders bundle files together. When the AI searches a folder, it can use every file in it.",
       "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
       "incoming": "Files other apps pushed in for your knowledge base. Review them, then keep or dismiss.",
       "typeFilter": "Show only one kind of file — documents, images, video or audio.",
       "vectorizedFilter": "Filter by whether files are searchable by AI.",
       "reVectorize": "Re-read this file and refresh what the AI knows from it. Use after editing it or if it failed.",
-      "moveGroup": "Move files into another knowledge group. This changes which group the AI searches them in — it doesn't delete anything.",
+      "moveGroup": "Move files into another knowledge folder. This changes which folder the AI searches them in — it doesn't delete anything.",
       "storage": "How much of your storage you've used. AI-generated media counts too, shown separately."
     },
     "empty": {
@@ -1259,6 +1294,9 @@
       "open": "Open",
       "retry": "Retry",
       "provenance": "from {source} · {time}"
+    },
+    "preview": {
+      "play": "Play"
     },
     "generated": {
       "title": "Generated",
@@ -1755,7 +1793,7 @@
       "promptContentSubtitle": "Markdown-formatted system message used for this topic.",
       "knowledgeTitle": "Knowledge Base",
       "knowledgeSubtitle": "Link vectorized files for retrieval-augmented context.",
-      "openFileManager": "File Manager",
+      "openFileManager": "Sources",
       "linkedFiles": "Linked files ({n})",
       "noFilesLinked": "No files linked yet",
       "noFilesLinkedHint": "Link files below to add them to this prompt's knowledge base.",
@@ -1764,7 +1802,7 @@
       "searchFilesPlaceholderShort": "Search files...",
       "loadingFiles": "Loading files...",
       "noFilesMatch": "No files match your search.",
-      "noVectorizedFiles": "No vectorized files available. Upload files in the Files page first.",
+      "noVectorizedFiles": "No vectorized files available. Upload files in Sources first.",
       "linked": "Linked",
       "linkFile": "Link",
       "fileMeta": "{chunks} chunks · {date}",
@@ -2214,6 +2252,62 @@
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests"
     },
+    "desktop": {
+      "title": "Desktop",
+      "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
+      "notAvailableYet": "Synaplan Desktop is not available to download yet. You can already create a pairing code to test the connection.",
+      "pairButton": "Pair this computer",
+      "loadFailed": "The connected computers could not be loaded.",
+      "disconnect": "Disconnect",
+      "confirmDisconnectTitle": "Disconnect this computer",
+      "confirmDisconnect": "\"{name}\" will no longer be able to reach your account. You can pair it again later with a new code.",
+      "disconnected": "Computer disconnected.",
+      "disconnectFailed": "The computer could not be disconnected.",
+      "pairing": {
+        "title": "Pair this computer",
+        "intro": "Open Synaplan Desktop on the computer you want to connect, then enter this address and code.",
+        "addressLabel": "Server address",
+        "codeLabel": "Pairing code",
+        "expiresIn": "Expires in {time}",
+        "expired": "This code has expired.",
+        "newCode": "Create a new code",
+        "copyAddress": "Copy address",
+        "copyCode": "Copy code",
+        "createFailed": "The pairing code could not be created.",
+        "copyFailed": "Could not copy to clipboard."
+      },
+      "devices": {
+        "empty": "No computers are connected yet.",
+        "name": "Computer",
+        "status": "Status",
+        "lastSeen": "Last seen",
+        "waitingJobs": "Waiting jobs",
+        "actions": "Actions",
+        "never": "never",
+        "statusActive": "Connected",
+        "statusRevoked": "Disconnected"
+      },
+      "run": {
+        "action": "Run on this computer",
+        "multiple": "{count} computers",
+        "needPrompt": "Type what the computer should do first.",
+        "skillTitle": "Run on this computer",
+        "skillMessage": "Which skill should run on \"{name}\"?",
+        "skillPlaceholder": "e.g. pptx",
+        "invalidSkill": "Use only lowercase letters, numbers and hyphens.",
+        "sent": "Sent to \"{name}\".",
+        "enqueueFailed": "The job could not be sent."
+      },
+      "jobCard": {
+        "waiting": "Waiting for {name}",
+        "done": "{name} finished",
+        "failed": "{name} could not finish",
+        "noAnswer": "This computer did not answer.",
+        "unknownSkill": "This computer does not have that skill.",
+        "skillDisabled": "That skill is turned off on this computer.",
+        "localError": "The skill failed on this computer."
+      }
+    },
     "phoneVerification": {
       "title": "Phone Verification",
       "description": "Verify your phone number to unlock full features and higher rate limits via WhatsApp.",
@@ -2609,7 +2703,7 @@
     "cloudProviders": "Cloud providers",
     "cloudProvidersHint": "Paste an API key, it is tested live and stored encrypted. Keys from your .env file are picked up automatically.",
     "recommended": "Recommended",
-    "freeTier": "Free tier available",
+    "freeTier": "Free API key at this provider",
     "connected": "Connected",
     "sourceEnv": "imported from .env",
     "sourceDbFromEnv": "stored in DB (from .env)",
@@ -2637,7 +2731,7 @@
     "loadFailed": "Could not load provider status",
     "ownService": {
       "title": "Add your own service",
-      "description": "Need a provider that is not listed? Add it on the Edit models tab of AI Model Config.",
+      "description": "Need a provider that is not listed? Add it on the Edit models tab of Models.",
       "cta": "Add your own service"
     },
     "localAi": {
@@ -2752,7 +2846,9 @@
     "clearSelection": "Clear selection",
     "view": "View",
     "expand": "Expand",
-    "noResults": "No results"
+    "noResults": "No results",
+    "skipToContent": "Skip to content",
+    "loadingMessages": "Loading messages…"
   },
   "search": {
     "sources": "Sources",
@@ -2780,6 +2876,7 @@
     "forgotPassword": "Forgot password?",
     "forgotPasswordDesc": "Enter your email address and we'll send you a link to reset your password.",
     "noAccount": "Don't have an account?",
+    "registrationClosed": "Registration is turned off. Please contact the administrator if you need an account.",
     "hasAccount": "Already have an account?",
     "signIn": "Sign In",
     "signingIn": "Signing in...",
@@ -2822,6 +2919,8 @@
     "registrationCompleteDesc": "We sent you a verification link. Please check your inbox and spam folder, then click the link to activate your account.",
     "passwordResetSuccess": "Request Sent!",
     "passwordResetSuccessDesc": "If an account with this email address exists, we have sent you a password reset link. Please check your inbox.",
+    "forgotPasswordNoMailerHint": "If you ever lose this password and no email can be delivered, an administrator with server access can set a new one with:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password you{'@'}example.com --generate",
     "recaptchaError": "reCAPTCHA verification failed. Please try again.",
     "backToHomepage": "← Back to www.synaplan.com",
     "hostingTermsNote": "The terms and conditions of the hosting platform apply.",
@@ -3200,7 +3299,7 @@
       "knowledge": {
         "intro": "Add documents so the AI assistant can answer questions about your content. This step is optional.",
         "uploadLabel": "Upload files",
-        "pickLabel": "Choose from File Manager",
+        "pickLabel": "Choose from Sources",
         "uploadHint": "PDF, Word, text, Markdown, CSV or JSON. Files are processed after the widget is created.",
         "empty": "No data sources yet — you can also add them later."
       },
@@ -3673,7 +3772,7 @@
       "title": "Select Files",
       "searchPlaceholder": "Search files...",
       "noResults": "No files match your search.",
-      "noFiles": "No files available. Upload files first in the File Manager.",
+      "noFiles": "No files available. Upload files first in Sources.",
       "selected": "{count} selected",
       "addFiles": "Add Files"
     },
@@ -3830,7 +3929,9 @@
       "robot": "Robot",
       "message": "Message",
       "support": "Support"
-    }
+    },
+    "listTitle": "Chat widgets",
+    "listEmpty": "No widgets yet. Create a chat widget to get started."
   },
   "profile": {
     "title": "Profile Settings",
@@ -3844,7 +3945,8 @@
       "email": "Email",
       "emailHint": "Your login email (cannot be changed)",
       "phone": "Phone",
-      "phonePlaceholder": "Optional contact number"
+      "phonePlaceholder": "Optional contact number",
+      "managedBy": "This account is managed by {provider}"
     },
     "companyInfo": {
       "title": "Company Information",
@@ -3891,7 +3993,10 @@
       "newPasswordHint": "Minimum 8 characters",
       "confirmPassword": "Confirm Password",
       "confirmPasswordPlaceholder": "Confirm new password",
-      "confirmPasswordHint": "Must match new password"
+      "confirmPasswordHint": "Must match new password",
+      "externalAuth": "You're using {provider} to sign in. Password management is handled there.",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 8 characters"
     },
     "appSecurity": {
       "title": "App Security",
@@ -4126,6 +4231,9 @@
     "generatingFileWriting": "Writing the document content…",
     "generatingFileWritingNamed": "Writing the content for {filename}…",
     "generatingFileConverting": "Creating {filename} for download…",
+    "editingImageTitle": "Editing your image",
+    "editingImageDesc": "Applying your changes to the picture from this conversation",
+    "editingImageNamed": "Applying your changes to {filename}",
     "thinkingTitle": "Thinking…",
     "thinkingDesc": "The model is reasoning before answering",
     "analyzingMemories": "Analyzing memories...",
@@ -4308,7 +4416,8 @@
       "models": "models",
       "adminOnlyTitle": "Admin access required",
       "adminOnlyMessage": "Feature status is available to administrators only."
-    }
+    },
+    "notLoggedIn": "Not logged in"
   },
   "cookies": {
     "title": "Cookie Settings",
@@ -4337,6 +4446,14 @@
     "poweredBy": "Powered by",
     "privacy": "Privacy",
     "terms": "Terms"
+  },
+  "messageRefs": {
+    "olderConversation": "Older conversation",
+    "clickToOpen": "Click to open the original conversation",
+    "missing": {
+      "badge": "Older message",
+      "tooltip": "This message reference could not be resolved. The message may have been deleted."
+    }
   },
   "memories": {
     "fullscreen": {
@@ -4938,6 +5055,82 @@
       "connect": "Connect",
       "connecting": "Checking connection…",
       "connectError": "This server can't be reached. Check the address and try again."
+    }
+  },
+  "setup": {
+    "title": "Set up {brand}",
+    "subtitle": "This server has no administrator yet. Three short steps and it is ready to use.",
+    "subtitleProgress": "Step {current} of {total}.",
+    "progressLabel": "Setup progress",
+    "loading": "Checking this server…",
+    "switchServer": "Connect to a different server",
+    "toggleTheme": "Switch between light and dark",
+    "switchLanguage": "Change language",
+    "footerHint": "Nobody else can use this server until setup is finished.",
+    "steps": {
+      "admin": "Administrator",
+      "provider": "AI provider",
+      "access": "Access"
+    },
+    "alreadyDone": {
+      "title": "This server is already set up",
+      "description": "It already has an administrator, so there is nothing to set up here. Sign in to continue.",
+      "cta": "Go to sign-in"
+    },
+    "admin": {
+      "title": "Create your administrator account",
+      "description": "This is the account you will sign in with. It can manage everything on this server.",
+      "emailLabel": "Email address",
+      "emailPlaceholder": "you{'@'}example.com",
+      "passwordLabel": "Password",
+      "passwordHint": "At least 8 characters, with an uppercase letter, a lowercase letter and a number.",
+      "confirmLabel": "Repeat password",
+      "togglePassword": "Show or hide the password",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "errorMismatch": "The two passwords do not match.",
+      "errorWeak": "The password needs at least 8 characters, an uppercase letter, a lowercase letter and a number.",
+      "errorInProgress": "This account is already being created somewhere else. Wait a moment, then reload this page.",
+      "errorAlreadyDone": "This server already has an administrator, so there is nothing to create here. Sign in instead.",
+      "errorDisabled": "Setting this server up in the browser is switched off. Whoever runs it creates the first account.",
+      "errorGeneric": "The account could not be created. Please try again."
+    },
+    "provider": {
+      "title": "Connect an AI provider",
+      "description": "The AI needs a provider to answer. Choose one and paste its API key — it is tested right away and stored encrypted on this server.",
+      "loading": "Loading providers…",
+      "loadFailed": "The provider list could not be loaded.",
+      "ready": "A provider is connected. The AI can answer now.",
+      "continue": "Continue",
+      "skipHint": "You can skip this and connect a provider later under Admin → AI Provider Setup. Chat will not work until you do.",
+      "chooseProvider": "Choose an AI provider",
+      "pickHint": "Pick a provider above to add its key. You only need one, and you can add more later.",
+      "keyLabel": "API key for {provider}",
+      "freeKeyHint": "Getting an API key from {provider} is free.",
+      "saving": "Testing…",
+      "willBecomeDefault": "Saving this key also makes {provider} the AI that answers by default.",
+      "alreadyDefault": "{provider} is already the AI that answers by default."
+    },
+    "access": {
+      "title": "Decide who can use this server",
+      "description": "You can change both of these at any time under Admin → Configuration.",
+      "registrationLabel": "Let visitors create their own account",
+      "registrationHint": "Anyone who can reach this server can sign up. Turn this off if you want to invite people yourself.",
+      "guestChatLabel": "Let visitors try the chat without an account",
+      "guestChatHint": "Useful for a public demo. Turn it off if this server is only for your team.",
+      "lockedByEnv": "Set by the environment variable {key}, so it cannot be changed here.",
+      "noMailerWarning": "No mail server is configured, so new accounts cannot confirm their email address.",
+      "changeLaterHint": "Finishing setup opens this server for use.",
+      "submit": "Finish setup",
+      "submitting": "Finishing…",
+      "errorGeneric": "Setup could not be finished. Please try again."
+    },
+    "done": {
+      "title": "Your server is ready",
+      "description": "Setup is complete. You are signed in as the administrator.",
+      "enter": "Start using {brand}",
+      "entering": "Opening…",
+      "enterFailed": "Could not open the app. Please try again."
     }
   },
   "iap": {

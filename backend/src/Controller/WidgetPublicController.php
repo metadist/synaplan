@@ -11,6 +11,7 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
@@ -66,6 +67,7 @@ class WidgetPublicController extends AbstractController
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private BrandingService $brandingService,
+        private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private string $uploadDir,
     ) {
     }
@@ -1016,6 +1018,14 @@ class WidgetPublicController extends AbstractController
                         'sender' => 'ai',
                     ]);
 
+                    // Rolling-summary refresh for the widget session's
+                    // persistent chat (channel parity). Memories stay disabled
+                    // for anonymous visitors; the per-session summary only
+                    // condenses this session's own thread.
+                    if (null !== $chat->getId()) {
+                        $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), (int) $owner->getId());
+                    }
+
                     // Generate AI title after 5 user messages (async, non-blocking)
                     $this->sessionService->generateTitleIfNeeded($currentSession, $owner->getId());
 
@@ -1684,16 +1694,10 @@ class WidgetPublicController extends AbstractController
 
         $allowedDomains = $config['allowedDomains'] ?? [];
         if (empty($allowedDomains)) {
-            $this->logger->warning('Widget request blocked: no domains configured', [
-                'allowed_domains_count' => 0,
-                'config_keys' => array_keys($config),
-                'request_host' => $request->headers->get('X-Widget-Host') ?? $request->getHost(),
-            ]);
-
-            return $this->json([
-                'error' => 'Domain not allowed',
-                'reason' => 'domain_not_whitelisted',
-            ], Response::HTTP_FORBIDDEN);
+            // An empty allowlist means the widget is embeddable everywhere —
+            // restricting domains is opt-in (same semantics as the legacy
+            // widget.js loader and WidgetOriginValidator).
+            return null;
         }
 
         $host = $this->extractHostFromRequest($request);

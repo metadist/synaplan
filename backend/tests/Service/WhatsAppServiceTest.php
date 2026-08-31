@@ -9,6 +9,7 @@ use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\EmailChatService;
 use App\Service\File\FileProcessor;
@@ -69,6 +70,10 @@ class WhatsAppServiceTest extends TestCase
     private $emailChatService;
     /** @var UserMemoryService&\PHPUnit\Framework\MockObject\MockObject */
     private $memoryService;
+    /** @var \App\Service\Digest\MessageReferenceResolver&\PHPUnit\Framework\MockObject\MockObject */
+    private $messageReferenceResolver;
+    /** @var ConversationSummaryRefreshDispatcher&\PHPUnit\Framework\MockObject\MockObject */
+    private $summaryRefreshDispatcher;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -106,6 +111,9 @@ class WhatsAppServiceTest extends TestCase
         $this->emailChatService = $this->createMock(EmailChatService::class);
         $this->memoryService = $this->createMock(UserMemoryService::class);
         $this->memoryService->method('resolveMemoryTags')->willReturnArgument(0);
+        $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
+        $this->messageReferenceResolver->method('resolveMessageTags')->willReturnArgument(0);
+        $this->summaryRefreshDispatcher = $this->createMock(ConversationSummaryRefreshDispatcher::class);
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
@@ -122,6 +130,8 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -151,6 +161,8 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -176,6 +188,8 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -392,6 +406,8 @@ class WhatsAppServiceTest extends TestCase
             $this->lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1218,6 +1234,8 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1560,6 +1578,8 @@ class WhatsAppServiceTest extends TestCase
             $lockFactory,
             $this->emailChatService,
             $this->memoryService,
+            $this->messageReferenceResolver,
+            $this->summaryRefreshDispatcher,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1984,6 +2004,27 @@ class WhatsAppServiceTest extends TestCase
         $this->assertTrue($result['success']);
 
         return $sends;
+    }
+
+    /**
+     * Channel parity (rolling summary): after the outgoing WhatsApp reply is
+     * persisted, the turn must dispatch an async summary refresh for the chat
+     * — exactly like the web streaming path does.
+     */
+    public function testTurnDispatchesConversationSummaryRefresh(): void
+    {
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getId')->willReturn(777);
+        // Configured BEFORE dispatchTurn(), so this expectation wins over the
+        // helper's id-less default chat mock.
+        $this->emailChatService->method('findOrCreateWhatsAppChat')->willReturn($chat);
+
+        $this->summaryRefreshDispatcher
+            ->expects($this->once())
+            ->method('dispatch')
+            ->with(777, 1);
+
+        $this->dispatchTurn(['content' => 'Hello back!', 'metadata' => []]);
     }
 
     /**

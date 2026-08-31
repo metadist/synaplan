@@ -371,34 +371,86 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * TrustedTokens (TNG, Germany) — three chat models + one Qwen vision row.
-     * Prices are USD/1M from https://trustedtokens.eu/api/billing/models
-     * (snapshot 2026-07-27). Provider ids keep the upstream org/name form.
+     * TrustedTokens (TNG, Germany) — chat + vision rows from
+     * https://trustedtokens.eu/api/billing/models (snapshot 2026-08-29).
+     * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
     {
         $glm = ModelCatalog::find('trustedtokens:zai-org/glm-5.2:chat');
+        $glm53 = ModelCatalog::find('trustedtokens:zai-org/glm-5.3:chat');
+        $glm53Flash = ModelCatalog::find('trustedtokens:zai-org/glm-5.3-flash:chat');
+        $glm53FlashVision = ModelCatalog::find('trustedtokens:zai-org/glm-5.3-flash:pic2text');
+        $chimera = ModelCatalog::find('trustedtokens:tngtech/deepseek-tng-r1t2-chimera:chat');
+        $v4Flash = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-flash:chat');
+        $v4Flash0731 = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat');
+        $v4Pro = ModelCatalog::find('trustedtokens:deepseek-ai/deepseek-v4-pro-0813:chat');
         $qwenChat = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:chat');
         $qwenVision = ModelCatalog::find('trustedtokens:qwen/qwen3.6-35b-a3b-fp8:pic2text');
         $gptOss = ModelCatalog::find('trustedtokens:openai/gpt-oss-120b:chat');
 
         $this->assertCount(1, $glm);
+        $this->assertCount(1, $glm53);
+        $this->assertCount(1, $glm53Flash);
+        $this->assertCount(1, $glm53FlashVision);
+        $this->assertCount(1, $chimera);
+        $this->assertCount(1, $v4Flash);
+        $this->assertCount(1, $v4Flash0731);
+        $this->assertCount(1, $v4Pro);
         $this->assertCount(1, $qwenChat);
         $this->assertCount(1, $qwenVision);
         $this->assertCount(1, $gptOss);
 
+        $this->assertSame(331, $glm53[0]['id']);
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3', $glm53[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3-Flash', $glm53Flash[0]['providerId']);
+        $this->assertSame('zai-org/GLM-5.3-Flash', $glm53FlashVision[0]['providerId']);
+        $this->assertSame('tngtech/DeepSeek-TNG-R1T2-Chimera', $chimera[0]['providerId']);
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Flash', $v4Flash[0]['providerId']);
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Flash-0731', $v4Flash0731[0]['providerId']);
+        $this->assertSame('deepseek-ai/DeepSeek-V4-Pro-0813', $v4Pro[0]['providerId']);
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
         $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);
 
         $this->assertEqualsWithDelta(1.50, (float) $glm[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(4.50, (float) $glm[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(1.50, (float) $glm53[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(4.50, (float) $glm53[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $glm53Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $glm53Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $glm53FlashVision[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $glm53FlashVision[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(1.00, (float) $chimera[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(3.00, (float) $chimera[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $v4Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $v4Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $v4Flash0731[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $v4Flash0731[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(2.25, (float) $v4Pro[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(6.75, (float) $v4Pro[0]['priceOut'], 1e-9);
         $this->assertEqualsWithDelta(0.25, (float) $qwenChat[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(1.50, (float) $qwenChat[0]['priceOut'], 1e-9);
         $this->assertEqualsWithDelta(0.15, (float) $gptOss[0]['priceIn'], 1e-9);
         $this->assertEqualsWithDelta(0.60, (float) $gptOss[0]['priceOut'], 1e-9);
 
-        foreach ([$glm[0], $qwenChat[0], $qwenVision[0], $gptOss[0]] as $row) {
+        // Cache-read pricing for EVERY new row — a drift in any of them would
+        // silently mischarge cached tokens (Chimera's 0.20 is the only
+        // distinct value and the most drift-prone).
+        $this->assertEqualsWithDelta(0.30, (float) ($glm53[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($glm53Flash[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($glm53FlashVision[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.20, (float) ($chimera[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($v4Flash[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.03, (float) ($v4Flash0731[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+        $this->assertEqualsWithDelta(0.45, (float) ($v4Pro[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+
+        $rows = [
+            $glm[0], $glm53[0], $glm53Flash[0], $glm53FlashVision[0],
+            $chimera[0], $v4Flash[0], $v4Flash0731[0], $v4Pro[0],
+            $qwenChat[0], $qwenVision[0], $gptOss[0],
+        ];
+        foreach ($rows as $row) {
             $this->assertSame('TrustedTokens', $row['service']);
             $this->assertSame('DE', $row['json']['meta']['jurisdiction'] ?? null);
         }

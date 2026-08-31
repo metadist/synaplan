@@ -66,6 +66,10 @@ class ChatHandlerVisionImageTest extends TestCase
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->createMock(\App\Service\Digest\DigestSearchService::class),
+            $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
 
@@ -111,15 +115,15 @@ class ChatHandlerVisionImageTest extends TestCase
         $originalBase64Length = intdiv(strlen($bigPng) + 2, 3) * 4;
 
         // The fixture must land in the testable window: large enough to exceed
-        // the inline budget (so the downscale path runs), but under the 10 MB
-        // file-size guard that short-circuits before downscaling. ImageMagick
-        // builds compress plasma differently, so skip rather than fail if this
-        // particular environment produced an out-of-range fixture.
+        // the inline budget (so the downscale path runs), but under the 50 MB
+        // file-size sanity cap that short-circuits before downscaling.
+        // ImageMagick builds compress plasma differently, so skip rather than
+        // fail if this environment produced an out-of-range fixture.
         if ($originalBase64Length <= self::MAX_VISION_BASE64_LENGTH) {
             $this->markTestSkipped('Generated fixture compressed below the inline budget on this ImageMagick build');
         }
-        if (strlen($bigPng) > 10 * 1024 * 1024) {
-            $this->markTestSkipped('Generated fixture exceeded the 10 MB pre-downscale size guard on this ImageMagick build');
+        if (strlen($bigPng) > 50 * 1024 * 1024) {
+            $this->markTestSkipped('Generated fixture exceeded the 50 MB pre-downscale size cap on this ImageMagick build');
         }
 
         file_put_contents($this->uploadDir.'/big.png', $bigPng);
@@ -151,6 +155,30 @@ class ChatHandlerVisionImageTest extends TestCase
         $result = $this->invokeImageToBase64DataUrl('broken.png');
 
         $this->assertNull($result);
+    }
+
+    /**
+     * When the CURRENT message carries images but none survives conversion,
+     * the handler must fail loudly instead of sending a text-only request the
+     * model would answer with "I don't see an image".
+     */
+    public function testThrowsWhenAllCurrentMessageImagesFailConversion(): void
+    {
+        // Over-budget bytes that are not a decodable image → conversion fails.
+        $garbage = str_repeat("\x00\x11\x22\x33", 400000);
+        file_put_contents($this->uploadDir.'/photo.jpg', $garbage);
+
+        $message = (new \App\Entity\Message())
+            ->setUserId(7)
+            ->setText('what is this?')
+            ->setFilePath('photo.jpg');
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'buildCurrentMessageContent');
+        $method->setAccessible(true);
+
+        $this->expectException(\App\Service\Exception\VisionImageUnprocessableException::class);
+
+        $method->invoke($this->handler, $message, true, []);
     }
 
     private function invokeImageToBase64DataUrl(string $relativePath): ?string

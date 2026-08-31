@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures schema-update schema-diff console cache-clear shell test plan-eval
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval summary-eval digest-run digest-eval digest-reindex
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -56,6 +56,9 @@ seed-ratelimits: ## Seed rate-limit config (BCONFIG)
 fixtures: ## Load demo user fixtures (PURGES entity tables — dev/test only)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console doctrine:fixtures:load --purge-with-truncate --no-interaction
 
+setup-reset: ## Reopen the first-run setup wizard (DELETES all accounts — dev/test only)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:setup:reset --force
+
 ## Database — Emergency only (do NOT use in production)
 schema-update: ## ⚠️  Emergency dev-only: force schema sync. Prefer 'make migrate-diff && make migrate'.
 	@echo "⚠️  schema-update bypasses migrations and can corrupt prod state."
@@ -83,6 +86,18 @@ test: ## Run all PHPUnit tests
 
 plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:multitask:plan-eval
+
+summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:summary:eval
+
+digest-run: ## Run the message-digest job once (LIVE model calls — normally scheduler-driven)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:digest:run
+
+digest-eval: ## Evaluate digest retrieval against the golden corpus (LIVE embedding model — not part of the CI gate)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:digest:eval
+
+digest-reindex: ## Rebuild the Qdrant digest index from MariaDB for all users (LIVE embedding calls)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:digest:reindex --all-users
 
 # Allow passing arguments to console target
 %:

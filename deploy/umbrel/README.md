@@ -33,13 +33,41 @@ Publishing a release tag opens one pull request
 multi-arch manifest the release workflow just published, so the PR never invents
 one. Do not edit them by hand.
 
-Merging that PR updates **this** repository only. Submitting the raised package
-to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) remains a
-separate, manual pull request — Umbrel cannot pull from our repo on its own.
+Nothing merges that PR on the spot, because merging restarts every Elestio
+instance tracking the default branch. `.github/workflows/release-rollout.yml`
+does it as soon as the proposal's checks are green and its guards agree.
 
-Three other manifest fields are still placeholders and have to be filled in for
-a store submission: `releaseNotes`, `gallery` (the store expects screenshots)
-and `submission`, which currently reads `.../pull/PENDING`.
+### How the package reaches the store
+
+Umbrel cannot pull from this repository, so the package has to be carried into
+[getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) — and that is
+`.github/workflows/umbrel-store-sync.yml`'s job, triggered by the raised pins
+landing on the default branch. It rebuilds
+[`metadist/umbrel-apps`](https://github.com/metadist/umbrel-apps) from upstream
+`master`, mirrors `synaplan/` from this directory, runs Umbrel's own
+`lint:apps --check-images`, and pushes.
+
+What happens next depends on whether the store already carries the app, because
+Umbrel's linter applies different rules to each case:
+
+| | Not in the store yet (today) | Already in the store |
+| --- | --- | --- |
+| Branch | `synaplan`, the one the open submission is built from | `synaplan-<version>` |
+| Pull request | the existing submission is updated | a new one is opened |
+| `releaseNotes` | **must stay empty** — an error otherwise | filled from the GitHub release |
+| `gallery`, `icon` | **must stay empty** — Umbrel produces the final assets | unchanged |
+
+That is why `releaseNotes: ""` and `gallery: []` in `umbrel-app.yml` are not
+placeholders waiting to be filled: for a new submission they are the required
+values, and the sync fills `releaseNotes` in the fork only once the app is
+released. `submission` points at the pull request the submission lives in.
+
+The merge itself stays Umbrel's: they review and merge store pull requests, and
+no automation here can shorten that.
+
+The sync owns `synaplan/` on that branch and force-pushes it. It refuses to run
+if the branch has grown changes outside `synaplan/`, so a maintainer's work
+elsewhere in the fork can never be discarded silently.
 
 Re-run the login check from *Testing* below against every raised pin: cookies
 must be issued without `Secure` over plain HTTP.
@@ -125,13 +153,20 @@ exists, so a changed value cannot lock anyone out.
 
 ## Testing
 
-Linting is necessary but proves nothing about runtime. From a fork of
-`umbrel-apps` with `deploy/umbrel/synaplan/` copied in as `synaplan/`:
+Linting is necessary but proves nothing about runtime. The store sync runs the
+linter on every release, so this is for trying a change before it is committed.
+From a fork of `umbrel-apps` with `deploy/umbrel/synaplan/` copied in as
+`synaplan/`:
 
 ```bash
 npm run lint:apps -- synaplan --check-images
 git diff --check
 ```
+
+Add `--changed upstream/master...HEAD` instead of naming the app to get the rules
+that depend on whether this is a new submission or an update — without it the
+linter cannot tell, and silently skips those checks. That is the form the sync
+uses.
 
 Then install it on a real umbrelOS. A containerised instance is enough and is
 what the current package was verified on:

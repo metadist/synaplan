@@ -41,6 +41,30 @@ final class DefaultModelConfigSeederTest extends TestCase
         }
     }
 
+    /**
+     * The sorter binding is a tuned pair with the tools:sort prompt, not a
+     * preference: gpt-oss-120b holds the strict JSON contract, heavier chat
+     * models reason past it and routing degrades install-wide. Moving it is a
+     * deliberate act that also needs the prompts re-validated and a migration
+     * for existing installs, so it must not drift in silently.
+     */
+    public function testTheSorterIsBoundToGptOss120b(): void
+    {
+        $reflection = new \ReflectionClass(DefaultModelConfigSeeder::class);
+        $defaults = $reflection->getReflectionConstant('PROD_MODEL_DEFAULTS');
+        $this->assertNotFalse($defaults, 'PROD_MODEL_DEFAULTS constant missing');
+
+        /** @var list<array{group: string, setting: string, modelKey: string}> $rows */
+        $rows = $defaults->getValue();
+
+        $sortKeys = array_values(array_map(
+            static fn (array $row): string => $row['modelKey'],
+            array_filter($rows, static fn (array $row): bool => 'SORT' === $row['setting']),
+        ));
+
+        $this->assertSame(['groq:openai/gpt-oss-120b:chat'], $sortKeys);
+    }
+
     public function testResolveProdDefaultsIsPrivateStaticContract(): void
     {
         // Documents the contract on resolveProdDefaults() — it must be a private

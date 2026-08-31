@@ -50,6 +50,11 @@ x-app-environment: &app-environment
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
+  # First-run setup wizard. Empty keeps it enabled, which is what a deployment
+  # without BOOTSTRAP_ADMIN_* needs: the API stays closed with 503 SETUP_REQUIRED
+  # until someone creates the first administrator at /setup. It never appears once
+  # the installation has a user, so an upgrade is unaffected either way.
+  SETUP_WIZARD_ENABLED: "${SETUP_WIZARD_ENABLED:-}"
   # Browser-side (cloud-backed) speech-to-text; air-gapped deployments set "false".
   WEB_SPEECH_ENABLED: "${WEB_SPEECH_ENABLED:-}"
   DB_HOST: db
@@ -195,7 +200,7 @@ services:
     networks: [internal]
 
   db:
-    image: mariadb:12.3.2@sha256:a02fe89cb597d4375812b2eac90cf9d0775d4686daa7f7cc750ebbcad7525bbc
+    image: mariadb:12.3.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MARIADB_DATABASE: "${MARIADB_DATABASE:-synaplan}"
@@ -281,7 +286,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:075246f72d4109385b4a01c3ac8e9cbd26a0bcb21cd7aa30edbccd24e1b3180c
+    image: ollama/ollama:latest@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

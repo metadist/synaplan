@@ -40,13 +40,24 @@
           <span v-if="file.processing" class="text-xs txt-muted">(processing...)</span>
           <button
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
-            aria-label="Remove file"
+            :aria-label="$t('files.removeFile')"
             :disabled="file.processing"
             @click="removeFile(index)"
           >
             <XMarkIcon class="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      <!-- DS16: waiting/failed cards for jobs dispatched to a paired computer. -->
+      <div v-if="desktopJobs.length > 0" class="mb-3 flex flex-col gap-2">
+        <DesktopJobCard
+          v-for="job in desktopJobs"
+          :key="job.id"
+          :job-id="job.id"
+          :device-name="job.deviceName"
+          @dismiss="dismissDesktopJob(job.id)"
+        />
       </div>
 
       <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
@@ -88,6 +99,35 @@
           (via `md:contents` on the control bar).
         -->
         <div class="flex flex-col md:block">
+          <!-- Voice activity strip.
+               Only shown on the record-then-transcribe path (see
+               `showVoiceActivity`): there the transcript arrives in one piece
+               when the user stops, so between tapping the microphone and
+               releasing it the composer is completely inert. The Web Speech
+               path writes recognised words into the textarea as they arrive
+               and is its own progress indicator. -->
+          <div
+            v-if="showVoiceActivity"
+            class="voice-activity"
+            role="status"
+            aria-live="polite"
+            data-testid="chat-voice-activity"
+          >
+            <template v-if="transcribing">
+              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" aria-hidden="true" />
+            </template>
+            <template v-else>
+              <span class="voice-activity__pulse" aria-hidden="true"></span>
+              <span class="voice-activity__meter" aria-hidden="true">
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+                <span class="voice-activity__bar"></span>
+              </span>
+            </template>
+            <span>{{ voiceActivityLabel }}</span>
+          </div>
+
           <!-- Textarea row. Mobile: full width with a comfortable 12px horizontal
                inset (matches the control bar below) so text never sits flush
                against the card edge. md+: py-2 (16px) + textarea min-h-[40px] =
@@ -175,6 +215,19 @@
                   <span class="font-medium">{{ $t('chatInput.plusMenu.attach') }}</span>
                 </button>
 
+                <!-- One-tap photo path: opens the OS camera directly on mobile
+                 (via the `capture` input below) and an image-filtered picker on
+                 desktop — no detour through the file-manager modal. -->
+                <button
+                  type="button"
+                  class="pill text-xs md:text-sm self-start"
+                  data-testid="btn-plus-photo"
+                  @click="handlePlusPhoto"
+                >
+                  <Icon icon="mdi:camera-outline" class="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span class="font-medium">{{ $t('chatInput.plusMenu.photo') }}</span>
+                </button>
+
                 <!-- Guest-mode rows: same `.pill` chip style as "Attach files"
                      above (and the real Model/Tools/Knowledge triggers in the
                      authenticated branch below) for a consistent list. -->
@@ -227,6 +280,7 @@
                     @toggle-thinking="toggleThinking"
                     @toggle-voice-reply="toggleVoiceReply"
                     @toggle-enhance="toggleEnhance"
+                    @run-on-device="handleRunOnDevice"
                   />
                   <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
                 </template>
@@ -238,6 +292,20 @@
                 class="hidden"
                 accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt"
                 data-testid="input-chat-file"
+                @change="handleFileSelect"
+              />
+
+              <!-- Camera capture input for the "Take photo" shortcut. `capture`
+                 opens the rear camera directly on mobile; desktop browsers
+                 ignore it and show an image-filtered file picker. Uploads go
+                 through the same pipeline as paste/drag (no file modal). -->
+              <input
+                ref="cameraInputRef"
+                type="file"
+                class="hidden"
+                accept="image/*,.heic,.heif"
+                capture="environment"
+                data-testid="input-chat-camera"
                 @change="handleFileSelect"
               />
             </div>
@@ -344,6 +412,7 @@ import CommandPalette from './CommandPalette.vue'
 import FileMentionPalette from './FileMentionPalette.vue'
 import ToolsDropdown from './ToolsDropdown.vue'
 import ToolBadge from './ToolBadge.vue'
+import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
@@ -366,6 +435,8 @@ import { useAutoPersist, useAttachmentPersist } from '@/composables/useInputPers
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
+import { useDialog } from '@/composables/useDialog'
+import { desktopApi } from '@/services/api/desktopApi'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
 
@@ -401,6 +472,7 @@ const keyboardOpen = useKeyboardOpen()
 
 const plusMenuOpen = ref(false)
 const plusMenuRef = ref<HTMLElement | null>(null)
+const cameraInputRef = ref<HTMLInputElement | null>(null)
 
 const togglePlusMenu = () => {
   triggerHapticImpact('light')
@@ -415,6 +487,16 @@ const handlePlusAttach = () => {
     return
   }
   triggerFileUpload()
+}
+
+const handlePlusPhoto = () => {
+  plusMenuOpen.value = false
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
+  if (uploading.value) return
+  cameraInputRef.value?.click()
 }
 
 const handlePlusGate = (key: string) => {
@@ -459,6 +541,7 @@ const isDragging = ref(false)
 const isFocused = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const isRecording = ref(false)
+const transcribing = ref(false)
 const audioRecorder = ref<AudioRecorder | null>(null)
 const webSpeechService = ref<WebSpeechService | null>(null)
 const interimTranscript = ref('')
@@ -481,7 +564,59 @@ const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
 const incognitoStore = useIncognitoStore()
+const dialog = useDialog()
 const { warning, error: showError, success } = useNotification()
+
+// DS16: jobs dispatched to a paired computer via "Run on this computer".
+// Rendered as waiting/failed cards above the composer until dismissed.
+const desktopJobs = ref<Array<{ id: number; deviceName: string }>>([])
+
+/**
+ * Send the typed instruction to a paired computer as a `skill.run` job. There is
+ * deliberately no planner hook (prompt-injection risk, §2.3): the user picks the
+ * skill explicitly. The server never verifies the skill exists — an uninstalled
+ * skill fails honestly on the device, surfaced by the waiting/failed card.
+ */
+const handleRunOnDevice = async (device: { id: number; name: string }) => {
+  const prompt = message.value.trim()
+  if (!prompt) {
+    warning(t('config.desktop.run.needPrompt'))
+    return
+  }
+
+  const skill = (
+    await dialog.prompt({
+      title: t('config.desktop.run.skillTitle'),
+      message: t('config.desktop.run.skillMessage', { name: device.name }),
+      placeholder: t('config.desktop.run.skillPlaceholder'),
+      confirmText: t('config.desktop.run.action'),
+    })
+  )?.trim()
+  if (!skill) return
+
+  if (!/^[a-z0-9-]{1,64}$/.test(skill)) {
+    showError(t('config.desktop.run.invalidSkill'))
+    return
+  }
+
+  try {
+    const { jobId } = await desktopApi.enqueueJob({
+      deviceId: device.id,
+      skill,
+      prompt,
+      chatId: chatsStore.activeChatId,
+    })
+    desktopJobs.value.push({ id: jobId, deviceName: device.name })
+    message.value = ''
+    success(t('config.desktop.run.sent', { name: device.name }))
+  } catch (err) {
+    showError(err instanceof Error ? err.message : t('config.desktop.run.enqueueFailed'))
+  }
+}
+
+const dismissDesktopJob = (jobId: number) => {
+  desktopJobs.value = desktopJobs.value.filter((j) => j.id !== jobId)
+}
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
@@ -564,6 +699,25 @@ const textareaPaddingRightPx = computed(() => {
 const useWebSpeech = computed(() => {
   return isWebSpeechSupported() && !isNativeApp() && configStore.speech.webSpeechEnabled
 })
+
+/**
+ * Whether to show the animated "recording / transcribing" strip.
+ *
+ * Scoped to the record-then-transcribe path, which is what the native app
+ * always uses (see the seam on `useWebSpeech`) and what any browser without
+ * the Web Speech API falls back to. On that path no text reaches the textarea
+ * until the upload completes, so a live microphone is otherwise indistinguishable
+ * from a dead one. The Web Speech path already streams words in as it hears them.
+ */
+const showVoiceActivity = computed(
+  () => !useWebSpeech.value && (isRecording.value || transcribing.value)
+)
+
+const voiceActivityLabel = computed(() =>
+  transcribing.value
+    ? t('chatInput.voiceStatus.transcribing')
+    : t('chatInput.voiceStatus.recording')
+)
 
 // Input persistence - auto-save with proper debouncing. Disabled during an
 // incognito session: drafts must never survive in localStorage.
@@ -1212,9 +1366,15 @@ const toggleRecording = async () => {
       webSpeechService.value = null
     }
     if (audioRecorder.value) {
+      // Do NOT clear `isRecording` here: MediaRecorder's onstop event fires
+      // asynchronously, so a synchronous clear would unmount the activity
+      // strip for a frame before `transcribeAudio` sets `transcribing`. The
+      // recorder's onStop/onError callbacks and transcribeAudio's `finally`
+      // own the flag from this point on.
       audioRecorder.value.stopRecording()
+    } else {
+      isRecording.value = false
     }
-    isRecording.value = false
     return
   }
 
@@ -1377,6 +1537,12 @@ const transcribeAudio = async (audioBlob: Blob) => {
     return
   }
 
+  // Set before the first await so the activity strip switches straight from
+  // "recording" to "transcribing". This only avoids a blink because the stop
+  // tap in `toggleRecording` deliberately leaves `isRecording` true until the
+  // recorder's callbacks run, and AudioRecorder invokes this callback before
+  // its own onStop — so the strip is still mounted when `transcribing` is set.
+  transcribing.value = true
   uploading.value = true
 
   try {
@@ -1401,6 +1567,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     showError(t('chatInput.transcriptionFailed', { error: error.message || 'Unknown error' }))
   } finally {
     isRecording.value = false
+    transcribing.value = false
     uploading.value = false
   }
 }
@@ -1502,3 +1669,95 @@ defineExpose<{
   submitText,
 })
 </script>
+
+<style scoped>
+/*
+ * Voice activity strip for the record-then-transcribe path.
+ *
+ * Three cues at once so the state reads at a glance: a pulsing red dot (the
+ * universal "we are recording" mark), a four-bar level meter that keeps moving
+ * so a live microphone never looks frozen, and the label. Colors come from the
+ * shared status tokens, which covers light, dark and the V2 glass design
+ * without a second definition. Follows the `.typing-dot` pattern in
+ * ChatMessage.vue.
+ */
+.voice-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 0;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--txt-secondary);
+}
+
+.voice-activity__pulse {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--status-error);
+  animation: voice-pulse 1.4s ease-in-out infinite;
+}
+
+.voice-activity__meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 14px;
+}
+
+.voice-activity__bar {
+  width: 3px;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--brand);
+  animation: voice-level 1s ease-in-out infinite;
+}
+
+/* Staggered so the meter sweeps left-to-right instead of pumping in unison. */
+.voice-activity__bar:nth-child(1) {
+  animation-delay: -0.9s;
+}
+.voice-activity__bar:nth-child(2) {
+  animation-delay: -0.6s;
+}
+.voice-activity__bar:nth-child(3) {
+  animation-delay: -0.3s;
+}
+
+@keyframes voice-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@keyframes voice-level {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* The motion is decoration — the label and the live region carry the meaning. */
+@media (prefers-reduced-motion: reduce) {
+  .voice-activity__pulse,
+  .voice-activity__bar {
+    animation: none;
+  }
+  .voice-activity__bar {
+    transform: scaleY(0.7);
+  }
+}
+</style>

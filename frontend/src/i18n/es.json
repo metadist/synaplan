@@ -54,6 +54,23 @@
     "endConfirmMessage": "La conversación se descartará de forma permanente y los archivos de esta sesión se eliminarán.",
     "endConfirmButton": "Finalizar y descartar"
   },
+  "modelMix": {
+    "title": "Configuración rápida de modelos",
+    "buttonLabel": "Mix de modelos",
+    "activeLabel": "Mix de modelos activo: {name}",
+    "mixes": {
+      "default": "Mix de modelos predeterminado",
+      "openai": "Mix ChatGPT Sol",
+      "anthropic": "Mix Claude Fable",
+      "google": "Mix Google Gemini",
+      "xai": "Mix Grok",
+      "europe": "Mix Europa"
+    },
+    "defaultDescription": "Los modelos recomendados por esta instalación",
+    "unavailable": "No hay ningún proveedor compatible configurado en este servidor",
+    "applied": "{name} ya está activo para las nuevas respuestas",
+    "applyError": "No se pudo cambiar el mix de modelos. Inténtalo de nuevo."
+  },
   "jobs": {
     "kind": {
       "video": "vídeo",
@@ -84,6 +101,7 @@
     "poweredBy": "Desarrollado por"
   },
   "pageTitles": {
+    "desktop": "Escritorio",
     "login": "Iniciar sesión",
     "register": "Registrarse",
     "forgotPassword": "Olvidé mi contraseña",
@@ -94,24 +112,24 @@
     "error": "Error",
     "chat": "Chat",
     "tools": "Herramientas",
-    "chatWidget": "Tus widgets",
+    "chatWidget": "Widgets de chat",
     "docSummary": "Resumidor",
-    "mailHandler": "Gestor de correo IMAP",
+    "mailHandler": "Gestor de correo",
     "plugins": "Plugins",
     "files": "Fuentes",
     "ragSearch": "Búsqueda",
     "vectorStorage": "Almacenamiento vectorial",
-    "configInbound": "Entrada estándar",
-    "configAiModels": "Configuración de modelos IA",
+    "configInbound": "Entrada",
+    "configAiModels": "Modelos",
     "configProviderHiggsfield": "Conexión con Higgsfield",
-    "configTaskPrompts": "Instrucciones predefinidas",
-    "configSortingPrompt": "Configuración de enrutamiento",
+    "configTaskPrompts": "Instrucciones",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
     "configApiDocs": "Documentación API",
-    "statistics": "Estadísticas",
+    "statistics": "Uso",
     "settings": "Preferencias",
     "profile": "Perfil",
-    "admin": "Panel de administración",
+    "admin": "Operar",
     "adminFeatures": "Estado de funciones",
     "adminModelStatus": "Estado de modelos",
     "adminConfig": "Configuración del Sistema",
@@ -132,7 +150,8 @@
     "mcpServers": "Servidores MCP",
     "aiAgents": "Agentes de IA",
     "connections": "Conexiones",
-    "savedTasks": "Tareas recurrentes"
+    "savedTasks": "Tareas guardadas",
+    "setup": "Configuración"
   },
   "adminModelStatus": {
     "title": "Estado de modelos",
@@ -309,7 +328,9 @@
       "public": "Público"
     },
     "fileOnlyDefaultMessage": "Por favor, revisa el archivo adjunto.",
-    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz."
+    "voiceMessageDefaultMessage": "Por favor, responde a mi mensaje de voz.",
+    "conversation": "conversación",
+    "conversations": "conversaciones"
   },
   "moderation": {
     "report": {
@@ -360,7 +381,7 @@
     }
   },
   "admin": {
-    "title": "Panel de Administración",
+    "title": "Operar",
     "description": "Gestión y configuración del sistema",
     "tabs": {
       "overview": "Resumen",
@@ -564,6 +585,7 @@
       "saveError": "Error al guardar la configuración",
       "saved": "Configuración guardada",
       "dbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",
+      "envOverridesDb": "Fijado por la variable de entorno {key}. Actualmente: {value}. Elimina la variable del entorno para gestionar este ajuste aquí.",
       "unsaved": "Cambios sin guardar",
       "testConnection": "Probar Conexión",
       "testFailed": "Prueba de conexión fallida",
@@ -623,20 +645,21 @@
     "upgrade": "Mejorar"
   },
   "nav": {
+    "desktop": "Escritorio",
     "chat": "Chat",
     "new": "Nuevo",
     "newDescription": "Iniciar un nuevo chat",
     "history": "Historial",
     "historyDescription": "Historial de chats",
     "tools": "Herramientas",
-    "toolsChatWidget": "Tus widgets",
+    "toolsChatWidget": "Widgets de chat",
     "toolsDocSummary": "Resumidor",
-    "toolsMailHandler": "Gestor de correo IMAP",
+    "toolsMailHandler": "Gestor de correo",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
     "configConnections": "Configurar conexiones",
     "groupApi": "API",
-    "savedTasks": "Tareas recurrentes",
+    "savedTasks": "Tareas guardadas",
     "plugins": "Plugins",
     "files": "Fuentes",
     "filesDescription": "Fuentes para tus chats",
@@ -647,16 +670,16 @@
     "preferences": "Preferencias",
     "account": "Cuenta",
     "accountDescription": "Cuenta y preferencias",
-    "configInbound": "Entrada estándar",
-    "configAiModels": "Configuración de modelos IA",
-    "configTaskPrompts": "Instrucciones predefinidas",
-    "configSortingPrompt": "Configuración de enrutamiento",
+    "configInbound": "Entrada",
+    "configAiModels": "Modelos",
+    "configTaskPrompts": "Instrucciones",
+    "configSortingPrompt": "Enrutamiento",
     "configApiKeys": "Claves API",
-    "statistics": "Estadísticas",
+    "statistics": "Uso",
     "subscription": "Suscripción",
     "upgrade": "Mejorar",
-    "admin": "Admin",
-    "adminDashboard": "Panel",
+    "admin": "Operar",
+    "adminDashboard": "Resumen",
     "adminFeatureStatus": "Estado de Funciones",
     "adminModelStatus": "Estado de Modelos",
     "adminSystemConfig": "Configuración del Sistema",
@@ -665,7 +688,14 @@
     "more": "Más",
     "moreDescription": "Más secciones y cuenta",
     "menu": "Menú",
-    "aiAgents": "Agentes de IA"
+    "aiAgents": "Agentes de IA",
+    "manage": "Gestionar",
+    "manageDescription": "Asistentes, canales y automatizaciones",
+    "groupAssistants": "Asistentes",
+    "groupAutomations": "Automatizaciones",
+    "groupTools": "Herramientas",
+    "liveSupport": "Soporte en vivo",
+    "usage": "Uso"
   },
   "guest": {
     "disabledTitle": "El chat de invitados no está disponible",
@@ -726,6 +756,7 @@
     "plusMenu": {
       "label": "Añadir",
       "attach": "Adjuntar archivos",
+      "photo": "Tomar foto",
       "model": "Modelo",
       "tools": "Herramientas",
       "knowledge": "Carpeta de conocimiento"
@@ -746,6 +777,10 @@
     "voiceWhisper": "Grabar y transcribir con Whisper",
     "listeningStarted": "🎙️ Escuchando... habla ahora",
     "recordingStarted": "🎙️ Grabación iniciada...",
+    "voiceStatus": {
+      "recording": "Grabando...",
+      "transcribing": "Transcribiendo..."
+    },
     "speechError": "Error de reconocimiento de voz: {error}",
     "recordingError": "Error de grabación: {error}",
     "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",
@@ -1047,7 +1082,7 @@
     "cloudProviders": "Proveedores en la nube",
     "cloudProvidersHint": "Pega una clave API: se prueba en vivo y se guarda cifrada. Las claves de tu archivo .env se detectan automáticamente.",
     "recommended": "Recomendado",
-    "freeTier": "Nivel gratuito disponible",
+    "freeTier": "Clave API gratuita en este proveedor",
     "connected": "Conectado",
     "sourceEnv": "importada de .env",
     "sourceDbFromEnv": "guardada en BD (desde .env)",
@@ -1180,7 +1215,9 @@
     "disabled": "Deshabilitado",
     "reset": "Restablecer",
     "expand": "Expandir",
-    "noResults": "Sin resultados"
+    "noResults": "Sin resultados",
+    "skipToContent": "Saltar al contenido",
+    "loadingMessages": "Cargando mensajes…"
   },
   "search": {
     "sources": "Fuentes",
@@ -1204,6 +1241,7 @@
     "forgotPassword": "¿Olvidaste tu contraseña?",
     "forgotPasswordDesc": "Ingresa tu dirección de correo electrónico y te enviaremos un enlace para restablecer tu contraseña.",
     "noAccount": "¿No tienes cuenta?",
+    "registrationClosed": "El registro está desactivado. Contacta al administrador si necesitas una cuenta.",
     "hasAccount": "¿Ya tienes cuenta?",
     "signIn": "Iniciar Sesión",
     "signingIn": "Iniciando sesión...",
@@ -1246,6 +1284,8 @@
     "registrationCompleteDesc": "Te enviamos un enlace de verificación. Revisa tu bandeja de entrada y la carpeta de spam, luego haz clic en el enlace para activar tu cuenta.",
     "passwordResetSuccess": "¡Solicitud Enviada!",
     "passwordResetSuccessDesc": "Si existe una cuenta con esta dirección de correo, te hemos enviado un enlace para restablecer tu contraseña. Por favor revisa tu bandeja de entrada.",
+    "forgotPasswordNoMailerHint": "Si pierdes esta contraseña y no se puede enviar ningún correo, alguien con acceso al servidor puede establecer una nueva con:",
+    "forgotPasswordRecoveryCommand": "php bin/console app:admin:reset-password tu{'@'}ejemplo.com --generate",
     "recaptchaError": "Error de verificación reCAPTCHA. Por favor intenta de nuevo.",
     "backToHomepage": "← Volver a www.synaplan.com",
     "hostingTermsNote": "Aplican los términos y condiciones de la plataforma de hosting.",
@@ -1386,7 +1426,7 @@
       "knowledge": {
         "intro": "Añade documentos para que el asistente de IA pueda responder preguntas sobre tu contenido. Este paso es opcional.",
         "uploadLabel": "Subir archivos",
-        "pickLabel": "Elegir del Gestor de Archivos",
+        "pickLabel": "Elegir de Fuentes",
         "uploadHint": "PDF, Word, texto, Markdown, CSV o JSON. Los archivos se procesan después de crear el widget.",
         "empty": "Aún no hay fuentes de datos — también puedes añadirlas más tarde."
       },
@@ -1566,7 +1606,9 @@
       "modelNotConfigured": "No hay modelo de IA configurado. Selecciona uno en Configuración Avanzada → Configuración IA → Prompt y Modelo.",
       "editHintTitle": "¿Quieres afinar tu asistente de IA?",
       "editHintDescription": "Después de guardar, puedes afinar tu asistente de IA en cualquier momento en Configuración Avanzada → Configuración IA → Asistente IA del Widget."
-    }
+    },
+    "listTitle": "Widgets de chat",
+    "listEmpty": "Aún no hay widgets. Crea un widget de chat para empezar."
   },
   "profile": {
     "title": "Configuración de Perfil",
@@ -1580,7 +1622,8 @@
       "email": "Correo",
       "emailHint": "Tu correo de inicio de sesión (no se puede cambiar)",
       "phone": "Teléfono",
-      "phonePlaceholder": "Número de contacto opcional"
+      "phonePlaceholder": "Número de contacto opcional",
+      "managedBy": "Esta cuenta la gestiona {provider}"
     },
     "companyInfo": {
       "title": "Información de Empresa",
@@ -1620,7 +1663,10 @@
       "newPasswordHint": "Mínimo 8 caracteres",
       "confirmPassword": "Confirmar Contraseña",
       "confirmPasswordPlaceholder": "Confirma nueva contraseña",
-      "confirmPasswordHint": "Debe coincidir con la nueva contraseña"
+      "confirmPasswordHint": "Debe coincidir con la nueva contraseña",
+      "externalAuth": "Inicias sesión con {provider}. La contraseña se gestiona allí.",
+      "mismatch": "Las contraseñas no coinciden",
+      "tooShort": "La contraseña debe tener al menos 8 caracteres"
     },
     "appSecurity": {
       "title": "Seguridad de la app",
@@ -1855,6 +1901,9 @@
     "generatingFileWriting": "Escribiendo el contenido del documento…",
     "generatingFileWritingNamed": "Escribiendo el contenido de {filename}…",
     "generatingFileConverting": "Creando {filename} para descargar…",
+    "editingImageTitle": "Editando tu imagen",
+    "editingImageDesc": "Aplicando tus cambios a la imagen de esta conversación",
+    "editingImageNamed": "Aplicando tus cambios a {filename}",
     "thinkingTitle": "Pensando…",
     "thinkingDesc": "El modelo está razonando antes de responder",
     "topic": "Tema",
@@ -2154,7 +2203,8 @@
       "models": "modelos",
       "adminOnlyTitle": "Se requiere acceso de administrador",
       "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores."
-    }
+    },
+    "notLoggedIn": "No has iniciado sesión"
   },
   "storage": {
     "title": "Cuota de Almacenamiento",
@@ -2311,7 +2361,7 @@
     "status_error": "Error",
     "terms": {
       "vectorized": "consultable por IA",
-      "knowledgeGroup": "grupo de conocimiento",
+      "knowledgeGroup": "carpeta de conocimiento",
       "incoming": "entrantes",
       "generated": "generado por IA",
       "notApplicable": "no aplicable"
@@ -2357,13 +2407,13 @@
     },
     "help": {
       "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
-      "group": "Los grupos de conocimiento agrupan archivos. Cuando la IA busca en un grupo, puede usar todos sus archivos.",
+      "group": "Las carpetas de conocimiento agrupan archivos. Cuando la IA busca en una carpeta, puede usar cada archivo.",
       "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
       "incoming": "Archivos que otras apps han enviado para tu base de conocimiento. Revísalos y consérvalos o descártalos.",
       "typeFilter": "Mostrar solo un tipo de archivo: documentos, imágenes, vídeo o audio.",
       "vectorizedFilter": "Filtrar según si los archivos son consultables por IA.",
       "reVectorize": "Volver a leer este archivo y actualizar lo que la IA sabe de él. Úsalo tras editarlo o si falló.",
-      "moveGroup": "Mover archivos a otro grupo de conocimiento. Esto cambia en qué grupo los busca la IA; no elimina nada.",
+      "moveGroup": "Mueve archivos a otra carpeta de conocimiento. Cambia dónde los busca la IA — no elimina nada.",
       "storage": "Cuánto almacenamiento has usado. El contenido generado por IA también cuenta y se muestra por separado."
     },
     "empty": {
@@ -2417,6 +2467,9 @@
       "open": "Abrir",
       "retry": "Reintentar",
       "provenance": "de {source} · {time}"
+    },
+    "preview": {
+      "play": "Reproducir"
     },
     "generated": {
       "title": "Generados",
@@ -3054,6 +3107,62 @@
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "usageCount": "solicitudes"
     },
+    "desktop": {
+      "title": "Escritorio",
+      "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
+      "notAvailableYet": "Synaplan Desktop aún no está disponible para descargar. Ya puedes crear un código de vinculación para probar la conexión.",
+      "pairButton": "Vincular este equipo",
+      "loadFailed": "No se pudieron cargar los equipos conectados.",
+      "disconnect": "Desconectar",
+      "confirmDisconnectTitle": "Desconectar este equipo",
+      "confirmDisconnect": "«{name}» ya no podrá acceder a tu cuenta. Podrás volver a vincularlo más tarde con un nuevo código.",
+      "disconnected": "Equipo desconectado.",
+      "disconnectFailed": "No se pudo desconectar el equipo.",
+      "pairing": {
+        "title": "Vincular este equipo",
+        "intro": "Abre Synaplan Desktop en el equipo que quieres conectar e introduce esta dirección y este código.",
+        "addressLabel": "Dirección del servidor",
+        "codeLabel": "Código de vinculación",
+        "expiresIn": "Caduca en {time}",
+        "expired": "Este código ha caducado.",
+        "newCode": "Crear un código nuevo",
+        "copyAddress": "Copiar dirección",
+        "copyCode": "Copiar código",
+        "createFailed": "No se pudo crear el código de vinculación.",
+        "copyFailed": "No se pudo copiar al portapapeles."
+      },
+      "devices": {
+        "empty": "Aún no hay equipos conectados.",
+        "name": "Equipo",
+        "status": "Estado",
+        "lastSeen": "Última conexión",
+        "waitingJobs": "Trabajos en espera",
+        "actions": "Acciones",
+        "never": "nunca",
+        "statusActive": "Conectado",
+        "statusRevoked": "Desconectado"
+      },
+      "run": {
+        "action": "Ejecutar en este equipo",
+        "multiple": "{count} equipos",
+        "needPrompt": "Escribe primero qué debe hacer el equipo.",
+        "skillTitle": "Ejecutar en este equipo",
+        "skillMessage": "¿Qué skill debe ejecutarse en «{name}»?",
+        "skillPlaceholder": "p. ej. pptx",
+        "invalidSkill": "Usa solo minúsculas, números y guiones.",
+        "sent": "Enviado a «{name}».",
+        "enqueueFailed": "No se pudo enviar el trabajo."
+      },
+      "jobCard": {
+        "waiting": "Esperando a {name}",
+        "done": "{name} ha terminado",
+        "failed": "{name} no pudo terminar",
+        "noAnswer": "Este equipo no respondió.",
+        "unknownSkill": "Este equipo no tiene ese skill.",
+        "skillDisabled": "Ese skill está desactivado en este equipo.",
+        "localError": "El skill falló en este equipo."
+      }
+    },
     "phoneVerification": {
       "title": "Verificación de Teléfono",
       "description": "Verifica tu número de teléfono para desbloquear todas las funciones y límites más altos vía WhatsApp.",
@@ -3449,6 +3558,14 @@
     "deleteSelectedConfirm": "¿Estás seguro de que deseas eliminar {count} chat(s) seleccionados? Esta acción no se puede deshacer.",
     "deleteSuccess": "{count} chat(s) eliminados con éxito",
     "deleteFailed": "Error al eliminar chats"
+  },
+  "messageRefs": {
+    "olderConversation": "Conversación anterior",
+    "clickToOpen": "Haz clic para abrir la conversación original",
+    "missing": {
+      "badge": "Mensaje anterior",
+      "tooltip": "No se pudo resolver esta referencia de mensaje. Es posible que el mensaje haya sido eliminado."
+    }
   },
   "memories": {
     "fullscreen": {
@@ -3952,6 +4069,82 @@
       "connect": "Conectar",
       "connecting": "Comprobando la conexión…",
       "connectError": "No se puede acceder a este servidor. Comprueba la dirección e inténtalo de nuevo."
+    }
+  },
+  "setup": {
+    "title": "Configurar {brand}",
+    "subtitle": "Este servidor aún no tiene administrador. Tres pasos cortos y estará listo.",
+    "subtitleProgress": "Paso {current} de {total}.",
+    "progressLabel": "Progreso de la configuración",
+    "loading": "Comprobando este servidor…",
+    "switchServer": "Conectar con otro servidor",
+    "toggleTheme": "Cambiar entre claro y oscuro",
+    "switchLanguage": "Cambiar idioma",
+    "footerHint": "Mientras la configuración no termine, nadie más puede usar este servidor.",
+    "steps": {
+      "admin": "Administrador",
+      "provider": "Proveedor de IA",
+      "access": "Acceso"
+    },
+    "alreadyDone": {
+      "title": "Este servidor ya está configurado",
+      "description": "Ya tiene un administrador, así que aquí no hay nada que configurar. Inicia sesión para continuar.",
+      "cta": "Ir al inicio de sesión"
+    },
+    "admin": {
+      "title": "Crea tu cuenta de administrador",
+      "description": "Es la cuenta con la que iniciarás sesión. Puede gestionar todo en este servidor.",
+      "emailLabel": "Correo electrónico",
+      "emailPlaceholder": "tu{'@'}ejemplo.com",
+      "passwordLabel": "Contraseña",
+      "passwordHint": "Al menos 8 caracteres, con una mayúscula, una minúscula y un número.",
+      "confirmLabel": "Repite la contraseña",
+      "togglePassword": "Mostrar u ocultar la contraseña",
+      "submit": "Crear cuenta",
+      "submitting": "Creando la cuenta…",
+      "errorMismatch": "Las dos contraseñas no coinciden.",
+      "errorWeak": "La contraseña necesita al menos 8 caracteres, una mayúscula, una minúscula y un número.",
+      "errorInProgress": "Esta cuenta ya se está creando en otro sitio. Espera un momento y vuelve a cargar la página.",
+      "errorAlreadyDone": "Este servidor ya tiene un administrador, así que aquí no hay nada que crear. Inicia sesión.",
+      "errorDisabled": "La configuración desde el navegador está desactivada en este servidor. Quien lo administra crea la primera cuenta.",
+      "errorGeneric": "No se pudo crear la cuenta. Inténtalo de nuevo."
+    },
+    "provider": {
+      "title": "Conecta un proveedor de IA",
+      "description": "La IA necesita un proveedor para responder. Elige uno y pega su clave API: se comprueba al instante y se guarda cifrada en este servidor.",
+      "loading": "Cargando proveedores…",
+      "loadFailed": "No se pudo cargar la lista de proveedores.",
+      "ready": "Hay un proveedor conectado. La IA ya puede responder.",
+      "continue": "Continuar",
+      "skipHint": "Puedes omitirlo y conectar un proveedor más tarde en Admin → Configuración de proveedor de IA. Hasta entonces el chat no funcionará.",
+      "chooseProvider": "Elige un proveedor de IA",
+      "pickHint": "Elige arriba un proveedor para añadir su clave. Basta con uno; puedes añadir más más adelante.",
+      "keyLabel": "Clave API de {provider}",
+      "freeKeyHint": "Obtener una clave API de {provider} es gratis.",
+      "saving": "Probando…",
+      "willBecomeDefault": "Al guardar esta clave, {provider} será la IA que responda por defecto.",
+      "alreadyDefault": "{provider} ya es la IA que responde por defecto."
+    },
+    "access": {
+      "title": "Decide quién puede usar este servidor",
+      "description": "Puedes cambiar ambas opciones en cualquier momento en Admin → Configuración.",
+      "registrationLabel": "Permitir que los visitantes creen su propia cuenta",
+      "registrationHint": "Cualquiera que alcance este servidor podrá registrarse. Desactívalo si prefieres invitar tú.",
+      "guestChatLabel": "Permitir que los visitantes prueben el chat sin cuenta",
+      "guestChatHint": "Útil para una demo pública. Desactívalo si el servidor es solo para tu equipo.",
+      "lockedByEnv": "Definido por la variable de entorno {key}, así que no se puede cambiar aquí.",
+      "noMailerWarning": "No hay servidor de correo configurado, por lo que las cuentas nuevas no podrán confirmar su correo.",
+      "changeLaterHint": "Al terminar la configuración, este servidor queda disponible.",
+      "submit": "Finalizar configuración",
+      "submitting": "Finalizando…",
+      "errorGeneric": "No se pudo finalizar la configuración. Inténtalo de nuevo."
+    },
+    "done": {
+      "title": "Tu servidor está listo",
+      "description": "La configuración ha terminado. Has iniciado sesión como administrador.",
+      "enter": "Empezar a usar {brand}",
+      "entering": "Abriendo…",
+      "enterFailed": "No se pudo abrir la aplicación. Inténtalo de nuevo."
     }
   },
   "iap": {

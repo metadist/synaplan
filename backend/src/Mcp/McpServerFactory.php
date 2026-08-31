@@ -5,13 +5,22 @@ declare(strict_types=1);
 namespace App\Mcp;
 
 use App\Entity\Chat;
+use App\Entity\DesktopDevice;
+use App\Entity\DesktopJob;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Observability\EventRingStore;
 use App\Repository\ChatRepository;
+use App\Repository\DesktopDeviceRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
+use App\Service\ConversationSummaryRefreshDispatcher;
+use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Desktop\DesktopJobContract;
+use App\Service\Desktop\DesktopJobResultNotifier;
+use App\Service\Desktop\DesktopJobStore;
+use App\Service\Desktop\Exception\ResultTooLargeException;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\File\FileHelper;
 use App\Service\File\FileStorageService;
@@ -75,6 +84,11 @@ final class McpServerFactory
         private readonly RateLimitService $rateLimit,
         private readonly EntityManagerInterface $em,
         private readonly CacheItemPoolInterface $cache,
+        private readonly ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private readonly DesktopAgentConfig $desktopAgentConfig,
+        private readonly DesktopJobStore $desktopJobStore,
+        private readonly DesktopDeviceRepository $desktopDeviceRepository,
+        private readonly DesktopJobResultNotifier $desktopJobResultNotifier,
         private readonly LoggerInterface $logger,
         private readonly EventRingStore $eventRing,
     ) {
@@ -82,8 +96,15 @@ final class McpServerFactory
 
     /**
      * Build a server instance with all tools bound to the given user.
+     *
+     * When the request is authenticated by a scoped key bound to a paired
+     * computer ($device is non-null) AND the Desktop feature is enabled, two
+     * extra tools are exposed — `agent_checkin` (lease work) and
+     * `agent_report_result` (return a result). They are the ONLY way a device
+     * pulls jobs; there is no push and no server-supplied shell command.
+     * A normal MCP client (Claude/Cursor, or a non-desktop key) never sees them.
      */
-    public function build(User $user): Server
+    public function build(User $user, ?DesktopDevice $device = null): Server
     {
         $builder = Server::builder()
             ->setServerInfo(
@@ -204,7 +225,7 @@ final class McpServerFactory
         // Admin-only troubleshooting tool. The `mcp` firewall authenticates any
         // valid API key (ROLE_USER), so the admin gate lives here: the tool is
         // invisible to non-admins in tools/list and refuses in the handler.
-        if ($user->isAdmin()) {
+        if (self::hasAdminRole($user)) {
             $builder->addTool(
                 $this->recentErrorsHandler($user),
                 'recent_errors',
@@ -219,9 +240,206 @@ final class McpServerFactory
             );
         }
 
+        if ($device instanceof DesktopDevice && $this->desktopAgentConfig->isEnabled((int) $user->getId())) {
+            $this->registerDesktopAgentTools($builder, $device);
+        }
+
         $this->registerPrompts($builder, $user);
 
         return $builder->build();
+    }
+
+    /**
+     * Register the Synaplan Desktop check-in tools for a paired device.
+     *
+     * These are gated twice: the device must be present (scoped key → device
+     * row) and the global flag must be ON. A revoked device's key is already
+     * inactive, so it never authenticates this far.
+     */
+    private function registerDesktopAgentTools(Builder $builder, DesktopDevice $device): void
+    {
+        $builder
+            ->addTool(
+                $this->agentCheckinHandler($device),
+                'agent_checkin',
+                'Desktop agent check-in',
+                'Synaplan Desktop calls this to lease the next queued job for THIS computer. '
+                .'Returns at most one job as {jobId, type, input:{skill,prompt,fileIds}, leaseToken, '
+                .'leaseExpires}, plus next_call_at (when to poll again). The input never contains a '
+                .'shell command — only a named skill the device already has installed.',
+                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
+                self::agentCheckinSchema(),
+            )
+            ->addTool(
+                $this->agentReportResultHandler($device),
+                'agent_report_result',
+                'Desktop agent report result',
+                'Synaplan Desktop calls this to report the outcome of a leased job, identified by its '
+                .'leaseToken. status is "succeeded" or "failed"; a refusal (unknown/disabled skill) is '
+                .'a normal "failed" with an errorCode, not an error.',
+                new ToolAnnotations(readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false),
+                self::agentReportResultSchema(),
+            );
+    }
+
+    /**
+     * @return \Closure(int, list<mixed>, list<mixed>, string, string): array<string, mixed>
+     */
+    private function agentCheckinHandler(DesktopDevice $device): \Closure
+    {
+        return function (int $protocol = DesktopJobContract::PROTOCOL_VERSION, array $capabilities = [], array $enabledSkills = [], string $agentKind = 'synaplan-desktop', string $status = 'idle') use ($device): array {
+            $now = time();
+
+            $device->touchLastSeen();
+            if ([] !== $capabilities) {
+                $device->setCapabilities(array_values(array_filter(
+                    $capabilities,
+                    static fn ($c): bool => \is_string($c),
+                )));
+            }
+            $this->desktopDeviceRepository->save($device);
+
+            // Never guess for a client speaking a protocol we don't know — hand
+            // back no work and a far next check-in (contract invariant C9).
+            if (DesktopJobContract::PROTOCOL_VERSION !== $protocol) {
+                return [
+                    'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                    'jobs' => [],
+                    'next_call_at' => $now + DesktopJobContract::NEXT_CALL_UNKNOWN_PROTOCOL_SECONDS,
+                ];
+            }
+
+            if (!$device->isActive()) {
+                return [
+                    'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                    'jobs' => [],
+                    'next_call_at' => $now + DesktopJobContract::NEXT_CALL_IDLE_SECONDS,
+                ];
+            }
+
+            $job = $this->desktopJobStore->leaseForDevice($device);
+            $jobs = $job instanceof DesktopJob ? [DesktopJobContract::buildDevicePayload($job)] : [];
+
+            return [
+                'protocol' => DesktopJobContract::PROTOCOL_VERSION,
+                'jobs' => $jobs,
+                'next_call_at' => $now + ([] === $jobs
+                    ? DesktopJobContract::NEXT_CALL_IDLE_SECONDS
+                    : DesktopJobContract::NEXT_CALL_ACTIVE_SECONDS),
+            ];
+        };
+    }
+
+    /**
+     * @return \Closure(string, string, ?array<string, mixed>, ?string): array<string, mixed>
+     */
+    private function agentReportResultHandler(DesktopDevice $device): \Closure
+    {
+        return function (string $leaseToken, string $status, ?array $result = null, ?string $errorCode = null) use ($device): array {
+            if ('' === trim($leaseToken)) {
+                throw new ToolCallException('leaseToken is required.');
+            }
+
+            if (null !== $errorCode && !DesktopJobContract::isValidErrorCode($errorCode)) {
+                throw new ToolCallException('Unknown errorCode.');
+            }
+
+            try {
+                $job = $this->desktopJobStore->reportResult($device, $leaseToken, $status, $result, $errorCode);
+            } catch (ResultTooLargeException $e) {
+                throw new ToolCallException($e->getMessage());
+            }
+
+            // Unknown / stale / foreign lease token → a clean tool error, not a 500.
+            if (!$job instanceof DesktopJob) {
+                throw new ToolCallException('Unknown or stale lease token, or invalid status.');
+            }
+
+            // Post the "done" note into the originating chat (if any). The
+            // result text is untrusted device content, stamped as such.
+            $this->desktopJobResultNotifier->notify($job);
+
+            return [
+                'success' => true,
+                'jobId' => $job->getId(),
+                'status' => $job->getStatus(),
+            ];
+        };
+    }
+
+    /**
+     * The frozen `agent_checkin` argument schema (protocol 1, DS18). Public so
+     * the contract-fixture test can assert the committed fixtures against the
+     * live schema (invariant C9).
+     *
+     * @return array<string, mixed>
+     */
+    public static function agentCheckinSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'protocol' => [
+                    'type' => 'integer',
+                    'default' => DesktopJobContract::PROTOCOL_VERSION,
+                    'description' => 'The desktop job protocol version the client speaks. Currently 1.',
+                ],
+                'capabilities' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Job kinds this computer supports (v1: ["skill.run"]).',
+                ],
+                'enabledSkills' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'string'],
+                    'description' => 'Names of skills currently installed/enabled on the device. A hint so the server can skip jobs the device would refuse — an optimization, not a security boundary.',
+                ],
+                'agentKind' => [
+                    'type' => 'string',
+                    'description' => 'Client identifier. Always "synaplan-desktop" for the official client.',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'description' => 'Free-form device status hint (e.g. "idle", "busy").',
+                ],
+            ],
+            'additionalProperties' => false,
+        ];
+    }
+
+    /**
+     * The frozen `agent_report_result` argument schema (protocol 1, DS18).
+     * Public for the contract-fixture test (invariant C9).
+     *
+     * @return array<string, mixed>
+     */
+    public static function agentReportResultSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => [
+                'leaseToken' => [
+                    'type' => 'string',
+                    'description' => 'The leaseToken from the job returned by agent_checkin.',
+                ],
+                'status' => [
+                    'type' => 'string',
+                    'enum' => [DesktopJob::STATUS_SUCCEEDED, DesktopJob::STATUS_FAILED],
+                    'description' => 'Outcome of the job. A refused skill is a normal "failed".',
+                ],
+                'result' => [
+                    'type' => ['object', 'null'],
+                    'description' => 'Structured result payload (e.g. {fileIds:[...], summary:"..."}). Size-capped.',
+                ],
+                'errorCode' => [
+                    'type' => ['string', 'null'],
+                    'enum' => [...DesktopJobContract::ERROR_CODES, null],
+                    'description' => 'Machine-readable failure reason when status is "failed".',
+                ],
+            ],
+            'required' => ['leaseToken', 'status'],
+            'additionalProperties' => false,
+        ];
     }
 
     /**
@@ -271,6 +489,16 @@ final class McpServerFactory
     }
 
     /**
+     * Mirrors the `ROLE_ADMIN` check the HTTP admin endpoints use. Deliberately
+     * not `User::isAdmin()`, which only looks at the internal user level and so
+     * would lock out an admin whose role comes from the OIDC role mapping.
+     */
+    private static function hasAdminRole(User $user): bool
+    {
+        return \in_array('ROLE_ADMIN', $user->getRoles(), true);
+    }
+
+    /**
      * @return \Closure(string, ?string, int, ?string, ?string, int): array<string, mixed>
      */
     private function recentErrorsHandler(User $user): \Closure
@@ -285,7 +513,7 @@ final class McpServerFactory
         ) use ($user): array {
             // Defence in depth: the tool is only registered for admins, but a
             // handler must never assume its own visibility gate held.
-            if (!$user->isAdmin()) {
+            if (!self::hasAdminRole($user)) {
                 throw new ToolCallException('recent_errors requires an admin account.');
             }
 
@@ -528,6 +756,12 @@ final class McpServerFactory
             $this->em->persist($outgoing);
             $chat->updateTimestamp();
             $this->em->flush();
+
+            // Rolling-summary refresh after the OUT persist (channel parity):
+            // MCP conversations thread through Chats like every other channel.
+            if (null !== $chat->getId()) {
+                $this->summaryRefreshDispatcher->dispatch((int) $chat->getId(), $userId);
+            }
 
             $this->recordChatUsage($user, $message, $answer, $meta);
 

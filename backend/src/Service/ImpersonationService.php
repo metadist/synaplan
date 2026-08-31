@@ -241,6 +241,47 @@ final readonly class ImpersonationService
     }
 
     /**
+     * Recover a clean admin session when a refresh raced the cookie-swap and
+     * left a valid admin stash next to a plain admin access token (no
+     * `impersonator_id`). Mints a fresh admin access token from the stash so the
+     * still-valid admin is not logged out; the stash is kept so
+     * `/impersonate/exit` can tear it down. Returns null when this is not the
+     * recoverable state (no/invalid stash, or a genuine impersonation token).
+     *
+     * @return array{access_token: string, user: User}|null
+     */
+    public function recoverAdminSessionFromStash(Request $request): ?array
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return null;
+        }
+
+        $admin = $this->resolveAdminFromStashedRefresh($stashRefresh);
+        if (!$admin) {
+            return null;
+        }
+
+        // Skip a genuine impersonation token — the normal refresh path owns it.
+        $accessTokenString = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        if (is_string($accessTokenString) && '' !== $accessTokenString) {
+            $payload = $this->tokenService->decodeAccessTokenIgnoringExpiry($accessTokenString);
+            if ($payload && isset($payload['impersonator_id'])) {
+                return null;
+            }
+        }
+
+        $this->logger->info('Impersonation swap recovered to admin session', [
+            'admin_id' => $admin->getId(),
+        ]);
+
+        return [
+            'access_token' => $this->tokenService->generateAccessToken($admin),
+            'user' => $admin,
+        ];
+    }
+
+    /**
      * Read the impersonator off the active access token claim.
      *
      * Used by `/auth/me` to label the impersonation banner. Returns null when
@@ -299,6 +340,38 @@ final readonly class ImpersonationService
     public function attachClearStashCookies(Response $response): void
     {
         $response->headers->setCookie($this->buildStashCookie('', expire: 1));
+    }
+
+    /**
+     * Resolve the admin behind a valid impersonation stash, or null when no
+     * valid stash is present. Lets logout / revoke-all act on the real operator
+     * (the admin) instead of the impersonated target that `#[CurrentUser]`
+     * resolves to during an active impersonation.
+     */
+    public function resolveStashedAdmin(Request $request): ?User
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return null;
+        }
+
+        return $this->resolveAdminFromStashedRefresh($stashRefresh);
+    }
+
+    /**
+     * Revoke the stashed admin refresh token in the DB, if present. During
+     * impersonation the regular refresh cookie is cleared and the admin's real
+     * refresh token lives in the stash, so a plain logout would revoke nothing.
+     * Returns true when a stash token was actually revoked.
+     */
+    public function revokeStashedAdminRefreshToken(Request $request): bool
+    {
+        $stashRefresh = $request->cookies->get(self::ADMIN_REFRESH_STASH_COOKIE);
+        if (!is_string($stashRefresh) || '' === $stashRefresh) {
+            return false;
+        }
+
+        return $this->tokenService->revokeRefreshToken($stashRefresh);
     }
 
     /**

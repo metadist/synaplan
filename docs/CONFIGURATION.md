@@ -21,9 +21,146 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `FRONTEND_URL` | `http://localhost:5173` | Frontend URL for email links |
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
-| `REGISTRATION_ENABLED` | `true` | Local email/password self-registration; set `false` on SSO-/OIDC-only instances (#462) |
-| `GUEST_CHAT_ENABLED` | `true` | Anonymous guest trial chat; set `false` on SSO-/OIDC-only instances so unauthenticated visitors go to the login page (#1517) |
+| `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
+| `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
 | `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
+
+---
+
+## First-Run Setup
+
+An installation that has no administrator — `APP_ENV=prod` without
+`BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD`, which is what Umbrel,
+Elestio, AWS and a hand-rolled `deploy/` produce — serves a short wizard at
+`/setup`:
+
+1. **Create the administrator.** Email and password, signed in immediately. The
+   address counts as verified, so a missing mailer cannot lock you out.
+2. **Connect an AI provider** (skippable). The same provider cards as
+   **Admin → AI Providers**, narrowed to the recommended ones.
+3. **Decide who may in.** Self-registration and guest chat, both explained in
+   plain words. A switch that an environment variable pins is shown as pinned
+   rather than as an editable value that would do nothing.
+
+While the wizard is pending, every other API route answers
+`503 SETUP_REQUIRED`; only `/api/v1/setup/*`, the health probe and the runtime
+config stay open. The frontend follows that and sends every route to `/setup`, so
+there is no half-configured state to stumble into.
+
+> **The window between the first start and the first administrator is open.** The
+> account belongs to whoever fills in that form first, as in Open WebUI, Immich
+> or n8n. Complete the wizard right after deploying a publicly reachable host, or
+> create the administrator through `BOOTSTRAP_ADMIN_*` so the window never
+> exists.
+
+`SETUP_WIZARD_ENABLED=false` switches the wizard off. An installation without an
+administrator then has no browser route in at all, which is the right choice when
+the account only ever comes from automation or from an identity provider — see
+[SSO-only instances](#sso-only-instances-no-local-accounts).
+
+Once an administrator exists the wizard is closed for good, and it does **not**
+reopen if every administrator is later deleted or demoted — a wizard that
+reappears on a running instance would let the next visitor claim it. Use
+`app:admin:reset-password --promote` for that case, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+**Dev and test installations never see the wizard**, because their fixtures seed
+a demo account. To reopen it on a running dev stack, without touching the volume:
+
+```bash
+make -C backend setup-reset
+```
+
+That is `app:setup:reset`, which deletes every account and the completion flag,
+then the next page load lands on `/setup` again. It refuses to run outside
+`APP_ENV=dev` or `test`. Add `--keep-policy` to leave the registration and
+guest-chat switches at the values the previous run stored.
+
+The reset only holds until the backend container restarts: the entrypoint sees an
+empty `BUSER` table and loads the demo fixtures again, and any account closes the
+wizard. Start the stack with `SEED_DEMO_DATA=false` to keep it open across
+restarts:
+
+```bash
+docker compose down -v
+SEED_DEMO_DATA=false docker compose up -d
+```
+
+---
+
+## SSO-Only Instances (No Local Accounts)
+
+An instance whose users all come from an identity provider does not need the
+wizard: there is no local administrator to create, and everything the wizard
+writes can come from the environment instead. Switch it off and let the IdP
+decide who is an administrator:
+
+```dotenv
+SETUP_WIZARD_ENABLED=false
+REGISTRATION_ENABLED=false
+GUEST_CHAT_ENABLED=false
+
+OIDC_DISCOVERY_URL=https://idp.example.com/realms/main/.well-known/openid-configuration
+OIDC_CLIENT_ID=synaplan
+OIDC_CLIENT_SECRET=…
+OIDC_AUTO_REDIRECT=true
+```
+
+The database then stays empty until the first person signs in, and that is a
+normal steady state rather than a pending setup: the API serves requests as
+usual, and the login page offers the identity provider instead of the wizard.
+
+**Administrators come from claims.** On sign-in, the roles found at
+`OIDC_ROLE_CLAIMS` are matched case-insensitively against `OIDC_ADMIN_ROLES`; a
+match sets `BUSERLEVEL=ADMIN`, and losing the role sets the account back to
+`NEW`. Both variables have Keycloak-shaped defaults and only need changing for a
+different provider:
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `OIDC_ADMIN_ROLES` | `admin,realm-admin,synaplan-admin,administrator` | Claim values that grant admin |
+| `OIDC_ROLE_CLAIMS` | `realm_access.roles,resource_access.{client_id}.roles,groups` | Dot-notation paths; `{client_id}` expands to `OIDC_CLIENT_ID`. Azure AD: `roles`. Auth0: `https://myapp\.com/roles` |
+
+Two properties of that mapping are worth knowing before you rely on it:
+
+- **A role change takes effect on the next sign-in.** The claims are read during
+  the login callback and on every OIDC Bearer request, not on cookie-backed
+  session requests or token refresh. Revoking admin in the IdP does not end a
+  session that is already open.
+- **A token that carries no role claim at all changes nothing.** An empty result
+  is treated as "no information", so a misconfigured claim path cannot silently
+  demote every administrator. Verify the path once against a real token rather
+  than assuming the default fits your provider.
+
+**No AI provider step either.** The wizard's provider page is a convenience, not
+the only way in: a key in the environment (for example `GROQ_API_KEY`,
+`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) is picked up on start, so a fully
+configured instance needs no browser step at all. See
+[AI Providers](#ai-providers).
+
+Recovery does not depend on the IdP. `php bin/console app:admin:reset-password
+--promote` still creates or promotes a local administrator if the identity
+provider becomes unavailable, see
+[Lost Administrator Password](ADMIN.md#lost-administrator-password).
+
+---
+
+## Access Policy
+
+Self-registration and guest chat are switches in **Admin → System
+Configuration**, stored in `BCONFIG` and effective without a restart. The setup
+wizard writes the same two rows.
+
+`REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` used to be the only place these
+lived. They still work and now act as a **pin**: when either is set in the
+environment, it wins over the database and the admin UI marks the field as
+overridden instead of showing a value that has no effect. Leave them unset unless
+a deployment has to guarantee the setting — an SSO-only instance, for example,
+where nobody may ever register locally.
+
+Both accept `true`/`false`. Unsetting the variable and restarting hands control
+back to the database value.
 
 ---
 
@@ -118,7 +255,7 @@ does not speak. The realtime Speech-to-Speech API is not supported. Get a key at
 TRUSTEDTOKENS_API_KEY=your_key_here
 ```
 
-Open-weight models (GLM 5.2, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
+Open-weight models (GLM 5.2 / 5.3, DeepSeek V4 / Chimera, Qwen3.6 35B, GPT OSS 120B) served from GPUs in Munich by TNG
 Technology Consulting, under German jurisdiction with zero data retention. Synaplan talks to
 its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
 [trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.
@@ -367,15 +504,15 @@ SYNAPLAN_TTS_URL=http://host.docker.internal:10200
 
 **Frontend language selects the voice.** `ChatView` sends the active vue-i18n
 locale with the chat request and later with each `/api/v1/tts/stream` call.
-`PiperProvider` maps `en` / `de` / `es` / `tr` to the baked voices
-(`en_US-lessac-medium`, `de_DE-thorsten-medium`, `es_ES-davefx-medium`,
-`tr_TR-dfki-medium`). If the backend detects a different reply language
+`PiperProvider` maps `en` / `de` / `es` / `fr` / `tr` to the baked voices
+(`en_US-lessac-medium`, `de_DE-kerstin-low`, `es_ES-davefx-medium`,
+`fr_FR-siwis-medium`, `tr_TR-dfki-medium`). If the backend detects a different reply language
 (`meta.language`), that short code wins over the UI locale. An explicit
 `voice=` query still overrides both. There is no separate voice dropdown.
 
 Add further Piper models by mounting `.onnx` + `.onnx.json` files into
 `EXTRA_VOICES_DIR` (`/voices-extra` on the container). Do not remount over
-`/voices` — that hides the four baked models. Details:
+`/voices` — that hides the five baked models. Details:
 [Adding more voices](https://github.com/metadist/synaplan-tts#adding-more-voices).
 
 Prefer a cloud voice? Set `ELEVENLABS_API_KEY` instead (or use Gemini / Mistral /

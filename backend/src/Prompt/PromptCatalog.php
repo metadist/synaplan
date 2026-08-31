@@ -144,6 +144,12 @@ class PromptCatalog
                 'prompt' => self::memoryExtractionPrompt(),
             ],
             [
+                'topic' => 'tools:message_digest',
+                'language' => 'en',
+                'shortDescription' => 'Write one searchable digest line per KEY message of a batch, for the deep-memory vector index. Returns JSON array or null.',
+                'prompt' => self::messageDigestPrompt(),
+            ],
+            [
                 'topic' => 'tools:feedback_false_positive_summary',
                 'language' => 'en',
                 'shortDescription' => 'Summarize incorrect or unwanted AI responses into a single sentence for feedback storage.',
@@ -349,6 +355,21 @@ This is the list, use only this:
    - Math, logic, translations, grammar, or rephrasing
    - Stable general knowledge (definitions, history, science, "what is the capital of France")
    - Summarizing, analysing, or answering about text/files the user already provided
+   - **Questions answerable from an attached file alone.** When the message
+     carries an attachment (BATTACHED_FILES / BATTACHED_COUNT is set, or
+     BFILETYPE / BFILETEXT is filled) and the text only asks to describe,
+     identify, read, summarize, translate, compare, or extract from it —
+     "what is that?", "was ist das?", "what do you see?", "describe this",
+     "summarize this document" — the vision/analysis model answers from the
+     file itself: set BWEBSEARCH to 0.
+
+   **Attachment + live information = search.** When the message carries an
+   attachment AND answering needs fresh external information ABOUT what the
+   file shows or says — "how much does this cost?" (photo of a product),
+   "where can I buy this?", "is this contract clause still legal?", "what do
+   reviews say about it?" — set BWEBSEARCH to 1. Do NOT worry that the text
+   is deictic ("this/that/das"): the system analyzes the file first and
+   builds the search phrase from its content, not from the literal words.
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
@@ -383,6 +404,10 @@ This is the list, use only this:
    - "Make this photo look like a painting" → mediamaker
    - "Replace the background with a beach" → mediamaker
    - "What is in this image?" → general
+   - "What is that?" → general, BWEBSEARCH: 0 ("that" is the attached image — vision answers from the file)
+   - "Was ist das?" → general, BWEBSEARCH: 0
+   - "How much does this cost?" → general, BWEBSEARCH: 1 (needs live prices for the thing shown — the system searches using the file's content)
+   - "Wo kann ich das kaufen?" → general, BWEBSEARCH: 1
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
@@ -410,9 +435,18 @@ This is the list, use only this:
    - "Convert to speech" → BMEDIA: "audio"
 
 9. **Detect input mode (BINPUTMODE)**: If BTOPIC is "mediamaker" AND BMEDIA is "image", set BINPUTMODE:
-   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer
-   - "text_only" - if the user wants to generate an image purely from text description (no reference images)
+   - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer,
+     OR if the user asks to change, edit, restyle, recolor, extend, or fix an image that was generated or uploaded
+     EARLIER IN THIS CONVERSATION. History turns that carry a file are marked with a note such as
+     "[Generated image file: car.png]" or "[Uploaded image file: photo.jpg]" - use those notes to tell an edit from a
+     new request. A short follow-up right after an image was generated is almost always an edit.
+   - "text_only" - if the user wants a NEW image generated purely from a text description, even when older images
+     exist in the conversation ("another one", "something completely different", "now draw a house")
    If unsure, omit BINPUTMODE.
+   Examples (assuming the previous assistant turn generated an image):
+   - "make the car blue" → BTOPIC: "mediamaker", BMEDIA: "image", BINPUTMODE: "reference_images"
+   - "remove the background" → BINPUTMODE: "reference_images"
+   - "now generate a picture of a house" → BINPUTMODE: "text_only"
 
 10. **Detect video duration (BDURATION)**: If BTOPIC is "mediamaker" AND BMEDIA is "video", extract the requested duration.
    - Supported durations: **4, 6, or 8 seconds only**
@@ -1147,12 +1181,16 @@ Take the user's request and create an enhanced, detailed prompt that will produc
 - Use the user's language
 
 ### For IMAGE EDITING / COMPOSITION prompts (with reference images):
-When the user has attached image(s) and wants to edit, combine, or compose them:
-- **You CANNOT see the attached images.** Do NOT describe what is in them.
+When the user wants to edit, combine, or compose image(s) — either attached to this message OR
+generated/shared earlier in this conversation (a follow-up like "make the car blue", "remove the
+background", "mach es heller" always refers to the picture that is already there):
+- **You CANNOT see the reference images.** Do NOT describe what is in them.
 - **Do NOT assign roles** to the images (e.g., "image 1 is the pattern, image 2 is the room").
 - **Preserve the user's instruction exactly** as they wrote it - they can see the images, you cannot.
 - Only lightly enhance clarity and add quality hints (e.g., "seamless blending, photorealistic, high resolution").
 - Keep the user's wording for object/scene references intact.
+- Write ONLY the requested change and add "keep everything else unchanged" — describing a full scene
+  makes the image model redraw the picture instead of editing it.
 - The downstream multimodal image model will see both the images and your enhanced text.
 
 ### For VIDEO prompts:
@@ -1177,6 +1215,9 @@ Output: A detailed image of a cat, photorealistic, soft natural lighting, high r
 
 Input (with 2 images attached): "Put the person from the coast next to the Android from the space ship"
 Output: Put the person from the coast next to the Android from the space ship. Seamless compositing, matching lighting and perspective, photorealistic blending, high resolution
+
+Input (follow-up to an image generated earlier): "make the car blue"
+Output: Change the colour of the car to blue, keep everything else unchanged. Photorealistic, matching the original lighting and composition
 
 Input (with 2 images attached): "Apply this pattern to the walls of the room"
 Output: Apply this pattern to the walls of the room. Realistic texture mapping, natural perspective, consistent lighting, photorealistic result, high resolution
@@ -1415,6 +1456,7 @@ Your task is to analyze the user's question and generate a concise, effective se
 6. Maintain the original language of the question
 7. Keep the query concise (typically 3-8 words)
 8. Return ONLY the search query, no explanations or additional text
+9. If the input contains an "Attached file content" section, the question refers to THAT file (an uploaded image, document, audio or video). Resolve every reference ("this", "that", "it", "das", "esto") using the file content and build a self-contained query about the file's actual subject. NEVER search for the literal question words in that case.
 
 ## Examples:
 
@@ -1435,6 +1477,18 @@ Search Query: world cup 2022 winner
 
 Question: "How does a quantum computer work?"
 Search Query: quantum computer how it works
+
+Question: "How much does this cost?"
+Attached file content (the question refers to this): "Photo of Sony WH-1000XM6 wireless noise-cancelling headphones, black"
+Search Query: sony wh-1000xm6 price
+
+Question: "Was ist das für ein Gebäude?"
+Attached file content (the question refers to this): "The Elbphilharmonie concert hall in Hamburg, seen from the harbor"
+Search Query: elbphilharmonie hamburg
+
+Question: "Is this still valid law?"
+Attached file content (the question refers to this): "GENERAL DATA PROTECTION REGULATION (EU) 2016/679 — Article 17, Right to erasure..."
+Search Query: gdpr article 17 current status
 
 Now generate the search query for the following user question:
 PROMPT;
@@ -1646,6 +1700,40 @@ Greet the user casually and ask about their business/website. Be welcoming!
 Example: "Hey! Great to have you here. Tell me a bit about what you do – what's your business or website about?"
 
 [QUESTION:1]
+PROMPT;
+    }
+
+    private static function messageDigestPrompt(): string
+    {
+        return <<<'PROMPT'
+You index a user's message history for later retrieval. You receive a batch of messages, each prefixed with its numeric id. Select ONLY the KEY messages — the ones the user might want to find again weeks or months later — and write one searchable digest line for each. Return a JSON array or null.
+
+## What counts as a KEY message
+- Documents and files the user created, received, or discussed (contracts, letters, invoices, reports)
+- Decisions, agreements, commitments ("we go with option B", "rent increase accepted")
+- Important facts, figures, dates, deadlines, names of people or companies
+- Requests or tasks with lasting relevance
+
+## What is NOT a key message
+- Small talk, greetings, thanks, acknowledgements
+- Meta-conversation about the assistant itself ("can you repeat that", "summarize this chat")
+- Redundant follow-ups that add nothing new over an already-covered message
+- Anything already covered by an existing digest title shown to you
+
+## Digest line rules
+- One line per key message, max 200 characters
+- Write it like a search result title: WHO/WHAT + concrete subject + distinguishing detail
+  Good: "office rent letter to realtor about the increase of payments"
+  Bad: "user talks about a letter"
+- Write in the language of the source message
+- Include concrete names, amounts, and dates when present — those are what the user will search for
+- `message_id` MUST be one of the ids shown in the batch. Never invent ids.
+
+## Response format (strict JSON, no markdown)
+[
+  {"title": "office rent letter to realtor about the increase of payments", "message_id": 1234}
+]
+Return [] or null if the batch contains no key messages. Most batches contain only 0-3 key messages — be selective.
 PROMPT;
     }
 

@@ -112,6 +112,18 @@ final class AdminSystemConfigController extends AbstractController
                                 nullable: true,
                                 description: 'True when the acting admin has a per-user BCONFIG override'
                             ),
+                            new OA\Property(
+                                property: 'envOverride',
+                                type: 'boolean',
+                                nullable: true,
+                                description: 'True when an explicit environment variable pins this setting, so the stored value has no effect until the operator removes it (REGISTRATION_ENABLED, GUEST_CHAT_ENABLED)'
+                            ),
+                            new OA\Property(
+                                property: 'effectiveValue',
+                                type: 'string',
+                                nullable: true,
+                                description: 'The value actually in force when envOverride is true'
+                            ),
                         ]
                     )
                 ),
