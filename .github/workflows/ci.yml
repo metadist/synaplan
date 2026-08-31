@@ -1427,9 +1427,9 @@ jobs:
       # A pull request, deliberately, rather than a push to main. Elestio
       # pipelines redeploy on every commit to the branch they track, so pushing
       # here would restart every managed instance at an unpredictable moment.
-      # release-rollout.yml merges this proposal in a nightly maintenance window
-      # instead, once its own guards agree that it is the release the published
-      # manifest advertises. The Umbrel package lives in this same PR so a
+      # release-rollout.yml merges this proposal instead, as soon as the checks
+      # here are green and its own guards agree that it is the release the
+      # published manifest advertises. The Umbrel package lives in this same PR so a
       # release bumps every catalog pin together; carrying that package into
       # getumbrel/umbrel-apps is umbrel-store-sync.yml's job, because a foreign
       # repository cannot be pinned from here.
@@ -1557,11 +1557,14 @@ jobs:
           pinned and change it only by following the update guide, so a redeploy never
           moves a running installation to a different version.
 
-          Merging this restarts every Elestio instance that tracks \`${BASE}\`, because
-          Elestio redeploys on each commit to the branch it tracks. That is why nothing
-          merges this on the spot: \`release-rollout.yml\` does it in the next nightly
-          maintenance window, once the checks here are green and this version is still
-          the one the release manifest advertises. Merge it by hand to roll out sooner.
+          Nobody has to merge this: \`release-rollout.yml\` does it as soon as the
+          checks above are green, provided this is still the version the release
+          manifest advertises and it has not been yanked meanwhile.
+
+          Merging restarts every Elestio instance that tracks \`${BASE}\`, because
+          Elestio redeploys on each commit to the branch it tracks — as does every
+          other commit that branch receives, which is why this one is not held back
+          for it.
 
           Once merged, \`umbrel-store-sync.yml\` carries the raised package into
           [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps), and the

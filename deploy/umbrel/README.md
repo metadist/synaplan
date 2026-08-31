@@ -35,7 +35,7 @@ one. Do not edit them by hand.
 
 Nothing merges that PR on the spot, because merging restarts every Elestio
 instance tracking the default branch. `.github/workflows/release-rollout.yml`
-does it in a nightly maintenance window once its guards agree.
+does it as soon as the proposal's checks are green and its guards agree.
 
 ### How the package reaches the store
 

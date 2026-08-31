@@ -283,12 +283,12 @@ raised package into `getumbrel/umbrel-apps`; Umbrel reviews and merges it.
 ## What "automatically updated" covers, and what it does not
 
 Every release raises the version pins in this directory, and
-`.github/workflows/release-rollout.yml` merges that change in a nightly
-maintenance window. The effect is precise and worth stating plainly:
+`.github/workflows/release-rollout.yml` merges that change as soon as the
+proposal's checks are green. The effect is precise and worth stating plainly:
 
 - **New deployments** install the current release. Whoever clicks the Elestio
   template, copies `selfhost.env.example`, installs from the Umbrel App Store, or
-  launches the AWS AMI tomorrow gets what was released today.
+  launches the AWS AMI after that merge gets what was just released.
 - **Existing installations are never touched.** They keep the version their
   operator pinned. Nothing here reaches into a running deployment, and nothing
   here should: an update runs database migrations, and the backup that makes those
