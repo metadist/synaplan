@@ -17,7 +17,7 @@ namespace App\Observability;
  * through. It exists precisely so the AI-facing feed never carries obvious
  * emails, bearer tokens, or provider keys.
  */
-final class EventScrubber
+final readonly class EventScrubber
 {
     private const MAX_LENGTH = 2000;
     private const REDACTED = '[redacted]';
@@ -44,15 +44,22 @@ final class EventScrubber
             return null;
         }
 
-        foreach (self::PATTERNS as $pattern => $replacement) {
-            $result = preg_replace($pattern, $replacement, $text);
-            if (\is_string($result)) {
-                $text = $result;
-            }
-        }
-
+        // Truncate BEFORE matching, not after: an exception message can carry a
+        // whole serialised payload, and the patterns are unanchored, so capping
+        // first bounds the matching cost and keeps PCRE well clear of its
+        // backtrack limit on the error path.
         if (mb_strlen($text) > self::MAX_LENGTH) {
             $text = mb_substr($text, 0, self::MAX_LENGTH).'…';
+        }
+
+        foreach (self::PATTERNS as $pattern => $replacement) {
+            $result = preg_replace($pattern, $replacement, $text);
+            if (!\is_string($result)) {
+                // A pattern that could not be evaluated means we cannot claim the
+                // text is masked. Fail closed rather than emit the raw value.
+                return self::REDACTED;
+            }
+            $text = $result;
         }
 
         return $text;

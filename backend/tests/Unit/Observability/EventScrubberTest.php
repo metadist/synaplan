@@ -62,6 +62,39 @@ final class EventScrubberTest extends TestCase
         self::assertStringEndsWith('…', $out);
     }
 
+    /**
+     * The patterns only ever see a capped string, so scrubbing cost does not
+     * grow with the size of whatever ended up in an exception message.
+     */
+    public function testMasksEmailInsideAnOverlongText(): void
+    {
+        $text = 'Upstream rejected payload for victim@example.com: '.str_repeat('a@a.', 50000);
+
+        $out = (string) $this->scrubber->scrub($text);
+
+        self::assertStringNotContainsString('victim@example.com', $out);
+        self::assertStringContainsString('[email]', $out);
+        self::assertLessThanOrEqual(2001, mb_strlen($out));
+    }
+
+    /**
+     * Regression: when a pattern cannot be evaluated — PCRE gives up on
+     * pathological input by returning null — the old code kept the untouched
+     * text, so an email went into the AI-facing feed verbatim. There is no
+     * basis left for claiming the text is masked, so it must fail closed.
+     */
+    public function testFailsClosedWhenAPatternCannotBeEvaluated(): void
+    {
+        $previous = ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', '1');
+
+        try {
+            self::assertSame('[redacted]', $this->scrubber->scrub('User victim@example.com not found'));
+        } finally {
+            ini_set('pcre.backtrack_limit', false === $previous ? '1000000' : $previous);
+        }
+    }
+
     public function testKeepsHarmlessText(): void
     {
         $text = 'RuntimeException in ChatHandler at line 764: RAG context loading failed';
