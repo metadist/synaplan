@@ -39,7 +39,7 @@ const writeCatalog = (files) => {
   return root
 }
 
-test('reads the version and digest a consistent catalog pins', () => {
+test('reads the version and digest that a consistent catalog pins', () => {
   const result = readPinnedRelease(writeCatalog(catalog()))
 
   assert.deepEqual(result, { version: '4.4.1', digest: DIGEST })
