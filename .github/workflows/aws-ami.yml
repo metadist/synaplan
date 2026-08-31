@@ -215,8 +215,7 @@ jobs:
             echo "AMI: \`${ami}\` in \`${AWS_REGION}\`"
             echo ""
             echo "The submit job below offers this AMI to the listing once the"
-            echo "verification launch has passed. It validates by default and only"
-            echo "submits for real when the \`AWS_MARKETPLACE_SUBMIT\` variable says so."
+            echo "verification launch has passed."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate and share the AMI with AWS Marketplace
@@ -656,31 +655,18 @@ jobs:
         env:
           PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
           INGESTION_ROLE_ARN: ${{ secrets.AWS_MARKETPLACE_INGESTION_ROLE_ARN }}
-          # Unset means validate. Rolling out a listing change is not something
-          # to discover by accident, and AWS keeps a submitted version in review
-          # for days — a wrong one costs a support case, not a revert.
-          SUBMIT: ${{ vars.AWS_MARKETPLACE_SUBMIT }}
           VERSION: ${{ needs.resolve.outputs.version }}
           ARCHITECTURES: ${{ needs.resolve.outputs.matrix }}
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ needs.resolve.outputs.version }}
         run: |
           set -euo pipefail
 
-          if [ "${SUBMIT:-}" = apply ]; then
-            intent=APPLY
-          else
-            intent=VALIDATE
-          fi
-
           {
             echo "### AWS Marketplace"
             echo ""
-            if [ "$intent" = VALIDATE ]; then
-              echo "Validated \`${VERSION}\` against the listing without submitting it."
-              echo "Set the repository variable \`AWS_MARKETPLACE_SUBMIT\` to \`apply\` to submit for real."
-            else
-              echo "Submitted \`${VERSION}\` to the listing. AWS reviews a new version before it becomes available."
-            fi
+            echo "Offering \`${VERSION}\` to the listing, one version per architecture."
+            echo "Each is validated before it is submitted, and AWS reviews a submitted version"
+            echo "before it becomes available."
             echo ""
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -749,22 +735,33 @@ jobs:
                 DetailsDocument: $details
               }]')"
 
-            echo "::group::${architecture}: ${intent} ${ami}"
+            # Validated first, then submitted, both inside this run. VALIDATE
+            # asks AWS whether it would accept the document without creating
+            # anything, which is how a wrong product id or a role AWS cannot
+            # assume is caught before a real version exists. This used to be a
+            # separate dry run, requested through a repository variable that a
+            # maintainer had to flip after reading a job summary — a step
+            # between two releases that nobody remembers.
+            echo "::group::${architecture}: validate ${ami}"
+            aws marketplace-catalog start-change-set \
+              --catalog AWSMarketplace \
+              --intent VALIDATE \
+              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
+              --change-set "$change_set" > /dev/null
+            echo "Accepted."
+            echo "::endgroup::"
+
+            echo "::group::${architecture}: submit ${ami}"
             id="$(
               aws marketplace-catalog start-change-set \
                 --catalog AWSMarketplace \
-                --intent "$intent" \
+                --intent APPLY \
                 --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
                 --change-set "$change_set" \
                 --query ChangeSetId --output text
             )"
             echo "Change set ${id}."
             echo "::endgroup::"
-
-            if [ "$intent" = VALIDATE ]; then
-              echo "- \`${architecture}\`: \`${ami}\` validated (change set \`${id}\`)" >> "$GITHUB_STEP_SUMMARY"
-              continue
-            fi
 
             # Waited out rather than fired and forgotten, for two reasons: the
             # next architecture cannot start while this change set holds the

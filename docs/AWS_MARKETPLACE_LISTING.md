@@ -168,20 +168,29 @@ later and slower.
 Once the listing exists, the `submit` job in
 [`aws-ami.yml`](../.github/workflows/aws-ami.yml) offers each release to it
 through the Marketplace Catalog API, after the AMI has been built, shared and
-verified by a real launch. It needs three settings, and skips itself with a
-notice while any of them is missing:
+verified by a real launch. It needs two secrets, and skips itself with a notice
+while either of them is missing:
 
-| Setting | Kind | Value |
-| --- | --- | --- |
-| `AWS_MARKETPLACE_PRODUCT_ID` | secret | the listing's product ID, `prod-…` |
-| `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | secret | the `IngestionRoleArn` output of the roles stack |
-| `AWS_MARKETPLACE_SUBMIT` | variable | `apply` to submit for real; anything else validates only |
+| Secret | Value |
+| --- | --- |
+| `AWS_MARKETPLACE_PRODUCT_ID` | the listing's product ID, `prod-…` |
+| `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | the `IngestionRoleArn` output of the roles stack |
 
-**The default is validation, not submission.** Without
-`AWS_MARKETPLACE_SUBMIT=apply` the job sends the same change set with
-`Intent=VALIDATE`, which checks the document against the listing and changes
-nothing. Look at one validated run before switching it over: a submitted version
-sits in AWS review for days, so a wrong one is expensive to take back.
+Nothing else has to be switched on, and nothing has to be switched over later.
+Every architecture is sent twice: first with `Intent=VALIDATE`, which asks AWS
+whether it would accept the document without creating anything, and then — only
+if that passed — with `Intent=APPLY`. That covers what a separate dry run used
+to cover, a wrong product ID or a role AWS cannot assume, without leaving a
+manual step between two releases for someone to forget.
+
+A submitted version still sits in AWS review for days, so it is not published by
+this job. If a submission turns out to be wrong, cancel its change set —
+`CancelChangeSet` is part of the build role's permissions:
+
+```bash
+aws marketplace-catalog cancel-change-set \
+  --catalog AWSMarketplace --change-set-id <id>
+```
 
 Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
 `<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
