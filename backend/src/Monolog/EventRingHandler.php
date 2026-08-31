@@ -24,6 +24,16 @@ use Symfony\Component\HttpFoundation\RequestStack;
  */
 final class EventRingHandler extends AbstractProcessingHandler
 {
+    /**
+     * Reentrancy guard. Writing an event can itself emit a `warning+` log — the
+     * shared {@see \App\Service\Infrastructure\RedisService} logs "Redis command
+     * failed" when the ring's own Redis call fails. That warning would route
+     * straight back into this handler and, with Redis unreachable, recurse until
+     * the stack overflows — precisely during an outage, when logging must stay
+     * cheap and safe. The flag makes the write self-suppressing.
+     */
+    private bool $handling = false;
+
     public function __construct(
         private readonly EventRingStore $store,
         private readonly RequestStack $requestStack,
@@ -32,6 +42,20 @@ final class EventRingHandler extends AbstractProcessingHandler
     }
 
     protected function write(LogRecord $record): void
+    {
+        if ($this->handling) {
+            return;
+        }
+
+        $this->handling = true;
+        try {
+            $this->record($record);
+        } finally {
+            $this->handling = false;
+        }
+    }
+
+    private function record(LogRecord $record): void
     {
         $request = $this->requestStack->getMainRequest();
 
