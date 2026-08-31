@@ -838,6 +838,11 @@
                       </div>
                     </div>
                     <div class="flex items-center gap-0 shrink-0">
+                      <FileMakeSearchableButton
+                        :file="file"
+                        :busy="isDescribing(file.id)"
+                        @activate="describeAndSort(file)"
+                      />
                       <FolderMoveMenu
                         :open="folderMenuOpen === file.id"
                         :folders="displayedFolders"
@@ -846,36 +851,6 @@
                         @move="moveFileToFolder(file.id, $event)"
                         @remove="removeFileFromFolder(file.id)"
                       />
-                      <button
-                        v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                        :title="$t('files.describeSortAction')"
-                        :disabled="isDescribing(file.id)"
-                        data-testid="btn-describe"
-                        @click="describeAndSort(file)"
-                      >
-                        <Icon
-                          :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                          class="w-4 h-4"
-                          :class="isDescribing(file.id) && 'animate-spin'"
-                        />
-                      </button>
-                      <button
-                        v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                        class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                        :title="$t('files.indexPromptAction')"
-                        :disabled="isDescribing(file.id)"
-                        data-testid="btn-index-prompt"
-                        @click="describeAndSort(file)"
-                      >
-                        <Icon
-                          :icon="
-                            isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                          "
-                          class="w-4 h-4"
-                          :class="isDescribing(file.id) && 'animate-spin'"
-                        />
-                      </button>
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                         :title="$t('common.view')"
@@ -986,72 +961,45 @@
                         {{ file.uploaded_date }}
                       </td>
                       <td class="py-2.5 px-3">
-                        <div
-                          class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                        >
-                          <FolderMoveMenu
-                            :open="folderMenuOpen === file.id"
-                            :folders="displayedFolders"
-                            :can-remove="!!file.group_key"
-                            @toggle="toggleFolderMenu(file.id)"
-                            @move="moveFileToFolder(file.id, $event)"
-                            @remove="removeFileFromFolder(file.id)"
+                        <div class="flex gap-0.5 justify-end items-center">
+                          <FileMakeSearchableButton
+                            :file="file"
+                            :busy="isDescribing(file.id)"
+                            @activate="describeAndSort(file)"
                           />
-                          <button
-                            v-if="
-                              vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'
-                            "
-                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                            :title="$t('files.describeSortAction')"
-                            :disabled="isDescribing(file.id)"
-                            data-testid="btn-describe"
-                            @click="describeAndSort(file)"
+                          <div
+                            class="flex gap-0.5 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                           >
-                            <Icon
-                              :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                              class="w-4 h-4"
-                              :class="isDescribing(file.id) && 'animate-spin'"
+                            <FolderMoveMenu
+                              :open="folderMenuOpen === file.id"
+                              :folders="displayedFolders"
+                              :can-remove="!!file.group_key"
+                              @toggle="toggleFolderMenu(file.id)"
+                              @move="moveFileToFolder(file.id, $event)"
+                              @remove="removeFileFromFolder(file.id)"
                             />
-                          </button>
-                          <button
-                            v-if="
-                              vectorStateOf(file) !== 'vectorized' && file.source === 'generated'
-                            "
-                            class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                            :title="$t('files.indexPromptAction')"
-                            :disabled="isDescribing(file.id)"
-                            data-testid="btn-index-prompt"
-                            @click="describeAndSort(file)"
-                          >
-                            <Icon
-                              :icon="
-                                isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                              "
-                              class="w-4 h-4"
-                              :class="isDescribing(file.id) && 'animate-spin'"
-                            />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('files.download')"
-                            @click="downloadFile(file.id, file.filename)"
-                          >
-                            <ArrowDownTrayIcon class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('common.view')"
-                            @click="viewFileContent(file.id)"
-                          >
-                            <Icon icon="heroicons:eye" class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                            :title="$t('files.delete')"
-                            @click="deleteFile(file.id)"
-                          >
-                            <TrashIcon class="w-4 h-4" />
-                          </button>
+                            <button
+                              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                              :title="$t('files.download')"
+                              @click="downloadFile(file.id, file.filename)"
+                            >
+                              <ArrowDownTrayIcon class="w-4 h-4" />
+                            </button>
+                            <button
+                              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                              :title="$t('common.view')"
+                              @click="viewFileContent(file.id)"
+                            >
+                              <Icon icon="heroicons:eye" class="w-4 h-4" />
+                            </button>
+                            <button
+                              class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                              :title="$t('files.delete')"
+                              @click="deleteFile(file.id)"
+                            >
+                              <TrashIcon class="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -1235,6 +1183,11 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-0 shrink-0">
+                    <FileMakeSearchableButton
+                      :file="file"
+                      :busy="isDescribing(file.id)"
+                      @activate="describeAndSort(file)"
+                    />
                     <FolderMoveMenu
                       :open="folderMenuOpen === file.id"
                       :folders="displayedFolders"
@@ -1244,34 +1197,6 @@
                       @move="moveFileToFolder(file.id, $event)"
                       @remove="removeFileFromFolder(file.id)"
                     />
-                    <button
-                      v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                      :title="$t('files.describeSortAction')"
-                      :disabled="isDescribing(file.id)"
-                      data-testid="btn-describe"
-                      @click="describeAndSort(file)"
-                    >
-                      <Icon
-                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                        class="w-4 h-4"
-                        :class="isDescribing(file.id) && 'animate-spin'"
-                      />
-                    </button>
-                    <button
-                      v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                      class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                      :title="$t('files.indexPromptAction')"
-                      :disabled="isDescribing(file.id)"
-                      data-testid="btn-index-prompt"
-                      @click="describeAndSort(file)"
-                    >
-                      <Icon
-                        :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
-                        class="w-4 h-4"
-                        :class="isDescribing(file.id) && 'animate-spin'"
-                      />
-                    </button>
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
                       :title="$t('common.view')"
@@ -1377,72 +1302,49 @@
                       {{ file.uploaded_date }}
                     </td>
                     <td class="py-2.5 px-3">
-                      <div
-                        class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                      >
-                        <FolderMoveMenu
-                          :open="folderMenuOpen === file.id"
-                          :folders="displayedFolders"
-                          :current-folder="openFolder"
-                          :can-remove="!!file.group_key"
-                          @toggle="toggleFolderMenu(file.id)"
-                          @move="moveFileToFolder(file.id, $event)"
-                          @remove="removeFileFromFolder(file.id)"
+                      <div class="flex gap-0.5 justify-end items-center">
+                        <FileMakeSearchableButton
+                          :file="file"
+                          :busy="isDescribing(file.id)"
+                          @activate="describeAndSort(file)"
                         />
-                        <button
-                          v-if="vectorStateOf(file) !== 'vectorized' && file.source !== 'generated'"
-                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                          :title="$t('files.describeSortAction')"
-                          :disabled="isDescribing(file.id)"
-                          data-testid="btn-describe"
-                          @click="describeAndSort(file)"
+                        <div
+                          class="flex gap-0.5 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                         >
-                          <Icon
-                            :icon="isDescribing(file.id) ? 'mdi:loading' : 'mdi:brain'"
-                            class="w-4 h-4"
-                            :class="isDescribing(file.id) && 'animate-spin'"
+                          <FolderMoveMenu
+                            :open="folderMenuOpen === file.id"
+                            :folders="displayedFolders"
+                            :current-folder="openFolder"
+                            :can-remove="!!file.group_key"
+                            @toggle="toggleFolderMenu(file.id)"
+                            @move="moveFileToFolder(file.id, $event)"
+                            @remove="removeFileFromFolder(file.id)"
                           />
-                        </button>
-                        <button
-                          v-if="vectorStateOf(file) !== 'vectorized' && file.source === 'generated'"
-                          class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
-                          :title="$t('files.indexPromptAction')"
-                          :disabled="isDescribing(file.id)"
-                          data-testid="btn-index-prompt"
-                          @click="describeAndSort(file)"
-                        >
-                          <Icon
-                            :icon="
-                              isDescribing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'
-                            "
-                            class="w-4 h-4"
-                            :class="isDescribing(file.id) && 'animate-spin'"
-                          />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('files.download')"
-                          data-testid="btn-download"
-                          @click="downloadFile(file.id, file.filename)"
-                        >
-                          <ArrowDownTrayIcon class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                          :title="$t('common.view')"
-                          data-testid="btn-view"
-                          @click="viewFileContent(file.id)"
-                        >
-                          <Icon icon="heroicons:eye" class="w-4 h-4" />
-                        </button>
-                        <button
-                          class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                          :title="$t('files.delete')"
-                          data-testid="btn-delete"
-                          @click="deleteFile(file.id)"
-                        >
-                          <TrashIcon class="w-4 h-4" />
-                        </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('files.download')"
+                            data-testid="btn-download"
+                            @click="downloadFile(file.id, file.filename)"
+                          >
+                            <ArrowDownTrayIcon class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('common.view')"
+                            data-testid="btn-view"
+                            @click="viewFileContent(file.id)"
+                          >
+                            <Icon icon="heroicons:eye" class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                            :title="$t('files.delete')"
+                            data-testid="btn-delete"
+                            @click="deleteFile(file.id)"
+                          >
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -1588,6 +1490,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
+import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
@@ -1599,6 +1502,7 @@ import FilesIntegrationsBanner from '@/components/FilesIntegrationsBanner.vue'
 import FilesTabs from '@/components/files/FilesTabs.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import FileSourceBadge from '@/components/files/FileSourceBadge.vue'
+import FileMakeSearchableButton from '@/components/files/FileMakeSearchableButton.vue'
 import FolderMoveMenu from '@/components/FolderMoveMenu.vue'
 import { Icon } from '@iconify/vue'
 import {
@@ -1619,7 +1523,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
@@ -1948,10 +1852,9 @@ const describingIds = ref<number[]>([])
 const isDescribing = (id: number): boolean => describingIds.value.includes(id)
 
 /**
- * Make a file RAG-ready. For AI-generated files this indexes their generation
- * prompt; for everything else it describes, vectorizes & AI-sorts the file into
- * a knowledge group. Same trigger, different per-file action (decided in UI by
- * the file's source).
+ * Make a file searchable by AI. Generated artefacts use /index-prompt so a
+ * missing description can fall back to the stored generation prompt; uploads
+ * use /describe. The buttons look the same — only the endpoint differs.
  */
 const describeAndSort = async (file: FileItem) => {
   if (isDescribing(file.id)) return
@@ -1963,11 +1866,7 @@ const describeAndSort = async (file: FileItem) => {
       : await filesService.describeVectorizeSortFile(file.id)
     if (res.success) {
       if (res.groupKey) {
-        // Sorted into a knowledge group (describe path, or index-prompt that
-        // also picked a group). Show the group-aware confirmation either way.
         showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
-      } else if (isGenerated) {
-        showSuccess(t('files.indexPromptDone'))
       } else {
         showSuccess(t('files.describeSortDone'))
       }
@@ -2564,13 +2463,9 @@ const formatFileSize = (bytes: number): string => {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB'
 }
 
-/** §4.4: show the original (source) name when present, else the stored name. */
+/** Prefer a human title; generic chat voice notes become "Voice memo · time". */
 const displayName = (file: FileItem): string =>
-  file.display_name || file.original_name || file.filename
-
-/** Derive the pill state, falling back to chunk count for legacy rows. */
-const vectorStateOf = (file: FileItem) =>
-  file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'none')
+  fileDisplayName(file, (key, values) => t(key, values as never), locale.value)
 
 // Load initial data
 onMounted(async () => {

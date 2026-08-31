@@ -77,13 +77,13 @@
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium txt-primary truncate" :title="file.filename">
-            {{ file.display_name || file.original_name || file.filename }}
+            {{ fileDisplayName(file, translate, locale) }}
           </p>
           <div class="flex items-center gap-2 mt-1 min-w-0 flex-wrap overflow-hidden">
             <FileSourceBadge v-if="file.source" :source="file.source" />
             <span class="text-[11px] txt-secondary truncate">{{ provenance(file) }}</span>
             <FileVectorPill
-              :state="file.vector_state ?? (file.is_vectorized ? 'vectorized' : 'pending')"
+              :state="vectorStateOf(file)"
               :chunk-count="file.chunk_count ?? file.chunks ?? 0"
               :group-key="file.group_key"
             />
@@ -142,10 +142,13 @@ import { ArrowDownTrayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import filesService, { type FileItem } from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import FileVectorPill from './FileVectorPill.vue'
 import FileSourceBadge from './FileSourceBadge.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const translate = (key: string, values?: Record<string, unknown>): string =>
+  t(key, (values ?? {}) as never)
 const { success: showSuccess, error: showError } = useNotification()
 const { formatDateTime } = useDateFormat()
 

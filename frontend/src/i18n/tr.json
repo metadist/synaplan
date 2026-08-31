@@ -2301,12 +2301,14 @@
     "movedSuccess": "Dosya \"{folder}\" klasörüne taşındı",
     "removeFromFolder": "Klasörden çıkar",
     "removedFromFolder": "Klasörden çıkarıldı (dosya ve arama dizini korunur)",
-    "describeSortAction": "Açıkla, vektörle ve sırala — yapay zekâ ile aranabilir yap",
+    "describeSortAction": "Yapay zekâ ile aranabilir yap",
     "describeSortDone": "Artık yapay zekâ ile aranabilir.",
     "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
     "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
-    "indexPromptAction": "Bilgi tabanına ekle",
-    "indexPromptDone": "Bilgi tabanınıza eklendi.",
+    "indexPromptAction": "Yapay zekâ ile aranabilir yap",
+    "indexPromptDone": "Artık yapay zekâ ile aranabilir.",
+    "voiceMemo": "Sesli not",
+    "voiceMemoNamed": "Sesli not · {time}",
     "emptyState": {
       "title": "Henüz dosya yok",
       "description": "Başlamak için dosya yükle. Dosyaları klasörler halinde düzenleyebilirsin.",
@@ -2409,6 +2411,9 @@
     },
     "help": {
       "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
+      "notSearchable": "Asistan bu dosyayı henüz yanıtlarda kullanamaz. Bilgiye eklemek için onu aranabilir yapın.",
+      "processing": "Bu dosya, asistanın kullanabilmesi için hazırlanıyor.",
+      "failed": "Bu dosya aranabilir yapılamadı. Yeniden deneyebilirsiniz.",
       "group": "Bilgi klasörleri dosyaları bir araya getirir. AI bir klasörde arama yaptığında içindeki her dosyayı kullanabilir.",
       "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
       "incoming": "Diğer uygulamaların bilgi tabanınız için gönderdiği dosyalar. İnceleyin, sonra saklayın veya çıkarın.",
@@ -2493,7 +2498,7 @@
       "deleteFailed": "Dosya silinemedi. Lütfen tekrar deneyin."
     },
     "explainer": {
-      "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. „Yapay zekâ ile aranabilir“ olarak işaretli dosyalar bilgi tabanınıza eklenir; böylece asistan bunları kullanabilir.",
+      "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. Asistan, yapay zekâ ile aranabilir işaretli dosyaları kullanabilir. Fotoğraflar, kayıtlar ve yapay zekânın ürettiği dosyalar için önce aranabilir yapmanız gerekir.",
       "dismiss": "Anladım",
       "reopen": "Bu nedir?"
     }

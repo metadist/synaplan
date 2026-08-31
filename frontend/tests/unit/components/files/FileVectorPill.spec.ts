@@ -20,6 +20,9 @@ const i18n = createI18n({
         },
         help: {
           vectorized: 'Its contents are in your knowledge base.',
+          notSearchable: 'The assistant cannot use this file yet.',
+          processing: 'This file is being prepared for the assistant.',
+          failed: 'This file could not be made searchable.',
         },
       },
     },
@@ -59,17 +62,18 @@ describe('FileVectorPill', () => {
     expect(wrapper.text()).toBe('Failed')
   })
 
-  it('renders nothing for the legacy not-applicable state', () => {
-    // Media is no longer "not applicable" — any stray legacy value renders
-    // nothing, just like the not-searchable state.
+  it('renders not-searchable for the legacy not-applicable state', () => {
     const wrapper = mountPill({ state: 'not_applicable' })
-    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(false)
-    expect(wrapper.text()).toBe('')
+    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(true)
+    expect(wrapper.text()).toBe('Not searchable')
   })
 
-  it('renders nothing when the file is not searchable', () => {
+  it('renders not-searchable when the file is not in the knowledge base', () => {
     const wrapper = mountPill()
-    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(false)
-    expect(wrapper.text()).toBe('')
+    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(true)
+    expect(wrapper.text()).toBe('Not searchable')
+    expect(wrapper.find('[data-testid="file-vector-pill"]').attributes('title')).toBe(
+      'The assistant cannot use this file yet.'
+    )
   })
 })

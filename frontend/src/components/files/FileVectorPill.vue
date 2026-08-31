@@ -1,6 +1,4 @@
 <template>
-  <!-- Nothing is shown when a file is not searchable — the absence of a pill is
-       the "not searchable" state. Only searchable / processing / failed render. -->
   <!-- `whitespace-nowrap` belongs on the label, not here: on the outer element
        it kept the pill at its full text width, so the inner `truncate` never
        took effect and a long folder name ran underneath the row's action
@@ -39,8 +37,11 @@ const props = withDefaults(
 
 const { t } = useI18n()
 
-// Only render for states that carry meaning; "none"/legacy values show nothing.
-const visible = computed(() => ['vectorized', 'pending', 'failed'].includes(props.state))
+// "Not searchable" is a real state the user must see — hiding it made two
+// otherwise identical rows (e.g. voice memos) look the same.
+const visible = computed(() =>
+  ['vectorized', 'pending', 'failed', 'none', 'not_applicable'].includes(props.state)
+)
 
 // Visual variants per 03_file-management.md §5.1.2.B — standard palette
 // utilities (already used across the files UI), dark-mode safe.
@@ -66,7 +67,7 @@ const variant = computed(() => {
       }
     default:
       return {
-        classes: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+        classes: 'bg-black/[0.06] txt-secondary dark:bg-white/[0.08]',
         icon: 'mdi:circle-outline',
         spin: false,
       }
@@ -92,5 +93,16 @@ const label = computed(() => {
   }
 })
 
-const tooltip = computed(() => t('files.help.vectorized'))
+const tooltip = computed(() => {
+  switch (props.state) {
+    case 'vectorized':
+      return t('files.help.vectorized')
+    case 'pending':
+      return t('files.help.processing')
+    case 'failed':
+      return t('files.help.failed')
+    default:
+      return t('files.help.notSearchable')
+  }
+})
 </script>

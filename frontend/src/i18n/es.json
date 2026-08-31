@@ -2300,12 +2300,14 @@
     "movedSuccess": "Archivo movido a \"{folder}\"",
     "removeFromFolder": "Quitar de la carpeta",
     "removedFromFolder": "Quitado de la carpeta (se conservan el archivo y su índice de búsqueda)",
-    "describeSortAction": "Describir, vectorizar y ordenar: hacer consultable por IA",
+    "describeSortAction": "Hacer consultable por IA",
     "describeSortDone": "Ya es consultable por IA.",
     "describeSortDoneGroup": "Ya es consultable por IA · archivado en \"{group}\".",
     "describeSortFailed": "No se pudo hacer consultable este archivo.",
-    "indexPromptAction": "Añadir a la base de conocimiento",
-    "indexPromptDone": "Añadido a tu base de conocimiento.",
+    "indexPromptAction": "Hacer consultable por IA",
+    "indexPromptDone": "Ya es consultable por IA.",
+    "voiceMemo": "Nota de voz",
+    "voiceMemoNamed": "Nota de voz · {time}",
     "emptyState": {
       "title": "Aún no hay archivos",
       "description": "Sube archivos para empezar. Puedes organizarlos en carpetas.",
@@ -2408,6 +2410,9 @@
     },
     "help": {
       "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
+      "notSearchable": "El asistente aún no puede usar este archivo en las respuestas. Hazlo consultable para añadirlo a tu conocimiento.",
+      "processing": "Este archivo se está preparando para que el asistente pueda usarlo.",
+      "failed": "No se pudo hacer consultable este archivo. Puedes intentarlo de nuevo.",
       "group": "Las carpetas de conocimiento agrupan archivos. Cuando la IA busca en una carpeta, puede usar cada archivo.",
       "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
       "incoming": "Archivos que otras apps han enviado para tu base de conocimiento. Revísalos y consérvalos o descártalos.",
@@ -2492,7 +2497,7 @@
       "deleteFailed": "No se pudo eliminar el archivo. Inténtalo de nuevo."
     },
     "explainer": {
-      "text": "Todo lo que subes o creas está aquí. Los archivos marcados como «consultables por IA» se añaden a tu base de conocimiento para que el asistente pueda usarlos.",
+      "text": "Todo lo que subes o creas está aquí. El asistente puede usar los archivos marcados como consultables por IA. Fotos, grabaciones y archivos creados por IA necesitan que los hagas consultables primero.",
       "dismiss": "Entendido",
       "reopen": "¿Qué es esto?"
     }
