@@ -1427,10 +1427,12 @@ jobs:
       # A pull request, deliberately, rather than a push to main. Elestio
       # pipelines redeploy on every commit to the branch they track, so pushing
       # here would restart every managed instance at an unpredictable moment.
-      # Merging is the maintainer's choice of when that happens. The Umbrel
-      # package lives in this same PR so a release bumps every catalog pin
-      # together; the getumbrel/umbrel-apps store submission stays a separate,
-      # manual step because it targets a foreign repository.
+      # release-rollout.yml merges this proposal in a nightly maintenance window
+      # instead, once its own guards agree that it is the release the published
+      # manifest advertises. The Umbrel package lives in this same PR so a
+      # release bumps every catalog pin together; carrying that package into
+      # getumbrel/umbrel-apps is umbrel-store-sync.yml's job, because a foreign
+      # repository cannot be pinned from here.
       - name: Checkout the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -1537,12 +1539,16 @@ jobs:
           moves a running installation to a different version.
 
           Merging this restarts every Elestio instance that tracks \`${BASE}\`, because
-          Elestio redeploys on each commit to the branch it tracks. Merge when that is
-          convenient.
+          Elestio redeploys on each commit to the branch it tracks. That is why nothing
+          merges this on the spot: \`release-rollout.yml\` does it in the next nightly
+          maintenance window, once the checks here are green and this version is still
+          the one the release manifest advertises. Merge it by hand to roll out sooner.
 
-          The Umbrel pin lives in this repository only. Submitting the raised package
-          to [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps) remains
-          a separate, manual pull request.
+          Once merged, \`umbrel-store-sync.yml\` carries the raised package into
+          [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps), and the
+          AWS Marketplace version is submitted from \`aws-ami.yml\`. Both are proposals
+          in someone else's queue: Umbrel merges its own store pull requests, and AWS
+          reviews a submitted version before it becomes available.
 
           Opened automatically after the image for \`${GITHUB_REF_NAME}\` was published
           and verified.

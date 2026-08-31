@@ -1,0 +1,314 @@
+name: Release Rollout
+
+# Merges the pin proposal that ci.yml's release-version-pin job opens, so a new
+# release reaches new deployments without anyone remembering to click Merge.
+#
+# Why a scheduled job and not an auto-merge on the proposal itself: merging
+# restarts every Elestio instance that tracks the default branch, because Elestio
+# redeploys on each commit to the branch it tracks. Auto-merge would fire the
+# moment CI goes green — mid-afternoon, mid-conversation. A maintenance window
+# turns an unpredictable restart into a predictable one.
+#
+# This job only ever moves the version that a NEW deployment installs. Running
+# installations are untouched: they keep the version their operator pinned and
+# change it only through docs/UPDATE_ELESTIO.md or docs/UPDATE_SELFHOST.md.
+#
+# Requires the release App to be a bypass actor of the review ruleset, and to
+# hold `Pull requests: write` so its proposals carry checks in the first place.
+# Without checks the status guard below can never be satisfied, which is the
+# intended failure mode: no checks, no rollout.
+
+on:
+  schedule:
+    # 01:00 UTC — the small hours in the timezone the instances are operated
+    # from. Deliberately not on the hour a release is usually cut.
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Evaluate the guards and report what would happen, without merging.'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+# One rollout at a time. Two concurrent runs would race on the same proposal and
+# the loser would report a confusing "already merged".
+concurrency:
+  group: release-rollout
+  cancel-in-progress: false
+
+jobs:
+  rollout:
+    name: Roll out the default release version
+    runs-on: ubuntu-latest
+
+    env:
+      BRANCH: automation/default-release-version
+      DRY_RUN: ${{ inputs.dry_run || false }}
+
+    steps:
+      # The secrets context is not available in an `if` expression, so their
+      # presence is carried through an output — the same workaround
+      # release-version-pin and aws-ami.yml use.
+      - name: Check the merge credentials
+        id: config
+        env:
+          APP_ID: ${{ secrets.MOBILE_TAG_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+        run: |
+          if test -n "$APP_ID" && test -n "$APP_PRIVATE_KEY"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No release App is configured; the rollout is skipped." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # GITHUB_TOKEN is deliberately not a fallback here. It cannot bypass the
+      # review ruleset, so it would fail at the merge — after the guards had
+      # already reported success, which reads like the rollout worked.
+      - name: Create merge token
+        id: app-token
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ secrets.MOBILE_TAG_APP_ID }}
+          private-key: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+
+      - name: Find the pin proposal
+        id: proposal
+        if: steps.config.outputs.configured == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          number="$(
+            gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --state open \
+              --json number --jq '.[0].number // ""'
+          )"
+
+          if [ -z "$number" ]; then
+            echo "number=" >> "$GITHUB_OUTPUT"
+            echo "No open pin proposal on \`${BRANCH}\`; nothing to roll out." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          sha="$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)"
+          echo "number=${number}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+
+      # The proposal's own head, not the default branch: the guards below have to
+      # judge the pins that would actually be merged.
+      - name: Checkout the proposal
+        if: steps.proposal.outputs.number != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.proposal.outputs.sha }}
+          persist-credentials: false
+
+      - name: Evaluate the guards
+        id: guards
+        if: steps.proposal.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NUMBER: ${{ steps.proposal.outputs.number }}
+          MANIFEST_URL: https://raw.githubusercontent.com/${{ github.repository }}/release-manifest/versions.json
+        run: |
+          set -euo pipefail
+
+          # Flattened to one line before it is written: a step output is
+          # newline-delimited, so a reason quoting a multi-line error message
+          # would corrupt the outputs that follow it.
+          block() {
+            reason="$(printf '%s' "$1" | tr '\n\r' '  ')"
+            echo "decision=blocked" >> "$GITHUB_OUTPUT"
+            echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+            echo "::warning::Not rolling out #${NUMBER}: ${reason}"
+            {
+              echo "### Rollout held back"
+              echo ""
+              echo "[Pull request #${NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${NUMBER}) was not merged: ${reason}"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+
+          # Guard 1: the catalog pins one released version across all five
+          # anchors. A half-bumped catalog would install one version and
+          # advertise another.
+          if ! pinned="$(node scripts/read-release-version.mjs 2>&1)"; then
+            block "the pinned version could not be read (${pinned})"
+          fi
+          version="$(printf '%s' "$pinned" | jq -r .version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          manifest="$(curl --fail-with-body --silent --show-error --retry 3 "$MANIFEST_URL")"
+
+          # Guard 2: only ever roll out the release that the published manifest
+          # advertises. A proposal left behind by an older release is stale, and
+          # merging it would move new deployments backwards.
+          stable="$(printf '%s' "$manifest" | jq -r '.stable.version')"
+          if [ "$version" != "$stable" ]; then
+            block "it pins \`${version}\` while the release manifest advertises \`${stable}\`"
+          fi
+
+          # Guard 3: a release withdrawn between the tag and this window must not
+          # become anybody's default. Tolerates both shapes the manifest may use
+          # for an entry, so a future object form does not read as "not yanked".
+          yanked="$(
+            printf '%s' "$manifest" | jq -r --arg v "$version" '
+              [.yanked[]? | if type == "object" then (.version // empty) else tostring end]
+              | if index($v) then "yes" else "" end
+            '
+          )"
+          if [ -n "$yanked" ]; then
+            block "\`${version}\` is listed as yanked in the release manifest"
+          fi
+
+          # Guard 4: nothing but the deployment pins may travel to the default
+          # branch on this automation branch.
+          unexpected="$(
+            gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '
+              [.files[].path]
+              | map(select(
+                  test("^elestio\\.yml$") == false and
+                  test("^deploy/selfhost\\.env\\.example$") == false and
+                  test("^deploy/umbrel/synaplan/") == false and
+                  test("^deploy/aws/packer/synaplan\\.pkr\\.hcl$") == false
+                ))
+              | join(", ")
+            '
+          )"
+          if [ -n "$unexpected" ]; then
+            block "it also changes files outside the deployment pins (${unexpected})"
+          fi
+
+          # Guard 5: the deployment templates must be green. Note that this reads
+          # the check by name instead of trusting mergeStateStatus, which stays
+          # BLOCKED on this repository for as long as the review requirement is
+          # unmet — the App bypasses that requirement at merge time, so BLOCKED
+          # here is normal and says nothing about the checks.
+          state="$(
+            gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" \
+              --json mergeable,statusCheckRollup --jq '{
+                mergeable: .mergeable,
+                gate: ([.statusCheckRollup[]? | select(.name == "All Checks Passed")] | last)
+              }'
+          )"
+
+          mergeable="$(printf '%s' "$state" | jq -r .mergeable)"
+          if [ "$mergeable" != MERGEABLE ]; then
+            block "GitHub reports the pull request as \`${mergeable}\` rather than mergeable"
+          fi
+
+          gate_status="$(printf '%s' "$state" | jq -r '.gate.status // "MISSING"')"
+          gate_conclusion="$(printf '%s' "$state" | jq -r '.gate.conclusion // "MISSING"')"
+          if [ "$gate_status" != COMPLETED ] || [ "$gate_conclusion" != SUCCESS ]; then
+            block "the \`All Checks Passed\` gate is ${gate_status}/${gate_conclusion} instead of COMPLETED/SUCCESS"
+          fi
+
+          echo "decision=merge" >> "$GITHUB_OUTPUT"
+
+      - name: Merge the proposal
+        id: merge
+        if: steps.guards.outputs.decision == 'merge'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NUMBER: ${{ steps.proposal.outputs.number }}
+          VERSION: ${{ steps.guards.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${NUMBER}"
+
+          if [ "$DRY_RUN" = true ]; then
+            echo "merged=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Dry run"
+              echo ""
+              echo "Every guard passed for \`${VERSION}\`. A real run would merge [#${NUMBER}](${url}) now."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Squash, to keep one commit per release on the default branch.
+          gh pr merge "$NUMBER" --repo "$GITHUB_REPOSITORY" --squash
+
+          echo "merged=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Rolled out ${VERSION}"
+            echo ""
+            echo "Merged [#${NUMBER}](${url}). New deployments now install \`${VERSION}\`:"
+            echo ""
+            echo "- \`elestio.yml\` for the one-click path"
+            echo "- \`deploy/selfhost.env.example\` for self-hosting"
+            echo "- \`deploy/umbrel/synaplan/\` for the Umbrel App Store package"
+            echo "- \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI"
+            echo ""
+            echo "Elestio instances that track the default branch are redeploying now."
+            echo "Running installations keep the version their operator pinned."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Deliberately a separate, optional channel from DISCORD_E2E_FLAKY_WEBHOOK:
+      # a version rollout is an operations event, not a test result. Silent when
+      # nothing happened, so a nightly run on an empty branch stays quiet.
+      - name: Report to Discord
+        if: always() && steps.proposal.outputs.number != ''
+        env:
+          HOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          NUMBER: ${{ steps.proposal.outputs.number }}
+          VERSION: ${{ steps.guards.outputs.version }}
+          DECISION: ${{ steps.guards.outputs.decision }}
+          REASON: ${{ steps.guards.outputs.reason }}
+          MERGED: ${{ steps.merge.outputs.merged }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [ -n "${HOOK:-}" ] || exit 0
+
+          pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${NUMBER}"
+
+          if [ "${MERGED:-}" = true ]; then
+            title="Rolled out ${VERSION} to new deployments"
+            colour=3066993
+            detail="Elestio instances tracking the default branch are redeploying. Running installations are unaffected."
+          elif [ "${DECISION:-}" = blocked ]; then
+            title="Release rollout held back"
+            colour=16776960
+            detail="${REASON:-no reason recorded}"
+          else
+            # Covers the dry run and an unexpected failure of a step above.
+            exit 0
+          fi
+
+          # Match DiscordNotificationService embed shape (title/fields/footer/timestamp).
+          payload="$(jq -n \
+            --arg title "$title" \
+            --arg detail "$detail" \
+            --arg pr "$pr_url" \
+            --arg run "$RUN_URL" \
+            --argjson colour "$colour" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              embeds: [{
+                title: $title,
+                color: $colour,
+                fields: [
+                  { name: "Details", value: ($detail | .[0:1000]), inline: false },
+                  { name: "Proposal", value: ("[Open pull request](" + $pr + ")"), inline: true },
+                  { name: "Workflow", value: ("[Open run](" + $run + ")"), inline: true }
+                ],
+                footer: { text: "Synaplan release rollout" },
+                timestamp: $ts
+              }]
+            }')"
+
+          curl --fail-with-body --silent --show-error --retry 3 \
+            -H 'Content-Type: application/json' \
+            -d "$payload" \
+            "$HOOK" \
+            || echo "::warning::Discord notification failed"
