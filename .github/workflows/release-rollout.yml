@@ -120,13 +120,15 @@ jobs:
           echo "number=${number}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      # The proposal's own head, not the default branch: the guards below have to
-      # judge the pins that would actually be merged.
-      - name: Checkout the proposal
+      # The default branch, deliberately NOT the proposal's head. This job runs
+      # in a privileged context — a workflow_run trigger with the merge token in
+      # reach — so running a script out of the branch it is about to judge would
+      # hand that token to whatever that branch happens to contain, before any
+      # guard has looked at it. The pins are fetched as data below instead.
+      - name: Checkout
         if: steps.proposal.outputs.number != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ steps.proposal.outputs.sha }}
           persist-credentials: false
 
       - name: Evaluate the guards
@@ -135,6 +137,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NUMBER: ${{ steps.proposal.outputs.number }}
+          SHA: ${{ steps.proposal.outputs.sha }}
           MANIFEST_URL: https://raw.githubusercontent.com/${{ github.repository }}/release-manifest/versions.json
         run: |
           set -euo pipefail
@@ -158,7 +161,21 @@ jobs:
           # Guard 1: the catalog pins one released version across all five
           # anchors. A half-bumped catalog would install one version and
           # advertise another.
-          if ! pinned="$(node scripts/read-release-version.mjs 2>&1)"; then
+          #
+          # The proposal's files are fetched one by one and read by the default
+          # branch's own copy of the script, which is what keeps the proposal from
+          # contributing code to this job. The path list comes from the script, so
+          # a sixth pin cannot be forgotten here.
+          pins="$(mktemp -d)"
+          while read -r path; do
+            mkdir -p "${pins}/$(dirname "$path")"
+            if ! gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${SHA}" \
+              -H 'Accept: application/vnd.github.raw' > "${pins}/${path}"; then
+              block "the proposal does not carry \`${path}\`"
+            fi
+          done < <(node scripts/read-release-version.mjs --paths)
+
+          if ! pinned="$(node scripts/read-release-version.mjs "$pins" 2>&1)"; then
             block "the pinned version could not be read (${pinned})"
           fi
           version="$(printf '%s' "$pinned" | jq -r .version)"

@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
-import { readPinnedRelease } from '../scripts/read-release-version.mjs'
+import { CATALOG_PATHS, readPinnedRelease } from '../scripts/read-release-version.mjs'
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const DIGEST = `sha256:${'a'.repeat(64)}`
 
@@ -105,6 +108,16 @@ test('refuses an Umbrel package without a published image digest', () => {
   )
 
   assert.throws(() => readPinnedRelease(root), /image digest/)
+})
+
+// The rollout workflow collects exactly these paths from a pull request instead
+// of checking it out, so a path that does not exist would mean a guard fetching
+// nothing and a release held back for it.
+test('every catalog path it names exists in this repository', () => {
+  assert.deepEqual(
+    CATALOG_PATHS.filter((path) => !existsSync(join(ROOT, path))),
+    []
+  )
 })
 
 // The real files have to satisfy the reader, or the rollout guard would hold
