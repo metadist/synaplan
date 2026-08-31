@@ -3,11 +3,17 @@ name: Release Rollout
 # Merges the pin proposal that ci.yml's release-version-pin job opens, so a new
 # release reaches new deployments without anyone remembering to click Merge.
 #
-# Why a scheduled job and not an auto-merge on the proposal itself: merging
-# restarts every Elestio instance that tracks the default branch, because Elestio
-# redeploys on each commit to the branch it tracks. Auto-merge would fire the
-# moment CI goes green — mid-afternoon, mid-conversation. A maintenance window
-# turns an unpredictable restart into a predictable one.
+# Merged as soon as the proposal's checks are green, not on a timer. Delaying it
+# was considered and dropped: the argument for a night-time window was that
+# merging restarts every Elestio instance tracking the default branch, and that
+# is true — but the default branch takes between four and nineteen commits a day
+# and every one of them restarts those pipelines anyway (see
+# deploy/elestio/README.md). Waiting bought a few hours of "bake time", at the
+# price of every new deployment installing yesterday's release for those hours.
+#
+# What keeps this safe is the guards below, not the hour it runs at. In
+# particular guard 3 still refuses a release that was withdrawn between the tag
+# and the merge.
 #
 # This job only ever moves the version that a NEW deployment installs. Running
 # installations are untouched: they keep the version their operator pinned and
@@ -19,9 +25,13 @@ name: Release Rollout
 # intended failure mode: no checks, no rollout.
 
 on:
+  # The proposal's own CI finishing is the signal to look at it.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  # A net under the trigger above, for a proposal whose CI ran before this
+  # workflow existed, or whose event was missed. Costs one no-op run a day.
   schedule:
-    # 01:00 UTC — the small hours in the timezone the instances are operated
-    # from. Deliberately not on the hour a release is usually cut.
     - cron: '0 1 * * *'
   workflow_dispatch:
     inputs:
@@ -44,6 +54,14 @@ jobs:
   rollout:
     name: Roll out the default release version
     runs-on: ubuntu-latest
+    # Every CI run on the repository reaches the workflow_run trigger, so the
+    # proposal's own branch has to be picked out here. The schedule and a manual
+    # dispatch carry no such event and always proceed to the guards.
+    if: >-
+      github.event_name != 'workflow_run' || (
+        github.event.workflow_run.head_branch == 'automation/default-release-version' &&
+        github.event.workflow_run.conclusion == 'success'
+      )
 
     env:
       BRANCH: automation/default-release-version
@@ -102,13 +120,15 @@ jobs:
           echo "number=${number}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
 
-      # The proposal's own head, not the default branch: the guards below have to
-      # judge the pins that would actually be merged.
-      - name: Checkout the proposal
+      # The default branch, deliberately NOT the proposal's head. This job runs
+      # in a privileged context — a workflow_run trigger with the merge token in
+      # reach — so running a script out of the branch it is about to judge would
+      # hand that token to whatever that branch happens to contain, before any
+      # guard has looked at it. The pins are fetched as data below instead.
+      - name: Checkout
         if: steps.proposal.outputs.number != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ steps.proposal.outputs.sha }}
           persist-credentials: false
 
       - name: Evaluate the guards
@@ -117,6 +137,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NUMBER: ${{ steps.proposal.outputs.number }}
+          SHA: ${{ steps.proposal.outputs.sha }}
           MANIFEST_URL: https://raw.githubusercontent.com/${{ github.repository }}/release-manifest/versions.json
         run: |
           set -euo pipefail
@@ -140,7 +161,21 @@ jobs:
           # Guard 1: the catalog pins one released version across all five
           # anchors. A half-bumped catalog would install one version and
           # advertise another.
-          if ! pinned="$(node scripts/read-release-version.mjs 2>&1)"; then
+          #
+          # The proposal's files are fetched one by one and read by the default
+          # branch's own copy of the script, which is what keeps the proposal from
+          # contributing code to this job. The path list comes from the script, so
+          # a sixth pin cannot be forgotten here.
+          pins="$(mktemp -d)"
+          while read -r path; do
+            mkdir -p "${pins}/$(dirname "$path")"
+            if ! gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${SHA}" \
+              -H 'Accept: application/vnd.github.raw' > "${pins}/${path}"; then
+              block "the proposal does not carry \`${path}\`"
+            fi
+          done < <(node scripts/read-release-version.mjs --paths)
+
+          if ! pinned="$(node scripts/read-release-version.mjs "$pins" 2>&1)"; then
             block "the pinned version could not be read (${pinned})"
           fi
           version="$(printf '%s' "$pinned" | jq -r .version)"
@@ -192,15 +227,26 @@ jobs:
           # BLOCKED on this repository for as long as the review requirement is
           # unmet — the App bypasses that requirement at merge time, so BLOCKED
           # here is normal and says nothing about the checks.
-          state="$(
-            gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" \
-              --json mergeable,statusCheckRollup --jq '{
-                mergeable: .mergeable,
-                gate: ([.statusCheckRollup[]? | select(.name == "All Checks Passed")] | last)
-              }'
-          )"
+          # Polled rather than read once: GitHub computes mergeability
+          # asynchronously and answers UNKNOWN until it has. This workflow now
+          # arrives seconds after CI finished, so it meets that state regularly,
+          # and reading it as "not mergeable" would hold back releases for a race
+          # instead of for a reason.
+          for attempt in $(seq 1 10); do
+            state="$(
+              gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" \
+                --json mergeable,statusCheckRollup --jq '{
+                  mergeable: .mergeable,
+                  gate: ([.statusCheckRollup[]? | select(.name == "All Checks Passed")] | last)
+                }'
+            )"
 
-          mergeable="$(printf '%s' "$state" | jq -r .mergeable)"
+            mergeable="$(printf '%s' "$state" | jq -r .mergeable)"
+            [ "$mergeable" = UNKNOWN ] || break
+            echo "Attempt ${attempt}: GitHub has not computed mergeability yet; waiting."
+            sleep 6
+          done
+
           if [ "$mergeable" != MERGEABLE ]; then
             block "GitHub reports the pull request as \`${mergeable}\` rather than mergeable"
           fi
