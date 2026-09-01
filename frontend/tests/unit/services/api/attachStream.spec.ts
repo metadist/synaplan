@@ -159,6 +159,31 @@ describe('chatApi.attachStream', () => {
     expect(events).toEqual([{ status: 'data', chunk: 'half' }, { status: 'complete' }])
   })
 
+  it('treats a backend error as the end of the turn, not as a dropped connection', async () => {
+    // A real failure (rate limit, cost budget, missing model) ends the turn just
+    // like `complete` does. Retrying would replay the log a second time and then
+    // append a bogus "Connection interrupted" over the error the user has to
+    // read — and because that wording counts as recoverable, the chat view would
+    // reload history and drop the explanation entirely.
+    const fetchMock = respondWith({
+      ok: true,
+      status: 200,
+      body: sseStream([
+        'id: 1\ndata: {"status":"error","error":"Rate limit exceeded","limit_type":"lifetime"}\n\n',
+      ]),
+    })
+
+    const events: StreamUpdatePayload[] = []
+    vi.stubGlobal('fetch', fetchMock)
+    chatApi.attachStream({ runId: 'run-e', onUpdate: (data) => events.push(data) })
+    await flush()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(events).toEqual([
+      { status: 'error', error: 'Rate limit exceeded', limit_type: 'lifetime' },
+    ])
+  })
+
   it('stops delivering events once the caller detaches', async () => {
     // Detaching is not a cancel: the turn keeps generating server-side, this
     // client just stops rendering it.

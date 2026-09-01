@@ -2309,11 +2309,25 @@ const streamAIResponse = async (
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
 
   // Paint what the turn already produced right away, so returning to a running
-  // chat shows the answer-so-far instead of an empty bubble. The replay that
-  // follows rebuilds the identical text from sequence 0 and takes over; the
-  // render is rAF-throttled, so the rebuild lands as a single repaint.
-  if (attach?.partialText) {
-    historyStore.updateStreamingMessage(messageId, attach.partialText)
+  // chat shows the answer-so-far instead of an empty bubble.
+  const paintedPrefix = attach?.partialText ?? ''
+  if (paintedPrefix) {
+    historyStore.updateStreamingMessage(messageId, paintedPrefix)
+  }
+
+  /**
+   * Render streamed text without ever letting the bubble shrink.
+   *
+   * The re-attach replays the turn from sequence 0 (which is what rebuilds the
+   * task cards and memory badges, so shortening the replay is not an option),
+   * meaning the first replayed chunks are far SHORTER than the answer-so-far
+   * already on screen. Rendering them verbatim would visibly rewind a long
+   * answer back to its first word and then re-type it. Holding the painted
+   * prefix until the replay grows past it keeps the text moving forward only;
+   * from there the replay is longer and takes over on its own.
+   */
+  const renderStreamingText = (text: string) => {
+    renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
   }
 
   let streamingRafId: number | null = null
@@ -2593,7 +2607,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -2673,7 +2687,7 @@ const streamAIResponse = async (
             }
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
@@ -3227,7 +3241,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -3473,7 +3487,7 @@ const streamAIResponse = async (
             streamingDirty = false
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),

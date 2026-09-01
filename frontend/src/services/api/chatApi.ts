@@ -394,8 +394,13 @@ export interface IncognitoHistoryEntry {
  * same event dialect — a re-attached turn must render through the identical
  * handler as a live one, otherwise the two paths drift.
  *
- * Returns whether a terminal (`complete`) event was seen; the caller decides
- * what a stream without one means.
+ * Returns whether a terminal event was seen; the caller decides what a stream
+ * without one means. `complete` AND `error` both end a turn — every
+ * `sendSSE('error', …)` in the backend returns right after it, and the run log
+ * marks both as terminal. Counting only `complete` would make a genuine backend
+ * failure (rate limit, cost budget, missing model) look like a dropped
+ * connection, so the caller would retry the turn and then append a bogus
+ * "Connection interrupted" on top of the real error the user needs to read.
  */
 async function readSseBody(
   body: ReadableStream<Uint8Array>,
@@ -403,7 +408,7 @@ async function readSseBody(
   isStopped: () => boolean,
   onEventId?: (seq: number) => void
 ): Promise<boolean> {
-  let completionReceived = false
+  let terminalReceived = false
 
   const processEvent = (eventChunk: string) => {
     const lines = eventChunk.split('\n')
@@ -426,7 +431,7 @@ async function readSseBody(
 
     try {
       const data = JSON.parse(jsonStr) as StreamUpdatePayload
-      completionReceived = completionReceived || data.status === 'complete'
+      terminalReceived = terminalReceived || data.status === 'complete' || data.status === 'error'
       onUpdate(data)
     } catch (error) {
       console.error('Failed to parse SSE data:', error, 'Raw data:', jsonStr)
@@ -447,7 +452,7 @@ async function readSseBody(
       buffer = events.pop() ?? ''
 
       for (const eventChunk of events) {
-        if (isStopped()) return completionReceived
+        if (isStopped()) return terminalReceived
         processEvent(eventChunk)
       }
     }
@@ -461,7 +466,7 @@ async function readSseBody(
     })
   }
 
-  return completionReceived
+  return terminalReceived
 }
 
 function openStreamPost(
@@ -519,12 +524,12 @@ function openStreamPost(
         return
       }
 
-      const completionReceived = await readSseBody(response.body, onUpdate, () => isStopped)
+      const terminalReceived = await readSseBody(response.body, onUpdate, () => isStopped)
 
       // Stream closed without a terminal event: the backend always ends a
       // turn with 'complete' or 'error', so this is a dropped connection or
       // a crashed worker — surface it instead of leaving an empty bubble.
-      if (!completionReceived && !isStopped) {
+      if (!terminalReceived && !isStopped) {
         console.error('❌ Stream ended without completion event')
         onUpdate({ status: 'error', error: 'Connection interrupted' })
       }
@@ -625,7 +630,7 @@ function openStreamAttach(opts: AttachStreamOptions): () => void {
           return
         }
 
-        const completionReceived = await readSseBody(
+        const terminalReceived = await readSseBody(
           response.body,
           opts.onUpdate,
           () => isStopped,
@@ -634,7 +639,10 @@ function openStreamAttach(opts: AttachStreamOptions): () => void {
           }
         )
 
-        if (completionReceived || isStopped) return
+        // The turn is over — either it finished or it failed, and the caller
+        // has already been handed that outcome. Retrying would replay the log a
+        // second time and then report a drop that never happened.
+        if (terminalReceived || isStopped) return
       }
 
       // Two attempts, still no terminal event: treat it as a dropped stream.

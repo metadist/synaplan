@@ -1993,7 +1993,7 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
     role: 'assistant',
     type: 'text',
     // Show what the turn already produced immediately; the replay that follows
-    // rewrites the same text and then continues past it.
+    // rebuilds the same text from the start and then continues past it.
     content: partialText,
     timestamp: new Date(),
     sender: 'ai',
@@ -2021,7 +2021,12 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
         replayed += chunk
         const bubble = findBubble()
         if (!bubble) return
-        bubble.content = replayed
+        // The replay restarts the turn from its first token, so early chunks are
+        // shorter than the answer-so-far already painted above. Writing them
+        // straight through would rewind a long answer to its first word and
+        // re-type it; holding the painted text until the replay grows past it
+        // keeps the bubble moving forward only.
+        bubble.content = replayed.length >= partialText.length ? replayed : partialText
         await scrollToBottom()
       },
     })
