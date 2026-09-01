@@ -69,6 +69,12 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
 
         $path = $request->getPathInfo();
 
+        // A key may always revoke itself (Synamail sign-out): a leaked key can
+        // only destroy itself, never the owner's other keys.
+        if (ApiKeyScope::isSelfRevoke($request->getMethod(), $path, (int) $apiKey->getId())) {
+            return;
+        }
+
         if (ApiKeyScope::allows($scopes, $path)) {
             return;
         }
