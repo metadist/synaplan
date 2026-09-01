@@ -20,22 +20,33 @@
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 
-// Every delivery option of one version shares a single AmiSource, so one
-// version can carry exactly one AMI. Two architectures are therefore two
-// versions, and the title is what tells them apart in the customer's version
-// picker.
-export const versionTitle = (version, architecture) => `${version} (${architecture})`
+// In submission order, and x86_64 leads deliberately: it is what most customers
+// launch.
+export const ARCHITECTURES = ['x86_64', 'arm64']
 
-// Graviton for arm64, the comparable Intel size otherwise. Only a
-// recommendation shown in the launch form; the customer may pick anything.
-const INSTANCE_TYPES = {
-  x86_64: 'm7i.xlarge',
-  arm64: 'm7g.xlarge',
+// What a buyer is choosing between. Every delivery option of one version shares
+// a single AmiSource, so one version carries exactly one AMI and two
+// architectures are two versions — sitting next to each other in the version
+// picker, where the title is all there is to go by. `arm64` alone does not tell
+// somebody comparing instance types anything, so the hardware is named.
+//
+// The architecture stays last and parenthesised. That is not cosmetic:
+// `missingArchitectures` recognises a version by it, including the bare
+// `<version> (<architecture>)` titles submitted before the names were added.
+const HARDWARE = {
+  x86_64: 'Intel or AMD',
+  arm64: 'Graviton',
 }
 
-// In submission order, and x86_64 leads deliberately: it is what most customers
-// launch, and the one the release's smoke test launched itself.
-export const ARCHITECTURES = Object.keys(INSTANCE_TYPES)
+export const versionTitle = (version, architecture) => {
+  const hardware = HARDWARE[architecture]
+  if (hardware === undefined) {
+    throw new Error(
+      `unknown architecture ${JSON.stringify(architecture)}, expected one of ${ARCHITECTURES.join(', ')}`
+    )
+  }
+  return `${version} - ${hardware} (${architecture})`
+}
 
 // Mirrors deploy/aws/packer/synaplan.pkr.hcl's source_ami_filter and
 // deploy/aws/scripts/harden.sh: Amazon Linux 2023, ec2-user, sshd listening but
@@ -63,20 +74,24 @@ const SECURITY_GROUPS = [
   { IpProtocol: 'tcp', FromPort: 80, ToPort: 80, IpRanges: ['0.0.0.0/0'] },
 ]
 
-export const buildChangeSet = ({ product, version, architecture, ami, role, releaseUrl }) => {
-  const missing = Object.entries({ product, version, architecture, ami, role })
+export const buildChangeSet = ({
+  product,
+  version,
+  architecture,
+  ami,
+  role,
+  instanceType,
+  releaseUrl,
+}) => {
+  const missing = Object.entries({ product, version, architecture, ami, role, instanceType })
     .filter(([, value]) => !value)
     .map(([name]) => name)
   if (missing.length > 0) {
     throw new Error(`missing: ${missing.join(', ')}`)
   }
 
-  const instanceType = INSTANCE_TYPES[architecture]
-  if (instanceType === undefined) {
-    throw new Error(
-      `unknown architecture ${JSON.stringify(architecture)}, expected one of ${ARCHITECTURES.join(', ')}`
-    )
-  }
+  // Throws on an architecture that has no name, before anything is sent.
+  const title = versionTitle(version, architecture)
 
   const notes = releaseUrl
     ? `Synaplan ${version}. Release notes: ${releaseUrl}`
@@ -87,7 +102,7 @@ export const buildChangeSet = ({ product, version, architecture, ami, role, rele
       ChangeType: 'AddDeliveryOptions',
       Entity: { Identifier: product, Type: 'AmiProduct@1.0' },
       DetailsDocument: {
-        Version: { VersionTitle: versionTitle(version, architecture), ReleaseNotes: notes },
+        Version: { VersionTitle: title, ReleaseNotes: notes },
         DeliveryOptions: [
           {
             Details: {
@@ -121,9 +136,19 @@ export const missingArchitectures = (version, known = []) => {
     throw new Error('known must be an array of version titles')
   }
 
-  return ARCHITECTURES.filter(
-    (architecture) => !known.includes(versionTitle(version, architecture))
-  )
+  // Matched by shape rather than compared for equality, so that a title written
+  // before the hardware names were added still counts as this release. Only the
+  // release at the front and the architecture at the back are load-bearing;
+  // anything between them is prose.
+  //
+  // The word boundary after the release is what keeps 4.4.3 apart from 4.4.30,
+  // and the anchor keeps it apart from 14.4.3.
+  const escaped = version.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+  return ARCHITECTURES.filter((architecture) => {
+    const offered = new RegExp(`^${escaped}\\b.*\\(${architecture}\\)$`)
+    return !known.some((title) => offered.test(title))
+  })
 }
 
 const readOption = (arguments_, name) => {
@@ -150,6 +175,7 @@ export const runCli = (arguments_ = []) => {
     architecture: readOption(options, '--architecture'),
     ami: readOption(options, '--ami'),
     role: readOption(options, '--role'),
+    instanceType: readOption(options, '--instance-type'),
     releaseUrl: readOption(options, '--release-url') ?? '',
   })
 

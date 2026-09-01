@@ -234,69 +234,112 @@ jobs:
         run: |
           set -euo pipefail
 
-          # One per run, by the same AWS rule that made this workflow necessary.
-          architecture="${MISSING%% *}"
-
-          # Found by the tags Packer and the smoke test write, so no run has to
-          # hand an AMI id to a later one. Newest wins, for a version that was
-          # rebuilt.
-          #
-          # SmokeTested is what aws-ami.yml puts on the images of a release that
-          # booted and served, and it is required here rather than merely
-          # preferred: it is the only thing left between an image and a public
-          # listing now that no job dependency spans the two runs. An image
-          # built from a branch never carries it.
-          ami="$(
-            aws ec2 describe-images --owners self \
-              --filters "Name=tag:SynaplanVersion,Values=${VERSION}" \
-                        "Name=tag:Architecture,Values=${architecture}" \
-                        "Name=tag:SmokeTested,Values=${VERSION}" \
-                        "Name=state,Values=available" \
-              --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
+          # What the listing lets a customer launch. The recommended type of a
+          # version has to be one of these, and inventing one instead cost a
+          # rejected submission: the listing offered three Intel types, arm64 was
+          # offered with a Graviton recommendation, and AWS answered
+          # RECOMMENDED_INSTANCE_TYPE_NOT_AVAILABLE.
+          available="$(
+            aws marketplace-catalog describe-entity \
+              --catalog AWSMarketplace --entity-id "$PRODUCT_ID" \
+              --query 'DetailsDocument.Compatibility.AvailableInstanceTypes' --output json
           )"
-          if [ -z "$ami" ] || [ "$ami" = None ]; then
-            # Not an error: the release build may still be running, or its smoke
-            # test may have failed and reported that itself. The next run picks
-            # it up.
-            echo "No smoke-tested AMI for \`${VERSION}\` on \`${architecture}\` yet; nothing offered." |
-              tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
+
+          # Which of them runs which architecture, asked of EC2 rather than read
+          # off the family letter. A `g` in the name is a convention, not a
+          # contract, and the answer decides what a customer is told to launch.
+          names="$(printf '%s' "$available" | jq -r '.[]' | tr '\n' ' ')"
+
+          # Deliberate word splitting: --instance-types takes a list.
+          # shellcheck disable=SC2086
+          architectures="$(
+            aws ec2 describe-instance-types \
+              --instance-types $names \
+              --query 'InstanceTypes[].{type:InstanceType,architectures:ProcessorInfo.SupportedArchitectures}' \
+              --output json
+          )"
+
+          submitted=''
+          for architecture in $MISSING; do
+            # In the listing's own order, so the first type it names for an
+            # architecture is the one recommended.
+            instance_type="$(
+              printf '%s' "$architectures" |
+                jq -r --arg a "$architecture" --argjson order "$available" '
+                  (map({(.type): .architectures}) | add) as $by
+                  | [$order[] | select((($by[.]) // []) | index($a))][0] // ""
+                '
+            )"
+            if [ -z "$instance_type" ]; then
+              echo "The listing offers no \`${architecture}\` instance type, so \`${VERSION}\` cannot be offered for it. Add one under Compatibility to change that." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # SmokeTested is what aws-ami.yml puts on an image that booted and
+            # served, and it is required here rather than merely preferred: it is
+            # the only thing left between an image and a public listing now that
+            # no job dependency spans the two runs. An image built from a branch
+            # never carries it.
+            ami="$(
+              aws ec2 describe-images --owners self \
+                --filters "Name=tag:SynaplanVersion,Values=${VERSION}" \
+                          "Name=tag:Architecture,Values=${architecture}" \
+                          "Name=tag:SmokeTested,Values=${VERSION}" \
+                          "Name=state,Values=available" \
+                --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
+            )"
+            if [ -z "$ami" ] || [ "$ami" = None ]; then
+              # Not an error: the release build may still be running, or its
+              # smoke test may have failed and reported that itself.
+              echo "No smoke-tested \`${architecture}\` image for \`${VERSION}\` yet." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            change_set="$(
+              node scripts/marketplace-change-set.mjs change-set \
+                --product "$PRODUCT_ID" \
+                --version "$VERSION" \
+                --architecture "$architecture" \
+                --ami "$ami" \
+                --role "$INGESTION_ROLE_ARN" \
+                --instance-type "$instance_type" \
+                --release-url "$RELEASE_URL"
+            )"
+
+            # Sent once, with APPLY. An `Intent=VALIDATE` call used to go first,
+            # on the assumption that it checks the document before anything real
+            # is created — but it returns an id immediately and does its checking
+            # asynchronously, over the same half hour, so its verdict arrived
+            # long after the submission it was meant to guard. All it produced
+            # was a second change set with the same title in the portal. What it
+            # was supposed to catch, a duplicate, cannot happen now that the
+            # history above is consulted; what it cannot catch either way, a
+            # rejected image, ends as a FAILED change set and is reported.
+            id="$(
+              aws marketplace-catalog start-change-set \
+                --catalog AWSMarketplace \
+                --intent APPLY \
+                --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
+                --change-set "$change_set" \
+                --query ChangeSetId --output text
+            )"
+
+            # One per run: AWS answers a second AddDeliveryOptions on the same
+            # product with an error while this one is in flight.
+            submitted="$(printf '%s' "$change_set" | jq -r '.[0].DetailsDocument.Version.VersionTitle')"
+            {
+              echo "Submitted \`${submitted}\` as change set \`${id}\`, using \`${ami}\` on \`${instance_type}\`."
+              echo ""
+              echo "AWS scans and copies the image for a few hours; a later run of this workflow reports how it ended."
+            } >> "$GITHUB_STEP_SUMMARY"
+            break
+          done
+
+          echo "submitted=${submitted}" >> "$GITHUB_OUTPUT"
+          if [ -z "$submitted" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing was offered this run." >> "$GITHUB_STEP_SUMMARY"
           fi
-
-          change_set="$(
-            node scripts/marketplace-change-set.mjs change-set \
-              --product "$PRODUCT_ID" \
-              --version "$VERSION" \
-              --architecture "$architecture" \
-              --ami "$ami" \
-              --role "$INGESTION_ROLE_ARN" \
-              --release-url "$RELEASE_URL"
-          )"
-
-          # Sent once, with APPLY. An `Intent=VALIDATE` call used to go first, on
-          # the assumption that it checks the document before anything real is
-          # created — but it returns an id immediately and does its checking
-          # asynchronously, over the same half hour, so its verdict arrived long
-          # after the submission it was meant to guard. All it produced was a
-          # second change set with the same title in the portal. What it was
-          # supposed to catch, a duplicate, cannot happen now that the history
-          # above is consulted; what it cannot catch either way, a rejected
-          # image, ends as a FAILED change set and is reported.
-          id="$(
-            aws marketplace-catalog start-change-set \
-              --catalog AWSMarketplace \
-              --intent APPLY \
-              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
-              --change-set "$change_set" \
-              --query ChangeSetId --output text
-          )"
-
-          echo "submitted=${VERSION} (${architecture})" >> "$GITHUB_OUTPUT"
-          {
-            echo "Submitted \`${VERSION} (${architecture})\` as change set \`${id}\`, using \`${ami}\`."
-            echo ""
-            echo "AWS scans and copies the image for a few hours; a later run of this workflow reports how it ended."
-          } >> "$GITHUB_STEP_SUMMARY"
 
       # Only ever speaks when something happened. An hourly job that reports
       # "nothing to do" teaches everyone to ignore the channel it reports to.
