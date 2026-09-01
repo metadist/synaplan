@@ -80,6 +80,7 @@ plugins/synaform/
 plugins/synasort/
 plugins/synaads/
 plugins/synafastbill/
+plugins/synamail/
 
 #local development stuff
 _devextras/local-ignore/
