@@ -166,7 +166,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
-          role-session-name: synaplan-ami-${{ github.run_id }}
+          role-session-name: synaplan-ami-${{ github.run_id }}-${{ matrix.architecture }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Check Marketplace encryption compatibility
@@ -503,7 +503,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
-          role-session-name: synaplan-teardown-${{ github.run_id }}
+          role-session-name: synaplan-teardown-${{ github.run_id }}-${{ matrix.architecture }}
           aws-region: ${{ env.AWS_REGION }}
 
       # The proof that this image booted and served, written onto the image

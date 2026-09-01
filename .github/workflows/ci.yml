@@ -1567,9 +1567,10 @@ jobs:
           for it.
 
           Once merged, \`umbrel-store-sync.yml\` carries the raised package into
-          [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps), and the
-          AWS Marketplace version is submitted from \`aws-ami.yml\`. Both are proposals
-          in someone else's queue: Umbrel merges its own store pull requests, and AWS
+          [getumbrel/umbrel-apps](https://github.com/getumbrel/umbrel-apps), and
+          \`marketplace-versions.yml\` offers the AWS Marketplace version once
+          \`aws-ami.yml\` has built and smoke-tested the image. Both are proposals in
+          someone else's queue: Umbrel merges its own store pull requests, and AWS
           reviews a submitted version before it becomes available.
 
           Opened automatically after the image for \`${GITHUB_REF_NAME}\` was published

@@ -245,6 +245,17 @@ jobs:
               --query 'DetailsDocument.Compatibility.AvailableInstanceTypes' --output json
           )"
 
+          # An empty or absent list is a different thing from a missing image or
+          # an architecture the listing does not carry, and it is not skipped
+          # quietly: nothing at all could ever be offered, and no amount of
+          # waiting fixes it. Left unchecked it surfaced as `Cannot iterate over
+          # null` from jq, or as an argument error from the EC2 call below, in an
+          # hourly job nobody reads until a release is found missing.
+          if [ "$(printf '%s' "$available" | jq 'if type == "array" then length else 0 end')" -eq 0 ]; then
+            echo "::error::The listing offers no instance types under Compatibility, so no version can be offered. Add the types synaplan-new-vpc.yaml accepts."
+            exit 1
+          fi
+
           # Which of them runs which architecture, asked of EC2 rather than read
           # off the family letter. A `g` in the name is a convention, not a
           # contract, and the answer decides what a customer is told to launch.

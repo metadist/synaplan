@@ -246,8 +246,12 @@ with a Graviton recommendation against an Intel-only listing, and AWS answered
 to which architecture is asked of EC2, not read off the family letter.
 
 **An architecture the listing cannot serve is skipped**, with a line in the run
-summary rather than a failure. So `arm64` is only offered once the listing lists a
-Graviton type. The listing should offer what
+summary rather than a failure — that is a configuration choice, so `arm64` is
+simply not offered until the listing lists a Graviton type. A listing offering
+**no** types at all is the other thing entirely and fails the run: nothing could
+ever be offered, and waiting does not fix it.
+
+The listing should offer what
 [`synaplan-new-vpc.yaml`](../deploy/aws/cloudformation/synaplan-new-vpc.yaml)
 accepts, which is:
 
