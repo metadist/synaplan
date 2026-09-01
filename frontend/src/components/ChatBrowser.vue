@@ -298,6 +298,18 @@
                 <GlobeAltIcon class="w-3 h-3" />
                 <span class="text-xs font-medium">{{ $t('chat.browser.public') }}</span>
               </div>
+              <!--
+                A turn keeps generating after the tab that started it navigated
+                away, so mark the chats that are still worth returning to.
+              -->
+              <div
+                v-if="chatsStore.activeRunChatIds.has(chat.id)"
+                class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[var(--brand)] bg-brand/10"
+                data-testid="indicator-chat-active-run"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+                <span class="text-xs font-medium">{{ $t('chat.stillGenerating') }}</span>
+              </div>
             </div>
 
             <!-- Chat Title -->

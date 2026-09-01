@@ -504,6 +504,7 @@ import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
 import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
+import type { StreamUpdatePayload } from '@/types/chatStream'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -525,6 +526,7 @@ import {
   parseMediaJobPayload,
   applyMediaJobUpdateToMessage,
   mapApiMessageRow,
+  IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
@@ -770,6 +772,12 @@ let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
+// Run this view is already re-attached to, so a repeated history load (the 2s
+// in-progress poll, a chat switch back and forth) cannot open a second
+// connection and render the same answer twice.
+let attachedRunId: string | null = null
+// Chat currently marked as "still answering" in the sidebar by this view.
+let generatingChatId: number | null = null
 let currentAudioStreamer: AudioStreamer | null = null
 const isAudioStreaming = ref(false)
 
@@ -895,6 +903,10 @@ onMounted(async () => {
         await nextTick()
         scrollToBottom()
       }
+
+      // A turn that was still generating when the guest reloaded keeps writing
+      // into a fresh bubble instead of being lost.
+      void resumeActiveRunIfAny()
     }
 
     const restricted = route.query.restricted as string | undefined
@@ -952,6 +964,9 @@ onMounted(async () => {
   } else {
     // Load messages for active chat
     await historyStore.loadMessages(chatsStore.activeChatId)
+    // A turn that was still generating when the page was reloaded keeps
+    // writing into this bubble instead of being lost.
+    void resumeActiveRunIfAny()
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -1081,6 +1096,95 @@ function handleNavigateAway() {
   finishStreamingTurnLocally()
 }
 
+/**
+ * Remember the resumable run the server opened for the turn this view is
+ * rendering, and mark its chat in the sidebar.
+ *
+ * The run id keeps a later history load from attaching a second time to a turn
+ * this tab already renders. The sidebar mark is what makes leaving mid-answer
+ * visible: the turn keeps generating, so the user needs to see which chat is
+ * worth returning to.
+ */
+function noteRunStarted(runId: unknown) {
+  if (typeof runId !== 'string' || runId === '') return
+
+  attachedRunId = runId
+
+  // Guests have no chat list to mark.
+  if (isGuestMode.value) return
+
+  // Tracked separately from currentStreamingChatId even though it starts from
+  // it: navigate-away clears that one while the turn deliberately keeps running,
+  // which is exactly when the marker has to stay.
+  generatingChatId = currentStreamingChatId ?? chatsStore.activeChatId ?? null
+  if (null !== generatingChatId) {
+    chatsStore.markChatGenerating(generatingChatId, true)
+  }
+}
+
+/**
+ * The turn ended on the wire. Releasing the run id lets the chat be picked up
+ * again later.
+ *
+ * A recoverable transport drop is NOT the end of the turn server-side — it keeps
+ * generating for whoever comes back — so that case deliberately keeps the
+ * sidebar marker, which is exactly what it exists to show.
+ */
+function noteRunTerminal(data: StreamUpdatePayload) {
+  attachedRunId = null
+
+  if (isRecoverableStreamError(data)) return
+
+  clearGeneratingMark()
+}
+
+function clearGeneratingMark() {
+  if (null !== generatingChatId) {
+    chatsStore.markChatGenerating(generatingChatId, false)
+    generatingChatId = null
+  }
+}
+
+/**
+ * Pick a still-generating turn back up after a reload, a chat switch, or a trip
+ * to another view.
+ *
+ * The backend keeps a turn alive across the disconnect and buffers its events,
+ * and the chat history response reports it as `activeRun`. Re-attaching replays
+ * what was missed and then follows the live tail, so the answer keeps writing
+ * itself instead of leaving the user on a bare prompt until it is persisted.
+ */
+async function resumeActiveRunIfAny() {
+  const run = isGuestMode.value ? guestStore.activeRun : historyStore.activeRun
+  if (!run) return
+
+  // Already rendering this turn — either the tab that started it never left, or
+  // a silent in-progress poll re-reported the same run. Attaching again would
+  // produce a second bubble for one answer.
+  if (attachedRunId === run.runId || isStreaming.value) return
+
+  // A multitask turn is reported BOTH as `inProgressTurn` (#1142 synthesizes a
+  // provisional card bubble) and as `activeRun`. The live re-attach renders the
+  // same turn more completely, so drop the provisional one instead of showing
+  // the answer twice. If the attach drops, finishStreamingMessage() clears the
+  // live flag and the next in-progress poll restores it.
+  historyStore.removeMessage(IN_PROGRESS_TURN_ID)
+
+  // The turn's REAL track id. Inventing a fresh one would leave Stop unable to
+  // flag the running turn — the answer would keep generating (and billing)
+  // while the UI claimed it was cancelled.
+  const runTrackId = Number.parseInt(run.trackId, 10)
+
+  attachedRunId = run.runId
+  await streamAIResponse('', {
+    attach: {
+      runId: run.runId,
+      partialText: run.partialText,
+      trackId: Number.isFinite(runTrackId) ? runTrackId : undefined,
+    },
+  })
+}
+
 // Cleanup: detach the running stream when the component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
@@ -1189,6 +1293,12 @@ watch(
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
+
+      // Coming back to a chat whose turn is still generating: keep watching it
+      // live. A different chat means a different run, so the previous
+      // attachment no longer applies.
+      attachedRunId = null
+      void resumeActiveRunIfAny()
 
       // Usage taximeter: a chat switch resets the session (not the day totals)
       // and rebuilds it from the newly loaded history.
@@ -2176,9 +2286,18 @@ const streamAIResponse = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    /**
+     * Re-attach to a turn already generating on the server instead of starting
+     * a new one. `userMessage` is then irrelevant — nothing is sent, the client
+     * only subscribes to the turn's buffered events. `trackId` is the turn's
+     * existing id, so an explicit Stop can still cancel it server-side.
+     */
+    attach?: { runId: string; partialText: string; trackId?: number }
   }
 ) => {
   streamingAbortController = new AbortController()
+
+  const attach = options?.attach
 
   const currentModel =
     aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
@@ -2188,6 +2307,28 @@ const streamAIResponse = async (
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
+
+  // Paint what the turn already produced right away, so returning to a running
+  // chat shows the answer-so-far instead of an empty bubble.
+  const paintedPrefix = attach?.partialText ?? ''
+  if (paintedPrefix) {
+    historyStore.updateStreamingMessage(messageId, paintedPrefix)
+  }
+
+  /**
+   * Render streamed text without ever letting the bubble shrink.
+   *
+   * The re-attach replays the turn from sequence 0 (which is what rebuilds the
+   * task cards and memory badges, so shortening the replay is not an option),
+   * meaning the first replayed chunks are far SHORTER than the answer-so-far
+   * already on screen. Rendering them verbatim would visibly rewind a long
+   * answer back to its first word and then re-type it. Holding the painted
+   * prefix until the replay grows past it keeps the text moving forward only;
+   * from there the replay is longer and takes over on its own.
+   */
+  const renderStreamingText = (text: string) => {
+    renderStreamingContent(text.length >= paintedPrefix.length ? text : paintedPrefix, messageId)
+  }
 
   let streamingRafId: number | null = null
   let streamingDirty = false
@@ -2218,22 +2359,32 @@ const streamAIResponse = async (
         return
       }
 
-      const trackId = Date.now()
+      // A re-attach adopts the running turn's id; only a NEW turn mints one.
+      const trackId = attach?.trackId ?? Date.now()
       currentTrackId = trackId
       let fullContent = ''
 
       processingStatus.value = 'started'
       processingMetadata.value = {}
 
-      const stopStreaming = chatApi.streamGuestMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const guestStreamOptions = {
         guestSessionId: guestStore.sessionId,
         message: userMessage,
         chatId: guestChatId,
         trackId,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        onUpdate: (data: StreamUpdatePayload) => {
           if (streamingAbortController?.signal.aborted) return
+
+          // Recognised here rather than in each terminal branch below, which
+          // exist per error kind and would each need their own reset.
+          if (data.status === 'complete' || data.status === 'error') {
+            noteRunTerminal(data)
+          }
 
           if (data.status === 'guest_limit_reached') {
             // #1128: drop the empty assistant placeholder — same as the
@@ -2261,6 +2412,11 @@ const streamAIResponse = async (
             const reached = (data as Record<string, unknown>).limitReached as boolean
             guestStore.updateCount(remaining, max, reached)
             guestStore.showBanner()
+            return
+          }
+
+          if (data.status === 'run_started') {
+            noteRunStarted(data.runId)
             return
           }
 
@@ -2451,7 +2607,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -2531,7 +2687,7 @@ const streamAIResponse = async (
             }
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
@@ -2658,7 +2814,15 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({
+            runId: attach.runId,
+            guestSessionId: guestStore.sessionId,
+            onUpdate: guestStreamOptions.onUpdate,
+          })
+        : chatApi.streamGuestMessage(guestStreamOptions)
 
       stopStreamingFn = stopStreaming
     } else {
@@ -2681,7 +2845,8 @@ const streamAIResponse = async (
         ? buildIncognitoHistorySnapshot()
         : []
 
-      const trackId = Date.now()
+      // A re-attach adopts the running turn's id; only a NEW turn mints one.
+      const trackId = attach?.trackId ?? Date.now()
       currentTrackId = trackId // Store for stop functionality
       currentStreamingChatId = chatId ?? undefined // Store chatId for stop functionality
       let fullContent = ''
@@ -2717,7 +2882,10 @@ const streamAIResponse = async (
         })
       }
 
-      const stopStreaming = chatApi.streamMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const streamOptions = {
         userId,
         message: userMessage,
         trackId,
@@ -2734,10 +2902,21 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
             return
+          }
+
+          if (data.status === 'run_started') {
+            noteRunStarted(data.runId)
+            return
+          }
+
+          // Recognised here rather than in each terminal branch below, which
+          // exist per error kind and would each need their own reset.
+          if (data.status === 'complete' || data.status === 'error') {
+            noteRunTerminal(data)
           }
 
           // [i2v-debug] Opt-in multitask/media tracing: a task card stuck at
@@ -3062,7 +3241,7 @@ const streamAIResponse = async (
                 streamingRafId = null
                 if (!streamingDirty) return
                 streamingDirty = false
-                renderStreamingContent(fullContent, messageId)
+                renderStreamingText(fullContent)
               })
             }
           } else if (data.status === 'reasoning' && data.chunk) {
@@ -3308,7 +3487,7 @@ const streamAIResponse = async (
             streamingDirty = false
 
             if (fullContent) {
-              renderStreamingContent(fullContent, messageId)
+              renderStreamingText(fullContent)
             } else if (data.mediaJob || data.media_job) {
               renderStreamingContent(
                 generatingTokenForMediaJob(data.mediaJob ?? data.media_job),
@@ -3802,7 +3981,11 @@ const streamAIResponse = async (
             console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({ runId: attach.runId, onUpdate: streamOptions.onUpdate })
+        : chatApi.streamMessage(streamOptions)
 
       // Store EventSource cleanup function globally
       stopStreamingFn = stopStreaming
@@ -3843,6 +4026,10 @@ const handleUserStop = async () => {
   if (streamingAbortController) {
     streamingAbortController.abort()
   }
+
+  // Unlike navigating away, an explicit Stop really does end the turn.
+  attachedRunId = null
+  clearGeneratingMark()
 
   // Close the EventSource connection IMMEDIATELY
   if (stopStreamingFn) {

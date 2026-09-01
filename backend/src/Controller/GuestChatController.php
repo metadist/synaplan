@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
@@ -40,6 +41,7 @@ class GuestChatController extends AbstractController
         private FileRepository $fileRepository,
         private MediaCancellationStore $cancellationStore,
         private MessageApiFormatter $messageApiFormatter,
+        private ChatRunService $chatRunService,
         private LoggerInterface $logger,
         private string $uploadDir,
     ) {
@@ -418,6 +420,18 @@ class GuestChatController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean'),
                 new OA\Property(property: 'messages', type: 'array', items: new OA\Items(type: 'object')),
+                new OA\Property(
+                    property: 'activeRun',
+                    description: 'Present when a turn in this session is still generating. The turn survives a client disconnect and buffers its Server-Sent Events, so a reloaded guest chat can paint `partialText` and re-attach via GET /api/v1/messages/stream/attach.',
+                    type: 'object',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(property: 'runId', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'trackId', type: 'string'),
+                        new OA\Property(property: 'lastSeq', type: 'integer'),
+                        new OA\Property(property: 'partialText', type: 'string'),
+                    ]
+                ),
             ]
         )
     )]
@@ -468,10 +482,22 @@ class GuestChatController extends AbstractController
             $messages
         );
 
-        return $this->json([
+        $payload = [
             'success' => true,
             'messages' => $messageData,
-        ]);
+        ];
+
+        // A turn still generating for this session: hand the returning visitor
+        // the text so far plus the run id to re-attach to.
+        $activeRun = $this->chatRunService->describeActiveForChat(
+            (int) $chatId,
+            ChatRunService::ownerKeyForGuest($session->getSessionId()),
+        );
+        if (null !== $activeRun) {
+            $payload['activeRun'] = $activeRun;
+        }
+
+        return $this->json($payload);
     }
 
     /**

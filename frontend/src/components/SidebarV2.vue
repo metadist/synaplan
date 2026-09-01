@@ -510,6 +510,15 @@
                     >
                       <Icon icon="mdi:link-variant" class="w-3 h-3" />
                     </span>
+                    <span
+                      v-if="isGenerating(chat)"
+                      class="text-[11px] text-[var(--brand)] flex items-center gap-1"
+                      :title="$t('chat.stillGenerating')"
+                      data-testid="indicator-chat-active-run"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-[var(--brand)] animate-pulse" />
+                      <span class="sr-only">{{ $t('chat.stillGenerating') }}</span>
+                    </span>
                   </div>
                 </div>
 
@@ -925,6 +934,12 @@ const getDisplayTitle = (chat: StoreChat): string => {
 const formatTimestamp = (dateStr: string): string => {
   return formatRelativeTime(new Date(dateStr))
 }
+
+/**
+ * A turn keeps generating after the tab that started it navigated away, so the
+ * dot tells the user which chat is still worth returning to.
+ */
+const isGenerating = (chat: StoreChat): boolean => chatsStore.activeRunChatIds.has(chat.id)
 
 const getChannelIcon = (chat: StoreChat): string | null => {
   switch (chat.source) {

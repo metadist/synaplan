@@ -664,6 +664,7 @@ import {
 import {
   uploadWidgetFile,
   sendWidgetMessage,
+  attachWidgetStream,
   WidgetUnavailableError,
 } from '@/services/api/widgetsApi'
 import { useI18n } from 'vue-i18n'
@@ -884,6 +885,9 @@ const sessionId = ref<string>('')
 const isSending = ref(false)
 const chatId = ref<number | null>(null)
 const historyLoaded = ref(false)
+// Run this widget instance is already re-attached to, so a forced history
+// reload cannot open a second connection and render the same answer twice.
+const attachedRunId = ref<string | null>(null)
 const sessionCreatedEmitted = ref(false)
 const isLoadingHistory = ref(false)
 const widgetUnavailable = ref(false)
@@ -1972,6 +1976,80 @@ const normalizeServerMessage = (rawUnknown: unknown): Message => {
   }
 }
 
+/**
+ * Pick a still-generating turn back up after the visitor reloaded the host page.
+ *
+ * The backend keeps the turn alive across the disconnect and buffers its
+ * events, so this replays the answer so far and then follows it live into a
+ * fresh assistant bubble.
+ */
+const resumeActiveRun = async (runId: string, partialText: string) => {
+  if (!sessionId.value || attachedRunId.value === runId || isSending.value) return
+  attachedRunId.value = runId
+
+  const assistantMessageId = `run-${runId}`
+  messages.value.push({
+    id: assistantMessageId,
+    role: 'assistant',
+    type: 'text',
+    // Show what the turn already produced immediately; the replay that follows
+    // rebuilds the same text from the start and then continues past it.
+    content: partialText,
+    timestamp: new Date(),
+    sender: 'ai',
+  })
+  await scrollToBottom()
+
+  // Looked up by id rather than taken as the last entry: anything appended
+  // while the replay runs would otherwise receive the answer's text.
+  const findBubble = () => messages.value.find((m) => m.id === assistantMessageId)
+  const dropBubble = () => {
+    const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
+    if (idx !== -1) messages.value.splice(idx, 1)
+  }
+
+  let replayed = ''
+
+  try {
+    isTyping.value = partialText === ''
+    await attachWidgetStream(props.widgetId, sessionId.value, runId, {
+      apiUrl: props.apiUrl,
+      headers: testModeHeaders.value,
+      onChunk: async (chunk: string) => {
+        if (!chunk) return
+        isTyping.value = false
+        replayed += chunk
+        const bubble = findBubble()
+        if (!bubble) return
+        // The replay restarts the turn from its first token, so early chunks are
+        // shorter than the answer-so-far already painted above. Writing them
+        // straight through would rewind a long answer to its first word and
+        // re-type it; holding the painted text until the replay grows past it
+        // keeps the bubble moving forward only.
+        bubble.content = replayed.length >= partialText.length ? replayed : partialText
+        await scrollToBottom()
+      },
+    })
+
+    // Nothing was replayed and there was nothing to paint either — the turn
+    // most likely finished between the history read and the attach. Mirror the
+    // send path and let the persisted answer take over the empty bubble.
+    if (replayed === '' && partialText === '') {
+      dropBubble()
+      await loadConversationHistory(true)
+    }
+  } catch (error) {
+    console.error('Failed to re-attach to the running answer:', error)
+    // The turn may have finished while we were re-attaching — the persisted
+    // history is authoritative, so drop the provisional bubble and reload.
+    dropBubble()
+    await loadConversationHistory(true)
+  } finally {
+    isTyping.value = false
+    await scrollToBottom()
+  }
+}
+
 const loadConversationHistory = async (force = false) => {
   // In test/preview mode, skip loading real history but mark as loaded for auto message
   if (isTestEnvironment.value) {
@@ -2049,6 +2127,16 @@ const loadConversationHistory = async (force = false) => {
       } else if (loadedMessages.length > 0) {
         messageCount.value = loadedMessages.filter((m: Message) => m.role === 'user').length
         fileUploadCount.value = 0
+      }
+
+      // A turn that was still generating when the visitor reloaded the host
+      // page: keep watching it instead of losing the answer.
+      const activeRun = data.activeRun
+      if (isRecord(activeRun) && typeof activeRun.runId === 'string') {
+        void resumeActiveRun(
+          activeRun.runId,
+          typeof activeRun.partialText === 'string' ? activeRun.partialText : ''
+        )
       }
     }
   } catch (error) {

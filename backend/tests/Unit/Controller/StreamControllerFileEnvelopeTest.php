@@ -30,6 +30,7 @@ use App\Service\UsageStatsService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
+use App\Tests\Support\ChatRunServiceFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -71,6 +72,7 @@ final class StreamControllerFileEnvelopeTest extends TestCase
             $this->createMock(UsageStatsService::class),
             $this->createMock(UsageTaximeterConfig::class),
             new PremiumFeatureGate(new BillingService('', '')),
+            ChatRunServiceFactory::withoutRedis(),
         );
     }
 

@@ -261,6 +261,7 @@
   "chat": {
     "title": "Chat",
     "newChat": "Neuer Chat",
+    "stillGenerating": "Antwortet noch",
     "quote": {
       "button": "Im Chat erwähnen",
       "remove": "Zitat entfernen"

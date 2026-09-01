@@ -76,6 +76,13 @@ export const useChatsStore = defineStore('chats', () => {
   const historyHasMore = ref(true)
   const historyOffset = ref(0)
 
+  /**
+   * Chats whose answer is still being written on the server. A turn survives
+   * the client disconnect it was started from, so this marks the chats a user
+   * can return to and keep watching.
+   */
+  const activeRunChatIds = ref<Set<number>>(new Set())
+
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
     return {
@@ -144,8 +151,11 @@ export const useChatsStore = defineStore('chats', () => {
     error.value = null
 
     try {
-      const data = await httpClient<{ chats: unknown[] }>('/api/v1/chats')
+      const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
+        '/api/v1/chats'
+      )
       chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
+      activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
       ensureValidActiveChat()
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to load chats'
@@ -153,6 +163,28 @@ export const useChatsStore = defineStore('chats', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  /**
+   * Flag a chat as generating (or no longer generating) without waiting for the
+   * next chat-list fetch.
+   *
+   * `loadChats()` is the server's word on this, but it only runs on entry, so on
+   * its own the marker would be a snapshot from app start: it would never light
+   * up when the user walks away from a running turn, and never go out when that
+   * turn finishes. The chat view drives it live from the stream's own
+   * `run_started` and terminal events instead.
+   */
+  function markChatGenerating(chatId: number, generating: boolean) {
+    // Replaced rather than mutated: a Set is not deeply reactive, so template
+    // reads of activeRunChatIds would not re-render on add/delete alone.
+    const next = new Set(activeRunChatIds.value)
+    if (generating) {
+      next.add(chatId)
+    } else {
+      next.delete(chatId)
+    }
+    activeRunChatIds.value = next
   }
 
   /**
@@ -489,6 +521,7 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
     historyHasMore.value = true
@@ -507,6 +540,8 @@ export const useChatsStore = defineStore('chats', () => {
     historyChats,
     historyLoading,
     historyHasMore,
+    activeRunChatIds,
+    markChatGenerating,
     loadChats,
     loadChatHistory,
     createChat,

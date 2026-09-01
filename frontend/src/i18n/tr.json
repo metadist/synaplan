@@ -265,6 +265,7 @@
     "config": "AI Yapılandırması",
     "statistics": "İstatistikler",
     "newChat": "Yeni Sohbet",
+    "stillGenerating": "Hâlâ yanıtlıyor",
     "quote": {
       "button": "Sohbette belirt",
       "remove": "Alıntıyı kaldır"
