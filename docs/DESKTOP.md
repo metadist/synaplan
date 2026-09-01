@@ -75,6 +75,22 @@ else — so a stolen laptop is a *revoke*, not an account takeover. Enforcement 
 central (`App\Security\ApiKeyScopeSubscriber`); the vocabulary and prefix map
 live in `App\Security\ApiKeyScope`.
 
+The **Outlook add-in (Synamail)** is the other integration that mints restricted
+keys (`messages:*`, `chats:*`, `files:*`, `rag:*` — issued by its connect flow
+since before enforcement existed). The map covers its surface too:
+
+| Scope | Grants |
+| ----- | ------ |
+| `messages:*` | `/api/v1/messages*`, `/api/v1/tts*`, `/api/v1/config/models*`, `/api/v1/user/{id}/plugins/*` |
+| `chats:*` | `/api/v1/chats*` |
+| `files:*` | `/api/v1/files*` (same surface as `desktop:files`) |
+| `rag:*` | `/api/v1/rag*` |
+
+Two self-service allowances apply to **every** valid key regardless of scopes:
+`GET /api/v1/auth/me` (identity introspection, needed for ping/health checks)
+and `DELETE /api/v1/apikeys/{ownId}` (a key may always revoke *itself* — a
+leaked key can only destroy itself, never the owner's other keys).
+
 **Existing keys are unaffected.** See
 [scoped vs. legacy keys](#scoped-vs-legacy-keys-grandfathering) below.
 
@@ -91,11 +107,12 @@ when its scope list is:
 - an explicit **`*`**.
 
 A key is **restricted** only when it opts into a non-empty, non-legacy scope
-list without `*` — which today only happens via desktop pairing. So nothing that
-worked yesterday stops working: your existing OpenAI-/Anthropic-compatible keys,
-webhook keys, and integrations keep full access, and only freshly paired desktop
-keys are limited to the four `desktop:*` scopes above. The logic is one pure
-class, `App\Security\ApiKeyScope::isRestricted()`.
+list without `*` — which today happens via desktop pairing and the Outlook
+add-in connect flow. So nothing that worked yesterday stops working: your
+existing OpenAI-/Anthropic-compatible keys, webhook keys, and integrations keep
+full access; freshly paired desktop keys are limited to the four `desktop:*`
+scopes, and add-in keys to the four add-in area scopes, above. The logic is one
+pure class, `App\Security\ApiKeyScope::isRestricted()`.
 
 ## Pairing
 

@@ -19,9 +19,11 @@ namespace App\Security;
  *   - an explicit `*` means full access.
  *
  * A key is *restricted* only when it opts into a non-empty, non-legacy list
- * without `*`. Pairing a desktop mints exactly such a restricted key
- * ({@see pairingScopes()}), so a stolen laptop is a revoke, not an account
- * takeover.
+ * without `*`. Two integrations mint exactly such restricted keys: desktop
+ * pairing ({@see pairingScopes()}) and the Outlook add-in connect flow
+ * ({@see addinScopes()}), so a stolen laptop or mailbox is a revoke, not an
+ * account takeover. Both vocabularies are mapped in
+ * {@see requiredScopesForPath()}.
  *
  * This class is pure logic (no I/O), so it is unit-testable in isolation and is
  * the single source of truth shared by the entity and the enforcement
@@ -46,6 +48,35 @@ final class ApiKeyScope
 
     /** Umbrella over every `desktop:` scope. */
     public const DESKTOP_ALL = 'desktop:*';
+
+    /**
+     * Add-in area scopes, minted by the Outlook add-in connect flow
+     * (`AddinConnectView.vue`) since long before enforcement existed. They are
+     * a live contract with every already-issued Synamail key, so the strings
+     * are frozen — see the prefix map in {@see requiredScopesForPath()} for
+     * what each one grants.
+     */
+
+    /** `/api/v1/messages*`, `/api/v1/tts*`, `/api/v1/config/models*`, plugin routes — the AI-action surface. */
+    public const ADDIN_MESSAGES = 'messages:*';
+
+    /** `/api/v1/chats*` — chat persistence (create chat, load history). */
+    public const ADDIN_CHATS = 'chats:*';
+
+    /** `/api/v1/files*` — upload/list/download the owner already may. */
+    public const ADDIN_FILES = 'files:*';
+
+    /** `/api/v1/rag*` — semantic search over the owner's documents. */
+    public const ADDIN_RAG = 'rag:*';
+
+    /**
+     * Paths any authenticated key may reach regardless of scopes: identity
+     * introspection of the key's own account ("who am I"), needed by every
+     * integration for its ping/health check. Read-only and owner-scoped.
+     *
+     * @var list<string>
+     */
+    private const SELF_SERVICE_PATHS = ['/api/v1/auth/me'];
 
     /**
      * Legacy webhook scopes. A key whose list contains ONLY these keeps full
@@ -73,6 +104,23 @@ final class ApiKeyScope
             self::DESKTOP_MCP,
             self::DESKTOP_FILES,
             self::DESKTOP_JOBS,
+        ];
+    }
+
+    /**
+     * The scope set the Outlook add-in connect flow mints
+     * (`frontend/src/views/AddinConnectView.vue`). Frozen: already-issued
+     * Synamail keys carry exactly this list.
+     *
+     * @return list<string>
+     */
+    public static function addinScopes(): array
+    {
+        return [
+            self::ADDIN_MESSAGES,
+            self::ADDIN_CHATS,
+            self::ADDIN_FILES,
+            self::ADDIN_RAG,
         ];
     }
 
@@ -108,19 +156,34 @@ final class ApiKeyScope
      * {@see isRestricted()} first (an unrestricted key is always allowed).
      *
      * Prefix map (v1):
-     *   /v1/               → desktop:messages
-     *   /mcp               → desktop:mcp
-     *   /api/v1/desktop/   → desktop:jobs
-     *   /api/v1/files      → desktop:files (a paired computer uploads its
-     *                        result artifact through the existing files API
-     *                        before reporting a fileId — sprint A3 §2.4)
-     *   everything else    → denied for a restricted key (a desktop-only key
-     *                        must never administer the instance)
+     *   /v1/                     → desktop:messages
+     *   /mcp                     → desktop:mcp
+     *   /api/v1/desktop/         → desktop:jobs
+     *   /api/v1/files            → desktop:files OR files:* (a paired computer
+     *                              uploads its result artifact through the
+     *                              existing files API before reporting a
+     *                              fileId — sprint A3 §2.4; the add-in uploads
+     *                              mail attachments the same way)
+     *   /api/v1/messages         → messages:*
+     *   /api/v1/tts              → messages:* (read-aloud of an AI answer)
+     *   /api/v1/config/models    → messages:* (read-only model info)
+     *   /api/v1/user/{id}/plugins→ messages:* (plugin AI features, e.g.
+     *                              Synamail contact profiling)
+     *   /api/v1/chats            → chats:*
+     *   /api/v1/rag              → rag:*
+     *   /api/v1/auth/me          → any key (self-service identity, see
+     *                              SELF_SERVICE_PATHS)
+     *   everything else          → denied for a restricted key (a scoped key
+     *                              must never administer the instance)
      *
      * @param list<string>|array<int|string, mixed> $scopes
      */
     public static function allows(array $scopes, string $path): bool
     {
+        if (\in_array($path, self::SELF_SERVICE_PATHS, true)) {
+            return true;
+        }
+
         $normalized = self::normalize($scopes);
 
         if (\in_array(self::WILDCARD, $normalized, true)) {
@@ -134,6 +197,17 @@ final class ApiKeyScope
         }
 
         return false;
+    }
+
+    /**
+     * Whether the request is a key revoking *itself* (the Synamail sign-out
+     * flow). Always allowed for any valid key regardless of scopes: it is
+     * security-positive — a leaked key can only destroy itself, never touch
+     * the owner's other keys.
+     */
+    public static function isSelfRevoke(string $method, string $path, int $keyId): bool
+    {
+        return 'DELETE' === strtoupper($method) && sprintf('/api/v1/apikeys/%d', $keyId) === $path;
     }
 
     /**
@@ -152,15 +226,37 @@ final class ApiKeyScope
             return [self::DESKTOP_MCP];
         }
 
-        if ('/api/v1/desktop' === $path || str_starts_with($path, '/api/v1/desktop/')) {
+        if (self::matchesPrefix($path, '/api/v1/desktop')) {
             return [self::DESKTOP_JOBS];
         }
 
-        if ('/api/v1/files' === $path || str_starts_with($path, '/api/v1/files/')) {
-            return [self::DESKTOP_FILES];
+        if (self::matchesPrefix($path, '/api/v1/files')) {
+            return [self::DESKTOP_FILES, self::ADDIN_FILES];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/messages')
+            || self::matchesPrefix($path, '/api/v1/tts')
+            || self::matchesPrefix($path, '/api/v1/config/models')
+            || 1 === preg_match('#^/api/v1/user/\d+/plugins(/|$)#', $path)
+        ) {
+            return [self::ADDIN_MESSAGES];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/chats')) {
+            return [self::ADDIN_CHATS];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/rag')) {
+            return [self::ADDIN_RAG];
         }
 
         return [];
+    }
+
+    /** `$prefix` itself, or anything below `$prefix/` — never `$prefix<other-chars>`. */
+    private static function matchesPrefix(string $path, string $prefix): bool
+    {
+        return $path === $prefix || str_starts_with($path, $prefix.'/');
     }
 
     /**
