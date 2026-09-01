@@ -104,6 +104,7 @@ import type { FileItem } from '@/services/filesService'
 import { previewIconForFile, previewKindForFile, previewSnippet } from '@/services/filePreview'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useMediaSrc } from '@/services/api/mediaAuth'
+import { fileDisplayName } from '@/utils/fileDisplayName'
 
 const props = defineProps<{
   file: FileItem
@@ -113,7 +114,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ play: [] }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // On web `mediaSrc` is a no-op; on native it appends a read-only media token so
 // a bare <img> (which cannot send auth headers) still loads. MessageVideo /
@@ -123,7 +124,9 @@ const { mediaSrc } = useMediaSrc()
 const kind = computed(() => previewKindForFile(props.file))
 const icon = computed(() => previewIconForFile(props.file))
 const snippet = computed(() => previewSnippet(props.file))
-const displayName = computed(() => props.file.display_name || props.file.filename)
+const displayName = computed(() =>
+  fileDisplayName(props.file, (key, values) => t(key, (values ?? {}) as never), locale.value)
+)
 
 const rawDownloadUrl = computed(() => `${getApiBaseUrl()}/api/v1/files/${props.file.id}/download`)
 // Build the absolute thumb URL from the id (mirrors the download URL) so it

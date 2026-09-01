@@ -77,12 +77,12 @@
         </div>
         <div class="p-2">
           <p class="text-xs font-medium txt-primary truncate" :title="file.filename">
-            {{ file.display_name || file.filename }}
+            {{ fileDisplayName(file, translate, locale) }}
           </p>
           <p class="text-[10px] txt-secondary truncate">{{ file.uploaded_date }}</p>
-          <div v-if="file.is_vectorized" class="mt-1">
+          <div class="mt-1">
             <FileVectorPill
-              :state="file.vector_state ?? 'vectorized'"
+              :state="vectorStateOf(file)"
               :chunk-count="file.chunk_count ?? 0"
               :group-key="file.group_key ?? null"
             />
@@ -114,16 +114,16 @@
             >
               <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
             </button>
-            <div v-if="!file.is_vectorized" class="relative shrink-0">
+            <div v-if="vectorStateOf(file) !== 'vectorized'" class="relative shrink-0">
               <button
                 class="px-2 py-1 rounded-md border border-light-border/30 dark:border-dark-border/10 txt-secondary hover:text-[var(--brand)] transition-colors text-[11px] flex items-center gap-1 disabled:opacity-50"
-                :title="$t('files.indexPromptAction')"
+                :title="$t('files.describeSortAction')"
                 :disabled="isIndexing(file.id)"
                 :data-testid="`btn-generated-index-${file.id}`"
                 @click.stop="toggleKbMenu(file.id)"
               >
                 <Icon
-                  :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:bookmark-plus-outline'"
+                  :icon="isIndexing(file.id) ? 'mdi:loading' : 'mdi:text-box-search-outline'"
                   class="w-3.5 h-3.5"
                   :class="isIndexing(file.id) && 'animate-spin'"
                 />
@@ -138,7 +138,7 @@
                   <div
                     class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider txt-secondary"
                   >
-                    {{ $t('files.indexPromptAction') }}
+                    {{ $t('files.describeSortAction') }}
                   </div>
                   <button
                     class="w-full flex items-center gap-2 px-3 py-2 text-xs txt-primary hover:bg-[var(--brand)]/10 transition-colors text-left"
@@ -232,11 +232,14 @@ import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicon
 import FilePreview from '@/components/files/FilePreview.vue'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
+import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const translate = (key: string, values?: Record<string, unknown>): string =>
+  t(key, (values ?? {}) as never)
 const router = useRouter()
 const { success: showSuccess, error: showError } = useNotification()
 const { confirm } = useDialog()
@@ -357,7 +360,7 @@ const addToKnowledgeBase = async (file: FileItem, groupKey?: string) => {
       if (res.groupKey) {
         showSuccess(t('files.describeSortDoneGroup', { group: res.groupKey }))
       } else {
-        showSuccess(t('files.indexPromptDone'))
+        showSuccess(t('files.describeSortDone'))
       }
       await Promise.all([load(), loadFolders()])
     } else {

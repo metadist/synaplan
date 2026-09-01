@@ -1128,12 +1128,12 @@
     "movedSuccess": "Fichier déplacé vers « {folder} »",
     "removeFromFolder": "Retirer du dossier",
     "removedFromFolder": "Retiré du dossier (le fichier et son index de recherche sont conservés)",
-    "describeSortAction": "Décrire, indexer et classer — rendre recherchable par l’IA",
+    "describeSortAction": "Rendre recherchable par l’IA",
     "describeSortDone": "Désormais recherchable par l’IA.",
     "describeSortDoneGroup": "Désormais recherchable par l’IA · classé dans « {group} ».",
     "describeSortFailed": "Impossible de rendre ce fichier recherchable.",
-    "indexPromptAction": "Ajouter à la base de connaissances",
-    "indexPromptDone": "Ajouté à votre base de connaissances.",
+    "voiceMemo": "Mémo vocal",
+    "voiceMemoNamed": "Mémo vocal · {time}",
     "emptyState": {
       "title": "Aucun fichier pour le moment",
       "description": "Téléversez des fichiers pour commencer. Vous pouvez les organiser en dossiers.",
@@ -1235,6 +1235,9 @@
     },
     "help": {
       "vectorized": "Lorsqu’un fichier est recherchable par l’IA, son contenu est ajouté à votre base de connaissances afin que l’assistant puisse s’en servir pour vous répondre.",
+      "notSearchable": "L’assistant ne peut pas encore utiliser ce fichier dans ses réponses. Rendez-le recherchable pour l’ajouter à vos connaissances.",
+      "processing": "Ce fichier est en cours de préparation pour que l’assistant puisse l’utiliser.",
+      "failed": "Impossible de rendre ce fichier recherchable. Vous pouvez réessayer.",
       "group": "Les dossiers de connaissances regroupent des fichiers. Lorsque l’IA recherche un dossier, elle peut utiliser chaque fichier qu’il contient.",
       "source": "D’où vient ce fichier — un téléversement, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, le widget, l’API, ou généré par l’IA.",
       "incoming": "Fichiers envoyés par d’autres applications pour votre base de connaissances. Examinez-les, puis conservez-les ou écartez-les.",
@@ -1319,7 +1322,7 @@
       "deleteFailed": "Impossible de supprimer le fichier. Veuillez réessayer."
     },
     "explainer": {
-      "text": "Tout ce que vous téléversez ou créez se trouve ici. Les fichiers marqués « recherchable par l’IA » sont ajoutés à votre base de connaissances afin que l’assistant puisse les utiliser.",
+      "text": "Tout ce que vous téléversez ou créez se trouve ici. L’assistant peut utiliser les fichiers marqués recherchables par l’IA. Photos, enregistrements et fichiers créés par l’IA doivent d’abord être rendus recherchables.",
       "dismiss": "Compris",
       "reopen": "Qu’est-ce que c’est ?"
     }
