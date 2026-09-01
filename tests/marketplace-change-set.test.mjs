@@ -15,6 +15,7 @@ const options = (overrides = {}) => ({
   architecture: 'x86_64',
   ami: 'ami-0123456789abcdef0',
   role: 'arn:aws:iam::123456789012:role/synaplan-marketplace-ingestion',
+  instanceType: 'c7i.xlarge',
   releaseUrl: 'https://github.com/metadist/synaplan/releases/tag/v4.4.3',
   ...overrides,
 })
@@ -35,20 +36,25 @@ test('offers the AMI as one version of the listing', () => {
 })
 
 // The title is the only thing distinguishing the two versions of one release in
-// the customer's version picker, and marketplace-versions.yml recognises an
-// already submitted architecture by exactly this string.
-test('titles a version by release and architecture', () => {
-  assert.equal(versionTitle('4.4.3', 'arm64'), '4.4.3 (arm64)')
-  assert.equal(details({ architecture: 'arm64' }).Version.VersionTitle, '4.4.3 (arm64)')
+// the customer's version picker, so it names the hardware rather than only the
+// architecture — and keeps the architecture last, where missingArchitectures
+// looks for it.
+test('titles a version by release and hardware', () => {
+  assert.equal(versionTitle('4.4.3', 'arm64'), '4.4.3 - Graviton (arm64)')
+  assert.equal(versionTitle('4.4.3', 'x86_64'), '4.4.3 - Intel or AMD (x86_64)')
+  assert.equal(details({ architecture: 'arm64' }).Version.VersionTitle, '4.4.3 - Graviton (arm64)')
 })
 
-test('recommends a Graviton instance for arm64 and an Intel one otherwise', () => {
-  const recommended = (architecture) =>
-    details({ architecture }).DeliveryOptions[0].Details.AmiDeliveryOptionDetails
-      .RecommendedInstanceType
+// The listing decides which instance types it offers, so the recommendation has
+// to come from there. Inventing one here cost a rejected submission:
+// RECOMMENDED_INSTANCE_TYPE_NOT_AVAILABLE, hours after the fact.
+test('recommends the instance type it was given', () => {
+  const recommended = (overrides) =>
+    details(overrides).DeliveryOptions[0].Details.AmiDeliveryOptionDetails.RecommendedInstanceType
 
-  assert.equal(recommended('arm64'), 'm7g.xlarge')
-  assert.equal(recommended('x86_64'), 'm7i.xlarge')
+  assert.equal(recommended({ architecture: 'arm64', instanceType: 'c7g.xlarge' }), 'c7g.xlarge')
+  assert.equal(recommended({ instanceType: 'm7i.2xlarge' }), 'm7i.2xlarge')
+  assert.throws(() => buildChangeSet(options({ instanceType: '' })), /missing: instanceType/)
 })
 
 test('links the release notes, and stays valid without them', () => {
@@ -56,9 +62,10 @@ test('links the release notes, and stays valid without them', () => {
   assert.equal(details({ releaseUrl: '' }).Version.ReleaseNotes, 'Synaplan 4.4.3.')
 })
 
-// A silently wrong architecture would offer an arm64 image with an Intel
-// recommendation, which a customer only discovers after launching it.
-test('refuses an architecture it has no recommendation for', () => {
+// An architecture nothing here knows about would be offered under a title that
+// says nothing about the hardware, which a customer only discovers by launching
+// it on the wrong instance.
+test('refuses an architecture it cannot describe', () => {
   assert.throws(() => buildChangeSet(options({ architecture: 'riscv64' })), /unknown architecture/)
   assert.deepEqual(ARCHITECTURES.toSorted(), ['arm64', 'x86_64'])
 })
@@ -73,6 +80,18 @@ test('refuses to build a change set with a missing field', () => {
 // offering a version the listing already had.
 test('recognises the architectures a release has already been offered', () => {
   assert.deepEqual(missingArchitectures('4.4.3', []), ['x86_64', 'arm64'])
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.2.4', versionTitle('4.4.3', 'x86_64')]), [
+    'arm64',
+  ])
+  assert.deepEqual(
+    missingArchitectures('4.4.3', ARCHITECTURES.map((a) => versionTitle('4.4.3', a))),
+    []
+  )
+})
+
+// The titles submitted before the hardware names existed are in the listing for
+// good, and a version that stops being recognised is offered a second time.
+test('still recognises the titles submitted under the old scheme', () => {
   assert.deepEqual(missingArchitectures('4.4.3', ['4.2.4', '4.4.3 (x86_64)']), ['arm64'])
   assert.deepEqual(missingArchitectures('4.4.3', ['4.4.3 (x86_64)', '4.4.3 (arm64)']), [])
 })
@@ -100,6 +119,10 @@ test('prints the missing architectures for a shell to walk', () => {
   assert.equal(runCli(['missing', '--version', '4.4.3']), 'x86_64 arm64\n')
 })
 
+test('refuses to title a version for an architecture it has no name for', () => {
+  assert.throws(() => versionTitle('4.4.3', 'riscv64'), /unknown architecture/)
+})
+
 test('refuses a command it does not know', () => {
   assert.throws(() => runCli([]), /expected change-set or missing/)
   assert.throws(() => runCli(['submit']), /expected change-set or missing/)
@@ -118,9 +141,11 @@ test('prints the change set as one JSON document', () => {
     'ami-0123456789abcdef0',
     '--role',
     'arn:aws:iam::123456789012:role/ingestion',
+    '--instance-type',
+    'c7g.xlarge',
   ])
 
   const parsed = JSON.parse(output)
   assert.equal(parsed.length, 1)
-  assert.equal(parsed[0].DetailsDocument.Version.VersionTitle, '4.4.3 (arm64)')
+  assert.equal(parsed[0].DetailsDocument.Version.VersionTitle, '4.4.3 - Graviton (arm64)')
 })

@@ -143,9 +143,9 @@ later and slower.
 
 1. **Build the AMI.** Push a release tag; the workflow builds x86_64 and arm64 in
    us-east-1, verifies their snapshots are unencrypted, shares both source AMIs
-   with the Marketplace ingestion account, then launches the x86_64 image through
-   `synaplan-new-vpc.yaml`, runs the smoke test on it over Session Manager, and
-   deletes the stack. About 20 minutes and a few cents of instance time.
+   with the Marketplace ingestion account, then launches each of them through
+   `synaplan-new-vpc.yaml`, runs the smoke test over Session Manager, and deletes
+   the stacks. About 20 minutes and a few cents of instance time.
 2. **Test Add Version** in the Management Portal. A free automated compliance
    scan that reports exactly what the review would otherwise reject: password
    authentication, root login, known CVEs, credentials left in the image.
@@ -179,9 +179,12 @@ Nothing else has to be switched on, and nothing has to be switched over later.
 
 ### Why one release takes several runs
 
-Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
-`<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
-version must share the same `AmiSource`, so one version can carry only one AMI.
+Each architecture becomes a **separate version**, titled
+`<version> - Intel or AMD (x86_64)` and `<version> - Graviton (arm64)`. That is
+AWS's rule, not a choice: all delivery options of one version must share the same
+`AmiSource`, so one version can carry only one AMI. The two sit next to each other
+in the buyer's version picker with nothing but the title to go by, which is why it
+names the hardware and not only the architecture.
 
 Those two versions cannot be submitted together. AWS answers a second
 `AddDeliveryOptions` on the same product with an error while the first is in
@@ -202,6 +205,8 @@ here. Everything it decides on, it reads:
   tag whose rollout a guard held back is not offered;
 - **the image** from the `SynaplanVersion`, `Architecture` and `SmokeTested` tags
   on the AMI;
+- **the recommended instance type** from the listing's own available types, and
+  each type's architecture from EC2;
 - **what is already submitted** from the listing *and* from the change set
   history.
 
@@ -224,11 +229,39 @@ only repeat a rejection somebody has already read. Build a new AMI, or dispatch
 the workflow once the reason is gone.
 
 `SmokeTested` is the tag [`aws-ami.yml`](../.github/workflows/aws-ami.yml) writes
-onto the images of a release whose verification launch booted and served. It is
-required, not preferred: the AMI build may be dispatched from any branch, so a
-deployment fix can be verified from its pull request, and that mark is what keeps
-such a trial build out of a public listing. Nothing in the build offers a version
-itself — one place submits, so a re-run cannot offer the same version twice.
+onto an image that booted and served — every architecture is launched, one
+instance each. It is required, not preferred: the AMI build may be dispatched
+from any branch, so a deployment fix can be verified from its pull request, and
+that mark is what keeps such a trial build out of a public listing. Nothing in
+the build offers a version itself — one place submits, so a re-run cannot offer
+the same version twice.
+
+### The listing's instance types
+
+A version names a **recommended instance type**, and it has to be one the listing
+offers under *Compatibility*. It is read from there rather than chosen in code,
+because a type the listing does not offer is rejected — `arm64` was once offered
+with a Graviton recommendation against an Intel-only listing, and AWS answered
+`RECOMMENDED_INSTANCE_TYPE_NOT_AVAILABLE` half a minute later. Which type belongs
+to which architecture is asked of EC2, not read off the family letter.
+
+**An architecture the listing cannot serve is skipped**, with a line in the run
+summary rather than a failure — that is a configuration choice, so `arm64` is
+simply not offered until the listing lists a Graviton type. A listing offering
+**no** types at all is the other thing entirely and fails the run: nothing could
+ever be offered, and waiting does not fix it.
+
+The listing should offer what
+[`synaplan-new-vpc.yaml`](../deploy/aws/cloudformation/synaplan-new-vpc.yaml)
+accepts, which is:
+
+```text
+c7i.xlarge  m7i.xlarge  m7i.2xlarge  r7i.xlarge
+c7g.xlarge  m7g.xlarge  m7g.2xlarge
+```
+
+The first type the listing names for an architecture is the one recommended, so
+their order there is worth a thought.
 
 A rejection is also what this workflow reports: it turns that run red and, if
 `DISCORD_RELEASE_WEBHOOK` is set, says so in the channel. It stays silent
