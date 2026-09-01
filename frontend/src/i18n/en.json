@@ -1302,6 +1302,28 @@
     "preview": {
       "play": "Play"
     },
+    "content": {
+      "fallbackTitle": "File details",
+      "loading": "Loading…",
+      "loadError": "Couldn't load this file.",
+      "noText": "No text has been extracted from this file yet.",
+      "imageAlt": "Preview of {name}",
+      "download": "Download",
+      "statsCharacters": "Characters",
+      "statsWords": "Words",
+      "statsLines": "Lines",
+      "copyText": "Copy text",
+      "copied": "Text copied to clipboard",
+      "copyFailed": "Couldn't copy the text",
+      "close": "Close",
+      "extractedText": "Extracted text",
+      "aiDescription": {
+        "title": "AI description (used for search)",
+        "hint": "This is how the AI describes this file so you can find it later. Your visitors never see this text.",
+        "show": "Show AI description",
+        "hide": "Hide AI description"
+      }
+    },
     "generated": {
       "title": "Generated",
       "subtitle": "Images, videos, audio, documents and calendar invites created in your chats and tasks.",

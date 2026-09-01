@@ -2475,6 +2475,28 @@
     "preview": {
       "play": "Reproducir"
     },
+    "content": {
+      "fallbackTitle": "Detalles del archivo",
+      "loading": "Cargando…",
+      "loadError": "No se pudo cargar este archivo.",
+      "noText": "Aún no se ha extraído texto de este archivo.",
+      "imageAlt": "Vista previa de {name}",
+      "download": "Descargar",
+      "statsCharacters": "Caracteres",
+      "statsWords": "Palabras",
+      "statsLines": "Líneas",
+      "copyText": "Copiar texto",
+      "copied": "Texto copiado al portapapeles",
+      "copyFailed": "No se pudo copiar el texto",
+      "close": "Cerrar",
+      "extractedText": "Texto extraído",
+      "aiDescription": {
+        "title": "Descripción de IA (usada para la búsqueda)",
+        "hint": "Así describe la IA este archivo para que puedas encontrarlo más tarde. Tus visitantes nunca ven este texto.",
+        "show": "Mostrar descripción de IA",
+        "hide": "Ocultar descripción de IA"
+      }
+    },
     "generated": {
       "title": "Generados",
       "subtitle": "Imágenes, vídeos, audio, documentos e invitaciones de calendario creados en tus chats y tareas.",

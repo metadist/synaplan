@@ -1302,6 +1302,28 @@
     "preview": {
       "play": "Lire"
     },
+    "content": {
+      "fallbackTitle": "Détails du fichier",
+      "loading": "Chargement…",
+      "loadError": "Impossible de charger ce fichier.",
+      "noText": "Aucun texte n'a encore été extrait de ce fichier.",
+      "imageAlt": "Aperçu de {name}",
+      "download": "Télécharger",
+      "statsCharacters": "Caractères",
+      "statsWords": "Mots",
+      "statsLines": "Lignes",
+      "copyText": "Copier le texte",
+      "copied": "Texte copié dans le presse-papiers",
+      "copyFailed": "Impossible de copier le texte",
+      "close": "Fermer",
+      "extractedText": "Texte extrait",
+      "aiDescription": {
+        "title": "Description IA (utilisée pour la recherche)",
+        "hint": "Voici comment l'IA décrit ce fichier pour que vous puissiez le retrouver plus tard. Vos visiteurs ne voient jamais ce texte.",
+        "show": "Afficher la description IA",
+        "hide": "Masquer la description IA"
+      }
+    },
     "generated": {
       "title": "Générés",
       "subtitle": "Images, vidéos, audio, documents et invitations d’agenda créés dans vos chats et tâches.",

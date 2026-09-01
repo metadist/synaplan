@@ -87,4 +87,19 @@ final class FileProcessorImageOcrTest extends TestCase
 
         self::assertStringContainsString('Invoice #4711', $text);
     }
+
+    public function testReasoningBlockIsStrippedFromVisionOutput(): void
+    {
+        $this->aiFacade->method('analyzeImage')->willReturn([
+            'content' => "<think>Let me examine the crops carefully before answering.</think>\n"
+                ."Invoice #4711\nTotal: 42.00 EUR",
+            'provider' => 'openai',
+        ]);
+
+        [$text] = $this->processor->extractText($this->imageRelative, 'png', 1);
+
+        self::assertStringNotContainsString('<think>', $text);
+        self::assertStringNotContainsString('examine the crops', $text);
+        self::assertStringContainsString('Invoice #4711', $text);
+    }
 }

@@ -2476,6 +2476,28 @@
     "preview": {
       "play": "Oynat"
     },
+    "content": {
+      "fallbackTitle": "Dosya ayrıntıları",
+      "loading": "Yükleniyor…",
+      "loadError": "Bu dosya yüklenemedi.",
+      "noText": "Bu dosyadan henüz metin çıkarılmadı.",
+      "imageAlt": "{name} önizlemesi",
+      "download": "İndir",
+      "statsCharacters": "Karakter",
+      "statsWords": "Kelime",
+      "statsLines": "Satır",
+      "copyText": "Metni kopyala",
+      "copied": "Metin panoya kopyalandı",
+      "copyFailed": "Metin kopyalanamadı",
+      "close": "Kapat",
+      "extractedText": "Çıkarılan metin",
+      "aiDescription": {
+        "title": "AI açıklaması (arama için kullanılır)",
+        "hint": "AI bu dosyayı daha sonra bulabilmeniz için böyle tanımlar. Ziyaretçileriniz bu metni asla görmez.",
+        "show": "AI açıklamasını göster",
+        "hide": "AI açıklamasını gizle"
+      }
+    },
     "generated": {
       "title": "Üretilen",
       "subtitle": "Sohbetlerinizde ve görevlerinizde oluşturulan görseller, videolar, ses, belgeler ve takvim davetleri.",

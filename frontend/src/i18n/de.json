@@ -3204,6 +3204,28 @@
     "preview": {
       "play": "Abspielen"
     },
+    "content": {
+      "fallbackTitle": "Dateidetails",
+      "loading": "Wird geladen…",
+      "loadError": "Diese Datei konnte nicht geladen werden.",
+      "noText": "Aus dieser Datei wurde noch kein Text extrahiert.",
+      "imageAlt": "Vorschau von {name}",
+      "download": "Herunterladen",
+      "statsCharacters": "Zeichen",
+      "statsWords": "Wörter",
+      "statsLines": "Zeilen",
+      "copyText": "Text kopieren",
+      "copied": "Text in die Zwischenablage kopiert",
+      "copyFailed": "Text konnte nicht kopiert werden",
+      "close": "Schließen",
+      "extractedText": "Extrahierter Text",
+      "aiDescription": {
+        "title": "KI-Beschreibung (für die Suche)",
+        "hint": "So beschreibt die KI diese Datei, damit du sie später wiederfindest. Deine Besucher sehen diesen Text nie.",
+        "show": "KI-Beschreibung anzeigen",
+        "hide": "KI-Beschreibung ausblenden"
+      }
+    },
     "generated": {
       "title": "Erzeugt",
       "subtitle": "Bilder, Videos, Audio, Dokumente und Kalendereinladungen aus deinen Chats und Aufgaben.",

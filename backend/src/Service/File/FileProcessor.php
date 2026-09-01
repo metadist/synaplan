@@ -287,6 +287,7 @@ final readonly class FileProcessor
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
 
             $text = $result['content'] ?? '';
+            $text = $this->stripReasoning($text);
             $text = $this->textCleaner->clean($text);
             if (0 === stripos($text, 'test image description:')) {
                 $text = preg_replace('/^test image description:\s*/i', '', $text);
@@ -318,6 +319,22 @@ final readonly class FileProcessor
                 @unlink($tempJpegAbsolute);
             }
         }
+    }
+
+    /**
+     * Strip reasoning-model "thinking" blocks from vision model output.
+     *
+     * Reasoning-capable vision models prepend their chain-of-thought wrapped in
+     * <think>…</think> (or <thinking>…</thinking>) tags. That scratch work is
+     * never part of the description we persist: shown verbatim in the file
+     * preview it is unreadable, and indexed for RAG it pollutes search. Remove
+     * the paired blocks before the text is cleaned and stored.
+     */
+    private function stripReasoning(string $text): string
+    {
+        $stripped = preg_replace('/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/i', '', $text);
+
+        return null === $stripped ? $text : ltrim($stripped);
     }
 
     /**
