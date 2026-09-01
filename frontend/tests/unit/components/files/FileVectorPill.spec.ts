@@ -41,39 +41,52 @@ function mountPill(props: Record<string, unknown> = {}) {
   })
 }
 
+function pill(wrapper: ReturnType<typeof mountPill>) {
+  return wrapper.find('[data-testid="file-vector-pill"]')
+}
+
 describe('FileVectorPill', () => {
-  it('renders the searchable label with group + chunk detail', () => {
+  it('is icon-only (no visible text label)', () => {
     const wrapper = mountPill({ state: 'vectorized', chunkCount: 12, groupKey: 'Contracts' })
-    expect(wrapper.text()).toBe('Searchable by AI · Contracts · 12 chunks')
+    expect(wrapper.text()).toBe('')
   })
 
-  it('renders the plain searchable label without a group', () => {
-    const wrapper = mountPill({ state: 'vectorized', chunkCount: 0, groupKey: null })
-    expect(wrapper.text()).toBe('Searchable by AI')
+  it('shows green + the searchable label with group + chunk detail in the tooltip', () => {
+    const el = pill(mountPill({ state: 'vectorized', chunkCount: 12, groupKey: 'Contracts' }))
+    expect(el.classes()).toContain('text-emerald-600')
+    expect(el.attributes('aria-label')).toBe('Searchable by AI')
+    expect(el.attributes('title')).toBe('Searchable by AI · Contracts · 12 chunks')
+  })
+
+  it('falls back to the plain help tooltip when there is no group', () => {
+    const el = pill(mountPill({ state: 'vectorized', chunkCount: 0, groupKey: null }))
+    expect(el.attributes('title')).toBe('Its contents are in your knowledge base.')
   })
 
   it('renders the processing state', () => {
-    const wrapper = mountPill({ state: 'pending' })
-    expect(wrapper.text()).toBe('Processing…')
+    const el = pill(mountPill({ state: 'pending' }))
+    expect(el.classes()).toContain('text-blue-500')
+    expect(el.attributes('aria-label')).toBe('Processing…')
   })
 
   it('renders the failed state', () => {
-    const wrapper = mountPill({ state: 'failed' })
-    expect(wrapper.text()).toBe('Failed')
+    const el = pill(mountPill({ state: 'failed' }))
+    expect(el.classes()).toContain('text-red-500')
+    expect(el.attributes('aria-label')).toBe('Failed')
   })
 
-  it('renders not-searchable for the legacy not-applicable state', () => {
-    const wrapper = mountPill({ state: 'not_applicable' })
-    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(true)
-    expect(wrapper.text()).toBe('Not searchable')
+  it('renders grey not-searchable for the legacy not-applicable state', () => {
+    const el = pill(mountPill({ state: 'not_applicable' }))
+    expect(el.exists()).toBe(true)
+    expect(el.classes()).toContain('txt-secondary')
+    expect(el.attributes('aria-label')).toBe('Not searchable')
   })
 
-  it('renders not-searchable when the file is not in the knowledge base', () => {
-    const wrapper = mountPill()
-    expect(wrapper.find('[data-testid="file-vector-pill"]').exists()).toBe(true)
-    expect(wrapper.text()).toBe('Not searchable')
-    expect(wrapper.find('[data-testid="file-vector-pill"]').attributes('title')).toBe(
-      'The assistant cannot use this file yet.'
-    )
+  it('renders grey not-searchable when the file is not in the knowledge base', () => {
+    const el = pill(mountPill())
+    expect(el.exists()).toBe(true)
+    expect(el.classes()).toContain('txt-secondary')
+    expect(el.attributes('aria-label')).toBe('Not searchable')
+    expect(el.attributes('title')).toBe('The assistant cannot use this file yet.')
   })
 })
