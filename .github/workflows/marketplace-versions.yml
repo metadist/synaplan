@@ -1,0 +1,263 @@
+name: Marketplace Versions
+
+# Finishes what aws-ami.yml can only start, and reports how it ended.
+#
+# Offering a release to the AMI listing means one version per architecture,
+# because every delivery option of a version shares a single AmiSource. Those
+# versions cannot be submitted together: AWS answers a second
+# `AddDeliveryOptions` on the same product with an error while the first is in
+# flight, and ingesting an AMI takes hours — it copies the image into every
+# region of the listing and scans it for vulnerabilities. A release build
+# therefore submits one architecture and ends; this job submits the next one as
+# soon as the entity is free.
+#
+# It derives everything it needs from AWS and from the default branch, and keeps
+# no state of its own: the release comes from the version the deployment catalog
+# pins, the AMIs from their build tags, and what is already offered from the
+# listing itself. A missed run costs an hour, never a version.
+
+on:
+  schedule:
+    # Off the hour, so it does not queue behind everything else that runs at :00.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Two runs would race for the same entity and the loser would get an error from
+# AWS rather than a clean skip.
+concurrency:
+  group: marketplace-versions
+  cancel-in-progress: false
+
+env:
+  # The Marketplace ingests from us-east-1 only.
+  AWS_REGION: us-east-1
+
+jobs:
+  offer:
+    name: Offer the remaining versions to the listing
+    runs-on: ubuntu-latest
+    # Same trust path as the jobs in aws-ami.yml: the AWS role trusts this
+    # environment's subject claim, not a branch.
+    environment: ami-build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Skipped rather than failed while the listing does not exist yet, exactly
+      # like the submit job in aws-ami.yml. An hourly schedule must not turn a
+      # not-yet-configured listing into an hourly red run.
+      - name: Check the listing credentials
+        id: config
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          INGESTION_ROLE_ARN: ${{ secrets.AWS_MARKETPLACE_INGESTION_ROLE_ARN }}
+          BUILD_ROLE_ARN: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+        run: |
+          if [ -n "${PRODUCT_ID:-}" ] && [ -n "${INGESTION_ROLE_ARN:-}" ] && [ -n "${BUILD_ROLE_ARN:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No AWS Marketplace listing is configured; nothing to offer." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Assume the build role
+        if: steps.config.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-marketplace-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The version a new deployment installs is the version the listing should
+      # offer. Reading it from the catalog rather than from the newest tag is
+      # deliberate: a tag whose rollout was held back by a guard is not a release
+      # anybody should be able to buy.
+      - name: Read the release the catalog pins
+        id: release
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          version="$(node scripts/read-release-version.mjs | jq -r .version)"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Report change sets that finished
+        id: finished
+        if: steps.config.outputs.configured == 'true'
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+        run: |
+          set -euo pipefail
+
+          summaries="$(
+            aws marketplace-catalog list-change-sets \
+              --catalog AWSMarketplace \
+              --filter-list "$(jq -nc --arg id "$PRODUCT_ID" '[{Name:"EntityId",ValueList:[$id]}]')" \
+              --query 'ChangeSetSummaryList[].{Id:ChangeSetId,Status:Status,Start:StartTime,End:EndTime}' \
+              --output json
+          )"
+
+          # ISO-8601 in UTC sorts lexicographically, so a string comparison is a
+          # date comparison here. The window matches the schedule: anything that
+          # ended since the previous run is new, and a little overlap only ever
+          # repeats a message, never drops one.
+          since="$(date -u -d '65 minutes ago' +%Y-%m-%dT%H:%M:%SZ)"
+
+          inflight="$(printf '%s' "$summaries" | jq -r '[.[] | select(.Status == "PREPARING" or .Status == "APPLYING")] | length')"
+          echo "inflight=${inflight}" >> "$GITHUB_OUTPUT"
+
+          failed="$(
+            printf '%s' "$summaries" |
+              jq -r --arg since "$since" '
+                [.[] | select(.Status == "FAILED" or .Status == "CANCELLED") | select((.End // "") > $since) | .Id]
+                | join(" ")
+              '
+          )"
+
+          for id in $failed; do
+            reason="$(
+              aws marketplace-catalog describe-change-set \
+                --catalog AWSMarketplace --change-set-id "$id" \
+                --query 'ChangeSet[].ErrorDetailList' --output json
+            )"
+            echo "::error::AWS rejected change set ${id}: ${reason}"
+            echo "AWS rejected change set \`${id}\`: ${reason}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "failed=${failed}" >> "$GITHUB_OUTPUT"
+
+          if [ "$inflight" -gt 0 ]; then
+            echo "A change set is still in flight; AWS accepts no further version until it ends." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Nothing else can be submitted while AWS is working on one, so the rest of
+      # the job is skipped rather than attempted and rejected.
+      - name: Find the versions the listing is missing
+        id: missing
+        if: steps.config.outputs.configured == 'true' && steps.finished.outputs.inflight == '0'
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # Every VersionTitle anywhere in the document, rather than one fixed
+          # path: the entity shape is AWS's to change, and reading it loosely
+          # fails safe. A title this job cannot see would at worst be offered
+          # twice, which AWS rejects, rather than silently never offered.
+          offered="$(
+            aws marketplace-catalog describe-entity \
+              --catalog AWSMarketplace --entity-id "$PRODUCT_ID" \
+              --query DetailsDocument --output json |
+              jq -c '[.. | objects | .VersionTitle? // empty]'
+          )"
+
+          missing="$(
+            jq -nr --argjson offered "$offered" --arg version "$VERSION" '
+              ["x86_64", "arm64"]
+              | map(select(($offered | index("\($version) (\(.))")) | not))
+              | join(" ")
+            '
+          )"
+
+          echo "architectures=${missing}" >> "$GITHUB_OUTPUT"
+          if [ -z "$missing" ]; then
+            echo "The listing already offers \`${VERSION}\` for every architecture." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Offer the next one
+        id: offer
+        if: steps.missing.outputs.architectures != ''
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          INGESTION_ROLE_ARN: ${{ secrets.AWS_MARKETPLACE_INGESTION_ROLE_ARN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          MISSING: ${{ steps.missing.outputs.architectures }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          # One per run, by the same AWS rule that made this workflow necessary.
+          architecture="${MISSING%% *}"
+
+          # Found by the tags deploy/aws/packer/synaplan.pkr.hcl writes, so no
+          # run has to hand an AMI id to a later one. Newest wins, for a version
+          # that was rebuilt.
+          ami="$(
+            aws ec2 describe-images --owners self \
+              --filters "Name=tag:SynaplanVersion,Values=${VERSION}" \
+                        "Name=tag:Architecture,Values=${architecture}" \
+                        "Name=state,Values=available" \
+              --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
+          )"
+          if [ -z "$ami" ] || [ "$ami" = None ]; then
+            # Not an error: the release build may still be running, or may have
+            # failed and reported that itself. The next run picks it up.
+            echo "No AMI is built for \`${VERSION}\` on \`${architecture}\` yet; nothing offered." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          change_set="$(
+            node scripts/marketplace-change-set.mjs \
+              --product "$PRODUCT_ID" \
+              --version "$VERSION" \
+              --architecture "$architecture" \
+              --ami "$ami" \
+              --role "$INGESTION_ROLE_ARN" \
+              --release-url "$RELEASE_URL"
+          )"
+
+          aws marketplace-catalog start-change-set \
+            --catalog AWSMarketplace \
+            --intent VALIDATE \
+            --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
+            --change-set "$change_set" > /dev/null
+
+          id="$(
+            aws marketplace-catalog start-change-set \
+              --catalog AWSMarketplace \
+              --intent APPLY \
+              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
+              --change-set "$change_set" \
+              --query ChangeSetId --output text
+          )"
+
+          echo "submitted=${VERSION} (${architecture})" >> "$GITHUB_OUTPUT"
+          {
+            echo "Submitted \`${VERSION} (${architecture})\` as change set \`${id}\`, using \`${ami}\`."
+            echo ""
+            echo "AWS scans and copies the image for a few hours; a later run of this workflow reports how it ended."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Only ever speaks when something happened. An hourly job that reports
+      # "nothing to do" teaches everyone to ignore the channel it reports to.
+      - name: Report to Discord
+        if: always() && (steps.offer.outputs.submitted != '' || steps.finished.outputs.failed != '')
+        env:
+          HOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          SUBMITTED: ${{ steps.offer.outputs.submitted }}
+          FAILED: ${{ steps.finished.outputs.failed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          test -n "${HOOK:-}" || exit 0
+
+          if [ -n "${FAILED:-}" ]; then
+            content="AWS Marketplace rejected a version. Change sets: ${FAILED}. ${RUN_URL}"
+          else
+            content="AWS Marketplace received \`${SUBMITTED}\`. Review takes a few days. ${RUN_URL}"
+          fi
+
+          curl --silent --show-error --fail-with-body \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg content "$content" '{content: $content}')" \
+            "$HOOK" > /dev/null

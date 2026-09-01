@@ -650,7 +650,7 @@ jobs:
           pattern: packer-manifest-*
           path: manifests
 
-      - name: Offer each architecture as a version
+      - name: Offer the release to the listing
         if: steps.listing.outputs.configured == 'true'
         env:
           PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
@@ -661,140 +661,113 @@ jobs:
         run: |
           set -euo pipefail
 
+          # One AMI per version, by AWS's rule that every delivery option of a
+          # version shares a single AmiSource. Two architectures are therefore
+          # two versions — and only one of them can be offered here, because AWS
+          # rejects a second `AddDeliveryOptions` while the first is in flight
+          # ("if two requests are the same ChangeType on the same product, the
+          # second request returns an error"), and ingesting an AMI takes hours.
+          # marketplace-versions.yml submits the rest once the entity is free.
+          architecture="$(
+            printf '%s' "$ARCHITECTURES" |
+              jq -r 'if index("x86_64") then "x86_64" else .[0] end'
+          )"
+          remaining="$(
+            printf '%s' "$ARCHITECTURES" |
+              jq -r --arg first "$architecture" '[.[] | select(. != $first)] | join(", ")'
+          )"
+
+          manifest="manifests/packer-manifest-${architecture}/packer-manifest.json"
+          if [ ! -f "$manifest" ]; then
+            echo "::error::No build manifest for ${architecture}; refusing to guess an AMI id."
+            exit 1
+          fi
+
+          ami="$(jq -r '.builds[-1].artifact_id' "$manifest" | cut -d: -f2)"
+          if [ -z "$ami" ] || [ "$ami" = null ]; then
+            echo "::error::${manifest} carries no AMI id."
+            exit 1
+          fi
+
+          change_set="$(
+            node scripts/marketplace-change-set.mjs \
+              --product "$PRODUCT_ID" \
+              --version "$VERSION" \
+              --architecture "$architecture" \
+              --ami "$ami" \
+              --role "$INGESTION_ROLE_ARN" \
+              --release-url "$RELEASE_URL"
+          )"
+
+          # Validated first, then submitted, both inside this run. VALIDATE asks
+          # AWS whether it would accept the document without creating anything,
+          # which is how a wrong product id or a role AWS cannot assume is caught
+          # before a real version exists.
+          echo "::group::${architecture}: validate ${ami}"
+          aws marketplace-catalog start-change-set \
+            --catalog AWSMarketplace \
+            --intent VALIDATE \
+            --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
+            --change-set "$change_set" > /dev/null
+          echo "Accepted."
+          echo "::endgroup::"
+
+          echo "::group::${architecture}: submit ${ami}"
+          id="$(
+            aws marketplace-catalog start-change-set \
+              --catalog AWSMarketplace \
+              --intent APPLY \
+              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
+              --change-set "$change_set" \
+              --query ChangeSetId --output text
+          )"
+          echo "Change set ${id}."
+          echo "::endgroup::"
+
           {
             echo "### AWS Marketplace"
             echo ""
-            echo "Offering \`${VERSION}\` to the listing, one version per architecture."
-            echo "Each is validated before it is submitted, and AWS reviews a submitted version"
-            echo "before it becomes available."
-            echo ""
+            echo "Submitted \`${VERSION} (${architecture})\` as change set \`${id}\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # One AMI per version, by AWS's rule that every delivery option of a
-          # version shares the same AmiSource. Two architectures are therefore
-          # two versions, and they have to go one after another: a running change
-          # set locks the entity and the second call would fail with
-          # ResourceInUseException.
-          for architecture in $(printf '%s' "$ARCHITECTURES" | jq -r '.[]'); do
-            manifest="manifests/packer-manifest-${architecture}/packer-manifest.json"
-            if [ ! -f "$manifest" ]; then
-              echo "::error::No build manifest for ${architecture}; refusing to guess an AMI id."
-              exit 1
-            fi
-
-            ami="$(jq -r '.builds[-1].artifact_id' "$manifest" | cut -d: -f2)"
-            if [ -z "$ami" ] || [ "$ami" = null ]; then
-              echo "::error::${manifest} carries no AMI id."
-              exit 1
-            fi
-
-            case "$architecture" in
-              arm64) instance_type=m7g.xlarge ;;
-              *)     instance_type=m7i.xlarge ;;
-            esac
-
-            # Mirrors deploy/aws/packer/synaplan.pkr.hcl's source_ami_filter and
-            # deploy/aws/scripts/harden.sh: Amazon Linux 2023, ec2-user, sshd
-            # listening but password and root login refused.
-            details="$(jq -n \
-              --arg title "${VERSION} (${architecture})" \
-              --arg notes "Synaplan ${VERSION}. Release notes: ${RELEASE_URL}" \
-              --arg ami "$ami" \
-              --arg role "$INGESTION_ROLE_ARN" \
-              --arg instance_type "$instance_type" \
-              '{
-                Version: { VersionTitle: $title, ReleaseNotes: $notes },
-                DeliveryOptions: [{
-                  Details: {
-                    AmiDeliveryOptionDetails: {
-                      AmiSource: {
-                        AmiId: $ami,
-                        AccessRoleArn: $role,
-                        UserName: "ec2-user",
-                        ScanningPort: 22,
-                        OperatingSystemName: "AMAZONLINUX",
-                        OperatingSystemVersion: "2023"
-                      },
-                      UsageInstructions: "Launch the instance, then open https://<public IP or your domain>. Sign in with the administrator address shown in the CloudFormation outputs; the single-use password is stored in SSM Parameter Store under /synaplan/<instance-id>/admin-password and must be replaced at first sign-in. Add an AI provider key under Admin, AI Providers. Full guide: https://github.com/metadist/synaplan/blob/main/deploy/aws/README.md",
-                      RecommendedInstanceType: $instance_type,
-                      SecurityGroups: [
-                        { IpProtocol: "tcp", FromPort: 443, ToPort: 443, IpRanges: ["0.0.0.0/0"] },
-                        { IpProtocol: "tcp", FromPort: 80, ToPort: 80, IpRanges: ["0.0.0.0/0"] }
-                      ]
-                    }
-                  }
-                }]
-              }')"
-
-            change_set="$(jq -n \
-              --arg product "$PRODUCT_ID" \
-              --argjson details "$details" \
-              '[{
-                ChangeType: "AddDeliveryOptions",
-                Entity: { Identifier: $product, Type: "AmiProduct@1.0" },
-                DetailsDocument: $details
-              }]')"
-
-            # Validated first, then submitted, both inside this run. VALIDATE
-            # asks AWS whether it would accept the document without creating
-            # anything, which is how a wrong product id or a role AWS cannot
-            # assume is caught before a real version exists. This used to be a
-            # separate dry run, requested through a repository variable that a
-            # maintainer had to flip after reading a job summary — a step
-            # between two releases that nobody remembers.
-            echo "::group::${architecture}: validate ${ami}"
-            aws marketplace-catalog start-change-set \
-              --catalog AWSMarketplace \
-              --intent VALIDATE \
-              --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
-              --change-set "$change_set" > /dev/null
-            echo "Accepted."
-            echo "::endgroup::"
-
-            echo "::group::${architecture}: submit ${ami}"
-            id="$(
-              aws marketplace-catalog start-change-set \
-                --catalog AWSMarketplace \
-                --intent APPLY \
-                --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}" \
-                --change-set "$change_set" \
-                --query ChangeSetId --output text
+          # Watched briefly, not waited out. AWS copies the image into every
+          # region of the listing and scans it for vulnerabilities, which its own
+          # documentation puts at "a few hours" — far past any sensible job. What
+          # this window is for is the other outcome: a document AWS rejects fails
+          # within minutes, and that has to turn this job red rather than sit
+          # unnoticed in the portal.
+          status=PREPARING
+          for _ in $(seq 1 20); do
+            sleep 60
+            status="$(
+              aws marketplace-catalog describe-change-set \
+                --catalog AWSMarketplace --change-set-id "$id" \
+                --query Status --output text
             )"
-            echo "Change set ${id}."
-            echo "::endgroup::"
-
-            # Waited out rather than fired and forgotten, for two reasons: the
-            # next architecture cannot start while this change set holds the
-            # entity, and a rejected document has to fail this job rather than
-            # sit unnoticed in the portal.
-            for _ in $(seq 1 60); do
-              status="$(
-                aws marketplace-catalog describe-change-set \
-                  --catalog AWSMarketplace --change-set-id "$id" \
-                  --query Status --output text
-              )"
-              case "$status" in
-                SUCCEEDED)
-                  echo "- \`${architecture}\`: \`${ami}\` submitted (change set \`${id}\`)" >> "$GITHUB_STEP_SUMMARY"
-                  break
-                  ;;
-                FAILED|CANCELLED)
-                  reason="$(
-                    aws marketplace-catalog describe-change-set \
-                      --catalog AWSMarketplace --change-set-id "$id" \
-                      --query 'ChangeSet[].ErrorDetailList' --output json
-                  )"
-                  echo "::error::Change set ${id} for ${architecture} ended as ${status}: ${reason}"
-                  exit 1
-                  ;;
-                *)
-                  sleep 30
-                  ;;
-              esac
-            done
-
-            if [ "$status" != SUCCEEDED ]; then
-              echo "::error::Change set ${id} for ${architecture} was still ${status} after thirty minutes."
-              exit 1
-            fi
+            case "$status" in
+              FAILED|CANCELLED)
+                reason="$(
+                  aws marketplace-catalog describe-change-set \
+                    --catalog AWSMarketplace --change-set-id "$id" \
+                    --query 'ChangeSet[].ErrorDetailList' --output json
+                )"
+                echo "::error::Change set ${id} for ${architecture} ended as ${status}: ${reason}"
+                exit 1
+                ;;
+              SUCCEEDED) break ;;
+            esac
           done
+
+          {
+            if [ "$status" = SUCCEEDED ]; then
+              echo "AWS has ingested it; the version is now in review."
+            else
+              echo "Still \`${status}\` after twenty minutes, which is normal — AWS scans and copies"
+              echo "the image for a few hours. \`marketplace-versions.yml\` reports the outcome."
+            fi
+            if [ -n "$remaining" ]; then
+              echo ""
+              echo "\`${remaining}\` cannot be submitted alongside it: AWS refuses a second version"
+              echo "while this one is in flight. \`marketplace-versions.yml\` picks it up hourly."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
