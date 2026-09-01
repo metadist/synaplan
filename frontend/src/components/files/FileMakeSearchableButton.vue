@@ -2,7 +2,7 @@
   <button
     v-if="vectorStateOf(file) !== 'vectorized'"
     type="button"
-    class="p-1.5 rounded-lg hover:bg-[var(--brand)]/10 text-[var(--brand)] transition-colors disabled:opacity-50"
+    class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
     :title="t('files.describeSortAction')"
     :aria-label="t('files.describeSortAction')"
     :disabled="busy"

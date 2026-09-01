@@ -2304,8 +2304,6 @@
     "describeSortDone": "Ya es consultable por IA.",
     "describeSortDoneGroup": "Ya es consultable por IA · archivado en \"{group}\".",
     "describeSortFailed": "No se pudo hacer consultable este archivo.",
-    "indexPromptAction": "Hacer consultable por IA",
-    "indexPromptDone": "Ya es consultable por IA.",
     "voiceMemo": "Nota de voz",
     "voiceMemoNamed": "Nota de voz · {time}",
     "emptyState": {

@@ -1132,8 +1132,6 @@
     "describeSortDone": "Désormais recherchable par l’IA.",
     "describeSortDoneGroup": "Désormais recherchable par l’IA · classé dans « {group} ».",
     "describeSortFailed": "Impossible de rendre ce fichier recherchable.",
-    "indexPromptAction": "Rendre recherchable par l’IA",
-    "indexPromptDone": "Désormais recherchable par l’IA.",
     "voiceMemo": "Mémo vocal",
     "voiceMemoNamed": "Mémo vocal · {time}",
     "emptyState": {

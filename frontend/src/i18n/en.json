@@ -1132,8 +1132,6 @@
     "describeSortDone": "Now searchable by AI.",
     "describeSortDoneGroup": "Now searchable by AI · filed in \"{group}\".",
     "describeSortFailed": "Couldn't make this file searchable.",
-    "indexPromptAction": "Make searchable by AI",
-    "indexPromptDone": "Now searchable by AI.",
     "voiceMemo": "Voice memo",
     "voiceMemoNamed": "Voice memo · {time}",
     "emptyState": {

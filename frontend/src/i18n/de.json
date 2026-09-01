@@ -3034,8 +3034,6 @@
     "describeSortDone": "Jetzt KI-durchsuchbar.",
     "describeSortDoneGroup": "Jetzt KI-durchsuchbar · abgelegt in \"{group}\".",
     "describeSortFailed": "Diese Datei konnte nicht durchsuchbar gemacht werden.",
-    "indexPromptAction": "Für den Assistenten durchsuchbar machen",
-    "indexPromptDone": "Jetzt KI-durchsuchbar.",
     "voiceMemo": "Sprachmemo",
     "voiceMemoNamed": "Sprachmemo · {time}",
     "emptyState": {

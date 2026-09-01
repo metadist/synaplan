@@ -838,11 +838,6 @@
                       </div>
                     </div>
                     <div class="flex items-center gap-0 shrink-0">
-                      <FileMakeSearchableButton
-                        :file="file"
-                        :busy="isDescribing(file.id)"
-                        @activate="describeAndSort(file)"
-                      />
                       <FolderMoveMenu
                         :open="folderMenuOpen === file.id"
                         :folders="displayedFolders"
@@ -850,6 +845,11 @@
                         @toggle="toggleFolderMenu(file.id)"
                         @move="moveFileToFolder(file.id, $event)"
                         @remove="removeFileFromFolder(file.id)"
+                      />
+                      <FileMakeSearchableButton
+                        :file="file"
+                        :busy="isDescribing(file.id)"
+                        @activate="describeAndSort(file)"
                       />
                       <button
                         class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
@@ -961,45 +961,43 @@
                         {{ file.uploaded_date }}
                       </td>
                       <td class="py-2.5 px-3">
-                        <div class="flex gap-0.5 justify-end items-center">
+                        <div
+                          class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        >
+                          <FolderMoveMenu
+                            :open="folderMenuOpen === file.id"
+                            :folders="displayedFolders"
+                            :can-remove="!!file.group_key"
+                            @toggle="toggleFolderMenu(file.id)"
+                            @move="moveFileToFolder(file.id, $event)"
+                            @remove="removeFileFromFolder(file.id)"
+                          />
                           <FileMakeSearchableButton
                             :file="file"
                             :busy="isDescribing(file.id)"
                             @activate="describeAndSort(file)"
                           />
-                          <div
-                            class="flex gap-0.5 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('files.download')"
+                            @click="downloadFile(file.id, file.filename)"
                           >
-                            <FolderMoveMenu
-                              :open="folderMenuOpen === file.id"
-                              :folders="displayedFolders"
-                              :can-remove="!!file.group_key"
-                              @toggle="toggleFolderMenu(file.id)"
-                              @move="moveFileToFolder(file.id, $event)"
-                              @remove="removeFileFromFolder(file.id)"
-                            />
-                            <button
-                              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                              :title="$t('files.download')"
-                              @click="downloadFile(file.id, file.filename)"
-                            >
-                              <ArrowDownTrayIcon class="w-4 h-4" />
-                            </button>
-                            <button
-                              class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                              :title="$t('common.view')"
-                              @click="viewFileContent(file.id)"
-                            >
-                              <Icon icon="heroicons:eye" class="w-4 h-4" />
-                            </button>
-                            <button
-                              class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                              :title="$t('files.delete')"
-                              @click="deleteFile(file.id)"
-                            >
-                              <TrashIcon class="w-4 h-4" />
-                            </button>
-                          </div>
+                            <ArrowDownTrayIcon class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                            :title="$t('common.view')"
+                            @click="viewFileContent(file.id)"
+                          >
+                            <Icon icon="heroicons:eye" class="w-4 h-4" />
+                          </button>
+                          <button
+                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                            :title="$t('files.delete')"
+                            @click="deleteFile(file.id)"
+                          >
+                            <TrashIcon class="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1183,11 +1181,6 @@
                     </div>
                   </div>
                   <div class="flex items-center gap-0 shrink-0">
-                    <FileMakeSearchableButton
-                      :file="file"
-                      :busy="isDescribing(file.id)"
-                      @activate="describeAndSort(file)"
-                    />
                     <FolderMoveMenu
                       :open="folderMenuOpen === file.id"
                       :folders="displayedFolders"
@@ -1196,6 +1189,11 @@
                       @toggle="toggleFolderMenu(file.id)"
                       @move="moveFileToFolder(file.id, $event)"
                       @remove="removeFileFromFolder(file.id)"
+                    />
+                    <FileMakeSearchableButton
+                      :file="file"
+                      :busy="isDescribing(file.id)"
+                      @activate="describeAndSort(file)"
                     />
                     <button
                       class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary transition-colors"
@@ -1302,49 +1300,47 @@
                       {{ file.uploaded_date }}
                     </td>
                     <td class="py-2.5 px-3">
-                      <div class="flex gap-0.5 justify-end items-center">
+                      <div
+                        class="flex gap-0.5 justify-end opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                      >
+                        <FolderMoveMenu
+                          :open="folderMenuOpen === file.id"
+                          :folders="displayedFolders"
+                          :current-folder="openFolder"
+                          :can-remove="!!file.group_key"
+                          @toggle="toggleFolderMenu(file.id)"
+                          @move="moveFileToFolder(file.id, $event)"
+                          @remove="removeFileFromFolder(file.id)"
+                        />
                         <FileMakeSearchableButton
                           :file="file"
                           :busy="isDescribing(file.id)"
                           @activate="describeAndSort(file)"
                         />
-                        <div
-                          class="flex gap-0.5 opacity-0 pointer-coarse:opacity-100 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                          :title="$t('files.download')"
+                          data-testid="btn-download"
+                          @click="downloadFile(file.id, file.filename)"
                         >
-                          <FolderMoveMenu
-                            :open="folderMenuOpen === file.id"
-                            :folders="displayedFolders"
-                            :current-folder="openFolder"
-                            :can-remove="!!file.group_key"
-                            @toggle="toggleFolderMenu(file.id)"
-                            @move="moveFileToFolder(file.id, $event)"
-                            @remove="removeFileFromFolder(file.id)"
-                          />
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('files.download')"
-                            data-testid="btn-download"
-                            @click="downloadFile(file.id, file.filename)"
-                          >
-                            <ArrowDownTrayIcon class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
-                            :title="$t('common.view')"
-                            data-testid="btn-view"
-                            @click="viewFileContent(file.id)"
-                          >
-                            <Icon icon="heroicons:eye" class="w-4 h-4" />
-                          </button>
-                          <button
-                            class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
-                            :title="$t('files.delete')"
-                            data-testid="btn-delete"
-                            @click="deleteFile(file.id)"
-                          >
-                            <TrashIcon class="w-4 h-4" />
-                          </button>
-                        </div>
+                          <ArrowDownTrayIcon class="w-4 h-4" />
+                        </button>
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:txt-primary transition-colors"
+                          :title="$t('common.view')"
+                          data-testid="btn-view"
+                          @click="viewFileContent(file.id)"
+                        >
+                          <Icon icon="heroicons:eye" class="w-4 h-4" />
+                        </button>
+                        <button
+                          class="p-1.5 rounded-lg hover:bg-red-500/10 text-red-400/70 hover:text-red-500 transition-colors"
+                          :title="$t('files.delete')"
+                          data-testid="btn-delete"
+                          @click="deleteFile(file.id)"
+                        >
+                          <TrashIcon class="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>

@@ -2305,8 +2305,6 @@
     "describeSortDone": "Artık yapay zekâ ile aranabilir.",
     "describeSortDoneGroup": "Artık yapay zekâ ile aranabilir · \"{group}\" içine eklendi.",
     "describeSortFailed": "Bu dosya aranabilir yapılamadı.",
-    "indexPromptAction": "Yapay zekâ ile aranabilir yap",
-    "indexPromptDone": "Artık yapay zekâ ile aranabilir.",
     "voiceMemo": "Sesli not",
     "voiceMemoNamed": "Sesli not · {time}",
     "emptyState": {
