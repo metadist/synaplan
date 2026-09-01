@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
@@ -35,6 +36,7 @@ class ChatController extends AbstractController
         private OgImageService $ogImageService,
         private MessageApiFormatter $messageApiFormatter,
         private InProgressTurnResolver $inProgressTurnResolver,
+        private ChatRunService $chatRunService,
         private LoggerInterface $logger,
     ) {
     }
@@ -92,6 +94,13 @@ class ChatController extends AbstractController
                         new OA\Property(property: 'offset', type: 'integer', example: 0),
                         new OA\Property(property: 'limit', type: 'integer', example: 20),
                         new OA\Property(property: 'hasMore', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'activeRunChatIds',
+                            description: 'Chats with a turn generating right now. A turn keeps running after the client that started it disconnects, so this marks where an answer is still being written after the user moved on. Not limited to the current page.',
+                            type: 'array',
+                            items: new OA\Items(type: 'integer'),
+                            example: [7]
+                        ),
                     ]
                 )
             ),
@@ -160,6 +169,12 @@ class ChatController extends AbstractController
             'offset' => $paginate ? $offset : 0,
             'limit' => $paginate ? $limit : count($result),
             'hasMore' => $paginate ? ($offset + count($result)) < $total : false,
+            // Turns keep generating after their client disconnects, so a user
+            // who left a chat mid-answer gets a visible "still working" marker
+            // instead of having to guess whether anything is happening.
+            'activeRunChatIds' => $this->chatRunService->activeChatIds(
+                ChatRunService::ownerKeyForUser((int) $user->getId()),
+            ),
         ]);
     }
 
@@ -547,6 +562,18 @@ class ChatController extends AbstractController
                                 ),
                             ]
                         ),
+                        new OA\Property(
+                            property: 'activeRun',
+                            description: 'Present only on the first page (offset 0) when a turn in this chat is still generating. The turn survives a client disconnect and mirrors its Server-Sent Events into a replayable log, so a client that reloaded can paint `partialText` immediately and then re-attach to the live stream via GET /api/v1/messages/stream/attach. Absent in incognito mode, which is never buffered server-side.',
+                            type: 'object',
+                            nullable: true,
+                            properties: [
+                                new OA\Property(property: 'runId', type: 'string', format: 'uuid', example: '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0'),
+                                new OA\Property(property: 'trackId', type: 'string', example: '1234567890'),
+                                new OA\Property(property: 'lastSeq', type: 'integer', description: 'Sequence number of the newest buffered event.', example: 42),
+                                new OA\Property(property: 'partialText', type: 'string', description: 'Assistant text produced so far, for an instant repaint before the re-attach delivers the rest.', example: 'The answer so far'),
+                            ]
+                        ),
                     ]
                 )
             ),
@@ -618,6 +645,18 @@ class ChatController extends AbstractController
             $inProgress = $this->inProgressTurnResolver->resolve($messages[array_key_last($messages)]);
             if (null !== $inProgress) {
                 $payload['inProgressTurn'] = $inProgress;
+            }
+
+            // A turn that is still generating right now: hand the client the
+            // text produced so far plus the run id, so returning to the chat
+            // re-attaches to the live stream instead of waiting for the
+            // finished answer to land in BMESSAGES.
+            $activeRun = $this->chatRunService->describeActiveForChat(
+                (int) $chat->getId(),
+                ChatRunService::ownerKeyForUser((int) $user->getId()),
+            );
+            if (null !== $activeRun) {
+                $payload['activeRun'] = $activeRun;
             }
         }
 

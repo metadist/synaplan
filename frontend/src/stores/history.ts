@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { AgainData } from '@/types/ai-models'
-import type { ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
+import type { ApiActiveRun, ApiInProgressTurn, ApiLoadedMessageRow } from '@/utils/messageMapper'
 import {
   IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
@@ -390,6 +390,16 @@ export const useHistoryStore = defineStore('history', () => {
   const currentOffset = ref(0)
   const inProgressPollIntervalMs = 2000
 
+  /**
+   * A turn of the loaded chat that is STILL generating on the server.
+   *
+   * The backend keeps a turn alive across a client disconnect and buffers its
+   * events, so a reload or a trip to another view can pick it back up. The
+   * store only reports it; ChatView owns the re-attach because rendering the
+   * events needs its stream handler.
+   */
+  const activeRun = ref<ApiActiveRun | null>(null)
+
   // Monotonic generation counter: incremented each time loadMessages is called
   // for a fresh chat (offset === 0). Responses from older generations are
   // discarded so a slow response for a previous chat never overwrites the
@@ -564,6 +574,7 @@ export const useHistoryStore = defineStore('history', () => {
     messages.value = []
     currentOffset.value = 0
     hasMoreMessages.value = false
+    activeRun.value = null
   }
 
   const loadMessages = async (chatId: number, offset = 0, limit = 50, silent = false) => {
@@ -596,12 +607,18 @@ export const useHistoryStore = defineStore('history', () => {
         messages?: ApiLoadedMessageRow[]
         pagination?: { hasMore?: boolean }
         inProgressTurn?: ApiInProgressTurn | null
+        activeRun?: ApiActiveRun | null
       }
 
       if (myGeneration !== loadGeneration) return
 
       if (response.success && response.messages) {
         const loadedMessages: Message[] = response.messages.map(mapApiMessageRow)
+
+        // Only the first page carries it, and only while the turn runs.
+        if (offset === 0) {
+          activeRun.value = response.activeRun ?? null
+        }
 
         // Issue #1142: append a provisional assistant bubble for a still-running
         // multi-task turn (only sent on the first page) so returning mid-stream
@@ -755,6 +772,7 @@ export const useHistoryStore = defineStore('history', () => {
     messages,
     isLoadingMessages,
     hasMoreMessages,
+    activeRun,
     addMessage,
     addStreamingMessage,
     updateStreamingMessage,

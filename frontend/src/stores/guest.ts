@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getApiBaseUrl, redirectToSetupWizard } from '@/services/api/httpClient'
-import type { ApiLoadedMessageRow } from '@/utils/messageMapper'
+import type { ApiActiveRun, ApiLoadedMessageRow } from '@/utils/messageMapper'
 
 export const GUEST_STORAGE_KEY = 'synaplan_guest_session'
 export const GUEST_BANNER_DISMISSED_KEY = 'synaplan_guest_banner_dismissed'
@@ -29,6 +29,8 @@ export const useGuestStore = defineStore('guest', () => {
   // Persisted so a dismissed banner stays gone across app restarts / reloads
   // for the same browser profile (cleared only on logout / session reset).
   const bannerDismissed = ref(loadBannerDismissed())
+  /** A turn of this session that is still generating on the server. */
+  const activeRun = ref<ApiActiveRun | null>(null)
 
   const remainingMessages = computed(() => Math.max(0, maxMessages.value - messageCount.value))
   const isGuestMode = computed(() => !!sessionId.value)
@@ -184,6 +186,10 @@ export const useGuestStore = defineStore('guest', () => {
       if (!response.ok) return []
 
       const data = await response.json()
+      // A turn still generating for this session: reloading the page detached
+      // the client, but the backend kept the turn alive and buffered its
+      // events, so the chat view can re-attach and keep rendering it.
+      activeRun.value = (data.activeRun as ApiActiveRun | undefined) ?? null
       return data.messages ?? []
     } catch {
       return []
@@ -245,6 +251,7 @@ export const useGuestStore = defineStore('guest', () => {
     rateLimited,
     sessionExpired,
     bannerDismissed,
+    activeRun,
     remainingMessages,
     isGuestMode,
     shouldShowBanner,

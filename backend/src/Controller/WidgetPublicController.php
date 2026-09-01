@@ -11,6 +11,9 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\Run\ChatRun;
+use App\Service\Chat\Run\ChatRunRecorder;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\DiscordNotificationService;
 use App\Service\File\FileProcessor;
@@ -68,9 +71,18 @@ class WidgetPublicController extends AbstractController
         private GeneratedFileRegistrar $generatedFileRegistrar,
         private BrandingService $brandingService,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private ChatRunService $chatRunService,
         private string $uploadDir,
     ) {
     }
+
+    /**
+     * Recorder for the turn currently being streamed by THIS request. Mirrors
+     * every SSE event into a replayable log so a visitor who reloads the host
+     * page mid-answer can re-attach instead of losing the turn. Set at the top
+     * of the stream callback, cleared in its `finally`.
+     */
+    private ?ChatRunRecorder $activeRun = null;
 
     /**
      * Resolve the URL operators land on when they click the "Take over"
@@ -780,6 +792,21 @@ class WidgetPublicController extends AbstractController
                 $chunkCount = 0;
                 $finishReason = null;
 
+                // Detach-on-navigation, matching the app chat (#1142/#1223/#1225):
+                // a visitor reloading the host page or clicking away must not
+                // kill the answer they asked for. The turn finishes in the
+                // background, is persisted, and can be re-attached to.
+                ignore_user_abort(true);
+
+                $this->activeRun = $this->chatRunService->begin(
+                    ChatRunService::ownerKeyForWidget($session->getSessionId()),
+                    $chat->getId(),
+                    (string) $incomingMessage->getId(),
+                );
+                if (null !== $this->activeRun) {
+                    $this->sendSse('run_started', ['runId' => $this->activeRun->getRunId()]);
+                }
+
                 try {
                     $result = $this->messageProcessor->processStream(
                         $incomingMessage,
@@ -792,10 +819,6 @@ class WidgetPublicController extends AbstractController
                             &$chunkCount,
                             &$finishReason
                         ) {
-                            if (connection_aborted()) {
-                                throw new \RuntimeException('Client disconnected');
-                            }
-
                             $sendChunk = function (string $content) use (&$responseText) {
                                 if ('' === $content) {
                                     return;
@@ -1057,6 +1080,7 @@ class WidgetPublicController extends AbstractController
                     }
 
                     $this->sendSse('complete', $completePayload);
+                    $this->activeRun?->finish(ChatRun::STATUS_COMPLETE, $incomingMessage->getId());
                 } catch (\Throwable $e) {
                     $this->logger->error('Widget message streaming failed', [
                         'error' => $e->getMessage(),
@@ -1088,6 +1112,12 @@ class WidgetPublicController extends AbstractController
                     $this->sendSse('error', [
                         'error' => 'Failed to process message',
                     ]);
+                } finally {
+                    // Safety net so a run can never stay `running` after the
+                    // worker is gone — a re-attaching visitor would otherwise
+                    // wait on a heartbeat that never ticks again.
+                    $this->activeRun?->finishFromRecordedOutcome();
+                    $this->activeRun = null;
                 }
             });
 
@@ -1431,6 +1461,39 @@ class WidgetPublicController extends AbstractController
         summary: 'Get widget chat history for a session',
         tags: ['Widget (Public)']
     )]
+    #[OA\Parameter(
+        name: 'sessionId',
+        in: 'query',
+        required: true,
+        description: 'Server-issued widget session id.',
+        schema: new OA\Schema(type: 'string')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Session history, plus a still-running turn when there is one',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean'),
+                new OA\Property(property: 'chatId', type: 'integer', nullable: true),
+                new OA\Property(property: 'messages', type: 'array', items: new OA\Items(type: 'object')),
+                new OA\Property(property: 'session', type: 'object'),
+                new OA\Property(
+                    property: 'activeRun',
+                    description: 'Present when a turn in this session is still generating. The turn survives a client disconnect and buffers its Server-Sent Events, so a reloaded widget can paint `partialText` and re-attach via GET /api/v1/messages/stream/attach.',
+                    type: 'object',
+                    nullable: true,
+                    properties: [
+                        new OA\Property(property: 'runId', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'trackId', type: 'string'),
+                        new OA\Property(property: 'lastSeq', type: 'integer'),
+                        new OA\Property(property: 'partialText', type: 'string'),
+                    ]
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'sessionId missing')]
+    #[OA\Response(response: 404, description: 'Widget not found')]
     public function history(string $widgetId, Request $request): JsonResponse
     {
         $sessionId = $request->query->getString('sessionId');
@@ -1550,7 +1613,7 @@ class WidgetPublicController extends AbstractController
             ];
         }, $messages);
 
-        return $this->json([
+        $payload = [
             'success' => true,
             'chatId' => $chat->getId(),
             'messages' => $history,
@@ -1561,7 +1624,20 @@ class WidgetPublicController extends AbstractController
                 'lastMessage' => $session->getLastMessage() ?: null,
                 'mode' => $session->getMode(),
             ],
-        ]);
+        ];
+
+        // A turn still generating for this session: the visitor reloaded the
+        // host page mid-answer, so hand them the text so far plus the run id to
+        // re-attach to (GET /api/v1/messages/stream/attach).
+        $activeRun = $this->chatRunService->describeActiveForChat(
+            (int) $chat->getId(),
+            ChatRunService::ownerKeyForWidget($session->getSessionId()),
+        );
+        if (null !== $activeRun) {
+            $payload['activeRun'] = $activeRun;
+        }
+
+        return $this->json($payload);
     }
 
     /**
@@ -1826,11 +1902,15 @@ class WidgetPublicController extends AbstractController
 
     private function sendSse(string $status, array $data = []): void
     {
+        $event = array_merge(['status' => $status], $this->sanitizeUtf8($data));
+
+        // Record BEFORE the abort guard — everything produced after the visitor
+        // disconnects is exactly what a re-attaching client needs to replay.
+        $this->activeRun?->record($event);
+
         if (connection_aborted()) {
             return;
         }
-
-        $event = array_merge(['status' => $status], $this->sanitizeUtf8($data));
 
         echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
 
