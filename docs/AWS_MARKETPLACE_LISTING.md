@@ -177,26 +177,47 @@ while either of them is missing:
 | `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | the `IngestionRoleArn` output of the roles stack |
 
 Nothing else has to be switched on, and nothing has to be switched over later.
-Every architecture is sent twice: first with `Intent=VALIDATE`, which asks AWS
-whether it would accept the document without creating anything, and then — only
-if that passed — with `Intent=APPLY`. That covers what a separate dry run used
-to cover, a wrong product ID or a role AWS cannot assume, without leaving a
-manual step between two releases for someone to forget.
+Each version is sent twice: first with `Intent=VALIDATE`, which asks AWS whether
+it would accept the document without creating anything, and then — only if that
+passed — with `Intent=APPLY`. That covers what a separate dry run used to cover,
+a wrong product ID or a role AWS cannot assume, without leaving a manual step
+between two releases for someone to forget.
 
-A submitted version still sits in AWS review for days, so it is not published by
-this job. If a submission turns out to be wrong, cancel its change set —
+### Why one release takes two runs
+
+Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
+`<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
+version must share the same `AmiSource`, so one version can carry only one AMI.
+
+Those two versions cannot be submitted together. AWS answers a second
+`AddDeliveryOptions` on the same product with an error while the first is in
+flight, and ingesting an AMI is slow — AWS copies the image into every region of
+the listing and scans it for vulnerabilities, which its own documentation puts at
+*a few hours*. So the release build submits one architecture and ends;
+[`marketplace-versions.yml`](../.github/workflows/marketplace-versions.yml) runs
+hourly and submits the next one once the entity is free. When waiting out the
+hour is not worth it, start it by hand: **Actions** → **Marketplace Versions** →
+**Run workflow**, from `main` — it refuses any other branch, because it would
+read that branch's pin and offer a version nobody released.
+
+That workflow keeps no state. It reads the release from the version the
+deployment catalog pins on `main`, finds each AMI by the `SynaplanVersion` and
+`Architecture` tags Packer writes, and asks the listing which versions it already
+offers. A missed run therefore costs an hour, never a version. It is also what
+reports the outcome: a change set AWS rejects turns that run red and, if
+`DISCORD_RELEASE_WEBHOOK` is set, says so in the channel. Both workflows build
+the change set with
+[`scripts/marketplace-change-set.mjs`](../scripts/marketplace-change-set.mjs), so
+the two halves of one release cannot end up described differently.
+
+A submitted version still sits in AWS review for days, and neither job publishes
+it. If a submission turns out to be wrong, cancel its change set —
 `CancelChangeSet` is part of the build role's permissions:
 
 ```bash
 aws marketplace-catalog cancel-change-set \
   --catalog AWSMarketplace --change-set-id <id>
 ```
-
-Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
-`<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
-version must share the same `AmiSource`, so one version can carry only one AMI.
-They are submitted one after the other because a running change set locks the
-entity.
 
 ### Finding the product ID
 
