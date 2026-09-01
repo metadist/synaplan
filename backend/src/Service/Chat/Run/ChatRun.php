@@ -147,7 +147,11 @@ final class ChatRun
         return $this->created;
     }
 
-    /** Heartbeat: the attach endpoint treats a stale run as a dead worker. */
+    /**
+     * Heartbeat: the attach endpoint treats a stale run as a dead worker. Only
+     * advanced when an event is recorded, so it lags behind a turn's silent
+     * phases — see {@see ChatRunService::STALE_AFTER_SECONDS}.
+     */
     public function getUpdated(): int
     {
         return $this->updated;

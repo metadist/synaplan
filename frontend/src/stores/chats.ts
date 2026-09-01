@@ -166,6 +166,28 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   /**
+   * Flag a chat as generating (or no longer generating) without waiting for the
+   * next chat-list fetch.
+   *
+   * `loadChats()` is the server's word on this, but it only runs on entry, so on
+   * its own the marker would be a snapshot from app start: it would never light
+   * up when the user walks away from a running turn, and never go out when that
+   * turn finishes. The chat view drives it live from the stream's own
+   * `run_started` and terminal events instead.
+   */
+  function markChatGenerating(chatId: number, generating: boolean) {
+    // Replaced rather than mutated: a Set is not deeply reactive, so template
+    // reads of activeRunChatIds would not re-render on add/delete alone.
+    const next = new Set(activeRunChatIds.value)
+    if (generating) {
+      next.add(chatId)
+    } else {
+      next.delete(chatId)
+    }
+    activeRunChatIds.value = next
+  }
+
+  /**
    * Load one page of the paginated chat history for the mobile drawer.
    *
    * @param reset When true, start over at offset 0 and replace the list
@@ -519,6 +541,7 @@ export const useChatsStore = defineStore('chats', () => {
     historyLoading,
     historyHasMore,
     activeRunChatIds,
+    markChatGenerating,
     loadChats,
     loadChatHistory,
     createChat,

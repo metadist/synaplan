@@ -198,14 +198,16 @@ final class ChatRunBufferTest extends KernelTestCase
         self::assertFalse($this->service->isStale($stale));
     }
 
-    public function testDiscardLeavesNothingBehind(): void
+    public function testForgetLeavesNothingBehind(): void
     {
-        $recorder = $this->service->begin($this->ownerKey, $this->chatId, 'track-discard');
+        $recorder = $this->service->begin($this->ownerKey, $this->chatId, 'track-forget');
         self::assertNotNull($recorder);
         $this->trackRun($recorder->getRunId());
         $recorder->record(['status' => 'data', 'chunk' => 'nevermind']);
 
-        $recorder->discard();
+        $run = $this->buffer->find($recorder->getRunId());
+        self::assertNotNull($run);
+        $this->buffer->forget($run);
 
         self::assertNull($this->buffer->find($recorder->getRunId()));
         self::assertSame([], $this->buffer->readEvents($recorder->getRunId()));

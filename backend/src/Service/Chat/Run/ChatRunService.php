@@ -24,8 +24,16 @@ final readonly class ChatRunService
      * generating worker died (deploy, crash, OOM) without ever reaching a
      * terminal state, so a client waiting on it must be released instead of
      * hanging until the TTL expires.
+     *
+     * The heartbeat is NOT a timer — {@see ChatRunRecorder} only touches the run
+     * when it records an event. A live turn can therefore be silent for a long
+     * while (media generation, a slow tool call, a large context's
+     * time-to-first-token), and a tight window would declare exactly those runs
+     * dead: resume would be withheld and an attached client dropped mid-answer.
+     * The window is sized for the silence a healthy turn can produce, since the
+     * cost of being late here is only a delayed fallback to the history poll.
      */
-    public const STALE_AFTER_SECONDS = 30;
+    public const STALE_AFTER_SECONDS = 300;
 
     public function __construct(
         private ChatRunBuffer $buffer,

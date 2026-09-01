@@ -135,17 +135,6 @@ final class ChatRunRecorder
         $this->finish($this->recordedOutcome ?? ChatRun::STATUS_ERROR);
     }
 
-    /**
-     * Remove the run and its log entirely — used when a turn must leave no
-     * server-side trace after the fact (e.g. the answer was not persisted).
-     */
-    public function discard(): void
-    {
-        $this->finished = true;
-        $this->pendingText = '';
-        $this->buffer->forget($this->run);
-    }
-
     private function flushPendingText(): void
     {
         if ('' === $this->pendingText) {

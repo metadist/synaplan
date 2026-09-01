@@ -2000,7 +2000,14 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
   })
   await scrollToBottom()
 
-  const appendTo = messages.value[messages.value.length - 1]
+  // Looked up by id rather than taken as the last entry: anything appended
+  // while the replay runs would otherwise receive the answer's text.
+  const findBubble = () => messages.value.find((m) => m.id === assistantMessageId)
+  const dropBubble = () => {
+    const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
+    if (idx !== -1) messages.value.splice(idx, 1)
+  }
+
   let replayed = ''
 
   try {
@@ -2012,16 +2019,25 @@ const resumeActiveRun = async (runId: string, partialText: string) => {
         if (!chunk) return
         isTyping.value = false
         replayed += chunk
-        appendTo.content = replayed
+        const bubble = findBubble()
+        if (!bubble) return
+        bubble.content = replayed
         await scrollToBottom()
       },
     })
+
+    // Nothing was replayed and there was nothing to paint either — the turn
+    // most likely finished between the history read and the attach. Mirror the
+    // send path and let the persisted answer take over the empty bubble.
+    if (replayed === '' && partialText === '') {
+      dropBubble()
+      await loadConversationHistory(true)
+    }
   } catch (error) {
     console.error('Failed to re-attach to the running answer:', error)
     // The turn may have finished while we were re-attaching — the persisted
     // history is authoritative, so drop the provisional bubble and reload.
-    const idx = messages.value.findIndex((m) => m.id === assistantMessageId)
-    if (idx !== -1) messages.value.splice(idx, 1)
+    dropBubble()
     await loadConversationHistory(true)
   } finally {
     isTyping.value = false

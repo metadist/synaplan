@@ -412,5 +412,37 @@ describe('Chats Store', () => {
 
       expect(store.activeRunChatIds.size).toBe(0)
     })
+
+    /**
+     * The server's answer only arrives with a chat-list fetch, which happens on
+     * entry. Without the live updates below the marker would be a snapshot from
+     * app start: never lighting up when the user walks away from a running turn,
+     * never going out when it finishes.
+     */
+    it('marks and unmarks a chat live, replacing the Set so templates re-render', async () => {
+      const store = useChatsStore()
+      const initial = store.activeRunChatIds
+
+      store.markChatGenerating(7, true)
+
+      expect(store.activeRunChatIds.has(7)).toBe(true)
+      expect(store.activeRunChatIds).not.toBe(initial)
+
+      const marked = store.activeRunChatIds
+      store.markChatGenerating(7, false)
+
+      expect(store.activeRunChatIds.has(7)).toBe(false)
+      expect(store.activeRunChatIds).not.toBe(marked)
+    })
+
+    it('keeps the other chats when one turn ends', async () => {
+      const store = useChatsStore()
+      store.markChatGenerating(1, true)
+      store.markChatGenerating(2, true)
+
+      store.markChatGenerating(1, false)
+
+      expect([...store.activeRunChatIds]).toEqual([2])
+    })
   })
 })

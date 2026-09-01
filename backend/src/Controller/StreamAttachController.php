@@ -45,6 +45,19 @@ final class StreamAttachController extends AbstractController
     /** Upper bound for one attach connection, matching the run's own retention. */
     private const MAX_ATTACH_SECONDS = 1800;
 
+    /**
+     * Idle time after which the stream emits an SSE comment.
+     *
+     * Two reasons, both load-bearing:
+     *  - PHP only notices a gone client when a write fails, so a stream that
+     *    sends nothing while it waits would never see `connection_aborted()` and
+     *    would keep a worker busy polling Redis for the full MAX_ATTACH_SECONDS
+     *    after the browser was closed.
+     *  - Proxies drop a connection that has been silent for too long, which a
+     *    turn between two slow phases can easily be.
+     */
+    private const IDLE_KEEPALIVE_SECONDS = 15;
+
     public function __construct(
         private readonly ChatRunService $chatRunService,
         private readonly WidgetService $widgetService,
@@ -158,6 +171,7 @@ final class StreamAttachController extends AbstractController
         $runId = $run->getRunId();
         $cursor = $fromSeq;
         $deadline = time() + self::MAX_ATTACH_SECONDS;
+        $lastWriteAt = time();
 
         while (true) {
             $events = $this->chatRunService->readEvents($runId, $cursor);
@@ -165,6 +179,7 @@ final class StreamAttachController extends AbstractController
             foreach ($events as $event) {
                 $cursor = $event['seq'];
                 $this->emit($cursor, $event['payload']);
+                $lastWriteAt = time();
 
                 if (connection_aborted()) {
                     return;
@@ -221,6 +236,18 @@ final class StreamAttachController extends AbstractController
                 return;
             }
 
+            // The run is alive but quiet. Poke the socket so a client that left
+            // in the meantime is actually detected on the next check instead of
+            // holding this worker until the deadline.
+            if ((time() - $lastWriteAt) >= self::IDLE_KEEPALIVE_SECONDS) {
+                $this->emitKeepalive();
+                $lastWriteAt = time();
+
+                if (connection_aborted()) {
+                    return;
+                }
+            }
+
             usleep(self::POLL_INTERVAL_MICROSECONDS);
         }
     }
@@ -230,6 +257,23 @@ final class StreamAttachController extends AbstractController
         echo 'id: '.$seq."\n";
         echo 'data: '.$payload."\n\n";
 
+        $this->flushOutput();
+    }
+
+    /**
+     * SSE comment frame. Carries no `data:` line, so both client parsers skip it
+     * (chatApi's `readSseBody` filters on `data:`, the widget's
+     * `consumeWidgetStream` bails when a frame has no data lines).
+     */
+    private function emitKeepalive(): void
+    {
+        echo ": keepalive\n\n";
+
+        $this->flushOutput();
+    }
+
+    private function flushOutput(): void
+    {
         if (ob_get_level() > 0) {
             ob_flush();
         }
