@@ -76,6 +76,13 @@ export const useChatsStore = defineStore('chats', () => {
   const historyHasMore = ref(true)
   const historyOffset = ref(0)
 
+  /**
+   * Chats whose answer is still being written on the server. A turn survives
+   * the client disconnect it was started from, so this marks the chats a user
+   * can return to and keep watching.
+   */
+  const activeRunChatIds = ref<Set<number>>(new Set())
+
   const normalizeChat = (chat: unknown): Chat => {
     const c = chat as Chat
     return {
@@ -144,8 +151,11 @@ export const useChatsStore = defineStore('chats', () => {
     error.value = null
 
     try {
-      const data = await httpClient<{ chats: unknown[] }>('/api/v1/chats')
+      const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
+        '/api/v1/chats'
+      )
       chats.value = (data.chats || []).map((chat) => normalizeChat(chat))
+      activeRunChatIds.value = new Set(data.activeRunChatIds ?? [])
       ensureValidActiveChat()
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to load chats'
@@ -489,6 +499,7 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
     historyHasMore.value = true
@@ -507,6 +518,7 @@ export const useChatsStore = defineStore('chats', () => {
     historyChats,
     historyLoading,
     historyHasMore,
+    activeRunChatIds,
     loadChats,
     loadChatHistory,
     createChat,

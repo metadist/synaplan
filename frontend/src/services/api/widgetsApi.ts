@@ -243,14 +243,7 @@ export async function sendWidgetMessage(
   sessionId: string,
   options: SendWidgetMessageOptions = {}
 ): Promise<SendWidgetMessageResult> {
-  const {
-    chatId,
-    fileIds,
-    externalUserId,
-    apiUrl: apiUrlOverride,
-    headers: extraHeaders,
-    onStatus,
-  } = options
+  const { chatId, fileIds, externalUserId, apiUrl: apiUrlOverride, headers: extraHeaders } = options
 
   const config = useConfigStore()
   const apiUrl = apiUrlOverride ?? config.apiBaseUrl
@@ -301,6 +294,22 @@ export async function sendWidgetMessage(
     const error = await response.json().catch(() => ({ error: 'Unknown error' }))
     throw new Error(error.error || `HTTP ${response.status}`)
   }
+
+  return consumeWidgetStream(response, options, chatId)
+}
+
+/**
+ * Read a widget SSE response to the end.
+ *
+ * Shared by the send path and the re-attach path so a turn picked back up
+ * after a reload renders through exactly the same event handling as a live one.
+ */
+async function consumeWidgetStream(
+  response: Response,
+  options: SendWidgetMessageOptions,
+  chatId?: number
+): Promise<SendWidgetMessageResult> {
+  const { onStatus } = options
 
   const decoder = new TextDecoder()
   let buffer = ''
@@ -439,6 +448,51 @@ export async function sendWidgetMessage(
     remainingUploads,
     text: aggregatedText,
   }
+}
+
+/**
+ * Re-attach to a widget turn that is still generating on the server.
+ *
+ * A visitor who reloads the host page mid-answer would otherwise lose it: the
+ * backend keeps the turn alive across the disconnect and buffers its events, so
+ * this replays what was missed and then follows the live tail. `runId` comes
+ * from `activeRun` in the session history response.
+ */
+export async function attachWidgetStream(
+  widgetId: string,
+  sessionId: string,
+  runId: string,
+  options: SendWidgetMessageOptions = {}
+): Promise<SendWidgetMessageResult> {
+  const config = useConfigStore()
+  const apiUrl = options.apiUrl ?? config.apiBaseUrl
+
+  const headers: Record<string, string> = {
+    Accept: 'text/event-stream',
+    'X-Widget-Id': widgetId,
+    'X-Widget-Session': sessionId,
+    ...(options.headers ?? {}),
+  }
+
+  const isDashboardMode =
+    options.headers?.['X-Widget-Test-Mode'] === 'true' ||
+    options.headers?.['X-Widget-Internal-Mode'] === 'true'
+
+  const params = new URLSearchParams({ runId, from: '0' })
+  const response = await fetch(`${apiUrl}/api/v1/messages/stream/attach?${params.toString()}`, {
+    method: 'GET',
+    headers,
+    credentials: isDashboardMode ? 'include' : 'omit',
+  })
+
+  if (!response.ok) {
+    if (response.status === 404 || response.status === 503) {
+      throw new WidgetUnavailableError(response.status)
+    }
+    throw new Error(`Re-attach failed with status ${response.status}`)
+  }
+
+  return consumeWidgetStream(response, options, options.chatId)
 }
 
 /**

@@ -265,6 +265,7 @@
     "config": "Configuración de IA",
     "statistics": "Estadísticas",
     "newChat": "Nuevo Chat",
+    "stillGenerating": "Sigue respondiendo",
     "quote": {
       "button": "Mencionar en el chat",
       "remove": "Quitar cita"

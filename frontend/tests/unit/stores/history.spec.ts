@@ -794,4 +794,79 @@ describe('History Store', () => {
       }
     })
   })
+
+  /**
+   * A turn keeps generating after the tab that started it navigates away, so
+   * the history response points a returning client at the still-running run.
+   * The store only has to report it faithfully — ChatView owns the re-attach.
+   */
+  describe('loadMessages — active run discovery', () => {
+    const activeRun = {
+      runId: 'run-42',
+      trackId: '1700000000',
+      lastSeq: 7,
+      partialText: 'Half an answer',
+    }
+
+    const loadWith = async (response: Record<string, unknown>, offset = 0) => {
+      vi.resetModules()
+      const getChatMessages = vi.fn().mockResolvedValue({
+        success: true,
+        messages: [],
+        pagination: { hasMore: false },
+        ...response,
+      })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+      await store.loadMessages(42, offset)
+
+      return store
+    }
+
+    it('exposes the still-running turn reported by the first page', async () => {
+      const store = await loadWith({ activeRun })
+
+      expect(store.activeRun).toEqual(activeRun)
+    })
+
+    it('reports no run when the turn already finished', async () => {
+      const store = await loadWith({ activeRun: null })
+
+      expect(store.activeRun).toBeNull()
+    })
+
+    it('keeps a known run when older pages are loaded on scroll-back', async () => {
+      // Only the first page carries `activeRun`; paging through history must
+      // not clear the run the client is currently attached to.
+      vi.resetModules()
+      const getChatMessages = vi
+        .fn()
+        .mockResolvedValueOnce({
+          success: true,
+          messages: [],
+          pagination: { hasMore: true },
+          activeRun,
+        })
+        .mockResolvedValueOnce({ success: true, messages: [], pagination: { hasMore: false } })
+      vi.doMock('@/services/api', () => ({ chatApi: { getChatMessages } }))
+
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+      await store.loadMessages(42, 50)
+
+      expect(store.activeRun).toEqual(activeRun)
+    })
+
+    it('forgets the run when the chat is cleared', async () => {
+      const store = await loadWith({ activeRun })
+
+      store.clear()
+
+      expect(store.activeRun).toBeNull()
+    })
+  })
 })

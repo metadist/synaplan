@@ -112,6 +112,12 @@ export interface StreamPerfPayload {
 export interface StreamUpdatePayload {
   status?: string
   chunk?: string
+  /**
+   * Id of the resumable run backing this turn, sent once as `run_started`.
+   * Lets the client re-attach to the still-generating turn after a reload or
+   * a trip to another view (`chatApi.attachStream`).
+   */
+  runId?: string
   error?: string
   message?: string
   messageId?: number

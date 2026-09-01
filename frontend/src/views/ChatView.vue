@@ -504,6 +504,7 @@ import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
 import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
+import type { StreamUpdatePayload } from '@/types/chatStream'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -770,6 +771,10 @@ let streamingAbortController: AbortController | null = null
 let stopStreamingFn: (() => void) | null = null // Store EventSource close function
 let currentTrackId: number | undefined = undefined // Store current trackId for stop request
 let currentStreamingChatId: number | undefined = undefined // Store chatId where stream was started
+// Run this view is already re-attached to, so a repeated history load (the 2s
+// in-progress poll, a chat switch back and forth) cannot open a second
+// connection and render the same answer twice.
+let attachedRunId: string | null = null
 let currentAudioStreamer: AudioStreamer | null = null
 const isAudioStreaming = ref(false)
 
@@ -895,6 +900,10 @@ onMounted(async () => {
         await nextTick()
         scrollToBottom()
       }
+
+      // A turn that was still generating when the guest reloaded keeps writing
+      // into a fresh bubble instead of being lost.
+      void resumeActiveRunIfAny()
     }
 
     const restricted = route.query.restricted as string | undefined
@@ -952,6 +961,9 @@ onMounted(async () => {
   } else {
     // Load messages for active chat
     await historyStore.loadMessages(chatsStore.activeChatId)
+    // A turn that was still generating when the page was reloaded keeps
+    // writing into this bubble instead of being lost.
+    void resumeActiveRunIfAny()
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -1081,6 +1093,28 @@ function handleNavigateAway() {
   finishStreamingTurnLocally()
 }
 
+/**
+ * Pick a still-generating turn back up after a reload, a chat switch, or a trip
+ * to another view.
+ *
+ * The backend keeps a turn alive across the disconnect and buffers its events,
+ * and the chat history response reports it as `activeRun`. Re-attaching replays
+ * what was missed and then follows the live tail, so the answer keeps writing
+ * itself instead of leaving the user on a bare prompt until it is persisted.
+ */
+async function resumeActiveRunIfAny() {
+  const run = isGuestMode.value ? guestStore.activeRun : historyStore.activeRun
+  if (!run) return
+
+  // Already rendering this turn — either the tab that started it never left, or
+  // a silent in-progress poll re-reported the same run. Attaching again would
+  // produce a second bubble for one answer.
+  if (attachedRunId === run.runId || isStreaming.value) return
+
+  attachedRunId = run.runId
+  await streamAIResponse('', { attach: { runId: run.runId, partialText: run.partialText } })
+}
+
 // Cleanup: detach the running stream when the component unmounts (user leaves chat)
 onBeforeUnmount(() => {
   isViewUnmounted = true
@@ -1189,6 +1223,12 @@ watch(
       // loadMessages() replaces messages when offset=0, making clear() redundant.
       // Calling clear() first causes empty chat if loadMessages() fails silently.
       await historyStore.loadMessages(newChatId)
+
+      // Coming back to a chat whose turn is still generating: keep watching it
+      // live. A different chat means a different run, so the previous
+      // attachment no longer applies.
+      attachedRunId = null
+      void resumeActiveRunIfAny()
 
       // Usage taximeter: a chat switch resets the session (not the day totals)
       // and rebuilds it from the newly loaded history.
@@ -2176,9 +2216,17 @@ const streamAIResponse = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    /**
+     * Re-attach to a turn already generating on the server instead of starting
+     * a new one. `userMessage` is then irrelevant — nothing is sent, the client
+     * only subscribes to the turn's buffered events.
+     */
+    attach?: { runId: string; partialText: string }
   }
 ) => {
   streamingAbortController = new AbortController()
+
+  const attach = options?.attach
 
   const currentModel =
     aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
@@ -2188,6 +2236,14 @@ const streamAIResponse = async (
 
   // Create empty streaming message with provider info
   const messageId = historyStore.addStreamingMessage('assistant', provider, modelLabel)
+
+  // Paint what the turn already produced right away, so returning to a running
+  // chat shows the answer-so-far instead of an empty bubble. The replay that
+  // follows rebuilds the identical text from sequence 0 and takes over; the
+  // render is rAF-throttled, so the rebuild lands as a single repaint.
+  if (attach?.partialText) {
+    historyStore.updateStreamingMessage(messageId, attach.partialText)
+  }
 
   let streamingRafId: number | null = null
   let streamingDirty = false
@@ -2225,14 +2281,17 @@ const streamAIResponse = async (
       processingStatus.value = 'started'
       processingMetadata.value = {}
 
-      const stopStreaming = chatApi.streamGuestMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const guestStreamOptions = {
         guestSessionId: guestStore.sessionId,
         message: userMessage,
         chatId: guestChatId,
         trackId,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        onUpdate: (data: StreamUpdatePayload) => {
           if (streamingAbortController?.signal.aborted) return
 
           if (data.status === 'guest_limit_reached') {
@@ -2261,6 +2320,22 @@ const streamAIResponse = async (
             const reached = (data as Record<string, unknown>).limitReached as boolean
             guestStore.updateCount(remaining, max, reached)
             guestStore.showBanner()
+            return
+          }
+
+          if (data.status === 'run_started') {
+            // The server opened a resumable run for this turn. Remembering it
+            // keeps a later history load from attaching a second time to the
+            // turn this tab is already rendering.
+            if (typeof data.runId === 'string') attachedRunId = data.runId
+            return
+          }
+
+          if (data.status === 'run_started') {
+            // The server opened a resumable run for this turn. Remembering it
+            // keeps a later history load from attaching a second time to the
+            // turn this tab is already rendering.
+            if (typeof data.runId === 'string') attachedRunId = data.runId
             return
           }
 
@@ -2658,7 +2733,15 @@ const streamAIResponse = async (
             historyStore.finishStreamingMessage(messageId)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({
+            runId: attach.runId,
+            guestSessionId: guestStore.sessionId,
+            onUpdate: guestStreamOptions.onUpdate,
+          })
+        : chatApi.streamGuestMessage(guestStreamOptions)
 
       stopStreamingFn = stopStreaming
     } else {
@@ -2717,7 +2800,10 @@ const streamAIResponse = async (
         })
       }
 
-      const stopStreaming = chatApi.streamMessage({
+      // The handler lives on an options object rather than inline at the call
+      // site so the re-attach transport can reuse the exact same one — a turn
+      // picked back up after a reload must render through identical logic.
+      const streamOptions = {
         userId,
         message: userMessage,
         trackId,
@@ -2734,7 +2820,7 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
-        onUpdate: (data) => {
+        onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {
             return
@@ -3802,7 +3888,11 @@ const streamAIResponse = async (
             console.warn('⚠️ Unknown status:', data.status, data)
           }
         },
-      })
+      }
+
+      const stopStreaming = attach
+        ? chatApi.attachStream({ runId: attach.runId, onUpdate: streamOptions.onUpdate })
+        : chatApi.streamMessage(streamOptions)
 
       // Store EventSource cleanup function globally
       stopStreamingFn = stopStreaming

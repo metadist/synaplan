@@ -566,6 +566,21 @@ export interface ApiInProgressTurn {
   }>
 }
 
+/**
+ * A turn that is still generating, as reported by the chat history endpoints.
+ *
+ * The backend keeps a turn alive after the client that started it disconnects
+ * and mirrors its Server-Sent Events into a replayable log. `partialText` is
+ * the answer so far (for an instant repaint) and `runId` is what the client
+ * re-attaches to in order to receive the rest live.
+ */
+export interface ApiActiveRun {
+  runId: string
+  trackId: string
+  lastSeq: number
+  partialText: string
+}
+
 /** Stable client id for the synthesized in-progress assistant bubble (#1142). */
 export const IN_PROGRESS_TURN_ID = 'in-progress-turn'
 

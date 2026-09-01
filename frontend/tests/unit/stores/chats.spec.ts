@@ -380,4 +380,37 @@ describe('Chats Store', () => {
       expect(store.chats.map((c) => c.id)).toContain(42)
     })
   })
+
+  /**
+   * A turn survives the client that started it, so the list marks the chats
+   * where an answer is still being written after the user moved on.
+   */
+  describe('loadChats — chats with a generating turn', () => {
+    it('tracks the chats the server reports as still generating', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat, chatPayload(2).chat],
+        activeRunChatIds: [2],
+      })
+
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.has(2)).toBe(true)
+      expect(store.activeRunChatIds.has(1)).toBe(false)
+    })
+
+    it('clears the marker once the turn finished', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chats: [chatPayload(1).chat],
+        activeRunChatIds: [1],
+      })
+      await store.loadChats()
+
+      httpClientMock.mockResolvedValueOnce({ chats: [chatPayload(1).chat] })
+      await store.loadChats()
+
+      expect(store.activeRunChatIds.size).toBe(0)
+    })
+  })
 })

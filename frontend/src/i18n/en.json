@@ -266,6 +266,7 @@
     "config": "AI Config",
     "statistics": "Statistics",
     "newChat": "New Chat",
+    "stillGenerating": "Still answering",
     "quote": {
       "button": "Mention in chat",
       "remove": "Remove quote"

@@ -5,11 +5,16 @@ namespace App\Controller;
 use App\AI\Service\AiFacade;
 use App\Entity\Chat;
 use App\Entity\File;
+use App\Entity\GuestSession;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
+use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Chat\ChatTitleService;
+use App\Service\Chat\Run\ChatRun;
+use App\Service\Chat\Run\ChatRunRecorder;
+use App\Service\Chat\Run\ChatRunService;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
@@ -110,8 +115,25 @@ class StreamController extends AbstractController
         private UsageStatsService $usageStatsService,
         private UsageTaximeterConfig $usageTaximeterConfig,
         private PremiumFeatureGate $premiumFeatureGate,
+        private ChatRunService $chatRunService,
     ) {
     }
+
+    /**
+     * Recorder for the turn currently being streamed by THIS request, mirroring
+     * every SSE event into a replayable Redis log so a returning client can
+     * re-attach. Set at the top of the stream callback and cleared in its
+     * `finally`, so it never leaks into the next request in worker mode.
+     */
+    private ?ChatRunRecorder $activeRun = null;
+
+    /**
+     * One-shot guard for the "connection aborted" log line. Detaching mid-turn
+     * is the normal case now (the turn keeps generating for a client that comes
+     * back), so logging per suppressed event would flood the log with one line
+     * per token for the rest of the answer.
+     */
+    private bool $abortLogged = false;
 
     private function suppressUnparseableOfficemakerEnvelope(
         string $text,
@@ -788,6 +810,22 @@ class StreamController extends AbstractController
 
             $chat = null;
             $incomingMessage = null;
+
+            // Open a resumable run for this turn: every SSE event below is
+            // mirrored into a replayable Redis log so a client that reloads or
+            // navigates away can re-attach and keep watching (see ChatRun).
+            //
+            // Incognito is deliberately excluded — it promises that nothing of
+            // the turn is kept server-side, and a resumable buffer is exactly
+            // that. Incognito turns therefore stream as before, without resume.
+            $this->activeRun = $incognito ? null : $this->chatRunService->begin(
+                $this->resolveRunOwnerKey($user, $isWidgetMode ? $widgetSession : null, $isGuestMode ? $guestSession : null),
+                is_numeric($chatId) ? (int) $chatId : null,
+                (string) $trackId,
+            );
+            if (null !== $this->activeRun) {
+                $this->sendSSE('run_started', ['runId' => $this->activeRun->getRunId()]);
+            }
 
             try {
                 // Load chat — skipped in incognito mode: the turn has no
@@ -2308,6 +2346,11 @@ class StreamController extends AbstractController
 
                 $this->sendSSE('complete', $completeData);
 
+                // Close the run only AFTER `complete` was recorded, so a client
+                // that re-attaches in the last moments still replays the
+                // terminal event instead of an open-ended log.
+                $this->activeRun?->finish(ChatRun::STATUS_COMPLETE, $outgoingMessage->getId());
+
                 usleep(100000);
 
                 $this->logger->info('Streamed message processed', [
@@ -2345,6 +2388,7 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+                $this->activeRun?->finish(ChatRun::STATUS_ERROR, $messageId);
             } catch (StreamCancelledException) {
                 // Explicit user cancel (/stop-stream flagged the turn) — not an
                 // error and not a disconnect. The frontend persists the partial
@@ -2353,6 +2397,7 @@ class StreamController extends AbstractController
                     'user_id' => $user->getId(),
                     'track_id' => (string) $trackId,
                 ]);
+                $this->activeRun?->finish(ChatRun::STATUS_CANCELLED);
             } catch (\Exception $e) {
                 $this->logger->error('Streaming failed', [
                     'user_id' => $user->getId(),
@@ -2375,10 +2420,41 @@ class StreamController extends AbstractController
                 }
 
                 $this->sendSSE('error', $errorData);
+                $this->activeRun?->finish(ChatRun::STATUS_ERROR, $messageId);
+            } finally {
+                // Safety net: every path above marks its own outcome, but an
+                // early `return` (rate limit, chat not found, non-streaming
+                // model) or a Throwable that is not an Exception must not leave
+                // the run `running` — a client would then wait on a heartbeat
+                // that never ticks again. finish() is idempotent, so this only
+                // fires when nothing else closed the run.
+                $this->activeRun?->finishFromRecordedOutcome();
+                $this->activeRun = null;
+                $this->abortLogged = false;
             }
         });
 
         return $response;
+    }
+
+    /**
+     * Owner scope for a resumable run, used to gate the re-attach endpoint.
+     *
+     * Widget and guest turns run under a shared processing user, so the user id
+     * alone would let one visitor replay another's conversation — those scopes
+     * key on the session instead.
+     */
+    private function resolveRunOwnerKey(User $user, ?WidgetSession $widgetSession, ?GuestSession $guestSession): string
+    {
+        if (null !== $widgetSession) {
+            return ChatRunService::ownerKeyForWidget($widgetSession->getSessionId());
+        }
+
+        if (null !== $guestSession) {
+            return ChatRunService::ownerKeyForGuest($guestSession->getSessionId());
+        }
+
+        return ChatRunService::ownerKeyForUser((int) $user->getId());
     }
 
     /**
@@ -3192,12 +3268,6 @@ class StreamController extends AbstractController
 
     private function sendSSE(string $status, array $data): void
     {
-        if (connection_aborted()) {
-            error_log('🔴 StreamController: Connection aborted');
-
-            return;
-        }
-
         // Sanitize all string values in data to ensure valid UTF-8
         $sanitizedData = $this->sanitizeUtf8($data);
 
@@ -3205,6 +3275,21 @@ class StreamController extends AbstractController
             'status' => $status,
             ...$sanitizedData,
         ];
+
+        // Record BEFORE the abort guard. Below it the buffer would stop filling
+        // at exactly the moment it is needed: the client is gone, the turn keeps
+        // generating, and everything produced from here on is precisely what a
+        // re-attaching client has to replay.
+        $this->activeRun?->record($event);
+
+        if (connection_aborted()) {
+            if (!$this->abortLogged) {
+                $this->abortLogged = true;
+                error_log('🔴 StreamController: Connection aborted — continuing in background');
+            }
+
+            return;
+        }
 
         echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
 
