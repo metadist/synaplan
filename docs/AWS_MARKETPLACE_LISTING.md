@@ -195,7 +195,10 @@ flight, and ingesting an AMI is slow — AWS copies the image into every region 
 the listing and scans it for vulnerabilities, which its own documentation puts at
 *a few hours*. So the release build submits one architecture and ends;
 [`marketplace-versions.yml`](../.github/workflows/marketplace-versions.yml) runs
-hourly and submits the next one once the entity is free.
+hourly and submits the next one once the entity is free. When waiting out the
+hour is not worth it, start it by hand: **Actions** → **Marketplace Versions** →
+**Run workflow**, from `main` — it refuses any other branch, because it would
+read that branch's pin and offer a version nobody released.
 
 That workflow keeps no state. It reads the release from the version the
 deployment catalog pins on `main`, finds each AMI by the `SynaplanVersion` and

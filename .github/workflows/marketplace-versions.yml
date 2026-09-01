@@ -11,15 +11,17 @@ name: Marketplace Versions
 # therefore submits one architecture and ends; this job submits the next one as
 # soon as the entity is free.
 #
-# It derives everything it needs from AWS and from the default branch, and keeps
-# no state of its own: the release comes from the version the deployment catalog
-# pins, the AMIs from their build tags, and what is already offered from the
-# listing itself. A missed run costs an hour, never a version.
+# It runs from the default branch only, and keeps no state of its own: the
+# release comes from the version the deployment catalog pins there, the AMIs from
+# their build tags, and what is already offered from the listing itself. A missed
+# run therefore costs an hour, never a version.
 
 on:
   schedule:
     # Off the hour, so it does not queue behind everything else that runs at :00.
     - cron: '17 * * * *'
+  # For not waiting out the hour — after a release, or after a rejection was
+  # fixed. Refused from anywhere but the default branch; see the first step.
   workflow_dispatch:
 
 permissions:
@@ -47,6 +49,28 @@ jobs:
       id-token: write
 
     steps:
+      # Checked before anything else, because this job holds real AWS
+      # credentials and creates real versions of a public listing: the
+      # ami-build environment carries no deployment branch policy, so nothing
+      # else keeps a dispatch from a feature branch out. From there it would
+      # read that branch's pin and its copy of the scripts, and could offer a
+      # version nobody released.
+      #
+      # Only dispatches are examined. A scheduled run is on the default branch
+      # by definition, and asking the event payload about it would make the
+      # hourly run depend on a field that a schedule payload need not carry.
+      - name: Require the default branch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SELECTED: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED" != "$DEFAULT" ]; then
+            echo "::error::A version is offered from ${DEFAULT}, not from ${SELECTED}."
+            exit 1
+          fi
+
       # Skipped rather than failed while the listing does not exist yet, exactly
       # like the submit job in aws-ami.yml. An hourly schedule must not turn a
       # not-yet-configured listing into an hourly red run.
