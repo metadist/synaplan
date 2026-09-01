@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 
-// Builds the AWS Marketplace change set that offers one built AMI to the
-// listing as a new version.
+// The AWS Marketplace version contract: what a version of the listing is
+// called, and which change set offers one built AMI as that version.
 //
-// It lives here rather than inline in a workflow because two of them need the
-// identical document: aws-ami.yml submits the first architecture right after a
-// release is built, and marketplace-versions.yml submits the remaining one
-// later. AWS refuses a second `AddDeliveryOptions` while the first is still in
-// flight, and an AMI version takes hours to ingest, so those two submissions
-// cannot happen in the same run — but they must produce the same version shape,
-// or the listing would carry two differently described halves of one release.
+// It lives here rather than inline in marketplace-versions.yml because it is
+// what has to stay consistent across runs. One release is two versions, one per
+// architecture, and they are submitted hours apart — AWS refuses a second
+// `AddDeliveryOptions` while the first is in flight, and ingesting an AMI takes
+// hours. The two halves of a release must still be titled and described the
+// same way.
+//
+// Deciding which architecture is still missing lives here for a second reason:
+// it was a two-line jq expression in the workflow, and it was wrong in a way no
+// eye caught. Inside `index(...)` a `.` refers to that filter's own input, so
+// the interpolated title never matched, every architecture always counted as
+// missing, and the same version was offered again on every run until AWS
+// answered DUPLICATE_VERSION_TITLE. Here it is covered by tests.
 
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
@@ -23,10 +29,12 @@ export const versionTitle = (version, architecture) => `${version} (${architectu
 // Graviton for arm64, the comparable Intel size otherwise. Only a
 // recommendation shown in the launch form; the customer may pick anything.
 const INSTANCE_TYPES = {
-  arm64: 'm7g.xlarge',
   x86_64: 'm7i.xlarge',
+  arm64: 'm7g.xlarge',
 }
 
+// In submission order, and x86_64 leads deliberately: it is what most customers
+// launch, and the one the release's smoke test launched itself.
 export const ARCHITECTURES = Object.keys(INSTANCE_TYPES)
 
 // Mirrors deploy/aws/packer/synaplan.pkr.hcl's source_ami_filter and
@@ -97,19 +105,52 @@ export const buildChangeSet = ({ product, version, architecture, ami, role, rele
   ]
 }
 
+// Which architectures of a release the listing has not been offered yet, in the
+// order they should be submitted.
+//
+// `known` is every version title the listing shows plus every one that has been
+// sent to it, including the titles of submissions that failed. A failed version
+// counts as offered on purpose: AWS fails one because it found something in the
+// image, so the same image fails again, and retrying it hourly would only repeat
+// a rejection somebody has already read.
+export const missingArchitectures = (version, known = []) => {
+  if (!version) {
+    throw new Error('missing: version')
+  }
+  if (!Array.isArray(known)) {
+    throw new Error('known must be an array of version titles')
+  }
+
+  return ARCHITECTURES.filter(
+    (architecture) => !known.includes(versionTitle(version, architecture))
+  )
+}
+
 const readOption = (arguments_, name) => {
   const index = arguments_.indexOf(name)
   return index === -1 ? null : (arguments_[index + 1] ?? null)
 }
 
 export const runCli = (arguments_ = []) => {
+  const [command, ...options] = arguments_
+
+  if (command === 'missing') {
+    const known = JSON.parse(readOption(options, '--known') ?? '[]')
+    // Space separated, because the caller is a shell that walks it word by word.
+    return `${missingArchitectures(readOption(options, '--version'), known).join(' ')}\n`
+  }
+
+  if (command !== 'change-set') {
+    throw new Error(`unknown command ${JSON.stringify(command ?? '')}, expected change-set or missing`)
+  }
+
   const changeSet = buildChangeSet({
-    product: readOption(arguments_, '--product'),
-    version: readOption(arguments_, '--version'),
-    architecture: readOption(arguments_, '--architecture'),
-    ami: readOption(arguments_, '--ami'),
-    role: readOption(arguments_, '--role'),
-    releaseUrl: readOption(arguments_, '--release-url') ?? '',
+    product: readOption(options, '--product'),
+    version: readOption(options, '--version'),
+    architecture: readOption(options, '--architecture'),
+    ami: readOption(options, '--ami'),
+    role: readOption(options, '--role'),
+    releaseUrl: readOption(options, '--release-url') ?? '',
   })
 
   return `${JSON.stringify(changeSet)}\n`

@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   ARCHITECTURES,
   buildChangeSet,
+  missingArchitectures,
   runCli,
   versionTitle,
 } from '../scripts/marketplace-change-set.mjs'
@@ -67,8 +68,46 @@ test('refuses to build a change set with a missing field', () => {
   assert.throws(() => buildChangeSet(options({ product: '', role: '' })), /missing: product, role/)
 })
 
+// This is what a jq expression in the workflow got wrong: it compared against
+// nothing at all, so it always answered "both", and the release run kept
+// offering a version the listing already had.
+test('recognises the architectures a release has already been offered', () => {
+  assert.deepEqual(missingArchitectures('4.4.3', []), ['x86_64', 'arm64'])
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.2.4', '4.4.3 (x86_64)']), ['arm64'])
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.4.3 (x86_64)', '4.4.3 (arm64)']), [])
+})
+
+// A release is not the one before it, and a title that merely contains the
+// version is not that version.
+test('does not confuse one release with another', () => {
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.4.2 (x86_64)', '4.4.2 (arm64)']), [
+    'x86_64',
+    'arm64',
+  ])
+  assert.deepEqual(missingArchitectures('4.4.3', ['14.4.3 (x86_64)', '4.4.30 (arm64)']), [
+    'x86_64',
+    'arm64',
+  ])
+})
+
+test('refuses to decide without a release', () => {
+  assert.throws(() => missingArchitectures('', ['4.4.3 (arm64)']), /missing: version/)
+  assert.throws(() => missingArchitectures('4.4.3', 'not an array'), /must be an array/)
+})
+
+test('prints the missing architectures for a shell to walk', () => {
+  assert.equal(runCli(['missing', '--version', '4.4.3', '--known', '["4.4.3 (arm64)"]']), 'x86_64\n')
+  assert.equal(runCli(['missing', '--version', '4.4.3']), 'x86_64 arm64\n')
+})
+
+test('refuses a command it does not know', () => {
+  assert.throws(() => runCli([]), /expected change-set or missing/)
+  assert.throws(() => runCli(['submit']), /expected change-set or missing/)
+})
+
 test('prints the change set as one JSON document', () => {
   const output = runCli([
+    'change-set',
     '--product',
     'prod-example',
     '--version',

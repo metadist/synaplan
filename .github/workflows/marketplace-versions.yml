@@ -1,20 +1,20 @@
 name: Marketplace Versions
 
-# Finishes what aws-ami.yml can only start, and reports how it ended.
+# Offers each release to the AWS Marketplace AMI listing, and reports how AWS
+# received it. The only place that submits a version — aws-ami.yml builds and
+# smoke-tests the images and marks them, nothing more.
 #
-# Offering a release to the AMI listing means one version per architecture,
-# because every delivery option of a version shares a single AmiSource. Those
-# versions cannot be submitted together: AWS answers a second
-# `AddDeliveryOptions` on the same product with an error while the first is in
-# flight, and ingesting an AMI takes hours — it copies the image into every
-# region of the listing and scans it for vulnerabilities. A release build
-# therefore submits one architecture and ends; this job submits the next one as
-# soon as the entity is free.
+# One version per architecture, because every delivery option of a version shares
+# a single AmiSource, and one version per run, because they cannot go together:
+# AWS answers a second `AddDeliveryOptions` on the same product with an error
+# while the first is in flight, and ingesting an AMI takes hours — it copies the
+# image into every region of the listing and scans it for vulnerabilities. So a
+# release is complete after two runs of this workflow.
 #
-# It runs from the default branch only, and keeps no state of its own: the
-# release comes from the version the deployment catalog pins there, the AMIs from
-# their build tags, and what is already offered from the listing itself. A missed
-# run therefore costs an hour, never a version.
+# It runs from the default branch only, and keeps no state of its own: the release
+# comes from the version the deployment catalog pins there, the images from their
+# tags, and what has already been sent from the listing and the change set
+# history. A missed run therefore costs an hour, never a version.
 
 on:
   schedule:
@@ -175,8 +175,7 @@ jobs:
 
           # Every VersionTitle anywhere in the document, rather than one fixed
           # path: the entity shape is AWS's to change, and reading it loosely
-          # fails safe. A title this job cannot see would at worst be offered
-          # twice, which AWS rejects, rather than silently never offered.
+          # fails safe.
           offered="$(
             aws marketplace-catalog describe-entity \
               --catalog AWSMarketplace --entity-id "$PRODUCT_ID" \
@@ -184,13 +183,39 @@ jobs:
               jq -c '[.. | objects | .VersionTitle? // empty]'
           )"
 
-          missing="$(
-            jq -nr --argjson offered "$offered" --arg version "$VERSION" '
-              ["x86_64", "arm64"]
-              | map(select(($offered | index("\($version) (\(.))")) | not))
-              | join(" ")
-            '
+          # What the listing shows is not everything it has been sent. A
+          # submission that is still being ingested is not part of the entity
+          # yet, and one that failed never will be — and both have to count,
+          # the first so it is not sent twice, the second so a rejected image is
+          # not sent again every hour. Only the change set history knows about
+          # them.
+          ids="$(
+            aws marketplace-catalog list-change-sets \
+              --catalog AWSMarketplace \
+              --filter-list "$(jq -nc --arg id "$PRODUCT_ID" '[{Name:"EntityId",ValueList:[$id]}]')" \
+              --query 'ChangeSetSummaryList[].ChangeSetId' --output json |
+              jq -r '.[]'
           )"
+
+          attempted='[]'
+          for id in $ids; do
+            # Every title anywhere in the document, for the same reason as
+            # above, and because DetailsDocument is an object for some change
+            # types and an array for others — a fixed path breaks on the ones it
+            # was not written for.
+            #
+            # VALIDATE change sets are on record too, from before this stopped
+            # sending them, and they created nothing that could collide.
+            titles="$(
+              aws marketplace-catalog describe-change-set \
+                --catalog AWSMarketplace --change-set-id "$id" --output json |
+                jq -c 'if .Intent == "APPLY" then [.. | objects | .VersionTitle? // empty] else [] end'
+            )"
+            attempted="$(printf '%s' "$attempted" | jq -c --argjson t "$titles" '. + $t')"
+          done
+
+          known="$(jq -nc --argjson a "$offered" --argjson b "$attempted" '$a + $b')"
+          missing="$(node scripts/marketplace-change-set.mjs missing --version "$VERSION" --known "$known")"
 
           echo "architectures=${missing}" >> "$GITHUB_OUTPUT"
           if [ -z "$missing" ]; then
@@ -212,26 +237,34 @@ jobs:
           # One per run, by the same AWS rule that made this workflow necessary.
           architecture="${MISSING%% *}"
 
-          # Found by the tags deploy/aws/packer/synaplan.pkr.hcl writes, so no
-          # run has to hand an AMI id to a later one. Newest wins, for a version
-          # that was rebuilt.
+          # Found by the tags Packer and the smoke test write, so no run has to
+          # hand an AMI id to a later one. Newest wins, for a version that was
+          # rebuilt.
+          #
+          # SmokeTested is what aws-ami.yml puts on the images of a release that
+          # booted and served, and it is required here rather than merely
+          # preferred: it is the only thing left between an image and a public
+          # listing now that no job dependency spans the two runs. An image
+          # built from a branch never carries it.
           ami="$(
             aws ec2 describe-images --owners self \
               --filters "Name=tag:SynaplanVersion,Values=${VERSION}" \
                         "Name=tag:Architecture,Values=${architecture}" \
+                        "Name=tag:SmokeTested,Values=${VERSION}" \
                         "Name=state,Values=available" \
               --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text
           )"
           if [ -z "$ami" ] || [ "$ami" = None ]; then
-            # Not an error: the release build may still be running, or may have
-            # failed and reported that itself. The next run picks it up.
-            echo "No AMI is built for \`${VERSION}\` on \`${architecture}\` yet; nothing offered." |
+            # Not an error: the release build may still be running, or its smoke
+            # test may have failed and reported that itself. The next run picks
+            # it up.
+            echo "No smoke-tested AMI for \`${VERSION}\` on \`${architecture}\` yet; nothing offered." |
               tee -a "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           change_set="$(
-            node scripts/marketplace-change-set.mjs \
+            node scripts/marketplace-change-set.mjs change-set \
               --product "$PRODUCT_ID" \
               --version "$VERSION" \
               --architecture "$architecture" \
@@ -240,12 +273,15 @@ jobs:
               --release-url "$RELEASE_URL"
           )"
 
-          aws marketplace-catalog start-change-set \
-            --catalog AWSMarketplace \
-            --intent VALIDATE \
-            --client-request-token "synaplan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${architecture}-validate" \
-            --change-set "$change_set" > /dev/null
-
+          # Sent once, with APPLY. An `Intent=VALIDATE` call used to go first, on
+          # the assumption that it checks the document before anything real is
+          # created — but it returns an id immediately and does its checking
+          # asynchronously, over the same half hour, so its verdict arrived long
+          # after the submission it was meant to guard. All it produced was a
+          # second change set with the same title in the portal. What it was
+          # supposed to catch, a duplicate, cannot happen now that the history
+          # above is consulted; what it cannot catch either way, a rejected
+          # image, ends as a FAILED change set and is reported.
           id="$(
             aws marketplace-catalog start-change-set \
               --catalog AWSMarketplace \

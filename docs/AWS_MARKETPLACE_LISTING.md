@@ -122,8 +122,8 @@ meant to verify has already been built.
 
 - **`AWSMarketplaceAmiIngestion`** lets AWS Marketplace copy a submitted AMI into
   its own account for the security scan. Every submitted version names it, in the
-  Add Version form's *IAM access role ARN* field or, when the submit job does the
-  submitting, in the `AmiSource` it sends. Store its ARN as the repository secret
+  Add Version form's *IAM access role ARN* field or, when a version is submitted
+  automatically, in the `AmiSource` that goes with it. Store its ARN as the repository secret
   `AWS_MARKETPLACE_INGESTION_ROLE_ARN`.
 - **The build role** is assumed by this repository's release workflow through
   GitHub OIDC — there is no access key anywhere in this repository, and there
@@ -151,8 +151,7 @@ later and slower.
    authentication, root login, known CVEs, credentials left in the image.
    `deploy/aws/scripts/harden.sh` fails the Packer build on the first three, so
    this should be a formality. Only needed while the listing is new — once the
-   secrets below are set, the `submit` job offers each release's version by
-   itself.
+   secrets below are set, every release's versions are offered automatically.
 3. **Create the product** as a Limited listing — published, but visible only to
    the seller account and any account we allowlist. Subscribe and launch it the
    way a customer will, including one-click "Launch from Website". This is the
@@ -165,11 +164,11 @@ later and slower.
 
 ## Submitting a version automatically
 
-Once the listing exists, the `submit` job in
-[`aws-ami.yml`](../.github/workflows/aws-ami.yml) offers each release to it
-through the Marketplace Catalog API, after the AMI has been built, shared and
-verified by a real launch. It needs two secrets, and skips itself with a notice
-while either of them is missing:
+Once the listing exists,
+[`marketplace-versions.yml`](../.github/workflows/marketplace-versions.yml) offers
+each release to it through the Marketplace Catalog API. It runs hourly, and needs
+two secrets — without either of them it skips itself with a notice rather than
+failing every hour:
 
 | Secret | Value |
 | --- | --- |
@@ -177,13 +176,8 @@ while either of them is missing:
 | `AWS_MARKETPLACE_INGESTION_ROLE_ARN` | the `IngestionRoleArn` output of the roles stack |
 
 Nothing else has to be switched on, and nothing has to be switched over later.
-Each version is sent twice: first with `Intent=VALIDATE`, which asks AWS whether
-it would accept the document without creating anything, and then — only if that
-passed — with `Intent=APPLY`. That covers what a separate dry run used to cover,
-a wrong product ID or a role AWS cannot assume, without leaving a manual step
-between two releases for someone to forget.
 
-### Why one release takes two runs
+### Why one release takes several runs
 
 Each architecture becomes a **separate version**, titled `<version> (x86_64)` and
 `<version> (arm64)`. That is AWS's rule, not a choice: all delivery options of one
@@ -193,25 +187,56 @@ Those two versions cannot be submitted together. AWS answers a second
 `AddDeliveryOptions` on the same product with an error while the first is in
 flight, and ingesting an AMI is slow — AWS copies the image into every region of
 the listing and scans it for vulnerabilities, which its own documentation puts at
-*a few hours*. So the release build submits one architecture and ends;
-[`marketplace-versions.yml`](../.github/workflows/marketplace-versions.yml) runs
-hourly and submits the next one once the entity is free. When waiting out the
-hour is not worth it, start it by hand: **Actions** → **Marketplace Versions** →
-**Run workflow**, from `main` — it refuses any other branch, because it would
-read that branch's pin and offer a version nobody released.
+*a few hours*. So one version goes per run, and a release is complete after two
+of them. When waiting out the hour is not worth it, start the workflow by hand:
+**Actions** → **Marketplace Versions** → **Run workflow**, from `main` — it
+refuses any other branch, because it would read that branch's version pin and
+offer a version nobody released.
 
-That workflow keeps no state. It reads the release from the version the
-deployment catalog pins on `main`, finds each AMI by the `SynaplanVersion` and
-`Architecture` tags Packer writes, and asks the listing which versions it already
-offers. A missed run therefore costs an hour, never a version. It is also what
-reports the outcome: a change set AWS rejects turns that run red and, if
-`DISCORD_RELEASE_WEBHOOK` is set, says so in the channel. Both workflows build
-the change set with
-[`scripts/marketplace-change-set.mjs`](../scripts/marketplace-change-set.mjs), so
-the two halves of one release cannot end up described differently.
+### What it submits, and what it will not
 
-A submitted version still sits in AWS review for days, and neither job publishes
-it. If a submission turns out to be wrong, cancel its change set —
+The workflow keeps no state of its own, which is what makes an hourly job safe
+here. Everything it decides on, it reads:
+
+- **the release** from the version the deployment catalog pins on `main`, so a
+  tag whose rollout a guard held back is not offered;
+- **the image** from the `SynaplanVersion`, `Architecture` and `SmokeTested` tags
+  on the AMI;
+- **what is already submitted** from the listing *and* from the change set
+  history.
+
+Both halves of that last point are needed, because what the listing shows is not
+everything it has been sent. A version AWS is still ingesting is not part of the
+entity yet, and one that failed never becomes part of it. Only the change set
+history knows about either, and without it a version in flight would be sent a
+second time, for AWS to reject with `DUPLICATE_VERSION_TITLE`.
+
+Which architecture is still missing is decided in
+[`scripts/marketplace-change-set.mjs`](../scripts/marketplace-change-set.mjs),
+under test, rather than in the workflow. It was two lines of `jq` there once, and
+they were wrong: inside `index(...)` a `.` refers to that filter's own input, so
+the interpolated title never matched anything, every architecture always counted
+as missing, and the same version was offered again on every run.
+
+**A failed version is not retried.** AWS fails a version because it found
+something in the image, and the same image fails again; an hourly retry would
+only repeat a rejection somebody has already read. Build a new AMI, or dispatch
+the workflow once the reason is gone.
+
+`SmokeTested` is the tag [`aws-ami.yml`](../.github/workflows/aws-ami.yml) writes
+onto the images of a release whose verification launch booted and served. It is
+required, not preferred: the AMI build may be dispatched from any branch, so a
+deployment fix can be verified from its pull request, and that mark is what keeps
+such a trial build out of a public listing. Nothing in the build offers a version
+itself — one place submits, so a re-run cannot offer the same version twice.
+
+A rejection is also what this workflow reports: it turns that run red and, if
+`DISCORD_RELEASE_WEBHOOK` is set, says so in the channel. It stays silent
+otherwise, because an hourly job that reports "nothing to do" teaches everyone to
+ignore it.
+
+A submitted version still sits in AWS review for days, and nothing here
+publishes it. If a submission turns out to be wrong, cancel its change set —
 `CancelChangeSet` is part of the build role's permissions:
 
 ```bash
@@ -239,8 +264,8 @@ aws marketplace-catalog list-entities \
 ```
 
 An empty list means the listing has not been created yet — do the steps above
-first. The `submit` job stays skipped until the secret is set, so releases keep
-working in the meantime.
+first. `marketplace-versions.yml` stays skipped until the secret is set, so
+releases keep working in the meantime.
 
 ## Usage Instructions
 
