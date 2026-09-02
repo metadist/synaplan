@@ -6,6 +6,9 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -89,6 +92,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         private int $timeout = 120,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -208,6 +212,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 ]);
             }
 
+            $schema = $options['structured_output'] ?? null;
+            if ($schema instanceof StructuredOutputSchema) {
+                $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema));
+            }
+
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -232,6 +241,14 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
                 if ('text' === $type) {
                     $textContent .= $block['text'] ?? '';
+                } elseif ('tool_use' === $type) {
+                    // Structured-output request (see StructuredOutputDialect::ANTHROPIC_TOOL_FORCING):
+                    // Claude has no native JSON-schema response mode, so the schema was
+                    // sent as a forced single tool call. Its `input` IS the desired JSON
+                    // result — re-encode it into `content` so callers can treat this
+                    // response exactly like a schema-following text response from any
+                    // other provider.
+                    $textContent .= json_encode($block['input'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 } elseif ('thinking' === $type) {
                     $thinkingContent .= $block['thinking'] ?? '';
                 }
@@ -335,6 +352,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                     'model' => $model,
                     'thinking' => $requestBody['thinking'],
                 ]);
+            }
+
+            $schema = $options['structured_output'] ?? null;
+            if ($schema instanceof StructuredOutputSchema) {
+                $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema));
             }
 
             $this->logger->info('Anthropic: Starting streaming chat', [
@@ -909,6 +931,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $callback([
                                 'type' => 'reasoning',
                                 'content' => $delta['thinking'] ?? '',
+                            ]);
+                        } elseif ('input_json_delta' === $deltaType) {
+                            // Structured-output tool-forcing (see chat()): the tool's
+                            // `input` streams as incremental JSON fragments here instead
+                            // of `text_delta`. Forward them as ordinary content chunks so
+                            // they concatenate into the same complete JSON string the
+                            // non-streaming path returns in `content`.
+                            $callback([
+                                'type' => 'content',
+                                'content' => $delta['partial_json'] ?? '',
                             ]);
                         }
                         // signature_delta carries integrity data only — no forwarding needed

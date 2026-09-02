@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\AI\Provider\OpenAIProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -590,6 +591,40 @@ class OpenAIProviderResponsesApiTest extends TestCase
 
         $this->assertSame('high', $result['reasoning']['effort']);
         $this->assertSame('concise', $result['reasoning']['summary']);
+    }
+
+    /**
+     * The Responses API nests structured output under `text.format`, NOT
+     * Chat Completions' top-level `response_format` — verify the schema
+     * lands where the API actually expects it.
+     */
+    public function testBuildResponsesRequestMergesStructuredOutputAsTextFormat(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Classify this']];
+        $schema = new StructuredOutputSchema('sort_classification', ['type' => 'object']);
+        $options = ['structured_output' => $schema];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, $options);
+
+        $this->assertSame('json_schema', $result['text']['format']['type']);
+        $this->assertSame('sort_classification', $result['text']['format']['name']);
+        $this->assertSame(['type' => 'object'], $result['text']['format']['schema']);
+        $this->assertArrayNotHasKey('response_format', $result);
+    }
+
+    public function testBuildResponsesRequestWithoutStructuredOutputOmitsTextFormat(): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'buildResponsesRequest');
+
+        $messages = [['role' => 'user', 'content' => 'Hello']];
+
+        $result = $method->invoke($provider, $messages, 'gpt-4o', false, []);
+
+        $this->assertArrayNotHasKey('text', $result);
     }
 
     public function testReduceToLastUserMessageViaReflection(): void
