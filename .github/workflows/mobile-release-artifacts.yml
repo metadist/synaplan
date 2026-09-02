@@ -1,10 +1,16 @@
 name: Mobile Release Artifacts
 
-# Publishing a GitHub release is the deliberate signal that a state should reach
-# the mobile apps. Tags alone (platform versioning, Docker images) no longer
-# start the chain: this workflow runs only on `release: published`, classifies
-# everything merged since the previously published release, and dispatches the
-# apps synchronization when the classification reaches the app.
+# Publishing a GitHub release is the signal that a state should reach the
+# mobile apps. Tags alone (platform versioning, Docker images) do not start the
+# chain: this workflow runs only on `release: published`, classifies everything
+# merged since the previously published release, and dispatches the apps
+# synchronization when the classification reaches the app.
+#
+# release-publish.yml raises that signal automatically, the moment a release
+# tag's own CI run goes green — publishing is no longer a manual click, but
+# this workflow's own trigger and guarantees are unchanged either way: it only
+# ever reacts to an already-published release, whoever or whatever published
+# it.
 on:
   release:
     types: [published]
