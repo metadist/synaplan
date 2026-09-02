@@ -82,6 +82,14 @@ test('recognises a release the listing has already been offered', () => {
   assert.deepEqual(missingArchitectures('4.4.3', ['4.2.4', versionTitle('4.4.3', 'x86_64')]), [])
 })
 
+// A title edited in the Management Portal must not be offered a second time.
+// Only the release at the front and the architecture at the back are matched,
+// so anything between them is prose.
+test('recognises a title that carries prose between the two', () => {
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.4.3 - Intel or AMD (x86_64)']), [])
+  assert.deepEqual(missingArchitectures('4.4.3', ['4.4.3 LTS (x86_64)']), [])
+})
+
 // A release is not the one before it, and a title that merely contains the
 // version is not that version.
 test('does not confuse one release with another', () => {
@@ -99,6 +107,10 @@ test('refuses to decide without a release', () => {
 test('prints the missing architecture for a shell to walk', () => {
   assert.equal(runCli(['missing', '--version', '4.4.3', '--known', '["4.4.3 (x86_64)"]']), '\n')
   assert.equal(runCli(['missing', '--version', '4.4.3']), 'x86_64\n')
+})
+
+test('refuses to title a version for an architecture it has no name for', () => {
+  assert.throws(() => versionTitle('4.4.3', 'riscv64'), /unknown architecture/)
 })
 
 test('refuses a command it does not know', () => {

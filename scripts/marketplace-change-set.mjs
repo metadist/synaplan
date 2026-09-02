@@ -135,9 +135,9 @@ export const missingArchitectures = (version, known = []) => {
   }
 
   // Matched by shape rather than compared for equality: only the release at the
-  // front and the architecture at the back are load-bearing, and prose could be
-  // added between them without breaking this. Titles are matched this way
-  // rather than compared for equality for exactly that reason.
+  // front and the architecture at the back are load-bearing, and anything
+  // between them is prose a title could carry without ceasing to be this
+  // release.
   //
   // The word boundary after the release is what keeps 4.4.3 apart from 4.4.30,
   // and the anchor keeps it apart from 14.4.3.
