@@ -2,6 +2,8 @@
 
 namespace App\AI\Interface;
 
+use App\AI\StructuredOutput\StructuredOutputSchema;
+
 /**
  * Chat Provider Interface.
  *
@@ -14,6 +16,19 @@ namespace App\AI\Interface;
  *   - Finish signal:    fn(['type' => 'finish', 'finish_reason' => 'stop'|'length'|...])
  *     Providers SHOULD emit a finish signal as the last callback invocation so callers
  *     can detect truncated responses (finish_reason = 'length').
+ *
+ * Structured output contract:
+ *   - $options may carry a `structured_output` key holding a
+ *     {@see StructuredOutputSchema}. A provider that supports schema-enforced
+ *     JSON (see {@see \App\AI\StructuredOutput\StructuredOutputCapability})
+ *     SHOULD translate it into its own dialect via
+ *     {@see \App\AI\StructuredOutput\StructuredOutputTranslator} and merge the
+ *     result into its request payload. A provider/model/streaming
+ *     combination that does NOT support it MUST silently ignore the option
+ *     and fall back to today's free-text behavior — never throw. Callers are
+ *     responsible for checking {@see \App\AI\StructuredOutput\StructuredOutputCapability::supports()}
+ *     when they need to know whether the schema was actually honoured (e.g.
+ *     to decide whether server-side enum validation is still required).
  */
 interface ChatProviderInterface extends ProviderMetadataInterface
 {
