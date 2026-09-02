@@ -6,6 +6,8 @@ namespace App\Service;
 
 use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\WidgetMemorySuggestionSchema;
+use App\AI\StructuredOutput\Schema\WidgetPromptMetadataSchema;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -279,6 +281,7 @@ PROMPT;
             'temperature' => 0.1,
             'provider' => $modelConfig['provider'],
             'model' => $modelConfig['model'],
+            'structured_output' => WidgetMemorySuggestionSchema::build(),
         ];
 
         try {
@@ -458,6 +461,7 @@ PROMPT;
                     'temperature' => 0.3,
                     'provider' => $metaModelConfig['provider'],
                     'model' => $metaModelConfig['model'],
+                    'structured_output' => WidgetPromptMetadataSchema::build(),
                 ];
 
                 $response = $this->aiFacade->chat(

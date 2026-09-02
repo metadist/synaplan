@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FeedbackContradictionSchema;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use Psr\Log\LoggerInterface;
@@ -334,6 +335,7 @@ PROMPT;
                     'provider' => $toolsConfig['provider'],
                     'model' => $toolsConfig['model'],
                     'temperature' => 0.2,
+                    'structured_output' => FeedbackContradictionSchema::build(),
                 ])
             );
 

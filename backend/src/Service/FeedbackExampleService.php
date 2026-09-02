@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FeedbackPreviewSchema;
+use App\AI\StructuredOutput\Schema\SourceSummariesSchema;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -304,6 +306,7 @@ PROMPT;
                     'provider' => $provider,
                     'model' => $modelName,
                     'temperature' => 0.3,
+                    'structured_output' => FeedbackPreviewSchema::build(),
                 ])
             );
 
@@ -958,6 +961,7 @@ PROMPT;
                     'provider' => $provider,
                     'model' => $modelName,
                     'temperature' => 0.2,
+                    'structured_output' => SourceSummariesSchema::build(),
                 ])
             );
 
@@ -1153,6 +1157,7 @@ PROMPT;
                     'provider' => $provider,
                     'model' => $modelName,
                     'temperature' => 0.2,
+                    'structured_output' => SourceSummariesSchema::build(),
                 ])
             );
 
