@@ -2,18 +2,19 @@ name: Marketplace Versions
 
 # Offers each release to the AWS Marketplace AMI listing, and reports how AWS
 # received it. The only place that submits a version — aws-ami.yml builds and
-# smoke-tests the images and marks them, nothing more.
+# smoke-tests the x86_64 image and marks it, nothing more.
 #
-# One version per architecture, because every delivery option of a version shares
-# a single AmiSource, and one version per run, because they cannot go together:
-# AWS answers a second `AddDeliveryOptions` on the same product with an error
-# while the first is in flight, and ingesting an AMI takes hours — it copies the
-# image into every region of the listing and scans it for vulnerabilities. So a
-# release is complete after two runs of this workflow.
+# x86_64 only: an AWS Marketplace AMI product is tied to the CPU architecture of
+# the versions it has already published, so arm64 cannot become a second version
+# of this listing — see scripts/marketplace-change-set.mjs for what that cost to
+# find out. One version per run regardless, because AWS answers a second
+# `AddDeliveryOptions` on the same product with an error while the first is
+# still in flight, and ingesting an AMI takes hours — it copies the image into
+# every region of the listing and scans it for vulnerabilities.
 #
 # It runs from the default branch only, and keeps no state of its own: the release
-# comes from the version the deployment catalog pins there, the images from their
-# tags, and what has already been sent from the listing and the change set
+# comes from the version the deployment catalog pins there, the image from its
+# tag, and what has already been sent from the listing and the change set
 # history. A missed run therefore costs an hour, never a version.
 
 on:

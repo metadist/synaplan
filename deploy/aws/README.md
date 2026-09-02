@@ -171,9 +171,11 @@ unencrypted, EBS-backed and HVM. The workflow rejects account-level EBS
 encryption before the build, verifies every resulting snapshot, and shares the
 AMI with Marketplace ingestion account `679593333241`. Marketplace encrypts its
 copy, and the CloudFormation templates independently encrypt every buyer volume.
-Other regions are produced by copying the AMI. Build both architectures: the
-container images are multi-arch, so `-var architecture=arm64` yields the Graviton
-image.
+Other regions are produced by copying the AMI. The container images are
+multi-arch, so `-var architecture=arm64` yields a Graviton image for testing —
+AWS Marketplace ties one AMI product to one CPU architecture, so only x86_64 is
+ever offered to the listing; see
+[Why x86_64 only](../../docs/AWS_MARKETPLACE_LISTING.md#why-x86_64-only).
 
 ## Testing it without AWS
 
@@ -210,7 +212,7 @@ pipeline below.
 | Runs | Where | What it does |
 | ---- | ----- | ------------ |
 | Every push | `deployment-templates` job in [`ci.yml`](../../.github/workflows/ci.yml) | `cfn-lint` on both templates, `packer fmt -check` and `packer validate`. No AWS account, no cost. |
-| Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds both unencrypted source AMIs with Packer, verifies and shares them with the AWS Marketplace ingestion account, then launches each one through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Marks an image that passed as `SmokeTested`, which is what [`marketplace-versions.yml`](../../.github/workflows/marketplace-versions.yml) offers to the Marketplace listing. Deletes the verification stack and the snapshot it leaves behind, whatever the outcome. |
+| Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds an unencrypted x86_64 source AMI with Packer (arm64 is available by hand, for testing a Graviton image outside Marketplace — AWS ties a Marketplace AMI product to one CPU architecture), verifies and shares it with the AWS Marketplace ingestion account, then launches it through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Marks it as `SmokeTested`, which is what [`marketplace-versions.yml`](../../.github/workflows/marketplace-versions.yml) offers to the Marketplace listing. Deletes the verification stack and the snapshot it leaves behind, whatever the outcome. |
 | Before a public listing | `taskcat` with [`.taskcat.yml`](.taskcat.yml) | Launches both templates in two or three regions. By hand, per release. |
 
 `aws-ami.yml` skips itself with a notice while the secret
