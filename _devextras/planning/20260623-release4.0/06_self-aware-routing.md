@@ -1,6 +1,8 @@
 # Feature 6 — Self-Aware Routing ("Synaplan can explain Synaplan")
 
-**Release:** 4.0 · **Priority:** P1 · **Status:** Planned (started 2026-06-27)
+**Release:** 4.0 · **Priority:** P1 · **Status:** Superseded on 2026-09-02 by
+[`../20260902-platform-self-awareness/`](../20260902-platform-self-awareness/00_master_plan.md)
+(never started; kept as history — decisions carried over or replaced there)
 **Related:** [`00_master_plan.md`](./00_master_plan.md),
 [`03_file-management.md`](./03_file-management.md) (shares the RAG/vectorization
 backbone), routing pipeline in `backend/src/Service/Multitask/`.
