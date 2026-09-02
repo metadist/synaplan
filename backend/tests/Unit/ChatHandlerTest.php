@@ -4,6 +4,7 @@ namespace App\Tests\Unit;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
@@ -1521,6 +1522,140 @@ class ChatHandlerTest extends TestCase
 
         self::assertSame('__FILE_GENERATION_FAILED__', $result['content']);
         self::assertStringNotContainsString('BFILETEXT', $result['content']);
+    }
+
+    /**
+     * The officemaker topic's reply IS the machine-readable
+     * {"BFILEPATH":…,"BFILETEXT":…} envelope, so `handle()` must attach
+     * {@see \App\AI\StructuredOutput\Schema\FileGenerationSchema} — replacing
+     * reliance on the prompt's "respond with PURE JSON" instruction alone.
+     */
+    public function testHandleForwardsTheFileGenerationSchemaForOfficemaker(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => '{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertInstanceOf(StructuredOutputSchema::class, $capturedOptions['structured_output'] ?? null);
+        self::assertSame('office_file_generation', $capturedOptions['structured_output']->name);
+    }
+
+    /**
+     * Every non-officemaker topic keeps its free-form chat completion — the
+     * schema must not leak onto normal conversations.
+     */
+    public function testHandleOmitsTheFileGenerationSchemaForNonOfficemakerTopics(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Hello there');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('general');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => 'Hi! How can I help?', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handle(
+            $message,
+            [],
+            ['topic' => 'general', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertArrayNotHasKey('structured_output', $capturedOptions);
+    }
+
+    /**
+     * Streaming variant: officemaker runs through `handleStream()` on the web
+     * chat channel just as much as through `handle()`.
+     */
+    public function testHandleStreamForwardsTheFileGenerationSchemaForOfficemaker(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getFeatures')->willReturn([]);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chatStream')
+            ->willReturnCallback(function (array $messages, callable $cb, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+                $cb('{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}');
+
+                return ['provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $this->handler->handleStream(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'de', 'model_id' => 206],
+            static function ($chunk): void {},
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertInstanceOf(StructuredOutputSchema::class, $capturedOptions['structured_output'] ?? null);
+        self::assertSame('office_file_generation', $capturedOptions['structured_output']->name);
     }
 
     /**

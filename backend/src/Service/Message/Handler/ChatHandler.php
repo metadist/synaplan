@@ -4,6 +4,7 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FileGenerationSchema;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -557,6 +558,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'stream' => false,
             'temperature' => 0.7,
         ];
+
+        // officemaker is the only topic whose reply IS the machine-readable
+        // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
+        // its free-form chat completion untouched.
+        if ('officemaker' === $topic) {
+            $aiOptions['structured_output'] = FileGenerationSchema::build();
+        }
 
         // Clamp max_tokens to min(plan_limit, model_max).
         // plan_limit is only set for ANONYMOUS (the only tier with a hard
@@ -1208,6 +1216,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
             'modelFeatures' => $modelFeatures,
         ], $options);
+
+        // officemaker is the only topic whose reply IS the machine-readable
+        // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
+        // its free-form chat completion untouched.
+        if ('officemaker' === $topic) {
+            $aiOptions['structured_output'] = FileGenerationSchema::build();
+        }
 
         // Clamp max_tokens to min(requested, plan_limit, model_max).
         // plan_limit is only set for ANONYMOUS; authenticated tiers get the
