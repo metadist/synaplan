@@ -9,6 +9,9 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use OpenAI\Contracts\ClientContract;
 use Psr\Log\LoggerInterface;
 
@@ -36,6 +39,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
         private readonly OpenAiCompatibleEndpointRegistry $endpoints,
         private readonly LoggerInterface $logger,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
+        private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -99,15 +103,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
         $client = $this->clientForCall($options);
 
         try {
-            $request = [
-                'model' => $model,
-                'messages' => $messages,
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-            if (isset($options['temperature'])) {
-                $request['temperature'] = $options['temperature'];
-            }
-
+            $request = $this->buildChatRequest($messages, $options, $model, false);
             $response = $client->chat()->create($request);
             $arr = $response->toArray();
 
@@ -128,17 +124,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
         $client = $this->clientForCall($options);
 
         try {
-            $request = [
-                'model' => $model,
-                'messages' => $messages,
-                'stream' => true,
-                'stream_options' => ['include_usage' => true],
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-            if (isset($options['temperature'])) {
-                $request['temperature'] = $options['temperature'];
-            }
-
+            $request = $this->buildChatRequest($messages, $options, $model, true);
             $stream = $client->chat()->createStreamed($request);
 
             $usage = $this->normalizeUsage([]);
@@ -317,6 +303,37 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
     }
 
     // ==================== INTERNALS ====================
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatRequest(array $messages, array $options, string $model, bool $stream): array
+    {
+        $request = [
+            'model' => $model,
+            'messages' => $messages,
+            'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+        ];
+
+        if ($stream) {
+            $request['stream'] = true;
+            $request['stream_options'] = ['include_usage' => true];
+        }
+
+        if (isset($options['temperature'])) {
+            $request['temperature'] = $options['temperature'];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $request = array_merge($request, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+        }
+
+        return $request;
+    }
 
     /**
      * @param array<string, mixed> $options

@@ -6,6 +6,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\HuggingFaceProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -277,6 +278,49 @@ class HuggingFaceProviderTest extends TestCase
         $this->assertSame(0.95, $captured['top_p'], 'K3 must enforce top_p=0.95 regardless of caller input');
         $this->assertSame('low', $captured['reasoning_effort'], 'reasoning_effort must be forwarded to the router');
         $this->assertSame('moonshotai/Kimi-K3:deepinfra', $captured['model']);
+    }
+
+    // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
+
+    public function testChatForwardsStructuredOutputAsOpenAiJsonSchema(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode([
+                'choices' => [['message' => ['content' => '{}']]],
+            ]), ['response_headers' => ['content-type' => 'application/json']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'ping']],
+            [
+                'model' => 'moonshotai/Kimi-K2.6',
+                'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+            ],
+        );
+
+        $this->assertSame('json_schema', $captured['response_format']['type']);
+        $this->assertSame('sort_result', $captured['response_format']['json_schema']['name']);
+        $this->assertSame(['type' => 'object'], $captured['response_format']['json_schema']['schema']);
+    }
+
+    public function testChatWithoutStructuredOutputOmitsResponseFormat(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(function (string $method, string $url, array $opts) use (&$captured): MockResponse {
+            $captured = json_decode($opts['body'], true);
+
+            return new MockResponse(json_encode(['choices' => [['message' => ['content' => 'pong']]]]));
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'ping']],
+            ['model' => 'moonshotai/Kimi-K2.6'],
+        );
+
+        $this->assertArrayNotHasKey('response_format', $captured);
     }
 
     public function testChatWrapsHttpErrorsAsProviderException(): void

@@ -7,6 +7,9 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -41,6 +44,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -156,15 +160,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'message_count' => count($messages),
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-
-            if (isset($options['temperature'])) {
-                $requestOptions['temperature'] = $options['temperature'];
-            }
+            $requestOptions = $this->buildChatOptions($messages, $options, false);
 
             $response = $this->client()->chat()->create($requestOptions);
 
@@ -213,17 +209,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'message_count' => count($messages),
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'stream' => true,
-                'stream_options' => ['include_usage' => true],
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-
-            if (isset($options['temperature'])) {
-                $requestOptions['temperature'] = $options['temperature'];
-            }
+            $requestOptions = $this->buildChatOptions($messages, $options, true);
 
             $stream = $this->client()->chat()->createStreamed($requestOptions);
 
@@ -295,6 +281,39 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
             throw new ProviderException('Groq streaming error: '.$e->getMessage(), 'groq', null, 0, $e);
         }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $model = $options['model'];
+
+        $requestOptions = [
+            'model' => $model,
+            'messages' => $messages,
+            'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+        ];
+
+        if ($stream) {
+            $requestOptions['stream'] = true;
+            $requestOptions['stream_options'] = ['include_usage' => true];
+        }
+
+        if (isset($options['temperature'])) {
+            $requestOptions['temperature'] = $options['temperature'];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+        }
+
+        return $requestOptions;
     }
 
     // ==================== VISION ====================
