@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptMetaRepository;
@@ -178,5 +179,23 @@ final class TaskPlannerTest extends TestCase
         $this->planner->plan($this->message(), [], 1);
 
         self::assertGreaterThanOrEqual(3000, $options['max_tokens'] ?? 0);
+    }
+
+    public function testPlanForwardsTheTaskPlanSchemaToTheAiFacade(): void
+    {
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+            }
+        );
+
+        $this->planner->plan($this->message(), [], 1);
+
+        self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
+        self::assertSame('task_plan', $options['structured_output']->name);
+        self::assertFalse($options['structured_output']->strict);
     }
 }

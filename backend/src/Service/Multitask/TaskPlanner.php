@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\TaskPlanSchema;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -93,6 +94,7 @@ final readonly class TaskPlanner
                 'model' => $modelName,
                 'temperature' => 0.1,
                 'max_tokens' => self::PLANNING_MAX_TOKENS,
+                'structured_output' => TaskPlanSchema::build(),
             ]);
             $raw = (string) ($response['content'] ?? '');
 
