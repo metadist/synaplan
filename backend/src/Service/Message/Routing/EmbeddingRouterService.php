@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  * pre-computed anchor embeddings — the example utterances declared on
  * {@see \App\Service\Message\Capability\SystemCapability} for the four
  * SYSTEM topics, synced into the `routing_anchors` Qdrant collection by
- * `app:routing-anchors:sync`.
+ * `app:routing:sync-anchors`.
  *
  * Deliberately narrow in scope, matching the plan's "Bewusst eng gefasst":
  *   - Only the four SYSTEM topics have curated anchors. A user-defined topic

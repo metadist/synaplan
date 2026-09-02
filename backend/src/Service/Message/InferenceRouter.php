@@ -61,7 +61,7 @@ final class InferenceRouter
 
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
-        // Handler für Intent finden
+        // Find the handler for this intent
         $handler = $this->getHandler($intent);
 
         try {
@@ -114,7 +114,7 @@ final class InferenceRouter
 
         $this->notify($progressCallback, 'processing', "Routing to handler: {$intent}");
 
-        // Handler für Intent finden
+        // Find the handler for this intent
         $handler = $this->getHandler($intent);
 
         $this->logger->info('InferenceRouter: Handler resolved', [

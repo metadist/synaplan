@@ -19,8 +19,9 @@ namespace App\Service\Message\Routing;
  *  - {@see self::reclassify()}: the resolved chat model cannot do native tool
  *    calling at all, so the deferral was never honoured. Nothing was sent to
  *    a model; the turn goes back through the classifier with deferral
- *    switched off and lands on the ordinary AI-sorter path — the "Rückfall auf
- *    den Sorter-Pfad" the plan requires to stay possible at all times.
+ *    switched off and lands on the ordinary AI-sorter path. That fallback is
+ *    a hard requirement of this path, not a nicety — see
+ *    {@see NativeToolRoutingConfig}.
  *
  * Travels inside the handler result array under {@see self::RESULT_KEY} rather
  * than as a thrown exception: a hand-off is an ordinary, expected outcome of

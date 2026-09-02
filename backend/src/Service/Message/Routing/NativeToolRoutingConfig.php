@@ -7,15 +7,14 @@ namespace App\Service\Message\Routing;
 use App\Repository\ConfigRepository;
 
 /**
- * Feature flag for the Phase 9 native tool-calling routing path
- * ("Verlässliche Modellantworten und zeitgemäßes Routing", Stufe B).
+ * Feature flag for the native tool-calling routing path.
  *
- * This is the flag the plan demands as a hard requirement rather than a
- * convenience ("Phase 9 ändert den heißesten Pfad des Produkts — eigenständige
- * Freigabe, eigener Feature-Flag, Rückfall auf den Sorter-Pfad muss jederzeit
- * möglich bleiben"). With it OFF — the default, including for every existing
- * install — the classifier keeps making the AI-sorter call exactly as before,
- * so this whole phase is inert until an operator opts in.
+ * A hard requirement rather than a convenience: this path changes the hottest
+ * path in the product, so it ships behind its own flag, gets released on its
+ * own, and must be able to fall back to the AI-sorter path at any time. With
+ * the flag OFF — the default, including for every existing install — the
+ * classifier keeps making the AI-sorter call exactly as before, so all of this
+ * is inert until an operator opts in.
  *
  * What it switches on: instead of spending one LLM call on classifying the
  * message and a second on answering it, the answering call itself carries the

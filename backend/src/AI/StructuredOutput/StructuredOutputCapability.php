@@ -10,7 +10,7 @@ namespace App\AI\StructuredOutput;
  * structured-output refactor plan live, so {@see StructuredOutputTranslator}
  * and every call site can stay ignorant of them.
  *
- * Hard rules encoded here (see plan "Verifizierte Ausgangslage"):
+ * Hard rules encoded here, each verified against the provider in question:
  *   - Groq supports `response_format.json_schema` but 400s when combined with
  *     streaming or tool use. Sorter/Planner/etc. calls are all non-streaming,
  *     but the guard must exist so a future streaming caller can't 400.

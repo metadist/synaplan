@@ -7,9 +7,8 @@ namespace App\Service\Message\Routing;
 use App\Repository\ConfigRepository;
 
 /**
- * Feature flag and confidence threshold for the Phase 8 embedding-router
- * cascade layer ("Verlässliche Modellantworten und zeitgemäßes Routing",
- * Stufe B).
+ * Feature flag and confidence threshold for the embedding-router cascade
+ * layer.
  *
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ENABLED — master switch. Default OFF, mirroring
@@ -19,9 +18,10 @@ use App\Repository\ConfigRepository;
  *     `app:sort-eval --cascade` shows the embedding layer matches or beats
  *     the sorter baseline on the four SYSTEM topics.
  *   - CONFIDENCE_THRESHOLD — minimum cosine similarity (0.0-1.0) required to
- *     short-circuit the AI sorter. Deliberately NOT guessed: calibrated via
- *     `app:sort-eval --cascade` against the labelled corpus, not a constant
- *     picked in code (see plan risk "Falsch gewählte Konfidenzschwelle").
+ *     short-circuit the AI sorter. Deliberately NOT guessed: a threshold
+ *     picked in code is the main way this layer can silently misroute, so it
+ *     is calibrated via `app:sort-eval --cascade` against the labelled
+ *     corpus.
  *
  * Resolution mirrors {@see \App\AI\StructuredOutput\StructuredOutputConfig}:
  * a per-user ENABLED row (BOWNERID = userId) overrides the global row

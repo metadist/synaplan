@@ -8,8 +8,7 @@ use App\Repository\ConfigRepository;
 
 /**
  * Feature-flag resolver — the kill switch for the whole structured-output
- * rollout (Stage A of "Verlässliche Modellantworten und zeitgemäßes
- * Routing").
+ * rollout.
  *
  * Flag lives in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - ENABLED — master switch. When ON, every call-site that classifies or
@@ -18,10 +17,10 @@ use App\Repository\ConfigRepository;
  *     `FeedbackExampleService` JSON calls, `WidgetSetupService`,
  *     `UserMemoryController`, and the `officemaker` topic in `ChatHandler`)
  *     attaches a {@see StructuredOutputSchema}. When OFF, none of them do —
- *     every provider falls back to the pre-Stage-A prompt-instruction +
- *     tolerant-parser behaviour, with zero code-path difference from before
- *     this rollout (the schema was always the ONLY thing `$options` gained;
- *     nothing downstream requires it).
+ *     every provider falls back to the prompt-instruction + tolerant-parser
+ *     behaviour that predates this rollout, with zero code-path difference
+ *     (the schema was always the ONLY thing `$options` gained; nothing
+ *     downstream requires it).
  *
  * Resolution mirrors {@see \App\Service\Desktop\DesktopAgentConfig}: a
  * per-user row (BOWNERID = userId) overrides the global row (BOWNERID = 0),

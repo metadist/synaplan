@@ -35,7 +35,7 @@ use Symfony\Component\Lock\LockFactory;
  */
 #[AsCommand(
     name: 'app:routing:sync-anchors',
-    description: 'Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry example utterances (Phase 8 embedding-router; LIVE embedding calls)',
+    description: 'Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry example utterances (embedding-router; LIVE embedding calls)',
 )]
 final class RoutingAnchorsSyncCommand extends Command
 {
@@ -56,7 +56,7 @@ final class RoutingAnchorsSyncCommand extends Command
 
         $lock = $this->lockFactory->createLock('routing-anchors-sync', self::LOCK_TTL_SECONDS);
         if (!$lock->acquire()) {
-            $io->writeln('Another routing-anchors sync is already in progress, skipping.');
+            $io->note('Another routing-anchors sync is already in progress, skipping.');
 
             return Command::SUCCESS;
         }
@@ -95,9 +95,26 @@ final class RoutingAnchorsSyncCommand extends Command
             }
 
             $io->table(['topic', 'utterance', 'result'], $rows);
-            $io->success(sprintf('Routing anchors synced: %d upserted, %d failed.', $upserted, $failed));
 
-            return $failed > 0 ? Command::FAILURE : Command::SUCCESS;
+            if ($failed > 0) {
+                // The collection was already wiped at this point, so a partial
+                // run leaves the failed topics with FEWER anchors than they
+                // should have — which degrades routing quietly rather than
+                // loudly. Say so, and say what to do about it.
+                $io->error(sprintf(
+                    '%d of %d routing anchor(s) could not be embedded. The collection was rebuilt without them, '
+                    .'so the affected topics are under-represented until this command succeeds. '
+                    .'Check the embedding model (DEFAULTMODEL.VECTORIZE) and re-run.',
+                    $failed,
+                    $upserted + $failed,
+                ));
+
+                return Command::FAILURE;
+            }
+
+            $io->success(sprintf('Routing anchors synced: %d upserted.', $upserted));
+
+            return Command::SUCCESS;
         } finally {
             $lock->release();
         }

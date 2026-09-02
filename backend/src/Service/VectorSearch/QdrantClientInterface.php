@@ -288,7 +288,7 @@ interface QdrantClientInterface
      *
      * Anchors are pre-computed embeddings of the example utterances declared
      * on {@see \App\Service\Message\Capability\SystemCapability}, populated
-     * by `app:routing-anchors:sync`. Unlike memories/documents/digests this
+     * by `app:routing:sync-anchors`. Unlike memories/documents/digests this
      * collection is global (system capabilities, not per-user data), so
      * there is no `$userId` filter anywhere in this section.
      *
@@ -317,7 +317,7 @@ interface QdrantClientInterface
     /**
      * Delete every routing-anchor point.
      *
-     * `app:routing-anchors:sync` wipes and rebuilds the (small, ~15-point)
+     * `app:routing:sync-anchors` wipes and rebuilds the (small, ~15-point)
      * collection on every run rather than diffing, so a removed or reworded
      * example utterance never leaves an orphaned anchor behind.
      *

@@ -626,7 +626,7 @@ final class QdrantClientDirect implements QdrantClientInterface
 
             return $results;
         } catch (\Throwable $e) {
-            // Lazily created collection: searching before `app:routing-anchors:sync`
+            // Lazily created collection: searching before `app:routing:sync-anchors`
             // has ever run is a normal empty state (disabled feature flag,
             // fresh install), not an error — the caller treats "no results"
             // as "defer to the AI sorter".

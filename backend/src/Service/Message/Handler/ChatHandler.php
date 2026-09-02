@@ -1683,7 +1683,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
 
-        // Thread Messages hinzufügen (letzte N Messages)
+        // Add thread messages (last N messages)
         // IMPORTANT: Exclude the current message from the thread to avoid duplicates
         foreach ($thread as $msg) {
             // Skip if this is the current message (already added at the end).

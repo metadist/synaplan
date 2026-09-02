@@ -90,10 +90,10 @@ plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE mod
 sort-eval: ## Evaluate the message sorter (tools:sort) against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval
 
-sort-eval-cascade: ## Evaluate the Phase 8 embedding-router cascade layer against the golden corpus, accuracy/latency per layer (LIVE model + embedding calls)
+sort-eval-cascade: ## Evaluate the embedding-router cascade layer against the golden corpus, accuracy/latency per layer (LIVE model + embedding calls)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval --cascade
 
-routing-anchors-sync: ## Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry (Phase 8 embedding-router; LIVE embedding calls)
+routing-anchors-sync: ## Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry (embedding-router; LIVE embedding calls)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:routing:sync-anchors
 
 summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)

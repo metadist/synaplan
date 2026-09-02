@@ -266,7 +266,7 @@ final readonly class MessageClassifier
         // against pre-computed example-utterance anchors for the four
         // SYSTEM topics (general, mediamaker, officemaker, docsummary)
         // stored in Qdrant — see EmbeddingRouterService and the
-        // `app:routing-anchors:sync` command that (re)populates the anchors
+        // `app:routing:sync-anchors` command that (re)populates the anchors
         // from SystemCapabilityRegistry::exampleUtterances. User-defined
         // topics have no curated anchors, so a confident match is always one
         // of the four system topics; anything else escalates to the AI

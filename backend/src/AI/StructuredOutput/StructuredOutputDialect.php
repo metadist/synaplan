@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\AI\StructuredOutput;
 
 /**
- * The wire shape a provider expects a JSON-schema request in, per
- * "Zielarchitektur" in the structured-output refactor plan.
+ * The wire shape a provider expects a JSON-schema request in.
+ *
+ * {@see StructuredOutputCapability} decides which provider speaks which
+ * dialect, {@see StructuredOutputTranslator} writes it.
  */
 enum StructuredOutputDialect
 {
