@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
@@ -11,6 +12,7 @@ use App\Service\File\FileTypeResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
@@ -26,7 +28,9 @@ use Psr\Log\LoggerInterface;
  * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
  * 4. Embedding-router cascade match against the four SYSTEM topics (Phase 8,
  *    skip sorting when confident — see {@see EmbeddingRouterService})
- * 5. Use MessageSorter for AI-based classification
+ * 5. Defer the decision to the answering call itself (Phase 9, default OFF —
+ *    see {@see NativeToolRoutingConfig} and {@see Routing\RoutingToolset})
+ * 6. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
@@ -57,18 +61,25 @@ final readonly class MessageClassifier
         private SystemCapabilityRegistry $capabilityRegistry,
         private EmbeddingRouterService $embeddingRouter,
         private EmbeddingRouterConfig $embeddingRouterConfig,
+        private NativeToolRoutingConfig $nativeToolRoutingConfig,
+        private ToolCallingCapability $toolCallingCapability,
     ) {
     }
 
     /**
      * Classify message and determine routing.
      *
-     * @param Message $message             Message entity
-     * @param array   $conversationHistory Previous messages
+     * @param Message $message              Message entity
+     * @param array   $conversationHistory  Previous messages
+     * @param bool    $allowRoutingDeferral whether the Phase 9 native tool-calling layer may
+     *                                      defer the decision to the answering call. Set to
+     *                                      false by {@see InferenceRouter} when a deferral came
+     *                                      back unhonoured, so the second pass takes the AI
+     *                                      sorter instead of deferring again
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null, bool $allowRoutingDeferral = true): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
@@ -306,6 +317,67 @@ final readonly class MessageClassifier
                     'confidence' => $embeddingMatch->score,
                 ]);
             }
+        }
+
+        // Phase 9: hand the routing decision to the answering call itself.
+        //
+        // Everything above this point is a layer that must decide BEFORE any
+        // model runs — an override, a slash command, an attachment rule, a
+        // cheap embedding match. What is left over is exactly the population
+        // that costs a full AI-sorter round-trip today, and for the most
+        // common member of that population (an ordinary chat turn) the sorter
+        // answers a question the chat model was about to answer anyway.
+        //
+        // So instead of classifying here, emit a deferred classification:
+        // route to `chat`, and let ChatHandler attach the RoutingToolset
+        // hand-off tools to the answering call. No tool call means it really
+        // was a chat turn — one LLM call for the whole turn instead of two.
+        // A hand-off tool call means ChatHandler discards its own answer and
+        // InferenceRouter re-routes to the media/office/summary handler.
+        //
+        // ChatHandler owns the fallback: if the resolved chat provider cannot
+        // do native tool calling ({@see \App\AI\ToolCalling\ToolCallingCapability}),
+        // it asks the sorter after all, so an unsupported provider behaves
+        // exactly as it does today.
+        if ($allowRoutingDeferral
+            && null === $overrideModelId
+            && !empty($text)
+            && $this->nativeToolRoutingConfig->isEnabled($userId)
+            && $this->accountChatModelCanRouteNatively($userId)
+        ) {
+            $deferredLanguage = $this->resolveConfidentLanguage($message, $text) ?? 'en';
+
+            $this->logger->info('MessageClassifier: Deferring routing to the answering call (native tool calling)', [
+                'message_id' => $messageId,
+                'language' => $deferredLanguage,
+            ]);
+
+            $deferredDecision = RoutingDecision::deterministic(RoutingLayer::NativeToolCalling, 'general');
+
+            return array_merge([
+                'topic' => 'general',
+                // Unlike the fast-path and the embedding router, an ambiguous
+                // language does NOT force an escalation here: those layers
+                // commit to a final topic, whereas this one only defers, and
+                // the answering model replies in the user's language whatever
+                // this field says.
+                'language' => $deferredLanguage,
+                // `web_search` is null for the same reason as on every other
+                // sorter-skipping layer: no sorter, no BWEBSEARCH vote. An
+                // explicit prompt `tool_internet=true` still forces a search
+                // in MessageProcessor via WebSearchTopicPolicy.
+                'web_search' => null,
+                'source' => $deferredDecision->toClassificationSource(),
+                'skip_sorting' => true,
+                'intent' => 'chat',
+                'model_id' => null,
+                'provider' => null,
+                'model_name' => null,
+                // The flag ChatHandler keys on to attach the hand-off tools.
+                // Absent (not false) on every other path, so no existing
+                // caller changes behaviour.
+                'defer_routing_to_chat' => true,
+            ], $deferredDecision->toClassificationFields());
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -1058,6 +1130,24 @@ final readonly class MessageClassifier
             .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
             $text
         );
+    }
+
+    /**
+     * Cheap pre-gate for the Phase 9 deferral: can the account's default chat
+     * provider do native tool calling at all?
+     *
+     * NOT the authoritative check — the model that ends up answering can be a
+     * different one (widget override, prompt binding, "Again" replay), which
+     * is why {@see Handler\ChatHandler} re-checks and can still send the turn
+     * back. This only avoids deferring on installs where the answer is a
+     * foregone "no", where every message would otherwise pay for a pointless
+     * re-route.
+     */
+    private function accountChatModelCanRouteNatively(?int $userId): bool
+    {
+        $provider = $this->modelConfigService->getDefaultProvider($userId, 'chat');
+
+        return '' !== $provider && $this->toolCallingCapability->supports($provider, null, false);
     }
 
     /**

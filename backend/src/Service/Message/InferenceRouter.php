@@ -7,6 +7,9 @@ use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\CodeGenerationHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingDirective;
+use App\Service\Message\Routing\RoutingLayer;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
@@ -29,6 +32,7 @@ final class InferenceRouter
         iterable $handlers,
         private LoggerInterface $logger,
         private SystemCapabilityRegistry $capabilityRegistry,
+        private MessageClassifier $classifier,
     ) {
         foreach ($handlers as $handler) {
             $this->handlers[$handler->getName()] = $handler;
@@ -62,6 +66,14 @@ final class InferenceRouter
 
         try {
             $result = $handler->handle($message, $thread, $classification, $progressCallback, $options);
+
+            $directive = RoutingDirective::fromHandlerResult($result);
+            if (null !== $directive) {
+                $rerouted = $this->applyDirective($directive, $message, $thread, $classification, $progressCallback);
+
+                return $this->getHandler($rerouted['intent'] ?? 'chat')
+                    ->handle($message, $thread, $rerouted, $progressCallback, $options);
+            }
 
             $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
@@ -114,6 +126,14 @@ final class InferenceRouter
         try {
             $result = $handler->handleStream($message, $thread, $classification, $streamCallback, $progressCallback, $options);
 
+            $directive = RoutingDirective::fromHandlerResult($result);
+            if (null !== $directive) {
+                $rerouted = $this->applyDirective($directive, $message, $thread, $classification, $progressCallback);
+
+                return $this->getHandler($rerouted['intent'] ?? 'chat')
+                    ->handleStream($message, $thread, $rerouted, $streamCallback, $progressCallback, $options);
+            }
+
             $this->notify($progressCallback, 'processing', "Handler complete: {$intent}");
 
             return $result;
@@ -129,6 +149,75 @@ final class InferenceRouter
 
             throw $e;
         }
+    }
+
+    /**
+     * Turn a handler's {@see RoutingDirective} into the classification for the
+     * second, final dispatch of this turn.
+     *
+     * Only the Phase 9 native tool-calling path produces a directive, and only
+     * on a turn whose classification carries `defer_routing_to_chat`. The
+     * result never does, which is what bounds this to exactly one re-route: a
+     * handler that is not asked to decide the routing cannot ask for a
+     * re-route.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function applyDirective(
+        RoutingDirective $directive,
+        Message $message,
+        array $thread,
+        array $classification,
+        ?callable $progressCallback,
+    ): array {
+        unset($classification['defer_routing_to_chat']);
+
+        if (RoutingDirective::TYPE_RECLASSIFY === $directive->type) {
+            $this->logger->info('InferenceRouter: Routing deferral could not be honoured — reclassifying via the AI sorter');
+
+            $this->notify($progressCallback, 'processing', 'Classifying request...');
+
+            // Transient keys the pipeline attached earlier (search results,
+            // fetched URL content, prompt metadata, widget model override) are
+            // NOT part of a classification and would be lost by taking the
+            // fresh result wholesale — hence merge, fresh result winning.
+            return array_merge(
+                $classification,
+                $this->classifier->classify($message, $thread, null, allowRoutingDeferral: false),
+            );
+        }
+
+        $topic = (string) $directive->topic;
+        $capability = $this->capabilityRegistry->byTopic($topic);
+        // Only a registered topic can be handed off (RoutingToolset builds the
+        // tools from the same register and rejects anything else), so an
+        // unknown one here would be a bug, not user input — degrade to chat.
+        $intent = null !== $capability ? $capability->intent : 'chat';
+        $decision = RoutingDecision::deterministic(RoutingLayer::NativeToolHandoff, $topic);
+
+        $this->logger->info('InferenceRouter: Re-routing after native tool hand-off', [
+            'topic' => $topic,
+            'intent' => $intent,
+            'fields' => $directive->fields,
+        ]);
+
+        $this->notify($progressCallback, 'processing', "Routing to handler: {$topic}");
+
+        return array_merge(
+            $classification,
+            [
+                'topic' => $topic,
+                'intent' => $intent,
+                'source' => $decision->toClassificationSource(),
+                'skip_sorting' => true,
+            ],
+            // media_type / input_mode / resolution when the model supplied
+            // them — already validated against the register.
+            $directive->fields,
+            $decision->toClassificationFields(),
+        );
     }
 
     private function getHandler(string $intent): object

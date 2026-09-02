@@ -10,6 +10,12 @@ use App\AI\Interface\VisionProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\ToolCalling\StreamingToolCallAccumulator;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingDialect;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
+use App\AI\ToolCalling\ToolDefinition;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -45,6 +51,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ToolCallingTranslator $toolCallingTranslator = new ToolCallingTranslator(new ToolCallingCapability()),
+        private ToolCallParser $toolCallParser = new ToolCallParser(),
     ) {
     }
 
@@ -180,6 +188,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             return [
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $usage,
+                'tool_calls' => $this->toolCallParser->parse(ToolCallingDialect::OPENAI_FUNCTIONS, $responseArray),
             ];
         } catch (\Exception $e) {
             $this->logger->error('Groq chat error', [
@@ -222,10 +231,16 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'cache_creation_tokens' => 0,
             ];
             $finishReason = null;
+            $toolCalls = new StreamingToolCallAccumulator();
 
             foreach ($stream as $response) {
                 ++$chunkCount;
                 $responseArray = $response->toArray();
+
+                // Tool-call fragments are accumulated, never forwarded to the
+                // callback: a routing hand-off is pipeline plumbing, not
+                // content the user should see appear in the answer.
+                $toolCalls->pushOpenAiChunk($responseArray);
 
                 // Capture usage from the final chunk
                 if (isset($responseArray['usage'])) {
@@ -270,9 +285,10 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'model' => $model,
                 'chunks' => $chunkCount,
                 'usage' => $usage,
+                'tool_calls' => count($toolCalls->toolCalls()),
             ]);
 
-            return ['usage' => $usage];
+            return ['usage' => $usage, 'tool_calls' => $toolCalls->toolCalls()];
         } catch (\Exception $e) {
             $this->logger->error('Groq streaming error', [
                 'error' => $e->getMessage(),
@@ -313,7 +329,30 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
         }
 
+        $tools = self::toolDefinitions($options);
+        if ([] !== $tools) {
+            $requestOptions = array_merge($requestOptions, $this->toolCallingTranslator->translate($this->getName(), $model, $stream, $tools));
+        }
+
         return $requestOptions;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return list<ToolDefinition>
+     */
+    private static function toolDefinitions(array $options): array
+    {
+        $tools = $options['tools'] ?? null;
+        if (!is_array($tools)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $tools,
+            static fn (mixed $tool): bool => $tool instanceof ToolDefinition,
+        ));
     }
 
     // ==================== VISION ====================

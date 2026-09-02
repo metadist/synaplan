@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
@@ -14,7 +15,9 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -128,6 +131,8 @@ class ChatHandlerVisionModelResolutionTest extends TestCase
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
             $this->createMock(StructuredOutputConfig::class),
+            new ToolCallingCapability(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 }

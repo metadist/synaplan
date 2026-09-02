@@ -6,6 +6,9 @@ use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\ToolCalling\ToolCall;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolDefinition;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
@@ -21,7 +24,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingDirective;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -106,6 +112,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
             $this->alwaysOnStructuredOutputConfig(),
+            new ToolCallingCapability(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 
@@ -120,6 +128,139 @@ class ChatHandlerTest extends TestCase
     public function testGetName(): void
     {
         $this->assertEquals('chat', $this->handler->getName());
+    }
+
+    /**
+     * A message on the Phase 9 deferral path, wired so the resolved chat
+     * model is the given provider.
+     */
+    private function deferredRoutingMessage(string $provider, string $model): Message&MockObject
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Make an image of a cat');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20250116120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(1);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(10);
+        $this->modelConfigService->method('getProviderForModel')->with(10)->willReturn($provider);
+        $this->modelConfigService->method('getModelName')->with(10)->willReturn($model);
+
+        return $message;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function deferredClassification(): array
+    {
+        return ['topic' => 'general', 'language' => 'en', 'defer_routing_to_chat' => true];
+    }
+
+    public function testDeferredRoutingAttachesTheHandoffToolsToTheAnsweringCall(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->with($this->anything(), 1, $this->callback(function (array $options): bool {
+                $names = array_map(static fn (ToolDefinition $t): string => $t->name, $options['tools']);
+                self::assertSame(['handoff_mediamaker', 'handoff_officemaker', 'handoff_docsummary'], $names);
+
+                return true;
+            }))
+            ->willReturn(['content' => 'A cat!', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+
+        $result = $this->handler->handle($message, [], $this->deferredClassification());
+
+        // No tool call: it really was a chat turn, and it cost exactly one
+        // model call for the whole turn.
+        self::assertSame('A cat!', $result['content']);
+        self::assertNull(RoutingDirective::fromHandlerResult($result));
+    }
+
+    public function testAHandoffToolCallReturnsADirectiveInsteadOfAnAnswer(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade->method('chat')->willReturn([
+            // Models often narrate before calling a tool; that preamble is
+            // not an answer and must not reach the user.
+            'content' => 'Sure, let me generate that.',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5',
+            'tool_calls' => [new ToolCall('toolu_1', 'handoff_mediamaker', ['media_type' => 'image'])],
+        ]);
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_HANDOFF, $directive->type);
+        self::assertSame('mediamaker', $directive->topic);
+        self::assertSame(['media_type' => 'image'], $directive->fields);
+    }
+
+    public function testAnUnknownToolNameIsIgnoredAndTheAnswerIsKept(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => 'Paris.',
+            'provider' => 'anthropic',
+            'model' => 'claude-sonnet-5',
+            'tool_calls' => [new ToolCall('toolu_1', 'search_the_web', [])],
+        ]);
+
+        $result = $this->handler->handle($message, [], $this->deferredClassification());
+
+        self::assertSame('Paris.', $result['content']);
+        self::assertNull(RoutingDirective::fromHandlerResult($result));
+    }
+
+    /**
+     * The authoritative capability check: the classifier pre-gates on the
+     * ACCOUNT default, but a widget/prompt/"Again" binding can resolve a
+     * different model — and that one decides.
+     */
+    public function testAModelWithoutToolCallingSendsTheTurnBackToTheSorterWithoutSpendingACall(): void
+    {
+        $message = $this->deferredRoutingMessage('ollama', 'llama3');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_RECLASSIFY, $directive->type);
+    }
+
+    public function testAnOrdinaryTurnDeclaresNoTools(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5');
+
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->with($this->anything(), 1, $this->callback(static function (array $options): bool {
+                self::assertArrayNotHasKey('tools', $options);
+
+                return true;
+            }))
+            ->willReturn(['content' => 'Paris.', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+
+        $this->handler->handle($message, [], ['topic' => 'general', 'language' => 'en']);
     }
 
     public function testHumanizeFileMarkersReplacesGeneratedMarker(): void
@@ -1645,6 +1786,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
             $structuredOutputConfig,
+            new ToolCallingCapability(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
 
         $handler->handle(

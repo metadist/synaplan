@@ -51,6 +51,33 @@ enum RoutingLayer: string
     case EmbeddingRouter = 'embedding_router';
 
     /**
+     * Phase 9: no separate routing call happened at all — the ANSWERING call
+     * carried the hand-off tools from {@see RoutingToolset} and the model
+     * declined to call one, which is the tool-calling way of saying "this is
+     * an ordinary chat turn". Emitted by
+     * {@see \App\Service\Message\Handler\ChatHandler} after the fact, since
+     * the decision only exists once that call returned.
+     *
+     * The inverse case (the model DID call a hand-off tool) never reaches a
+     * classification carrying this layer: it re-enters
+     * {@see \App\Service\Message\InferenceRouter} with the handed-off topic
+     * and {@see self::NativeToolHandoff} instead.
+     *
+     * Like {@see FastPathHeuristic} and {@see EmbeddingRouter}, this source
+     * is deliberately absent from {@see \App\Service\Multitask\TaskPlanExecutor}'s
+     * planner allow-list — there is no `multi_step` vote without a sorter.
+     */
+    case NativeToolCalling = 'native_tool_calling';
+
+    /**
+     * Phase 9: the answering model called one of the {@see RoutingToolset}
+     * hand-off tools, so its own reply is discarded and the pipeline
+     * re-routes to the handed-off capability's handler. The topic and the
+     * media parameters both come from the tool call, not from a classifier.
+     */
+    case NativeToolHandoff = 'native_tool_handoff';
+
+    /**
      * The AI sorter (`DEFAULTMODEL.SORT`) decided — including its internal
      * rule-based shortcut ({@see \App\Service\Message\MessageSorter::checkRuleBasedRouting()})
      * and its parse-failure fallback, both of which keep emitting this same

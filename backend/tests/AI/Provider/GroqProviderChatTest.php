@@ -7,6 +7,7 @@ namespace App\Tests\AI\Provider;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\GroqProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\ToolCalling\ToolDefinition;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -83,6 +84,58 @@ class GroqProviderChatTest extends TestCase
         ], false);
 
         $this->assertFalse($request['response_format']['json_schema']['strict']);
+    }
+
+    // ==================== NATIVE TOOL CALLING (Phase 9) ====================
+
+    public function testChatOptionsDeclareToolsInTheOpenAiFunctionEnvelope(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'openai/gpt-oss-120b',
+            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+        ], false);
+
+        $this->assertSame('function', $request['tools'][0]['type']);
+        $this->assertSame('handoff_mediamaker', $request['tools'][0]['function']['name']);
+        $this->assertSame('auto', $request['tool_choice']);
+    }
+
+    /**
+     * Unlike a JSON schema, tools DO survive streaming on Groq — the routing
+     * hand-off has to work on the streaming web path, which is the hot one.
+     */
+    public function testChatOptionsKeepToolsWhenStreaming(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'openai/gpt-oss-120b',
+            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+        ], true);
+
+        $this->assertCount(1, $request['tools']);
+        $this->assertTrue($request['stream']);
+    }
+
+    public function testChatOptionsWithoutToolsOmitThemEntirely(): void
+    {
+        $request = $this->buildChatOptions([], ['model' => 'openai/gpt-oss-120b'], false);
+
+        $this->assertArrayNotHasKey('tools', $request);
+        $this->assertArrayNotHasKey('tool_choice', $request);
+    }
+
+    /**
+     * `$options['tools']` is a public-ish seam; anything that is not a
+     * ToolDefinition must be ignored rather than shipped to the provider as
+     * a malformed declaration.
+     */
+    public function testChatOptionsIgnoreNonToolDefinitionEntries(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'openai/gpt-oss-120b',
+            'tools' => ['not-a-tool', ['name' => 'raw_array']],
+        ], false);
+
+        $this->assertArrayNotHasKey('tools', $request);
     }
 
     private function makeProvider(?string $apiKey = 'test-key'): GroqProvider

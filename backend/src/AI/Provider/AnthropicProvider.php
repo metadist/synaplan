@@ -9,6 +9,12 @@ use App\AI\Interface\VisionProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\ToolCalling\StreamingToolCallAccumulator;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingDialect;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
+use App\AI\ToolCalling\ToolDefinition;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -22,10 +28,14 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * - Extended Thinking (reasoning)
  * - System messages
  *
- * Tool use / function calling is NOT implemented here. Claude Code and other
- * Anthropic-protocol clients that need tools should use the Messages gateway
- * at POST /v1/messages (AnthropicPassthroughTranslator), which forwards the
- * request body verbatim — including tools — to the upstream Anthropic API.
+ * Tool use is supported for ONE narrow purpose: the routing hand-off tools of
+ * the native tool-calling path ({@see \App\Service\Message\Routing\RoutingToolset}),
+ * declared via `$options['tools']` and returned as normalised
+ * {@see \App\AI\ToolCalling\ToolCall}s. There is no tool RESULT loop here —
+ * the caller acts on the call and never continues the conversation with a
+ * tool result. Claude Code and other Anthropic-protocol clients that need a
+ * full agentic tool loop still use the Messages gateway at POST /v1/messages
+ * (AnthropicPassthroughTranslator), which forwards the request body verbatim.
  */
 class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
 {
@@ -93,7 +103,27 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ToolCallingTranslator $toolCallingTranslator = new ToolCallingTranslator(new ToolCallingCapability()),
+        private ToolCallParser $toolCallParser = new ToolCallParser(),
     ) {
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return list<ToolDefinition>
+     */
+    private static function toolDefinitions(array $options): array
+    {
+        $tools = $options['tools'] ?? null;
+        if (!is_array($tools)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $tools,
+            static fn (mixed $tool): bool => $tool instanceof ToolDefinition,
+        ));
     }
 
     private function resolveApiKey(): ?string
@@ -217,6 +247,11 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema));
             }
 
+            $tools = self::toolDefinitions($options);
+            if ([] !== $tools) {
+                $requestBody = array_merge($requestBody, $this->toolCallingTranslator->translate($this->getName(), $model, false, $tools));
+            }
+
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -241,13 +276,19 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
                 if ('text' === $type) {
                     $textContent .= $block['text'] ?? '';
-                } elseif ('tool_use' === $type) {
+                } elseif ('tool_use' === $type && $schema instanceof StructuredOutputSchema) {
                     // Structured-output request (see StructuredOutputDialect::ANTHROPIC_TOOL_FORCING):
                     // Claude has no native JSON-schema response mode, so the schema was
                     // sent as a forced single tool call. Its `input` IS the desired JSON
                     // result — re-encode it into `content` so callers can treat this
                     // response exactly like a schema-following text response from any
                     // other provider.
+                    //
+                    // Guarded on the schema being requested: with native tool
+                    // calling a `tool_use` block is a REAL tool call whose
+                    // arguments are routing plumbing, and re-encoding those
+                    // into the answer text would show the user a raw JSON blob
+                    // instead of an answer.
                     $textContent .= json_encode($block['input'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 } elseif ('thinking' === $type) {
                     $thinkingContent .= $block['thinking'] ?? '';
@@ -276,6 +317,12 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             return [
                 'content' => $textContent,
                 'usage' => $usage,
+                // Only real tool calls: with a structured-output schema the
+                // single forced `tool_use` block was already folded into
+                // `content` above and must not be reported twice.
+                'tool_calls' => $schema instanceof StructuredOutputSchema
+                    ? []
+                    : $this->toolCallParser->parse(ToolCallingDialect::ANTHROPIC_TOOLS, $data),
             ];
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
@@ -359,6 +406,16 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema));
             }
 
+            $tools = self::toolDefinitions($options);
+            $toolCalls = null;
+            if ([] !== $tools) {
+                $translated = $this->toolCallingTranslator->translate($this->getName(), $model, true, $tools);
+                if ([] !== $translated) {
+                    $requestBody = array_merge($requestBody, $translated);
+                    $toolCalls = new StreamingToolCallAccumulator();
+                }
+            }
+
             $this->logger->info('Anthropic: Starting streaming chat', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -388,11 +445,14 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             }
 
             // Parse SSE stream and collect usage
-            $usage = $this->parseSSEStream($response, $callback);
+            $usage = $this->parseSSEStream($response, $callback, $toolCalls);
 
-            $this->logger->info('🔵 Anthropic: Streaming completed', ['usage' => $usage]);
+            $this->logger->info('🔵 Anthropic: Streaming completed', [
+                'usage' => $usage,
+                'tool_calls' => null === $toolCalls ? 0 : count($toolCalls->toolCalls()),
+            ]);
 
-            return ['usage' => $usage];
+            return ['usage' => $usage, 'tool_calls' => $toolCalls?->toolCalls() ?? []];
         } catch (ProviderException $e) {
             // Already carries a formatted, user-safe message (e.g. the up-front
             // HTTP error detection above) — surface it as-is without re-wrapping.
@@ -871,8 +931,13 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      * - message_stop: Stream complete
      * - ping: Keep-alive
      * - error: Error occurred
+     *
+     * `$toolCalls` is non-null only when the request declared native tools.
+     * It flips the meaning of `input_json_delta`: those fragments then belong
+     * to a real tool call and are accumulated instead of being streamed to
+     * the user (with a schema, they still ARE the answer — see chat()).
      */
-    private function parseSSEStream(ResponseInterface $response, callable $callback): array
+    private function parseSSEStream(ResponseInterface $response, callable $callback, ?StreamingToolCallAccumulator $toolCalls = null): array
     {
         $buffer = '';
         $currentBlockType = null;
@@ -916,6 +981,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         if ('thinking' === $currentBlockType) {
                             $this->logger->info('🧠 Anthropic: Thinking block started');
                         }
+
+                        $toolCalls?->pushAnthropicEvent($event['data'] ?? []);
                         break;
 
                     case 'content_block_delta':
@@ -932,6 +999,12 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                                 'type' => 'reasoning',
                                 'content' => $delta['thinking'] ?? '',
                             ]);
+                        } elseif ('input_json_delta' === $deltaType && null !== $toolCalls) {
+                            // Native tool calling (see chatStream()): these
+                            // fragments are the arguments of a REAL tool call,
+                            // so they are accumulated for the caller instead of
+                            // being streamed to the user as answer text.
+                            $toolCalls->pushAnthropicEvent($event['data'] ?? []);
                         } elseif ('input_json_delta' === $deltaType) {
                             // Structured-output tool-forcing (see chat()): the tool's
                             // `input` streams as incremental JSON fragments here instead

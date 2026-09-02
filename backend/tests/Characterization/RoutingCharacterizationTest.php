@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
@@ -15,6 +16,7 @@ use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -260,11 +262,26 @@ final class RoutingCharacterizationTest extends TestCase
             new SystemCapabilityRegistry(),
             $this->createMock(EmbeddingRouterService::class),
             new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->buildMessage($case);
 
         return $classifier->classify($message);
+    }
+
+    /**
+     * The Phase 9 deferral switched off: this snapshot locks the routing
+     * contract of the SORTER-based cascade, and a deferred turn deliberately
+     * has no classification to lock (the answering call decides).
+     */
+    private function disabledNativeToolRouting(): NativeToolRoutingConfig
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn(null);
+
+        return new NativeToolRoutingConfig($configRepo);
     }
 
     /**

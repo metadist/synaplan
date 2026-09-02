@@ -18,6 +18,7 @@ use App\Seed\MobileConfigSeeder;
 use App\Seed\ModelRetirementSeeder;
 use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
+use App\Seed\NativeToolRoutingConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SavedTaskConfigSeeder;
@@ -58,7 +59,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default OFF until GA)
  *  18. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
  *  19. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
- *  20. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  20. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
+ *  21. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -91,6 +93,7 @@ final class SeedAllCommand extends Command
         private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
         private readonly StructuredOutputConfigSeeder $structuredOutputConfigSeeder,
         private readonly EmbeddingRouterConfigSeeder $embeddingRouterConfigSeeder,
+        private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -119,7 +122,8 @@ final class SeedAllCommand extends Command
             "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default OFF until GA)\n".
             "  18. structured-output flag    (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
             "  19. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
-            "  20. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  20. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
+            "  21. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -150,6 +154,7 @@ final class SeedAllCommand extends Command
             ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
             ['structured-output', fn (): SeedResult => $this->structuredOutputConfigSeeder->seed()],
             ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
+            ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 
