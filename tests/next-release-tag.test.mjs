@@ -4,7 +4,6 @@ import test from 'node:test'
 import {
   classifyCommits,
   latestReleaseTag,
-  nextPatchTag,
   nextReleaseTag,
   parseReleaseTag,
   resolveBump
@@ -22,16 +21,16 @@ test('orders release tags numerically rather than lexically', () => {
   const tags = ['v3.9.6', 'v4.0.0', 'v4.0.10', 'v4.0.2', 'v2.3.2']
 
   assert.equal(latestReleaseTag(tags).tag, 'v4.0.10')
-  assert.equal(nextPatchTag(tags), 'v4.0.11')
+  assert.equal(nextReleaseTag(tags), 'v4.0.11')
 })
 
 test('ignores pre-release tags and unrelated refs', () => {
-  assert.equal(nextPatchTag(['v4.0.6', 'v4.1.0-rc.1', 'nightly']), 'v4.0.7')
+  assert.equal(nextReleaseTag(['v4.0.6', 'v4.1.0-rc.1', 'nightly']), 'v4.0.7')
 })
 
 test('starts a series when no release tag exists yet', () => {
-  assert.equal(nextPatchTag([]), 'v0.0.1')
-  assert.equal(nextPatchTag(['nightly', 'bootstrap']), 'v0.0.1')
+  assert.equal(nextReleaseTag([]), 'v0.0.1')
+  assert.equal(nextReleaseTag(['nightly', 'bootstrap']), 'v0.0.1')
 })
 
 test('nextReleaseTag bumps the requested component and resets the ones below it', () => {

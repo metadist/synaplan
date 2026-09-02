@@ -135,7 +135,10 @@ mobile support a narrow, reviewable compatibility layer:
   `tests/mobile-impact.test.mjs`, and verify with
   `node scripts/mobile-impact.mjs --base <base> --head <head>`.
 - The app release chain starts only when a GitHub release is **published**
-  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs.
+  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs. Publishing is no
+  longer a manual click: `release-publish.yml` publishes the draft that `Cut Release Tag` left
+  behind as soon as the CI run for that tag is green, so cutting a tag is in practice the decision
+  to start the chain.
 - Treat these as mobile-risk paths: auth/OAuth and Bearer handling, subscription/IAP and
   entitlement logic, native guards/bootstrap, forced updates, and Capacitor-facing services.
 - Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate

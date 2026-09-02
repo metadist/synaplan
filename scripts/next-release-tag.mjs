@@ -45,11 +45,6 @@ export const nextReleaseTag = (tags, level = 'patch') => {
   return `v${base.major}.${base.minor}.${base.patch + 1}`
 }
 
-// Kept as a thin wrapper: it is the one entry point resolve-app-version.mjs
-// still relies on, and existing callers should not have to know the level
-// exists.
-export const nextPatchTag = (tags) => nextReleaseTag(tags, 'patch')
-
 // A Conventional Commits type, optional scope, optional breaking marker (`!`),
 // then the colon. Matched case-insensitively because a squash-merge title
 // case follows GitHub's own casing, not the commit convention's.
@@ -139,12 +134,19 @@ const readTags = (root) =>
 // containing a blank line is never mistaken for the boundary between two
 // commits. Empty when either end is missing, so a caller that only wants a
 // tag — the historical, argument-less invocation — never triggers `git log`.
+//
+// The default 1 MiB buffer is far too small for the range release-tag.yml
+// falls back to when no release tag exists yet: the root commit, and therefore
+// the whole history — already a few megabytes here at roughly a kilobyte of
+// message per commit.
+const MESSAGE_BUFFER_BYTES = 64 * 1024 * 1024
+
 const readCommitMessages = (root, base, head) => {
   if (!base || !head) return []
   const output = execFileSync(
     'git',
     ['log', '--format=%B%x00', `${base}..${head}`],
-    { cwd: root, encoding: 'utf8' }
+    { cwd: root, encoding: 'utf8', maxBuffer: MESSAGE_BUFFER_BYTES }
   )
   return output
     .split('\x00')
