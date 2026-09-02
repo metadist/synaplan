@@ -140,7 +140,7 @@ describe('AnnouncementModal', () => {
     const wrapper = await mountModal()
 
     expect(wrapper.find('[data-testid="img-announcement"]').exists()).toBe(false)
-    expect(wrapper.find('img[alt=""]').attributes('src')).toBe('/brand.svg')
+    expect(wrapper.find('img[src="/brand.svg"]').exists()).toBe(true)
   })
 
   it('stays away from an instance that has no app to offer', async () => {

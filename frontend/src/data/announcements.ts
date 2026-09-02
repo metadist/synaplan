@@ -66,10 +66,22 @@ export interface Announcement {
 
 /**
  * Tags a store link so the stores can attribute the install to this
- * campaign, preserving a query string the operator may already have set.
+ * campaign. Goes through `URL` rather than string concatenation so a
+ * fragment (`#...`) stays after the query instead of swallowing it, and so
+ * re-tagging never leaves two `ct` parameters if the operator already set
+ * one — it overwrites theirs instead of duplicating it.
  */
 function withCampaign(url: string, campaign: string): string {
-  return `${url}${url.includes('?') ? '&' : '?'}ct=${campaign}`
+  try {
+    const tagged = new URL(url)
+    tagged.searchParams.set('ct', campaign)
+    return tagged.toString()
+  } catch {
+    // Not an absolute URL (e.g. a relative path an operator pasted by
+    // mistake). Falling back to the simple form still gets them a working
+    // link instead of a thrown error breaking the whole announcement.
+    return `${url}${url.includes('?') ? '&' : '?'}ct=${campaign}`
+  }
 }
 
 /**

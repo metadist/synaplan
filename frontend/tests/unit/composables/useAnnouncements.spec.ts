@@ -124,6 +124,31 @@ describe('the shipped catalogue', () => {
     expect(actions[0]?.url).toBe('https://apps.apple.com/de/app/id1?l=de&ct=web-announcement')
   })
 
+  it('keeps a fragment after the query instead of appending past it', () => {
+    const actions =
+      mobileApp?.actions?.(
+        visitor({ iosAppUrl: 'https://apps.apple.com/app/id1#reviews', androidAppUrl: '' })
+      ) ?? []
+
+    expect(actions[0]?.url).toBe('https://apps.apple.com/app/id1?ct=web-announcement#reviews')
+  })
+
+  it('overwrites rather than duplicates a ct the operator already configured', () => {
+    const actions =
+      mobileApp?.actions?.(
+        visitor({ iosAppUrl: 'https://apps.apple.com/app/id1?ct=operator', androidAppUrl: '' })
+      ) ?? []
+
+    expect(actions[0]?.url).toBe('https://apps.apple.com/app/id1?ct=web-announcement')
+  })
+
+  it('falls back to plain concatenation for a non-absolute store URL', () => {
+    const actions =
+      mobileApp?.actions?.(visitor({ iosAppUrl: '/local-app', androidAppUrl: '' })) ?? []
+
+    expect(actions[0]?.url).toBe('/local-app?ct=web-announcement')
+  })
+
   it('gives every entry an id and expiry that the modal can rely on', () => {
     for (const entry of announcements) {
       expect(entry.id).not.toBe('')
