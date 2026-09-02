@@ -4,48 +4,44 @@
 // called, and which change set offers one built AMI as that version.
 //
 // It lives here rather than inline in marketplace-versions.yml because it is
-// what has to stay consistent across runs. One release is two versions, one per
-// architecture, and they are submitted hours apart — AWS refuses a second
-// `AddDeliveryOptions` while the first is in flight, and ingesting an AMI takes
-// hours. The two halves of a release must still be titled and described the
-// same way.
-//
-// Deciding which architecture is still missing lives here for a second reason:
-// it was a two-line jq expression in the workflow, and it was wrong in a way no
-// eye caught. Inside `index(...)` a `.` refers to that filter's own input, so
-// the interpolated title never matched, every architecture always counted as
-// missing, and the same version was offered again on every run until AWS
+// what has to stay consistent across runs, and because deciding whether a
+// release is already offered was a two-line jq expression in the workflow that
+// was wrong in a way no eye caught: inside `index(...)` a `.` refers to that
+// filter's own input, so the interpolated title never matched, the release
+// always counted as missing, and it was offered again on every run until AWS
 // answered DUPLICATE_VERSION_TITLE. Here it is covered by tests.
+//
+// One architecture, not two: an AWS Marketplace AMI product is tied to the CPU
+// architecture of the versions it has already published, and `AddInstanceTypes`
+// is checked against that — so a second architecture cannot become a second
+// version of this product. `Compatibility.AvailableInstanceTypes` on the
+// listing offered exactly this route once, and every attempt to add a Graviton
+// instance type failed on `INVALID_AMI_ARCHITECTURE`, "CPU architecture of
+// latest version of the product is 'x86_64'", including from within the very
+// change set that also added the arm64 version. A Graviton build would need a
+// separate Marketplace listing, with its own product id — not a second
+// architecture here.
+//
+// The architecture stays in the title regardless, because it already shipped
+// that way with the first version and changing it now would only make the
+// version picker inconsistent for buyers.
 
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 
-// In submission order, and x86_64 leads deliberately: it is what most customers
-// launch.
-export const ARCHITECTURES = ['x86_64', 'arm64']
-
-// What a buyer is choosing between. Every delivery option of one version shares
-// a single AmiSource, so one version carries exactly one AMI and two
-// architectures are two versions — sitting next to each other in the version
-// picker, where the title is all there is to go by. `arm64` alone does not tell
-// somebody comparing instance types anything, so the hardware is named.
-//
-// The architecture stays last and parenthesised. That is not cosmetic:
-// `missingArchitectures` recognises a version by it, including the bare
-// `<version> (<architecture>)` titles submitted before the names were added.
-const HARDWARE = {
-  x86_64: 'Intel or AMD',
-  arm64: 'Graviton',
-}
+// The only architecture this listing can ever offer. Kept as an array, and
+// `missingArchitectures` still speaks of "architectures", so that a second
+// Marketplace product for another architecture could reuse this contract by
+// pointing at its own product id rather than by changing this file.
+export const ARCHITECTURES = ['x86_64']
 
 export const versionTitle = (version, architecture) => {
-  const hardware = HARDWARE[architecture]
-  if (hardware === undefined) {
+  if (!ARCHITECTURES.includes(architecture)) {
     throw new Error(
       `unknown architecture ${JSON.stringify(architecture)}, expected one of ${ARCHITECTURES.join(', ')}`
     )
   }
-  return `${version} - ${hardware} (${architecture})`
+  return `${version} (${architecture})`
 }
 
 // Mirrors deploy/aws/packer/synaplan.pkr.hcl's source_ami_filter and
@@ -120,8 +116,10 @@ export const buildChangeSet = ({
   ]
 }
 
-// Which architectures of a release the listing has not been offered yet, in the
-// order they should be submitted.
+// Which architectures of a release the listing has not been offered yet — in
+// practice at most `['x86_64']`, since that is the only entry in
+// `ARCHITECTURES`, but the plural stays: `known` already carries titles from
+// every architecture a listing could ever have offered.
 //
 // `known` is every version title the listing shows plus every one that has been
 // sent to it, including the titles of submissions that failed. A failed version
@@ -136,10 +134,10 @@ export const missingArchitectures = (version, known = []) => {
     throw new Error('known must be an array of version titles')
   }
 
-  // Matched by shape rather than compared for equality, so that a title written
-  // before the hardware names were added still counts as this release. Only the
-  // release at the front and the architecture at the back are load-bearing;
-  // anything between them is prose.
+  // Matched by shape rather than compared for equality: only the release at the
+  // front and the architecture at the back are load-bearing, and anything
+  // between them is prose a title could carry without ceasing to be this
+  // release.
   //
   // The word boundary after the release is what keeps 4.4.3 apart from 4.4.30,
   // and the anchor keeps it apart from 14.4.3.

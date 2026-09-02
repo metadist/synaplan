@@ -1,6 +1,13 @@
 name: AWS Marketplace AMI
 
-# Builds the AMI that AWS Marketplace publishes, for both architectures.
+# Builds the AMI that AWS Marketplace publishes.
+#
+# x86_64 by default: an AWS Marketplace AMI product is tied to one CPU
+# architecture, checked against the architecture of the versions it has already
+# published, so a second architecture cannot become a second version of this
+# product. Offering Graviton would mean a second, separate Marketplace listing,
+# not a second architecture here. `arm64` and `both` remain selectable by hand,
+# for building a Graviton image to test outside Marketplace.
 #
 # Not part of CI: it costs EC2 instance hours and it may only ever bake a
 # release whose container images are already published and verified. Release
@@ -28,11 +35,11 @@ on:
         required: true
         type: string
       architecture:
-        description: 'Which image to build.'
+        description: 'Which image to build. Only x86_64 is ever offered to Marketplace; arm64 is for building a Graviton image to test outside it.'
         required: true
-        default: both
+        default: x86_64
         type: choice
-        options: [both, x86_64, arm64]
+        options: [x86_64, arm64, both]
       verify:
         description: 'Launch the x86_64 AMI through CloudFormation and smoke-test it. Costs a few cents of instance time.'
         required: false
@@ -70,7 +77,7 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          INPUT_ARCHITECTURE: ${{ inputs.architecture || 'both' }}
+          INPUT_ARCHITECTURE: ${{ inputs.architecture || 'x86_64' }}
         run: |
           set -euo pipefail
 
@@ -91,9 +98,9 @@ jobs:
           fi
 
           case "$INPUT_ARCHITECTURE" in
-            x86_64) matrix='["x86_64"]' ;;
-            arm64)  matrix='["arm64"]' ;;
-            *)      matrix='["x86_64","arm64"]' ;;
+            arm64) matrix='["arm64"]' ;;
+            both)  matrix='["x86_64","arm64"]' ;;
+            *)     matrix='["x86_64"]' ;;
           esac
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -166,7 +173,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
-          role-session-name: synaplan-ami-${{ github.run_id }}-${{ matrix.architecture }}
+          role-session-name: synaplan-ami-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Check Marketplace encryption compatibility
@@ -217,9 +224,16 @@ jobs:
             echo "### Synaplan ${VERSION} — ${ARCHITECTURE}"
             echo ""
             echo "AMI: \`${ami}\` in \`${AWS_REGION}\`"
-            echo ""
-            echo "\`marketplace-versions.yml\` offers this AMI to the listing once the"
-            echo "verification launch has passed."
+            if [ "$ARCHITECTURE" = x86_64 ]; then
+              echo ""
+              echo "\`marketplace-versions.yml\` offers this AMI to the listing once the"
+              echo "verification launch has passed."
+            else
+              echo ""
+              echo "Not offered to Marketplace: the listing is x86_64, and a Graviton image"
+              echo "would need a separate listing, not a second version of this one. Built for"
+              echo "testing outside Marketplace."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate and share the AMI with AWS Marketplace
@@ -274,19 +288,12 @@ jobs:
           retention-days: 30
 
   verify:
-    name: Launch and smoke-test the AMI (${{ matrix.architecture }})
+    name: Launch and smoke-test the AMI
     runs-on: ubuntu-latest
     needs: [resolve, build]
-    # Every architecture is launched, one instance each, in parallel.
-    #
-    # Only x86_64 used to be, on the argument that both images come out of the
-    # same provisioner and a second launch would re-test the scripts rather than
-    # the architecture. That holds for an internal build and does not hold for an
-    # image sold to a stranger: the arm64 build starts from a different base AMI
-    # and pulls the arm64 build of every package and container it installs, and
-    # that is exactly where an architecture breaks. Nothing is offered to the
-    # public listing that has not booted and served here.
-    #
+    # Only the x86_64 image is launched. The two AMIs come out of the same
+    # provisioner on the same base OS, so a second launch would re-test the
+    # scripts rather than the architecture, for a second instance-hour.
     # The trigger is spelled out rather than tested as `inputs.verify != false`.
     # On a tag push the inputs context is empty, and GitHub compares an empty
     # string to a boolean by casting both to a number — so `'' != false` is
@@ -294,6 +301,7 @@ jobs:
     # only ever ran when someone dispatched the workflow by hand.
     if: >-
       needs.resolve.outputs.version != '' &&
+      contains(fromJSON(needs.resolve.outputs.matrix), 'x86_64') &&
       (github.event_name != 'workflow_dispatch' || inputs.verify)
     # Same reasoning as on the build job: the AWS role trusts the environment.
     environment: ami-build
@@ -301,15 +309,8 @@ jobs:
       contents: read
       id-token: write
 
-    strategy:
-      # One architecture failing must not cancel the other: which of them boots
-      # is the answer this job exists for, and each is offered on its own.
-      fail-fast: false
-      matrix:
-        architecture: ${{ fromJSON(needs.resolve.outputs.matrix) }}
-
     env:
-      STACK_NAME: synaplan-verify-${{ github.run_id }}-${{ matrix.architecture }}
+      STACK_NAME: synaplan-verify-${{ github.run_id }}
 
     steps:
       - name: Checkout
@@ -319,7 +320,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
-          role-session-name: synaplan-verify-${{ github.run_id }}-${{ matrix.architecture }}
+          role-session-name: synaplan-verify-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
           # The default hour is not enough any more: waiting out a cold first
           # boot alone may take fifty minutes. This is the maximum the role
@@ -330,7 +331,7 @@ jobs:
       - name: Download the build manifest
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
-          name: packer-manifest-${{ matrix.architecture }}
+          name: packer-manifest-x86_64
 
       - name: Read the AMI id
         id: ami
@@ -347,17 +348,8 @@ jobs:
       - name: Create the stack
         env:
           AMI_ID: ${{ steps.ami.outputs.ami }}
-          ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
-
-          # The cheapest type the template allows for this architecture, since
-          # what is being tested is the image and not the machine.
-          case "$ARCHITECTURE" in
-            arm64) instance_type=c7g.xlarge ;;
-            *)     instance_type=c7i.xlarge ;;
-          esac
-
           aws cloudformation create-stack \
             --stack-name "$STACK_NAME" \
             --template-body file://deploy/aws/cloudformation/synaplan-new-vpc.yaml \
@@ -365,7 +357,7 @@ jobs:
             --on-failure DO_NOTHING \
             --parameters \
               "ParameterKey=ImageId,ParameterValue=${AMI_ID}" \
-              "ParameterKey=InstanceType,ParameterValue=${instance_type}" \
+              ParameterKey=InstanceType,ParameterValue=c7i.xlarge \
               ParameterKey=DataVolumeSize,ParameterValue=20 \
               ParameterKey=AllowedWebCidr,ParameterValue=0.0.0.0/0 \
               ParameterKey=EnableDailySnapshots,ParameterValue=false \
@@ -503,42 +495,58 @@ jobs:
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
-          role-session-name: synaplan-teardown-${{ github.run_id }}-${{ matrix.architecture }}
+          role-session-name: synaplan-teardown-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # The proof that this image booted and served, written onto the image
-      # itself so that marketplace-versions.yml can still find it hours later,
-      # from another run. It replaces what the old submit job got from
-      # `needs: verify`, and survives what a job dependency cannot: a version is
-      # offered long after this run has ended.
+      # The proof that this release boots and serves, written onto the images
+      # themselves so that marketplace-versions.yml can still find it hours
+      # later, from another run. It replaces what the old submit job got from
+      # `needs: verify`, and survives what a job dependency cannot: the second
+      # architecture is offered long after this run has ended.
+      #
+      # Both images are marked, although only x86_64 was launched. That is the
+      # same reasoning that let one launch gate both submissions before: the two
+      # differ in the base OS's architecture, not in the provisioning that could
+      # break, so a passing smoke test is a property of the release.
       #
       # A build from a feature branch is deliberately left unmarked. This
       # workflow may be dispatched from anywhere, which is what lets a
       # deployment fix be verified from its pull request — and the mark is now
       # the only thing standing between an image and a public listing, so a
       # trial build must not carry it.
-      - name: Mark the image as smoke-tested
+      - name: Mark the release as smoke-tested
         if: >-
           success() &&
           (startsWith(github.ref, 'refs/tags/') ||
            github.ref_name == github.event.repository.default_branch)
         env:
           VERSION: ${{ needs.resolve.outputs.version }}
-          ARCHITECTURE: ${{ matrix.architecture }}
-          AMI_ID: ${{ steps.ami.outputs.ami }}
         run: |
           set -euo pipefail
 
-          aws ec2 create-tags --resources "$AMI_ID" --tags "Key=SmokeTested,Value=${VERSION}"
+          ids="$(
+            aws ec2 describe-images --owners self \
+              --filters "Name=tag:SynaplanVersion,Values=${VERSION}" \
+                        "Name=state,Values=available" \
+              --query 'Images[].ImageId' --output text
+          )"
+          if [ -z "$ids" ]; then
+            echo "::error::No available AMI carries SynaplanVersion=${VERSION}; nothing could be offered to the listing."
+            exit 1
+          fi
+
+          # Deliberate word splitting: one --resources flag takes every id.
+          # shellcheck disable=SC2086
+          aws ec2 create-tags --resources $ids --tags "Key=SmokeTested,Value=${VERSION}"
 
           {
-            echo "### Smoke test — ${ARCHITECTURE}"
+            echo "### Smoke test"
             echo ""
-            echo "\`${AMI_ID}\` booted and served, and is marked as smoke-tested."
+            echo "Marked as smoke-tested: \`${ids}\`."
             echo ""
-            echo "\`marketplace-versions.yml\` offers it to the AWS Marketplace listing from here,"
-            echo "one architecture per run. It runs hourly, and can be started by hand from"
-            echo "\`main\` to skip the wait."
+            echo "\`marketplace-versions.yml\` offers \`${VERSION}\` to the AWS Marketplace listing"
+            echo "from here, one architecture per run. It runs hourly, and can be started by hand"
+            echo "from \`main\` to skip the wait."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Show why the stack failed
