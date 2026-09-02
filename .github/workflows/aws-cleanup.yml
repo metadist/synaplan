@@ -1,0 +1,250 @@
+name: AWS Cleanup
+
+# Removes what the AMI pipeline leaves behind and nothing else pays for.
+#
+# Every release builds an AMI, and an AMI keeps a 30 GiB snapshot alive for as
+# long as it is registered. Nothing removed them, so twenty-six had piled up
+# since 4.2.4 — eleven from one day of iterating on a single release — next to
+# two Packer builders that a cancelled run had left stopped on 60 GiB of gp3 for
+# eleven days. Roughly $0.36 a day and rising, on an account whose only purpose
+# is publishing one listing.
+#
+# What it will not touch: an image a published Marketplace version launches from,
+# the two most recent releases, and anything without the tags this pipeline
+# writes. The listing still offers 4.2.4 next to the current release, so age
+# alone is never the reason an image goes.
+#
+# Deleting is decided in scripts/ami-retention.mjs, under test, because a wrong
+# answer here breaks a buyer's launch and cannot be undone.
+
+on:
+  schedule:
+    # Nightly, off the hour. Nothing here is urgent; a snapshot that lives half a
+    # day longer costs a fraction of a cent.
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only report what would be deleted.'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# A second run would race the first into deleting the same snapshot and get an
+# error from AWS instead of a clean skip.
+concurrency:
+  group: aws-cleanup
+  cancel-in-progress: false
+
+env:
+  # Everything this pipeline creates lives where the Marketplace ingests from.
+  AWS_REGION: us-east-1
+
+jobs:
+  cleanup:
+    name: Delete what no longer has a purpose
+    runs-on: ubuntu-latest
+    # Same trust path as the jobs in aws-ami.yml: the AWS role trusts this
+    # environment's subject claim, not a branch.
+    environment: ami-build
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      # Checked before anything else, because this job holds credentials that
+      # can delete a published image: the ami-build environment carries no
+      # deployment branch policy, so nothing else keeps a dispatch from a
+      # feature branch out, and from there it would run that branch's copy of
+      # the retention rules.
+      - name: Require the default branch
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          SELECTED: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$SELECTED" != "$DEFAULT" ]; then
+            echo "::error::Cleanup runs from ${DEFAULT}, not from ${SELECTED}."
+            exit 1
+          fi
+
+      # Skipped rather than failed while the account does not exist yet, like
+      # the other AWS workflows. A nightly schedule must not turn a
+      # not-yet-configured listing into a nightly red run.
+      - name: Check the credentials
+        id: config
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+          BUILD_ROLE_ARN: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+        run: |
+          if [ -n "${PRODUCT_ID:-}" ] && [ -n "${BUILD_ROLE_ARN:-}" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "No AWS listing is configured; nothing to clean up." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Assume the build role
+        if: steps.config.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
+          role-session-name: synaplan-cleanup-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Packer terminates its own builder. This is for when it cannot, because a
+      # cancelled or timed-out workflow run killed it first — the instance keeps
+      # running or sits stopped, and its root volume is billed either way.
+      #
+      # Found by the tag Packer writes for exactly this purpose, never by
+      # guessing from an untagged instance: somebody else's manual instance in
+      # this account must survive a nightly job.
+      #
+      # The age cut-off is what keeps it from terminating the builder of a
+      # release that is being built right now. A build takes about twenty
+      # minutes; six hours is far past any of them and far short of a day.
+      - name: Terminate abandoned Packer builders
+        id: builders
+        if: steps.config.outputs.configured == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          cutoff="$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          stale="$(
+            aws ec2 describe-instances \
+              --filters 'Name=tag:PackerBuilder,Values=synaplan' \
+                        'Name=instance-state-name,Values=running,stopped,stopping' \
+              --query "Reservations[].Instances[?LaunchTime<='${cutoff}'].InstanceId" \
+              --output text | tr '\t' ' '
+          )"
+
+          if [ -z "$stale" ]; then
+            echo "No abandoned Packer builder." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            echo "Would terminate: \`${stale}\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Deliberate word splitting: one --instance-ids flag takes every id.
+          # shellcheck disable=SC2086
+          aws ec2 terminate-instances --instance-ids $stale > /dev/null
+          echo "terminated=${stale}" >> "$GITHUB_OUTPUT"
+          echo "Terminated abandoned Packer builders: \`${stale}\`. Their root volumes go with them." >> "$GITHUB_STEP_SUMMARY"
+
+      # What the listing launches from, which is the one thing that must survive
+      # regardless of age. Read before anything is deleted, and required to be
+      # answered: an empty result from a call that silently failed would make
+      # every published image look unused.
+      - name: Read what the listing publishes
+        id: published
+        if: steps.config.outputs.configured == 'true'
+        env:
+          PRODUCT_ID: ${{ secrets.AWS_MARKETPLACE_PRODUCT_ID }}
+        run: |
+          set -euo pipefail
+
+          versions="$(
+            aws marketplace-catalog describe-entity \
+              --catalog AWSMarketplace --entity-id "$PRODUCT_ID" \
+              --query 'DetailsDocument.Versions' --output json
+          )"
+          if [ "$(printf '%s' "$versions" | jq 'if type == "array" then length else 0 end')" -eq 0 ]; then
+            echo "::error::The listing reports no versions. Refusing to delete anything, because every published image would look unused."
+            exit 1
+          fi
+
+          images="$(printf '%s' "$versions" | jq -c '[.. | objects | select(.Image? != null) | .Image] | unique')"
+          echo "images=${images}" >> "$GITHUB_OUTPUT"
+          echo "The listing publishes $(printf '%s' "$images" | jq 'length') image(s): \`$(printf '%s' "$images" | jq -r 'join(", ")')\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Delete expired images and their snapshots
+        if: steps.config.outputs.configured == 'true'
+        env:
+          PUBLISHED: ${{ steps.published.outputs.images }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          # Only what this pipeline built. An image without SynaplanVersion is
+          # somebody else's and never reaches the retention rules.
+          images="$(
+            aws ec2 describe-images --owners self \
+              --filters 'Name=tag-key,Values=SynaplanVersion' \
+              --query 'Images[].{imageId:ImageId,version:Tags[?Key==`SynaplanVersion`]|[0].Value,snapshotIds:BlockDeviceMappings[].Ebs.SnapshotId}' \
+              --output json
+          )"
+
+          expired="$(
+            node scripts/ami-retention.mjs expired \
+              --images "$images" \
+              --protected "$PUBLISHED"
+          )"
+
+          if [ -z "$expired" ]; then
+            echo "Nothing has expired: $(printf '%s' "$images" | jq 'length') image(s), all published or recent." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ "${DRY_RUN:-false}" = "true" ]; then
+            {
+              echo "### Would delete"
+              echo ""
+              printf '%s\n' "$expired" | sed 's/^/- `/; s/$/`/'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          deleted=0
+          # An AMI has to be deregistered before its snapshot can go; the other
+          # order fails on a snapshot that is still in use by a registered image.
+          while read -r ami version snapshots; do
+            [ -z "$ami" ] && continue
+            aws ec2 deregister-image --image-id "$ami"
+            for snapshot in $snapshots; do
+              aws ec2 delete-snapshot --snapshot-id "$snapshot"
+            done
+            echo "- \`${ami}\` (${version}) and its snapshot(s): \`${snapshots}\`" >> "$GITHUB_STEP_SUMMARY"
+            deleted=$((deleted + 1))
+          done <<< "$expired"
+
+          # Written after the list, so the summary reads as a heading over it.
+          echo "### Deleted ${deleted} expired image(s)" >> "$GITHUB_STEP_SUMMARY"
+
+      # Unattached volumes cost the same as attached ones and belong to nothing.
+      # Reported rather than deleted: this job cannot tell whether one holds
+      # something somebody still wants, and the pipeline's own volumes go away
+      # with their instances.
+      - name: Report unattached volumes
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+
+          orphans="$(
+            aws ec2 describe-volumes --filters 'Name=status,Values=available' \
+              --query 'Volumes[].[VolumeId,Size,CreateTime]' --output text
+          )"
+          if [ -n "$orphans" ]; then
+            {
+              echo "### Unattached volumes"
+              echo ""
+              echo "Billed like any other, attached to nothing. Delete them by hand if they hold nothing:"
+              echo ""
+              echo '```'
+              echo "$orphans"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

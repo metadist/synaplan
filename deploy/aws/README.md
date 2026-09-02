@@ -211,6 +211,7 @@ pipeline below.
 | ---- | ----- | ------------ |
 | Every push | `deployment-templates` job in [`ci.yml`](../../.github/workflows/ci.yml) | `cfn-lint` on both templates, `packer fmt -check` and `packer validate`. No AWS account, no cost. |
 | Every release tag | [`aws-ami.yml`](../../.github/workflows/aws-ami.yml) | Waits for the release's container images, builds both unencrypted source AMIs with Packer, verifies and shares them with the AWS Marketplace ingestion account, then launches each one through `synaplan-new-vpc.yaml` and runs `synaplan-smoke-test` on it over Session Manager. Marks an image that passed as `SmokeTested`, which is what [`marketplace-versions.yml`](../../.github/workflows/marketplace-versions.yml) offers to the Marketplace listing. Deletes the verification stack and the snapshot it leaves behind, whatever the outcome. |
+| Nightly | [`aws-cleanup.yml`](../../.github/workflows/aws-cleanup.yml) | Deregisters expired AMIs and deletes their snapshots, and terminates Packer builders a cancelled run abandoned. Never touches an image a published listing version launches from, the two newest releases, or anything this pipeline did not tag. Dispatch it with **Only report what would be deleted** to see its reasoning first. |
 | Before a public listing | `taskcat` with [`.taskcat.yml`](.taskcat.yml) | Launches both templates in two or three regions. By hand, per release. |
 
 `aws-ami.yml` skips itself with a notice while the secret
