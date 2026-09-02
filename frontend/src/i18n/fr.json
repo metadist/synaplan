@@ -2285,6 +2285,7 @@
         "title": "Associer cet ordinateur",
         "intro": "Ouvrez Synaplan Desktop sur l'ordinateur à connecter, puis saisissez cette adresse et ce code.",
         "addressLabel": "Adresse du serveur",
+        "addressHint": "Saisissez cette adresse dans Synaplan Desktop. En local, c’est l’API (http://localhost:8000), pas le port de l’interface web.",
         "codeLabel": "Code d'association",
         "expiresIn": "Expire dans {time}",
         "expired": "Ce code a expiré.",

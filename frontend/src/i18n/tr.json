@@ -3141,6 +3141,7 @@
         "title": "Bu bilgisayarı bağla",
         "intro": "Bağlamak istediğiniz bilgisayarda Synaplan Desktop'ı açın, ardından bu adresi ve kodu girin.",
         "addressLabel": "Sunucu adresi",
+        "addressHint": "Bu adresi Synaplan Desktop’a yazın. Yerelde bu API’dir (http://localhost:8000), web arayüzü bağlantı noktası değil.",
         "codeLabel": "Eşleme kodu",
         "expiresIn": "{time} içinde sona erer",
         "expired": "Bu kodun süresi doldu.",
