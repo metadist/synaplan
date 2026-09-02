@@ -6,7 +6,9 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -17,8 +19,10 @@ use Psr\Log\LoggerInterface;
  * @see https://console.groq.com/docs/
  * @see https://console.groq.com/docs/speech-to-text
  */
-class GroqProvider implements ChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
+class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     /**
      * Fallback vision model when the caller passed none. Qwen 3.6 27B replaced
      * the retired Llama 4 Scout (shut down 2026-07-17); normal flows resolve the
@@ -166,6 +170,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 $requestOptions['temperature'] = $options['temperature'];
             }
 
+            $requestOptions = $this->applyChatCompletionsToolOptions($requestOptions, $options);
+
             $response = $this->client()->chat()->create($requestOptions);
 
             $responseArray = $response->toArray();
@@ -181,10 +187,10 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'cache_creation_tokens' => 0,
             ];
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $usage,
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (\Exception $e) {
             $this->logger->error('Groq chat error', [
                 'error' => $e->getMessage(),
@@ -224,6 +230,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             if (isset($options['temperature'])) {
                 $requestOptions['temperature'] = $options['temperature'];
             }
+
+            $requestOptions = $this->applyChatCompletionsToolOptions($requestOptions, $options);
 
             $stream = $this->client()->chat()->createStreamed($requestOptions);
 
@@ -274,6 +282,8 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
                     $callback($content);
                 }
+
+                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
             }
 
             if (null !== $finishReason) {

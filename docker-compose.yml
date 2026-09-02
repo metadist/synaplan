@@ -264,6 +264,10 @@ services:
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
+      # Optional Collabora CODE convert-to. Empty = disabled (default).
+      # When using `--profile office`, set OFFICE_CONVERT_URL=http://collabora:9980
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -417,6 +421,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
@@ -851,6 +857,30 @@ services:
       - ./_docker/keycloak/setup.sh:/setup/setup.sh:ro
     profiles: [oidc]
     restart: "no"
+    networks:
+      - synaplan-network
+
+  # Optional Collabora CODE — LibreOffice convert-to over HTTP.
+  # Not started by default (keeps ~2 GB RAM off the core stack). Enable with:
+  #   OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+  # Docs: docs/DEVELOPMENT.md ("Office conversion")
+  # No published port: the backend talks to collabora:9980 on the compose network.
+  collabora:
+    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    container_name: synaplan-collabora
+    profiles: [office]
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+    # CODE 25.04 dropped curl (CollaboraOnline/online#11856). Same /dev/tcp
+    # probe as deploy/compose.yaml's ollama service; coolwsd --probe is 26.04+.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9980 && printf 'GET /hosting/capabilities HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     networks:
       - synaplan-network
 

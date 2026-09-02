@@ -91,11 +91,15 @@ Creates a chat completion. Supports both streaming and non-streaming modes.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `messages` | array | Yes | Array of message objects (`role` + `content`) |
+| `messages` | array | Yes | Array of message objects (`role` + `content`). Assistant `tool_calls` and `role: tool` turns are kept intact. |
 | `model` | string | No | Model ID (e.g., `gpt-4o`, `llama3.1:8b`). Falls back to user default. |
 | `temperature` | number | No | Sampling temperature (0-2). Default varies by model. |
 | `max_tokens` | integer | No | Maximum tokens to generate. |
 | `stream` | boolean | No | If `true`, returns SSE stream. Default `false`. |
+| `tools` | array | No | OpenAI function declarations. Requires a model that advertises `synaplan:tool_use`. |
+| `tool_choice` | string or object | No | `auto`, `none`, `required`, or `{type:"function",function:{name}}`. |
+| `parallel_tool_calls` | boolean | No | Forwarded to the upstream provider when supported. |
+| `stream_options.include_usage` | boolean | No | When streaming, emit a trailing usage chunk before `[DONE]`. |
 
 **Model Resolution:**
 
@@ -104,7 +108,108 @@ The `model` field is matched against Synaplan's model registry in this order:
 2. Exact match on model `name`
 3. Falls back to the user's default chat model
 
-Use `GET /v1/models` to see available model IDs.
+Use `GET /v1/models` to see available model IDs. Models that pass the dual
+tool-calling gate (provider implements tool calling **and** the catalog row
+has `tool_use`) include `capabilities: ["synaplan:tool_use"]`.
+
+#### Function calling / tools (client-owned)
+
+Client tools are **relayed**, not executed. Synaplan never runs a function the
+client declared (Collabora editor tools, Cursor/Continue tools, your own SDK
+tools). When the model wants one of those functions it answers with
+`finish_reason: "tool_calls"` and `message.tool_calls`; you run the function
+and send a second request that includes the assistant `tool_calls` turn plus
+`role: tool` results.
+
+A `tools` / `tool_choice` (other than `none`) on a model that does not
+advertise `synaplan:tool_use` returns `400` `tools_not_supported` — never a
+silent text answer.
+
+```bash
+# Round 1 — the model asks the client to run get_weather
+curl https://your-synaplan-instance.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-your-synaplan-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "What is the weather in Berlin?"}],
+    "tools": [{
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Look up current weather for a city",
+        "parameters": {
+          "type": "object",
+          "properties": {"city": {"type": "string"}},
+          "required": ["city"]
+        }
+      }
+    }]
+  }'
+
+# Round 2 — send the tool result back
+curl https://your-synaplan-instance.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-your-synaplan-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [
+      {"role": "user", "content": "What is the weather in Berlin?"},
+      {
+        "role": "assistant",
+        "tool_calls": [{
+          "id": "call_abc",
+          "type": "function",
+          "function": {"name": "get_weather", "arguments": "{\"city\":\"Berlin\"}"}
+        }]
+      },
+      {"role": "tool", "tool_call_id": "call_abc", "content": "{\"temp\":18,\"unit\":\"C\"}"}
+    ],
+    "tools": [{
+      "type": "function",
+      "function": {"name": "get_weather", "parameters": {"type": "object"}}
+    }]
+  }'
+```
+
+Streaming uses the same OpenAI shape: first chunk `delta.role`, text as
+`delta.content`, tool calls as `delta.tool_calls` (first chunk per index
+carries `id` / `type` / `function.name`, later chunks only `arguments`),
+then `finish_reason: "tool_calls"` and `[DONE]`.
+
+#### Server tools (MCP and web search)
+
+On models that advertise `synaplan:tool_use`, this endpoint also **injects
+and executes** Synaplan-owned tools. That is a deliberate policy difference
+from [`POST /v1/messages`](./ANTHROPIC_COMPATIBLE_API.md): the Anthropic
+gateway leaves MCP off until an admin enables `MESSAGES_GATEWAY.MCP_TOOLS_ENABLED`,
+and it only runs `web_search` when the client declared Anthropic's
+`web_search_*` server tool (or mode is `synaplan`). OpenAI SDK clients and
+Collabora never send that declaration and usually ship their own `tools[]`,
+so `/v1/chat/completions` would offer nothing if it reused those defaults.
+
+| Tool | Injected when | Executed by |
+|------|----------------|-------------|
+| User MCP catalog (read-only) | `MCP_CLIENT_ENABLED` is on **and** the user has at least one connected MCP server | Synaplan (`McpClient`) |
+| `web_search` | A search provider is configured **and** `MESSAGES_GATEWAY.WEB_SEARCH_MODE` is not `off` | Synaplan (`WebSearchTool`) |
+
+Injection happens **alongside** client tools. If the client already declared
+the same function name, Synaplan skips its own declaration (the client owns
+that name). `tool_choice: "none"` disables inject and the loop.
+
+Intermediate MCP / search rounds are **not** streamed. The client sees either
+the final text (`finish_reason: "stop"`) or the **client-owned** `tool_calls`.
+
+```bash
+# No client tools — still gets a search-backed answer when Brave is configured
+curl https://your-synaplan-instance.com/v1/chat/completions \
+  -H "Authorization: Bearer sk-your-synaplan-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [{"role": "user", "content": "What is the latest Synaplan release?"}]
+  }'
+```
 
 ### `POST /v1/audio/transcriptions`
 
@@ -253,7 +358,9 @@ model choice stay consistent.
 
 ### `GET /v1/models`
 
-Returns all available models in OpenAI format.
+Returns all available models in OpenAI format. An additive `capabilities`
+array is present only when **both** tool-calling gates pass (the chat
+provider implements tool calling and the catalog row has `tool_use`).
 
 **Response:**
 
@@ -261,7 +368,7 @@ Returns all available models in OpenAI format.
 {
   "object": "list",
   "data": [
-    {"id": "gpt-4o", "object": "model", "created": 1700000000, "owned_by": "openai"},
+    {"id": "gpt-4o", "object": "model", "created": 1700000000, "owned_by": "openai", "capabilities": ["synaplan:tool_use"]},
     {"id": "llama3.1:8b", "object": "model", "created": 1700000000, "owned_by": "ollama"}
   ]
 }
@@ -320,7 +427,7 @@ Errors follow the OpenAI error format:
 
 - **Synaplan routes to the correct AI provider automatically.** When you request `model: "gpt-4o"`, Synaplan uses the OpenAI provider. When you request `model: "llama3.1:8b"`, it uses Ollama. This is transparent to the caller.
 - **Token usage** is not always reported (depends on the provider). The `usage` field may contain zeros.
-- **Function calling / tools** are not yet supported through this endpoint.
+- **Function calling / tools** are supported as a client-tool pass-through on models that advertise `synaplan:tool_use` on `GET /v1/models`. Synaplan does not execute those tools. A request with `tools` on an unsupported model returns `400` `tools_not_supported`.
 - **Image inputs** (vision) are not yet supported through this endpoint.
 - **Speech-to-text** is supported at `/v1/audio/transcriptions` (one-shot) and `/v1/audio/transcriptions/sessions` (streaming, with `client_id` + `api_key_id`).
 - The existing Synaplan API at `/api/v1/` is unchanged and fully functional.

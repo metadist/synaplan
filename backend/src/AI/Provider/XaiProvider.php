@@ -13,8 +13,10 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -43,8 +45,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://docs.x.ai/developers/model-capabilities/imagine
  * @see https://docs.x.ai/developers/model-capabilities/audio/voice
  */
-final class XaiProvider implements ChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
+final class XaiProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     private const PROVIDER_NAME = 'xai';
     private const DISPLAY_NAME = 'xAI';
     private const ENV_VAR = 'XAI_API_KEY';
@@ -310,10 +314,10 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $this->parseUsage($responseArray['usage'] ?? []),
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -1174,6 +1178,8 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
         if (is_string($content) && '' !== $content) {
             $callback($content);
         }
+
+        $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
     }
 
     /**
@@ -1218,7 +1224,7 @@ final class XaiProvider implements ChatProviderInterface, ImageGenerationProvide
             $request['stream_options'] = ['include_usage' => true];
         }
 
-        return $request;
+        return $this->applyChatCompletionsToolOptions($request, $options);
     }
 
     /**

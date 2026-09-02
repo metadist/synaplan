@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\AI\Exception\ProviderException;
+use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
+use App\AI\Tool\ToolCallAccumulator;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\Api\OpenAiChatCompletionRequest;
+use App\Service\Api\OpenAiChatCompletionRequestException;
+use App\Service\Api\OpenAiChatCompletionResponder;
+use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
@@ -43,6 +50,8 @@ class OpenAICompatibleController extends AbstractController
         private MessagesGatewayConfig $messagesGatewayConfig,
         private MessageBusInterface $messageBus,
         private LoggerInterface $logger,
+        private OpenAiToolCallingGate $toolCallingGate,
+        private OpenAiGatewayToolLoop $toolLoop,
     ) {
     }
 
@@ -50,7 +59,7 @@ class OpenAICompatibleController extends AbstractController
     #[OA\Post(
         path: '/v1/chat/completions',
         summary: 'Create a chat completion (OpenAI-compatible)',
-        description: 'Generates a chat completion. Accepts the same request format as the OpenAI API. Supports streaming via SSE when stream=true.',
+        description: 'Generates a chat completion. Accepts the same request format as the OpenAI API. Supports streaming via SSE when stream=true. Client tools are relayed as finish_reason=tool_calls when the resolved model passes the dual tool-calling gate.',
         security: [['Bearer' => []]],
         tags: ['OpenAI Compatible']
     )]
@@ -65,8 +74,10 @@ class OpenAICompatibleController extends AbstractController
                     type: 'array',
                     items: new OA\Items(
                         properties: [
-                            new OA\Property(property: 'role', type: 'string', enum: ['system', 'user', 'assistant']),
-                            new OA\Property(property: 'content', type: 'string'),
+                            new OA\Property(property: 'role', type: 'string', enum: ['system', 'user', 'assistant', 'tool']),
+                            new OA\Property(property: 'content', description: 'String or array of content parts'),
+                            new OA\Property(property: 'tool_calls', type: 'array', items: new OA\Items(type: 'object')),
+                            new OA\Property(property: 'tool_call_id', type: 'string'),
                         ]
                     ),
                     example: [['role' => 'user', 'content' => 'Hello!']]
@@ -74,6 +85,35 @@ class OpenAICompatibleController extends AbstractController
                 new OA\Property(property: 'temperature', type: 'number', example: 0.7),
                 new OA\Property(property: 'max_tokens', type: 'integer', example: 4096),
                 new OA\Property(property: 'stream', type: 'boolean', example: false),
+                new OA\Property(
+                    property: 'tools',
+                    type: 'array',
+                    description: 'OpenAI function declarations. Requires a model with synaplan:tool_use.',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'type', type: 'string', example: 'function'),
+                            new OA\Property(
+                                property: 'function',
+                                properties: [
+                                    new OA\Property(property: 'name', type: 'string', example: 'get_weather'),
+                                    new OA\Property(property: 'description', type: 'string'),
+                                    new OA\Property(property: 'parameters', type: 'object'),
+                                ],
+                                type: 'object'
+                            ),
+                        ],
+                        type: 'object'
+                    )
+                ),
+                new OA\Property(property: 'tool_choice', description: 'auto | none | required | {type:function,function:{name}}'),
+                new OA\Property(property: 'parallel_tool_calls', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'stream_options',
+                    properties: [
+                        new OA\Property(property: 'include_usage', type: 'boolean', example: true),
+                    ],
+                    type: 'object'
+                ),
             ]
         )
     )]
@@ -96,7 +136,8 @@ class OpenAICompatibleController extends AbstractController
                                 property: 'message',
                                 properties: [
                                     new OA\Property(property: 'role', type: 'string', example: 'assistant'),
-                                    new OA\Property(property: 'content', type: 'string', example: 'Hello! How can I help?'),
+                                    new OA\Property(property: 'content', type: 'string', example: 'Hello! How can I help?', nullable: true),
+                                    new OA\Property(property: 'tool_calls', type: 'array', items: new OA\Items(type: 'object')),
                                 ],
                                 type: 'object'
                             ),
@@ -116,6 +157,7 @@ class OpenAICompatibleController extends AbstractController
             ]
         )
     )]
+    #[OA\Response(response: 400, description: 'Invalid request or tools not supported on this model')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 404, description: 'Model not found')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
@@ -130,9 +172,10 @@ class OpenAICompatibleController extends AbstractController
             return $this->openAiError('Invalid JSON body', 'invalid_request_error', 'invalid_json', 400);
         }
 
-        $messages = $body['messages'] ?? null;
-        if (!is_array($messages) || empty($messages)) {
-            return $this->openAiError('messages is required and must be a non-empty array', 'invalid_request_error', 'missing_messages', 400);
+        try {
+            $parsed = OpenAiChatCompletionRequest::fromBody($body);
+        } catch (OpenAiChatCompletionRequestException $e) {
+            return $this->openAiError($e->getMessage(), 'invalid_request_error', $e->errorCode, 400);
         }
 
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'MESSAGES');
@@ -140,59 +183,14 @@ class OpenAICompatibleController extends AbstractController
             return $this->openAiError('Rate limit exceeded', 'rate_limit_error', 'rate_limit_exceeded', 429);
         }
 
-        $modelString = $body['model'] ?? null;
-        $temperature = isset($body['temperature']) ? (float) $body['temperature'] : null;
-        $maxTokens = isset($body['max_tokens']) ? (int) $body['max_tokens'] : null;
-        $stream = (bool) ($body['stream'] ?? false);
-
-        $resolvedModel = $this->resolveModel($modelString, $user->getId());
-        if (null === $resolvedModel) {
-            return $this->openAiError(
-                null !== $modelString && '' !== $modelString
-                    ? sprintf('The model `%s` does not exist or is not available.', $modelString)
-                    : 'No model specified and no default chat model is configured.',
-                'invalid_request_error',
-                'model_not_found',
-                404,
-            );
-        }
-        $completionId = 'chatcmpl-synaplan-'.bin2hex(random_bytes(12));
-        $created = time();
-
-        $options = [
-            'model' => $resolvedModel['providerModelId'],
-            'provider' => $resolvedModel['provider'],
-        ];
-        if (null !== $temperature) {
-            $options['temperature'] = $temperature;
-        }
-        if (null !== $maxTokens) {
-            $options['max_tokens'] = $maxTokens;
-        }
-
-        $this->logger->info('OpenAI-compatible chat request', [
-            'user_id' => $user->getId(),
-            'model_requested' => $modelString,
-            'model_resolved' => $resolvedModel['providerModelId'],
-            'provider' => $resolvedModel['provider'],
-            'stream' => $stream,
-            'messages_count' => count($messages),
-        ]);
-
-        $dbModelId = $resolvedModel['model_id'];
-
-        if ($stream) {
-            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
-        }
-
-        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+        return $this->dispatchChatCompletion($user, $parsed);
     }
 
     #[Route('/v1/models', name: 'openai_list_models', methods: ['GET'])]
     #[OA\Get(
         path: '/v1/models',
         summary: 'List available models (OpenAI-compatible)',
-        description: 'Returns a list of all available models in OpenAI format.',
+        description: 'Returns a list of all available models in OpenAI format. Models that pass the dual tool-calling gate include capabilities: ["synaplan:tool_use"].',
         security: [['Bearer' => []]],
         tags: ['OpenAI Compatible']
     )]
@@ -211,6 +209,12 @@ class OpenAICompatibleController extends AbstractController
                             new OA\Property(property: 'object', type: 'string', example: 'model'),
                             new OA\Property(property: 'created', type: 'integer', example: 1700000000),
                             new OA\Property(property: 'owned_by', type: 'string', example: 'openai'),
+                            new OA\Property(
+                                property: 'capabilities',
+                                type: 'array',
+                                items: new OA\Items(type: 'string'),
+                                example: ['synaplan:tool_use']
+                            ),
                         ]
                     )
                 ),
@@ -228,12 +232,16 @@ class OpenAICompatibleController extends AbstractController
         $data = [];
 
         foreach ($models as $model) {
-            $data[] = [
+            $row = [
                 'id' => $model->getProviderId() ?: $model->getName(),
                 'object' => 'model',
                 'created' => 1700000000,
                 'owned_by' => strtolower($model->getService()),
             ];
+            if ($this->toolCallingGate->allows($model)) {
+                $row['capabilities'] = [OpenAiToolCallingGate::CAPABILITY];
+            }
+            $data[] = $row;
         }
 
         return new JsonResponse([
@@ -242,46 +250,100 @@ class OpenAICompatibleController extends AbstractController
         ]);
     }
 
+    private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed): Response
+    {
+        $resolvedModel = $this->resolveModel($parsed->model, $user->getId());
+        if (null === $resolvedModel) {
+            return $this->openAiError(
+                null !== $parsed->model && '' !== $parsed->model
+                    ? sprintf('The model `%s` does not exist or is not available.', $parsed->model)
+                    : 'No model specified and no default chat model is configured.',
+                'invalid_request_error',
+                'model_not_found',
+                404,
+            );
+        }
+
+        $gateAllows = $this->toolCallingGate->allows($resolvedModel['entity']);
+        if ($parsed->requestsTools() && !$gateAllows) {
+            return $this->openAiError(
+                sprintf('The model `%s` does not support tools.', $resolvedModel['displayModel']),
+                'invalid_request_error',
+                'tools_not_supported',
+                400,
+            );
+        }
+
+        $options = array_merge([
+            'model' => $resolvedModel['providerModelId'],
+            'provider' => $resolvedModel['provider'],
+            'include_usage' => $parsed->includeUsage,
+        ], $parsed->providerToolOptions());
+        if ($gateAllows && 'none' !== $parsed->toolChoice) {
+            $options['server_tool_loop'] = true;
+        }
+        if (null !== $parsed->temperature) {
+            $options['temperature'] = $parsed->temperature;
+        }
+        if (null !== $parsed->maxTokens) {
+            $options['max_tokens'] = $parsed->maxTokens;
+        }
+
+        $this->logger->info('OpenAI-compatible chat request', [
+            'user_id' => $user->getId(),
+            'model_requested' => $parsed->model,
+            'model_resolved' => $resolvedModel['providerModelId'],
+            'provider' => $resolvedModel['provider'],
+            'stream' => $parsed->stream,
+            'messages_count' => count($parsed->messages),
+            'tools' => count($parsed->tools),
+        ]);
+
+        $completionId = 'chatcmpl-synaplan-'.bin2hex(random_bytes(12));
+        $created = time();
+        $dbModelId = $resolvedModel['model_id'];
+
+        if ($parsed->stream) {
+            return $this->handleStream($user, $parsed->messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+        }
+
+        return $this->handleNonStream($user, $parsed->messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     */
     private function handleNonStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): JsonResponse
     {
         try {
-            $result = $this->aiFacade->chat($messages, $user->getId(), $options);
+            $result = !empty($options['server_tool_loop'])
+                ? $this->toolLoop->complete($user, $messages, $options)
+                : $this->aiFacade->chat($messages, $user->getId(), $options);
+            $payload = OpenAiChatCompletionResponder::nonStreamPayload($completionId, $created, $displayModel, $result);
+            $toolCalls = is_array($payload['choices'][0]['message']['tool_calls'] ?? null)
+                ? $payload['choices'][0]['message']['tool_calls']
+                : [];
+            $content = is_string($result['content'] ?? null) ? $result['content'] : '';
+            $responseText = OpenAiChatCompletionResponder::responseTextForMetering($content, $toolCalls);
+            $loopNotes = is_array($result['loop_notes'] ?? null) ? $result['loop_notes'] : [];
+            if ([] !== $loopNotes) {
+                $responseText = trim($responseText."\n".implode("\n", $loopNotes));
+            }
 
             $this->recordChatUsage($user, [
                 'provider' => $result['provider'] ?? 'unknown',
                 'model' => $result['model'] ?? 'unknown',
                 'model_id' => $dbModelId,
                 'usage' => $result['usage'] ?? [],
-                'response_text' => $result['content'] ?? '',
+                'response_text' => $responseText,
                 'input_text' => $this->lastUserText($messages),
                 'source' => 'OPENAI_API',
             ]);
 
-            $this->dispatchSessionSummary($user, $messages, $displayModel, (string) ($result['content'] ?? ''));
+            $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText);
 
-            $usage = $result['usage'] ?? [];
-
-            return new JsonResponse([
-                'id' => $completionId,
-                'object' => 'chat.completion',
-                'created' => $created,
-                'model' => $displayModel,
-                'choices' => [
-                    [
-                        'index' => 0,
-                        'message' => [
-                            'role' => 'assistant',
-                            'content' => $result['content'] ?? '',
-                        ],
-                        'finish_reason' => 'stop',
-                    ],
-                ],
-                'usage' => [
-                    'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
-                    'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
-                    'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
-                ],
-            ]);
+            return new JsonResponse($payload);
         } catch (\Throwable $e) {
             ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
 
@@ -303,6 +365,8 @@ class OpenAICompatibleController extends AbstractController
      * clients to retry a request that can never succeed. Relay the upstream
      * status and the error type OpenAI clients branch on.
      *
+     * Upstream 4xx about tools become 400 tools_not_supported, never a 500.
+     *
      * @return array{status: int, type: string, code: string}
      */
     private function describeFailure(\Throwable $e): array
@@ -318,6 +382,12 @@ class OpenAICompatibleController extends AbstractController
                 $status = $current->getResponse()->getStatusCode();
                 break;
             }
+        }
+
+        if ($status < 500 && self::isToolsUpstreamError($e->getMessage())) {
+            return [
+                'status' => 400, 'type' => 'invalid_request_error', 'code' => 'tools_not_supported',
+            ];
         }
 
         return match (true) {
@@ -336,6 +406,23 @@ class OpenAICompatibleController extends AbstractController
         };
     }
 
+    private static function isToolsUpstreamError(string $message): bool
+    {
+        $haystack = strtolower($message);
+        foreach (['tool_choice', 'tool_calls', 'function calling', 'function_call'] as $needle) {
+            if (str_contains($haystack, $needle)) {
+                return true;
+            }
+        }
+
+        return str_contains($haystack, 'tool')
+            && (str_contains($haystack, 'support') || str_contains($haystack, 'not enabled'));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     */
     private function handleStream(User $user, array $messages, array $options, string $completionId, int $created, string $displayModel, ?int $dbModelId): StreamedResponse
     {
         $response = new StreamedResponse();
@@ -345,89 +432,101 @@ class OpenAICompatibleController extends AbstractController
         $response->headers->set('Connection', 'keep-alive');
 
         $response->setCallback(function () use ($user, $messages, $options, $completionId, $created, $displayModel, $dbModelId) {
-            while (ob_get_level()) {
-                ob_end_clean();
+            // Real HTTP (FrankenPHP / php-fpm) must drop leftover output
+            // buffers or SSE never reaches the client. PHPUnit captures via
+            // its own buffer and PHP_SAPI is cli — leave those alone, and
+            // do not implicit-flush or the test buffer is emptied on echo.
+            $flushToClient = 'cli' !== \PHP_SAPI;
+            if ($flushToClient) {
+                while (ob_get_level()) {
+                    ob_end_clean();
+                }
+                ob_implicit_flush(true);
             }
-            ob_implicit_flush(true);
             set_time_limit(0);
             ignore_user_abort(false);
 
             $firstChunk = true;
             $accumulatedContent = '';
+            $finishReason = 'stop';
+            $accumulator = new ToolCallAccumulator();
+            $announcedIndexes = [];
 
             try {
-                $streamMetadata = $this->aiFacade->chatStream(
-                    $messages,
-                    function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent) {
-                        if (connection_aborted()) {
-                            return;
+                $onChunk = function ($chunk) use ($completionId, $created, $displayModel, &$firstChunk, &$accumulatedContent, &$finishReason, $accumulator, &$announcedIndexes, $flushToClient) {
+                    if (connection_aborted()) {
+                        return;
+                    }
+
+                    if (is_array($chunk) && 'finish' === ($chunk['type'] ?? '')) {
+                        $reason = $chunk['finish_reason'] ?? null;
+                        if (is_string($reason) && '' !== $reason) {
+                            $finishReason = $reason;
                         }
 
-                        // Only visible answer text is forwarded — reasoning
-                        // chunks (chain-of-thought) are never exposed (#1067).
-                        $content = is_string($chunk) || is_array($chunk)
-                            ? StreamChunk::visibleText($chunk)
-                            : '';
+                        return;
+                    }
 
-                        if ('' === $content) {
-                            return;
-                        }
-
-                        $accumulatedContent .= $content;
-
+                    if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
+                        $accumulator->addDelta($chunk);
                         if ($firstChunk) {
-                            $this->writeSSE([
-                                'id' => $completionId,
-                                'object' => 'chat.completion.chunk',
-                                'created' => $created,
-                                'model' => $displayModel,
-                                'choices' => [
-                                    [
-                                        'index' => 0,
-                                        'delta' => ['role' => 'assistant'],
-                                        'finish_reason' => null,
-                                    ],
-                                ],
-                            ]);
+                            $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);
                             $firstChunk = false;
                         }
+                        $this->writeSSE(OpenAiChatCompletionResponder::toolCallDeltaChunk(
+                            $completionId,
+                            $created,
+                            $displayModel,
+                            $chunk,
+                            $announcedIndexes,
+                        ), $flushToClient);
 
-                        $this->writeSSE([
-                            'id' => $completionId,
-                            'object' => 'chat.completion.chunk',
-                            'created' => $created,
-                            'model' => $displayModel,
-                            'choices' => [
-                                [
-                                    'index' => 0,
-                                    'delta' => ['content' => $content],
-                                    'finish_reason' => null,
-                                ],
-                            ],
-                        ]);
-                    },
-                    $user->getId(),
-                    $options
-                );
+                        return;
+                    }
 
-                $this->writeSSE([
-                    'id' => $completionId,
-                    'object' => 'chat.completion.chunk',
-                    'created' => $created,
-                    'model' => $displayModel,
-                    'choices' => [
-                        [
-                            'index' => 0,
-                            'delta' => new \stdClass(),
-                            'finish_reason' => 'stop',
-                        ],
-                    ],
-                ]);
-                echo "data: [DONE]\n\n";
-                if (ob_get_level()) {
-                    ob_flush();
+                    // Only visible answer text is forwarded — reasoning
+                    // chunks (chain-of-thought) are never exposed (#1067).
+                    $content = is_string($chunk) || is_array($chunk)
+                        ? StreamChunk::visibleText($chunk)
+                        : '';
+
+                    if ('' === $content) {
+                        return;
+                    }
+
+                    $accumulatedContent .= $content;
+
+                    if ($firstChunk) {
+                        $this->writeSSE(OpenAiChatCompletionResponder::roleChunk($completionId, $created, $displayModel), $flushToClient);
+                        $firstChunk = false;
+                    }
+
+                    $this->writeSSE(OpenAiChatCompletionResponder::contentChunk($completionId, $created, $displayModel, $content), $flushToClient);
+                };
+                $streamMetadata = !empty($options['server_tool_loop'])
+                    ? $this->toolLoop->stream($user, $messages, $onChunk, $options)
+                    : $this->aiFacade->chatStream($messages, $onChunk, $user->getId(), $options);
+
+                if (!$accumulator->isEmpty() && 'stop' === $finishReason) {
+                    $finishReason = 'tool_calls';
                 }
-                flush();
+
+                $this->writeSSE(OpenAiChatCompletionResponder::finishChunk($completionId, $created, $displayModel, $finishReason), $flushToClient);
+
+                if (!empty($options['include_usage'])) {
+                    $usage = is_array($streamMetadata['usage'] ?? null) ? $streamMetadata['usage'] : [];
+                    $this->writeSSE(OpenAiChatCompletionResponder::usageChunk($completionId, $created, $displayModel, $usage), $flushToClient);
+                }
+
+                echo "data: [DONE]\n\n";
+                $this->flushSse($flushToClient);
+
+                $toolCalls = $accumulator->isEmpty() ? [] : $accumulator->complete();
+                $responseText = OpenAiChatCompletionResponder::responseTextForMetering($accumulatedContent, $toolCalls);
+                $loopNotes = is_array($streamMetadata['loop_notes'] ?? null) ? $streamMetadata['loop_notes'] : [];
+                if ([] !== $loopNotes) {
+                    $responseText = trim($responseText."\n".implode("\n", $loopNotes));
+                }
 
                 $this->recordChatUsage($user, [
                     'provider' => $streamMetadata['provider'] ?? 'unknown',
@@ -436,24 +535,28 @@ class OpenAICompatibleController extends AbstractController
                     'usage' => $streamMetadata['usage'] ?? [],
                     'source' => 'OPENAI_API',
                     'input_text' => $this->lastUserText($messages),
-                    'response_text' => $accumulatedContent,
+                    'response_text' => $responseText,
                 ]);
 
-                $this->dispatchSessionSummary($user, $messages, $displayModel, $accumulatedContent);
+                $this->dispatchSessionSummary($user, $messages, $displayModel, $responseText);
             } catch (\Throwable $e) {
+                ['status' => $status, 'type' => $type, 'code' => $code] = $this->describeFailure($e);
                 $errorPayload = [
                     'error' => [
                         'message' => $e->getMessage(),
-                        'type' => 'server_error',
-                        'code' => 'internal_error',
+                        'type' => $type,
+                        'code' => $code,
                     ],
                 ];
                 echo 'data: '.json_encode($errorPayload, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
                 echo "data: [DONE]\n\n";
-                if (ob_get_level()) {
-                    ob_flush();
-                }
-                flush();
+                $this->flushSse($flushToClient);
+
+                $this->logger->error('OpenAI-compatible stream failed', [
+                    'error' => $e->getMessage(),
+                    'user_id' => $user->getId(),
+                    'status' => $status,
+                ]);
             }
         });
 
@@ -598,7 +701,7 @@ class OpenAICompatibleController extends AbstractController
     /**
      * Resolve a model string (e.g., "gpt-4o") to a Synaplan model with provider info.
      *
-     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: int}|null
+     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: int, entity: Model}|null
      */
     private function resolveModel(?string $modelString, int $userId): ?array
     {
@@ -611,13 +714,8 @@ class OpenAICompatibleController extends AbstractController
                 ->getQuery()
                 ->getOneOrNullResult();
 
-            if ($model) {
-                return [
-                    'provider' => strtolower($model->getService()),
-                    'providerModelId' => $model->getProviderId(),
-                    'displayModel' => $model->getProviderId(),
-                    'model_id' => (int) $model->getId(),
-                ];
+            if ($model instanceof Model) {
+                return $this->resolvedFromEntity($model);
             }
 
             $model = $this->modelRepository->createQueryBuilder('m')
@@ -628,26 +726,16 @@ class OpenAICompatibleController extends AbstractController
                 ->getQuery()
                 ->getOneOrNullResult();
 
-            if ($model) {
-                return [
-                    'provider' => strtolower($model->getService()),
-                    'providerModelId' => $model->getProviderId(),
-                    'displayModel' => $model->getProviderId(),
-                    'model_id' => (int) $model->getId(),
-                ];
+            if ($model instanceof Model) {
+                return $this->resolvedFromEntity($model);
             }
         }
 
         $defaultModelId = $this->modelConfigService->getDefaultModel('CHAT', $userId);
         if ($defaultModelId) {
             $defaultModel = $this->modelRepository->find($defaultModelId);
-            if ($defaultModel) {
-                return [
-                    'provider' => strtolower($defaultModel->getService()),
-                    'providerModelId' => $defaultModel->getProviderId(),
-                    'displayModel' => $defaultModel->getProviderId(),
-                    'model_id' => (int) $defaultModel->getId(),
-                ];
+            if ($defaultModel instanceof Model) {
+                return $this->resolvedFromEntity($defaultModel);
             }
         }
 
@@ -663,9 +751,31 @@ class OpenAICompatibleController extends AbstractController
         return null;
     }
 
-    private function writeSSE(array $data): void
+    /**
+     * @return array{provider: string, providerModelId: string, displayModel: string, model_id: int, entity: Model}
+     */
+    private function resolvedFromEntity(Model $model): array
+    {
+        return [
+            'provider' => strtolower($model->getService()),
+            'providerModelId' => $model->getProviderId(),
+            'displayModel' => $model->getProviderId(),
+            'model_id' => (int) $model->getId(),
+            'entity' => $model,
+        ];
+    }
+
+    private function writeSSE(array $data, bool $flushToClient = true): void
     {
         echo 'data: '.json_encode($data, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
+        $this->flushSse($flushToClient);
+    }
+
+    private function flushSse(bool $flushToClient): void
+    {
+        if (!$flushToClient) {
+            return;
+        }
         if (ob_get_level()) {
             ob_flush();
         }

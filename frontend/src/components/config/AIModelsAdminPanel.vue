@@ -258,6 +258,14 @@
                       {{ m.name }}
                     </span>
                     <span
+                      v-if="hasToolUse(m.json)"
+                      class="pill text-[10px] whitespace-nowrap"
+                      :title="t('config.aiModels.toolUseTooltip')"
+                      data-testid="badge-model-tool-use"
+                    >
+                      {{ t('config.aiModels.toolUseBadge') }}
+                    </span>
+                    <span
                       v-if="!m.providerAvailable"
                       class="pill text-[10px] whitespace-nowrap"
                       :title="availabilityTooltip(m)"
@@ -587,6 +595,11 @@ const paginatedAdminModels = computed(() => {
 watch(adminSearch, () => {
   adminPage.value = 1
 })
+
+function hasToolUse(json: Record<string, unknown>): boolean {
+  const features = json.features
+  return Array.isArray(features) && features.includes('tool_use')
+}
 
 /**
  * Unavailable rows stay in the catalog (never deleted) but are greyed and

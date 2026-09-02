@@ -37,6 +37,36 @@ The worker **MUST run in the same `APP_ENV` as the backend container**. The `Red
 
 After switching branches a `docker compose restart worker` is enough to pick up code changes (the entrypoint clears and re-warms the cache).
 
+### Office conversion (optional)
+
+Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
+legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
+(`collabora/code`). It is **off by default**: `OFFICE_CONVERT_URL` is empty, so
+`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+
+```bash
+# Dev / minimal: start the sidecar and point the app at it
+OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+
+# Self-host (`deploy/compose.yaml`): the entrypoint sets the URL when the
+# profile is listed
+COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
+```
+
+`GET /api/v1/config/runtime` then reports `features.officeConvertEnabled: true`.
+Admin **Settings → Features** (`/api/v1/config/features`) pings
+`/hosting/capabilities`. Umbrel / AWS Marketplace / Elestio stay off unless
+the operator opts in the same way.
+
+If convert-to answers **HTTP 403**, the compose subnet is outside CODE’s
+default `net.post_allow.host` list. Add
+`--o:net.post_allow.host[0]=<compose subnet regex>` to the service
+`extra_params` (do not publish port 9980).
+
+This is **not** host `apt install libreoffice` and **not** the LibreOffice
+binary Desktop looks for on the user’s PC. The PHP app talks only to
+`OFFICE_CONVERT_URL` over HTTP.
+
 #### Troubleshooting stuck media jobs
 
 The chat bubble for an async video shows `Auftrag läuft noch / Job still running` indefinitely:
@@ -227,6 +257,7 @@ make test    # Run tests
 | phpMyAdmin | http://localhost:8082 |
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
+| Collabora CODE (profile `office`, no published port) | `http://collabora:9980` on the compose network |
 
 ### GPU Support for Local AI Models
 

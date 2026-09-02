@@ -521,6 +521,33 @@ need this service.
 
 ---
 
+## Office conversion (optional Collabora CODE)
+
+Office thumbnails, PDF export, inline preview, officemaker PDF output, and
+combine-as-PDF need Collabora CODE (`collabora/code`), reached over HTTP.
+Empty `OFFICE_CONVERT_URL` (the default) keeps today’s behaviour.
+
+```bash
+# Dev
+OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+
+# Self-host
+COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
+```
+
+```bash
+# backend/.env — only needed if the entrypoint / compose profile does not set it
+OFFICE_CONVERT_URL=http://collabora:9980
+OFFICE_CONVERT_TIMEOUT_MS=60000
+```
+
+Do **not** bind-mount host `/usr/bin/soffice` into the PHP container. The app
+never execs LibreOffice; it only calls `OFFICE_CONVERT_URL`. Host
+`apt install libreoffice` is unused by the containers. Desktop’s local
+LibreOffice (Agent Skills) is a different binary on the user’s PC.
+
+---
+
 ## WhatsApp Integration
 
 ```bash

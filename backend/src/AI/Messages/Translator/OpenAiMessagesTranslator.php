@@ -7,6 +7,7 @@ namespace App\AI\Messages\Translator;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -156,7 +157,7 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         }
 
         if (isset($requestBody['tools']) && \is_array($requestBody['tools'])) {
-            $tools = [];
+            $clientTools = [];
             foreach ($requestBody['tools'] as $tool) {
                 if (!\is_array($tool) || AnthropicServerTools::isServerToolDeclaration($tool)) {
                     // Server tools (`web_search_*`, `code_execution_*`, …) are
@@ -165,22 +166,16 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
                     // hand the model a tool nobody can answer.
                     continue;
                 }
-                $tools[] = [
-                    'type' => 'function',
-                    'function' => [
-                        'name' => (string) ($tool['name'] ?? 'tool'),
-                        'description' => (string) ($tool['description'] ?? ''),
-                        'parameters' => $tool['input_schema'] ?? ['type' => 'object', 'properties' => []],
-                    ],
-                ];
+                $clientTools[] = $tool;
             }
+            $tools = OpenAiToolShapes::toChatCompletionsTools($clientTools);
             if ([] !== $tools) {
                 $payload['tools'] = $tools;
             }
         }
 
         if (isset($requestBody['tool_choice'])) {
-            $payload['tool_choice'] = $this->mapToolChoice($requestBody['tool_choice']);
+            $payload['tool_choice'] = OpenAiToolShapes::mapAnthropicToolChoice($requestBody['tool_choice']);
         }
 
         if ($stream) {
@@ -397,25 +392,6 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         }
 
         return implode("\n", $parts);
-    }
-
-    private function mapToolChoice(mixed $toolChoice): mixed
-    {
-        if (!\is_array($toolChoice)) {
-            return $toolChoice;
-        }
-        $type = (string) ($toolChoice['type'] ?? '');
-        if ('auto' === $type || 'any' === $type) {
-            return 'auto' === $type ? 'auto' : 'required';
-        }
-        if ('tool' === $type && isset($toolChoice['name'])) {
-            return [
-                'type' => 'function',
-                'function' => ['name' => (string) $toolChoice['name']],
-            ];
-        }
-
-        return 'auto';
     }
 
     /**

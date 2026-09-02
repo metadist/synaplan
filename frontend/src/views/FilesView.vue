@@ -66,7 +66,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv"
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.rtf,.pages,.numbers,.key,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"
@@ -753,7 +753,26 @@
               </div>
 
               <!-- Bulk actions -->
-              <div v-if="selectedFileIds.length > 0" class="mb-4">
+              <div v-if="selectedFileIds.length > 0" class="mb-4 flex flex-wrap items-center gap-3">
+                <button
+                  v-if="canCombineSelected"
+                  type="button"
+                  class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                  data-testid="btn-combine-selected"
+                  @click="combineSelected"
+                >
+                  {{ $t('files.combinePdf') }} ({{ combinableSelectedIds.length }})
+                </button>
+                <button
+                  v-if="canCombineOfficeSelected"
+                  type="button"
+                  class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                  data-testid="btn-combine-office-selected"
+                  @click="combineOfficeSelected"
+                >
+                  {{ $t('files.combineOffice', { format: officeCombineFormatLabel }) }}
+                  ({{ combinableOfficeSelectedIds.length }})
+                </button>
                 <button
                   class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                   data-testid="btn-delete-selected"
@@ -1073,7 +1092,26 @@
             </div>
 
             <!-- Bulk actions -->
-            <div v-if="selectedFileIds.length > 0" class="mb-4 flex items-center gap-3">
+            <div v-if="selectedFileIds.length > 0" class="mb-4 flex flex-wrap items-center gap-3">
+              <button
+                v-if="canCombineSelected"
+                type="button"
+                class="px-4 py-2 rounded-lg bg-[var(--brand)] text-white hover:opacity-90 transition-colors flex items-center gap-2 text-sm"
+                data-testid="btn-combine-selected"
+                @click="combineSelected"
+              >
+                {{ $t('files.combinePdf') }} ({{ combinableSelectedIds.length }})
+              </button>
+              <button
+                v-if="canCombineOfficeSelected"
+                type="button"
+                class="px-4 py-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-primary hover:bg-[var(--brand)]/10 transition-colors flex items-center gap-2 text-sm"
+                data-testid="btn-combine-office-selected"
+                @click="combineOfficeSelected"
+              >
+                {{ $t('files.combineOffice', { format: officeCombineFormatLabel }) }}
+                ({{ combinableOfficeSelectedIds.length }})
+              </button>
               <button
                 class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 text-sm"
                 data-testid="btn-delete-selected"
@@ -1514,8 +1552,16 @@ import filesService, {
   type UploadProgress,
   UploadBlockedError,
 } from '@/services/filesService'
-import { previewBadgeClass, previewIconForName } from '@/services/filePreview'
+import {
+  extensionOf,
+  kindFromExtension,
+  previewBadgeClass,
+  previewIconForName,
+} from '@/services/filePreview'
+import { isDocumentToolsEnabled } from '@/composables/useDocumentToolsFeature'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { ApiError } from '@/services/api/httpClient'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -1528,6 +1574,7 @@ function useFolderInChat(folderName: string): void {
   router.push({ path: '/', query: { folder: folderName } })
 }
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
+const { confirm } = useDialog()
 
 // File persistence - save selected files metadata
 const { saveFileMetadata, loadFileMetadata, clearFiles } = useFilePersistence('files_upload')
@@ -2220,6 +2267,112 @@ const toggleSelectAll = async () => {
         }
       })
     }
+  }
+}
+
+const combinableSelectedIds = computed(() =>
+  selectedFileIds.value.filter((id) => {
+    const file = files.value.find((item) => item.id === id)
+    if (!file) return false
+    const kind = kindFromExtension(extensionOf(file.filename) || file.file_type)
+    return 'document' === kind || 'pdf' === kind
+  })
+)
+const canCombineSelected = computed(() => combinableSelectedIds.value.length >= 2)
+
+const officeCombineFormatOf = (name: string, type: string): 'docx' | 'xlsx' | 'pptx' | null => {
+  const ext = (extensionOf(name) || type).toLowerCase()
+  if (['doc', 'docx', 'odt', 'rtf', 'pages'].includes(ext)) return 'docx'
+  if (['xls', 'xlsx', 'ods', 'csv', 'numbers'].includes(ext)) return 'xlsx'
+  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'pptx'
+  return null
+}
+
+const combinableOfficeSelectedIds = computed(() => {
+  if (!isDocumentToolsEnabled()) return []
+  const rows = selectedFileIds.value
+    .map((id) => files.value.find((item) => item.id === id))
+    .filter((file): file is NonNullable<typeof file> => Boolean(file))
+    .map((file) => ({
+      id: file.id,
+      format: officeCombineFormatOf(file.filename, file.file_type),
+    }))
+  const formats = new Set(
+    rows
+      .map((row) => row.format)
+      .filter((format): format is 'docx' | 'xlsx' | 'pptx' => format !== null)
+  )
+  if (1 !== formats.size) return []
+  return rows.filter((row) => null !== row.format).map((row) => row.id)
+})
+const officeCombineFormat = computed((): 'docx' | 'xlsx' | 'pptx' | null => {
+  const first = files.value.find((item) => combinableOfficeSelectedIds.value.includes(item.id))
+  return first ? officeCombineFormatOf(first.filename, first.file_type) : null
+})
+const officeCombineFormatLabel = computed(() => (officeCombineFormat.value ?? 'docx').toUpperCase())
+const canCombineOfficeSelected = computed(() => combinableOfficeSelectedIds.value.length >= 2)
+
+const combineSelected = async () => {
+  if (!canCombineSelected.value) return
+  if (combinableSelectedIds.value.length > 20) {
+    showError(t('files.combineTooMany', { count: 20 }))
+    return
+  }
+  const names = combinableSelectedIds.value
+    .map(
+      (id) =>
+        files.value.find((item) => item.id === id)?.display_name ||
+        files.value.find((item) => item.id === id)?.filename
+    )
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+  const ok = await confirm({
+    title: t('files.combinePdf'),
+    message: `${t('files.combineOrderHint')}\n\n${names}`,
+  })
+  if (!ok) return
+  try {
+    await filesService.combineFiles(combinableSelectedIds.value)
+    showSuccess(t('files.combined'))
+    selectedFileIds.value = []
+    await loadFiles()
+  } catch (err) {
+    const reason = err instanceof ApiError ? err.details?.reason : undefined
+    if ('engine_required' === reason) {
+      showError(t('files.combineEngineRequired'))
+      return
+    }
+    showError(t('files.combineFailed'))
+  }
+}
+
+const combineOfficeSelected = async () => {
+  const format = officeCombineFormat.value
+  if (!canCombineOfficeSelected.value || !format) return
+  if (combinableOfficeSelectedIds.value.length > 20) {
+    showError(t('files.combineTooMany', { count: 20 }))
+    return
+  }
+  const names = combinableOfficeSelectedIds.value
+    .map(
+      (id) =>
+        files.value.find((item) => item.id === id)?.display_name ||
+        files.value.find((item) => item.id === id)?.filename
+    )
+    .filter((name): name is string => Boolean(name))
+    .join(', ')
+  const ok = await confirm({
+    title: t('files.combineOffice', { format: format.toUpperCase() }),
+    message: `${t('files.combineOrderHint')}\n\n${names}`,
+  })
+  if (!ok) return
+  try {
+    await filesService.combineFiles(combinableOfficeSelectedIds.value, undefined, format)
+    showSuccess(t('files.combinedOffice'))
+    selectedFileIds.value = []
+    await loadFiles()
+  } catch {
+    showError(t('files.combineFailed'))
   }
 }
 

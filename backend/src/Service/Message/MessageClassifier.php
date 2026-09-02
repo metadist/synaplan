@@ -6,8 +6,11 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Document\DocumentKind;
+use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\ModelConfigService;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
@@ -60,6 +63,8 @@ final readonly class MessageClassifier
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private ?SelfAwareConfig $selfAwareConfig = null,
+        private ?OfficeConverterClient $officeConverter = null,
+        private ?DocumentToolsConfig $documentToolsConfig = null,
     ) {
     }
 
@@ -222,6 +227,19 @@ final readonly class MessageClassifier
 
         // 3. Document / audio / video attachments → FileAnalysisHandler (ANALYZE model), before AI sorting (#595, #722)
         if ($this->messageHasAnalyzableNonImageAttachment($message)) {
+            if ($this->shouldRouteOfficeEditToOfficemaker($message)) {
+                $this->logger->info('MessageClassifier: Routing office edit to officemaker', [
+                    'message_id' => $messageId,
+                ]);
+
+                return [
+                    'topic' => 'officemaker',
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => 'document_generation',
+                    'source' => 'attachment_office_edit',
+                    'skip_sorting' => true,
+                ];
+            }
             $this->logger->info('MessageClassifier: Forcing analyzefile route (document, audio, or video attachment)', [
                 'message_id' => $messageId,
             ]);
@@ -518,6 +536,56 @@ final readonly class MessageClassifier
      * video-only message fell through to the AI sorter and was answered as a
      * plain (text-less) chat.
      */
+    /**
+     * When DOCUMENT_TOOLS.ALLOW_UPLOAD_EDIT is on, an office attachment plus
+     * an edit-intent prompt goes to officemaker instead of analyzefile.
+     * Default-off so characterization snapshots stay unchanged.
+     */
+    private function shouldRouteOfficeEditToOfficemaker(Message $message): bool
+    {
+        if (null === $this->documentToolsConfig || !$this->documentToolsConfig->allowUploadEdit($message->getUserId())) {
+            return false;
+        }
+        $text = trim((string) $message->getText());
+        if ('' === $text) {
+            return false;
+        }
+        if (!$this->messageHasOfficeDocumentAttachment($message)) {
+            return false;
+        }
+
+        return 1 === preg_match(
+            '/\b(edit|change|update|format|sort|insert|replace|merge|restyle|currency|conditional|'
+            .'add (?:a |the )?(?:chart|sheet|column|row|slide|heading)|'
+            .'bearbeiten|ändern|formatieren|einfügen|'
+            .'editar|cambiar|modificar|'
+            .'modifier|ajouter|'
+            .'düzenle|değiştir|ekle)\b/iu',
+            $text,
+        );
+    }
+
+    private function messageHasOfficeDocumentAttachment(Message $message): bool
+    {
+        foreach ($message->getFiles() as $file) {
+            $ext = $file->getFileType() ?: pathinfo($file->getFileName(), PATHINFO_EXTENSION);
+            if (null !== DocumentKind::fromExtension((string) $ext)) {
+                return true;
+            }
+        }
+        if ($message->getFile() > 0) {
+            $file = $this->em->getRepository(File::class)->find($message->getFile());
+            if (null !== $file) {
+                $ext = $file->getFileType() ?: pathinfo($file->getFileName(), PATHINFO_EXTENSION);
+                if (null !== DocumentKind::fromExtension((string) $ext)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function messageHasAnalyzableNonImageAttachment(Message $message): bool
     {
         $files = $message->getFiles();
@@ -659,9 +727,13 @@ final readonly class MessageClassifier
         // otherwise be shortcut to `general` ("schreibe es als docx",
         // "mach eine excel tabelle", #1042 review). If the message names a
         // supported office format/extension, defer to the AI sorter so it can
-        // pick `officemaker`. PDF is intentionally excluded: we cannot produce
-        // real PDFs, so we must not route PDF requests to the office maker.
-        if (preg_match('/\b(docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation)\b/iu', $trimmed)) {
+        // pick `officemaker`. PDF is included only when the LibreOffice
+        // engine is on — without it we still cannot produce real PDFs.
+        $officeFormats = 'docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation';
+        if ($this->officePdfGenerationEnabled()) {
+            $officeFormats .= '|pdf';
+        }
+        if (preg_match('/\b(?:'.$officeFormats.')\b/iu', $trimmed)) {
             return false;
         }
 
@@ -1062,5 +1134,10 @@ final readonly class MessageClassifier
         // persists $classification['language'] to BLANG (email webhook reply,
         // queue-mode chat persistence, ...).
         return $bestScore >= 2 ? $best : null;
+    }
+
+    private function officePdfGenerationEnabled(): bool
+    {
+        return null !== $this->officeConverter && $this->officeConverter->isEnabled();
     }
 }

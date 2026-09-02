@@ -140,6 +140,11 @@ parameters:
     env(TIKA_RETRY_BACKOFF_MS): '1000'
     env(TIKA_MIN_LENGTH): '10'
     env(TIKA_MIN_ENTROPY): '3.0'
+    # Office convert (Collabora CODE). Empty = disabled (OSS default).
+    env(OFFICE_CONVERT_URL): ''
+    env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
+    env(OFFICE_TEXT_MAX_ROWS): '500'
+    env(OFFICE_COMBINE_MAX_FILES): '20'
     env(RASTERIZE_DPI): '150'
     env(RASTERIZE_PAGE_CAP): '10'
     env(RASTERIZE_TIMEOUT_MS): '30000'
@@ -212,6 +217,8 @@ services:
         # by ModelListProbeRegistry. Never inference, always metadata.
         App\AI\Health\Probe\ModelListProbeInterface:
             tags: ['app.model_list_probe']
+        App\Service\Document\Tool\DocumentToolInterface:
+            tags: ['app.document_tool']
 
     App\:
         resource: '../src/'
@@ -974,6 +981,41 @@ services:
             $tikaHttpUser: '%env(TIKA_HTTP_USER)%'
             $tikaHttpPass: '%env(TIKA_HTTP_PASS)%'
 
+    App\Service\File\Office\OfficeConverterClient:
+        arguments:
+            $officeConvertUrl: '%env(OFFICE_CONVERT_URL)%'
+            $officeConvertTimeoutMs: '%env(int:OFFICE_CONVERT_TIMEOUT_MS)%'
+
+    App\Service\File\Office\StructuredTextExtractor:
+        arguments:
+            $officeTextMaxRows: '%env(int:OFFICE_TEXT_MAX_ROWS)%'
+
+    App\Service\File\Office\DocumentCombineService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $officeCombineMaxFiles: '%env(int:OFFICE_COMBINE_MAX_FILES)%'
+
+    App\Service\File\GeneratedDocumentStore:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\Persist\DocumentRevisionService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\DocumentEditCoordinator:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\Tool\MergeDocumentsTool:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Document\DocumentOfficeMergeService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+            $officeCombineMaxFiles: '%env(int:OFFICE_COMBINE_MAX_FILES)%'
+
     App\Service\File\FileStorageService:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
@@ -1019,6 +1061,18 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Service\File\ThumbnailService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\File\Office\DocumentThumbnailGenerator:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\File\Office\DocumentExportService:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\MessageHandler\GenerateDocumentThumbnailMessageHandler:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
 

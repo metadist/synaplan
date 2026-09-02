@@ -32,8 +32,15 @@ final class PdfRasterizer
      *
      * @return array Array of absolute paths to generated PNG files
      */
-    public function pdfToPng(string $absolutePdfPath): array
+    /**
+     * @param int|null $pageCap Override the configured page cap (e.g. 1 for a poster)
+     *
+     * @return array<int, string>
+     */
+    public function pdfToPng(string $absolutePdfPath, ?int $pageCap = null): array
     {
+        $cap = max(1, $pageCap ?? $this->rasterizePageCap);
+
         if (!is_file($absolutePdfPath) || 0 === filesize($absolutePdfPath)) {
             $this->logger->warning('Rasterizer: PDF file missing or empty', ['file' => $absolutePdfPath]);
 
@@ -50,7 +57,7 @@ final class PdfRasterizer
                 $imagick = new \Imagick();
                 $imagick->setResolution($this->rasterizeDpi, $this->rasterizeDpi);
                 $imagick->readImage($absolutePdfPath);
-                $pages = min($this->rasterizePageCap, $imagick->getNumberImages());
+                $pages = min($cap, $imagick->getNumberImages());
                 $imagick->setIteratorIndex(0);
 
                 for ($i = 0; $i < $pages; ++$i) {
@@ -91,7 +98,7 @@ final class PdfRasterizer
         }
 
         // Fallback to pdftoppm
-        $images = $this->pdfToPngViaPdftoppm($absolutePdfPath, $targetDir, $basename);
+        $images = $this->pdfToPngViaPdftoppm($absolutePdfPath, $targetDir, $basename, $cap);
 
         if (!empty($images)) {
             $this->lastEngine = 'pdftoppm';
@@ -111,13 +118,13 @@ final class PdfRasterizer
     /**
      * Fallback method using pdftoppm command-line tool.
      */
-    private function pdfToPngViaPdftoppm(string $absolutePdfPath, string $targetDir, string $basename): array
+    private function pdfToPngViaPdftoppm(string $absolutePdfPath, string $targetDir, string $basename, int $pageCap): array
     {
         $prefix = $targetDir.'/'.$basename;
         $cmd = sprintf(
             'pdftoppm -png -r %d -f 1 -l %d %s %s',
             $this->rasterizeDpi,
-            $this->rasterizePageCap,
+            $pageCap,
             escapeshellarg($absolutePdfPath),
             escapeshellarg($prefix)
         );
@@ -125,7 +132,7 @@ final class PdfRasterizer
         $this->execWithTimeout($cmd);
 
         $images = [];
-        for ($i = 1; $i <= $this->rasterizePageCap; ++$i) {
+        for ($i = 1; $i <= $pageCap; ++$i) {
             $file = $prefix.'-'.$i.'.png';
             if (is_file($file) && filesize($file) > 0) {
                 $images[] = $file;
