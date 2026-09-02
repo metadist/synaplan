@@ -191,6 +191,14 @@ not a second architecture on this one. `aws-ami.yml` still builds an arm64 image
 by hand on request, for testing outside Marketplace, but nothing here ever
 submits it.
 
+None of this is new. `deploy/aws/marketplace/README.md` opens with "AWS
+Marketplace AMI products are architecture-specific", and the arm64 CloudFormation
+templates next to it were generated for precisely that separate Graviton product.
+This page contradicted them — it claimed two architectures were two versions of
+one product and called that "AWS's rule" — and a release was spent finding out
+which of the two was right. The answer is written here now so the next reader
+starts from it.
+
 Titles still carry the architecture — `<version> (x86_64)` — because the first
 published version already did, and dropping it now would make the version
 picker inconsistent for buyers, not simpler.
