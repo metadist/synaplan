@@ -275,6 +275,8 @@
     "showLess": "Weniger anzeigen",
     "showAll": "Alle anzeigen",
     "recent": "Letzte Unterhaltungen",
+    "hideHistory": "Chatverlauf ausblenden",
+    "resizePanel": "Breite anpassen",
     "ttsGenerating": "Sprachantwort wird erstellt…",
     "audioUnavailable": "Audio konnte nicht geladen werden",
     "audioUnavailableDescription": "Die Datei ist auf dem Server nicht verfügbar. Versuche es später erneut oder lade sie herunter.",

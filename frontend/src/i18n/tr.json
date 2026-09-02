@@ -275,6 +275,8 @@
     "showLess": "Daha az göster",
     "showAll": "Tümünü Göster",
     "recent": "Son Konuşmalar",
+    "hideHistory": "Sohbet geçmişini gizle",
+    "resizePanel": "Paneli yeniden boyutlandır",
     "ttsGenerating": "Sesli yanıt ekleniyor…",
     "audioUnavailable": "Ses yüklenemedi",
     "audioUnavailableDescription": "Dosya şu anda sunucuda mevcut değil. Lütfen daha sonra tekrar deneyin veya indirin.",

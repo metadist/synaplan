@@ -280,6 +280,8 @@
     "showLess": "Afficher moins",
     "showAll": "Tout afficher",
     "recent": "Conversations récentes",
+    "hideHistory": "Masquer l'historique des discussions",
+    "resizePanel": "Redimensionner le panneau",
     "ttsGenerating": "Ajout de la réponse parlée…",
     "audioUnavailable": "L’audio n’a pas pu être chargé",
     "audioUnavailableDescription": "Le fichier est actuellement indisponible sur le serveur. Réessayez plus tard ou téléchargez-le.",

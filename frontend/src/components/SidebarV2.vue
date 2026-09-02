@@ -641,6 +641,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useSidebarStore } from '../stores/sidebar'
+import { matchesPhoneChrome } from '../composables/usePhoneChrome'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import { isPurchaseAllowed } from '../services/api/nativeServer'
 import { useAuthStore } from '../stores/auth'
@@ -837,7 +838,14 @@ const handleNavClick = (item: NavItem) => {
 
   if (item.path === '/') {
     closeFlyout()
-    sidebarStore.toggleChatSheet()
+    // On desktop chrome while chatting, the History icon toggles the persistent
+    // left history panel. Everywhere else (other routes, or phone chrome where
+    // there is no panel) it falls back to the modal history sheet.
+    if (route.name === 'chat' && !matchesPhoneChrome()) {
+      sidebarStore.toggleChatHistoryCollapsed()
+    } else {
+      sidebarStore.toggleChatSheet()
+    }
     return
   }
 

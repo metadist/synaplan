@@ -275,6 +275,8 @@
     "showLess": "Mostrar menos",
     "showAll": "Mostrar Todo",
     "recent": "Conversaciones Recientes",
+    "hideHistory": "Ocultar historial de chats",
+    "resizePanel": "Cambiar el ancho",
     "ttsGenerating": "Añadiendo respuesta hablada…",
     "audioUnavailable": "El audio no se pudo cargar",
     "audioUnavailableDescription": "El archivo no está disponible en el servidor por el momento. Inténtalo de nuevo más tarde o descárgalo.",

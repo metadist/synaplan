@@ -10,6 +10,15 @@
     <SidebarV2 />
 
     <!--
+      Persistent chat-history panel, docked left of the content on the chat
+      route (desktop chrome only — the panel itself carries `v2-desktop-chrome`).
+      Open by default so past chats are always one glance away; the rail's
+      History icon collapses/expands it. Signed-out guests have no chat library,
+      so it is hidden for them.
+    -->
+    <ChatHistoryPanel v-if="showChatHistory" />
+
+    <!--
       Mobile push-drawer shell (§4.3): on phone chrome (narrow or short /
       landscape-phone viewports) the content column slides to the right
       (~85%, leaving a 15% peek) to reveal the drawer underneath. On desktop
@@ -122,6 +131,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
 import SidebarV2 from './SidebarV2.vue'
+import ChatHistoryPanel from './ChatHistoryPanel.vue'
 import MobileNav from './MobileNav.vue'
 import HelpHost from './help/HelpHost.vue'
 import JobsTrayLauncher from './jobs/JobsTrayLauncher.vue'
@@ -137,6 +147,13 @@ const configStore = useConfigStore()
 // Signed-out users get a prominent login shortcut in the top bar. Hidden while
 // the drawer is open so it never overlaps the sliding content / close button.
 const showLoginButton = computed(() => !authStore.isAuthenticated && !sidebarStore.mobileDrawerOpen)
+
+// Persistent left chat-history panel: only on the chat route, only for signed-in
+// users, and only while not collapsed. Phone chrome is handled by the panel's
+// own `v2-desktop-chrome` class (the mobile drawer covers history there).
+const showChatHistory = computed(
+  () => route.name === 'chat' && authStore.isAuthenticated && !sidebarStore.chatHistoryCollapsed
+)
 
 // Incognito toggle (mobile, top-right): signed-in users on the chat route only.
 const showIncognitoToggle = computed(
