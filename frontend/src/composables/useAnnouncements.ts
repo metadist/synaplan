@@ -1,7 +1,13 @@
 import { computed, ref } from 'vue'
 import { useConfigStore } from '@/stores/config'
 import { isNativeApp } from '@/services/api/nativeRuntime'
-import { announcements, type Announcement, type AnnouncementContext } from '@/data/announcements'
+import { detectBrowserOs } from '@/utils/detectBrowserOs'
+import {
+  announcements,
+  type Announcement,
+  type AnnouncementAction,
+  type AnnouncementContext,
+} from '@/data/announcements'
 
 /**
  * Which announcements this browser has already closed. The `v1` suffix
@@ -61,8 +67,8 @@ export interface ActiveAnnouncement {
   id: string
   i18nKey: string
   image?: string
-  /** Null when the announcement is an acknowledgement without a next step. */
-  actionUrl: string | null
+  /** Empty when the announcement is an acknowledgement without a next step. */
+  actions: AnnouncementAction[]
 }
 
 /**
@@ -77,7 +83,9 @@ export function useAnnouncements() {
   const current = computed<ActiveAnnouncement | null>(() => {
     const context: AnnouncementContext = {
       iosAppUrl: config.mobile.iosAppUrl,
+      androidAppUrl: config.mobile.androidAppUrl,
       isNativeApp: isNativeApp(),
+      deviceOs: detectBrowserOs(),
     }
 
     const announcement = selectAnnouncement(announcements, seen.value, context, Date.now())
@@ -90,7 +98,7 @@ export function useAnnouncements() {
       id: announcement.id,
       i18nKey: announcement.i18nKey,
       image: announcement.image,
-      actionUrl: announcement.actionUrl?.(context) ?? null,
+      actions: announcement.actions?.(context) ?? [],
     }
   })
 
