@@ -2285,6 +2285,7 @@
         "title": "Pair this computer",
         "intro": "Open Synaplan Desktop on the computer you want to connect, then enter this address and code.",
         "addressLabel": "Server address",
+        "addressHint": "Type this address in Synaplan Desktop. On a local install it is the API (http://localhost:8000), not the web UI port.",
         "codeLabel": "Pairing code",
         "expiresIn": "Expires in {time}",
         "expired": "This code has expired.",

@@ -3140,6 +3140,7 @@
         "title": "Vincular este equipo",
         "intro": "Abre Synaplan Desktop en el equipo que quieres conectar e introduce esta dirección y este código.",
         "addressLabel": "Dirección del servidor",
+        "addressHint": "Escribe esta dirección en Synaplan Desktop. En local es la API (http://localhost:8000), no el puerto de la interfaz web.",
         "codeLabel": "Código de vinculación",
         "expiresIn": "Caduca en {time}",
         "expired": "Este código ha caducado.",

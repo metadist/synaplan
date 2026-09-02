@@ -209,6 +209,9 @@
                   <label class="block text-sm font-medium txt-primary mb-2">
                     {{ $t('config.desktop.pairing.addressLabel') }}
                   </label>
+                  <p class="text-xs txt-secondary mb-2">
+                    {{ $t('config.desktop.pairing.addressHint') }}
+                  </p>
                   <div class="flex items-center gap-2">
                     <code
                       class="flex-1 min-w-0 truncate text-sm font-mono txt-primary surface-card px-3 py-2.5 rounded"
@@ -302,6 +305,7 @@ import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { desktopPairingAddress } from '@/utils/desktopPairingAddress'
 
 const { t } = useI18n()
 const dialog = useDialog()
@@ -321,9 +325,9 @@ const pairingError = ref<string | null>(null)
 const pairingCode = ref<PairingCode | null>(null)
 const copiedField = ref<'address' | 'code' | null>(null)
 
-// The address the user types into Synaplan Desktop is this Synaplan install's
-// origin — the same host the browser is already talking to.
-const serverAddress = window.location.origin
+// Desktop talks to the API origin. In local Vite that is :8000, not this
+// page's :5173 (and never Keycloak on :8080).
+const serverAddress = desktopPairingAddress()
 
 const now = ref(Math.floor(Date.now() / 1000))
 let ticker: number | null = null

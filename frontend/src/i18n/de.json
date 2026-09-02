@@ -2359,6 +2359,7 @@
         "title": "Diesen Computer verbinden",
         "intro": "Öffne Synaplan Desktop auf dem Computer, den du verbinden möchtest, und gib diese Adresse und den Code ein.",
         "addressLabel": "Serveradresse",
+        "addressHint": "Diese Adresse in Synaplan Desktop eingeben. Lokal ist das die API (http://localhost:8000), nicht der Port der Web-Oberfläche.",
         "codeLabel": "Verbindungscode",
         "expiresIn": "Läuft ab in {time}",
         "expired": "Dieser Code ist abgelaufen.",
