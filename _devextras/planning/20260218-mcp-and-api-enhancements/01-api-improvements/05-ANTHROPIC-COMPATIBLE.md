@@ -565,15 +565,23 @@ The Anthropic protocol has **no warning channel**, so three layers:
 Metering: `recordUsage($user, 'API_CHAT', [...])` with `source: 'MESSAGES_API'`
 and the resolved `model_id`. **Verified:** `CostCalculationService` is already
 cache-aware and provider-aware — `calculateCost(promptTokens,
-completionTokens, cachedTokens, cacheCreationTokens, modelId)` applies
-Anthropic's real 0.10x read discount and 1.25x write multiplier
-(`CACHE_READ_DISCOUNT_ANTHROPIC` / `CACHE_WRITE_MULTIPLIER_ANTHROPIC`). The
-gateway only maps fields: `cachedTokens = cache_read_input_tokens`,
+completionTokens, cachedTokens, cacheCreationTokens, modelId, timestamp,
+cacheCreation1hTokens)` applies Anthropic's real 0.10x read discount and
+1.25x/2.0x write multipliers (`CACHE_READ_DISCOUNT_ANTHROPIC` /
+`CACHE_WRITE_MULTIPLIER_ANTHROPIC` / `CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H`).
+The gateway only maps fields: `cachedTokens = cache_read_input_tokens`,
 `cacheCreationTokens = cache_creation_input_tokens`, `promptTokens =
 input_tokens + both cache fields` — the same arithmetic `AnthropicProvider`
-lines 236-247 already uses. One known gap: 1-hour-TTL cache writes really
-bill 2x but are costed at 1.25x; the usage payload's `cache_creation`
-breakdown (`ephemeral_1h_input_tokens`) would allow refining this later.
+lines 236-247 already uses.
+**Fixed 2026-09-02:** the 1-hour-TTL gap noted below was real — 1h-TTL cache
+writes bill 2x but were costed at the flat 1.25x 5m rate. Fixed by reading the
+usage payload's `cache_creation.ephemeral_1h_input_tokens` breakdown via the
+new `MessagesUsage::extractCacheCreation1hTokens()` helper (shared by every
+Anthropic usage-parsing call site: `AnthropicProvider`, both
+`AnthropicPassthroughTranslator` stream paths, `GatewayToolLoop`) and billing
+that slice at `CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H` (2.0x) while the remainder
+stays at 1.25x. See `docs/PRICING_MAINTENANCE.md` ("Cache-write pricing:
+5-minute vs. 1-hour TTL").
 
 **Known limitation:** usage is recorded after the stream ends, so concurrent
 requests can overshoot the budget slightly. Either accept and document, or add a

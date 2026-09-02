@@ -14,7 +14,12 @@ use Psr\Log\LoggerInterface;
 final readonly class CostCalculationService
 {
     private const CACHE_READ_DISCOUNT_ANTHROPIC = 0.10;
+    // Default TTL (5 minutes) cache write, per https://platform.claude.com/docs/en/build-with-claude/prompt-caching.
     private const CACHE_WRITE_MULTIPLIER_ANTHROPIC = 1.25;
+    // Opt-in 1-hour TTL cache write (`cache_control: {"type": "ephemeral", "ttl": "1h"}`) — billed
+    // at 2x base input price, not the 1.25x default. Applies uniformly across the whole Anthropic
+    // lineup (Anthropic docs footnote: only cache *reads* vary per model, e.g. Fable 5.1's 0.025x).
+    private const CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H = 2.0;
     private const CACHE_READ_DISCOUNT_DEFAULT = 0.50;
 
     public function __construct(
@@ -24,6 +29,14 @@ final readonly class CostCalculationService
     ) {
     }
 
+    /**
+     * @param int $cacheCreationTokens   total tokens written to the cache (both TTLs combined) —
+     *                                   Anthropic's `cache_creation_input_tokens`
+     * @param int $cacheCreation1hTokens Subset of $cacheCreationTokens written with a 1-hour TTL —
+     *                                   Anthropic's `cache_creation.ephemeral_1h_input_tokens`. The
+     *                                   remainder is billed at the default 5-minute-TTL rate.
+     *                                   Non-Anthropic providers never populate this (always 0).
+     */
     public function calculateCost(
         int $promptTokens,
         int $completionTokens,
@@ -31,6 +44,7 @@ final readonly class CostCalculationService
         int $cacheCreationTokens,
         ?int $modelId,
         ?int $timestamp = null,
+        int $cacheCreation1hTokens = 0,
     ): CostResult {
         if (!$modelId) {
             return $this->zeroCostResult();
@@ -84,6 +98,7 @@ final readonly class CostCalculationService
         $provider = ModelCatalog::normalizeProvider($model->getService());
         $cacheReadDiscount = $this->getCacheReadDiscount($provider);
         $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider);
+        $cacheWriteMultiplier1h = $this->getCacheWriteMultiplier1h($provider);
 
         // Override with explicit cache price if available
         $cacheReadPricePerToken = null !== $cachePriceIn
@@ -96,9 +111,16 @@ final readonly class CostCalculationService
             $regularInputTokens = 0;
         }
 
+        // Split cache writes by TTL: the 1-hour slice is billed at the higher
+        // multiplier, the remainder at the default (5-minute) rate. Clamp
+        // defensively so a caller-supplied 1h count can never exceed the total.
+        $cacheCreation1h = min(max($cacheCreation1hTokens, 0), $cacheCreationTokens);
+        $cacheCreation5m = $cacheCreationTokens - $cacheCreation1h;
+
         $regularInputCost = $regularInputTokens * $pricePerInputToken;
         $cachedInputCost = $cachedTokens * $cacheReadPricePerToken;
-        $cacheCreationCost = $cacheCreationTokens * $pricePerInputToken * $cacheWriteMultiplier;
+        $cacheCreationCost = ($cacheCreation5m * $pricePerInputToken * $cacheWriteMultiplier)
+            + ($cacheCreation1h * $pricePerInputToken * $cacheWriteMultiplier1h);
         $outputCost = $completionTokens * $pricePerOutputToken;
 
         $totalInputCost = $regularInputCost + $cachedInputCost + $cacheCreationCost;
@@ -459,6 +481,13 @@ final readonly class CostCalculationService
     {
         return 'anthropic' === $provider
             ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC
+            : 1.0;
+    }
+
+    private function getCacheWriteMultiplier1h(string $provider): float
+    {
+        return 'anthropic' === $provider
+            ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H
             : 1.0;
     }
 
