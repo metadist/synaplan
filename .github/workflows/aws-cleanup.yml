@@ -167,7 +167,18 @@ jobs:
             exit 1
           fi
 
+          # The check above says the call answered; this one says the answer
+          # still has the shape the extraction reads. Every version of an AMI
+          # product launches from an image, so none of them yielding one means
+          # Versions[].Sources[].Image moved — and an empty list would travel on
+          # as "the listing protects nothing" and expire every published image
+          # older than the two most recent releases.
           images="$(printf '%s' "$versions" | jq -c '[.. | objects | select(.Image? != null) | .Image] | unique')"
+          if [ "$(printf '%s' "$images" | jq 'length')" -eq 0 ]; then
+            echo "::error::The listing reports $(printf '%s' "$versions" | jq 'length') version(s) but no image id could be read from them. Refusing to delete anything until Versions[].Sources[].Image is readable again."
+            exit 1
+          fi
+
           echo "images=${images}" >> "$GITHUB_OUTPUT"
           echo "The listing publishes $(printf '%s' "$images" | jq 'length') image(s): \`$(printf '%s' "$images" | jq -r 'join(", ")')\`." >> "$GITHUB_STEP_SUMMARY"
 
