@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\UserMemoryActionSchema;
 use App\Entity\User;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
@@ -706,7 +707,7 @@ class UserMemoryController extends AbstractController
                 ],
                 userId: $user->getId(),
                 options: array_filter([
-                    'json_mode' => true,
+                    'structured_output' => UserMemoryActionSchema::build(),
                     'model' => $memoryModelConfig['model'],
                     'provider' => $memoryModelConfig['provider'],
                     'temperature' => 0.3, // Low temperature for consistent JSON output
