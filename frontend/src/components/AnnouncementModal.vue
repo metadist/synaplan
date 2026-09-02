@@ -60,18 +60,25 @@
                 {{ $t(`${announcement.i18nKey}.body`) }}
               </p>
 
-              <!-- Left-aligned with the text above it, so the main action leads. -->
-              <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-start">
+              <!-- Left-aligned with the text above it, so the main action leads.
+                   The visitor's own store (see `useAnnouncements`) is first and
+                   styled as primary; any other store is offered too, just less
+                   emphasized, since a desktop visitor may want either link. -->
+              <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-start">
                 <a
-                  v-if="announcement.actionUrl"
-                  :href="announcement.actionUrl"
+                  v-for="(action, index) in announcement.actions"
+                  :key="action.url"
+                  :href="action.url"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="btn-primary px-4 py-2.5 rounded-xl text-sm font-semibold text-center"
-                  data-testid="link-announcement-action"
+                  :class="[
+                    'px-4 py-2.5 rounded-xl text-sm font-semibold text-center',
+                    0 === index ? 'btn-primary' : 'btn-secondary',
+                  ]"
+                  :data-testid="`link-announcement-action-${action.labelKey}`"
                   @click="close"
                 >
-                  {{ $t(`${announcement.i18nKey}.action`) }}
+                  {{ $t(`${announcement.i18nKey}.${action.labelKey}`) }}
                 </a>
                 <button
                   class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"

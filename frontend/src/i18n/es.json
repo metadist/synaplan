@@ -1,10 +1,11 @@
 {
   "announcements": {
     "later": "Ahora no",
-    "iosApp": {
-      "title": "Synaplan ya está en el iPhone",
+    "mobileApp": {
+      "title": "Synaplan ya está disponible para iPhone y Android",
       "body": "La app lleva tus chats, documentos y asistentes al móvil. La misma cuenta y los mismos datos: dicta tu pregunta mientras vas de camino y retoma cualquier conversación donde la dejaste.",
-      "action": "Descargar en el App Store"
+      "appStore": "Descargar en el App Store",
+      "googlePlay": "Descargar en Google Play"
     }
   },
   "updates": {

@@ -11,7 +11,9 @@ import { nextTick } from 'vue'
 
 const runtime = vi.hoisted(() => ({
   iosAppUrl: 'https://apps.apple.com/app/id6784278288',
+  androidAppUrl: 'https://play.google.com/store/apps/details?id=com.synaplan.app',
   isNative: false,
+  deviceOs: 'other' as 'ios' | 'android' | 'other',
   path: '/',
 }))
 
@@ -21,12 +23,19 @@ vi.mock('@/stores/config', () => ({
       get iosAppUrl() {
         return runtime.iosAppUrl
       },
+      get androidAppUrl() {
+        return runtime.androidAppUrl
+      },
     },
   }),
 }))
 
 vi.mock('@/services/api/nativeRuntime', () => ({
   isNativeApp: () => runtime.isNative,
+}))
+
+vi.mock('@/utils/detectBrowserOs', () => ({
+  detectBrowserOs: () => runtime.deviceOs,
 }))
 
 vi.mock('vue-router', () => ({
@@ -84,7 +93,9 @@ describe('AnnouncementModal', () => {
     localStorage.clear()
     document.body.style.overflow = ''
     runtime.iosAppUrl = 'https://apps.apple.com/app/id6784278288'
+    runtime.androidAppUrl = 'https://play.google.com/store/apps/details?id=com.synaplan.app'
     runtime.isNative = false
+    runtime.deviceOs = 'other'
     runtime.path = '/'
   })
 
@@ -101,29 +112,54 @@ describe('AnnouncementModal', () => {
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
   })
 
-  it('greets a web visitor of an instance that has an app', async () => {
+  it('greets a web visitor of an instance that has both apps, App Store leading', async () => {
     const wrapper = await mountModal()
 
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
-    expect(wrapper.find('[data-testid="link-announcement-action"]').attributes('href')).toBe(
-      'https://apps.apple.com/app/id6784278288?ct=web-announcement'
-    )
+    expect(
+      wrapper.find('[data-testid="link-announcement-action-appStore"]').attributes('href')
+    ).toBe('https://apps.apple.com/app/id6784278288?ct=web-announcement')
+    expect(
+      wrapper.find('[data-testid="link-announcement-action-googlePlay"]').attributes('href')
+    ).toBe('https://play.google.com/store/apps/details?id=com.synaplan.app&ct=web-announcement')
   })
 
-  it('shows the illustration the announcement carries', async () => {
+  it('leads with Google Play for a visitor on an Android device', async () => {
+    runtime.deviceOs = 'android'
+
+    const wrapper = await mountModal()
+    const actions = wrapper.findAll('a[data-testid^="link-announcement-action-"]')
+
+    expect(actions.map((action) => action.attributes('data-testid'))).toEqual([
+      'link-announcement-action-googlePlay',
+      'link-announcement-action-appStore',
+    ])
+  })
+
+  it('falls back to the brand mark when the announcement has no illustration', async () => {
     const wrapper = await mountModal()
 
-    expect(wrapper.find('[data-testid="img-announcement"]').attributes('src')).toBe(
-      '/announcements/iphone-app.webp'
-    )
+    expect(wrapper.find('[data-testid="img-announcement"]').exists()).toBe(false)
+    expect(wrapper.find('img[alt=""]').attributes('src')).toBe('/brand.svg')
   })
 
   it('stays away from an instance that has no app to offer', async () => {
     runtime.iosAppUrl = ''
+    runtime.androidAppUrl = ''
 
     const wrapper = await mountModal()
 
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(false)
+  })
+
+  it('still greets a visitor when only the Android app is published', async () => {
+    runtime.iosAppUrl = ''
+
+    const wrapper = await mountModal()
+
+    expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
+    expect(wrapper.find('[data-testid="link-announcement-action-appStore"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="link-announcement-action-googlePlay"]').exists()).toBe(true)
   })
 
   it('does not advertise the app inside the app', async () => {
@@ -150,16 +186,16 @@ describe('AnnouncementModal', () => {
     await wrapper.find('[data-testid="btn-announcement-close"]').trigger('click')
 
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(false)
-    expect(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')).toContain('ios-app-launch')
+    expect(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')).toContain('mobile-apps-launch')
 
     expect((await mountModal()).find(`[data-testid="${modal}"]`).exists()).toBe(false)
   })
 
-  it('counts following the link as having seen it', async () => {
+  it('counts following a store link as having seen it', async () => {
     const wrapper = await mountModal()
-    await wrapper.find('[data-testid="link-announcement-action"]').trigger('click')
+    await wrapper.find('[data-testid="link-announcement-action-appStore"]').trigger('click')
 
-    expect(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')).toContain('ios-app-launch')
+    expect(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')).toContain('mobile-apps-launch')
   })
 
   it('closes when the backdrop is clicked', async () => {
