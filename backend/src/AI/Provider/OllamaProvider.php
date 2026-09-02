@@ -5,6 +5,9 @@ namespace App\AI\Provider;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use ArdaGnsrn\Ollama\Ollama;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -17,6 +20,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         private LoggerInterface $logger,
         private string $baseUrl,
         private HttpClientInterface $httpClient,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
         // Set timeout to 5 minutes for slow CPU-based models
         ini_set('default_socket_timeout', 300);
@@ -105,12 +109,9 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'message_count' => count($messages),
             ]);
 
-            $ollamaMessages = $this->convertMessages($messages);
+            $requestBody = $this->buildChatRequestBody($messages, $options, $model);
 
-            $response = $this->client->chat()->create([
-                'model' => $model,
-                'messages' => $ollamaMessages,
-            ]);
+            $response = $this->client->chat()->create($requestBody);
 
             $promptTokens = $response->promptEvalCount ?? 0;
             $completionTokens = $response->evalCount ?? 0;
@@ -193,6 +194,11 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 $requestBody['options'] = [
                     'num_predict' => $options['max_tokens'],
                 ];
+            }
+
+            $schema = $options['structured_output'] ?? null;
+            if ($schema instanceof StructuredOutputSchema) {
+                $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema));
             }
 
             // Stream directly via HttpClient so we can read the `thinking` field
@@ -341,6 +347,30 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             throw new ProviderException('Ollama streaming error: '.$e->getMessage(), 'ollama', null, 0, $e);
         }
+    }
+
+    /**
+     * Build the non-streaming `/api/chat` request body sent through the
+     * Ollama SDK client.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatRequestBody(array $messages, array $options, string $model): array
+    {
+        $requestBody = [
+            'model' => $model,
+            'messages' => $this->convertMessages($messages),
+        ];
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema));
+        }
+
+        return $requestBody;
     }
 
     /**

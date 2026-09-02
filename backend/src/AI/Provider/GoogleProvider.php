@@ -11,6 +11,9 @@ use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
@@ -98,6 +101,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?string $vertexAccessToken = null,
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
         // Ensure projectId is null if empty string
         if (empty($this->projectId)) {
@@ -204,6 +208,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 ],
             ];
 
+            $payload = $this->applyStructuredOutput($payload, $options, $model, false);
+
             $this->logger->info('Google: Generating chat completion', [
                 'model' => $model,
                 'message_count' => count($messages),
@@ -298,6 +304,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'contents' => $contents,
                 'generationConfig' => $generationConfig,
             ];
+
+            $payload = $this->applyStructuredOutput($payload, $options, $model, true);
 
             $this->logger->info('Google: Streaming chat completion', [
                 'model' => $model,
@@ -431,6 +439,37 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Merge a {@see StructuredOutputSchema} (if present in `$options`) into
+     * an already-built Gemini request payload.
+     *
+     * The translator returns `{'generationConfig': {responseMimeType,
+     * responseSchema}}`, which must be merged INTO the payload's existing
+     * `generationConfig` (temperature, topP, thinkingConfig, …) rather than
+     * replacing it — a flat array_merge() of the whole payload would drop
+     * every generation parameter built above.
+     *
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyStructuredOutput(array $payload, array $options, string $model, bool $stream): array
+    {
+        $schema = $options['structured_output'] ?? null;
+        if (!$schema instanceof StructuredOutputSchema) {
+            return $payload;
+        }
+
+        $translated = $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema);
+        if (isset($translated['generationConfig']) && is_array($translated['generationConfig'])) {
+            $payload['generationConfig'] = array_merge($payload['generationConfig'] ?? [], $translated['generationConfig']);
+            unset($translated['generationConfig']);
+        }
+
+        return array_merge($payload, $translated);
     }
 
     /**
