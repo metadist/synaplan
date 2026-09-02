@@ -71,6 +71,12 @@ locals {
   instance_type = var.instance_type != "" ? var.instance_type : (var.architecture == "arm64" ? "c7g.large" : "c7i.large")
   ssh_username  = "ec2-user"
   repo_root     = "${path.root}/../../.."
+
+  build_tags = {
+    SynaplanVersion = var.synaplan_version
+    Architecture    = var.architecture
+    BuiltBy         = "packer"
+  }
 }
 
 # Amazon Linux 2023: AWS maintains it, it is free of licence cost for the
@@ -126,12 +132,25 @@ source "amazon-ebs" "synaplan" {
     http_put_response_hop_limit = 2
   }
 
-  tags = {
-    Name            = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
-    SynaplanVersion = var.synaplan_version
-    Architecture    = var.architecture
-    BuiltBy         = "packer"
-  }
+  tags = merge(local.build_tags, {
+    Name = "${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+  })
+
+  # The temporary instance Packer provisions on, and its volumes. Packer
+  # terminates them itself; these tags are for when it does not, because a
+  # cancelled workflow run kills Packer before it can clean up. Two such
+  # builders once sat stopped and completely untagged on 60 GB of gp3 for eleven
+  # days, which nobody could attribute to anything until the bill arrived.
+  # aws-cleanup.yml finds them by PackerBuilder and terminates them.
+  run_tags = merge(local.build_tags, {
+    Name          = "packer-${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+    PackerBuilder = "synaplan"
+  })
+
+  run_volume_tags = merge(local.build_tags, {
+    Name          = "packer-${var.ami_name_prefix}-${var.synaplan_version}-${var.architecture}"
+    PackerBuilder = "synaplan"
+  })
 }
 
 build {

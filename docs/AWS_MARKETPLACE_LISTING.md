@@ -444,3 +444,34 @@ Deliberately avoided: a NAT gateway (~32 USD/month — a public subnet with an
 internet gateway does the same job here), an Application Load Balancer
 (~18 USD/month — Caddy terminates TLS on the instance), and Secrets Manager
 (0.40 USD per secret per month — the Parameter Store standard tier is free).
+
+### What the seller account itself costs
+
+Not nothing, and it does not stay flat by itself. Two things accumulate:
+
+- **Every release leaves an AMI**, and a registered AMI keeps a 30 GiB snapshot
+  alive behind it. One release is cents a month; a year of releases is not.
+- **A cancelled workflow run leaves a Packer builder**, because the cancellation
+  kills Packer before it can terminate its own instance. A stopped instance costs
+  no compute, but its root volume is billed exactly like a running one.
+
+Both happened. Twenty-six AMIs had piled up since 4.2.4 — eleven of them from a
+single day of iterating on one release — and two builders sat stopped on 60 GiB
+of gp3 for eleven days. Together roughly 0.36 USD a day and rising, which is what
+a first surprise bill looks like on an account whose only purpose is one listing.
+
+[`aws-cleanup.yml`](../.github/workflows/aws-cleanup.yml) runs nightly against
+both. It keeps every image a published listing version launches from, the two
+newest releases, and anything without this pipeline's tags; it terminates
+builders older than six hours found by the `PackerBuilder` tag; and it reports
+unattached volumes rather than deleting them, because it cannot know what is on
+one. Which images may go is decided in
+[`scripts/ami-retention.mjs`](../scripts/ami-retention.mjs) under test, since a
+wrong answer breaks a buyer's launch and cannot be undone.
+
+Age alone is never the reason an image goes: the listing still offers 4.2.4 next
+to the current release, and that version launches from an image far older than
+any retention window would keep.
+
+Dispatch the workflow with **Only report what would be deleted** to read its
+reasoning before it acts.
