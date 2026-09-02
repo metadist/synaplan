@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
@@ -66,11 +67,14 @@ final readonly class MessageSorter
 
     /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
-     * and the Veo provider. Keep in sync with
-     * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS so the AI never
-     * leaks an unsupported value (e.g. "8K", "1440p") into the pipeline.
+     * and the Veo provider. Sourced from the mediamaker capability's
+     * parameter schema ({@see SystemCapabilityRegistry}) — the single place
+     * this enum is now declared — so the AI never leaks an unsupported value
+     * (e.g. "8K", "1440p") into the pipeline. Keep
+     * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS in sync with the
+     * same registry constant.
      */
-    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
+    private const SUPPORTED_VIDEO_RESOLUTIONS = SystemCapabilityRegistry::MEDIAMAKER_VIDEO_RESOLUTIONS;
 
     /**
      * Common aliases the AI (or user) might emit, mapped to the canonical
@@ -580,7 +584,7 @@ final readonly class MessageSorter
             $inputMode = null;
             if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
                 $inputMode = strtolower(trim($data['BINPUTMODE']));
-                if (!in_array($inputMode, ['text_only', 'reference_images'], true)) {
+                if (!in_array($inputMode, SystemCapabilityRegistry::MEDIAMAKER_INPUT_MODES, true)) {
                     $inputMode = null;
                 }
             }

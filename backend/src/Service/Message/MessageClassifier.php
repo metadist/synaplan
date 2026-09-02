@@ -8,6 +8,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
@@ -49,6 +50,7 @@ final readonly class MessageClassifier
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private SystemCapabilityRegistry $capabilityRegistry,
     ) {
     }
 
@@ -471,13 +473,25 @@ final readonly class MessageClassifier
 
     /**
      * Map topic to intent for handler routing.
+     *
+     * The four SYSTEM topics (general, mediamaker, officemaker, docsummary)
+     * are looked up from {@see SystemCapabilityRegistry} — the single source
+     * of truth shared with {@see InferenceRouter::getHandler()} and
+     * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
+     * Everything else here is a deterministic ROUTING ALIAS (tool commands,
+     * "again" model-tag topics, legacy single-model topics): these are not
+     * product capabilities in their own right, just other spellings that
+     * resolve to the same handler, so they stay a local map.
      */
     private function mapTopicToIntent(string $topic): string
     {
-        // Map BPROMPTS topics to InferenceRouter intents
-        $topicToIntent = [
-            // Media generation
-            'mediamaker' => 'image_generation', // Handles images, videos, and audio
+        $systemIntent = $this->capabilityRegistry->topicToIntentMap()[$topic] ?? null;
+        if (null !== $systemIntent) {
+            return $systemIntent;
+        }
+
+        $aliasToIntent = [
+            // Media-generation aliases (tool commands, legacy single-model topics)
             'text2pic' => 'image_generation',
             'text2vid' => 'image_generation',
             'text2sound' => 'image_generation',
@@ -485,22 +499,18 @@ final readonly class MessageClassifier
             'tools:vid' => 'image_generation', // /vid command
             'tools:tts' => 'image_generation', // /tts command (audio via MediaGenerationHandler)
 
-            // Document/Office generation
-            'officemaker' => 'document_generation',
-
-            // Analysis
+            // File-analysis aliases
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
             'analyzefile' => 'file_analysis',
 
-            // Chat/General
-            'general' => 'chat',
+            // Chat alias
             'chat' => 'chat',
 
             // Add more mappings as needed
         ];
 
-        return $topicToIntent[$topic] ?? 'chat'; // Default to chat
+        return $aliasToIntent[$topic] ?? 'chat'; // Default to chat
     }
 
     /**

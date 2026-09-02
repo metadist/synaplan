@@ -3,6 +3,7 @@
 namespace App\Service\Message;
 
 use App\Entity\Message;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\CodeGenerationHandler;
 use App\Service\Message\Handler\MediaGenerationHandler;
@@ -27,6 +28,7 @@ final class InferenceRouter
         #[AutowireIterator('app.message.handler')]
         iterable $handlers,
         private LoggerInterface $logger,
+        private SystemCapabilityRegistry $capabilityRegistry,
     ) {
         foreach ($handlers as $handler) {
             $this->handlers[$handler->getName()] = $handler;
@@ -131,17 +133,29 @@ final class InferenceRouter
 
     private function getHandler(string $intent): object
     {
-        // Mapping von Intent zu Handler
-        $handlerMap = [
-            'chat' => 'chat',
-            'image_generation' => 'image_generation',
-            'code_generation' => 'code_generation',
-            'file_analysis' => 'file_analysis', // Vision AI für Bild-zu-Text
-            'summarize' => 'chat', // Nutzt Chat Handler mit speziellem Prompt
-            'translate' => 'chat',
-            'email' => 'tool',
-            'calendar' => 'tool',
-        ];
+        // Intent → handler. The four SYSTEM intents (chat, image_generation,
+        // document_generation, file_analysis) come from
+        // SystemCapabilityRegistry — the single source of truth shared with
+        // MessageClassifier::mapTopicToIntent() and SortClassificationSchema.
+        // `document_generation` used to be MISSING here entirely, silently
+        // defaulting to 'chat' via the `?? 'chat'` below — which happened to
+        // be correct (ChatHandler runs the officemaker path internally) but
+        // was never an explicit decision. It is now an explicit registry
+        // entry; see SystemCapabilityRegistryTest for the regression test.
+        //
+        // The remaining entries are NOT product capabilities in their own
+        // right (code_generation/summarize/translate/email/calendar have no
+        // dedicated topic), so they stay a local map.
+        $handlerMap = array_merge(
+            [
+                'code_generation' => 'code_generation',
+                'summarize' => 'chat', // Nutzt Chat Handler mit speziellem Prompt
+                'translate' => 'chat',
+                'email' => 'tool',
+                'calendar' => 'tool',
+            ],
+            $this->capabilityRegistry->intentToHandlerMap(),
+        );
 
         $handlerName = $handlerMap[$intent] ?? 'chat';
 

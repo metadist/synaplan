@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\StructuredOutput\Schema;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 
 /**
  * JSON schema for {@see \App\Service\Message\MessageSorter}'s classification
@@ -28,11 +29,14 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  */
 final class SortClassificationSchema
 {
-    private const MEDIA_TYPES = ['image', 'video', 'audio'];
+    // Sourced from the mediamaker capability's parameter schema
+    // ({@see SystemCapabilityRegistry}) rather than a private literal, so this
+    // schema's enums and the capability registry cannot drift apart.
+    private const MEDIA_TYPES = SystemCapabilityRegistry::MEDIAMAKER_MEDIA_TYPES;
 
-    private const INPUT_MODES = ['text_only', 'reference_images'];
+    private const INPUT_MODES = SystemCapabilityRegistry::MEDIAMAKER_INPUT_MODES;
 
-    private const VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
+    private const VIDEO_RESOLUTIONS = SystemCapabilityRegistry::MEDIAMAKER_VIDEO_RESOLUTIONS;
 
     /**
      * @param list<string> $topics    Valid BTOPIC values for this user (system topics + their own custom ones)

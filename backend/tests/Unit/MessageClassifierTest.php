@@ -6,6 +6,7 @@ use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
@@ -45,7 +46,8 @@ class MessageClassifierTest extends TestCase
             $this->modelConfigService,
             $this->configRepository,
             $this->em,
-            $this->logger
+            $this->logger,
+            new SystemCapabilityRegistry(),
         );
     }
 
@@ -503,6 +505,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -545,6 +548,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -711,6 +715,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -779,6 +784,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -850,6 +856,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -893,6 +900,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -957,6 +965,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $message = $this->createMock(Message::class);
@@ -1006,6 +1015,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $previousFileMessage = $this->createMock(Message::class);
@@ -1057,6 +1067,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $previousReply = $this->createMock(Message::class);
@@ -1103,6 +1114,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1159,6 +1171,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1343,6 +1356,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
         );
     }
 
