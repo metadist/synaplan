@@ -346,6 +346,33 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Claude Fable 5.1 — successor to Fable 5 at the same input/output price.
+     * Cache reads are priced at a quarter of Fable 5's implicit rate
+     * (0.25 vs the 1.0 = 10 * 0.1 the Anthropic-wide discount would otherwise
+     * apply), so the catalog carries an explicit `cache_read_price_per_1M`
+     * override that CostCalculationService::getPriceSnapshot() picks up
+     * ahead of the per-provider discount.
+     */
+    public function testClaudeFable51ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $fable51 = ModelCatalog::find('anthropic:claude-fable-5-1');
+
+        $this->assertCount(2, $fable51, 'Expected claude-fable-5-1 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($fable51, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-fable-5-1:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('anthropic:claude-fable-5-1:pic2text'));
+
+        foreach ($fable51 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-fable-5-1', $variant['providerId']);
+            $this->assertSame('claude-fable-5-1', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.25, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        }
+    }
+
+    /**
      * Sonnet 5 also backs the MEM-tagged memory-extraction row (BID 222), so the
      * bare `service:providerId` key resolves to three variants — capability
      * bindings must therefore always use the tag-qualified key.
