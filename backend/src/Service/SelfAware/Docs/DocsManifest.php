@@ -79,6 +79,9 @@ final readonly class DocsManifest
         if (1 !== preg_match(self::SLUG_PATTERN, $slug)) {
             throw new \InvalidArgumentException(sprintf('Invalid docs slug "%s".', $slug));
         }
+        if (self::hostOf($url, 'url') !== $siteHost) {
+            throw new \InvalidArgumentException(sprintf('url for slug "%s" is not on the manifest host.', $slug));
+        }
         if (self::hostOf($rawUrl, 'raw_url') !== $siteHost) {
             throw new \InvalidArgumentException(sprintf('raw_url for slug "%s" is not on the manifest host.', $slug));
         }

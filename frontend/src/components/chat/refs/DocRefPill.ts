@@ -70,5 +70,5 @@ export function renderDocRefPill(
   const ariaLabel = escapeHtml(labels.ariaLabel)
   const safeSlug = escapeHtml(slug)
 
-  return `<a class="pill no-underline align-middle" href="${href}" target="_blank" rel="noopener" title="${tooltip}" aria-label="${ariaLabel}" data-doc-slug="${safeSlug}">${BOOK_ICON}<span>${title}</span></a>`
+  return `<a class="pill no-underline align-middle" href="${href}" target="_blank" rel="noopener noreferrer" title="${tooltip}" aria-label="${ariaLabel}" data-doc-slug="${safeSlug}">${BOOK_ICON}<span>${title}</span></a>`
 }

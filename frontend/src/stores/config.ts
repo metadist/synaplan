@@ -109,8 +109,8 @@ const config = {
       return features?.help === true
     },
     get selfAware(): boolean {
-      // Defensive: the generated schema omits this until the backend OpenAPI
-      // property lands; passthrough still delivers the runtime flag.
+      // Current backends send features.selfAware. Older ones omit it — treat
+      // a missing flag as off so the hint and /help stay hidden.
       const features = getConfigSync().features as { selfAware?: boolean } | undefined
       return features?.selfAware === true
     },

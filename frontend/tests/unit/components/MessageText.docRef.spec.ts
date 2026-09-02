@@ -34,7 +34,7 @@ describe('MessageText [Doc:slug] pills', () => {
     expect(link).not.toBeNull()
     expect(link?.getAttribute('href')).toBe(channelsDoc.url)
     expect(link?.getAttribute('target')).toBe('_blank')
-    expect(link?.getAttribute('rel')).toBe('noopener')
+    expect(link?.getAttribute('rel')).toBe('noopener noreferrer')
     expect(el.textContent).toContain('Channels: WhatsApp & Email')
     expect(el.textContent).not.toContain('[Doc:channels]')
   })
