@@ -400,6 +400,13 @@ run_scheduler_role() {
                 runtime_log "Message digest run failed; it will be retried on the next daily interval." >&2
             fi
 
+            # Official documentation corpus for the self-aware chat (owner 0 /
+            # SYSTEM:synaplan). Failure is expected on air-gapped installs and
+            # is retried on the next interval; the previous corpus stays.
+            if ! run_scheduler_command bin/console --env="$env" app:selfaware:sync-docs --no-interaction; then
+                runtime_log "Platform docs sync failed; it will be retried on the next daily interval." >&2
+            fi
+
             next_daily=$((now + daily_seconds))
         fi
 

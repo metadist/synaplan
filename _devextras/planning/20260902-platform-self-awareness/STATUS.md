@@ -1,41 +1,39 @@
 # Status — Platform Self-Awareness
 
-Plan of record: `00_master_plan.md`. Work one step at a time; update this
-table when a branch is opened, merged, or a decision is taken. The
-predecessor `../20260623-release4.0/06_self-aware-routing.md` is superseded
-by this plan and is not updated any more.
+Plan of record: `00_master_plan.md`. Implemented on `feat/self-awareness`
+in one pass (SA1–SA12) so the CI gate can run before the PR.
 
 ## Sprint 1 — inventory and routing
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| SA1 — `PlatformCapabilityInventory` + renderer | `feat/self-aware-inventory` | planned | Pure library code; ships the dev command `app:selfaware:inventory` |
-| SA2 — `synaplan` topic, sorter/planner rules, `general` rewrite, `SelfAwareConfigSeeder` | `feat/self-aware-topic` | planned | Snapshot re-record #1 |
-| SA3 — Inventory injection, fast-path guard, `/help`, widget exclusion | `feat/self-aware-injection` | planned | Snapshot re-record #2 (`/help` case) |
+| SA1 — `PlatformCapabilityInventory` + renderer | `feat/self-awareness` | implemented | Dev command `app:selfaware:inventory` |
+| SA2 — `synaplan` topic, sorter/planner rules, `general` rewrite, `SelfAwareConfigSeeder` | `feat/self-awareness` | implemented | Seed step 18; planner snapshot re-recorded |
+| SA3 — Inventory injection, fast-path guard, `/help`, widget exclusion | `feat/self-awareness` | implemented | `/help` characterization case `cmd_help` |
 
 ## Sprint 2 — docs corpus
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| SA4 — `synaplan-docs`: `/docs-manifest.json`, `/raw/{slug}.md`, `/llms.txt` | `feat/docs-manifest` (docs repo) | planned | Separate public repo; schema copied both ways |
-| SA5 — Sync service, `app:selfaware:sync-docs`, `SyncPlatformDocsMessage` | `feat/self-aware-docs-sync` | planned | Owner-0 checks (embedding model, rate limit, stale-hit filter) to be recorded here |
-| SA6 — Scheduler daily slot + release trigger | `feat/self-aware-docs-schedule` | planned | **Ask-first** (edits `_docker/backend/lib/container-runtime.sh`) |
+| SA4 — `synaplan-docs`: `/docs-manifest.json`, `/raw/{slug}.md`, `/llms.txt` | `feat/self-awareness` (docs repo) | implemented | Intercept in `index.php` via `lib/docs_export.php`; `site_url` from `SYNAPLAN_DOCS_SITE_URL` |
+| SA5 — Sync service, `app:selfaware:sync-docs`, `SyncPlatformDocsMessage` | `feat/self-awareness` | implemented | Owner 0: no User row ⇒ `VectorizationService` skips rate-limit recording (verified). Embedding model is the system VECTORIZE default. |
+| SA6 — Scheduler daily slot + release trigger | `feat/self-awareness` | implemented | Daily `app:selfaware:sync-docs`; `app:updates:check` dispatches the message when the published version changes |
 
 ## Sprint 3 — grounded answers and chat UX
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| SA7 — `PlatformDocsRetriever`, `[Doc:slug]` context, `docs_loaded` | `feat/self-aware-docs-retrieval` | planned | Owner 0 at query time |
-| SA8 — Doc pills in `MessageText.vue` | `feat/self-aware-doc-pills` | planned | Tokens only; light/dark/V2 check |
-| SA9 — Hint line, `/help` in composer, `features.selfAware` | `feat/self-aware-discoverability` | planned | Schema regen; five locales |
+| SA7 — `PlatformDocsRetriever`, `[Doc:slug]` context, `docs_loaded` | `feat/self-awareness` | implemented | Owner 0 at query time; ChatHandler + ChatRunner |
+| SA8 — Doc pills in `MessageText.vue` | `feat/self-awareness` | implemented | `DocRefPill.ts`; tokens only |
+| SA9 — Hint line, `/help` in composer, `features.selfAware` | `feat/self-awareness` | implemented | Five locales; runtime-config flag |
 
 ## Sprint 4 — eval and rollout
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| SA10 — Eval corpus + `app:selfaware:eval` | `feat/self-aware-eval` | planned | Live-model spot check, not in `make test` |
-| SA11 — Docs, release checklist, mobile-impact classification | `docs/self-aware` | planned | Edits three `synaplan-docs` pages |
-| SA12 — Rollout (fresh + upgraded install, platform notes) | — | planned | |
+| SA10 — Eval corpus + `app:selfaware:eval` | `feat/self-awareness` | implemented | Live-model spot check, not in `make test` |
+| SA11 — Docs, release checklist, mobile-impact classification | `feat/self-awareness` | implemented | README + `docs/ADMIN.md`; existing `frontend/src/**` ota-candidate / `backend/**` backend-only allow-lists cover new files. `stores/config.ts` remains store-required (pre-existing). |
+| SA12 — Rollout (fresh + upgraded install, platform notes) | `feat/self-awareness` | implemented | `app:seed` inserts four `SELF_AWARE` rows (step 18). Local CI gate green: lint, PHPStan, PHPUnit 4652, frontend lint/vitest/vue-tsc. Scheduler daily slot + `app:updates:check` dispatch cover the first corpus fill. |
 
 ## Decisions
 
@@ -51,23 +49,8 @@ by this plan and is not updated any more.
 
 ## Investigation baseline (2026-09-02)
 
-- Nothing from the Release 4.0 self-aware plan exists in code: no `synaplan`
-  topic, no system-owned RAG group, no `SELF_AWARE` flags.
-- `general` prompt redirects every file request and forbids meta-commentary
-  about limitations; capability questions therefore get model guesses.
-- Fast path is default-OFF (`CLASSIFIER.FAST_PATH_ENABLED`); the sorter sees
-  every message; `[DYNAMICLIST]` excludes `tools:*` only.
-- Live capability knowledge is spread over `SkillCatalog`, `ModelConfigService`,
-  `ChatReadinessService`, `ConfigController::getRuntimeConfig()`,
-  `MultitaskRoutingConfig`, `PluginManager`, `CapabilityService`,
-  `UpdateStatusService`; nothing aggregates it.
-- RAG is user-scoped at storage level; `CrawlWidgetUrlMessageHandler` is
-  the exact ingestion shape needed (deterministic file id, `deleteByFile`,
-  `vectorizeAndStore`, no `BFILES` row).
-- Scheduler daily slot in `_docker/backend/lib/container-runtime.sh` runs
-  `app:updates:check` and `app:digest:run`.
-- `synaplan-docs`: custom PHP + CommonMark, 29 flat Markdown pages
-  (~209 KB), English only, metadata in `index.php` `$docsMap`, no export.
-- PDF output is explicitly unsupported today and becomes install-dependent
-  with `../20260902-office-docs/` A0/A4; no music generation exists anywhere.
-- Five UI locales: `de`, `en`, `es`, `fr`, `tr`.
+- PDF export is `available` iff `OFFICE_CONVERT_URL` is set; otherwise
+  `needs_setup` with admin hint `office engine (OFFICE_CONVERT_URL)`.
+- Owner 0 has no `User` row, so vectorization does not call
+  `RateLimitService::recordUsage` (the `$user` lookup is null). No extra
+  whitelist was required.

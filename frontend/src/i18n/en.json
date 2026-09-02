@@ -235,6 +235,19 @@
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",
+  "selfAware": {
+    "emptyHint": "Not sure what's possible here? Ask me what I can do.",
+    "emptyHintQuestion": "What can you do here?",
+    "examplePrompt": "What can you do?",
+    "helpCommand": {
+      "label": "Help",
+      "description": "Ask what this AI assistant can do here"
+    },
+    "docPill": {
+      "tooltip": "Open in the documentation",
+      "ariaLabel": "Open {title} in the documentation"
+    }
+  },
   "examplePrompts": {
     "heading": "Try one of these",
     "items": {

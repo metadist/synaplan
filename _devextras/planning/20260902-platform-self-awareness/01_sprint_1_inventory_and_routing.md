@@ -1,6 +1,6 @@
 # Sprint 1 — Capability inventory, `synaplan` topic, graceful inability
 
-Status: planned
+Status: implemented
 Date: 2026-09-02
 Depends on: `00_master_plan.md` (Decisions 1–3, 8, 9)
 

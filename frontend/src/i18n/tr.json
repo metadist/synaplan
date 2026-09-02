@@ -234,6 +234,19 @@
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
+  "selfAware": {
+    "emptyHint": "Burada neler mümkün olduğundan emin değil misiniz? Bana neler yapabileceğimi sorun.",
+    "emptyHintQuestion": "Burada neler yapabilirsin?",
+    "examplePrompt": "Ne yapabilirsin?",
+    "helpCommand": {
+      "label": "Yardım",
+      "description": "Bu AI asistanının burada neler yapabileceğini sor"
+    },
+    "docPill": {
+      "tooltip": "Dokümantasyonda aç",
+      "ariaLabel": "{title} dokümantasyonunda aç"
+    }
+  },
   "examplePrompts": {
     "heading": "Bunlardan birini deneyin",
     "items": {

@@ -1,0 +1,388 @@
+[
+  {
+    "id": "Q1",
+    "lang": "en",
+    "text": "Can you create PDFs?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["not", "nicht", "not available", "not set"],
+      "must_mention_any": ["DOCX", "Word", "XLSX"],
+      "must_not_contain": ["http://", "https://files", "I have attached", "€", "$"]
+    }
+  },
+  {
+    "id": "Q2",
+    "lang": "en",
+    "text": "Can you create PDFs?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["yes", "can", "PDF"],
+      "must_not_contain": ["maybe", "I have attached", "€"]
+    }
+  },
+  {
+    "id": "Q3",
+    "lang": "de",
+    "text": "Kannst du mir eine PDF erstellen?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["nicht", "keine"],
+      "must_mention_any": ["DOCX", "Word", "Administrator"],
+      "must_not_contain": ["I have attached", "€"]
+    }
+  },
+  {
+    "id": "Q4",
+    "lang": "en",
+    "text": "Would you create a song like the Beatles?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["cannot", "can't", "not"],
+      "must_mention_any": ["lyrics"],
+      "must_not_contain": ["MP3", "I have attached", "€"]
+    }
+  },
+  {
+    "id": "Q5",
+    "lang": "en",
+    "text": "Would you create a song like the Beatles?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["cannot", "can't", "not"],
+      "must_mention_any": ["lyrics", "MP3"],
+      "must_not_contain": ["I have attached", "€"]
+    }
+  },
+  {
+    "id": "Q6",
+    "lang": "es",
+    "text": "¿Puedes buscar en internet?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["sí", "si", "puedo", "/search"],
+      "must_not_contain": ["no puedo", "€"]
+    }
+  },
+  {
+    "id": "Q7",
+    "lang": "es",
+    "text": "¿Puedes buscar en internet?",
+    "install": "no_keys",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["no", "aún", "configur"],
+      "must_not_contain": ["sí, puedo buscar", "€"]
+    }
+  },
+  {
+    "id": "Q8",
+    "lang": "fr",
+    "text": "Peux-tu lire mes e-mails ?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["pas", "non", "Channels", "canal"],
+      "must_not_contain": ["€", "$"]
+    }
+  },
+  {
+    "id": "Q9",
+    "lang": "tr",
+    "text": "Bana bir video yapabilir misin?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["değil", "yok", "hayır"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q10",
+    "lang": "tr",
+    "text": "Bana bir video yapabilir misin?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["evet", "/vid", "video"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q11",
+    "lang": "en",
+    "text": "Can you run Python code for me?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["cannot", "can't", "not"],
+      "must_mention_any": ["Desktop", "skills"],
+      "must_not_contain": ["```python", "€"]
+    }
+  },
+  {
+    "id": "Q12",
+    "lang": "en",
+    "text": "Can you remember things about me?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["yes", "memor"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q13",
+    "lang": "en",
+    "text": "Can you remember things about me?",
+    "install": "no_keys",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["not", "Qdrant", "administrator"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q14",
+    "lang": "de",
+    "text": "Kannst du Audiodateien transkribieren?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["ja", "kann", "hochladen"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q15",
+    "lang": "en",
+    "text": "What file types can I upload?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_mention_any": ["PDF", "DOCX", "PNG"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q16",
+    "lang": "de",
+    "text": "Was kannst du?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["Chat", "Dokument", "/help", "Dokumentation"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q17",
+    "lang": "en",
+    "text": "What can you do here?",
+    "install": "no_keys",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["not", "administrator", "provider"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q18",
+    "lang": "en",
+    "text": "How do I connect WhatsApp?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["WhatsApp", "Meta"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q19",
+    "lang": "de",
+    "text": "Wie binde ich das Chat-Widget in meine Website ein?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["Widget", "script"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q20",
+    "lang": "fr",
+    "text": "Est-ce que vous supportez Nextcloud ?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["Nextcloud"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q21",
+    "lang": "en",
+    "text": "Can I use you from Outlook?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["Synamail", "Outlook"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q22",
+    "lang": "es",
+    "text": "¿Qué hay de nuevo?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["nuevo", "versión", "version"],
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "Q23",
+    "lang": "en",
+    "text": "Are you ChatGPT?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["Synaplan", "assistant"],
+      "must_not_contain": ["sk-", "api_key", "€"]
+    }
+  },
+  {
+    "id": "Q24",
+    "lang": "en",
+    "text": "How much does the Pro plan cost?",
+    "install": "full",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["pricing", "plan"],
+      "must_not_contain": ["€", "$", "£"]
+    }
+  },
+  {
+    "id": "Q25",
+    "lang": "en",
+    "text": "How much does the Pro plan cost?",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_contain_any": ["self-hosted", "not configured", "plans"],
+      "must_not_contain": ["€", "$"]
+    }
+  },
+  {
+    "id": "Q26",
+    "lang": "en",
+    "text": "/help",
+    "install": "no_engine",
+    "expect": {
+      "topic": "synaplan",
+      "must_not_contain": ["€"]
+    }
+  },
+  {
+    "id": "T1",
+    "lang": "en",
+    "text": "Create a PDF of the following text: \"Quarterly notes …\"",
+    "install": "no_engine",
+    "expect": {
+      "topic": "not_synaplan",
+      "must_mention_any": ["DOCX", "Word"],
+      "must_not_contain": ["__FILE_GENERATED__", "https://files"]
+    }
+  },
+  {
+    "id": "T2",
+    "lang": "de",
+    "text": "Mach mir daraus ein Video.",
+    "install": "no_engine",
+    "expect": {
+      "topic": "not_synaplan",
+      "must_not_contain": ["hier ist dein Video", "https://files"]
+    }
+  },
+  {
+    "id": "T3",
+    "lang": "en",
+    "text": "Write me a poem and read it to me as MP3",
+    "install": "no_engine",
+    "expect": {
+      "topic": "not_synaplan",
+      "must_not_contain": ["https://files"]
+    }
+  },
+  {
+    "id": "T4",
+    "lang": "en",
+    "text": "Write me a poem and read it to me as MP3",
+    "install": "full",
+    "expect": {
+      "topic": "not_synaplan"
+    }
+  },
+  {
+    "id": "N1",
+    "lang": "en",
+    "text": "Write me a poem about autumn",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "N2",
+    "lang": "en",
+    "text": "Can you help me with my Excel formulas?",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "N3",
+    "lang": "de",
+    "text": "Kannst du das zusammenfassen?",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "N4",
+    "lang": "fr",
+    "text": "Peux-tu traduire ce texte en anglais : Bonjour",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "N5",
+    "lang": "en",
+    "text": "What can you tell me about the Beatles?",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "N6",
+    "lang": "en",
+    "text": "Search the web for Synaplan reviews",
+    "install": "any",
+    "expect": { "topic": "not_synaplan" }
+  },
+  {
+    "id": "W1",
+    "lang": "en",
+    "text": "What can you do?",
+    "install": "any",
+    "expect": {}
+  },
+  {
+    "id": "W2",
+    "lang": "en",
+    "text": "Can you create PDFs?",
+    "install": "any",
+    "expect": {}
+  }
+]

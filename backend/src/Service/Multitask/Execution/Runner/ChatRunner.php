@@ -18,7 +18,11 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\SelfAware\Docs\PlatformDocsRetriever;
+use App\Service\SelfAware\SelfAwareConfig;
+use App\Service\SelfAware\SelfAwarePromptDecorator;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Text-capability runner for `chat`, `summarize`, `translate`, `rag_query`.
@@ -48,6 +52,10 @@ final readonly class ChatRunner implements TaskRunner
         private KnowledgeContextFormatter $knowledgeContextFormatter,
         private PromptService $promptService,
         private LoggerInterface $logger,
+        #[Autowire(lazy: true)]
+        private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
+        #[Autowire(lazy: true)]
+        private ?PlatformDocsRetriever $platformDocsRetriever = null,
     ) {
     }
 
@@ -86,6 +94,7 @@ final readonly class ChatRunner implements TaskRunner
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;
 
         $systemPrompt = $this->systemPrompt($node, $language, $context, $topicBinding['systemPrompt']);
+        $systemPrompt = $this->decorateSelfAwareTopic($systemPrompt, $node, $context, $text);
         $ragChunks = 0;
         if (Capability::RagQuery === $node->capability) {
             $ragContext = $this->ragContext($text, $context, $ragChunks);
@@ -270,6 +279,46 @@ final readonly class ChatRunner implements TaskRunner
         $chunks = count($results);
 
         return $this->knowledgeContextFormatter->formatRagContext($results);
+    }
+
+    private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query): string
+    {
+        if (null === $this->selfAwarePromptDecorator) {
+            return $systemPrompt;
+        }
+
+        $topicId = $node->params['topic_id'] ?? null;
+        $topic = is_string($topicId) ? trim($topicId) : '';
+        $isWidget = SelfAwarePromptDecorator::isWidgetConversation(
+            $context->classification,
+            $context->options,
+        );
+        $docsHits = null;
+        if (SelfAwareConfig::ROUTABLE_TOPIC === $topic && null !== $this->platformDocsRetriever && !$isWidget) {
+            $retrievalQuery = trim($query);
+            if ('' === $retrievalQuery || 1 === preg_match('/^\/help\b/i', $retrievalQuery)) {
+                $retrievalQuery = 'What can you do here?';
+            }
+            try {
+                $docsHits = $this->platformDocsRetriever->retrieve(
+                    $retrievalQuery,
+                    $context->userId ?? $context->message->getUserId(),
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatRunner: Platform docs retrieval failed, continuing without', [
+                    'error' => $e->getMessage(),
+                ]);
+                $docsHits = null;
+            }
+        }
+
+        return $this->selfAwarePromptDecorator->apply(
+            $systemPrompt,
+            '' !== $topic ? $topic : 'general',
+            $context->userId ?? $context->message->getUserId(),
+            $isWidget,
+            $docsHits,
+        );
     }
 
     private function systemPrompt(TaskNode $node, string $language, NodeContext $context, ?string $topicPrompt = null): string

@@ -115,6 +115,13 @@
         "source": "tool_command",
         "topic": "tools:filesort"
     },
+    "cmd_help": {
+        "intent": "chat",
+        "language": "en",
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "synaplan"
+    },
     "cmd_lang": {
         "intent": "chat",
         "language": "en",

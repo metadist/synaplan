@@ -212,6 +212,7 @@ import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isDesktopAgentEnabled } from '@/composables/useDesktopAgentFeature'
 import { useDesktopDevices } from '@/composables/useDesktopDevices'
+import { useConfigStore } from '@/stores/config'
 
 interface Props {
   activeCommand?: string | null
@@ -234,30 +235,52 @@ const emit = defineEmits<{
   runOnDevice: [device: { id: number; name: string }]
 }>()
 
+const configStore = useConfigStore()
+
 /** Feature-gated tools that toggle a removable badge in the chat input. */
-const commandTools = [
-  {
-    id: 'web-search',
-    command: 'search',
-    icon: 'mdi:web',
-    labelKey: 'chatInput.tools.webSearch',
-    descKey: 'chatInput.tools.webSearchDesc',
-  },
-  {
-    id: 'image-gen',
-    command: 'pic',
-    icon: 'mdi:image',
-    labelKey: 'chatInput.tools.imageGen',
-    descKey: 'chatInput.tools.imageGenDesc',
-  },
-  {
-    id: 'video-gen',
-    command: 'vid',
-    icon: 'mdi:video',
-    labelKey: 'chatInput.tools.videoGen',
-    descKey: 'chatInput.tools.videoGenDesc',
-  },
-] as const
+const commandTools = computed(() => {
+  const tools: Array<{
+    id: string
+    command: string
+    icon: string
+    labelKey: string
+    descKey: string
+  }> = [
+    {
+      id: 'web-search',
+      command: 'search',
+      icon: 'mdi:web',
+      labelKey: 'chatInput.tools.webSearch',
+      descKey: 'chatInput.tools.webSearchDesc',
+    },
+    {
+      id: 'image-gen',
+      command: 'pic',
+      icon: 'mdi:image',
+      labelKey: 'chatInput.tools.imageGen',
+      descKey: 'chatInput.tools.imageGenDesc',
+    },
+    {
+      id: 'video-gen',
+      command: 'vid',
+      icon: 'mdi:video',
+      labelKey: 'chatInput.tools.videoGen',
+      descKey: 'chatInput.tools.videoGenDesc',
+    },
+  ]
+
+  if (configStore.features.selfAware) {
+    tools.push({
+      id: 'help',
+      command: 'help',
+      icon: 'mdi:help-circle-outline',
+      labelKey: 'selfAware.helpCommand.label',
+      descKey: 'selfAware.helpCommand.description',
+    })
+  }
+
+  return tools
+})
 
 const router = useRouter()
 const { t } = useI18n()

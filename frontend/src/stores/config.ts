@@ -108,6 +108,12 @@ const config = {
       const features = getConfigSync().features
       return features?.help === true
     },
+    get selfAware(): boolean {
+      // Defensive: the generated schema omits this until the backend OpenAPI
+      // property lands; passthrough still delivers the runtime flag.
+      const features = getConfigSync().features as { selfAware?: boolean } | undefined
+      return features?.selfAware === true
+    },
     get memoryService(): boolean {
       // Return cached async check if available, otherwise fall back to config flag
       if (memoryServiceAvailable.value !== null) {

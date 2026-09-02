@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Knowledge;
 
+use App\Service\SelfAware\Docs\PlatformDocsHits;
+
 /**
  * Shared wording for RAG / memory context blocks injected into prompts.
  *
@@ -78,6 +80,29 @@ final class KnowledgeContextFormatter
         $memoriesContext .= "- Only use IDs from the list above. Never invent IDs.\n";
 
         return $memoriesContext;
+    }
+
+    public function formatPlatformDocsContext(PlatformDocsHits $hits): string
+    {
+        if ($hits->isEmpty()) {
+            return '';
+        }
+
+        $block = "\n\n## Synaplan documentation (relevant to this question):\n";
+        foreach ($hits->hits as $hit) {
+            $block .= sprintf(
+                "[Doc:%s] %s — %s\n",
+                $hit->slug,
+                $hit->title,
+                trim($hit->text),
+            );
+        }
+        $block .= "\nUse only what is written above for how-to and feature questions. REFERENCES: cite the page you used as [Doc:slug] (clickable). Rules:\n";
+        $block .= "- ONE slug per bracket. Good: [Doc:channels] and [Doc:widget]. Bad: [Doc:channels, widget].\n";
+        $block .= "- Only slugs from the list above. Never invent slugs or URLs.\n";
+        $block .= "- If the documentation does not answer the question, say so and refer the user to the documentation site instead of guessing.\n";
+
+        return $block;
     }
 
     /**

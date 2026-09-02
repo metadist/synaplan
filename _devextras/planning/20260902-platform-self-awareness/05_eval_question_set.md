@@ -1,6 +1,6 @@
 # Eval question set — what "self-aware" means, row by row
 
-Status: planned (frozen when SA10 lands; additions go through a PR that
+Status: implemented (frozen when SA10 lands; additions go through a PR that
 also updates `backend/tests/Eval/self_aware_eval_corpus.json`)
 Date: 2026-09-02
 

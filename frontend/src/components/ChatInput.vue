@@ -417,7 +417,7 @@ import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
 import { parseCommand } from '../commands/parse'
-import { type Command } from '@/stores/commands'
+import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
@@ -563,6 +563,7 @@ const aiConfigStore = useAiConfigStore()
 const chatsStore = useChatsStore()
 const configStore = useConfigStore()
 const authStore = useAuthStore()
+const commandsStore = useCommandsStore()
 const incognitoStore = useIncognitoStore()
 const dialog = useDialog()
 const { warning, error: showError, success } = useNotification()
@@ -767,10 +768,14 @@ const canSend = computed(() => {
     return false
   }
 
-  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments)
+  // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments).
+  // Commands that take no arguments (e.g. /help) are sendable as-is.
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
   if (isOnlyCommand && !hasFiles) {
-    return false
+    const cmd = commandsStore.getCommand(trimmedMessage.slice(1))
+    if (!cmd || cmd.requiresArgs) {
+      return false
+    }
   }
 
   return (hasMessage || hasFiles) && filesReady && !uploading.value

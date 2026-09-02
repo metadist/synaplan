@@ -77,12 +77,13 @@ When the request maps to one of these task topics, use capability `chat` and
 put the topic key in `params.topic_id`:
 
 - "general": Catch-all topic for everyday questions.
+- "synaplan": Questions about Synaplan itself: what it can and cannot do, how to use a feature, what is new, plans and pricing.
 - "mediamaker": Media-generation topic for images, videos and audio.
 - "officemaker": Generate a single Office document.
 - "docsummary": Summarize a document or attached file text.
 - "legal-review": Custom user topic: review legal clauses.
 
-Allowed topic keys: "general" | "mediamaker" | "officemaker" | "docsummary" | "legal-review"
+Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "docsummary" | "legal-review"
 
 ## Routing decisions (apply in order)
 
@@ -221,7 +222,10 @@ Allowed topic keys: "general" | "mediamaker" | "officemaker" | "docsummary" | "l
    emit `mcp_action` for read-only questions (use `mcp_fetch`), and NEVER
    emit it when it is not in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
-   node, no `compose_reply` needed.
+   node, no `compose_reply` needed. A question about Synaplan itself
+   (what it can do, how a feature works, what is new, who/what it is) is
+   still one `chat` node, with `topic_id: "synaplan"`. Never use that
+   question as the reply node for `email_me`.
 11. A SINGLE media request with no follow-up step ("make an image of X",
     "generate a video of Y", "read this aloud", "make an excel table") → ONE
     generator node (`image_generation` / `video_generation` / `text2sound` /
@@ -549,7 +553,19 @@ User: "Wer bist du?"
   "language": "de",
   "reply_node": "n1",
   "tasks": [
-    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "general" } }
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
+  ]
+}
+
+### Question about Synaplan itself
+User: "Can you create PDFs?"
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
   ]
 }
 

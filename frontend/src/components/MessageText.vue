@@ -35,11 +35,13 @@ import { useNotification } from '@/composables/useNotification'
 import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import { renderDocRefPill, type PlatformDocRef } from '@/components/chat/refs/DocRefPill'
 
 interface Props {
   content: string
   isStreaming?: boolean
   memories?: UserMemory[] | null | undefined
+  docs?: PlatformDocRef[] | null
   /** When true, disables memory fetching (for shared/anonymous views) */
   readonly?: boolean
 }
@@ -639,8 +641,8 @@ function normalizeInlineReferences(text: string): string {
   // does not wrap them in separate <p> blocks.
   // Handles both numeric IDs ([Memory:12345]) and named keys ([Memory:hobby]).
   return text
-    .replace(/\n+(\[(?:Feedback|Memory|Message)\s*:\s*[\w.-]+\])/gi, ' $1')
-    .replace(/(\[(?:Feedback|Memory|Message)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
+    .replace(/\n+(\[(?:Feedback|Memory|Message|Doc)\s*:\s*[\w.-]+\])/gi, ' $1')
+    .replace(/(\[(?:Feedback|Memory|Message|Doc)\s*:\s*[\w.-]+\])\n+/gi, '$1 ')
 }
 
 // Normalize special file markers + reference markers + apply badge / table
@@ -669,8 +671,24 @@ function normalizeContentForRender(input: string): string {
   return input
 }
 
+function processDocRefPills(html: string): string {
+  if (!html.includes('[Doc:')) {
+    return html
+  }
+
+  return html.replace(/\[Doc:([a-z0-9-]+)\.{0,3}\]/g, (_match, slug: string) => {
+    const title = props.docs?.find((doc) => doc.slug === slug)?.title ?? slug
+    return renderDocRefPill(slug, props.docs, {
+      tooltip: t('selfAware.docPill.tooltip'),
+      ariaLabel: t('selfAware.docPill.ariaLabel', { title }),
+    })
+  })
+}
+
 function postProcessHtml(html: string): string {
-  html = processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(html)))
+  html = processDocRefPills(
+    processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(html)))
+  )
   html = html.replace(/<table(\s|>)/g, '<div class="table-scroll"><table$1')
   html = html.replace(/<\/table>/g, '</table></div>')
   // Demo-mode CTA from TestProvider. A <button> (not an <a>) so ChatView
@@ -766,7 +784,9 @@ function renderStreamingIncremental(content: string): string {
   let tailHtml = ''
   if (trailingTail.length > 0) {
     tailHtml = renderStreamingTail(trailingTail)
-    tailHtml = processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(tailHtml)))
+    tailHtml = processDocRefPills(
+      processMessageReferenceBadges(processFeedbackBadges(processMemoryBadges(tailHtml)))
+    )
   }
 
   // Concatenation is fine now: morphdom diffs the combined HTML against the
@@ -1099,6 +1119,22 @@ watch(
       }
     }
   }
+)
+
+// Re-render when docs_loaded arrives so [Doc:slug] tokens become pills.
+watch(
+  () => props.docs,
+  async () => {
+    if (props.content.includes('[Doc:')) {
+      invalidateStreamingCache()
+      const currentVersion = ++renderVersion
+      const result = await processContent(props.content, currentVersion)
+      if (result !== null) {
+        applyHtml(result)
+      }
+    }
+  },
+  { deep: true }
 )
 </script>
 

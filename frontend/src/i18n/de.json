@@ -235,6 +235,19 @@
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",
+  "selfAware": {
+    "emptyHint": "Nicht sicher, was hier möglich ist? Frag mich, was ich tun kann.",
+    "emptyHintQuestion": "Was kannst du hier tun?",
+    "examplePrompt": "Was kannst du tun?",
+    "helpCommand": {
+      "label": "Hilfe",
+      "description": "Fragen, was dieser KI-Assistent hier tun kann"
+    },
+    "docPill": {
+      "tooltip": "In der Dokumentation öffnen",
+      "ariaLabel": "{title} in der Dokumentation öffnen"
+    }
+  },
   "examplePrompts": {
     "heading": "Probiere eines davon",
     "items": {

@@ -1,6 +1,6 @@
 # Platform Self-Awareness — Master Plan
 
-Status: planned (see `STATUS.md`)
+Status: implemented (see `STATUS.md`)
 Date: 2026-09-02
 Supersedes: `../20260623-release4.0/06_self-aware-routing.md` (Release 4.0
 Feature 6, never started). That document stays as history; every decision it
