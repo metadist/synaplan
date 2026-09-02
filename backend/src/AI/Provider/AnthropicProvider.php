@@ -23,6 +23,14 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Anthropic-protocol clients that need tools should use the Messages gateway
  * at POST /v1/messages (AnthropicPassthroughTranslator), which forwards the
  * request body verbatim — including tools — to the upstream Anthropic API.
+ *
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
+ * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
+ * invalid_request_error — only "auto" (default) and "none" are accepted.
+ * This provider is unaffected since it never sends tool_choice. The Messages
+ * Gateway passthrough forwards the client's tool_choice verbatim and lets
+ * Anthropic's own 400 surface the mismatch, exactly as a direct API call
+ * would.
  */
 class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
 {
@@ -49,6 +57,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
@@ -60,6 +69,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
@@ -75,6 +85,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
