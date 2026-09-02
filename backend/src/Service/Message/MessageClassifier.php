@@ -16,6 +16,7 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
+use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -49,7 +50,18 @@ final readonly class MessageClassifier
         '/web' => 'tools:web',
         '/list' => 'tools:list',
         '/docs' => 'tools:filesort',
+        '/help' => 'synaplan',
     ];
+
+    /**
+     * Meta-questions about this product (EN/DE/ES/FR/TR). A match only
+     * defers to the AI sorter — it never routes by itself.
+     *
+     * Languages: can you / what can you (en), kannst du / was kannst (de),
+     * puedes / qué puedes (es), peux-tu / que peux (fr), yapabilir misin /
+     * ne yapabilirsin (tr), plus the word "synaplan".
+     */
+    private const SELF_AWARE_GUARD_PATTERN = '/(?:can you|what can you|kannst du|was kannst|puedes|qu[eé] puedes|peux-tu|que peux|yapabilir misin|ne yapabilirsin|synaplan)/iu';
 
     public function __construct(
         private MessageSorter $messageSorter,
@@ -63,6 +75,7 @@ final readonly class MessageClassifier
         private EmbeddingRouterConfig $embeddingRouterConfig,
         private NativeToolRoutingConfig $nativeToolRoutingConfig,
         private ToolCallingCapability $toolCallingCapability,
+        private ?SelfAwareConfig $selfAwareConfig = null,
     ) {
     }
 
@@ -270,6 +283,7 @@ final readonly class MessageClassifier
         if (null === $overrideModelId
             && !empty($text)
             && $this->embeddingRouterConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
         ) {
             $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
 
@@ -343,6 +357,7 @@ final readonly class MessageClassifier
             && null === $overrideModelId
             && !empty($text)
             && $this->nativeToolRoutingConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
             && $this->accountChatModelCanRouteNatively($userId)
         ) {
             $deferredLanguage = $this->resolveConfidentLanguage($message, $text) ?? 'en';
@@ -821,6 +836,10 @@ final readonly class MessageClassifier
             return false;
         }
 
+        if ($this->isSelfAwareQuestion($trimmed, $message->getUserId() > 0 ? $message->getUserId() : null)) {
+            return false;
+        }
+
         // Long messages can hide intent — keep the full sorter for anything
         // over ~280 characters (Twitter limit feels right for a chat one-liner).
         if (mb_strlen($trimmed) > 280) {
@@ -1130,6 +1149,28 @@ final readonly class MessageClassifier
             .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
             $text
         );
+    }
+
+    /**
+     * Is this a meta-question about the product that must reach the AI sorter?
+     *
+     * Self-awareness works by the sorter picking the `synaplan` topic, whose
+     * prompt carries the product knowledge. Every layer that skips the sorter
+     * therefore has to step aside for these messages, or the question gets
+     * answered by a plain chat turn that knows nothing about Synaplan — the
+     * exact failure the self-awareness feature exists to prevent.
+     *
+     * Applies to all three skipping layers (fast path, embedding router,
+     * native tool-calling deferral) rather than just the fast path, because
+     * none of them can produce the `synaplan` topic: the embedding anchors and
+     * the hand-off toolset both come from {@see SystemCapabilityRegistry},
+     * which covers the four system capabilities only.
+     */
+    private function isSelfAwareQuestion(string $text, ?int $userId): bool
+    {
+        return null !== $this->selfAwareConfig
+            && $this->selfAwareConfig->isEnabled($userId)
+            && 1 === preg_match(self::SELF_AWARE_GUARD_PATTERN, $text);
     }
 
     /**

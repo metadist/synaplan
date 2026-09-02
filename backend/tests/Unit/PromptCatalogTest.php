@@ -20,6 +20,7 @@ final class PromptCatalogTest extends TestCase
         $topics = array_column(PromptCatalog::all(), 'topic');
 
         $this->assertContains('general', $topics);
+        $this->assertContains('synaplan', $topics);
         $this->assertContains('mediamaker', $topics);
         $this->assertContains('docsummary', $topics);
         $this->assertContains('officemaker', $topics);
@@ -109,6 +110,44 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('NEVER search for the literal question words', $prompt);
         // Worked example: deictic price question + product photo.
         $this->assertStringContainsString('sony wh-1000xm6 price', $prompt);
+    }
+
+    public function testSynaplanTopicIsRoutableAndHasPlaceholders(): void
+    {
+        $synaplan = null;
+        $general = null;
+        $sort = null;
+        $plan = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('synaplan' === $entry['topic']) {
+                $synaplan = $entry;
+            }
+            if ('general' === $entry['topic']) {
+                $general = $entry;
+            }
+            if ('tools:sort' === $entry['topic']) {
+                $sort = $entry;
+            }
+            if ('tools:plan' === $entry['topic']) {
+                $plan = $entry;
+            }
+        }
+
+        $this->assertNotNull($synaplan);
+        $this->assertStringStartsNotWith('tools:', $synaplan['topic']);
+        $this->assertNotSame('', $synaplan['shortDescription']);
+        $this->assertSame(1, substr_count($synaplan['prompt'], '[PLATFORM_CAPABILITIES]'));
+        $this->assertSame(1, substr_count($synaplan['prompt'], '[PLATFORM_DOCS]'));
+
+        $this->assertNotNull($general);
+        $this->assertSame(1, substr_count($general['prompt'], '[PLATFORM_CAPABILITIES]'));
+
+        $this->assertNotNull($sort);
+        $this->assertStringContainsString('Questions about Synaplan itself', $sort['prompt']);
+        $this->assertStringContainsString('BTOPIC "synaplan"', $sort['prompt']);
+
+        $this->assertNotNull($plan);
+        $this->assertStringContainsString('topic_id: "synaplan"', $plan['prompt']);
     }
 
     public function testTopicsAreUniquePerLanguage(): void

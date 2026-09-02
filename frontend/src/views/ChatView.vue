@@ -174,6 +174,7 @@
                   incognitoStore.active ? $t('incognito.emptyHint') : $t('chatInput.placeholder')
                 }}
               </p>
+              <SelfAwareEmptyHint @ask="handleSendMessage" />
             </div>
 
             <!-- Speed config: the expanded mix card greets the user on every
@@ -223,6 +224,7 @@
               :web-search="message.webSearch"
               :memory-ids="message.memoryIds"
               :feedback-ids="message.feedbackIds"
+              :docs="message.docs"
               :status="message.status"
               :error-type="message.errorType"
               :error-data="message.errorData"
@@ -472,6 +474,8 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
 import ExamplePrompts from '@/components/ExamplePrompts.vue'
+import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
+import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
 import ConsumptionRing from '@/components/usage/ConsumptionRing.vue'
 import QuoteSelectionButton from '@/components/QuoteSelectionButton.vue'
@@ -607,6 +611,13 @@ const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
+
+function applyDocsToMessage(message: Message, raw: unknown): void {
+  const docs = parsePlatformDocs(raw)
+  if (docs) {
+    message.docs = docs
+  }
+}
 
 const isGuestMode = computed(() => !authStore.isAuthenticated && guestStore.isGuestMode)
 
@@ -1907,6 +1918,8 @@ const handleContinueResponse = async (message: Message) => {
           message.truncated = true
         }
 
+        applyDocsToMessage(message, data.docs)
+
         message.isStreaming = false
         historyStore.finishStreamingMessage(message.id)
 
@@ -2675,6 +2688,11 @@ const streamAIResponse = async (
                 }),
               })
             }
+          } else if (data.status === 'docs_loaded') {
+            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+            if (streamingMessage) {
+              applyDocsToMessage(streamingMessage, data.metadata?.docs)
+            }
           } else if (data.status === 'complete') {
             if (streamingRafId !== null) {
               cancelAnimationFrame(streamingRafId)
@@ -2762,6 +2780,8 @@ const streamAIResponse = async (
                   resultsCount: data.searchResults.length,
                 }
               }
+
+              applyDocsToMessage(message, data.docs)
 
               applyAssistantChatModelFooter(
                 message,
@@ -3394,6 +3414,11 @@ const streamAIResponse = async (
                 streamingMessage.memoryIds = memoryIds
               }
             }
+          } else if (data.status === 'docs_loaded') {
+            const streamingMessage = historyStore.messages.find((m) => m.id === messageId)
+            if (streamingMessage) {
+              applyDocsToMessage(streamingMessage, data.metadata?.docs)
+            }
           } else if (data.status === 'feedback_loaded') {
             // Feedback examples loaded - store in feedbackStore for badge rendering
             const feedbacks = data.metadata?.feedbacks
@@ -3617,6 +3642,8 @@ const streamAIResponse = async (
               if (data.memoryIds && Array.isArray(data.memoryIds) && data.memoryIds.length > 0) {
                 message.memoryIds = data.memoryIds
               }
+
+              applyDocsToMessage(message, data.docs)
 
               // Store feedback IDs if provided
               if (

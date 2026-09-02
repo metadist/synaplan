@@ -50,6 +50,12 @@ export interface StreamFeedbackRow {
   value?: string
 }
 
+export interface StreamDocRef {
+  slug: string
+  title: string
+  url: string
+}
+
 /** A task node as announced in the `plan` event (multitask routing). */
 export interface StreamTaskNode {
   node_id: string
@@ -73,6 +79,8 @@ export interface StreamEventMetadata {
   language?: string
   memories?: StreamMemoryRow[]
   feedbacks?: StreamFeedbackRow[]
+  /** Platform documentation cited for this turn (`docs_loaded`). */
+  docs?: StreamDocRef[]
   /** Multitask routing (status === 'plan'): the visible task list + reply node. */
   plan?: StreamTaskNode[]
   reply_node?: string
@@ -132,6 +140,7 @@ export interface StreamUpdatePayload {
   searchResults?: StreamSearchResult[]
   memoryIds?: number[]
   feedbackIds?: number[]
+  docs?: StreamDocRef[]
   provider?: string
   model?: string
   model_id?: number | null

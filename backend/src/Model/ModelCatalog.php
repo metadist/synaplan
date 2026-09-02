@@ -3998,5 +3998,60 @@ class ModelCatalog
                 'features' => ['timestamps', 'diarization', 'multilingual'],
             ],
         ],
+        [
+            // Snapshot 2026-09-02 (https://platform.claude.com/docs/en/about-claude/models/whats-new-fable-5-1).
+            // Claude Fable 5.1 — successor to Claude Fable 5 at the same input/
+            // output price. Cache reads are a quarter of Fable 5's rate
+            // (0.025x base input vs the standard Anthropic 0.1x), overridden
+            // below via `cache_read_price_per_1M`. Adaptive thinking (always
+            // on). Does NOT support forced tool_choice ({"type": "any"} /
+            // {"type": "tool", ...}) — Anthropic returns a 400
+            // invalid_request_error; only "auto" (default) and "none" work.
+            // See AnthropicProvider's class docblock for how that's handled.
+            'id' => 338,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5.1',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5-1',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5.1 - Anthropic\'s successor to Claude Fable 5 for the most demanding reasoning and long-horizon agentic coding, knowledge work and research. Adaptive thinking (always on). 1M context, 128K max output.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-fable-5-1'],
+                'features' => ['vision', 'reasoning'],
+                'meta' => ['context_window' => '1000000', 'max_output' => '128000'],
+                'cache_read_price_per_1M' => 0.25,
+            ],
+        ],
+        [
+            'id' => 339,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5.1 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5-1',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5.1 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-fable-5-1'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.25,
+            ],
+        ],
     ];
 }

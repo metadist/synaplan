@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import type { Part } from '../stores/history'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import type { PlatformDocRef } from '@/components/chat/refs/DocRefPill'
 import MessageText from './MessageText.vue'
 import MessageImage from './MessageImage.vue'
 import MessageVideo from './MessageVideo.vue'
@@ -25,6 +26,7 @@ interface Props {
   part: Part
   isStreaming?: boolean
   memories?: UserMemory[] | null // Full memory objects (resolved from IDs)
+  docs?: PlatformDocRef[] | null
 }
 
 const props = defineProps<Props>()
@@ -71,6 +73,7 @@ const componentProps = computed(() => {
         content: props.part.content || '',
         isStreaming: props.isStreaming,
         memories: props.memories,
+        docs: props.docs,
       }
     case 'image':
       return { url: props.part.url || '', alt: props.part.alt }
@@ -113,7 +116,7 @@ const componentProps = computed(() => {
         isStreaming: props.part.isStreaming,
       }
     default:
-      return { content: props.part.content || '', memories: props.memories }
+      return { content: props.part.content || '', memories: props.memories, docs: props.docs }
   }
 })
 </script>

@@ -6,6 +6,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Messages\MessagesUsage;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -28,14 +29,32 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * - Extended Thinking (reasoning)
  * - System messages
  *
- * Tool use is supported for ONE narrow purpose: the routing hand-off tools of
- * the native tool-calling path ({@see \App\Service\Message\Routing\RoutingToolset}),
- * declared via `$options['tools']` and returned as normalised
- * {@see \App\AI\ToolCalling\ToolCall}s. There is no tool RESULT loop here —
- * the caller acts on the call and never continues the conversation with a
- * tool result. Claude Code and other Anthropic-protocol clients that need a
- * full agentic tool loop still use the Messages gateway at POST /v1/messages
- * (AnthropicPassthroughTranslator), which forwards the request body verbatim.
+ * Tool use is supported for two narrow, single-shot purposes, never as an
+ * agentic loop — this provider acts on a tool call and never continues the
+ * conversation with a tool result:
+ *   - structured output, which Anthropic has no native response mode for and
+ *     which is therefore expressed as a FORCED single tool call
+ *     ({@see StructuredOutputTranslator}), and
+ *   - the routing hand-off tools of the native tool-calling path
+ *     ({@see \App\Service\Message\Routing\RoutingToolset}), declared via
+ *     `$options['tools']` and returned as normalised
+ *     {@see \App\AI\ToolCalling\ToolCall}s.
+ *
+ * Claude Code and other Anthropic-protocol clients that need a full agentic
+ * tool loop still use the Messages gateway at POST /v1/messages
+ * (AnthropicPassthroughTranslator), which forwards the request body verbatim
+ * — including tools — to the upstream Anthropic API.
+ *
+ * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
+ * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
+ * invalid_request_error — only "auto" (default) and "none" are accepted.
+ * That rules out the structured-output dialect for them, so
+ * {@see StructuredOutputCapability} reports it as unsupported and callers
+ * fall back to the prose-instruction path; the
+ * routing hand-off tools are unaffected because they send tool_choice `auto`
+ * by design. The Messages Gateway passthrough forwards the client's
+ * tool_choice verbatim and lets Anthropic's own 400 surface the mismatch,
+ * exactly as a direct API call would.
  */
 class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
 {
@@ -62,6 +81,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-sonnet-5',
         'claude-haiku-4-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /** Models that require adaptive thinking format instead of manual budget_tokens. */
@@ -73,6 +93,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
@@ -88,6 +109,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         'claude-opus-5',
         'claude-sonnet-5',
         'claude-fable-5',
+        'claude-fable-5-1',
     ];
 
     /**
@@ -298,6 +320,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $inputTokens = $data['usage']['input_tokens'] ?? 0;
             $outputTokens = $data['usage']['output_tokens'] ?? 0;
             $cacheCreationTokens = $data['usage']['cache_creation_input_tokens'] ?? 0;
+            $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($data['usage'] ?? []);
             $cacheReadTokens = $data['usage']['cache_read_input_tokens'] ?? 0;
 
             $usage = [
@@ -306,6 +329,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
                 'cached_tokens' => $cacheReadTokens,
                 'cache_creation_tokens' => $cacheCreationTokens,
+                'cache_creation_1h_tokens' => $cacheCreation1hTokens,
             ];
 
             $this->logger->info('Anthropic: Chat completed', [
@@ -944,6 +968,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreationTokens = 0;
+        $cacheCreation1hTokens = 0;
         $cacheReadTokens = 0;
         $finishReason = null;
 
@@ -972,6 +997,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         $msgUsage = $event['data']['message']['usage'] ?? [];
                         $inputTokens = $msgUsage['input_tokens'] ?? 0;
                         $cacheCreationTokens = $msgUsage['cache_creation_input_tokens'] ?? 0;
+                        $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($msgUsage);
                         $cacheReadTokens = $msgUsage['cache_read_input_tokens'] ?? 0;
                         break;
 
@@ -1063,6 +1089,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
             'cached_tokens' => $cacheReadTokens,
             'cache_creation_tokens' => $cacheCreationTokens,
+            'cache_creation_1h_tokens' => $cacheCreation1hTokens,
         ];
     }
 

@@ -1,10 +1,11 @@
 {
   "announcements": {
     "later": "Şimdi değil",
-    "iosApp": {
-      "title": "Synaplan artık iPhone'da",
+    "mobileApp": {
+      "title": "Synaplan artık iPhone ve Android'de",
       "body": "Uygulama sohbetlerinizi, belgelerinizi ve asistanlarınızı cebinize taşır. Aynı hesap, aynı veriler — yolda sorunuzu sesli olarak söyleyin ve her sohbete kaldığınız yerden devam edin.",
-      "action": "App Store'dan indirin"
+      "appStore": "App Store'dan indirin",
+      "googlePlay": "Google Play'den indirin"
     }
   },
   "updates": {
@@ -234,6 +235,19 @@
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
+  "selfAware": {
+    "emptyHint": "Burada neler mümkün olduğundan emin değil misiniz? Bana neler yapabileceğimi sorun.",
+    "emptyHintQuestion": "Burada neler yapabilirsin?",
+    "examplePrompt": "Ne yapabilirsin?",
+    "helpCommand": {
+      "label": "Yardım",
+      "description": "Bu AI asistanının burada neler yapabileceğini sor"
+    },
+    "docPill": {
+      "tooltip": "Dokümantasyonda aç",
+      "ariaLabel": "{title} dokümantasyonunda aç"
+    }
+  },
   "examplePrompts": {
     "heading": "Bunlardan birini deneyin",
     "items": {
@@ -3127,6 +3141,7 @@
         "title": "Bu bilgisayarı bağla",
         "intro": "Bağlamak istediğiniz bilgisayarda Synaplan Desktop'ı açın, ardından bu adresi ve kodu girin.",
         "addressLabel": "Sunucu adresi",
+        "addressHint": "Bu adresi Synaplan Desktop’a yazın. Yerelde bu API’dir (http://localhost:8000), web arayüzü bağlantı noktası değil.",
         "codeLabel": "Eşleme kodu",
         "expiresIn": "{time} içinde sona erer",
         "expired": "Bu kodun süresi doldu.",

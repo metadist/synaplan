@@ -187,7 +187,7 @@ class ChatController extends AbstractController
      */
     private function stripToolCommandPrefix(string $text): string
     {
-        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search)\s*/i', '', $text) ?? $text;
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $text) ?? $text;
     }
 
     #[Route('', name: 'create', methods: ['POST'])]

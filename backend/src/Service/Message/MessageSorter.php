@@ -16,6 +16,7 @@ use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -114,6 +115,7 @@ final readonly class MessageSorter
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
         private StructuredOutputConfig $structuredOutputConfig,
+        private ?SelfAwareConfig $selfAwareConfig = null,
     ) {
     }
 
@@ -191,6 +193,16 @@ final readonly class MessageSorter
         // Get all available topics (exclude tools:* internal topics).
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        if (null !== $this->selfAwareConfig && !$this->selfAwareConfig->isEnabled($userId)) {
+            $topics = array_values(array_filter(
+                $topics,
+                static fn (string $topic): bool => SelfAwareConfig::ROUTABLE_TOPIC !== $topic,
+            ));
+            $topicsWithDesc = array_values(array_filter(
+                $topicsWithDesc,
+                static fn (array $item): bool => SelfAwareConfig::ROUTABLE_TOPIC !== ($item['topic'] ?? ''),
+            ));
+        }
 
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);

@@ -1,10 +1,11 @@
 {
   "announcements": {
     "later": "Ahora no",
-    "iosApp": {
-      "title": "Synaplan ya está en el iPhone",
+    "mobileApp": {
+      "title": "Synaplan ya está disponible para iPhone y Android",
       "body": "La app lleva tus chats, documentos y asistentes al móvil. La misma cuenta y los mismos datos: dicta tu pregunta mientras vas de camino y retoma cualquier conversación donde la dejaste.",
-      "action": "Descargar en el App Store"
+      "appStore": "Descargar en el App Store",
+      "googlePlay": "Descargar en Google Play"
     }
   },
   "updates": {
@@ -234,6 +235,19 @@
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
+  "selfAware": {
+    "emptyHint": "¿No sabes qué es posible aquí? Pregúntame qué puedo hacer.",
+    "emptyHintQuestion": "¿Qué puedes hacer aquí?",
+    "examplePrompt": "¿Qué puedes hacer?",
+    "helpCommand": {
+      "label": "Ayuda",
+      "description": "Preguntar qué puede hacer este asistente de IA aquí"
+    },
+    "docPill": {
+      "tooltip": "Abrir en la documentación",
+      "ariaLabel": "Abrir {title} en la documentación"
+    }
+  },
   "examplePrompts": {
     "heading": "Prueba una de estas",
     "items": {
@@ -3126,6 +3140,7 @@
         "title": "Vincular este equipo",
         "intro": "Abre Synaplan Desktop en el equipo que quieres conectar e introduce esta dirección y este código.",
         "addressLabel": "Dirección del servidor",
+        "addressHint": "Escribe esta dirección en Synaplan Desktop. En local es la API (http://localhost:8000), no el puerto de la interfaz web.",
         "codeLabel": "Código de vinculación",
         "expiresIn": "Caduca en {time}",
         "expired": "Este código ha caducado.",

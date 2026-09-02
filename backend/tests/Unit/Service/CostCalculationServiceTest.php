@@ -115,6 +115,96 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.010035', $result->totalCost);
     }
 
+    /**
+     * Anthropic's 1-hour cache TTL (opt-in via `cache_control: {"ttl": "1h"}`) writes
+     * cost 2x base input, not the 1.25x default for the 5-minute TTL — see
+     * https://platform.claude.com/docs/en/build-with-claude/prompt-caching. Before
+     * this was fixed, ALL cache-creation tokens were billed at the flat 1.25x rate
+     * regardless of TTL, under-billing every 1h-TTL write.
+     */
+    public function testCalculatesCostWithFullyOneHourCacheWriteAnthropicProvider(): void
+    {
+        $model = $this->createModelMock('Anthropic', 3.0, 15.0, 'per1M', 'per1M');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 1000 total prompt, 200 cached (0.10x read), 100 cache creation ALL 1h TTL (2.0x write)
+        // Regular: (1000 - 200 - 100) = 700 * 3/1M = 0.002100
+        // Cached: 200 * 3/1M * 0.10 = 0.000060
+        // Cache creation (1h): 100 * 3/1M * 2.0 = 0.000600
+        // Completion: 500 * 15/1M = 0.007500
+        $result = $this->service->calculateCost(1000, 500, 200, 100, 1, null, 100);
+
+        $this->assertSame('0.010260', $result->totalCost);
+    }
+
+    /**
+     * Mixed TTL: a single request can carry both a 5-minute-TTL breakpoint and a
+     * 1-hour-TTL breakpoint (Anthropic's `cache_creation.ephemeral_5m_input_tokens`
+     * / `ephemeral_1h_input_tokens`), so the two slices must be billed separately.
+     */
+    public function testCalculatesCostWithMixedFiveMinuteAndOneHourCacheWriteAnthropicProvider(): void
+    {
+        $model = $this->createModelMock('Anthropic', 3.0, 15.0, 'per1M', 'per1M');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 1000 total prompt, 0 cached, 100 cache creation: 40 at 1h TTL, 60 at 5m TTL (remainder)
+        // Regular: (1000 - 0 - 100) = 900 * 3/1M = 0.002700
+        // Cache creation (5m): 60 * 3/1M * 1.25 = 0.000225
+        // Cache creation (1h): 40 * 3/1M * 2.0 = 0.000240
+        // Completion: 500 * 15/1M = 0.007500
+        $result = $this->service->calculateCost(1000, 500, 0, 100, 1, null, 40);
+
+        $this->assertSame('0.010665', $result->totalCost);
+    }
+
+    /**
+     * Non-Anthropic providers never carry a 1h/5m TTL distinction; a stray
+     * $cacheCreation1hTokens value (e.g. from a shared code path) must not
+     * change their (flat 1.0x) cache-write cost.
+     */
+    public function testCacheCreation1hTokensIgnoredForNonAnthropicProvider(): void
+    {
+        $model = $this->createModelMock('openai', 3.0, 15.0, 'per1M', 'per1M');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $withoutFlag = $this->service->calculateCost(1000, 500, 0, 100, 1);
+        $withFlag = $this->service->calculateCost(1000, 500, 0, 100, 1, null, 100);
+
+        $this->assertSame($withoutFlag->totalCost, $withFlag->totalCost);
+    }
+
+    /**
+     * Defensive clamp: a caller-supplied 1h count above the total cache-creation
+     * total (e.g. a stale/inconsistent breakdown) must never inflate the bill
+     * beyond "the whole cache-creation total billed at the 1h rate".
+     */
+    public function testCacheCreation1hTokensClampedToCacheCreationTokens(): void
+    {
+        $model = $this->createModelMock('Anthropic', 3.0, 15.0, 'per1M', 'per1M');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $clampedToTotal = $this->service->calculateCost(1000, 500, 0, 100, 1, null, 100);
+        $overTotal = $this->service->calculateCost(1000, 500, 0, 100, 1, null, 999);
+
+        $this->assertSame($clampedToTotal->totalCost, $overTotal->totalCost);
+    }
+
     public function testUsesHistoryPriceWhenAvailable(): void
     {
         $model = $this->createModelMock('openai', 3.0, 15.0, 'per1M', 'per1M');

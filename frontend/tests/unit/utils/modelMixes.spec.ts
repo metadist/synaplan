@@ -101,6 +101,29 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.TEXT2PIC).toBeUndefined()
   })
 
+  it('prefers Claude Fable 5.1 over Fable 5 when the installation serves both', () => {
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [
+        model({
+          id: 240,
+          service: 'Anthropic',
+          providerId: 'claude-fable-5',
+          name: 'Claude Fable 5',
+        }),
+        model({
+          id: 338,
+          service: 'Anthropic',
+          providerId: 'claude-fable-5-1',
+          name: 'Claude Fable 5.1',
+        }),
+      ],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('anthropic'), models)
+
+    expect(resolved.defaults.CHAT).toBe(338)
+  })
+
   it('marks a mix without a resolvable chat model as unavailable', () => {
     const resolved = resolveModelMix(mixDefinition('europe'), {
       CHAT: [model({ id: 251, service: 'OpenAI', providerId: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' })],

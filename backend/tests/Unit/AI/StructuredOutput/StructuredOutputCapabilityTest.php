@@ -69,6 +69,44 @@ final class StructuredOutputCapabilityTest extends TestCase
         self::assertTrue($this->capability->supports($provider, null, false));
     }
 
+    /**
+     * The Anthropic dialect IS a forced tool call, and these models answer a
+     * forced `tool_choice` with a 400 — so structured output is unavailable on
+     * them and the caller has to keep the prose-instruction path.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function anthropicModelsRejectingForcedToolChoice(): array
+    {
+        return [
+            'fable 5.1' => ['claude-fable-5-1'],
+            'fable 5.1 dated alias' => ['claude-fable-5-1-20260812'],
+            'mythos 5.1' => ['claude-mythos-5-1'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('anthropicModelsRejectingForcedToolChoice')]
+    public function testAnthropicModelsThatRejectForcedToolChoiceAreUnsupported(string $model): void
+    {
+        self::assertFalse($this->capability->supports('anthropic', $model, false));
+        self::assertFalse($this->capability->supports('anthropic', $model, true));
+    }
+
+    public function testOtherAnthropicModelsKeepStructuredOutput(): void
+    {
+        self::assertTrue($this->capability->supports('anthropic', 'claude-sonnet-5', false));
+        self::assertTrue($this->capability->supports('anthropic', 'claude-fable-5', false));
+    }
+
+    /**
+     * The restriction is about FORCING a tool, not about tools as such: the
+     * routing hand-off path sends `tool_choice: auto` and stays available.
+     */
+    public function testTheRestrictionDoesNotLeakIntoNativeToolCalling(): void
+    {
+        self::assertTrue((new \App\AI\ToolCalling\ToolCallingCapability())->supports('anthropic', 'claude-fable-5-1', false));
+    }
+
     public function testUnknownProviderHasNoDialect(): void
     {
         self::assertNull($this->capability->dialect('some-future-provider'));

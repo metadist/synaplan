@@ -1,10 +1,11 @@
 {
   "announcements": {
     "later": "Pas maintenant",
-    "iosApp": {
-      "title": "Synaplan est désormais sur iPhone",
+    "mobileApp": {
+      "title": "Synaplan est désormais disponible sur iPhone et Android",
       "body": "L’application emporte vos chats, documents et assistants dans votre poche. Même compte, mêmes données — dictez une question en chemin et reprenez n’importe quelle conversation là où vous l’avez laissée.",
-      "action": "Télécharger sur l’App Store"
+      "appStore": "Télécharger sur l’App Store",
+      "googlePlay": "Télécharger sur Google Play"
     }
   },
   "updates": {
@@ -235,6 +236,19 @@
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",
+  "selfAware": {
+    "emptyHint": "Vous ne savez pas ce qui est possible ici ? Demandez-moi ce que je peux faire.",
+    "emptyHintQuestion": "Que pouvez-vous faire ici ?",
+    "examplePrompt": "Que pouvez-vous faire ?",
+    "helpCommand": {
+      "label": "Aide",
+      "description": "Demander ce que cet assistant IA peut faire ici"
+    },
+    "docPill": {
+      "tooltip": "Ouvrir dans la documentation",
+      "ariaLabel": "Ouvrir {title} dans la documentation"
+    }
+  },
   "examplePrompts": {
     "heading": "Essayez l’une de ces idées",
     "items": {
@@ -2271,6 +2285,7 @@
         "title": "Associer cet ordinateur",
         "intro": "Ouvrez Synaplan Desktop sur l'ordinateur à connecter, puis saisissez cette adresse et ce code.",
         "addressLabel": "Adresse du serveur",
+        "addressHint": "Saisissez cette adresse dans Synaplan Desktop. En local, c’est l’API (http://localhost:8000), pas le port de l’interface web.",
         "codeLabel": "Code d'association",
         "expiresIn": "Expire dans {time}",
         "expired": "Ce code a expiré.",

@@ -252,6 +252,75 @@ class RateLimitServiceUnifiedTest extends TestCase
         ]);
     }
 
+    /**
+     * Regression for a Copilot review comment on #1680: `usage` is an untyped
+     * array, so `cache_creation_1h_tokens` can arrive as a numeric string (or
+     * even negative) from a caller. recordUsage() must cast/clamp it to a
+     * non-negative int before forwarding to CostCalculationService, matching
+     * the other token fields' int contract.
+     */
+    public function testRecordUsageCastsAndClampsCacheCreation1hTokensFromUntypedUsageArray(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+
+        $costCalculationService = $this->createMock(CostCalculationService::class);
+        $costCalculationService->method('getPricingMode')->willReturn('per_token');
+
+        $capturedCacheCreation1hTokens = null;
+        $costCalculationService->expects($this->once())
+            ->method('calculateCost')
+            ->with(
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->anything(),
+                $this->callback(function ($cacheCreation1hTokens) use (&$capturedCacheCreation1hTokens) {
+                    $capturedCacheCreation1hTokens = $cacheCreation1hTokens;
+
+                    return true;
+                }),
+            )
+            ->willReturn(new \App\DTO\CostResult(
+                totalCost: '0.000000',
+                inputCost: '0.000000',
+                outputCost: '0.000000',
+                cacheSavings: '0.000000',
+                priceSnapshot: [],
+                billedInputTokens: 0,
+            ));
+
+        $service = new RateLimitService(
+            $this->configRepository,
+            $this->em,
+            $this->logger,
+            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            $costCalculationService,
+            $this->createMock(SubscriptionRepository::class),
+            $this->createMock(TopupRepository::class),
+        );
+
+        $this->connection->expects($this->once())->method('executeStatement');
+
+        $service->recordUsage($user, 'API_CHAT', [
+            'provider' => 'anthropic',
+            'model' => 'claude-fable-5-1',
+            'model_id' => 338,
+            'usage' => [
+                'prompt_tokens' => 1000,
+                'completion_tokens' => 500,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 100,
+                // Numeric string, as an untyped metadata array could carry.
+                'cache_creation_1h_tokens' => '40',
+            ],
+        ]);
+
+        $this->assertSame(40, $capturedCacheCreation1hTokens);
+    }
+
     public function testUnifiedLimitScenarioWhatsAppThenEmail(): void
     {
         $user = $this->createMock(User::class);

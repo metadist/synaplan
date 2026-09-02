@@ -33,6 +33,8 @@ use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Search\BraveSearchService;
+use App\Service\SelfAware\CapabilityInventory;
+use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -85,6 +87,8 @@ class ConfigController extends AbstractController
         private CapabilityService $capabilityService,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
+        private readonly ?SelfAwareConfig $selfAwareConfig = null,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
     ) {
     }
 
@@ -169,6 +173,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'help', type: 'boolean', example: true, description: 'Enable help system'),
                         new OA\Property(property: 'memoryService', type: 'boolean', example: true, description: 'Qdrant vector database availability'),
                         new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
+                        new OA\Property(property: 'selfAware', type: 'boolean', example: true, description: 'When true, the web chat can answer what this installation can do and cite official documentation. Off restores the previous chat behaviour.'),
                         new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
                     ]
                 ),
@@ -467,6 +472,7 @@ class ConfigController extends AbstractController
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
             'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
+            'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration
@@ -1276,6 +1282,8 @@ class ConfigController extends AbstractController
         if ($vectorizeChanged) {
             $this->embeddingMetadata->invalidate();
         }
+
+        $this->capabilityInventory?->forget($global ? null : $user->getId());
 
         $response = [
             'success' => true,

@@ -11,6 +11,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\ProviderKeyValidator;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\SelfAware\CapabilityInventory;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,6 +37,7 @@ final class AdminProviderKeysController extends AbstractController
         private readonly ProviderDefaultsService $defaults,
         private readonly ConfigRepository $configRepository,
         private readonly ChatReadinessService $chatReadiness,
+        private readonly ?CapabilityInventory $capabilityInventory = null,
     ) {
     }
 
@@ -167,6 +169,7 @@ final class AdminProviderKeysController extends AbstractController
         // The setup banner reads a short-lived availability snapshot — drop it so
         // the new key takes effect on the next page load instead of up to 30 s later.
         $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
 
         $defaultsApplied = false;
         if ($applyDefaults && ProviderDefaultsService::supports($provider)) {
@@ -231,6 +234,7 @@ final class AdminProviderKeysController extends AbstractController
             return $this->json(['error' => 'No stored key for this provider.'], Response::HTTP_NOT_FOUND);
         }
         $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
 
         return $this->json([
             'success' => true,
@@ -316,6 +320,7 @@ final class AdminProviderKeysController extends AbstractController
 
         $applied = $this->defaults->applyGlobalDefaults($provider);
         $this->chatReadiness->invalidate();
+        $this->capabilityInventory?->forget();
 
         return $this->json([
             'success' => true,

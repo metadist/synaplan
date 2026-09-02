@@ -15,6 +15,7 @@ use App\Service\Message\Routing\EmbeddingRouterMatch;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -105,6 +106,24 @@ class MessageClassifierTest extends TestCase
 
         $this->assertEquals('tools:pic', $result['topic']);
         $this->assertEquals('tool_command', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    public function testHelpCommandRoutesToSynaplan(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(21);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('/help');
+        $message->method('getLanguage')->willReturn('en');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('chat', $result['intent']);
+        $this->assertSame('tool_command', $result['source']);
         $this->assertTrue($result['skip_sorting']);
     }
 
@@ -1613,6 +1632,54 @@ class MessageClassifierTest extends TestCase
     }
 
     /**
+     * Self-awareness answers by routing to the `synaplan` topic, which only
+     * the AI sorter can pick — the hand-off toolset covers the four system
+     * capabilities and nothing else. Deferring such a question would answer it
+     * from a plain chat turn that knows nothing about the product.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheDeferralStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(905, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Same rule for the Phase 8 layer: a confident anchor match can only ever
+     * be one of the four system topics, so `synaplan` would be unreachable.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheEmbeddingRouterStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(906, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
      * @param string $chatProvider the account's default chat provider, which decides
      *                             whether the classifier's cheap pre-gate lets the
      *                             deferral through at all
@@ -1644,6 +1711,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),
             new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
         );
     }
 
@@ -1689,7 +1757,49 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
         );
+    }
+
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function selfAwareGuardUtterances(): array
+    {
+        return [
+            ['can you make PDFs?'],
+            ['was kannst du?'],
+            ['¿puedes buscar en internet?'],
+            ['peux-tu lire mes e-mails ?'],
+            ['video yapabilir misin?'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testFastPathDefersSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(410, $text));
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testFastPathStillClassifiesOrdinaryChat(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(411, 'write me a poem'));
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
     }
 
     private function classifierWithFastPathEnabled(MessageSorter $sorter): MessageClassifier
@@ -1715,6 +1825,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
         );
     }
 

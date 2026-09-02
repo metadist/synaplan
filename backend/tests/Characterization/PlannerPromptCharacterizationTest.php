@@ -46,6 +46,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
     /** Fixed topic fixture standing in for the BPROMPTS routing pool. */
     private const TOPIC_FIXTURE = [
         ['topic' => 'general', 'description' => 'Catch-all topic for everyday questions.'],
+        ['topic' => 'synaplan', 'description' => 'Questions about Synaplan itself: what it can and cannot do, how to use a feature, what is new, plans and pricing.'],
         ['topic' => 'mediamaker', 'description' => 'Media-generation topic for images, videos and audio.'],
         ['topic' => 'officemaker', 'description' => 'Generate a single Office document.'],
         ['topic' => 'docsummary', 'description' => 'Summarize a document or attached file text.'],

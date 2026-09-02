@@ -179,6 +179,8 @@ export interface Message {
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
+  /** Platform docs cited in this answer (`docs_loaded` / complete.docs). */
+  docs?: { slug: string; title: string; url: string }[]
   processingStatus?: string
   processingMetadata?: Record<string, unknown> | null
   // Multitask routing: live task-card state while a multi-node plan streams.

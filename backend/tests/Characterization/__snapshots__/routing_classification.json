@@ -151,6 +151,16 @@
         "source": "tool_command",
         "topic": "tools:filesort"
     },
+    "cmd_help": {
+        "intent": "chat",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "source": "tool_command",
+        "topic": "synaplan"
+    },
     "cmd_lang": {
         "intent": "chat",
         "language": "en",

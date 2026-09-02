@@ -108,6 +108,12 @@ const config = {
       const features = getConfigSync().features
       return features?.help === true
     },
+    get selfAware(): boolean {
+      // Current backends send features.selfAware. Older ones omit it — treat
+      // a missing flag as off so the hint and /help stay hidden.
+      const features = getConfigSync().features as { selfAware?: boolean } | undefined
+      return features?.selfAware === true
+    },
     get memoryService(): boolean {
       // Return cached async check if available, otherwise fall back to config flag
       if (memoryServiceAvailable.value !== null) {
