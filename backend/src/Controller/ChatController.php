@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
+use App\Service\Chat\ChatSearchService;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
@@ -37,6 +38,7 @@ class ChatController extends AbstractController
         private MessageApiFormatter $messageApiFormatter,
         private InProgressTurnResolver $inProgressTurnResolver,
         private ChatRunService $chatRunService,
+        private ChatSearchService $chatSearchService,
         private LoggerInterface $logger,
     ) {
     }
@@ -45,11 +47,12 @@ class ChatController extends AbstractController
     #[OA\Get(
         path: '/api/v1/chats',
         summary: 'List chats for authenticated user',
-        description: 'Returns the user\'s chats ordered by last activity. Pagination is opt-in: pass a `limit` query parameter to page through the list (used by the mobile history drawer). Without `limit` the full list is returned for backwards compatibility.',
+        description: 'Returns the user\'s chats ordered by last activity. Pagination is opt-in: pass a `limit` query parameter to page through the list (used by the mobile history drawer). Without `limit` the full list is returned for backwards compatibility. Pass `q` to search titles and message bodies; a search is always paginated.',
         tags: ['Chats'],
         parameters: [
             new OA\Parameter(name: 'limit', in: 'query', required: false, description: 'When present, enables pagination and caps the page size.', schema: new OA\Schema(type: 'integer', default: 20, minimum: 1, maximum: 100)),
             new OA\Parameter(name: 'offset', in: 'query', required: false, description: 'Number of chats to skip (only used when `limit` is present).', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+            new OA\Parameter(name: 'q', in: 'query', required: false, description: 'Free-text search over chat titles and message bodies. Terms shorter than 2 characters are ignored and the normal list is returned.', schema: new OA\Schema(type: 'string', example: 'galera migration')),
         ],
         responses: [
             new OA\Response(
@@ -73,6 +76,7 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'isShared', type: 'boolean', example: false),
                                     new OA\Property(property: 'source', type: 'string', nullable: true, example: 'web'),
                                     new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
+                                    new OA\Property(property: 'matchSnippet', description: 'Excerpt around the search hit, present only when `q` matched a message body. Null when the chat matched on its title or when no search ran.', type: 'string', nullable: true, example: '…we moved the Galera migration to Sunday…'),
                                     new OA\Property(
                                         property: 'widgetSession',
                                         type: 'object',
@@ -120,7 +124,19 @@ class ChatController extends AbstractController
         $limit = max(1, min((int) $request->query->get('limit', 20), 100));
         $offset = max(0, (int) $request->query->get('offset', 0));
 
-        if ($paginate) {
+        // A search always pages, even when the caller omitted `limit`: matching
+        // every message of a long-lived account can return far more rows than the
+        // unfiltered list the desktop happily loads in full.
+        $term = $this->chatSearchService->normalizeTerm($request->query->get('q'));
+        $snippets = [];
+
+        if (null !== $term) {
+            $paginate = true;
+            $result = $this->chatSearchService->search($user->getId(), $term, $limit, $offset);
+            $chats = $result['chats'];
+            $total = $result['total'];
+            $snippets = $result['snippets'];
+        } elseif ($paginate) {
             $chats = $this->chatRepository->findByUserPaginated($user->getId(), $limit, $offset);
             $total = $this->chatRepository->countByUser($user->getId());
         } else {
@@ -131,7 +147,7 @@ class ChatController extends AbstractController
         $chatIds = array_map(static fn (Chat $chat) => $chat->getId(), $chats);
         $sessionMap = $this->widgetSessionService->getSessionMapForChats($chatIds);
 
-        $result = array_map(function (Chat $chat) use ($sessionMap) {
+        $result = array_map(function (Chat $chat) use ($sessionMap, $snippets) {
             // Get first user message preview (first 30 chars)
             // Direction 'IN' = user message, 'OUT' = assistant message
             $firstMessagePreview = null;
@@ -159,6 +175,9 @@ class ChatController extends AbstractController
                 'source' => $chat->getSource(),
                 'widgetSession' => $sessionMap[$chat->getId()] ?? null,
                 'firstMessagePreview' => $firstMessagePreview,
+                'matchSnippet' => isset($snippets[$chat->getId()])
+                    ? $this->stripToolCommandPrefix($snippets[$chat->getId()])
+                    : null,
             ];
         }, $chats);
 

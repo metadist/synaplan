@@ -4,6 +4,8 @@ namespace App\Repository;
 
 use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
@@ -552,7 +554,7 @@ class MessageRepository extends ServiceEntityRepository
         $result = $conn->executeQuery(
             $sql,
             [$chatIds, $chatIds],
-            [\Doctrine\DBAL\ArrayParameterType::INTEGER, \Doctrine\DBAL\ArrayParameterType::INTEGER]
+            [ArrayParameterType::INTEGER, ArrayParameterType::INTEGER]
         );
 
         $messages = [];
@@ -561,6 +563,50 @@ class MessageRepository extends ServiceEntityRepository
         }
 
         return $messages;
+    }
+
+    /**
+     * Get the most recent message text matching a term, for each of the given chats.
+     *
+     * Feeds the match snippet in the chat list: the newest mention is the most
+     * useful excerpt when a term comes up repeatedly in one conversation.
+     * Chats that matched on their title only are absent from the result.
+     *
+     * @param int[] $chatIds
+     *
+     * @return array<int, string>
+     */
+    public function findMatchingTextForChats(array $chatIds, string $term): array
+    {
+        if (empty($chatIds)) {
+            return [];
+        }
+
+        $sql = '
+            SELECT m.BCHATID AS chat_id, m.BTEXT AS text
+            FROM BMESSAGES m
+            INNER JOIN (
+                SELECT BCHATID, MAX(BID) AS hit_id
+                FROM BMESSAGES
+                WHERE BCHATID IN (?) AND BTEXT LIKE ?
+                GROUP BY BCHATID
+            ) hit ON m.BCHATID = hit.BCHATID AND m.BID = hit.hit_id
+        ';
+
+        // Array parameters cannot go through bindValue(): ArrayParameterType is
+        // only accepted by executeQuery()'s $types argument.
+        $result = $this->getEntityManager()->getConnection()->executeQuery(
+            $sql,
+            [$chatIds, '%'.ChatRepository::escapeLike($term).'%'],
+            [ArrayParameterType::INTEGER, ParameterType::STRING]
+        );
+
+        $matches = [];
+        foreach ($result->fetchAllAssociative() as $row) {
+            $matches[(int) $row['chat_id']] = (string) $row['text'];
+        }
+
+        return $matches;
     }
 
     /**
