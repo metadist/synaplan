@@ -134,7 +134,8 @@ Flow:
 
 1. User opens **Channels → Desktop** in the web app and clicks *Pair a
    computer* → server mints a code. The address shown is the API origin
-   (`http://localhost:8000` in local Vite, not `:5173` or Keycloak `:8080`).
+   (`http://localhost:8000` in local Vite — or the same host on `:8000` when
+   the UI is opened via a LAN IP — not `:5173` or Keycloak `:8080`).
 2. User types the address and code into Synaplan Desktop (or pastes an API
    key on the desktop **API key** tab).
 3. The client calls `POST /pair` → gets `{ deviceId, key, apiBaseUrl }` and

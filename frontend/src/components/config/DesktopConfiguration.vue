@@ -325,8 +325,9 @@ const pairingError = ref<string | null>(null)
 const pairingCode = ref<PairingCode | null>(null)
 const copiedField = ref<'address' | 'code' | null>(null)
 
-// Desktop talks to the API origin. In local Vite that is :8000, not this
-// page's :5173 (and never Keycloak on :8080).
+// Desktop talks to the API origin. In local Vite that is :8000 on the same
+// host as this page (LAN IP and custom hostnames included), never :5173
+// and never Keycloak on :8080.
 const serverAddress = desktopPairingAddress()
 
 const now = ref(Math.floor(Date.now() / 1000))

@@ -8,6 +8,12 @@ describe('desktopPairingAddress', () => {
     expect(desktopPairingAddress('http://127.0.0.1:4173')).toBe('http://127.0.0.1:8000')
   })
 
+  it('maps a LAN IP or custom hostname on the Vite port to the same host on :8000', () => {
+    expect(desktopPairingAddress('http://192.168.1.42:5173')).toBe('http://192.168.1.42:8000')
+    expect(desktopPairingAddress('http://synaplan.local:4173')).toBe('http://synaplan.local:8000')
+    expect(desktopPairingAddress('http://[::1]:5173')).toBe('http://[::1]:8000')
+  })
+
   it('keeps a production or already-correct API origin', () => {
     expect(desktopPairingAddress('https://web.synaplan.com')).toBe('https://web.synaplan.com')
     expect(desktopPairingAddress('http://localhost:8000')).toBe('http://localhost:8000')
