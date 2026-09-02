@@ -20,22 +20,18 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const mobileDrawerOpen = ref(false)
 
   /**
-   * Desktop navigation rail: expanded (labels + inline chat history, ~260px) or
-   * collapsed to the icon rail (80px). Expanded by default so past chats are
-   * one glance away — chatting is a primary feature and the history must not be
-   * hidden behind a modal. Remembered per device.
-   *
-   * Narrow desktop viewports force the collapsed look regardless of this flag
-   * (see SidebarV2), so the sidebar never eats the conversation.
+   * Desktop rail open (chat list visible, ~248px) or the 80px icon rail.
+   * Open by default — the user must see and pick a chat without an extra click.
+   * A new storage key so earlier experiment flags cannot leave the list hidden.
    */
-  const railExpanded = ref(localStorage.getItem('synaplan_sidebar_expanded') !== 'false')
+  const railExpanded = ref(localStorage.getItem('synaplan_rail_open') !== 'false')
 
   const toggleRail = () => {
     railExpanded.value = !railExpanded.value
   }
 
   watch(railExpanded, (value) => {
-    localStorage.setItem('synaplan_sidebar_expanded', String(value))
+    localStorage.setItem('synaplan_rail_open', String(value))
   })
 
   const openMobileDrawer = () => {

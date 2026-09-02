@@ -43,7 +43,7 @@ export interface Chat {
    * FOLDER SEAM (planned): optional id of the user-defined chat folder this
    * conversation belongs to. Undefined/null = not sorted into any folder.
    * The backend (`BCHATFOLDERS` + `BCHATS.BFOLDERID`) and the folder tree in
-   * `ChatHistoryPanel` are a follow-up phase; the field is declared now so the
+   * `SidebarChatHistory` are a follow-up phase; the field is declared now so the
    * list can group by it without a breaking type change later.
    */
   folderId?: number | null

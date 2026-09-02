@@ -62,13 +62,15 @@
    the desktop chrome is showing (iPad landscape, notched desktops). */
 .v2-sidebar-rail {
   box-sizing: border-box;
+  flex-shrink: 0;
+  overflow: hidden;
   width: calc(80px + env(safe-area-inset-left, 0px));
   min-width: calc(80px + env(safe-area-inset-left, 0px));
+  background: var(--bg-sidebar);
+  transition: width 0.18s ease;
 }
 
-/* Expanded: nav labels + inline chat history in the SAME element, so there is
-   never a second sidebar column. Kept narrow on purpose — the conversation is
-   the page, the sidebar is not. */
+/* Expanded: nav labels + the full chat list in the SAME element. */
 .v2-sidebar-rail--expanded {
   width: calc(248px + env(safe-area-inset-left, 0px));
   min-width: calc(248px + env(safe-area-inset-left, 0px));
@@ -78,6 +80,12 @@
   .v2-sidebar-rail--expanded {
     width: calc(268px + env(safe-area-inset-left, 0px));
     min-width: calc(268px + env(safe-area-inset-left, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-sidebar-rail {
+    transition: none;
   }
 }
 

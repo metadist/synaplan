@@ -663,6 +663,7 @@
     "history": "History",
     "historyDescription": "Chat history",
     "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
     "profile": "Profile",
     "tools": "Tools",
     "toolsChatWidget": "Chat widgets",

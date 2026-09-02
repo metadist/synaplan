@@ -4,7 +4,7 @@
     column). Deliberately compact: one line per chat, no avatar tile, no card
     padding — the sidebar must stay narrow on every screen size.
   -->
-  <div class="flex flex-col min-h-0" data-testid="comp-sidebar-chat-history">
+  <div class="flex flex-col flex-1 min-h-0" data-testid="comp-sidebar-chat-history">
     <div class="flex items-center justify-between gap-2 px-2 pb-1 flex-shrink-0">
       <p class="text-[11px] font-semibold uppercase tracking-wider txt-secondary opacity-70">
         {{ $t('nav.history') }}
@@ -148,7 +148,6 @@ import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../st
 import { useDialog } from '../composables/useDialog'
 import ChatShareModal from './ChatShareModal.vue'
 
-/** Lets a host that renders this as an overlay (the collapsed-rail flyout) close itself. */
 const emit = defineEmits<{ navigate: [] }>()
 
 const { t } = useI18n()

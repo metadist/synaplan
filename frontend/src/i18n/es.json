@@ -653,6 +653,7 @@
     "history": "Historial",
     "historyDescription": "Historial de chats",
     "collapseSidebar": "Contraer barra lateral",
+    "expandSidebar": "Expandir barra lateral",
     "tools": "Herramientas",
     "toolsChatWidget": "Widgets de chat",
     "toolsDocSummary": "Resumidor",

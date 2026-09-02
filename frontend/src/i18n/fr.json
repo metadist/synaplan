@@ -664,6 +664,7 @@
     "history": "Historique",
     "historyDescription": "Historique des chats",
     "collapseSidebar": "Réduire la barre latérale",
+    "expandSidebar": "Développer la barre latérale",
     "profile": "Profil",
     "tools": "Outils",
     "toolsChatWidget": "Widgets de chat",
