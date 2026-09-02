@@ -8,6 +8,8 @@ use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -117,17 +119,19 @@ final readonly class MessageClassifier
                 // these trivial chats answer immediately without a web round-trip.
                 // An explicit prompt `tool_internet=true` still forces search
                 // later in `MessageProcessor` via `WebSearchTopicPolicy`.
-                return [
+                $fastPathDecision = RoutingDecision::deterministic(RoutingLayer::FastPathHeuristic, 'general');
+
+                return array_merge([
                     'topic' => 'general',
                     'language' => $confidentLanguage,
                     'web_search' => null,
-                    'source' => 'fast_path_heuristic',
+                    'source' => $fastPathDecision->toClassificationSource(),
                     'skip_sorting' => true,
                     'intent' => 'chat',
                     'model_id' => null,
                     'provider' => null,
                     'model_name' => null,
-                ];
+                ], $fastPathDecision->toClassificationFields());
             }
 
             $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
@@ -155,14 +159,16 @@ final readonly class MessageClassifier
                 'intent' => $intent,
             ]);
 
-            return [
+            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $topic);
+
+            return array_merge([
                 'topic' => $topic,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $intent,
-                'source' => 'model_override_auto',
+                'source' => $modelOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
                 'model_id' => $modelOverride,
-            ];
+            ], $modelOverrideDecision->toClassificationFields());
         }
 
         if ($promptOverride) {
@@ -172,13 +178,15 @@ final readonly class MessageClassifier
                 'model_id' => $modelOverride,
             ]);
 
-            $result = [
+            $promptOverrideDecision = RoutingDecision::deterministic(RoutingLayer::PromptOverride, $promptOverride);
+
+            $result = array_merge([
                 'topic' => $promptOverride,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $this->mapTopicToIntent($promptOverride),
-                'source' => 'prompt_override',
+                'source' => $promptOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $promptOverrideDecision->toClassificationFields());
 
             // Add model_id if user explicitly selected a model (Again)
             if ($modelOverride) {
@@ -197,13 +205,15 @@ final readonly class MessageClassifier
                     'tool' => $toolTopic,
                 ]);
 
-                return [
+                $toolCommandDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
+
+                return array_merge([
                     'topic' => $toolTopic,
                     'language' => $message->getLanguage() ?: 'en',
                     'intent' => $this->mapTopicToIntent($toolTopic),
-                    'source' => 'tool_command',
+                    'source' => $toolCommandDecision->toClassificationSource(),
                     'skip_sorting' => true,
-                ];
+                ], $toolCommandDecision->toClassificationFields());
             }
         }
 
@@ -213,13 +223,15 @@ final readonly class MessageClassifier
                 'message_id' => $messageId,
             ]);
 
-            return [
+            $attachmentDecision = RoutingDecision::deterministic(RoutingLayer::AttachmentRule, 'analyzefile');
+
+            return array_merge([
                 'topic' => 'analyzefile',
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => 'file_analysis',
-                'source' => 'attachment_document_or_audio',
+                'source' => $attachmentDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $attachmentDecision->toClassificationFields());
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -233,6 +245,31 @@ final readonly class MessageClassifier
         // handler resolution, BFILEPATH keys) understands directly.
         $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
+        // The sorter already built its own RoutingDecision (rule-based match,
+        // genuine classification, or a fallback — see
+        // MessageSorter::buildRoutingDecision()) and flattened it into
+        // $result via RoutingDecision::toClassificationFields(). A mocked
+        // sorter (tests) or a source outside the AI-sorting layer may omit
+        // these keys entirely, so default to "full confidence, no fallback"
+        // rather than treating an absent key as a low-confidence result.
+        $aiSortingDecision = new RoutingDecision(
+            RoutingLayer::AiSorting,
+            $canonicalTopic,
+            confidence: (float) ($result['routing_confidence'] ?? 1.0),
+            discardedAlternatives: $result['routing_discarded_alternatives'] ?? [],
+            fallbackReason: $result['routing_fallback_reason'] ?? null,
+        );
+
+        if ($aiSortingDecision->isFallback()) {
+            $this->logger->warning('MessageClassifier: ⚠️ AI-sorting result is a fallback, not a confident decision', [
+                'message_id' => $messageId,
+                'topic' => $canonicalTopic,
+                'confidence' => $aiSortingDecision->confidence,
+                'fallback_reason' => $aiSortingDecision->fallbackReason,
+                'discarded_alternatives' => $aiSortingDecision->discardedAlternatives,
+            ]);
+        }
+
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $canonicalTopic,
@@ -243,10 +280,11 @@ final readonly class MessageClassifier
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
+            'confidence' => $aiSortingDecision->confidence,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        $classification = [
+        $classification = array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
@@ -264,7 +302,7 @@ final readonly class MessageClassifier
             // Usage taximeter: tokens/charged cost of the sorting call (null
             // when the fast path skipped the AI sorter or recording failed).
             'sorting_usage' => $result['sorting_usage'] ?? null,
-        ];
+        ], $aiSortingDecision->toClassificationFields());
 
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;

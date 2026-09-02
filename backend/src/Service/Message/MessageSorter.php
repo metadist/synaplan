@@ -4,11 +4,14 @@ namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\SortClassificationSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -106,6 +109,7 @@ final readonly class MessageSorter
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -141,7 +145,11 @@ final readonly class MessageSorter
                     $promptMetadata = $promptData['metadata'] ?? [];
                 }
 
-                return [
+                // Deterministic: a user-authored selection rule matched, no LLM
+                // ran. Full confidence — see RoutingDecision::deterministic().
+                $ruleBasedDecision = RoutingDecision::deterministic(RoutingLayer::AiSorting, $ruleBasedTopic);
+
+                return array_merge([
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
                     // No LLM ran on the rule-based path, so there is no
@@ -157,7 +165,7 @@ final readonly class MessageSorter
                     'sorting_model_id' => null,
                     'sorting_provider' => null,
                     'sorting_model_name' => null,
-                ];
+                ], $ruleBasedDecision->toClassificationFields());
             }
         }
 
@@ -167,11 +175,13 @@ final readonly class MessageSorter
         if (!$sortingPrompt) {
             $this->logger->error('MessageSorter: Sorting prompt not found');
 
-            return [
+            $missingPromptDecision = RoutingDecision::fallback('general', 'sorting_prompt_missing');
+
+            return array_merge([
                 'topic' => 'general',
                 'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
-            ];
+            ], $missingPromptDecision->toClassificationFields());
         }
 
         // Get all available topics (exclude tools:* internal topics).
@@ -239,19 +249,25 @@ final readonly class MessageSorter
         }
 
         try {
-            // Call AI for sorting
-            $response = $this->aiFacade->chat($messages, $userId, [
+            $aiOptions = [
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
                 'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
-                // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on
-                // providers that support it (StructuredOutputCapability decides
-                // per provider/model/streaming — a no-op everywhere else, see
-                // parseResponse()'s server-side BTOPIC validation below for the
-                // fallback path).
-                'structured_output' => SortClassificationSchema::build($topics, self::SUPPORTED_LANGUAGES),
-            ]);
+            ];
+
+            // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on
+            // providers that support it (StructuredOutputCapability decides
+            // per provider/model/streaming — a no-op everywhere else, see
+            // parseResponse()'s server-side BTOPIC validation below for the
+            // fallback path). Gated by the STRUCTURED_OUTPUT.ENABLED kill
+            // switch — see StructuredOutputConfig.
+            if ($this->structuredOutputConfig->isEnabled($userId)) {
+                $aiOptions['structured_output'] = SortClassificationSchema::build($topics, self::SUPPORTED_LANGUAGES);
+            }
+
+            // Call AI for sorting
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
 
             $aiResponse = $response['content'];
 
@@ -266,6 +282,22 @@ final readonly class MessageSorter
             // Parse JSON response
             $parsed = $this->parseResponse($aiResponse, $messageData, $topics);
 
+            // Distinguish a genuine classification from a silent fallback —
+            // see RoutingDecision's docblock for the exact ambiguity this
+            // closes (a JSON parse failure and a confident "general" used to
+            // be indistinguishable in the log, both source=ai_sorting).
+            $routingDecision = $this->buildRoutingDecision($parsed, $recordedSortingUsage);
+
+            if ($routingDecision->isFallback()) {
+                $this->logger->warning('MessageSorter: ⚠️ Classification fell back (low confidence)', [
+                    'topic' => $parsed['topic'],
+                    'confidence' => $routingDecision->confidence,
+                    'fallback_reason' => $routingDecision->fallbackReason,
+                    'discarded_alternatives' => $routingDecision->discardedAlternatives,
+                    'raw_ai_response' => $aiResponse,
+                ]);
+            }
+
             $this->logger->info('MessageSorter: ✅ Classification result', [
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
@@ -275,6 +307,7 @@ final readonly class MessageSorter
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
                 'input_mode' => $parsed['input_mode'] ?? null,
+                'confidence' => $routingDecision->confidence,
                 'raw_ai_response' => $aiResponse,
             ]);
 
@@ -305,7 +338,7 @@ final readonly class MessageSorter
             // web-search decision is made by WebSearchTopicPolicy in
             // MessageProcessor, which trusts this vote unless the prompt
             // explicitly opts in/out or the topic cannot consume web context.
-            return [
+            return array_merge([
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
@@ -327,7 +360,7 @@ final readonly class MessageSorter
                     'prompt_tokens' => $recordedSortingUsage->promptTokens,
                     'completion_tokens' => $recordedSortingUsage->completionTokens,
                 ] : null,
-            ];
+            ], $routingDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
             // Re-throw ProviderException to preserve install instructions
             $this->logger->error('MessageSorter: AI Provider failed', [
@@ -341,12 +374,47 @@ final readonly class MessageSorter
                 'error' => $e->getMessage(),
             ]);
 
-            return [
+            $exceptionDecision = RoutingDecision::fallback('general', 'exception:'.$e::class);
+
+            return array_merge([
                 'topic' => 'general',
                 'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
-            ];
+            ], $exceptionDecision->toClassificationFields());
         }
+    }
+
+    /**
+     * Build the {@see RoutingDecision} for a completed AI-sorting call from
+     * {@see self::parseResponse()}'s output.
+     *
+     * Two failure modes collapse into the same `topic: general` today, and
+     * this is where they get told apart again: a JSON parse failure
+     * (`parse_failed`) versus the AI returning a `BTOPIC` outside the valid
+     * enum, which {@see self::validateTopic()} already silently corrected to
+     * `general` before this method ever sees it (`raw_topic !== topic`).
+     */
+    private function buildRoutingDecision(array $parsed, ?RecordedUsage $usage): RoutingDecision
+    {
+        $cost = $usage?->chargedCost;
+
+        if ($parsed['parse_failed'] ?? false) {
+            return RoutingDecision::fallback((string) $parsed['topic'], 'json_parse_failed');
+        }
+
+        $rawTopic = $parsed['raw_topic'] ?? null;
+        if (is_string($rawTopic) && $rawTopic !== $parsed['topic']) {
+            return new RoutingDecision(
+                RoutingLayer::AiSorting,
+                (string) $parsed['topic'],
+                confidence: 0.3,
+                discardedAlternatives: [$rawTopic],
+                cost: $cost,
+                fallbackReason: 'invalid_topic',
+            );
+        }
+
+        return new RoutingDecision(RoutingLayer::AiSorting, (string) $parsed['topic'], confidence: 1.0, cost: $cost);
     }
 
     /**
@@ -531,6 +599,12 @@ final readonly class MessageSorter
 
             return [
                 'topic' => $this->validateTopic($topic, $validTopics),
+                // The AI's raw, pre-validation claim — RoutingDecision compares
+                // this against the validated topic above to tell "the AI
+                // confidently chose general" apart from "the AI hallucinated an
+                // out-of-enum topic and validateTopic() corrected it".
+                'raw_topic' => (string) $topic,
+                'parse_failed' => false,
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
                 'multi_step' => $multiStep,
@@ -548,6 +622,8 @@ final readonly class MessageSorter
             // Fallback to original values or defaults
             return [
                 'topic' => $this->validateTopic($originalData['BTOPIC'] ?? 'general', $validTopics),
+                'raw_topic' => null,
+                'parse_failed' => true,
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
                 'multi_step' => null,

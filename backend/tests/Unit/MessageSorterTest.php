@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
@@ -35,6 +36,8 @@ class MessageSorterTest extends TestCase
         $em = $this->createMock(EntityManagerInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $discord = $this->createMock(DiscordNotificationService::class);
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(true);
 
         $this->sorter = new MessageSorter(
             $aiFacade,
@@ -44,7 +47,8 @@ class MessageSorterTest extends TestCase
             $rateLimitService,
             $em,
             $this->logger,
-            $discord
+            $discord,
+            $structuredOutputConfig
         );
 
         // Make private methods accessible for testing
@@ -620,6 +624,7 @@ class MessageSorterTest extends TestCase
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
             $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         // A null user id skips the rule-based routing lookup and the usage record.
@@ -664,12 +669,68 @@ class MessageSorterTest extends TestCase
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
             $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
 
         $this->assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         $this->assertSame(['general', 'mediamaker', 'docsummary'], $options['structured_output']->schema['properties']['BTOPIC']['enum']);
+    }
+
+    /**
+     * The STRUCTURED_OUTPUT.ENABLED kill switch: when OFF (per-user or
+     * global BCONFIG override), classify() must not attach a schema at all —
+     * every provider falls back to the pre-Stage-A prompt-only behaviour.
+     */
+    public function testClassifyOmitsTheStructuredOutputSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'mediamaker']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $options = null;
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"BTOPIC":"general","BLANG":"en"}', 'provider' => 'groq'];
+            }
+        );
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $structuredOutputConfig,
+        );
+
+        $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+
+        $this->assertArrayNotHasKey('structured_output', $options ?? []);
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     /**
@@ -764,6 +825,7 @@ class MessageSorterTest extends TestCase
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
             $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $sorter->classify(['BTEXT' => 'make the car blue', 'BLANG' => 'en', 'BTOPIC' => ''], $history, null);
