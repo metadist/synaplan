@@ -300,6 +300,9 @@ final class RateLimitService
         $completionTokens = $usage['completion_tokens'] ?? 0;
         $cachedTokens = $usage['cached_tokens'] ?? 0;
         $cacheCreationTokens = $usage['cache_creation_tokens'] ?? 0;
+        // Anthropic-only: subset of $cacheCreationTokens written with a 1-hour TTL (billed at
+        // 2x base input instead of the 1.25x default) — see MessagesUsage::extractCacheCreation1hTokens().
+        $cacheCreation1hTokens = $usage['cache_creation_1h_tokens'] ?? 0;
         $totalTokens = $usage['total_tokens'] ?? ($promptTokens + $completionTokens);
 
         // Legacy support: if 'tokens' was passed directly (old API)
@@ -413,6 +416,7 @@ final class RateLimitService
                 $cacheCreationTokens,
                 $modelId,
                 $timestamp,
+                $cacheCreation1hTokens,
             );
         }
 

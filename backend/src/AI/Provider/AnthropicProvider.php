@@ -6,6 +6,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Messages\MessagesUsage;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -251,6 +252,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $inputTokens = $data['usage']['input_tokens'] ?? 0;
             $outputTokens = $data['usage']['output_tokens'] ?? 0;
             $cacheCreationTokens = $data['usage']['cache_creation_input_tokens'] ?? 0;
+            $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($data['usage'] ?? []);
             $cacheReadTokens = $data['usage']['cache_read_input_tokens'] ?? 0;
 
             $usage = [
@@ -259,6 +261,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
                 'cached_tokens' => $cacheReadTokens,
                 'cache_creation_tokens' => $cacheCreationTokens,
+                'cache_creation_1h_tokens' => $cacheCreation1hTokens,
             ];
 
             $this->logger->info('Anthropic: Chat completed', [
@@ -868,6 +871,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreationTokens = 0;
+        $cacheCreation1hTokens = 0;
         $cacheReadTokens = 0;
         $finishReason = null;
 
@@ -896,6 +900,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                         $msgUsage = $event['data']['message']['usage'] ?? [];
                         $inputTokens = $msgUsage['input_tokens'] ?? 0;
                         $cacheCreationTokens = $msgUsage['cache_creation_input_tokens'] ?? 0;
+                        $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($msgUsage);
                         $cacheReadTokens = $msgUsage['cache_read_input_tokens'] ?? 0;
                         break;
 
@@ -969,6 +974,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
             'cached_tokens' => $cacheReadTokens,
             'cache_creation_tokens' => $cacheCreationTokens,
+            'cache_creation_1h_tokens' => $cacheCreation1hTokens,
         ];
     }
 

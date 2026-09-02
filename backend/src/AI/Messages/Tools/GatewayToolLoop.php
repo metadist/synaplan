@@ -350,6 +350,7 @@ final readonly class GatewayToolLoop
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheCreation = 0;
+        $cacheCreation1h = 0;
         $cacheRead = 0;
         $error = false;
 
@@ -363,6 +364,7 @@ final readonly class GatewayToolLoop
             &$inputTokens,
             &$outputTokens,
             &$cacheCreation,
+            &$cacheCreation1h,
             &$cacheRead,
             &$error,
             $emitter,
@@ -390,6 +392,7 @@ final readonly class GatewayToolLoop
                 if (\is_array($usage)) {
                     $inputTokens = (int) ($usage['input_tokens'] ?? $inputTokens);
                     $cacheCreation = (int) ($usage['cache_creation_input_tokens'] ?? $cacheCreation);
+                    $cacheCreation1h = MessagesUsage::extractCacheCreation1hTokens($usage);
                     $cacheRead = (int) ($usage['cache_read_input_tokens'] ?? $cacheRead);
                 }
                 // Emit immediately — suppressed on subsequent turns by the emitter.
@@ -503,6 +506,7 @@ final readonly class GatewayToolLoop
                 inputTokens: $inputTokens,
                 outputTokens: $outputTokens,
                 cacheCreationTokens: $cacheCreation,
+                cacheCreation1hTokens: $cacheCreation1h,
                 cacheReadTokens: $cacheRead,
                 stopReason: $stopReason,
             ),
@@ -801,6 +805,7 @@ final readonly class GatewayToolLoop
             inputTokens: $a->inputTokens + $b->inputTokens,
             outputTokens: $a->outputTokens + $b->outputTokens,
             cacheCreationTokens: $a->cacheCreationTokens + $b->cacheCreationTokens,
+            cacheCreation1hTokens: $a->cacheCreation1hTokens + $b->cacheCreation1hTokens,
             cacheReadTokens: $a->cacheReadTokens + $b->cacheReadTokens,
             stopReason: $b->stopReason ?? $a->stopReason,
         );
@@ -819,6 +824,16 @@ final readonly class GatewayToolLoop
             'cache_creation_input_tokens' => $usage->cacheCreationTokens,
             'cache_read_input_tokens' => $usage->cacheReadTokens,
         ];
+
+        // Mirror Anthropic's TTL breakdown so a client inspecting the aggregated
+        // multi-turn usage (e.g. for its own cost estimate) sees the same shape
+        // it would from a single-turn response.
+        if ($usage->cacheCreation1hTokens > 0) {
+            $body['usage']['cache_creation'] = [
+                'ephemeral_5m_input_tokens' => $usage->cacheCreationTokens - $usage->cacheCreation1hTokens,
+                'ephemeral_1h_input_tokens' => $usage->cacheCreation1hTokens,
+            ];
+        }
 
         return $body;
     }
