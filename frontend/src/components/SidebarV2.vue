@@ -4,10 +4,15 @@
     short / landscape-phone viewports — see usePhoneChrome.ts); the push-drawer
     is the primary navigation there.
   -->
-  <aside class="v2-sidebar-rail v2-desktop-chrome flex-col" data-testid="comp-sidebar-v2">
-    <!-- Brand logo -->
+  <aside
+    class="v2-sidebar-rail v2-desktop-chrome flex-col"
+    :class="expanded && 'v2-sidebar-rail--expanded'"
+    data-testid="comp-sidebar-v2"
+  >
+    <!-- Brand logo + expand/collapse -->
     <div
-      class="flex flex-col items-center justify-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
+      class="flex items-center flex-shrink-0 border-b border-white/[0.04] h-[76px]"
+      :class="expanded ? 'justify-between px-3' : 'justify-center'"
     >
       <img
         :src="iconSrc"
@@ -15,13 +20,28 @@
         class="h-7 w-auto"
         data-testid="img-sidebar-brand"
       />
+      <button
+        v-if="expanded"
+        class="v2-rail-icon w-8 h-8 flex items-center justify-center rounded-lg"
+        :title="$t('nav.collapseSidebar')"
+        :aria-label="$t('nav.collapseSidebar')"
+        data-testid="btn-sidebar-v2-collapse"
+        @click="sidebarStore.toggleRail()"
+      >
+        <Icon icon="mdi:chevron-double-left" class="w-5 h-5" aria-hidden="true" />
+      </button>
     </div>
 
     <!-- New Chat Button -->
-    <div class="flex items-center justify-center py-3 flex-shrink-0">
+    <div class="flex-shrink-0" :class="expanded ? 'px-2 py-2.5' : 'flex justify-center py-3'">
       <button
-        class="v2-new-chat-btn w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all duration-200"
-        :class="{ 'v2-new-chat-btn--creating': isCreatingChat }"
+        class="v2-new-chat-btn transition-all duration-200 rounded-xl"
+        :class="[
+          { 'v2-new-chat-btn--creating': isCreatingChat },
+          expanded
+            ? 'w-full flex items-center gap-2.5 px-3 min-h-[40px]'
+            : 'w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5',
+        ]"
         :title="$t('nav.newDescription')"
         :disabled="isCreatingChat"
         data-testid="btn-sidebar-v2-new-chat"
@@ -30,24 +50,34 @@
         <Icon
           v-if="isCreatingChat"
           icon="mdi:loading"
-          class="w-6 h-6 animate-spin"
+          class="w-5 h-5 animate-spin flex-shrink-0"
           aria-hidden="true"
         />
-        <PlusIcon v-else class="w-6 h-6" aria-hidden="true" />
-        <span class="v2-rail-label text-[10px] font-medium leading-tight">
+        <PlusIcon v-else class="w-5 h-5 flex-shrink-0" aria-hidden="true" />
+        <span v-if="expanded" class="text-[13px] font-semibold">{{ $t('chat.newChat') }}</span>
+        <span v-else class="v2-rail-label text-[10px] font-medium leading-tight">
           {{ $t('nav.new') }}
         </span>
       </button>
     </div>
 
     <!-- Nav Icons -->
-    <nav class="flex-1 flex flex-col items-center gap-1 py-1 overflow-y-auto sidebar-scroll">
+    <nav
+      :class="
+        expanded
+          ? 'flex flex-col gap-0.5 px-2 pb-1 flex-shrink-0'
+          : 'flex-1 flex flex-col items-center gap-1 py-1 overflow-y-auto sidebar-scroll'
+      "
+    >
       <button
-        v-for="item in navItems"
+        v-for="item in visibleNavItems"
         :key="item.path"
         :ref="(el) => setNavBtnRef(el, item.path)"
         :class="[
-          'v2-rail-icon w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5 relative',
+          'v2-rail-icon relative',
+          expanded
+            ? 'w-full min-h-[38px] flex items-center gap-2.5 px-2.5 rounded-lg'
+            : 'w-[72px] min-h-[48px] flex flex-col items-center justify-center gap-0.5 py-1.5',
           isItemActive(item) && 'v2-rail-icon--active',
           item.isUpgrade && 'text-amber-500 dark:text-amber-400',
           item.requiresAuth && isGuestMode && 'opacity-60',
@@ -61,17 +91,37 @@
             : undefined
         "
         @click="handleNavClick(item)"
+        @pointerenter="onNavPointerEnter(item, $event)"
+        @pointerleave="onNavPointerLeave(item)"
       >
-        <component :is="item.icon" class="w-6 h-6 flex-shrink-0" aria-hidden="true" />
+        <component
+          :is="item.icon"
+          :class="expanded ? 'w-[18px] h-[18px] flex-shrink-0' : 'w-6 h-6 flex-shrink-0'"
+          aria-hidden="true"
+        />
+        <span v-if="expanded" class="flex-1 text-left text-[13px] font-medium truncate">
+          {{ item.label }}
+        </span>
         <!-- Two-line clamp instead of truncate: longer rail labels (and their
              translations) would otherwise be cut off on the 72px rail. -->
         <span
+          v-else
           class="v2-rail-label text-[10px] font-medium leading-tight max-w-full px-0.5 text-center line-clamp-2 break-words"
         >
           {{ item.label }}
         </span>
       </button>
     </nav>
+
+    <!--
+      Chat history lives INSIDE the rail when expanded — one navigation element,
+      not a second column. Collapsed, the History nav icon opens the modal sheet
+      instead (there is no room for a list on 80px).
+    -->
+    <SidebarChatHistory
+      v-if="expanded && !isGuestMode"
+      class="flex-1 min-h-0 border-t border-white/[0.04] pt-2 mt-1"
+    />
 
     <!-- Upgrade Button -->
     <div
@@ -337,6 +387,39 @@
         :current-path="route.path"
         @close="closeFlyout"
       />
+    </Transition>
+  </Teleport>
+
+  <!--
+    Chat history overlay for the collapsed rail. Floats above the content, so
+    opening it never reflows the conversation the way a widening rail would.
+  -->
+  <Teleport to="#app">
+    <Transition
+      enter-active-class="transition ease-out duration-150"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-100"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="activeFlyout === 'history'"
+        class="fixed inset-0 z-[200]"
+        data-testid="overlay-sidebar-v2-history"
+        @click="closeFlyout"
+      >
+        <div
+          class="fixed dropdown-panel origin-top-left flex flex-col overflow-hidden py-2"
+          :style="historyFlyoutStyle"
+          data-testid="dropdown-sidebar-v2-history"
+          @click.stop
+          @pointerenter="cancelHistoryClose"
+          @pointerleave="scheduleHistoryClose"
+        >
+          <SidebarChatHistory class="flex-1 min-h-0" @navigate="closeFlyout" />
+        </div>
+      </div>
     </Transition>
   </Teleport>
 
@@ -654,6 +737,7 @@ import {
   type NavItem,
 } from '../composables/useNavItems'
 import SidebarNavFlyout from './SidebarNavFlyout.vue'
+import SidebarChatHistory from './SidebarChatHistory.vue'
 import { useTheme } from '../composables/useTheme'
 import { useBrandLogo } from '../composables/useBrandLogo'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
@@ -714,9 +798,96 @@ const chatSearchQuery = ref('')
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 
-type FlyoutType = 'nav' | null
+type FlyoutType = 'nav' | 'history' | null
 const activeFlyout = ref<FlyoutType>(null)
 const activeFlyoutItem = ref<NavItem | null>(null)
+const historyFlyoutStyle = ref<Record<string, string>>({})
+
+/**
+ * Collapsed-rail chat history, shown as an overlay instead of widening the rail.
+ *
+ * Click is the primary trigger on purpose: a hover-only reveal would strand
+ * touch devices that still get the desktop chrome (iPad in landscape, touch
+ * laptops) with no way to open the list. Hover is a mouse-only convenience on
+ * top, delayed so that merely crossing the rail on the way to the window edge
+ * does not pop the panel open.
+ */
+const HISTORY_FLYOUT_WIDTH = 288
+const HOVER_OPEN_DELAY_MS = 260
+const HOVER_CLOSE_DELAY_MS = 220
+
+let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null
+let hoverCloseTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearHoverTimers = () => {
+  if (hoverOpenTimer) clearTimeout(hoverOpenTimer)
+  if (hoverCloseTimer) clearTimeout(hoverCloseTimer)
+  hoverOpenTimer = null
+  hoverCloseTimer = null
+}
+
+const openHistoryFlyout = () => {
+  clearHoverTimers()
+  const rect = navBtnRefs.value['/']?.getBoundingClientRect()
+  const maxHeight = Math.round(window.innerHeight * 0.7)
+  historyFlyoutStyle.value = {
+    left: `${(rect?.right ?? 80) + 8}px`,
+    top: `${Math.max(8, Math.min(rect?.top ?? 8, window.innerHeight - maxHeight - 8))}px`,
+    width: `${HISTORY_FLYOUT_WIDTH}px`,
+    maxHeight: `${maxHeight}px`,
+  }
+  activeFlyoutItem.value = null
+  activeFlyout.value = 'history'
+}
+
+const cancelHistoryClose = () => {
+  if (hoverCloseTimer) clearTimeout(hoverCloseTimer)
+  hoverCloseTimer = null
+}
+
+const scheduleHistoryClose = () => {
+  cancelHistoryClose()
+  hoverCloseTimer = setTimeout(() => {
+    if ('history' === activeFlyout.value) closeFlyout()
+  }, HOVER_CLOSE_DELAY_MS)
+}
+
+/** Mouse-only: touch fires pointerenter on tap, which would double-trigger the click. */
+const onNavPointerEnter = (item: NavItem, event: PointerEvent) => {
+  if ('/' !== item.path || expanded.value || 'mouse' !== event.pointerType) return
+  cancelHistoryClose()
+  if ('history' === activeFlyout.value) return
+  hoverOpenTimer = setTimeout(openHistoryFlyout, HOVER_OPEN_DELAY_MS)
+}
+
+const onNavPointerLeave = (item: NavItem) => {
+  if ('/' !== item.path) return
+  if (hoverOpenTimer) clearTimeout(hoverOpenTimer)
+  hoverOpenTimer = null
+  if ('history' === activeFlyout.value) scheduleHistoryClose()
+}
+
+/**
+ * Below this width the expanded sidebar would eat too much of the conversation,
+ * so the rail collapses to icons regardless of the user's preference. The
+ * preference itself is kept, so widening the window restores the list.
+ */
+const EXPANDED_MIN_VIEWPORT = 1100
+const viewportAllowsExpanded = ref(true)
+
+const syncViewportAllowance = () => {
+  viewportAllowsExpanded.value = window.innerWidth >= EXPANDED_MIN_VIEWPORT
+}
+
+const expanded = computed(() => sidebarStore.railExpanded && viewportAllowsExpanded.value)
+
+/**
+ * Expanded, the chat history is already on screen, so a "History" icon that
+ * opens a modal of the same list is pure noise — drop it from the nav.
+ */
+const visibleNavItems = computed(() =>
+  expanded.value ? navItems.value.filter((item) => item.path !== '/') : navItems.value
+)
 
 // Whoever opens the sheet (rail or mobile nav), the list refreshes.
 watch(
@@ -732,6 +903,7 @@ watch(
 
 onMounted(() => {
   loadFeatureStatus()
+  syncViewportAllowance()
   document.addEventListener('keydown', handleEscape)
   window.addEventListener('resize', handleViewportChange)
 })
@@ -739,11 +911,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
   window.removeEventListener('resize', handleViewportChange)
+  clearHoverTimers()
 })
 
 const handleViewportChange = () => {
   closeFlyout()
   userMenuOpen.value = false
+  syncViewportAllowance()
 }
 
 const toggleUserMenu = () => {
@@ -837,14 +1011,15 @@ const handleNavClick = (item: NavItem) => {
   }
 
   if (item.path === '/') {
-    closeFlyout()
-    // On desktop chrome while chatting, the History icon toggles the persistent
-    // left history panel. Everywhere else (other routes, or phone chrome where
-    // there is no panel) it falls back to the modal history sheet.
-    if (route.name === 'chat' && !matchesPhoneChrome()) {
-      sidebarStore.toggleChatHistoryCollapsed()
-    } else {
+    // Collapsed on desktop, History opens the overlay flyout next to the rail.
+    // On phone chrome there is no rail, so the modal sheet stays the entry point.
+    if (matchesPhoneChrome()) {
+      closeFlyout()
       sidebarStore.toggleChatSheet()
+    } else if ('history' === activeFlyout.value) {
+      closeFlyout()
+    } else {
+      openHistoryFlyout()
     }
     return
   }
@@ -1059,6 +1234,7 @@ const toggleChatMenu = (chatId: number, event: MouseEvent) => {
 }
 
 const closeFlyout = () => {
+  clearHoverTimers()
   activeFlyout.value = null
   activeFlyoutItem.value = null
   userMenuOpen.value = false

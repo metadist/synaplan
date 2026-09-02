@@ -66,6 +66,21 @@
   min-width: calc(80px + env(safe-area-inset-left, 0px));
 }
 
+/* Expanded: nav labels + inline chat history in the SAME element, so there is
+   never a second sidebar column. Kept narrow on purpose — the conversation is
+   the page, the sidebar is not. */
+.v2-sidebar-rail--expanded {
+  width: calc(248px + env(safe-area-inset-left, 0px));
+  min-width: calc(248px + env(safe-area-inset-left, 0px));
+}
+
+@media (min-width: 1440px) {
+  .v2-sidebar-rail--expanded {
+    width: calc(268px + env(safe-area-inset-left, 0px));
+    min-width: calc(268px + env(safe-area-inset-left, 0px));
+  }
+}
+
 /* Mobile floating header button clearance — pushes titles below the button.
    Excluded: ChatView (page-chat) where messages scroll behind the button. */
 @media (max-width: 767px), (max-height: 519px) {

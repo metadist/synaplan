@@ -20,21 +20,22 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const mobileDrawerOpen = ref(false)
 
   /**
-   * Persistent desktop chat-history panel (docked left of the content, next to
-   * the rail, on the chat route). Collapsed state is remembered per device.
-   * Default is OPEN so past chats are always one glance away — chatting is a
-   * primary feature and the history must not be hidden behind a modal.
+   * Desktop navigation rail: expanded (labels + inline chat history, ~260px) or
+   * collapsed to the icon rail (80px). Expanded by default so past chats are
+   * one glance away — chatting is a primary feature and the history must not be
+   * hidden behind a modal. Remembered per device.
+   *
+   * Narrow desktop viewports force the collapsed look regardless of this flag
+   * (see SidebarV2), so the sidebar never eats the conversation.
    */
-  const chatHistoryCollapsed = ref(
-    localStorage.getItem('synaplan_chat_history_collapsed') === 'true'
-  )
+  const railExpanded = ref(localStorage.getItem('synaplan_sidebar_expanded') !== 'false')
 
-  const toggleChatHistoryCollapsed = () => {
-    chatHistoryCollapsed.value = !chatHistoryCollapsed.value
+  const toggleRail = () => {
+    railExpanded.value = !railExpanded.value
   }
 
-  watch(chatHistoryCollapsed, (value) => {
-    localStorage.setItem('synaplan_chat_history_collapsed', String(value))
+  watch(railExpanded, (value) => {
+    localStorage.setItem('synaplan_sidebar_expanded', String(value))
   })
 
   const openMobileDrawer = () => {
@@ -120,8 +121,8 @@ export const useSidebarStore = defineStore('sidebar', () => {
     chatDisclosure,
     chatSheetOpen,
     mobileDrawerOpen,
-    chatHistoryCollapsed,
-    toggleChatHistoryCollapsed,
+    railExpanded,
+    toggleRail,
     toggle,
     close,
     open,
