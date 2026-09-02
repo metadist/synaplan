@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Prompt\PromptCatalog;
@@ -94,6 +95,7 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
             $this->createMock(PromptRepository::class),
             $this->createMock(LoggerInterface::class),
             $feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $user = $this->createMock(User::class);
@@ -195,6 +197,7 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
             $promptRepository,
             $this->createMock(LoggerInterface::class),
             $feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $user = $this->createMock(User::class);
@@ -243,5 +246,13 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
         }
 
         self::fail('feedback_contradiction_check prompt missing from PromptCatalog::all()');
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 }

@@ -6,6 +6,7 @@ namespace App\Service\Digest;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\MessageDigestSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\MessageDigest;
 use App\Entity\User;
@@ -44,6 +45,7 @@ final readonly class MessageDigestService
         private QdrantClientInterface $qdrantClient,
         private MemoryEmbeddingModelResolver $embeddingResolver,
         private LoggerInterface $logger,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -142,18 +144,23 @@ PROMPT;
         try {
             $modelConfig = $this->modelConfigService->getMemoryModelConfig($user->getId());
 
+            $aiOptions = [
+                'temperature' => 0.2,
+                'model' => $modelConfig['model'],
+                'provider' => $modelConfig['provider'],
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = MessageDigestSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $this->getDigestPrompt()],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 $user->getId(),
-                [
-                    'temperature' => 0.2,
-                    'model' => $modelConfig['model'],
-                    'provider' => $modelConfig['provider'],
-                    'structured_output' => MessageDigestSchema::build(),
-                ]
+                $aiOptions
             );
 
             $content = $response['content'] ?? '';

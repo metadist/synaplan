@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\MemoryExtractionSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -26,6 +27,7 @@ final readonly class MemoryExtractionService
         private PromptRepository $promptRepository,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -173,18 +175,23 @@ PROMPT;
         try {
             $extractionConfig = $this->getExtractionModelConfig($message->getUserId());
 
+            $aiOptions = [
+                'temperature' => 0.3, // Low temperature for consistent extraction
+                'model' => $extractionConfig['model'],
+                'provider' => $extractionConfig['provider'],
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($message->getUserId())) {
+                $aiOptions['structured_output'] = MemoryExtractionSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 $message->getUserId(),
-                [
-                    'temperature' => 0.3, // Low temperature for consistent extraction
-                    'model' => $extractionConfig['model'],
-                    'provider' => $extractionConfig['provider'],
-                    'structured_output' => MemoryExtractionSchema::build(),
-                ]
+                $aiOptions
             );
 
             $content = $response['content'] ?? '';

@@ -6,6 +6,7 @@ namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\TaskPlanSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -58,6 +59,7 @@ final readonly class TaskPlanner
         private SkillCatalog $skillCatalog,
         private PromptService $promptService,
         private RateLimitService $rateLimitService,
+        private StructuredOutputConfig $structuredOutputConfig,
         private ?PlannerChannelCatalog $channelCatalog = null,
     ) {
     }
@@ -89,13 +91,18 @@ final readonly class TaskPlanner
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
-            $response = $this->aiFacade->chat($messages, $userId, [
+            $aiOptions = [
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1,
                 'max_tokens' => self::PLANNING_MAX_TOKENS,
-                'structured_output' => TaskPlanSchema::build(),
-            ]);
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($userId)) {
+                $aiOptions['structured_output'] = TaskPlanSchema::build();
+            }
+
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
             $raw = (string) ($response['content'] ?? '');
 
             // The planner call is a billable LLM request like the sorter's —

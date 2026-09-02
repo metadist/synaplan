@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
@@ -67,7 +68,16 @@ final class TaskPlannerTest extends TestCase
                 new NullLogger(),
             ),
             $this->createMock(RateLimitService::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function message(string $text = 'hello', string $lang = 'en'): Message&MockObject
@@ -197,5 +207,43 @@ final class TaskPlannerTest extends TestCase
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('task_plan', $options['structured_output']->name);
         self::assertFalse($options['structured_output']->strict);
+    }
+
+    public function testPlanOmitsTheTaskPlanSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"version":1,"language":"en","reply_node":"n1","tasks":[{"id":"n1","capability":"chat"}]}'];
+            }
+        );
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $planner = new TaskPlanner(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->modelConfigService,
+            new TaskPlanValidator(),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(UserRepository::class),
+            new TimeContextBuilder(),
+            SkillCatalogFactory::real(),
+            new PromptService(
+                $this->createMock(PromptRepository::class),
+                $this->createMock(PromptMetaRepository::class),
+                $this->createMock(EntityManagerInterface::class),
+                new NullLogger(),
+            ),
+            $this->createMock(RateLimitService::class),
+            $structuredOutputConfig,
+        );
+
+        $planner->plan($this->message(), [], 1);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 }

@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\UserMemoryActionSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\ModelConfigService;
@@ -49,6 +50,7 @@ class UserMemoryController extends AbstractController
         private readonly PromptService $promptService,
         private readonly ModelConfigService $modelConfigService,
         private readonly RateLimitService $rateLimitService,
+        private readonly StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -700,18 +702,23 @@ class UserMemoryController extends AbstractController
         }
 
         try {
+            $aiOptions = array_filter([
+                'model' => $memoryModelConfig['model'],
+                'provider' => $memoryModelConfig['provider'],
+                'temperature' => 0.3, // Low temperature for consistent JSON output
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = UserMemoryActionSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 messages: [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userMessage],
                 ],
                 userId: $user->getId(),
-                options: array_filter([
-                    'structured_output' => UserMemoryActionSchema::build(),
-                    'model' => $memoryModelConfig['model'],
-                    'provider' => $memoryModelConfig['provider'],
-                    'temperature' => 0.3, // Low temperature for consistent JSON output
-                ])
+                options: $aiOptions
             );
 
             $content = $response['content'] ?? '';

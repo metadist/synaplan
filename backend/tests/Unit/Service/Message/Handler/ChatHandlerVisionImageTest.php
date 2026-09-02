@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
@@ -70,6 +71,7 @@ class ChatHandlerVisionImageTest extends TestCase
             $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(StructuredOutputConfig::class),
         );
     }
 

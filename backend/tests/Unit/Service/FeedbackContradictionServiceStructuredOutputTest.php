@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -46,7 +47,16 @@ final class FeedbackContradictionServiceStructuredOutputTest extends TestCase
             $promptRepository,
             new NullLogger(),
             $this->feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function stubOneRelatedMemory(): void
@@ -101,6 +111,47 @@ final class FeedbackContradictionServiceStructuredOutputTest extends TestCase
 
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('feedback_contradiction', $options['structured_output']->name);
+    }
+
+    public function testCheckContradictionsOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $this->stubOneRelatedMemory();
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"contradictions": []}'];
+            }
+        );
+
+        $modelConfigService = $this->createMock(ModelConfigService::class);
+        $modelConfigService->method('getToolsModelConfig')
+            ->willReturn(['provider' => 'test', 'model' => 'test-model', 'model_id' => 1]);
+        $promptRepository = $this->createMock(PromptRepository::class);
+        $promptRepository->method('findOneBy')->willReturn(null);
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new FeedbackContradictionService(
+            $this->aiFacade,
+            $modelConfigService,
+            $this->createMock(RateLimitService::class),
+            $this->memoryService,
+            $promptRepository,
+            new NullLogger(),
+            $this->feedbackConfig,
+            $structuredOutputConfig,
+        );
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(42);
+
+        $service->checkContradictions($user, 'I am 25 years old', 'positive');
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 
     /**

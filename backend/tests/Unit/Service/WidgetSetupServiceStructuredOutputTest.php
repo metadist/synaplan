@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
@@ -52,9 +53,18 @@ final class WidgetSetupServiceStructuredOutputTest extends TestCase
             $this->createMock(RateLimitService::class),
             $this->createMock(UrlContentService::class),
             new NullLogger(),
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $this->generatePromptMetadataMethod = new \ReflectionMethod(WidgetSetupService::class, 'generatePromptMetadata');
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function makeUser(int $id): User
@@ -129,5 +139,75 @@ final class WidgetSetupServiceStructuredOutputTest extends TestCase
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('widget_prompt_metadata', $options['structured_output']->name);
         self::assertSame('Car Dealer Assistant', $result['title']);
+    }
+
+    public function testSuggestMemoriesForWidgetOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new WidgetSetupService(
+            $this->createMock(EntityManagerInterface::class),
+            $this->aiFacade,
+            $this->createMock(PromptService::class),
+            $this->createMock(PromptRepository::class),
+            $this->createMock(WidgetService::class),
+            $this->modelConfigService,
+            $this->createMock(RateLimitService::class),
+            $this->createMock(UrlContentService::class),
+            new NullLogger(),
+            $structuredOutputConfig,
+        );
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"suggestions": []}'];
+            }
+        );
+
+        $memories = [new UserMemoryDTO(id: 1, category: 'business', key: 'location', value: 'Berlin')];
+
+        $service->suggestMemoriesForWidget($this->makeUser(7), $memories);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
+    }
+
+    public function testGeneratePromptMetadataOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new WidgetSetupService(
+            $this->createMock(EntityManagerInterface::class),
+            $this->aiFacade,
+            $this->createMock(PromptService::class),
+            $this->createMock(PromptRepository::class),
+            $this->createMock(WidgetService::class),
+            $this->modelConfigService,
+            $this->createMock(RateLimitService::class),
+            $this->createMock(UrlContentService::class),
+            new NullLogger(),
+            $structuredOutputConfig,
+        );
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"title": "Car Dealer Assistant", "description": "Helps customers find cars."}'];
+            }
+        );
+
+        $widget = new Widget();
+        $widget->setName('My Widget');
+
+        $method = new \ReflectionMethod(WidgetSetupService::class, 'generatePromptMetadata');
+        $method->invoke($service, $this->makeUser(7), $widget, [1 => 'Sells cars', 2 => 'Car buyers']);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 }

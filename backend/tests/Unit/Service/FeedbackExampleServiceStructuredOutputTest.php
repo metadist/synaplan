@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -57,10 +58,19 @@ final class FeedbackExampleServiceStructuredOutputTest extends TestCase
             $promptRepository,
             new NullLogger(),
             $this->feedbackConfig,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $this->user = $this->createMock(User::class);
         $this->user->method('getId')->willReturn(42);
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testPreviewFalsePositiveForwardsTheFeedbackPreviewSchema(): void
@@ -127,5 +137,42 @@ final class FeedbackExampleServiceStructuredOutputTest extends TestCase
         self::assertSame('source_summaries', $options['structured_output']->name);
         self::assertCount(1, $result['sources']);
         self::assertSame('Confirms Canberra is the capital.', $result['sources'][0]['summary']);
+    }
+
+    public function testPreviewFalsePositiveOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $modelConfigService = $this->createMock(ModelConfigService::class);
+        $modelConfigService->method('getToolsModelConfig')
+            ->willReturn(['provider' => 'test', 'model' => 'test-model', 'model_id' => 1]);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new FeedbackExampleService(
+            $this->aiFacade,
+            $modelConfigService,
+            $this->createMock(RateLimitService::class),
+            $this->memoryService,
+            $this->vectorSearchService,
+            $this->braveSearchService,
+            $promptRepository,
+            new NullLogger(),
+            $this->feedbackConfig,
+            $structuredOutputConfig,
+        );
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"classification": "feedback", "summaryOptions": ["a"], "correctionOptions": ["b"]}'];
+            }
+        );
+
+        $service->previewFalsePositive($this->user, 'The capital of Australia is Sydney.');
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 }

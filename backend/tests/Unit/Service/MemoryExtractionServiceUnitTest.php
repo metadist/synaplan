@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\User;
@@ -49,7 +50,16 @@ final class MemoryExtractionServiceUnitTest extends TestCase
             $this->promptRepository,
             $this->entityManager,
             new NullLogger(),
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testAnalyzeAndExtractForwardsTheMemoryExtractionSchema(): void
@@ -87,6 +97,35 @@ final class MemoryExtractionServiceUnitTest extends TestCase
             [['action' => 'create', 'category' => 'personal', 'key' => 'name', 'value' => 'Anna']],
             $result,
         );
+    }
+
+    public function testAnalyzeAndExtractOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"memories": []}'];
+            }
+        );
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new MemoryExtractionService(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->createMock(RateLimitService::class),
+            $this->promptRepository,
+            $this->entityManager,
+            new NullLogger(),
+            $structuredOutputConfig,
+        );
+
+        $service->analyzeAndExtract($this->makeMessage(101, 'My name is Anna.'), []);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 
     private function makeMessage(int $id, string $text): Message

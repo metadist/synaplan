@@ -4,6 +4,7 @@ namespace App\Tests\Unit;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -104,7 +105,16 @@ class ChatHandlerTest extends TestCase
             $this->digestConfig,
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testGetName(): void
@@ -1569,6 +1579,82 @@ class ChatHandlerTest extends TestCase
         self::assertIsArray($capturedOptions);
         self::assertInstanceOf(StructuredOutputSchema::class, $capturedOptions['structured_output'] ?? null);
         self::assertSame('office_file_generation', $capturedOptions['structured_output']->name);
+    }
+
+    /**
+     * The STRUCTURED_OUTPUT.ENABLED kill switch must suppress the
+     * officemaker schema too — there is no separate flag per call site.
+     */
+    public function testHandleOmitsTheFileGenerationSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('Create a presentation');
+        $message->method('getUnixTimestamp')->willReturn(time());
+        $message->method('getDateTime')->willReturn('20260804083000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFileType')->willReturn('');
+        $message->method('getTopic')->willReturn('officemaker');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFileText')->willReturn('');
+
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->expects(self::any())->method('getProviderForModel')->with(206)->willReturn('openai');
+        $this->modelConfigService->expects(self::any())->method('getModelName')->with(206)->willReturn('gpt-5.5-pro');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getJson')->willReturn(['supportsSystemMessages' => true]);
+        $this->modelRepository->expects(self::any())->method('find')->with(206)->willReturn($model);
+
+        $capturedOptions = null;
+        $this->aiFacade
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return ['content' => '{"BFILEPATH":"slides.pptx","BFILETEXT":"content"}', 'provider' => 'openai', 'model' => 'gpt-5.5-pro'];
+            });
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $handler = new ChatHandler(
+            $this->aiFacade,
+            $this->promptRepository,
+            $this->promptService,
+            $this->modelConfigService,
+            $this->modelRepository,
+            $this->logger,
+            $this->vectorSearchService,
+            $this->em,
+            '/tmp/uploads',
+            $this->userUploadPathBuilder,
+            $this->userMemoryService,
+            $this->feedbackConfigService,
+            $this->rateLimitService,
+            $this->memoryExtractionDispatcher,
+            $this->perfPipelineFlag,
+            $this->createMock(DocumentGeneratorService::class),
+            $this->createMock(DocumentImageReferenceResolver::class),
+            $this->createMock(DocumentImageCatalog::class),
+            new TimeContextBuilder(),
+            new \App\Service\Knowledge\KnowledgeContextFormatter(),
+            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->digestSearchService,
+            $this->digestConfig,
+            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $structuredOutputConfig,
+        );
+
+        $handler->handle(
+            $message,
+            [],
+            ['topic' => 'officemaker', 'language' => 'en', 'model_id' => 206],
+        );
+
+        self::assertIsArray($capturedOptions);
+        self::assertArrayNotHasKey('structured_output', $capturedOptions);
     }
 
     /**

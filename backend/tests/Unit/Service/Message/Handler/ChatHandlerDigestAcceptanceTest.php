@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -205,6 +206,7 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
             $digestConfig,
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(StructuredOutputConfig::class),
         );
     }
 }

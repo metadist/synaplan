@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Controller\PromptController;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -82,6 +83,7 @@ final class PromptControllerTestRoutingTest extends TestCase
                     new NullLogger(),
                 ),
                 $this->createMock(RateLimitService::class),
+                $this->alwaysOnStructuredOutputConfig(),
             ),
             $this->createMock(FileUploadService::class),
         );
@@ -94,6 +96,14 @@ final class PromptControllerTestRoutingTest extends TestCase
             }
         });
         $this->controller->setContainer($container);
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     private function makeUser(int $id = 1): User&MockObject

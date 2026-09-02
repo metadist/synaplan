@@ -5,6 +5,7 @@ namespace App\Service\Message\Handler;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\FileGenerationSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -102,6 +103,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private MessageDigestConfig $digestConfig,
         private ConversationFileCatalog $conversationFileCatalog,
         private GeneratedImageVisionFlag $generatedImageVisionFlag,
+        private StructuredOutputConfig $structuredOutputConfig,
         iterable $pluginContextProviders = [],
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
@@ -562,7 +564,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // officemaker is the only topic whose reply IS the machine-readable
         // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
         // its free-form chat completion untouched.
-        if ('officemaker' === $topic) {
+        if ('officemaker' === $topic && $this->structuredOutputConfig->isEnabled($message->getUserId())) {
             $aiOptions['structured_output'] = FileGenerationSchema::build();
         }
 
@@ -1220,7 +1222,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // officemaker is the only topic whose reply IS the machine-readable
         // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
         // its free-form chat completion untouched.
-        if ('officemaker' === $topic) {
+        if ('officemaker' === $topic && $this->structuredOutputConfig->isEnabled($message->getUserId())) {
             $aiOptions['structured_output'] = FileGenerationSchema::build();
         }
 

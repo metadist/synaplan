@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Digest;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\MessageDigest;
@@ -61,9 +62,18 @@ final class MessageDigestServiceTest extends TestCase
             $this->qdrantClient,
             $this->embeddingResolver,
             new NullLogger(),
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $this->user = $this->makeUser(7);
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testDigestBatchStoresValidProposalInDbAndQdrant(): void
@@ -260,6 +270,40 @@ final class MessageDigestServiceTest extends TestCase
 
         self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         self::assertSame('message_digest', $options['structured_output']->name);
+    }
+
+    public function testDigestBatchOmitsTheSchemaWhenTheKillSwitchIsOff(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(false);
+
+        $service = new MessageDigestService(
+            $this->aiFacade,
+            $this->modelConfigService,
+            $this->rateLimitService,
+            $this->promptRepository,
+            $this->digestRepository,
+            $this->qdrantClient,
+            $this->embeddingResolver,
+            new NullLogger(),
+            $structuredOutputConfig,
+        );
+
+        $service->digestBatch($this->user, [$this->makeMessage(101, 'hi')]);
+
+        self::assertArrayNotHasKey('structured_output', $options ?? []);
     }
 
     /**

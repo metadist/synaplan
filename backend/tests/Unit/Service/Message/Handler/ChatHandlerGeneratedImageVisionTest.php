@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -237,6 +238,7 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
             $this->createMock(MessageDigestConfig::class),
             new ConversationFileCatalog($fileRepository, $this->uploadDir),
             $flag,
+            $this->createMock(StructuredOutputConfig::class),
         );
     }
 
