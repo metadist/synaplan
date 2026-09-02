@@ -321,4 +321,66 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertSame(1, $result['iterations']);
         $this->assertSame('tool_use', $result['usage']->stopReason);
     }
+
+    /**
+     * Regression for a Copilot review comment on #1680: withUsage() must never
+     * emit a negative ephemeral_5m_input_tokens in the aggregated multi-turn
+     * usage body, even if a (defensively impossible, but not enforced by the
+     * type system) cacheCreation1hTokens > cacheCreationTokens slips through.
+     */
+    public function testWithUsageClampsOneHourCacheBreakdownToCacheCreationTotal(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $loop = new GatewayToolLoop(
+            new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $this->createMock(WebSearchTool::class),
+            $this->createMock(AnalyzeImageTool::class),
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $this->createConfiguredMock(RateLimitService::class, [
+                'checkLimit' => ['allowed' => true],
+            ]),
+            new NullLogger(),
+        );
+
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->expects($this->once())->method('complete')->willReturn([
+            'status' => 200,
+            'headers' => [],
+            'body' => [
+                'content' => [['type' => 'text', 'text' => 'done']],
+                'stop_reason' => 'end_turn',
+                'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+            ],
+            // Inconsistent on purpose: cacheCreation1hTokens (999) exceeds
+            // cacheCreationTokens (20). A real Anthropic response can't do
+            // this, but withUsage() must still clamp rather than compute a
+            // negative 5m count.
+            'usage' => new MessagesUsage(
+                inputTokens: 10,
+                outputTokens: 5,
+                cacheCreationTokens: 20,
+                cacheReadTokens: 0,
+                stopReason: 'end_turn',
+                cacheCreation1hTokens: 999,
+            ),
+        ]);
+
+        $result = $loop->runComplete(
+            ['model' => 'x', 'max_tokens' => 1, 'messages' => [['role' => 'user', 'content' => 'x']]],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            ['tools' => [], 'dispatch' => [], 'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE],
+        );
+
+        $this->assertIsArray($result['body']);
+        $cacheCreation = $result['body']['usage']['cache_creation'];
+        $this->assertSame(20, $cacheCreation['ephemeral_1h_input_tokens']);
+        $this->assertSame(0, $cacheCreation['ephemeral_5m_input_tokens']);
+        $this->assertGreaterThanOrEqual(0, $cacheCreation['ephemeral_5m_input_tokens']);
+    }
 }

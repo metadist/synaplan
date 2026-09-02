@@ -827,11 +827,15 @@ final readonly class GatewayToolLoop
 
         // Mirror Anthropic's TTL breakdown so a client inspecting the aggregated
         // multi-turn usage (e.g. for its own cost estimate) sees the same shape
-        // it would from a single-turn response.
+        // it would from a single-turn response. Clamp defensively: summing
+        // per-turn usage (sumUsage()) should never let the 1h count exceed the
+        // total, but a negative ephemeral_5m_input_tokens would be an invalid
+        // token count and could confuse a client parsing this breakdown.
         if ($usage->cacheCreation1hTokens > 0) {
+            $cacheCreation1h = min($usage->cacheCreation1hTokens, $usage->cacheCreationTokens);
             $body['usage']['cache_creation'] = [
-                'ephemeral_5m_input_tokens' => $usage->cacheCreationTokens - $usage->cacheCreation1hTokens,
-                'ephemeral_1h_input_tokens' => $usage->cacheCreation1hTokens,
+                'ephemeral_5m_input_tokens' => $usage->cacheCreationTokens - $cacheCreation1h,
+                'ephemeral_1h_input_tokens' => $cacheCreation1h,
             ];
         }
 
