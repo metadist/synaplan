@@ -9,6 +9,8 @@ use App\Repository\MessageMetaRepository;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
@@ -22,7 +24,9 @@ use Psr\Log\LoggerInterface;
  * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
  * 2. Check for tool commands (e.g., /pic, /vid, /search)
  * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
- * 4. Use MessageSorter for AI-based classification
+ * 4. Embedding-router cascade match against the four SYSTEM topics (Phase 8,
+ *    skip sorting when confident — see {@see EmbeddingRouterService})
+ * 5. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
@@ -51,6 +55,8 @@ final readonly class MessageClassifier
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private SystemCapabilityRegistry $capabilityRegistry,
+        private EmbeddingRouterService $embeddingRouter,
+        private EmbeddingRouterConfig $embeddingRouterConfig,
     ) {
     }
 
@@ -99,14 +105,7 @@ final readonly class MessageClassifier
             // "wer bist du?" got an English answer: the directive built
             // downstream from this value told the chat model to reply in
             // English.
-            $confidentLanguage = $this->detectLanguageConfident($text);
-
-            if (null === $confidentLanguage) {
-                $existingLanguage = strtolower(trim($message->getLanguage()));
-                if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
-                    $confidentLanguage = $existingLanguage;
-                }
-            }
+            $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
 
             if (null !== $confidentLanguage) {
                 $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
@@ -234,6 +233,79 @@ final readonly class MessageClassifier
                 'source' => $attachmentDecision->toClassificationSource(),
                 'skip_sorting' => true,
             ], $attachmentDecision->toClassificationFields());
+        }
+
+        // Phase 8: embedding-router cascade layer. Sits after every
+        // deterministic layer above (overrides, tool commands, attachments)
+        // and before the AI sorter below. Embeds the message with the same
+        // bge-m3 model used for RAG and matches it via cosine similarity
+        // against pre-computed example-utterance anchors for the four
+        // SYSTEM topics (general, mediamaker, officemaker, docsummary)
+        // stored in Qdrant — see EmbeddingRouterService and the
+        // `app:routing-anchors:sync` command that (re)populates the anchors
+        // from SystemCapabilityRegistry::exampleUtterances. User-defined
+        // topics have no curated anchors, so a confident match is always one
+        // of the four system topics; anything else escalates to the AI
+        // sorter below exactly like today.
+        //
+        // Like the fast-path, a confident match short-circuits the sorter
+        // round-trip entirely — unlike the fast-path this is not restricted
+        // to `general`. Extraction of the sorter's topic-specific votes
+        // (BMEDIA, BRESOLUTION, BINPUTMODE) is intentionally NOT attempted
+        // here: MediaPromptExtractor already re-derives BMEDIA from the
+        // message text via its own dedicated AI call whenever the
+        // classification omits it, so a mediamaker match degrades
+        // gracefully instead of needing those votes up front.
+        if (null === $overrideModelId
+            && !empty($text)
+            && $this->embeddingRouterConfig->isEnabled($userId)
+        ) {
+            $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
+
+            if (null !== $embeddingMatch && $embeddingMatch->score >= $this->embeddingRouterConfig->getConfidenceThreshold()) {
+                $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
+
+                if (null !== $confidentLanguage) {
+                    $this->logger->info('MessageClassifier: Embedding-router match (skipped AI sorter)', [
+                        'message_id' => $messageId,
+                        'topic' => $embeddingMatch->topic,
+                        'confidence' => $embeddingMatch->score,
+                        'language' => $confidentLanguage,
+                    ]);
+
+                    $embeddingDecision = new RoutingDecision(
+                        RoutingLayer::EmbeddingRouter,
+                        $embeddingMatch->topic,
+                        confidence: $embeddingMatch->score,
+                        discardedAlternatives: array_map(
+                            static fn (array $alternative): string => sprintf('%s (%.3f)', $alternative['topic'], $alternative['score']),
+                            $embeddingMatch->discardedAlternatives
+                        ),
+                    );
+
+                    // `web_search` is intentionally null here for the same
+                    // reason as the fast-path: no AI-sorter round-trip means
+                    // no BWEBSEARCH vote, and under the "trust the model"
+                    // policy a missing vote means no search.
+                    return array_merge([
+                        'topic' => $embeddingMatch->topic,
+                        'language' => $confidentLanguage,
+                        'web_search' => null,
+                        'source' => $embeddingDecision->toClassificationSource(),
+                        'skip_sorting' => true,
+                        'intent' => $this->mapTopicToIntent($embeddingMatch->topic),
+                        'model_id' => null,
+                        'provider' => null,
+                        'model_name' => null,
+                    ], $embeddingDecision->toClassificationFields());
+                }
+
+                $this->logger->info('MessageClassifier: Embedding-router match declined (language ambiguous) — deferring to AI sorter', [
+                    'message_id' => $messageId,
+                    'topic' => $embeddingMatch->topic,
+                    'confidence' => $embeddingMatch->score,
+                ]);
+            }
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -986,6 +1058,36 @@ final readonly class MessageClassifier
             .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
             $text
         );
+    }
+
+    /**
+     * Resolve a confident 2-letter language code for a deterministic
+     * short-circuit (fast-path heuristic or embedding-router match) that
+     * skips the AI sorter entirely.
+     *
+     * Tries, in order:
+     *   1. {@see detectLanguageConfident()} — a local text heuristic.
+     *   2. A language already pinned on the message (frontend UI locale or a
+     *      previously detected turn; 'NN' is the entity default = unknown).
+     *
+     * Returns null when neither is available. Callers MUST treat null as "do
+     * not shortcut, fall through to the AI sorter" rather than defaulting to
+     * 'en' — see {@see detectLanguageConfident()}'s docblock for the
+     * incident this guards against (a German "wer bist du?" answered in
+     * English because an undetectable language silently defaulted).
+     */
+    private function resolveConfidentLanguage(Message $message, string $text): ?string
+    {
+        $confidentLanguage = $this->detectLanguageConfident($text);
+
+        if (null === $confidentLanguage) {
+            $existingLanguage = strtolower(trim($message->getLanguage()));
+            if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
+                $confidentLanguage = $existingLanguage;
+            }
+        }
+
+        return $confidentLanguage;
     }
 
     /**

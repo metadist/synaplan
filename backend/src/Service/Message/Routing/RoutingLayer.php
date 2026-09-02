@@ -34,6 +34,23 @@ enum RoutingLayer: string
     case AttachmentRule = 'attachment_document_or_audio';
 
     /**
+     * Phase 8: cosine-similarity match against pre-computed example-utterance
+     * anchors for the four SYSTEM topics (general, mediamaker, officemaker,
+     * docsummary), embedded with bge-m3 and stored in Qdrant — see
+     * {@see EmbeddingRouterService}. Sits after
+     * every deterministic layer above and before the AI sorter below; a
+     * confident match skips the sorter round-trip the same way
+     * {@see FastPathHeuristic} does, generalised from regex matching to
+     * semantic matching and from one topic (`general`) to all four. Like
+     * {@see FastPathHeuristic}, this source is deliberately absent from
+     * {@see \App\Service\Multitask\TaskPlanExecutor}'s planner allow-list: a
+     * bypassed sorter has no `multi_step` vote to plan on, so the DAG
+     * planner is skipped too and the legacy single-node router handles the
+     * turn — identical trade-off to the fast-path, not a new one.
+     */
+    case EmbeddingRouter = 'embedding_router';
+
+    /**
      * The AI sorter (`DEFAULTMODEL.SORT`) decided — including its internal
      * rule-based shortcut ({@see \App\Service\Message\MessageSorter::checkRuleBasedRouting()})
      * and its parse-failure fallback, both of which keep emitting this same

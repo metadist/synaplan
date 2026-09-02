@@ -24,6 +24,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
     private const DEFAULT_DIGESTS_COLLECTION = 'user_message_digests';
+    private const DEFAULT_ROUTING_ANCHORS_COLLECTION = 'routing_anchors';
     private const BATCH_LIMIT = 100;
 
     /** @var array<string, bool> tracks which collections have been verified/created */
@@ -32,6 +33,7 @@ final class QdrantClientDirect implements QdrantClientInterface
     private readonly string $memoriesCollection;
     private readonly string $documentsCollection;
     private readonly string $digestsCollection;
+    private readonly string $routingAnchorsCollection;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -43,6 +45,7 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?string $documentsCollection = null,
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
         ?string $digestsCollection = null,
+        ?string $routingAnchorsCollection = null,
     ) {
         $this->memoriesCollection = (null !== $memoriesCollection && '' !== $memoriesCollection)
             ? $memoriesCollection
@@ -53,6 +56,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         $this->digestsCollection = (null !== $digestsCollection && '' !== $digestsCollection)
             ? $digestsCollection
             : self::DEFAULT_DIGESTS_COLLECTION;
+        $this->routingAnchorsCollection = (null !== $routingAnchorsCollection && '' !== $routingAnchorsCollection)
+            ? $routingAnchorsCollection
+            : self::DEFAULT_ROUTING_ANCHORS_COLLECTION;
     }
 
     public function getMemoriesCollection(): string
@@ -68,6 +74,11 @@ final class QdrantClientDirect implements QdrantClientInterface
     public function getDigestsCollection(): string
     {
         return $this->digestsCollection;
+    }
+
+    public function getRoutingAnchorsCollection(): string
+    {
+        return $this->routingAnchorsCollection;
     }
 
     public function getQdrantUrl(): string
@@ -554,6 +565,108 @@ final class QdrantClientDirect implements QdrantClientInterface
         } catch (\Throwable $e) {
             $this->logger->error('Failed to delete all digests for user from Qdrant', [
                 'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
+    // ──────────────────────────────────────────────
+    //  Routing Anchor Operations (Phase 8 embedding-router cascade layer)
+    // ──────────────────────────────────────────────
+
+    public function upsertRoutingAnchor(string $pointId, array $vector, array $payload): void
+    {
+        $this->ensureRoutingAnchorsCollection();
+
+        $payload['_point_id'] = $pointId;
+
+        try {
+            // This collection never contained legacy integer-keyed points
+            // (it is new in Phase 8), so a plain deterministic-UUID upsert
+            // is sufficient — re-syncing the same logical anchor overwrites
+            // it in place, exactly like upsertDigest().
+            $this->upsertPoints($this->routingAnchorsCollection, [
+                [
+                    'id' => QdrantPointId::uuidFor($pointId),
+                    'vector' => $vector,
+                    'payload' => $payload,
+                ],
+            ]);
+
+            $this->logger->debug('Routing anchor upserted to Qdrant', ['point_id' => $pointId]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to upsert routing anchor to Qdrant', [
+                'point_id' => $pointId,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new \RuntimeException('Failed to upsert routing anchor: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    public function searchRoutingAnchors(array $queryVector, int $limit = 5): array
+    {
+        try {
+            $response = $this->qdrantRequest('POST', "/collections/{$this->routingAnchorsCollection}/points/query", [
+                'query' => $queryVector,
+                'limit' => $limit,
+                'with_payload' => true,
+            ]);
+
+            $results = [];
+            foreach ($response['result']['points'] ?? [] as $hit) {
+                $results[] = [
+                    'id' => $hit['payload']['_point_id'] ?? (string) $hit['id'],
+                    'score' => $hit['score'],
+                    'payload' => $hit['payload'] ?? [],
+                ];
+            }
+
+            return $results;
+        } catch (\Throwable $e) {
+            // Lazily created collection: searching before `app:routing-anchors:sync`
+            // has ever run is a normal empty state (disabled feature flag,
+            // fresh install), not an error — the caller treats "no results"
+            // as "defer to the AI sorter".
+            if ($this->isMissingCollectionError($e)) {
+                $this->logger->debug('Qdrant routing-anchors collection does not exist yet, returning no results');
+
+                return [];
+            }
+
+            $this->logger->error('Failed to search routing anchors in Qdrant', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    public function deleteAllRoutingAnchors(): int
+    {
+        try {
+            $countResponse = $this->qdrantRequest('POST', "/collections/{$this->routingAnchorsCollection}/points/count", []);
+            $deletedCount = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $deletedCount) {
+                return 0;
+            }
+
+            $this->qdrantRequest('POST', "/collections/{$this->routingAnchorsCollection}/points/delete?wait=true", [
+                'filter' => [],
+            ]);
+
+            $this->logger->info('All routing anchors deleted from Qdrant', ['deleted_count' => $deletedCount]);
+
+            return $deletedCount;
+        } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                return 0;
+            }
+
+            $this->logger->error('Failed to delete all routing anchors from Qdrant', [
                 'error' => $e->getMessage(),
             ]);
 
@@ -1321,6 +1434,52 @@ final class QdrantClientDirect implements QdrantClientInterface
             $this->logger->info('Created Qdrant digests collection with indices', ['collection' => $collection]);
         } catch (\Throwable $e) {
             $this->logger->error('Failed to create digests collection', [
+                'collection' => $collection,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    private function ensureRoutingAnchorsCollection(): void
+    {
+        $collection = $this->routingAnchorsCollection;
+
+        if (isset($this->ensuredCollections[$collection])) {
+            return;
+        }
+
+        try {
+            $this->qdrantRequest('GET', "/collections/{$collection}");
+            // See ensureMemoriesCollection() — idempotent payload-index
+            // backfill for pre-existing collections.
+            $this->ensurePayloadIndexes($collection, [
+                'topic' => 'keyword',
+                '_point_id' => 'keyword',
+            ]);
+            $this->ensuredCollections[$collection] = true;
+
+            return;
+        } catch (\Throwable) {
+            // Collection doesn't exist, create it
+        }
+
+        try {
+            $this->qdrantRequest('PUT', "/collections/{$collection}", [
+                'vectors' => [
+                    'size' => $this->vectorDimension,
+                    'distance' => 'Cosine',
+                ],
+            ]);
+
+            $this->createPayloadIndex($collection, 'topic', 'keyword');
+            $this->createPayloadIndex($collection, '_point_id', 'keyword');
+
+            $this->ensuredCollections[$collection] = true;
+
+            $this->logger->info('Created Qdrant routing-anchors collection with indices', ['collection' => $collection]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to create routing-anchors collection', [
                 'collection' => $collection,
                 'error' => $e->getMessage(),
             ]);

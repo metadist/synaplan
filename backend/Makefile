@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval sort-eval summary-eval digest-run digest-eval digest-reindex
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval sort-eval sort-eval-cascade summary-eval digest-run digest-eval digest-reindex routing-anchors-sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -89,6 +89,12 @@ plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE mod
 
 sort-eval: ## Evaluate the message sorter (tools:sort) against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval
+
+sort-eval-cascade: ## Evaluate the Phase 8 embedding-router cascade layer against the golden corpus, accuracy/latency per layer (LIVE model + embedding calls)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval --cascade
+
+routing-anchors-sync: ## Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry (Phase 8 embedding-router; LIVE embedding calls)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:routing:sync-anchors
 
 summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:summary:eval

@@ -13,6 +13,8 @@ use App\Repository\MessageMetaRepository;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\ModelConfigService;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -256,6 +258,8 @@ final class RoutingCharacterizationTest extends TestCase
             $em,
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
         );
 
         $message = $this->buildMessage($case);

@@ -348,6 +348,83 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertSame([], array_values($errorRecords), 'missing collection must not be logged as an error');
     }
 
+    public function testSearchRoutingAnchorsTreatsMissingCollectionAsEmptyWithoutErrorLog(): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: mixed, message: string}> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = ['level' => $level, 'message' => (string) $message];
+            }
+        };
+
+        $factory = static fn (): MockResponse => new MockResponse(
+            json_encode(['status' => ['error' => "Not found: Collection `routing_anchors` doesn't exist!"], 'time' => 0.0]),
+            ['http_code' => 404],
+        );
+        $client = new QdrantClientDirect(
+            httpClient: new MockHttpClient($factory),
+            qdrantUrl: self::QDRANT_URL,
+            logger: $logger,
+        );
+
+        $results = $client->searchRoutingAnchors(array_fill(0, 1024, 0.5));
+
+        $this->assertSame([], $results);
+        $errorRecords = array_filter($logger->records, static fn (array $r): bool => 'error' === $r['level']);
+        $this->assertSame([], array_values($errorRecords), 'missing collection must not be logged as an error');
+    }
+
+    public function testSearchRoutingAnchorsReturnsBestFirstWithTopicPayload(): void
+    {
+        $client = $this->buildClient([
+            '/points/query' => fn (): MockResponse => new MockResponse(json_encode(['result' => ['points' => [
+                ['id' => 'a', 'score' => 0.93, 'payload' => ['_point_id' => 'route_mediamaker_1', 'topic' => 'mediamaker']],
+                ['id' => 'b', 'score' => 0.41, 'payload' => ['_point_id' => 'route_general_1', 'topic' => 'general']],
+            ]]]), ['http_code' => 200]),
+        ]);
+
+        $results = $client->searchRoutingAnchors(array_fill(0, 1024, 0.1), limit: 5);
+
+        $this->assertCount(2, $results);
+        $this->assertSame('route_mediamaker_1', $results[0]['id']);
+        $this->assertSame(0.93, $results[0]['score']);
+        $this->assertSame('mediamaker', $results[0]['payload']['topic']);
+        $this->assertSame('general', $results[1]['payload']['topic']);
+    }
+
+    public function testUpsertRoutingAnchorUpsertsPointWithDeterministicId(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            // ensureRoutingAnchorsCollection: GET collection exists
+            '/collections/routing_anchors' => fn (): MockResponse => new MockResponse(
+                json_encode(['result' => ['status' => 'green']]),
+                ['http_code' => 200]
+            ),
+            '/collections/routing_anchors/index' => fn (): MockResponse => $this->okEmpty(),
+            '/collections/routing_anchors/points' => fn (): MockResponse => $this->okEmpty(),
+        ], $calls);
+
+        $client->upsertRoutingAnchor('route_general_1', array_fill(0, 1024, 0.2), ['topic' => 'general', 'intent' => 'chat']);
+
+        $upsertCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => 'PUT' === $c['method'] && str_ends_with($c['path'], '/collections/routing_anchors/points'),
+        ));
+        $this->assertCount(1, $upsertCalls);
+        $this->assertStringContainsString('wait=true', $upsertCalls[0]['query']);
+
+        $body = json_decode((string) $upsertCalls[0]['body'], true);
+        $this->assertIsArray($body);
+        $point = $body['points'][0];
+        $this->assertSame(QdrantPointId::uuidFor('route_general_1'), $point['id']);
+        $this->assertSame('general', $point['payload']['topic']);
+        $this->assertSame('route_general_1', $point['payload']['_point_id']);
+    }
+
     public function testUpsertDocumentIssuesAtomicBatchDeleteThenUpsert(): void
     {
         $calls = [];
@@ -473,10 +550,14 @@ final class QdrantClientDirectTest extends TestCase
             logger: new NullLogger(),
             memoriesCollection: 'custom_mem',
             documentsCollection: 'custom_doc',
+            digestsCollection: 'custom_dig',
+            routingAnchorsCollection: 'custom_anchors',
         );
 
         $this->assertSame('custom_mem', $client->getMemoriesCollection());
         $this->assertSame('custom_doc', $client->getDocumentsCollection());
+        $this->assertSame('custom_dig', $client->getDigestsCollection());
+        $this->assertSame('custom_anchors', $client->getRoutingAnchorsCollection());
         $this->assertSame('http://x', $client->getQdrantUrl());
     }
 }

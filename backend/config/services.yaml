@@ -90,6 +90,7 @@ parameters:
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
     env(QDRANT_DIGESTS_COLLECTION): ''
+    env(QDRANT_ROUTING_ANCHORS_COLLECTION): ''
     env(TRITON_SERVER_URL): ''
     env(GOOGLE_CLIENT_ID): ''
     env(GITHUB_CLIENT_ID): ''
@@ -1059,6 +1060,7 @@ services:
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
             $digestsCollection: '%env(default::QDRANT_DIGESTS_COLLECTION)%'
+            $routingAnchorsCollection: '%env(default::QDRANT_ROUTING_ANCHORS_COLLECTION)%'
 
     App\Service\VectorSearch\QdrantClientInterface:
         alias: App\Service\VectorSearch\QdrantClientDirect

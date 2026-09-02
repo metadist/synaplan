@@ -6,6 +6,8 @@ namespace App\Command;
 
 use App\Repository\PromptRepository;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -49,6 +51,8 @@ final class SortEvalCommand extends Command
     public function __construct(
         private readonly MessageSorter $sorter,
         private readonly PromptRepository $promptRepository,
+        private readonly EmbeddingRouterService $embeddingRouter,
+        private readonly EmbeddingRouterConfig $embeddingRouterConfig,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
     ) {
@@ -62,7 +66,8 @@ final class SortEvalCommand extends Command
             ->addOption('filter', null, InputOption::VALUE_REQUIRED, 'Only run cases whose id contains this substring')
             ->addOption('repeat', null, InputOption::VALUE_REQUIRED, 'Run every case N times (stability check)', '1')
             ->addOption('user', null, InputOption::VALUE_REQUIRED, 'Resolve the sorting model for this user id (default: global)')
-            ->addOption('json', null, InputOption::VALUE_NONE, 'Emit machine-readable JSON summary instead of a table (for before/after diffing)');
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Emit machine-readable JSON summary instead of a table (for before/after diffing)')
+            ->addOption('cascade', null, InputOption::VALUE_NONE, 'Phase 8: try the embedding-router cascade layer first (bypassing its BCONFIG flag — this IS the calibration tool for that flag); escalate to the AI sorter on a sub-threshold match. Reports accuracy and latency separately per layer that made the final decision.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -91,6 +96,8 @@ final class SortEvalCommand extends Command
         $userOption = $input->getOption('user');
         $userId = null !== $userOption ? (int) $userOption : null;
         $asJson = (bool) $input->getOption('json');
+        $cascade = (bool) $input->getOption('cascade');
+        $confidenceThreshold = $this->embeddingRouterConfig->getConfidenceThreshold();
 
         // The set of topics actually offered to the model for this user.
         // Anything the model returns outside this set is a hallucinated
@@ -113,6 +120,8 @@ final class SortEvalCommand extends Command
         $confusion = [];
         /** @var array<string, array{hits: int, total: int}> $perTopic */
         $perTopic = [];
+        /** @var array<string, array{total: int, topic_hits: int, topic_total: int, latency_ms_sum: float}> $layerStats keyed by cascade layer ('embedding_router' | 'ai_sorting') */
+        $layerStats = [];
 
         foreach ($corpus as $case) {
             if (!is_array($case) || !is_string($case['id'] ?? null)) {
@@ -128,8 +137,37 @@ final class SortEvalCommand extends Command
             for ($run = 1; $run <= $repeat; ++$run) {
                 ++$runsTotal;
                 $messageData = $this->buildMessageData($case);
+                $text = is_string($messageData['BTEXT'] ?? null) ? $messageData['BTEXT'] : '';
 
-                $result = $this->sorter->classify($messageData, [], $userId);
+                $layer = 'ai_sorting';
+                $startedAt = microtime(true);
+                $result = null;
+
+                if ($cascade) {
+                    // This is the calibration tool for EmbeddingRouterConfig,
+                    // so it deliberately bypasses isEnabled() and evaluates
+                    // the confidence threshold directly against the raw
+                    // match — the whole point is to answer "if this were
+                    // turned on with threshold X, what would happen?".
+                    $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
+                    if (null !== $embeddingMatch && $embeddingMatch->score >= $confidenceThreshold) {
+                        $layer = 'embedding_router';
+                        // The embedding router only votes on topic. Language,
+                        // multi_step, media_type, and web_search are left
+                        // unset here (not asserted downstream against the
+                        // sorter's richer votes) — see EmbeddingRouterService's
+                        // docblock for why those are intentionally out of
+                        // scope for this layer.
+                        $result = ['topic' => $embeddingMatch->topic, 'source' => 'embedding_router'];
+                    }
+                }
+
+                if (null === $result) {
+                    $result = $this->sorter->classify($messageData, [], $userId);
+                }
+
+                $latencyMs = (microtime(true) - $startedAt) * 1000.0;
+
                 $actualTopic = (string) ($result['topic'] ?? 'general');
                 $actualLang = (string) ($result['language'] ?? 'en');
 
@@ -137,6 +175,17 @@ final class SortEvalCommand extends Command
                 $parseFailed = '' !== $rawResponse && !$this->looksLikeParsedJson($rawResponse);
                 if ($parseFailed) {
                     ++$parseFailureCount;
+                }
+
+                if ($cascade) {
+                    $layerStats[$layer]['total'] = ($layerStats[$layer]['total'] ?? 0) + 1;
+                    $layerStats[$layer]['latency_ms_sum'] = ($layerStats[$layer]['latency_ms_sum'] ?? 0.0) + $latencyMs;
+                    if (null !== $expectedTopic) {
+                        $layerStats[$layer]['topic_total'] = ($layerStats[$layer]['topic_total'] ?? 0) + 1;
+                        if ($actualTopic === $expectedTopic) {
+                            $layerStats[$layer]['topic_hits'] = ($layerStats[$layer]['topic_hits'] ?? 0) + 1;
+                        }
+                    }
                 }
 
                 $isInvalidTopic = '' !== $actualTopic && !in_array($actualTopic, $validTopics, true);
@@ -191,13 +240,18 @@ final class SortEvalCommand extends Command
                 }
 
                 $ok = [] === $problems;
-                $rows[] = [
+                $row = [
                     $case['id'].($repeat > 1 ? " #{$run}" : ''),
                     $ok ? '<info>PASS</info>' : '<error>FAIL</error>',
                     $actualTopic.($isInvalidTopic ? ' <error>[INVALID]</error>' : ''),
                     $actualLang,
                     implode('; ', $problems),
                 ];
+                if ($cascade) {
+                    $row[] = $layer;
+                    $row[] = sprintf('%.1f', $latencyMs);
+                }
+                $rows[] = $row;
             }
         }
 
@@ -225,13 +279,42 @@ final class SortEvalCommand extends Command
             'confusion' => $confusion,
         ];
 
+        if ($cascade) {
+            // Phase 8 acceptance criterion: accuracy and latency reported
+            // SEPARATELY per cascade layer, never blended into the headline
+            // topic_accuracy_pct above — a high embedding-router escalation
+            // rate must not be hidden behind a good blended number.
+            $summary['cascade'] = array_map(
+                static fn (array $v): array => [
+                    'decisions' => $v['total'],
+                    'topic_accuracy_pct' => ($v['topic_total'] ?? 0) > 0
+                        ? round((($v['topic_hits'] ?? 0) / $v['topic_total']) * 100, 1)
+                        : 0.0,
+                    'avg_latency_ms' => $v['total'] > 0
+                        ? round($v['latency_ms_sum'] / $v['total'], 1)
+                        : 0.0,
+                ],
+                $layerStats
+            );
+        }
+
         if ($asJson) {
             $output->writeln(json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
             return Command::SUCCESS;
         }
 
-        $io->table(['case', 'result', 'topic', 'lang', 'detail'], $rows);
+        $io->table($cascade ? ['case', 'result', 'topic', 'lang', 'detail', 'layer', 'latency_ms'] : ['case', 'result', 'topic', 'lang', 'detail'], $rows);
+
+        if ($cascade && [] !== $layerStats) {
+            $io->section('Cascade layers (Phase 8)');
+            $cascadeRows = [];
+            foreach ($summary['cascade'] as $layerName => $stats) {
+                $cascadeRows[] = [$layerName, $stats['decisions'], $stats['topic_accuracy_pct'].'%', $stats['avg_latency_ms'].' ms'];
+            }
+            $io->table(['layer', 'decisions', 'topic accuracy', 'avg latency'], $cascadeRows);
+            $io->writeln(sprintf('<comment>Confidence threshold in effect: %.2f (BCONFIG EMBEDDING_ROUTER.CONFIDENCE_THRESHOLD)</comment>', $confidenceThreshold));
+        }
 
         $io->section('Summary');
         $io->writeln(sprintf('Topic accuracy: %.1f%% (%d/%d)', $topicAccuracy, $topicHits, $topicTotal));
