@@ -3,6 +3,7 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\SortClassificationSchema;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -244,6 +245,12 @@ final readonly class MessageSorter
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
                 'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
+                // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on
+                // providers that support it (StructuredOutputCapability decides
+                // per provider/model/streaming — a no-op everywhere else, see
+                // parseResponse()'s server-side BTOPIC validation below for the
+                // fallback path).
+                'structured_output' => SortClassificationSchema::build($topics, self::SUPPORTED_LANGUAGES),
             ]);
 
             $aiResponse = $response['content'];
@@ -257,7 +264,7 @@ final readonly class MessageSorter
             ]);
 
             // Parse JSON response
-            $parsed = $this->parseResponse($aiResponse, $messageData);
+            $parsed = $this->parseResponse($aiResponse, $messageData, $topics);
 
             $this->logger->info('MessageSorter: ✅ Classification result', [
                 'topic' => $parsed['topic'],
@@ -445,8 +452,17 @@ final readonly class MessageSorter
 
     /**
      * Parse AI response JSON.
+     *
+     * @param list<string> $validTopics Topics valid for this user, used to
+     *                                  server-side validate BTOPIC (see
+     *                                  {@see self::validateTopic()}) — a
+     *                                  belt-and-suspenders check independent
+     *                                  of the schema's enum, since providers
+     *                                  without structured-output support fall
+     *                                  back to the prose instruction and can
+     *                                  still invent a topic
      */
-    private function parseResponse(string $response, array $originalData): array
+    private function parseResponse(string $response, array $originalData, array $validTopics = []): array
     {
         // Try to extract JSON from response
         $response = trim($response);
@@ -511,8 +527,10 @@ final readonly class MessageSorter
                 $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
             }
 
+            $topic = $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general';
+
             return [
-                'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
+                'topic' => $this->validateTopic($topic, $validTopics),
                 'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
                 'web_search' => $webSearch,
                 'multi_step' => $multiStep,
@@ -529,7 +547,7 @@ final readonly class MessageSorter
 
             // Fallback to original values or defaults
             return [
-                'topic' => $originalData['BTOPIC'] ?? 'general',
+                'topic' => $this->validateTopic($originalData['BTOPIC'] ?? 'general', $validTopics),
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
                 'multi_step' => null,
@@ -539,6 +557,36 @@ final readonly class MessageSorter
                 'input_mode' => null,
             ];
         }
+    }
+
+    /**
+     * Server-side validation of BTOPIC, independent of the schema's `enum`
+     * constraint on {@see SortClassificationSchema}.
+     *
+     * The schema only constrains providers with structured-output support
+     * (see {@see \App\AI\StructuredOutput\StructuredOutputCapability}) — every
+     * other provider still answers from prose instructions alone and can
+     * invent a topic outside the list, or a strict-mode-incapable provider
+     * can ignore the enum. Previously this field ran through completely
+     * unvalidated (`$data['BTOPIC'] ?? ... ?? 'general'`), silently routing
+     * to whatever string the model produced. An empty `$validTopics` list
+     * (e.g. a call site that never loaded the topic catalog) skips the check
+     * rather than rejecting every topic.
+     *
+     * @param list<string> $validTopics
+     */
+    private function validateTopic(string $topic, array $validTopics): string
+    {
+        if ([] === $validTopics || in_array($topic, $validTopics, true)) {
+            return $topic;
+        }
+
+        $this->logger->warning('MessageSorter: AI returned invalid BTOPIC, falling back to general', [
+            'invalid_topic' => $topic,
+            'valid_topics' => $validTopics,
+        ]);
+
+        return 'general';
     }
 
     /**

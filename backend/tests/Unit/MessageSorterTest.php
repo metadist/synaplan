@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
@@ -21,6 +22,8 @@ class MessageSorterTest extends TestCase
     private MessageSorter $sorter;
     private \ReflectionMethod $parseResponseMethod;
     private \ReflectionMethod $normalizeMediaTypeMethod;
+    private \ReflectionMethod $validateTopicMethod;
+    private LoggerInterface&\PHPUnit\Framework\MockObject\MockObject $logger;
 
     protected function setUp(): void
     {
@@ -30,7 +33,7 @@ class MessageSorterTest extends TestCase
         $promptService = $this->createMock(PromptService::class);
         $rateLimitService = $this->createMock(RateLimitService::class);
         $em = $this->createMock(EntityManagerInterface::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
         $discord = $this->createMock(DiscordNotificationService::class);
 
         $this->sorter = new MessageSorter(
@@ -40,7 +43,7 @@ class MessageSorterTest extends TestCase
             $promptService,
             $rateLimitService,
             $em,
-            $logger,
+            $this->logger,
             $discord
         );
 
@@ -52,6 +55,64 @@ class MessageSorterTest extends TestCase
 
         $this->normalizeMediaTypeMethod = $reflection->getMethod('normalizeMediaType');
         $this->normalizeMediaTypeMethod->setAccessible(true);
+
+        $this->validateTopicMethod = $reflection->getMethod('validateTopic');
+        $this->validateTopicMethod->setAccessible(true);
+    }
+
+    // ===========================================
+    // validateTopic (server-side BTOPIC guard)
+    // ===========================================
+
+    public function testValidateTopicPassesThroughAValidTopic(): void
+    {
+        $result = $this->validateTopicMethod->invoke($this->sorter, 'mediamaker', ['general', 'mediamaker']);
+        $this->assertSame('mediamaker', $result);
+    }
+
+    public function testValidateTopicFallsBackToGeneralForAnInventedTopic(): void
+    {
+        $this->logger->expects($this->once())->method('warning');
+
+        $result = $this->validateTopicMethod->invoke($this->sorter, 'not_a_real_topic', ['general', 'mediamaker']);
+        $this->assertSame('general', $result);
+    }
+
+    public function testValidateTopicSkipsTheCheckWhenNoTopicListIsGiven(): void
+    {
+        $this->logger->expects($this->never())->method('warning');
+
+        // A call site that never loaded the topic catalog (empty list) must
+        // not reject every topic — the check is skipped, not "always fail".
+        $result = $this->validateTopicMethod->invoke($this->sorter, 'anything', []);
+        $this->assertSame('anything', $result);
+    }
+
+    // ===========================================
+    // parseResponse BTOPIC server-side validation
+    // ===========================================
+
+    public function testParseResponseRejectsAnInventedTopicFromTheAiResponse(): void
+    {
+        // A provider without structured-output support answered from prose
+        // alone and invented a topic outside the enum — the server-side
+        // check must catch what the schema's `enum` could not enforce.
+        $response = '{"BTOPIC": "made_up_topic", "BLANG": "en"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData, ['general', 'mediamaker']);
+
+        $this->assertSame('general', $result['topic']);
+    }
+
+    public function testParseResponseAcceptsAValidTopicFromTheAiResponse(): void
+    {
+        $response = '{"BTOPIC": "mediamaker", "BLANG": "en"}';
+        $originalData = ['BTOPIC' => 'general', 'BLANG' => 'en'];
+
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, $originalData, ['general', 'mediamaker']);
+
+        $this->assertSame('mediamaker', $result['topic']);
     }
 
     // ===========================================
@@ -565,6 +626,50 @@ class MessageSorterTest extends TestCase
         $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
 
         $this->assertGreaterThanOrEqual(2048, $options['max_tokens'] ?? 0);
+    }
+
+    /**
+     * The AiFacade/provider layer only honours a schema when
+     * `structured_output` is present in options — verify classify() always
+     * builds and forwards one, dynamically scoped to the user's topic list.
+     */
+    public function testClassifyForwardsAStructuredOutputSchemaScopedToTheTopicList(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'mediamaker', 'docsummary']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $options = null;
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"BTOPIC":"general","BLANG":"en"}', 'provider' => 'groq'];
+            }
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+        );
+
+        $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+
+        $this->assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
+        $this->assertSame(['general', 'mediamaker', 'docsummary'], $options['structured_output']->schema['properties']['BTOPIC']['enum']);
     }
 
     /**
