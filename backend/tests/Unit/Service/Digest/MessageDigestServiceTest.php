@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Digest;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\MessageDigest;
 use App\Entity\User;
@@ -239,6 +240,48 @@ final class MessageDigestServiceTest extends TestCase
         self::assertCount(1, $result['proposals']);
         self::assertSame(102, $result['proposals'][0]['message_id']);
         self::assertSame(200, mb_strlen($result['proposals'][0]['title']));
+    }
+
+    public function testDigestBatchForwardsTheMessageDigestSchema(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+
+        $options = null;
+        $this->aiFacade->method('chat')->willReturnCallback(
+            function (array $messages, ?int $userId, array $opts) use (&$options): array {
+                $options = $opts;
+
+                return ['content' => '{"digests": []}', 'usage' => []];
+            }
+        );
+
+        $this->service->digestBatch($this->user, [$this->makeMessage(101, 'hi')]);
+
+        self::assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
+        self::assertSame('message_digest', $options['structured_output']->name);
+    }
+
+    /**
+     * The object-wrapped schema response (`{"digests": [...]}`) must parse
+     * exactly like the legacy bare-array response — no parsing change was
+     * needed because the extractor's regex already grabs the innermost
+     * `[...]` regardless of what wraps it.
+     */
+    public function testWrappedSchemaResponseParsesTheSameAsABareArray(): void
+    {
+        $this->digestRepository->method('findDigestedMessageIds')->willReturn([]);
+        $this->digestRepository->method('findTitlesForChats')->willReturn([]);
+        $this->qdrantClient->method('isAvailable')->willReturn(false);
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"digests": [{"title": "office rent letter to realtor", "message_id": 102}]}',
+            'usage' => [],
+        ]);
+
+        $result = $this->service->digestBatch($this->user, [$this->makeMessage(102, 'Letter to the realtor.')]);
+
+        self::assertSame(1, $result['created']);
+        self::assertSame([['title' => 'office rent letter to realtor', 'message_id' => 102]], $result['proposals']);
     }
 
     public function testUsageIsRecordedWithDigestSource(): void

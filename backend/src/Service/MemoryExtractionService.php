@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\MemoryExtractionSchema;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -182,6 +183,7 @@ PROMPT;
                     'temperature' => 0.3, // Low temperature for consistent extraction
                     'model' => $extractionConfig['model'],
                     'provider' => $extractionConfig['provider'],
+                    'structured_output' => MemoryExtractionSchema::build(),
                 ]
             );
 

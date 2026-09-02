@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Digest;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\MessageDigestSchema;
 use App\Entity\Message;
 use App\Entity\MessageDigest;
 use App\Entity\User;
@@ -151,6 +152,7 @@ PROMPT;
                     'temperature' => 0.2,
                     'model' => $modelConfig['model'],
                     'provider' => $modelConfig['provider'],
+                    'structured_output' => MessageDigestSchema::build(),
                 ]
             );
 
