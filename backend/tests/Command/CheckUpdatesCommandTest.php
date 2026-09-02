@@ -6,6 +6,7 @@ namespace App\Tests\Command;
 
 use App\Command\CheckUpdatesCommand;
 use App\Entity\Config;
+use App\Message\SyncPlatformDocsMessage;
 use App\Repository\ConfigRepository;
 use App\Service\Update\UpdateConfig;
 use App\Service\Update\UpdateManifestClient;
@@ -19,6 +20,8 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * The scheduler runs this once a day, unattended. An unreachable manifest is an
@@ -114,6 +117,42 @@ final class CheckUpdatesCommandTest extends TestCase
         self::assertSame('4.0.14', $this->rows[UpdateConfig::KEY_LATEST_VERSION]);
     }
 
+    public function testDispatchesDocsSyncWhenPublishedVersionChanges(): void
+    {
+        $this->stubConfigRepository();
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::isInstanceOf(SyncPlatformDocsMessage::class))
+            ->willReturn(new Envelope(new SyncPlatformDocsMessage()));
+
+        $tester = $this->testerWith('4.0.12', new MockHttpClient(new MockResponse((string) json_encode([
+            'schema' => 1,
+            'stable' => ['version' => '4.0.13', 'severity' => 'security'],
+        ]))), $bus);
+
+        $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+    }
+
+    public function testDoesNotDispatchDocsSyncWhenVersionIsUnchanged(): void
+    {
+        $this->stubConfigRepository();
+        $this->rows[UpdateConfig::KEY_LATEST_VERSION] = '4.0.13';
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+
+        $tester = $this->testerWith('4.0.13', new MockHttpClient(new MockResponse((string) json_encode([
+            'schema' => 1,
+            'stable' => ['version' => '4.0.13'],
+        ]))), $bus);
+
+        $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+    }
+
     public function testAnUnexpectedErrorExitsNonZero(): void
     {
         $this->configRepository
@@ -148,8 +187,11 @@ final class CheckUpdatesCommandTest extends TestCase
         return $this->testerWith($currentVersion, new MockHttpClient($response));
     }
 
-    private function testerWith(string $currentVersion, MockHttpClient $httpClient): CommandTester
-    {
+    private function testerWith(
+        string $currentVersion,
+        MockHttpClient $httpClient,
+        ?MessageBusInterface $messageBus = null,
+    ): CommandTester {
         $service = new UpdateStatusService(
             new UpdateConfig($this->configRepository),
             new UpdateManifestClient($httpClient, new ArrayAdapter(), new NullLogger()),
@@ -158,7 +200,7 @@ final class CheckUpdatesCommandTest extends TestCase
         );
 
         $application = new Application();
-        $application->addCommand(new CheckUpdatesCommand($service));
+        $application->addCommand(new CheckUpdatesCommand($service, $messageBus));
 
         return new CommandTester($application->find('app:updates:check'));
     }

@@ -256,7 +256,7 @@ class StreamController extends AbstractController
     #[OA\Get(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response',
-        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. Status events include memories_loaded and docs_loaded (documentation citations for the synaplan topic). NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
         security: [['Bearer' => []]],
         tags: ['Messages']
     )]
@@ -1797,6 +1797,10 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMeta('ai_chat_usage', json_encode($response['metadata']['usage']));
                 }
 
+                if (isset($response['metadata']['docs']) && is_array($response['metadata']['docs']) && [] !== $response['metadata']['docs']) {
+                    $outgoingMessage->setMeta('docs', json_encode($response['metadata']['docs'], JSON_UNESCAPED_SLASHES));
+                }
+
                 if (!empty($response['metadata']['response_id'])) {
                     $outgoingMessage->setMeta('openai_response_id', $response['metadata']['response_id']);
                 }
@@ -2141,6 +2145,10 @@ class StreamController extends AbstractController
                     $this->logger->info('StreamController: Including memory IDs in complete event', [
                         'count' => count($response['metadata']['memories']),
                     ]);
+                }
+
+                if (isset($response['metadata']['docs']) && is_array($response['metadata']['docs']) && [] !== $response['metadata']['docs']) {
+                    $completeData['docs'] = $response['metadata']['docs'];
                 }
 
                 // Include feedbacks used for this response
@@ -2721,6 +2729,10 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMeta('ai_chat_usage', json_encode($metadata['usage']));
             }
 
+            if (isset($metadata['docs']) && is_array($metadata['docs']) && [] !== $metadata['docs']) {
+                $outgoingMessage->setMeta('docs', json_encode($metadata['docs'], JSON_UNESCAPED_SLASHES));
+            }
+
             if (!empty($metadata['response_id'])) {
                 $outgoingMessage->setMeta('openai_response_id', $metadata['response_id']);
             }
@@ -2900,6 +2912,11 @@ class StreamController extends AbstractController
 
             if (isset($metadata['memories']) && is_array($metadata['memories'])) {
                 $completeData['memoryIds'] = array_map(fn ($memory) => $memory['id'], $metadata['memories']);
+            }
+
+            if (isset($metadata['docs']) && is_array($metadata['docs']) && [] !== $metadata['docs']) {
+                $completeData['docs'] = $metadata['docs'];
+                $outgoingMessage->setMeta('docs', json_encode($metadata['docs'], JSON_UNESCAPED_SLASHES));
             }
 
             if (isset($metadata['feedbacks']) && is_array($metadata['feedbacks'])) {

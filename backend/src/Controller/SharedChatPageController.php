@@ -167,7 +167,7 @@ class SharedChatPageController extends AbstractController
      */
     private function cleanSlashCommands(string $text): string
     {
-        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video)\s*/i', '', $text);
+        return preg_replace('/^\/(?:pic|vid|audio|tts|image|video|search|help)\s*/i', '', $text);
     }
 
     /**

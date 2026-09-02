@@ -9,6 +9,7 @@ use App\Repository\MessageMetaRepository;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\ModelConfigService;
+use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -38,7 +39,18 @@ final readonly class MessageClassifier
         '/web' => 'tools:web',
         '/list' => 'tools:list',
         '/docs' => 'tools:filesort',
+        '/help' => 'synaplan',
     ];
+
+    /**
+     * Meta-questions about this product (EN/DE/ES/FR/TR). A match only
+     * defers to the AI sorter — it never routes by itself.
+     *
+     * Languages: can you / what can you (en), kannst du / was kannst (de),
+     * puedes / qué puedes (es), peux-tu / que peux (fr), yapabilir misin /
+     * ne yapabilirsin (tr), plus the word "synaplan".
+     */
+    private const SELF_AWARE_GUARD_PATTERN = '/(?:can you|what can you|kannst du|was kannst|puedes|qu[eé] puedes|peux-tu|que peux|yapabilir misin|ne yapabilirsin|synaplan)/iu';
 
     public function __construct(
         private MessageSorter $messageSorter,
@@ -47,6 +59,7 @@ final readonly class MessageClassifier
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private ?SelfAwareConfig $selfAwareConfig = null,
     ) {
     }
 
@@ -626,6 +639,13 @@ final readonly class MessageClassifier
         // Tool prefixes are already handled earlier in classify(); be defensive
         // in case the order changes.
         if (str_starts_with($trimmed, '/')) {
+            return false;
+        }
+
+        if (null !== $this->selfAwareConfig
+            && $this->selfAwareConfig->isEnabled($message->getUserId() > 0 ? $message->getUserId() : null)
+            && 1 === preg_match(self::SELF_AWARE_GUARD_PATTERN, $trimmed)
+        ) {
             return false;
         }
 

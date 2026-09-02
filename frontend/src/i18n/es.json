@@ -234,6 +234,19 @@
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
+  "selfAware": {
+    "emptyHint": "¿No sabes qué es posible aquí? Pregúntame qué puedo hacer.",
+    "emptyHintQuestion": "¿Qué puedes hacer aquí?",
+    "examplePrompt": "¿Qué puedes hacer?",
+    "helpCommand": {
+      "label": "Ayuda",
+      "description": "Preguntar qué puede hacer este asistente de IA aquí"
+    },
+    "docPill": {
+      "tooltip": "Abrir en la documentación",
+      "ariaLabel": "Abrir {title} en la documentación"
+    }
+  },
   "examplePrompts": {
     "heading": "Prueba una de estas",
     "items": {

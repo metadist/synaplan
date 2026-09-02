@@ -38,11 +38,15 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\Docs\PlatformDocsRetriever;
+use App\Service\SelfAware\SelfAwareConfig;
+use App\Service\SelfAware\SelfAwarePromptDecorator;
 use App\Service\UserMemoryService;
 use App\Service\Vision\VisionModelResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Chat Handler - Normaler Konversations-Chat.
@@ -102,6 +106,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ConversationFileCatalog $conversationFileCatalog,
         private GeneratedImageVisionFlag $generatedImageVisionFlag,
         iterable $pluginContextProviders = [],
+        #[Autowire(lazy: true)]
+        private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
+        #[Autowire(lazy: true)]
+        private ?PlatformDocsRetriever $platformDocsRetriever = null,
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
     }
@@ -406,6 +414,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        $docsList = [];
+        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
+        $systemPrompt = $decorated['prompt'];
+        $docsList = $decorated['docs'];
+
         if (!empty($ragContext)) {
             $systemPrompt .= $ragContext;
             $this->logger->info('ChatHandler: RAG context appended to system prompt', [
@@ -709,6 +722,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
+                'docs' => $docsList,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ]),
         ];
@@ -1008,6 +1022,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'prompt_length' => strlen($systemPrompt),
             ]);
         }
+
+        $docsList = [];
+        $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
+        $systemPrompt = $decorated['prompt'];
+        $docsList = $decorated['docs'];
 
         // Append RAG context to system prompt if available
         if (!empty($ragContext)) {
@@ -1348,8 +1367,73 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
+                'docs' => $docsList,
                 'extraction_payload' => $deferExtraction ? $extractionPayload : null,
             ],
+        ];
+    }
+
+    /**
+     * Replace or strip `[PLATFORM_CAPABILITIES]` / `[PLATFORM_DOCS]` after the
+     * topic prompt is loaded and before RAG/memories are appended.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array{prompt: string, docs: list<array{slug: string, title: string, url: string}>}
+     */
+    private function decorateSelfAwarePrompt(
+        string $systemPrompt,
+        string $topic,
+        Message $message,
+        array $classification,
+        array $options,
+        ?callable $progressCallback,
+    ): array {
+        $docsList = [];
+        if (null === $this->selfAwarePromptDecorator) {
+            return ['prompt' => $systemPrompt, 'docs' => $docsList];
+        }
+
+        $isWidget = SelfAwarePromptDecorator::isWidgetConversation($classification, $options);
+        $docsHits = null;
+        if (SelfAwareConfig::ROUTABLE_TOPIC === $topic && null !== $this->platformDocsRetriever && !$isWidget) {
+            $query = trim($message->getText());
+            if ('' === $query || 1 === preg_match('/^\/help\b/i', $query)) {
+                $query = 'What can you do here?';
+            }
+            try {
+                $docsHits = $this->platformDocsRetriever->retrieve($query, $message->getUserId());
+                $docsList = $docsHits->toClientList();
+            } catch (\Throwable $e) {
+                $this->logger->warning('ChatHandler: Platform docs retrieval failed, continuing without', [
+                    'error' => $e->getMessage(),
+                ]);
+                $docsHits = null;
+                $docsList = [];
+            }
+            if ([] !== $docsList && null !== $progressCallback) {
+                $progressCallback([
+                    'status' => 'docs_loaded',
+                    'message' => 'Documentation loaded',
+                    'metadata' => [
+                        'docs' => $docsList,
+                        'count' => count($docsList),
+                    ],
+                    'timestamp' => time(),
+                ]);
+            }
+        }
+
+        return [
+            'prompt' => $this->selfAwarePromptDecorator->apply(
+                $systemPrompt,
+                $topic,
+                $message->getUserId(),
+                $isWidget,
+                $docsHits,
+            ),
+            'docs' => $docsList,
         ];
     }
 

@@ -16,6 +16,7 @@ use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\SelfAware\SelfAwareConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -58,6 +59,7 @@ final readonly class TaskPlanner
         private PromptService $promptService,
         private RateLimitService $rateLimitService,
         private ?PlannerChannelCatalog $channelCatalog = null,
+        private ?SelfAwareConfig $selfAwareConfig = null,
     ) {
     }
 
@@ -222,6 +224,16 @@ final readonly class TaskPlanner
     {
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        if (null !== $this->selfAwareConfig && !$this->selfAwareConfig->isEnabled($userId)) {
+            $topics = array_values(array_filter(
+                $topics,
+                static fn (string $topic): bool => SelfAwareConfig::ROUTABLE_TOPIC !== $topic,
+            ));
+            $topicsWithDesc = array_values(array_filter(
+                $topicsWithDesc,
+                static fn (array $item): bool => SelfAwareConfig::ROUTABLE_TOPIC !== ($item['topic'] ?? ''),
+            ));
+        }
 
         // Catalog-lite (release 4.0): the capability list is assembled from the
         // SkillDescriptors the runners declare — one source of truth per block.

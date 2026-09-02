@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Knowledge;
 
 use App\Service\Knowledge\KnowledgeContextFormatter;
+use App\Service\SelfAware\Docs\PlatformDocsHit;
+use App\Service\SelfAware\Docs\PlatformDocsHits;
 use PHPUnit\Framework\TestCase;
 
 final class KnowledgeContextFormatterTest extends TestCase
@@ -28,6 +30,35 @@ final class KnowledgeContextFormatterTest extends TestCase
 
         $clamped = $fmt->combineAndClamp('ABCDEFGHIJ', '', 5);
         $this->assertSame("ABCDE\n…", $clamped);
+    }
+
+    public function testFormatPlatformDocsContextRendersDocPillsAndRules(): void
+    {
+        $fmt = new KnowledgeContextFormatter();
+        $block = $fmt->formatPlatformDocsContext(new PlatformDocsHits([
+            new PlatformDocsHit(
+                'channels',
+                'Channels: WhatsApp & Email',
+                'https://docs.synaplan.com/channels',
+                'Using',
+                'Connect WhatsApp via the Meta Business API.',
+                0.8,
+            ),
+            new PlatformDocsHit(
+                'widget',
+                'Widget Integration',
+                'https://docs.synaplan.com/widget',
+                'Using',
+                'Embed the chat widget with a script tag.',
+                0.7,
+            ),
+        ]));
+
+        $this->assertStringContainsString('[Doc:channels] Channels: WhatsApp & Email', $block);
+        $this->assertStringContainsString('[Doc:widget] Widget Integration', $block);
+        $this->assertStringContainsString('ONE slug per bracket', $block);
+        $this->assertStringContainsString('Never invent slugs', $block);
+        $this->assertSame('', (new KnowledgeContextFormatter())->formatPlatformDocsContext(new PlatformDocsHits([])));
     }
 
     public function testFormatDigestContextEmptyInputYieldsEmptyString(): void

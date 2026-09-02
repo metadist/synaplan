@@ -1,6 +1,6 @@
 # Sprint 2 — The docs corpus (`SYSTEM:synaplan`)
 
-Status: planned
+Status: implemented
 Date: 2026-09-02
 Depends on: `00_master_plan.md` (Decisions 4, 5), sprint 1 (`SelfAwareConfig`)
 

@@ -1,6 +1,6 @@
 # Sprint 3 — Grounded answers, citations, and chat discoverability
 
-Status: planned
+Status: implemented
 Date: 2026-09-02
 Depends on: sprint 1 (topic + injection), sprint 2 (corpus + sync state)
 

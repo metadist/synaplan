@@ -508,6 +508,7 @@
             :part="part"
             :is-streaming="isStreaming"
             :memories="memories"
+            :docs="docs"
           />
 
           <!-- Continue Button (truncated response) -->
@@ -1198,6 +1199,7 @@ interface Props {
   } | null // Tool metadata (e.g., web search, file generation)
   memoryIds?: number[] | null // IDs of memories used (resolved from memoriesStore)
   feedbackIds?: number[] | null // IDs of feedbacks used (resolved from feedbackStore)
+  docs?: { slug: string; title: string; url: string }[] | null
   truncated?: boolean
   // Multitask routing: live task-card state while a multi-node plan streams.
   taskPlan?: TaskPlanState | null

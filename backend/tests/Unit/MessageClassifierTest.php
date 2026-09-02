@@ -97,6 +97,24 @@ class MessageClassifierTest extends TestCase
         $this->assertTrue($result['skip_sorting']);
     }
 
+    public function testHelpCommandRoutesToSynaplan(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(21);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('/help');
+        $message->method('getLanguage')->willReturn('en');
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('chat', $result['intent']);
+        $this->assertSame('tool_command', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
     public function testClassifyWithAiSorting(): void
     {
         $message = $this->createMock(Message::class);
@@ -1325,6 +1343,47 @@ class MessageClassifierTest extends TestCase
         $this->assertArrayNotHasKey('input_mode', $this->service->classify($this->plainMessage(306, 'hello there')));
     }
 
+    /**
+     * @return list<array{0: string}>
+     */
+    public static function selfAwareGuardUtterances(): array
+    {
+        return [
+            ['can you make PDFs?'],
+            ['was kannst du?'],
+            ['¿puedes buscar en internet?'],
+            ['peux-tu lire mes e-mails ?'],
+            ['video yapabilir misin?'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testFastPathDefersSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(410, $text));
+
+        $this->assertSame('synaplan', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testFastPathStillClassifiesOrdinaryChat(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter);
+        $result = $classifier->classify($this->plainMessage(411, 'write me a poem'));
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
     private function classifierWithFastPathEnabled(MessageSorter $sorter): MessageClassifier
     {
         $configRepo = $this->createMock(ConfigRepository::class);
@@ -1343,6 +1402,7 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new \App\Service\SelfAware\SelfAwareConfig($configRepo),
         );
     }
 

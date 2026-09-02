@@ -368,6 +368,64 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
+## Self-awareness (`SELF_AWARE`)
+
+The assistant can answer "what can you do here?" from a live capability
+inventory, and "how do I …?" from a system-owned copy of
+[docs.synaplan.com](https://docs.synaplan.com/). Both are gated by the
+`SELF_AWARE` BCONFIG group (owner 0). Rows are insert-if-missing on
+`app:seed` and are never overwritten.
+
+### Flags
+
+| Group / Key | Default | Effect when off |
+|-------------|---------|-----------------|
+| `SELF_AWARE / ENABLED` | `true` | No inventory block, `/help` falls through to ordinary chat, the `synaplan` topic is hidden from routing. Byte-identical to a pre-feature install. |
+| `SELF_AWARE / INVENTORY_IN_GENERAL` | `true` | Inventory is injected only into the `synaplan` topic, not into everyday `general` chat. |
+| `SELF_AWARE / DOCS_RAG_ENABLED` | `true` | No documentation retrieval and no `docs_loaded` citations. The corpus sync still runs. |
+| `SELF_AWARE / DOCS_MANIFEST_URL` | `https://docs.synaplan.com/docs-manifest.json` | Empty string disables sync (air-gapped). Point at a mirror that serves the same three endpoints (`/docs-manifest.json`, `/raw/{slug}.md`, `/llms.txt`). |
+
+Resolution for the boolean flags is per-user → owner 0 → built-in default.
+`DOCS_MANIFEST_URL` is operator-only (owner 0).
+
+### Commands
+
+```bash
+# Live capability block for a user (default user id 2)
+docker compose exec -T backend php bin/console app:selfaware:inventory --user 2
+
+# Refresh the SYSTEM:synaplan documentation corpus
+docker compose exec -T backend php bin/console app:selfaware:sync-docs
+docker compose exec -T backend php bin/console app:selfaware:sync-docs --dry-run
+docker compose exec -T backend php bin/console app:selfaware:sync-docs --force
+
+# Release spot-check (needs a live chat model; not part of `make test`)
+docker compose exec -T backend php bin/console app:selfaware:eval --install=no_engine
+```
+
+`app:selfaware:sync-docs` also runs in the daily scheduler slot (after
+`app:updates:check`) and is queued when a new published version is
+recorded. It never runs at container boot. The corpus is owner 0 /
+`SYSTEM:synaplan` and does not appear in any user's file list.
+
+An unreachable manifest leaves the previous corpus in place. An empty
+`DOCS_MANIFEST_URL` prints `skipped` and exits 0.
+
+### Release checklist: `KNOWN_ABSENT`
+
+There is no `docs/RELEASE.md`. Before every release that ships a capability,
+review `PlatformCapabilityInventory::KNOWN_ABSENT`:
+
+1. **Remove** any entry a shipped feature now provides.
+2. **Add** an `alternative` (and an `adminHint` when an operator can enable
+   the missing piece) for anything newly and deliberately unsupported.
+
+This is the only hand-maintained list in the feature. Leaving a stale
+entry makes the assistant deny something the install can do; missing an
+entry makes it invent a capability.
+
+---
+
 ## Integrations
 
 | Channel | Guide |

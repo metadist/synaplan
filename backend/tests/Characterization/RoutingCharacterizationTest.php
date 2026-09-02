@@ -120,6 +120,7 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'cmd_web', 'text' => '/web example.com', 'language' => 'en'],
             ['id' => 'cmd_list', 'text' => '/list', 'language' => 'en'],
             ['id' => 'cmd_docs', 'text' => '/docs sort my files', 'language' => 'en'],
+            ['id' => 'cmd_help', 'text' => '/help', 'language' => 'en'],
 
             // ---- Again overrides (fast-path off, like the existing override tests) ----
             ['id' => 'again_prompt_override', 'text' => 'redo that', 'language' => 'en', 'fastPath' => false, 'meta' => ['PROMPTID' => 'tools:pic']],

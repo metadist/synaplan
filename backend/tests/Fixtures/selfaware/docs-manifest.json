@@ -1,0 +1,41 @@
+{
+  "schema": "synaplan-docs-manifest/1",
+  "generated_at": "2026-09-02T09:00:00Z",
+  "site_url": "https://docs.synaplan.com",
+  "version": "2026.09",
+  "pages": [
+    {
+      "slug": "intro",
+      "title": "Introduction & Auth",
+      "section": "Getting started",
+      "description": "Official Synaplan documentation: self-host an open-source AI knowledge platform with RAG, an embeddable chat widget, and a REST API.",
+      "url": "https://docs.synaplan.com/",
+      "raw_url": "https://docs.synaplan.com/raw/intro.md",
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "bytes": 1842,
+      "updated_at": "2026-08-30T14:11:02Z"
+    },
+    {
+      "slug": "using-synaplan",
+      "title": "Using Synaplan",
+      "section": "Using Synaplan",
+      "description": "A task-oriented tour of chat, files and RAG, memories, and saved tasks.",
+      "url": "https://docs.synaplan.com/using-synaplan",
+      "raw_url": "https://docs.synaplan.com/raw/using-synaplan.md",
+      "sha256": "2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06dced5c0ae",
+      "bytes": 2560,
+      "updated_at": "2026-09-01T08:22:11Z"
+    },
+    {
+      "slug": "dag-routing",
+      "title": "Multi-Task (DAG) Routing",
+      "section": "Developers",
+      "description": "How Synaplan turns a complex request into a DAG of tasks with live task cards.",
+      "url": "https://docs.synaplan.com/dag-routing",
+      "raw_url": "https://docs.synaplan.com/raw/dag-routing.md",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 9123,
+      "updated_at": "2026-08-30T14:11:02Z"
+    }
+  ]
+}

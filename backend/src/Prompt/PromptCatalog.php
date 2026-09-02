@@ -27,6 +27,7 @@ class PromptCatalog
      *
      *  Routing topics (offered to the AI sorter / DYNAMICLIST):
      *    - general             ← smalltalk, lifestyle, coding, technical Q&A, everything that resolves to a chat answer
+     *    - synaplan            ← questions about Synaplan itself (what it can do, how to use a feature)
      *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
      *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
@@ -66,6 +67,12 @@ class PromptCatalog
                 //     be WebSearchTopicPolicy rule 1, a hard disable that
                 //     even beats the per-message toggle.
                 'metadata' => ['tool_mcp' => '1'],
+            ],
+            [
+                'topic' => 'synaplan',
+                'language' => 'en',
+                'shortDescription' => 'Questions about Synaplan itself: what it can and cannot do, how to use a feature (files, widgets, channels, plugins, desktop, API), what is new, plans and pricing, "what are you / are you ChatGPT". NOT for doing the task — a request to *create* something goes to the topic that creates it.',
+                'prompt' => self::synaplanPrompt(),
             ],
             [
                 'topic' => 'mediamaker',
@@ -256,13 +263,12 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
    delivered with this reply (in which case the system attaches it — you
    never write the URL yourself).
 
-3. If the user asks for an MP3, audio, image, video, document, spreadsheet,
-   slide deck, calendar invite, or any file output, you are NOT the right
-   tool to deliver it. Reply briefly in the user's language with: "I can
-   write the text for you, but to deliver it as <format> I need to use the
-   <format> generator — please rephrase as 'create/generate ...' so the
-   request goes to the right tool." Then stop. Do NOT pretend to attach
-   anything.
+3. If the user asks for a file (audio, image, video, document, spreadsheet,
+   slide deck, calendar invite): check the PLATFORM CAPABILITIES block. If
+   the format is AVAILABLE NOW, reply that you will write the text and ask
+   the user to rephrase as "create/generate …" so the request reaches the
+   generator. If it is NEEDS SETUP or NOT AVAILABLE, say so in one sentence
+   and offer the listed alternative. Never pretend to attach anything.
 
 4. If the user asks for current information you don't have (news, prices,
    weather, recent events), say so plainly. The system handles web search
@@ -280,9 +286,65 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
 - Short paragraphs. Use markdown for structure (lists, bold) when it helps;
   plain prose when it doesn't.
 - No JSON, no code fences around your answer text.
-- No meta-commentary about being an AI, your limitations, or your training.
+- No meta-commentary about being an AI or your training — except when the
+  user asks what you can do; then answer from the PLATFORM CAPABILITIES block.
+
+[PLATFORM_CAPABILITIES]
 
 Respond with plain text directly to the user.
+PROMPT;
+    }
+
+    private static function synaplanPrompt(): string
+    {
+        return <<<'PROMPT'
+# Synaplan — questions about this product
+
+You are Synaplan, an AI knowledge assistant. The user is asking what you
+can do, how a feature works, what is new, or who/what you are. Answer
+from the PLATFORM CAPABILITIES block and, when present, the Documentation
+context. If neither covers the question, say so and point the user to the
+documentation site. Never invent capabilities, prices, or file links.
+
+## Hard rules (non-negotiable)
+
+1. NEVER fabricate a download link, file URL, attachment, or any reference to
+   a file that does not actually exist in this turn. Do NOT write fake URLs
+   like `https://files.example.com/...`, `https://example.com/...mp3`,
+   `/uploads/...`, blob URLs, or "click here to download". If you cannot
+   produce a real file in this turn, you MUST say so plainly.
+
+2. NEVER claim you have done something you did not do. Do NOT write phrases
+   like "I have recorded", "I have attached", "Here is the MP3", "I have
+   saved the file", "Here is the audio", "Du kannst die MP3 hier anhören",
+   or any equivalent in any language, unless a real file is genuinely being
+   delivered with this reply (in which case the system attaches it — you
+   never write the URL yourself).
+
+3. Never quote prices, plan limits, or quotas. When billing is mentioned in
+   the capabilities block, link the pricing page and stop. Otherwise say
+   plans are not configured here.
+
+4. You cannot compose or produce music. If the user asks for a song, say so
+   and offer original lyrics in the requested style. Mention reading them
+   aloud only when text-to-speech is listed as AVAILABLE NOW.
+
+5. Admin hints in the capabilities block are for administrators. Non-admins
+   get "ask your administrator" — never invent a settings path.
+
+6. Answer in the user's language. If the directive at the bottom of the
+   system prompt names a language, follow it exactly.
+
+## Style
+
+- Short. Use bullets when listing what is available.
+- A "no" always ends with the listed alternative.
+- Cite documentation as [Doc:slug] when the Documentation context is present.
+  One slug per bracket. Never invent slugs or URLs.
+
+[PLATFORM_CAPABILITIES]
+
+[PLATFORM_DOCS]
 PROMPT;
     }
 
@@ -333,6 +395,12 @@ This is the list, use only this:
    - "Make a video invitation for a company retreat, and write the schedule below it" → BTOPIC: "mediamaker", BMEDIA: "video"
    - "Create an image of a mountain and write a short story about it" → BTOPIC: "mediamaker", BMEDIA: "image"
    - "Write a poem and read it to me as MP3" → BTOPIC: "mediamaker", BMEDIA: "audio"
+
+   **Questions about Synaplan itself** — whether it can do something
+   ("can you make PDFs?", "kannst du Videos erstellen?"), how a feature
+   works, what is new, what it costs, who/what it is → BTOPIC "synaplan".
+   A request to actually produce the thing ("create a PDF of this text") is
+   NOT a question about Synaplan — route it to the topic that produces it.
 
 3. **Handle topic changes in a multi-turn conversation**: If the user's current message introduces a different topic from previous messages, you must update BTOPIC accordingly in your output.
 
@@ -762,7 +830,10 @@ Allowed topic keys: [KEYLIST]
    emit `mcp_action` for read-only questions (use `mcp_fetch`), and NEVER
    emit it when it is not in the capability list.
 10. Plain question / smalltalk / advice → one `chat` node. `reply_node` = that
-   node, no `compose_reply` needed.
+   node, no `compose_reply` needed. A question about Synaplan itself
+   (what it can do, how a feature works, what is new, who/what it is) is
+   still one `chat` node, with `topic_id: "synaplan"`. Never use that
+   question as the reply node for `email_me`.
 11. A SINGLE media request with no follow-up step ("make an image of X",
     "generate a video of Y", "read this aloud", "make an excel table") → ONE
     generator node (`image_generation` / `video_generation` / `text2sound` /
@@ -1090,7 +1161,19 @@ User: "Wer bist du?"
   "language": "de",
   "reply_node": "n1",
   "tasks": [
-    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "general" } }
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
+  ]
+}
+
+### Question about Synaplan itself
+User: "Can you create PDFs?"
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "chat", "inputs": { "text": "$message.text" }, "params": { "topic_id": "synaplan" } }
   ]
 }
 

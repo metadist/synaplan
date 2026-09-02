@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Message\SyncPlatformDocsMessage;
 use App\Service\Update\UpdateStatusService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Refreshes the stored release-notice status (detection only — this command
@@ -29,6 +31,7 @@ final class CheckUpdatesCommand extends Command
 {
     public function __construct(
         private readonly UpdateStatusService $updateStatusService,
+        private readonly ?MessageBusInterface $messageBus = null,
     ) {
         parent::__construct();
     }
@@ -46,11 +49,17 @@ final class CheckUpdatesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         try {
+            $previousLatest = $this->updateStatusService->getStatus()['latestVersion'];
             $status = $this->updateStatusService->refresh(force: (bool) $input->getOption('force'));
         } catch (\Throwable $e) {
             $output->writeln(sprintf('<error>Update check failed unexpectedly: %s</error>', $e->getMessage()));
 
             return Command::FAILURE;
+        }
+
+        $newLatest = $status['latestVersion'] ?? null;
+        if (null !== $this->messageBus && null !== $newLatest && $newLatest !== $previousLatest) {
+            $this->messageBus->dispatch(new SyncPlatformDocsMessage());
         }
 
         $output->writeln($this->summarize($status));

@@ -1,6 +1,6 @@
 # Sprint 4 — Evaluation, documentation, rollout
 
-Status: planned
+Status: implemented
 Date: 2026-09-02
 Depends on: sprints 1–3
 
