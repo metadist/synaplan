@@ -103,6 +103,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertSame(CapabilityState::Available, $report->fact('web_search')?->state);
         $this->assertSame(CapabilityState::NeedsSetup, $report->fact('video_generation')?->state);
         $this->assertSame(CapabilityState::NeedsSetup, $report->fact('pdf_export')?->state);
+        $this->assertStringNotContainsString('PDF', (string) $report->fact('document_generation')?->detail);
         $this->assertSame(CapabilityState::NeedsSetup, $report->fact('text_to_speech')?->state);
         $this->assertSame('original lyrics in that style', $report->fact('music_generation')?->alternative);
     }
@@ -128,6 +129,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         )->build(2);
 
         $this->assertSame(CapabilityState::Available, $report->fact('pdf_export')?->state);
+        $this->assertStringContainsString('PDF', (string) $report->fact('document_generation')?->detail);
         $this->assertSame(CapabilityState::Available, $report->fact('text_to_speech')?->state);
         $this->assertSame(CapabilityState::Available, $report->fact('video_generation')?->state);
         $this->assertSame('original lyrics, read aloud as MP3', $report->fact('music_generation')?->alternative);

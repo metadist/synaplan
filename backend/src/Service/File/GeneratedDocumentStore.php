@@ -56,6 +56,10 @@ final readonly class GeneratedDocumentStore
             return null;
         }
 
+        if (!isset($fileData['export']) && $this->converter->isEnabled() && $this->conversationWantsPdf($message)) {
+            $fileData['export'] = 'pdf';
+        }
+
         try {
             if ('pptx' === strtolower($extension)) {
                 $content = PptxRequestDirectiveResolver::apply($content, (string) $message->getText());
@@ -269,6 +273,65 @@ final readonly class GeneratedDocumentStore
         $file->setEphemeral($ephemeral);
 
         return $file;
+    }
+
+    /**
+     * True when this conversation already asked for a PDF or attached one.
+     * Used to keep BEXPORT when the model omits it on a follow-up edit.
+     *
+     * @param list<string> $texts
+     */
+    public static function conversationWantsPdfExport(array $texts): bool
+    {
+        foreach ($texts as $text) {
+            if (self::textMarksGeneratedPdf($text) || self::textAsksForPdf($text)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function conversationWantsPdf(Message $message): bool
+    {
+        $texts = [(string) $message->getText()];
+        $chatId = $message->getChatId();
+        if (null !== $chatId && $chatId > 0) {
+            try {
+                $rows = $this->em->createQueryBuilder()
+                    ->select('m.text')
+                    ->from(Message::class, 'm')
+                    ->where('m.chatId = :chatId')
+                    ->setParameter('chatId', $chatId)
+                    ->orderBy('m.id', 'DESC')
+                    ->setMaxResults(40)
+                    ->getQuery()
+                    ->getSingleColumnResult();
+                foreach ($rows as $row) {
+                    if (is_string($row) && '' !== $row) {
+                        $texts[] = $row;
+                    }
+                }
+            } catch (\Throwable) {
+                // Tests and half-booted kernels may mock the EM without DQL.
+            }
+        }
+
+        return self::conversationWantsPdfExport($texts);
+    }
+
+    private static function textAsksForPdf(string $text): bool
+    {
+        if (1 !== preg_match('/\bpdf\b/i', $text)) {
+            return false;
+        }
+
+        return 1 === preg_match('/\b(create|generate|export|erstelle|erstellen|mach mir|make me)\b/i', $text);
+    }
+
+    private static function textMarksGeneratedPdf(string $text): bool
+    {
+        return 1 === preg_match('/__FILE_GENERATED__:[^\s]+\.pdf\b/i', $text);
     }
 
     public static function mimeTypeForExtension(string $extension): string

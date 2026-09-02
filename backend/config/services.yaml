@@ -621,7 +621,12 @@ services:
     App\Service\Message\MessagePreProcessor:
         arguments:
             $uploadsDir: '%kernel.project_dir%/var/uploads'
-    App\Service\Message\MessageSorter: ~
+    App\Service\Message\MessageSorter:
+        arguments:
+            $officePdfRouting: '@App\Service\File\Office\OfficePdfRoutingDecorator'
+    App\Service\Multitask\TaskPlanner:
+        arguments:
+            $officePdfRouting: '@App\Service\File\Office\OfficePdfRoutingDecorator'
     App\Service\Message\MessageClassifier: ~
     App\Service\Message\InferenceRouter: ~
     App\Service\Message\MessageProcessor: ~

@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
+use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -107,6 +108,7 @@ final readonly class MessageSorter
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
         private ?SelfAwareConfig $selfAwareConfig = null,
+        private ?OfficePdfRoutingDecorator $officePdfRouting = null,
     ) {
     }
 
@@ -189,6 +191,10 @@ final readonly class MessageSorter
             ));
         }
 
+        if (null !== $this->officePdfRouting) {
+            $topicsWithDesc = $this->officePdfRouting->decorateTopics($topicsWithDesc);
+        }
+
         // Build dynamic list and key list for prompt
         $dynamicList = $this->buildDynamicList($topicsWithDesc);
         $keyList = implode(' | ', array_map(fn ($t) => '"'.$t.'"', $topics));
@@ -208,6 +214,9 @@ final readonly class MessageSorter
         $promptText = str_replace('[DYNAMICLIST]', $dynamicList, $promptText);
         $promptText = str_replace('[KEYLIST]', $keyList, $promptText);
         $promptText = str_replace('[LANGLIST]', $langList, $promptText);
+        if (null !== $this->officePdfRouting) {
+            $promptText = $this->officePdfRouting->decoratePrompt($promptText);
+        }
 
         // Build messages array for AI
         $messages = [

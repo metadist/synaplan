@@ -26,12 +26,12 @@ Characterization snapshots did not drift (engine off / `DOCUMENT_TOOLS` off).
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| A0 — Converter client + `collabora/code` sidecar | `feat/office-tools-v1` | done (uncommitted, OSS) | `OfficeConverterClient`; profile `office` on dev + minimal + `deploy/compose.yaml`; empty `OFFICE_CONVERT_URL` by default. Platform + docs PRs still open |
+| A0 — Converter client + `collabora/code` sidecar | `feat/office-tools-v1` | done (uncommitted, OSS) | `OfficeConverterClient`; profile `office` on dev + minimal + `deploy/compose.yaml`; empty `OFFICE_CONVERT_URL` by default. Platform wiring: `feat/office-collabora-sidecar` in `synaplan-platform` |
 | A0-docs — LibreOffice/Collabora required for new office features | `feat/docs-office-libreoffice` in **`synaplan-docs`** | done (uncommitted) | New `docs/office-documents.md` + cross-links (quickstart, FAQ, architecture, using-synaplan, desktop-tools). Ships with A0 so operators see the requirement before the features land |
 | A1 — Thumbnails for office docs and PDFs | `feat/office-tools-v1` | done (uncommitted) | Messenger `async_index`; PDF via rasterizer without engine |
 | A2 — Download as PDF | `feat/office-tools-v1` | done (uncommitted) | `GET /api/v1/files/{id}/export` + guest twin; menu hidden when engine off |
 | A3 — Inline preview modal | `feat/office-tools-v1` | done (uncommitted) | `DocumentPreviewModal`; native WebView falls back to PDF download |
-| A4 — officemaker delivers PDF | `feat/office-tools-v1` | done (uncommitted) | `GeneratedDocumentStore` + optional `BEXPORT`; classifier PDF only when engine on; snapshots unchanged (engine off in test) |
+| A4 — officemaker delivers PDF | `feat/office-tools-v1` | done (uncommitted) | `GeneratedDocumentStore` + optional `BEXPORT`; classifier PDF only when engine on. `OfficePdfRoutingDecorator` rewrites sorter/planner PDF copy at runtime (catalog still says “no PDF” for OSS). General bounce rule does not loop create↔generate. Store keeps PDF export on follow-up edits when the conversation already asked for / attached a PDF. Snapshots unchanged (engine off in test) |
 | A5 — DOCX default styling | `feat/office-tools-v1` | done (uncommitted) | `DocxStyleSheet` registered before HTML; footer page numbers |
 | A6 — Analysable ingestion (legacy formats + structured text for xlsx/pptx) | `feat/office-tools-v1` | done (uncommitted) | A6a convert-then-Tika; A6b `StructuredTextExtractor` (A1 coords, slide notes) |
 | A7 — Combine documents as one PDF | `feat/office-tools-v1` | done (uncommitted) | `POST /api/v1/files/combine`; PDF-only works without engine |

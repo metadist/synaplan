@@ -30,7 +30,7 @@ class PromptCatalog
      *    - synaplan            ← questions about Synaplan itself (what it can do, how to use a feature)
      *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
-     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
+     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents (PDF when the office engine is on)
      *
      *  Internal helper prompts (excluded from the routing pool):
      *    - tools:sort          ← AI classifier (DYNAMICLIST template)
@@ -264,11 +264,14 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
    never write the URL yourself).
 
 3. If the user asks for a file (audio, image, video, document, spreadsheet,
-   slide deck, calendar invite): check the PLATFORM CAPABILITIES block. If
-   the format is AVAILABLE NOW, reply that you will write the text and ask
-   the user to rephrase as "create/generate …" so the request reaches the
-   generator. If it is NEEDS SETUP or NOT AVAILABLE, say so in one sentence
-   and offer the listed alternative. Never pretend to attach anything.
+   slide deck, PDF, calendar invite): check the PLATFORM CAPABILITIES block.
+   If the format is AVAILABLE NOW and the user did not already use a
+   create/generate/erstelle verb, reply that you will write the text and ask
+   them to rephrase as "create/generate …" so the request reaches the
+   generator. If they already used that verb, do not bounce them — say
+   plainly that this turn cannot attach a file (never invent one). If it is
+   NEEDS SETUP or NOT AVAILABLE, say so in one sentence and offer the listed
+   alternative. Never pretend to attach anything.
 
 4. If the user asks for current information you don't have (news, prices,
    weather, recent events), say so plainly. The system handles web search
@@ -1361,15 +1364,17 @@ PROMPT;
 
 ## PDF export (BEXPORT)
 
-When the user asked for a PDF, still return an editable Office source in
-BFILEPATH (`.docx`, `.xlsx` or `.pptx` — pick the format that fits the
-content) and set `"BEXPORT":"pdf"`. The server converts the source to PDF
-and attaches both files. Never put `.pdf` in BFILEPATH.
+When the user asked for a PDF — in this turn OR earlier in this conversation
+— still return an editable Office source in BFILEPATH (`.docx`, `.xlsx` or
+`.pptx` — pick the format that fits the content) and set `"BEXPORT":"pdf"`.
+The server converts the source to PDF and attaches both files. Keep BEXPORT
+on follow-up edits of that document so the PDF is re-exported. Never put
+`.pdf` in BFILEPATH.
 
 Example:
 {"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nBody","BEXPORT":"pdf"}
 
-Do not set BEXPORT unless the user asked for a PDF.
+Do not set BEXPORT unless the user asked for a PDF in this conversation.
 PROMPT;
     }
 

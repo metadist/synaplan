@@ -197,7 +197,7 @@ environment:
   OLLAMA_BASE_URL: http://<gpu-server-ip>:11434  # Shared Ollama server
   TIKA_URL: http://<tika-host>                   # External Tika
   QDRANT_URL: http://qdrant:6333                # Qdrant vector database
-  OFFICE_CONVERT_URL: http://collabora:9980     # Per-node Collabora CODE sidecar (optional on OSS)
+  OFFICE_CONVERT_URL: http://collabora:9980     # Per-node Collabora CODE sidecar (always-on on platform; optional on OSS)
 
 ```
 

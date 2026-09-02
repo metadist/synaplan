@@ -95,6 +95,52 @@ final class GeneratedDocumentStoreTest extends TestCase
         self::assertSame('report.docx', $bundle->primary()->getFileName());
     }
 
+    public function testConversationWantsPdfExportDetectsAskAndPriorFile(): void
+    {
+        self::assertTrue(GeneratedDocumentStore::conversationWantsPdfExport([
+            'Create a PDF with a Friday agenda',
+        ]));
+        self::assertTrue(GeneratedDocumentStore::conversationWantsPdfExport([
+            'Erstelle mir ein PDF mit einer Agenda',
+        ]));
+        self::assertTrue(GeneratedDocumentStore::conversationWantsPdfExport([
+            'Füge ein Kapitel hinzu',
+            '__FILE_GENERATED__:sicherheitsrichtlinie.pdf',
+        ]));
+        self::assertFalse(GeneratedDocumentStore::conversationWantsPdfExport([
+            'Create a Word letter for new employees',
+        ]));
+        self::assertFalse(GeneratedDocumentStore::conversationWantsPdfExport([
+            'Can you make PDFs?',
+        ]));
+    }
+
+    public function testInheritsPdfExportWhenCurrentMessageAsksAndModelOmitsBexport(): void
+    {
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+        $converter->method('convert')->willReturnCallback(function (string $source): string {
+            $pdf = dirname($source).'/tmp-export.pdf';
+            file_put_contents($pdf, '%PDF-ok');
+
+            return $pdf;
+        });
+
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(7);
+        $message->method('getText')->willReturn('Create a PDF agenda');
+        $message->method('getChatId')->willReturn(null);
+
+        $bundle = $this->store($converter)->store(
+            ['filename' => 'agenda.docx', 'content' => '# Agenda', 'extension' => 'docx'],
+            $message,
+        );
+
+        self::assertNotNull($bundle);
+        self::assertNotNull($bundle->export);
+        self::assertSame('agenda.pdf', $bundle->export->getFileName());
+    }
+
     public function testRefusesEmptyContent(): void
     {
         $converter = $this->createMock(OfficeConverterClient::class);
