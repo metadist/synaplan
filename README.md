@@ -43,7 +43,7 @@ cd synaplan
 docker compose up -d
 ```
 
-1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). The same notes print in `docker compose logs -f startup-notes`.
+1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). It also lists which [optional building blocks](#lean-by-design-core-vs-optional-building-blocks) (Qdrant, Centrifugo, Collabora, …) this install is running and how to switch each on or off. The same notes print in `docker compose logs -f startup-notes`.
 2. **Log in** as `admin@synaplan.com` / `admin123` — the status screen shows these too.
 3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat answers in demo mode and points you to the setup. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
@@ -305,11 +305,30 @@ Synaplan is provider-neutral: connect the providers you want in **Admin → AI P
 
 ---
 
-## Qdrant Vector Database
+## Lean by design: core vs optional building blocks
 
-Qdrant runs as an internal Docker service — no configuration needed. It powers AI memories, RAG document search, and the feedback system.
+`docker compose up -d` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Admin → System Status** (`/admin/features`) does the same after login.
 
-Starts automatically with `docker compose up -d`. Synaplan works fully without it (memories and vector search will be disabled).
+| Block | Gives you | Default | Switch |
+|-------|-----------|---------|--------|
+| **Core** — `frontend`, `backend`, `worker`, `db` (MariaDB), `redis` | The app, its API, async jobs, storage, cache and queues | always on | — |
+| **Ollama** (`ollama`) | Local AI on your hardware: `bge-m3` embeddings for document search, optional local chat (`ENABLE_LOCAL_GPT_OSS=true`) | on (standard) · absent (minimal) | `docker compose stop ollama` — or use `docker-compose-minimal.yml` |
+| **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on (standard) · absent (minimal) | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
+| **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false docker compose up -d` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
+| **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
+| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](#office-documents-optional-collabora-code) | **off** | `docker compose --profile office up -d` |
+| **Text-to-speech** (`tts`) | Spoken answers, four built-in voices — [details](#text-to-speech-optional) | **off** | `docker compose --profile tts up -d` |
+| **Keycloak** (`keycloak`) | SSO test realm for OIDC development ([configuration](docs/CONFIGURATION.md)) | **off** | `docker compose --profile oidc up -d` |
+
+**Keep a default-on block off across restarts.** `docker compose stop` is undone by the next `up -d`. To make a block opt-in permanently, give it a profile in a `docker-compose.override.yml` (not tracked by git) — plain `up -d` then skips it, `--profile optional` brings it back:
+
+```yaml
+services:
+  qdrant:
+    profiles: [optional]
+```
+
+Production follows the same rule set: [`deploy/compose.yaml`](deploy/README.md) ships the core plus Qdrant, Centrifugo and Tika, with `office` and `local-ai` as profiles (`COMPOSE_PROFILES=office,local-ai` in `deploy/.env`); Kubernetes installs wire the same services via [synaplan-charts](https://github.com/metadist/synaplan-charts). The other dev-only containers (`phpmyadmin`, `mailhog`, `frontend-widgets`, `startup-notes`) never ship to production.
 
 ---
 

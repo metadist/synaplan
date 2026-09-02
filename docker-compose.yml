@@ -13,6 +13,22 @@
 #   docker compose down
 #   docker compose -f docker-compose-minimal.yml up -d
 #
+# Lean by design -- core vs optional building blocks
+# ---------------------------------------------------
+# Core (always):     frontend, backend, worker, db (MariaDB), redis
+# On by default,     ollama (local AI), qdrant (memories / vectors),
+#   switchable:      centrifugo (live support), tika (text extraction)
+#                    -> stop one:  docker compose stop <name>
+#                       (Synaplan keeps running; the matching feature hides)
+#                    -> keep it off across restarts: give it a profile in a
+#                       docker-compose.override.yml, e.g.
+#                         services: { qdrant: { profiles: [optional] } }
+# Opt-in profiles:   office (Collabora CODE, office files, ~2 GB RAM)
+#                    tts    (Piper text-to-speech)
+#                    oidc   (Keycloak, SSO test realm)
+#                    -> docker compose --profile office --profile tts up -d
+# The boot page at http://localhost:5173 shows which blocks are running.
+#
 services:
   # ----------------------------------------------------------------------------
   # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
@@ -62,6 +78,18 @@ services:
 
          Chat needs one AI provider key -- the app greets you with
          a first-run setup screen and guides you (free key: Groq).
+
+         LEAN BY DESIGN -- optional building blocks
+           Core is small: app + MariaDB + Redis. Everything else is a
+           block you switch on when you need it, off when you don't:
+             Ollama      local AI            on   (docker compose stop ollama)
+             Qdrant      memories / vectors  on   (docker compose stop qdrant)
+             Centrifugo  live support        on   (REALTIME_ENABLED=false)
+             Tika        text extraction     on   (docker compose stop tika)
+             Collabora   office files        off  (--profile office)
+             TTS         spoken answers      off  (--profile tts)
+           Off = Synaplan keeps running, the feature simply stays hidden.
+           The status screen lists the live state of every block.
 
          Follow this readiness check:  docker compose logs -f startup-notes
          Follow the whole stack:       docker compose logs -f
@@ -137,6 +165,10 @@ services:
       # Probed by the boot-status onboarding page (see /boot-status mount).
       BOOT_STATUS_OLLAMA_URL: http://ollama:11434
       BOOT_STATUS_DB_HOST: db
+      # Optional building blocks the boot page lists with a live on/off state
+      # (TCP probe per entry). A profile that is not enabled leaves the host
+      # name unresolvable, so the block shows as "off" with its enable command.
+      BOOT_STATUS_COMPANIONS: qdrant=qdrant:6333,centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
     ports:
       - "5173:5173"
     volumes:

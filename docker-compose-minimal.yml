@@ -20,6 +20,14 @@
 #   docker compose -f docker-compose-minimal.yml down
 #   docker compose up -d
 #
+# Optional building blocks (same profiles as docker-compose.yml):
+#   office  Collabora CODE (office files, ~2 GB RAM)
+#   tts     Piper text-to-speech
+#   -> docker compose -f docker-compose-minimal.yml --profile office up -d
+# On-by-default blocks (centrifugo, tika) can be stopped with
+#   docker compose -f docker-compose-minimal.yml stop <name>
+# Synaplan keeps running; the matching feature simply stays hidden.
+#
 services:
   # ----------------------------------------------------------------------------
   # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
@@ -61,6 +69,17 @@ services:
          This minimal install uses cloud AI only: the app greets
          you with a first-run setup screen where you paste one
          provider key (free key: Groq) -- then chat works.
+
+         LEAN BY DESIGN -- optional building blocks
+           Core is small: app + MariaDB + Redis. Everything else is a
+           block you switch on when you need it, off when you don't:
+             Centrifugo  live support        on   (REALTIME_ENABLED=false)
+             Tika        text extraction     on   (docker compose stop tika)
+             Collabora   office files        off  (--profile office)
+             TTS         spoken answers      off  (--profile tts)
+             Ollama / Qdrant (local AI, memories): standard docker-compose.yml
+           Off = Synaplan keeps running, the feature simply stays hidden.
+           The status screen lists the live state of every block.
 
          Follow this readiness check:
            docker compose -f docker-compose-minimal.yml logs -f startup-notes
@@ -127,6 +146,9 @@ services:
       BACKEND_URL: http://backend
       # Probed by the boot-status onboarding page (no Ollama in the minimal stack).
       BOOT_STATUS_DB_HOST: db
+      # Optional building blocks the boot page lists with a live on/off state.
+      # No Qdrant here on purpose (see header) -- the page says so explicitly.
+      BOOT_STATUS_COMPANIONS: centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
     ports:
       - "5173:5173"
     volumes:
