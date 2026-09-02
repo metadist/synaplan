@@ -270,7 +270,7 @@ docker compose -f docker-compose-minimal.yml up -d
 - **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
 - **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule (**Channels → Saved Tasks**)
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; four baked voices, UI language selects the voice)
-- **Documents** — PDF, Word, Excel, images with OCR
+- **Documents** — PDF, Word, Excel, images with OCR; optional Collabora CODE sidecar for office thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/index.php/office-documents))
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
@@ -345,6 +345,41 @@ The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://host.docker.int
 
 ---
 
+## Office documents (Optional Collabora CODE)
+
+Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
+legacy / Apple format conversion, and “Combine as PDF” need a **Collabora CODE**
+sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
+work without it. The sidecar is **off by default** (`--profile office`) so
+`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+
+```bash
+# Dev / minimal — compose already defaults OFFICE_CONVERT_URL to http://collabora:9980
+docker compose --profile office up -d
+
+# Production (deploy/) — env, not backend/.env
+# in deploy/.env:  COMPOSE_PROFILES=office
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile office up -d
+
+# Already running CODE (Nextcloud, OpenCloud, another compose)
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
+```
+
+Do **not** put `OFFICE_CONVERT_URL` in `backend/.env`: Compose injects the
+variable, so the file cannot override it. Deployments set the env on the host
+or in compose. `OFFICE_CONVERT_URL=disabled` turns the engine off.
+
+**Collabora never sees Synaplan users.** Convert-to is a server-to-server POST
+of a file; identity stays in Synaplan (login + file ownership). No Collabora
+accounts, no WOPI token on this path. HTTP 403 is usually CODE’s
+`net.post_allow.host` rejecting the compose subnet.
+
+Full operator guide: [docs.synaplan.com/office-documents](https://docs.synaplan.com/index.php/office-documents).
+Kubernetes / reuse in other projects:
+[synaplan-charts `docs/collabora-office-engine.md`](https://github.com/metadist/synaplan-charts/blob/docs/collabora-office-engine/docs/collabora-office-engine.md).
+
+---
+
 ## Common Commands
 
 ```bash
@@ -384,6 +419,7 @@ In-repo guides (for developers working on this codebase):
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
 | [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
 | [Observability](docs/OBSERVABILITY.md) | Request correlation ids, redacted event ring, admin logs API |
+| [Office documents](https://docs.synaplan.com/index.php/office-documents) | Optional Collabora CODE sidecar (PDF export, previews, convert-to) |
 | [RAG System](docs/RAG.md) | Document search and processing |
 | [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |

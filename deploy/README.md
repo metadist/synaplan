@@ -9,6 +9,8 @@ other development services.
 - Docker Engine with Docker Compose v2
 - Cloud-AI profile: at least 4 vCPU, 8 GB RAM, and 30 GB free disk
 - Optional `local-ai` profile: at least 16 GB RAM and substantially more disk
+- Optional `office` profile (Collabora CODE sidecar): about +2 GB RAM; off by
+  default so the 8 GB Cloud-AI floor stays valid
 - A reverse proxy terminating HTTPS in front of `127.0.0.1:8000`
 
 All database, cache, vector, upload, model, and backup data lives below
@@ -142,10 +144,33 @@ off unless `ENABLE_LOCAL_GPT_OSS=true`. To return to Cloud AI, empty
 `COMPOSE_PROFILES`, set the desired cloud provider in the UI, and redeploy. Model
 files remain in `deploy/data/` until deliberately removed.
 
+## Office profile (Collabora CODE)
+
+Office thumbnails, PDF export, inline preview, and combine need Collabora CODE.
+The profile is **off by default**. Set it in `deploy/.env` (Compose env — not
+`backend/.env`):
+
+```dotenv
+COMPOSE_PROFILES=office
+```
+
+The entrypoint then sets `OFFICE_CONVERT_URL=http://collabora:9980`. Combine
+profiles with a comma (`local-ai,office`). To use an **existing** CODE instance
+instead, leave the `office` profile off and set:
+
+```dotenv
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980
+```
+
+Convert-to is server-to-server: Collabora never sees Synaplan users. Identity
+stays in the app (login + file ownership). `OFFICE_CONVERT_URL=disabled` turns
+the engine off. Details:
+[Office documents](https://docs.synaplan.com/index.php/office-documents).
+
 ## Network and persistence
 
 Only the web service binds a host port. MariaDB, Redis, Centrifugo, Tika, Qdrant,
-Ollama, and Whisper remain on the Compose network. The default bind is
+Ollama, Whisper, and Collabora (when the `office` profile is on) remain on the Compose network. The default bind is
 `127.0.0.1:8000`. A managed platform whose HTTPS proxy runs in its own container
 cannot reach that address and needs `SYNAPLAN_HTTP_BIND` set to the host
 interface the proxy connects to — the Docker bridge gateway, usually

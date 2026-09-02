@@ -525,20 +525,28 @@ need this service.
 
 Office thumbnails, PDF export, inline preview, officemaker PDF output, and
 combine-as-PDF need Collabora CODE (`collabora/code`), reached over HTTP.
-Empty `OFFICE_CONVERT_URL` (the default) keeps today’s behaviour.
+Local compose defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`.
+Self-host / Umbrel / AWS leave it empty unless you opt in. Set the env on
+the host or in the deployment compose — not in `backend/.env` (Compose
+already injects the variable, so the file cannot override it).
 
 ```bash
-# Dev
-OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+# Dev — sidecar still needs the office profile
+docker compose --profile office up -d
 
 # Self-host
 COMPOSE_PROFILES=office docker compose -f deploy/compose.yaml up -d
+
+# External CODE already running (reachable from backend + worker)
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
 ```
 
 ```bash
-# backend/.env — only needed if the entrypoint / compose profile does not set it
+# Deployment env (compose / platform), not backend/.env
 OFFICE_CONVERT_URL=http://collabora:9980
 OFFICE_CONVERT_TIMEOUT_MS=60000
+# Turn the engine off even when the compose default would enable it:
+# OFFICE_CONVERT_URL=disabled
 ```
 
 Do **not** bind-mount host `/usr/bin/soffice` into the PHP container. The app

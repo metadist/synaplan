@@ -41,12 +41,14 @@ After switching branches a `docker compose restart worker` is enough to pick up 
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
 legacy-format analysis, and “Combine as PDF” need a **Collabora CODE** sidecar
-(`collabora/code`). It is **off by default**: `OFFICE_CONVERT_URL` is empty, so
+(`collabora/code`). The sidecar is **off by default** (`profiles: [office]`), so
 `docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+The compose file defaults `OFFICE_CONVERT_URL` to `http://collabora:9980`;
+override that env for an external CODE, or set `OFFICE_CONVERT_URL=disabled`.
 
 ```bash
-# Dev / minimal: start the sidecar and point the app at it
-OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+# Dev / minimal: start the sidecar (URL default is already collabora:9980)
+docker compose --profile office up -d
 
 # Self-host (`deploy/compose.yaml`): the entrypoint sets the URL when the
 # profile is listed

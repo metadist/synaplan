@@ -264,9 +264,11 @@ services:
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
-      # Optional Collabora CODE convert-to. Empty = disabled (default).
-      # When using `--profile office`, set OFFICE_CONVERT_URL=http://collabora:9980
-      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-}
+      # Collabora CODE convert-to. Local default is the compose service name.
+      # Override with OFFICE_CONVERT_URL for an external CODE, or set
+      # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
+      # needs `--profile office` (it is not started by a plain `up -d`).
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
@@ -421,7 +423,7 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
-      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-}
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -862,7 +864,7 @@ services:
 
   # Optional Collabora CODE — LibreOffice convert-to over HTTP.
   # Not started by default (keeps ~2 GB RAM off the core stack). Enable with:
-  #   OFFICE_CONVERT_URL=http://collabora:9980 docker compose --profile office up -d
+  #   docker compose --profile office up -d
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
   # No published port: the backend talks to collabora:9980 on the compose network.
   collabora:
