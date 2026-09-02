@@ -45,16 +45,37 @@ export const nextReleaseTag = (tags, level = 'patch') => {
   return `v${base.major}.${base.minor}.${base.patch + 1}`
 }
 
-// A Conventional Commits type, optional scope, optional breaking marker (`!`),
-// then the colon. Matched case-insensitively because a squash-merge title
-// case follows GitHub's own casing, not the commit convention's.
-const CONVENTIONAL_TYPE = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?(!)?:\s*/i
+// The commit types that carry a version signal. Only the START of the subject
+// is inspected: whatever separates the type from the rest — `feat: x`,
+// `feat(chat): x`, `feat!: x`, `Feat/desktop client (#1669)`, even `Feature
+// flag for …` — is not looked at, and the casing is not either, because a
+// squash-merge title follows GitHub's casing rather than the convention's.
+//
+// Deliberately lenient: a commit that meant to be a feature should not ship as
+// a patch release over a missing colon. The cost is that a subject merely
+// STARTING with a type word is read as that type, so `feature-flag cleanup`
+// raises the minor version. Naming a commit after what it does keeps that
+// honest.
+const COMMIT_TYPES = [
+  'feat',
+  'fix',
+  'docs',
+  'style',
+  'refactor',
+  'perf',
+  'test',
+  'build',
+  'ci',
+  'chore',
+  'revert'
+]
 
-// `feat/branch-name` squash-merge titles (`Feat/desktop client (#1669)`) carry
-// the same "this adds a feature" signal as `feat:`, even though the slash form
-// is not a full Conventional Commits type on its own — `fix/…`, `chore/…` and
-// so on do NOT raise the version, only `feat/…` does.
-const FEATURE_SLASH = /^feat\//i
+const TYPE_PREFIX = new RegExp(`^(${COMMIT_TYPES.join('|')})`, 'i')
+
+// The Conventional Commits breaking marker: a `!` directly before the colon,
+// with or without a scope (`feat!:`, `feat(api)!:`). Only the full convention
+// carries it, so unlike the type itself this is not matched loosely.
+const BREAKING_SUBJECT = /^[a-z]+(\([^)]*\))?!:/i
 
 // The Conventional Commits breaking-change footer, on its own line in the
 // commit body.
@@ -74,27 +95,19 @@ export const classifyCommits = (messages) => {
     const subject = message.split('\n', 1)[0].trim()
     if (!subject) continue
 
-    const typeMatch = CONVENTIONAL_TYPE.exec(subject)
-    const isFeatureSlash = FEATURE_SLASH.test(subject)
-    const isBreaking = Boolean(typeMatch?.[3]) || BREAKING_FOOTER.test(message)
-
-    if (isBreaking) {
+    if (BREAKING_SUBJECT.test(subject) || BREAKING_FOOTER.test(message)) {
       breaking.push(subject)
     }
 
-    if (typeMatch) {
-      if (typeMatch[1].toLowerCase() === 'feat') {
-        features.push(subject)
-      }
+    const typeMatch = TYPE_PREFIX.exec(subject)
+    if (!typeMatch) {
+      unconventional.push(subject)
       continue
     }
 
-    if (isFeatureSlash) {
+    if (typeMatch[1].toLowerCase() === 'feat') {
       features.push(subject)
-      continue
     }
-
-    unconventional.push(subject)
   }
 
   return {

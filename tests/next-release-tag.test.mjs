@@ -63,26 +63,42 @@ test('classifyCommits raises the minor version when a feat: commit is present', 
   assert.deepEqual(result.unconventional, [])
 })
 
-test('classifyCommits stays on patch when only fix/chore commits are present', () => {
+test('classifyCommits stays on patch when no commit starts with feat', () => {
   const result = classifyCommits([
     'fix(pricing): apply OpenAI GPT-5.6 Sol price cut',
-    'chore(deps): update node.js to be23f54'
+    'chore(deps): update node.js to be23f54',
+    'Chore/gitignore updates (#1653)',
+    'Refactored the message sorter'
   ])
 
   assert.equal(result.level, 'patch')
   assert.deepEqual(result.features, [])
+  assert.deepEqual(result.unconventional, [])
 })
 
-test('classifyCommits treats a feat/ squash-merge title as a feature, but not fix/ or chore/', () => {
+test('classifyCommits matches the type as a prefix, whatever follows it and however it is cased', () => {
   const result = classifyCommits([
+    'feat(chat): the full convention',
     'Feat/desktop client (#1669)',
-    'Chore/gitignore updates (#1653)',
-    'fix/unrelated-branch-name'
+    'FEAT: shouted',
+    'Feature flag for the new composer',
+    'feats of strength'
   ])
 
   assert.equal(result.level, 'minor')
-  assert.deepEqual(result.features, ['Feat/desktop client (#1669)'])
-  assert.deepEqual(result.unconventional, ['Chore/gitignore updates (#1653)', 'fix/unrelated-branch-name'])
+  assert.equal(result.features.length, 5)
+  assert.deepEqual(result.unconventional, [])
+})
+
+test('classifyCommits only matches a type at the start of the subject', () => {
+  const result = classifyCommits([
+    'Add a new feature to the composer',
+    'Revert "feat: the thing"'
+  ])
+
+  assert.equal(result.level, 'patch')
+  assert.deepEqual(result.features, [])
+  assert.deepEqual(result.unconventional, ['Add a new feature to the composer'])
 })
 
 test('classifyCommits records breaking markers without ever raising the level to major', () => {

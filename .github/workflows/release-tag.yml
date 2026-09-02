@@ -17,14 +17,16 @@ name: Cut Release Tag
 # selects an earlier commit on that branch, for when the tip carries work that
 # should not ship yet.
 #
-# The version level comes from the `bump` input. "auto" (the default) reads
-# the Conventional Commits between the previous release and this one: any
-# `feat:` or `feat/…` (the shape a squash-merged PR title takes) raises the
-# minor version, everything else raises the patch version — see
-# scripts/next-release-tag.mjs and its tests for the exact rules. A major
-# version is never automatic; select `bump: major` deliberately when a
-# release should be one. A `BREAKING CHANGE:` footer or `feat!:` marker is
-# called out in the step summary instead of silently becoming a major bump.
+# The version level comes from the `bump` input. "auto" (the default) reads the
+# commit types between the previous release and this one: any commit whose
+# subject STARTS with `feat` raises the minor version, everything else raises
+# the patch version. Only the start matters and the casing does not, so `feat:`,
+# `feat(chat):` and the `Feat/desktop client` shape a squash-merged PR title
+# takes all count — see scripts/next-release-tag.mjs and its tests for the
+# exact rules. A major version is never automatic; select `bump: major`
+# deliberately when a release should be one. A `BREAKING CHANGE:` footer or
+# `feat!:` marker is called out in the step summary instead of silently
+# becoming a major bump.
 #
 # The tag is created through a GitHub App installation token on purpose. Refs
 # created with the default GITHUB_TOKEN do not start new workflow runs, so the
@@ -35,8 +37,8 @@ on:
     inputs:
       bump:
         description: >-
-          Version level. "auto" reads the Conventional Commits since the last
-          release: any feat: or feat/ raises the minor version, everything else
+          Version level. "auto" reads the commits since the last release: any
+          commit starting with "feat" raises the minor version, everything else
           the patch version. A major version is never automatic — select it
           here.
         required: false
@@ -232,9 +234,9 @@ jobs:
 
             if [ "$REQUESTED" = auto ]; then
               if [ "$LEVEL" = minor ]; then
-                echo "Version \`$RELEASE_TAG\` raises the minor version: ${feature_count} of ${commit_count} commits since \`$PREVIOUS\` add a feature (\`feat:\` or \`feat/\`)."
+                echo "Version \`$RELEASE_TAG\` raises the minor version: ${feature_count} of ${commit_count} commits since \`$PREVIOUS\` start with \`feat\`."
               else
-                echo "Version \`$RELEASE_TAG\` raises the patch version: none of the ${commit_count} commits since \`$PREVIOUS\` add a feature."
+                echo "Version \`$RELEASE_TAG\` raises the patch version: none of the ${commit_count} commits since \`$PREVIOUS\` start with \`feat\`."
               fi
             else
               echo "Version \`$RELEASE_TAG\` raises the ${LEVEL} version because \`bump: ${REQUESTED}\` was requested."
@@ -251,7 +253,7 @@ jobs:
 
             if [ "$unconventional_count" -gt 0 ]; then
               echo ""
-              echo "${unconventional_count} commit(s) did not follow Conventional Commits (or \`feat/…\`) and could not be classified for \`bump: auto\`:"
+              echo "${unconventional_count} commit(s) do not start with a known commit type and could not be classified for \`bump: auto\`:"
               printf '%s' "$PLAN" | jq -r '.unconventional[] | "- `" + . + "`"'
             fi
 
