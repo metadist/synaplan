@@ -265,13 +265,24 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             }
 
             $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
             if ($schema instanceof StructuredOutputSchema) {
-                $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema));
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
             }
 
             $tools = self::toolDefinitions($options);
             if ([] !== $tools) {
-                $requestBody = array_merge($requestBody, $this->toolCallingTranslator->translate($this->getName(), $model, false, $tools));
+                $requestBody = array_merge($requestBody, $this->toolCallingTranslator->translate(
+                    $this->getName(),
+                    $model,
+                    false,
+                    $tools,
+                    // Whether the schema was actually MERGED, not merely
+                    // requested: models that reject a forced tool_choice get
+                    // no schema, and then the tools may keep the tool slot.
+                    withStructuredOutput: [] !== $translatedSchema,
+                ));
             }
 
             $this->logger->info('Anthropic: Chat request', [
@@ -426,14 +437,24 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             }
 
             $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
             if ($schema instanceof StructuredOutputSchema) {
-                $requestBody = array_merge($requestBody, $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema));
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
             }
 
             $tools = self::toolDefinitions($options);
             $toolCalls = null;
             if ([] !== $tools) {
-                $translated = $this->toolCallingTranslator->translate($this->getName(), $model, true, $tools);
+                $translated = $this->toolCallingTranslator->translate(
+                    $this->getName(),
+                    $model,
+                    true,
+                    $tools,
+                    // See the non-streaming path: keyed off the schema
+                    // actually being merged, not merely requested.
+                    withStructuredOutput: [] !== $translatedSchema,
+                );
                 if ([] !== $translated) {
                     $requestBody = array_merge($requestBody, $translated);
                     $toolCalls = new StreamingToolCallAccumulator();

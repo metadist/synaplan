@@ -674,6 +674,55 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
     }
 
+    public function deleteRoutingAnchorsExcept(array $keepPointIds): int
+    {
+        if ([] === $keepPointIds) {
+            return $this->deleteAllRoutingAnchors();
+        }
+
+        $filter = [
+            'must_not' => [
+                ['key' => '_point_id', 'match' => ['any' => $keepPointIds]],
+            ],
+        ];
+
+        try {
+            $countResponse = $this->qdrantRequest(
+                'POST',
+                "/collections/{$this->routingAnchorsCollection}/points/count",
+                ['filter' => $filter, 'exact' => true],
+            );
+            $deletedCount = (int) ($countResponse['result']['count'] ?? 0);
+
+            if (0 === $deletedCount) {
+                return 0;
+            }
+
+            $this->qdrantRequest(
+                'POST',
+                "/collections/{$this->routingAnchorsCollection}/points/delete?wait=true",
+                ['filter' => $filter],
+            );
+
+            $this->logger->info('Stale routing anchors pruned from Qdrant', [
+                'deleted_count' => $deletedCount,
+                'kept_count' => count($keepPointIds),
+            ]);
+
+            return $deletedCount;
+        } catch (\Throwable $e) {
+            if ($this->isMissingCollectionError($e)) {
+                return 0;
+            }
+
+            $this->logger->error('Failed to prune stale routing anchors from Qdrant', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
     // ──────────────────────────────────────────────
     //  Document Operations
     // ──────────────────────────────────────────────

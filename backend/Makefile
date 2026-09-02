@@ -82,7 +82,12 @@ cache-clear: ## Clear Symfony cache
 test: ## Run all PHPUnit tests
 	# The backend's HTTP timeout also applies to CLI in the container. The full
 	# suite legitimately exceeds it, so disable only the CLI execution limit.
-	docker compose -f ../docker-compose.yml exec -T backend php -d max_execution_time=0 bin/phpunit
+	#
+	# memory_limit likewise: one PHP process runs all ~5000 tests, several of
+	# which boot the kernel, and the peak is past the container's 512M. CI does
+	# not hit this because shivammathur/setup-php ships memory_limit=-1, so
+	# without this the local gate would fail on a suite that is green in CI.
+	docker compose -f ../docker-compose.yml exec -T backend php -d max_execution_time=0 -d memory_limit=-1 bin/phpunit
 
 plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:multitask:plan-eval

@@ -77,12 +77,48 @@ final class StructuredOutputTranslatorTest extends TestCase
         self::assertSame('sort_classification', $result['text']['format']['name']);
     }
 
-    public function testGoogleUsesGenerationConfigResponseSchema(): void
+    public function testGoogleUsesGenerationConfigResponseJsonSchema(): void
     {
         $result = $this->translator->translate('google', 'gemini-2.5-flash', false, $this->schema());
 
         self::assertSame('application/json', $result['generationConfig']['responseMimeType']);
-        self::assertSame(['type' => 'object', 'properties' => ['topic' => ['type' => 'string']], 'required' => ['topic']], $result['generationConfig']['responseSchema']);
+        self::assertSame(['type' => 'object', 'properties' => ['topic' => ['type' => 'string']], 'required' => ['topic']], $result['generationConfig']['responseJsonSchema']);
+        // Google requires the legacy field to be absent when this one is set.
+        self::assertArrayNotHasKey('responseSchema', $result['generationConfig']);
+    }
+
+    public function testGoogleSchemaIsNormalizedIntoTheSupportedKeywordSubset(): void
+    {
+        $nullable = new StructuredOutputSchema(
+            name: 'sort_classification',
+            schema: [
+                'type' => 'object',
+                'properties' => ['BMEDIA' => ['type' => ['string', 'null'], 'enum' => ['image', null]]],
+                'required' => ['BMEDIA'],
+            ],
+        );
+
+        $result = $this->translator->translate('google', 'gemini-2.5-flash', false, $nullable);
+
+        self::assertSame(
+            ['anyOf' => [['type' => 'string', 'enum' => ['image']], ['type' => 'null']]],
+            $result['generationConfig']['responseJsonSchema']['properties']['BMEDIA'],
+        );
+    }
+
+    public function testOtherDialectsKeepUnionTypesVerbatim(): void
+    {
+        $nullable = new StructuredOutputSchema(
+            name: 'sort_classification',
+            schema: ['type' => 'object', 'properties' => ['BMEDIA' => ['type' => ['string', 'null']]]],
+        );
+
+        $result = $this->translator->translate('groq', 'openai/gpt-oss-120b', false, $nullable);
+
+        self::assertSame(
+            ['type' => ['string', 'null']],
+            $result['response_format']['json_schema']['schema']['properties']['BMEDIA'],
+        );
     }
 
     public function testOllamaUsesFormatField(): void

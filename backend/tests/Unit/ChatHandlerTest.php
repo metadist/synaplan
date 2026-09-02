@@ -58,6 +58,7 @@ class ChatHandlerTest extends TestCase
     private PerfPipelineFlag&MockObject $perfPipelineFlag;
     private \App\Service\Digest\DigestSearchService&MockObject $digestSearchService;
     private \App\Service\Digest\MessageDigestConfig&MockObject $digestConfig;
+    private \App\Service\Vision\VisionModelResolver&MockObject $visionModelResolver;
     private ChatHandler $handler;
 
     protected function setUp(): void
@@ -78,6 +79,7 @@ class ChatHandlerTest extends TestCase
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
         $this->digestSearchService = $this->createMock(\App\Service\Digest\DigestSearchService::class);
         $this->digestConfig = $this->createMock(\App\Service\Digest\MessageDigestConfig::class);
+        $this->visionModelResolver = $this->createMock(\App\Service\Vision\VisionModelResolver::class);
 
         // Every resolved model is revalidated before it reaches the provider.
         // Unless a test says otherwise, the model it picked still works.
@@ -106,7 +108,7 @@ class ChatHandlerTest extends TestCase
             $this->createMock(DocumentImageCatalog::class),
             new TimeContextBuilder(),
             new \App\Service\Knowledge\KnowledgeContextFormatter(),
-            $this->createMock(\App\Service\Vision\VisionModelResolver::class),
+            $this->visionModelResolver,
             $this->digestSearchService,
             $this->digestConfig,
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
@@ -134,14 +136,14 @@ class ChatHandlerTest extends TestCase
      * A message on the Phase 9 deferral path, wired so the resolved chat
      * model is the given provider.
      */
-    private function deferredRoutingMessage(string $provider, string $model): Message&MockObject
+    private function deferredRoutingMessage(string $provider, string $model, string $filePath = ''): Message&MockObject
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(1);
         $message->method('getText')->willReturn('Make an image of a cat');
         $message->method('getUnixTimestamp')->willReturn(time());
         $message->method('getDateTime')->willReturn('20250116120000');
-        $message->method('getFilePath')->willReturn('');
+        $message->method('getFilePath')->willReturn($filePath);
         $message->method('getFileType')->willReturn('');
         $message->method('getTopic')->willReturn('CHAT');
         $message->method('getLanguage')->willReturn('en');
@@ -235,6 +237,43 @@ class ChatHandlerTest extends TestCase
     public function testAModelWithoutToolCallingSendsTheTurnBackToTheSorterWithoutSpendingACall(): void
     {
         $message = $this->deferredRoutingMessage('ollama', 'llama3');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+
+        $directive = RoutingDirective::fromHandlerResult(
+            $this->handler->handle($message, [], $this->deferredClassification())
+        );
+
+        self::assertNotNull($directive);
+        self::assertSame(RoutingDirective::TYPE_RECLASSIFY, $directive->type);
+    }
+
+    /**
+     * An attached image makes the handler swap in the configured vision model,
+     * and THAT model decides whether the deferral can be honoured. Resolving
+     * the hand-off tools against the pre-swap chat model would build tools the
+     * translator then drops for the vision provider — the deferral would
+     * silently evaporate and the user would get a vision answer instead of the
+     * route they asked for.
+     */
+    public function testTheVisionModelDecidesWhetherTheDeferralCanBeHonoured(): void
+    {
+        $message = $this->deferredRoutingMessage('anthropic', 'claude-sonnet-5', 'user/1/cat.png');
+
+        $chatModel = $this->createMock(Model::class);
+        $chatModel->method('hasFeature')->willReturnCallback(
+            static fn (string $feature): bool => 'vision' !== $feature,
+        );
+        $this->modelRepository->method('find')->willReturn($chatModel);
+
+        // The account's vision model is an Ollama one, which cannot do native
+        // tool calling.
+        $visionModel = $this->createMock(Model::class);
+        $visionModel->method('getId')->willReturn(99);
+        $visionModel->method('getService')->willReturn('Ollama');
+        $visionModel->method('getProviderId')->willReturn('llama3');
+        $visionModel->method('getName')->willReturn('Llama 3 Vision');
+        $this->visionModelResolver->method('resolve')->willReturn($visionModel);
 
         $this->aiFacade->expects($this->never())->method('chat');
 

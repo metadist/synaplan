@@ -425,6 +425,78 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertSame('route_general_1', $point['payload']['_point_id']);
     }
 
+    public function testDeleteRoutingAnchorsExceptScopesBothCountAndDeleteToTheStalePoints(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/routing_anchors/points/count' => fn (): MockResponse => new MockResponse(
+                json_encode(['result' => ['count' => 3]]),
+                ['http_code' => 200]
+            ),
+            '/collections/routing_anchors/points/delete' => fn (): MockResponse => $this->okEmpty(),
+        ], $calls);
+
+        $deleted = $client->deleteRoutingAnchorsExcept(['route_general_1', 'route_mediamaker_2']);
+
+        $this->assertSame(3, $deleted);
+
+        $expectedFilter = [
+            'must_not' => [
+                ['key' => '_point_id', 'match' => ['any' => ['route_general_1', 'route_mediamaker_2']]],
+            ],
+        ];
+
+        $countBody = json_decode((string) $calls[0]['body'], true);
+        $this->assertIsArray($countBody);
+        $this->assertSame($expectedFilter, $countBody['filter']);
+        $this->assertTrue($countBody['exact'], 'the reported delete count must be exact, not an estimate');
+
+        $deleteCalls = array_values(array_filter(
+            $calls,
+            static fn (array $c): bool => str_ends_with($c['path'], '/points/delete'),
+        ));
+        $this->assertCount(1, $deleteCalls);
+        $this->assertStringContainsString('wait=true', $deleteCalls[0]['query']);
+        $deleteBody = json_decode((string) $deleteCalls[0]['body'], true);
+        $this->assertIsArray($deleteBody);
+        $this->assertSame($expectedFilter, $deleteBody['filter']);
+    }
+
+    public function testDeleteRoutingAnchorsExceptSkipsTheDeleteWhenNothingIsStale(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/routing_anchors/points/count' => fn (): MockResponse => new MockResponse(
+                json_encode(['result' => ['count' => 0]]),
+                ['http_code' => 200]
+            ),
+        ], $calls);
+
+        $this->assertSame(0, $client->deleteRoutingAnchorsExcept(['route_general_1']));
+        $this->assertSame(
+            [],
+            array_values(array_filter($calls, static fn (array $c): bool => str_ends_with($c['path'], '/points/delete'))),
+        );
+    }
+
+    public function testDeleteRoutingAnchorsExceptWithAnEmptyKeepListWipesTheCollection(): void
+    {
+        $calls = [];
+        $client = $this->buildClient([
+            '/collections/routing_anchors/points/count' => fn (): MockResponse => new MockResponse(
+                json_encode(['result' => ['count' => 7]]),
+                ['http_code' => 200]
+            ),
+            '/collections/routing_anchors/points/delete' => fn (): MockResponse => $this->okEmpty(),
+        ], $calls);
+
+        $this->assertSame(7, $client->deleteRoutingAnchorsExcept([]));
+
+        $deleteBody = json_decode((string) $calls[1]['body'], true);
+        $this->assertIsArray($deleteBody);
+        $this->assertSame([], $deleteBody['filter'], 'an empty keep-list must degrade to the unfiltered wipe');
+    }
+
     public function testUpsertDocumentIssuesAtomicBatchDeleteThenUpsert(): void
     {
         $calls = [];

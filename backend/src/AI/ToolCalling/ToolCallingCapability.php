@@ -49,16 +49,22 @@ final class ToolCallingCapability
     private const STREAMING_CAPABLE_PROVIDERS = ['groq', 'anthropic'];
 
     /**
-     * Providers that reject a request carrying BOTH a tool declaration and a
-     * JSON-schema response format.
+     * Providers for which a tool declaration and a JSON-schema response
+     * format cannot travel in the same request.
      *
-     * Groq documents this combination as unsupported and 400s on it. No
-     * caller sends both today — the officemaker path uses a schema and never
-     * declares tools, the routing path declares tools and never a schema —
-     * but the rule belongs next to the other provider quirks rather than in a
-     * caller's head.
+     * Two different reasons, same consequence:
+     *   - `groq` documents the combination as unsupported and 400s on it.
+     *   - `anthropic` has no native schema mode: structured output IS a forced
+     *     tool call ({@see \App\AI\StructuredOutput\StructuredOutputDialect::ANTHROPIC_TOOL_FORCING}),
+     *     so both translators write the same `tools`/`tool_choice` keys and
+     *     whichever merges last silently erases the other.
+     *
+     * No caller sends both today — the officemaker path uses a schema and
+     * never declares tools, the routing path declares tools and never a
+     * schema. {@see ToolCallingTranslator::translate()} enforces the rule
+     * anyway so the failure mode cannot come back with the next caller.
      */
-    private const NO_TOOLS_WITH_STRUCTURED_OUTPUT = ['groq'];
+    private const NO_TOOLS_WITH_STRUCTURED_OUTPUT = ['groq', 'anthropic'];
 
     public function supports(string $providerName, ?string $model, bool $streaming): bool
     {

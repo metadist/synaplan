@@ -1528,6 +1528,63 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('ai_sorting', $result['source']);
     }
 
+    /**
+     * With both new layers on, Phase 8's refusal must reach the AI sorter and
+     * not be intercepted by Phase 9. The refusal is specifically a request for
+     * BLANG resolution, and Phase 9 answers `language: 'en'` — i.e. exactly
+     * the guess Phase 8 declined to make.
+     */
+    public function testAnEmbeddingMatchDeclinedForLanguageReachesTheSorterEvenWithPhase9On(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('general', 0.99));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'de']);
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(405);
+        $message->method('getUserId')->willReturn(10);
+        // No language anchor words, and 'NN' (unknown) on the message.
+        $message->method('getText')->willReturn('xyzzy plugh');
+        $message->method('getLanguage')->willReturn('NN');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertArrayNotHasKey('defer_routing_to_chat', $result);
+        $this->assertSame('de', $result['language']);
+    }
+
+    /**
+     * The complement of the test above: when Phase 8 finds NO match at all it
+     * has expressed no opinion, so Phase 9 is free to take the turn.
+     */
+    public function testPhase9StillTakesTheTurnWhenTheEmbeddingRouterFoundNothing(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(null);
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $result = $classifier->classify($this->plainMessage(406, 'What is the capital of France?'));
+
+        $this->assertTrue($result['defer_routing_to_chat']);
+    }
+
     public function testNativeToolRoutingDefersTheDecisionToTheAnsweringCall(): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -1708,6 +1765,51 @@ class MessageClassifierTest extends TestCase
             $this->createMock(LoggerInterface::class),
             new SystemCapabilityRegistry(),
             $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * Both new cascade layers on at once — the configuration in which the
+     * layers can shadow each other.
+     */
+    private function classifierWithBothNewLayers(
+        EmbeddingRouterService $embeddingRouter,
+        MessageSorter $sorter,
+        float $threshold = 0.88,
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting) use ($threshold): ?string {
+                if ('EMBEDDING_ROUTER' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+                if ('EMBEDDING_ROUTER' === $group && 'CONFIDENCE_THRESHOLD' === $setting) {
+                    return (string) $threshold;
+                }
+                if ('NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+
+                return null;
+            }
+        );
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $embeddingRouter,
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),
             new ToolCallingCapability(),

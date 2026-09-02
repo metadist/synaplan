@@ -3,6 +3,7 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\SortClassificationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
@@ -116,6 +117,7 @@ final readonly class MessageSorter
         private DiscordNotificationService $discord,
         private StructuredOutputConfig $structuredOutputConfig,
         private ?SelfAwareConfig $selfAwareConfig = null,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -548,91 +550,12 @@ final readonly class MessageSorter
      */
     private function parseResponse(string $response, array $originalData, array $validTopics = []): array
     {
-        // Try to extract JSON from response
-        $response = trim($response);
+        $decoded = $this->jsonDecoder->decode($response);
 
-        // Remove markdown code blocks if present
-        if (str_starts_with($response, '```')) {
-            $response = preg_replace('/^```(?:json)?\s*/', '', $response);
-            $response = preg_replace('/\s*```$/', '', $response);
-            $response = trim($response);
-        }
-
-        try {
-            $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
-
-            // Parse BWEBSEARCH (can be 0, 1, true, false)
-            $webSearch = false;
-            if (isset($data['BWEBSEARCH'])) {
-                $webSearch = (bool) $data['BWEBSEARCH'];
-            }
-
-            // Parse BMULTI — the sorter's vote on whether answering this
-            // message takes more than one step. Stays null when the model omitted
-            // the field (older seeded prompt, model that drops unknown keys) so
-            // downstream consumers can tell "no vote" from an explicit "no".
-            $multiStep = null;
-            if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
-                $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
-            }
-
-            // Parse BMEDIA for mediamaker topic (image, video, audio)
-            $mediaType = null;
-            if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
-                $mediaType = $this->normalizeMediaType($data['BMEDIA']);
-            }
-
-            // Parse BDURATION for video generation (integer seconds)
-            $duration = null;
-            if (isset($data['BDURATION']) && is_numeric($data['BDURATION'])) {
-                $duration = (int) $data['BDURATION'];
-                // Sanity check: duration should be between 1 and 120 seconds
-                if ($duration < 1 || $duration > 120) {
-                    $duration = null;
-                }
-            }
-
-            // Parse BINPUTMODE (text_only or reference_images) when present
-            $inputMode = null;
-            if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
-                $inputMode = strtolower(trim($data['BINPUTMODE']));
-                if (!in_array($inputMode, SystemCapabilityRegistry::MEDIAMAKER_INPUT_MODES, true)) {
-                    $inputMode = null;
-                }
-            }
-
-            // Parse BRESOLUTION for video generation. Accept the canonical
-            // values directly and translate common aliases (e.g. "uhd",
-            // "fullhd", "8k") so we never forward unsupported strings to the
-            // provider. Anything we cannot map is dropped (returns null) so
-            // downstream code falls back to the configured default.
-            $resolution = null;
-            if (isset($data['BRESOLUTION']) && (is_string($data['BRESOLUTION']) || is_int($data['BRESOLUTION']))) {
-                $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
-            }
-
-            $topic = $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general';
-
-            return [
-                'topic' => $this->validateTopic($topic, $validTopics),
-                // The AI's raw, pre-validation claim — RoutingDecision compares
-                // this against the validated topic above to tell "the AI
-                // confidently chose general" apart from "the AI hallucinated an
-                // out-of-enum topic and validateTopic() corrected it".
-                'raw_topic' => (string) $topic,
-                'parse_failed' => false,
-                'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
-                'web_search' => $webSearch,
-                'multi_step' => $multiStep,
-                'media_type' => $mediaType,
-                'duration' => $duration,
-                'resolution' => $resolution,
-                'input_mode' => $inputMode,
-            ];
-        } catch (\JsonException $e) {
+        if (!$decoded->success) {
             $this->logger->warning('MessageSorter: Failed to parse JSON response', [
-                'error' => $e->getMessage(),
-                'response' => substr($response, 0, 200),
+                'error' => $decoded->errorReason,
+                'response' => substr(trim($response), 0, 200),
             ]);
 
             // Fallback to original values or defaults
@@ -649,6 +572,77 @@ final readonly class MessageSorter
                 'input_mode' => null,
             ];
         }
+
+        $data = $decoded->data;
+
+        // Parse BWEBSEARCH (can be 0, 1, true, false)
+        $webSearch = false;
+        if (isset($data['BWEBSEARCH'])) {
+            $webSearch = (bool) $data['BWEBSEARCH'];
+        }
+
+        // Parse BMULTI — the sorter's vote on whether answering this
+        // message takes more than one step. Stays null when the model omitted
+        // the field (older seeded prompt, model that drops unknown keys) so
+        // downstream consumers can tell "no vote" from an explicit "no".
+        $multiStep = null;
+        if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
+            $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+        }
+
+        // Parse BMEDIA for mediamaker topic (image, video, audio)
+        $mediaType = null;
+        if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
+            $mediaType = $this->normalizeMediaType($data['BMEDIA']);
+        }
+
+        // Parse BDURATION for video generation (integer seconds)
+        $duration = null;
+        if (isset($data['BDURATION']) && is_numeric($data['BDURATION'])) {
+            $duration = (int) $data['BDURATION'];
+            // Sanity check: duration should be between 1 and 120 seconds
+            if ($duration < 1 || $duration > 120) {
+                $duration = null;
+            }
+        }
+
+        // Parse BINPUTMODE (text_only or reference_images) when present
+        $inputMode = null;
+        if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
+            $inputMode = strtolower(trim($data['BINPUTMODE']));
+            if (!in_array($inputMode, SystemCapabilityRegistry::MEDIAMAKER_INPUT_MODES, true)) {
+                $inputMode = null;
+            }
+        }
+
+        // Parse BRESOLUTION for video generation. Accept the canonical
+        // values directly and translate common aliases (e.g. "uhd",
+        // "fullhd", "8k") so we never forward unsupported strings to the
+        // provider. Anything we cannot map is dropped (returns null) so
+        // downstream code falls back to the configured default.
+        $resolution = null;
+        if (isset($data['BRESOLUTION']) && (is_string($data['BRESOLUTION']) || is_int($data['BRESOLUTION']))) {
+            $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
+        }
+
+        $topic = $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general';
+
+        return [
+            'topic' => $this->validateTopic($topic, $validTopics),
+            // The AI's raw, pre-validation claim — RoutingDecision compares
+            // this against the validated topic above to tell "the AI
+            // confidently chose general" apart from "the AI hallucinated an
+            // out-of-enum topic and validateTopic() corrected it".
+            'raw_topic' => (string) $topic,
+            'parse_failed' => false,
+            'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
+            'web_search' => $webSearch,
+            'multi_step' => $multiStep,
+            'media_type' => $mediaType,
+            'duration' => $duration,
+            'resolution' => $resolution,
+            'input_mode' => $inputMode,
+        ];
     }
 
     /**

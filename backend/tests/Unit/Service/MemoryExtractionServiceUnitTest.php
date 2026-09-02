@@ -81,9 +81,7 @@ final class MemoryExtractionServiceUnitTest extends TestCase
 
     /**
      * The object-wrapped schema response (`{"memories": [...]}`) must parse
-     * exactly like the legacy bare-array response — no parsing change was
-     * needed because the extractor's regex already grabs the innermost
-     * `[...]` regardless of what wraps it.
+     * exactly like the legacy bare-array response.
      */
     public function testWrappedSchemaResponseParsesTheSameAsABareArray(): void
     {
@@ -95,6 +93,45 @@ final class MemoryExtractionServiceUnitTest extends TestCase
 
         self::assertSame(
             [['action' => 'create', 'category' => 'personal', 'key' => 'name', 'value' => 'Anna']],
+            $result,
+        );
+    }
+
+    public function testBareArrayResponseStillParses(): void
+    {
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '[{"action": "create", "category": "personal", "key": "name", "value": "Anna"}]',
+        ]);
+
+        $result = $this->service->analyzeAndExtract($this->makeMessage(101, 'My name is Anna.'), []);
+
+        self::assertSame(
+            [['action' => 'create', 'category' => 'personal', 'key' => 'name', 'value' => 'Anna']],
+            $result,
+        );
+    }
+
+    /**
+     * A square bracket inside a memory VALUE used to truncate the extraction:
+     * the old non-greedy `/\[[\s\S]*?\]/` stopped at the first `]` it found,
+     * which produced invalid JSON and dropped every memory of the turn.
+     */
+    public function testBracketsInsideAValueDoNotDropTheWholeTurn(): void
+    {
+        $this->aiFacade->method('chat')->willReturn([
+            'content' => '{"memories": ['
+                .'{"action": "create", "category": "preferences", "key": "notation", "value": "writes lists as [a, b]"},'
+                .'{"action": "create", "category": "personal", "key": "name", "value": "Anna"}'
+                .']}',
+        ]);
+
+        $result = $this->service->analyzeAndExtract($this->makeMessage(101, 'I write lists as [a, b], and I am Anna.'), []);
+
+        self::assertSame(
+            [
+                ['action' => 'create', 'category' => 'preferences', 'key' => 'notation', 'value' => 'writes lists as [a, b]'],
+                ['action' => 'create', 'category' => 'personal', 'key' => 'name', 'value' => 'Anna'],
+            ],
             $result,
         );
     }

@@ -21,7 +21,7 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  * Anthropic tool-forcing), but keeps the controller's own field names
  * (`existingId`, nested `memory` object, `reason`) so no parsing change is
  * required: `parseAiResponse()`'s "Format 1: {"actions": [...]}" branch
- * already handles exactly this envelope.
+ * handles exactly this envelope.
  *
  * `existingId`, `memory` and `reason` are modelled as nullable rather than
  * omittable: `action: "create"` never carries an `existingId`, `action:

@@ -317,13 +317,29 @@ interface QdrantClientInterface
     /**
      * Delete every routing-anchor point.
      *
-     * `app:routing:sync-anchors` wipes and rebuilds the (small, ~15-point)
-     * collection on every run rather than diffing, so a removed or reworded
-     * example utterance never leaves an orphaned anchor behind.
-     *
      * @return int Number of deleted points
      */
     public function deleteAllRoutingAnchors(): int;
+
+    /**
+     * Delete every routing-anchor point whose logical id is NOT in
+     * `$keepPointIds`.
+     *
+     * This is how `app:routing:sync-anchors` prunes: it upserts the current
+     * anchor set FIRST and only then removes what is left over, so a failed
+     * embedding can never leave the collection under-populated (which would
+     * degrade routing quietly). Anchor point ids are deterministic
+     * (`route_{topic}_{md5(utterance)}`), so re-syncing an unchanged utterance
+     * overwrites it in place and it survives the prune.
+     *
+     * An empty `$keepPointIds` is equivalent to
+     * {@see self::deleteAllRoutingAnchors()}.
+     *
+     * @param list<string> $keepPointIds logical point ids to preserve
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteRoutingAnchorsExcept(array $keepPointIds): int;
 
     // --- Health & Info ---
 

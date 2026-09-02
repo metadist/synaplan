@@ -37,6 +37,16 @@ final class StructuredOutputCapabilityTest extends TestCase
         self::assertFalse($this->capability->supportsStrict('groq', null));
     }
 
+    /**
+     * Provider and model both come out of BMODELS, where casing is not
+     * normalised — a capitalised id must not silently downgrade a documented
+     * model to the non-strict schema.
+     */
+    public function testStrictLookupIgnoresCasingOnBothProviderAndModel(): void
+    {
+        self::assertTrue($this->capability->supportsStrict('Groq', 'OpenAI/GPT-OSS-120B'));
+    }
+
     public function testStrictNeverAssumedForOtherProviders(): void
     {
         self::assertFalse($this->capability->supportsStrict('openai', 'gpt-5'));
@@ -56,7 +66,7 @@ final class StructuredOutputCapabilityTest extends TestCase
             'openaicompatible' => ['openaicompatible', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'huggingface' => ['huggingface', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openai' => ['openai', StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT],
-            'google' => ['google', StructuredOutputDialect::GOOGLE_RESPONSE_SCHEMA],
+            'google' => ['google', StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA],
             'ollama' => ['ollama', StructuredOutputDialect::OLLAMA_FORMAT],
             'anthropic' => ['anthropic', StructuredOutputDialect::ANTHROPIC_TOOL_FORCING],
         ];

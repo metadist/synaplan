@@ -14,8 +14,8 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  * of proposals; it is wrapped under a `digests` property because structured
  * output requires an `object` root. {@see
  * \App\Service\Digest\MessageDigestService::parseDigestsFromResponse()}
- * needs no change — its regex already extracts the innermost `[...]`
- * whether wrapped or bare.
+ * reads that key when present and falls back to a bare array for providers
+ * answering on the prose-instruction path.
  */
 final class MessageDigestSchema
 {

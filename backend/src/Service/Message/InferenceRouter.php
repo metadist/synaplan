@@ -238,7 +238,7 @@ final class InferenceRouter
         $handlerMap = array_merge(
             [
                 'code_generation' => 'code_generation',
-                'summarize' => 'chat', // Nutzt Chat Handler mit speziellem Prompt
+                'summarize' => 'chat', // Uses the chat handler with a dedicated prompt
                 'translate' => 'chat',
                 'email' => 'tool',
                 'calendar' => 'tool',

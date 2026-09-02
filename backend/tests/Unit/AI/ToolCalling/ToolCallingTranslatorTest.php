@@ -7,7 +7,9 @@ namespace App\Tests\Unit\AI\ToolCalling;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\AI\ToolCalling\ToolCallingTranslator;
 use App\AI\ToolCalling\ToolDefinition;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 
 final class ToolCallingTranslatorTest extends TestCase
 {
@@ -81,5 +83,56 @@ final class ToolCallingTranslatorTest extends TestCase
     public function testNoToolsYieldsNoRequestParameters(): void
     {
         self::assertSame([], $this->translator->translate('groq', 'openai/gpt-oss-120b', false, []));
+    }
+
+    /**
+     * Groq 400s on the combination; Anthropic expresses structured output AS a
+     * forced tool call, so merging both would overwrite the schema's
+     * `tools`/`tool_choice`. Either way the schema is the caller's output
+     * contract and wins.
+     *
+     * @return iterable<string, array{0: string, 1: string}>
+     */
+    public static function conflictingProviderProvider(): iterable
+    {
+        yield 'groq rejects the combination outright' => ['groq', 'openai/gpt-oss-120b'];
+        yield 'anthropic would have its forced schema tool overwritten' => ['anthropic', 'claude-sonnet-5'];
+    }
+
+    #[DataProvider('conflictingProviderProvider')]
+    public function testToolsAreDroppedWhenTheSameRequestCarriesASchema(string $provider, string $model): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $warnings = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                if ('warning' === $level) {
+                    $this->warnings[] = (string) $message;
+                }
+            }
+        };
+        $translator = new ToolCallingTranslator(new ToolCallingCapability(), $logger);
+
+        self::assertSame(
+            [],
+            $translator->translate($provider, $model, false, [$this->tool()], withStructuredOutput: true),
+        );
+        self::assertCount(1, $logger->warnings, 'dropping a tool declaration must not be silent');
+    }
+
+    /**
+     * The guard must key off the schema actually being present, not off the
+     * provider — a plain tool request on the same provider is the routing
+     * path's normal case and stays untouched.
+     */
+    #[DataProvider('conflictingProviderProvider')]
+    public function testToolsSurviveWhenNoSchemaTravelsWithThem(string $provider, string $model): void
+    {
+        $params = $this->translator->translate($provider, $model, false, [$this->tool()], withStructuredOutput: false);
+
+        self::assertCount(1, $params['tools']);
+        self::assertStringContainsString('handoff_mediamaker', (string) json_encode($params['tools']));
     }
 }

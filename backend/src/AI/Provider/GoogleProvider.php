@@ -446,7 +446,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
      * an already-built Gemini request payload.
      *
      * The translator returns `{'generationConfig': {responseMimeType,
-     * responseSchema}}`, which must be merged INTO the payload's existing
+     * responseJsonSchema}}`, which must be merged INTO the payload's existing
      * `generationConfig` (temperature, topP, thinkingConfig, …) rather than
      * replacing it — a flat array_merge() of the whole payload would drop
      * every generation parameter built above.

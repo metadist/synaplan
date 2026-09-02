@@ -459,15 +459,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
-        // Phase 9: the classifier deferred the routing decision to this call.
-        // Decided here, before any context is built, so an unhonourable
-        // deferral costs nothing but a re-route.
-        $routingDeferred = self::isRoutingDeferred($classification);
-        $routingTools = $routingDeferred ? $this->routingHandoffTools($provider, $modelName, false) : null;
-        if ($routingDeferred && null === $routingTools) {
-            return RoutingDirective::reclassify()->toHandlerResult();
-        }
-
         // Check if message has images and current model supports vision (non-streaming)
         $hasImages = $this->hasAttachedImages($message);
         $includeImagesInMessages = false;
@@ -502,6 +493,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
                     $this->logger->warning('ChatHandler: No vision-capable model found, images will not be analyzed (non-streaming)');
                 }
             }
+        }
+
+        // Phase 9: the classifier deferred the routing decision to this call.
+        // Resolved AFTER the vision swap above, because that swap can replace
+        // $provider/$modelName with a model that cannot do tool calling — tools
+        // built for the original model would then be dropped by the translator
+        // and the hand-off would silently never happen. Still before any
+        // context is built, so an unhonourable deferral costs nothing but a
+        // re-route. The streaming twin resolves it at the same point.
+        $routingDeferred = self::isRoutingDeferred($classification);
+        $routingTools = $routingDeferred ? $this->routingHandoffTools($provider, $modelName, false) : null;
+        if ($routingDeferred && null === $routingTools) {
+            return RoutingDirective::reclassify()->toHandlerResult();
         }
 
         $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);

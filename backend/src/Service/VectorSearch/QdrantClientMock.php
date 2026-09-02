@@ -127,6 +127,13 @@ final class QdrantClientMock implements QdrantClientInterface
         return 0;
     }
 
+    public function deleteRoutingAnchorsExcept(array $keepPointIds): int
+    {
+        $this->logger->info('QdrantClientMock: deleteRoutingAnchorsExcept', ['kept_count' => count($keepPointIds)]);
+
+        return 0;
+    }
+
     // --- Document Operations ---
 
     public function upsertDocument(string $pointId, array $vector, array $payload): void

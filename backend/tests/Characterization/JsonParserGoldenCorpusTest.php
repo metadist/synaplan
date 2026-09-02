@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Characterization;
 
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\Controller\UserMemoryController;
 use App\Service\FeedbackContradictionService;
 use App\Service\File\FileGenerationEnvelope;
@@ -16,8 +17,7 @@ use Psr\Log\NullLogger;
 
 /**
  * Golden-corpus documentation of the JSON-recovery tolerance of the SIX
- * independently grown parsers this repo uses to turn a raw model reply into
- * structured data:
+ * parsers this repo uses to turn a raw model reply into structured data:
  *
  *  1. {@see MessageSorter::parseResponse()}            — tools:sort
  *  2. {@see TaskPlanner::decodeJson()}                  — tools:plan
@@ -26,20 +26,28 @@ use Psr\Log\NullLogger;
  *  5. {@see UserMemoryController::parseAiResponse()}    — memory action extraction
  *  6. {@see FileGenerationEnvelope::extract()}           — officemaker envelope
  *
- * Each parser independently re-invented fence-stripping, prose-extraction and
+ * Each had independently re-invented fence-stripping, prose-extraction and
  * truncation-repair — with different results. This test feeds all six the
  * SAME five shapes a live model can emit (clean, fenced, prose-embedded,
  * truncated, smart-quoted) and pins the observed outcome. It is
  * intentionally NOT a correctness test — a "FAIL" row is not a bug, it is
  * today's documented behavior.
  *
- * Purpose (structured-output refactor, phase 0b): this is the acceptance
- * bar for {@see \App\AI\StructuredOutput\JsonResponseDecoder} once it lands —
- * the consolidated decoder must recover at least everything a row below
- * marks RECOVERED, or the change is a regression in fault tolerance that
- * would otherwise only be discovered in production. Diff this file's
- * expectations deliberately; never adjust them to make a red run green
- * without understanding why the recovery rate moved.
+ * Parsers 1–5 (plus MessageDigestService and MemoryExtractionService, whose
+ * shapes are covered by their own unit tests) now delegate to
+ * {@see JsonResponseDecoder}, so their rows are no longer independent — they
+ * document the SHARED tolerance. Parser 6 keeps its own scanner on purpose:
+ * it locates the envelope by anchoring on the `BFILEPATH` key and walking
+ * balanced braces with string-literal awareness, which is strictly more
+ * precise than a generic outermost-span search when `BFILETEXT` contains
+ * braces.
+ *
+ * The decoder must recover at least everything a row below marks RECOVERED,
+ * or the change is a regression in fault tolerance that would otherwise only
+ * be discovered in production. Diff this file's expectations deliberately;
+ * never adjust them to make a red run green without understanding why the
+ * recovery rate moved. Rows that improved through the migration carry an
+ * inline note naming what the old parser could not do.
  */
 final class JsonParserGoldenCorpusTest extends TestCase
 {
@@ -80,9 +88,20 @@ final class JsonParserGoldenCorpusTest extends TestCase
         ];
     }
 
+    /**
+     * newInstanceWithoutConstructor() skips promoted-property defaults, so the
+     * shared decoder every migrated parser now delegates to has to be set by
+     * hand.
+     */
     private static function newBare(string $class): object
     {
-        return (new \ReflectionClass($class))->newInstanceWithoutConstructor();
+        $instance = (new \ReflectionClass($class))->newInstanceWithoutConstructor();
+
+        if (property_exists($instance, 'jsonDecoder')) {
+            self::setProp($instance, 'jsonDecoder', new JsonResponseDecoder());
+        }
+
+        return $instance;
     }
 
     private static function setProp(object $object, string $property, mixed $value): void
@@ -103,7 +122,12 @@ final class JsonParserGoldenCorpusTest extends TestCase
         return [
             'clean' => ['clean', true],
             'fenced' => ['fenced', true],
-            'prose_embedded' => ['prose_embedded', false],
+            // Gained by the migration to JsonResponseDecoder: the old parser
+            // required the reply to START with `{`.
+            'prose_embedded' => ['prose_embedded', true],
+            // Still lost, and correctly so: the cut fell mid-key
+            // (`…,"BWEBSEA`), and no amount of brace-balancing can invent the
+            // missing value.
             'truncated' => ['truncated', false],
             'smart_quotes' => ['smart_quotes', false],
         ];
@@ -162,7 +186,8 @@ final class JsonParserGoldenCorpusTest extends TestCase
         return [
             'clean' => ['clean', true],
             'fenced' => ['fenced', true],
-            'prose_embedded' => ['prose_embedded', false],
+            // Gained by the migration to JsonResponseDecoder.
+            'prose_embedded' => ['prose_embedded', true],
             'truncated' => ['truncated', false],
             'smart_quotes' => ['smart_quotes', false],
         ];
@@ -219,7 +244,10 @@ final class JsonParserGoldenCorpusTest extends TestCase
         return [
             'clean' => ['clean', true],
             'fenced' => ['fenced', true],
-            'prose_embedded' => ['prose_embedded', false],
+            // Gained by the migration to JsonResponseDecoder: the NDJSON
+            // fallback could never help here, because prose and JSON share
+            // one line.
+            'prose_embedded' => ['prose_embedded', true],
             'truncated' => ['truncated', false],
             'smart_quotes' => ['smart_quotes', false],
         ];

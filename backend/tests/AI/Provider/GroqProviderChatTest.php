@@ -124,6 +124,44 @@ class GroqProviderChatTest extends TestCase
     }
 
     /**
+     * Groq 400s on a request carrying both, so one of them has to go. The
+     * schema is the caller's output contract — something downstream parses
+     * against it — while "the model called no tool" is already a valid
+     * outcome of every toolset we declare, so the tools are what gets
+     * dropped.
+     */
+    public function testToolsAreDroppedWhenTheSameRequestCarriesAJsonSchema(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'openai/gpt-oss-120b',
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+        ], false);
+
+        $this->assertArrayNotHasKey('tools', $request);
+        $this->assertArrayNotHasKey('tool_choice', $request);
+        $this->assertSame('sort_result', $request['response_format']['json_schema']['name']);
+    }
+
+    /**
+     * Streaming already drops the schema on Groq
+     * ({@see self::testChatOptionsOmitStructuredOutputWhenStreaming()}), so
+     * there is nothing left to conflict with and the tools must survive —
+     * the guard may not fire on the request that is actually valid.
+     */
+    public function testToolsSurviveAStreamingRequestWhoseSchemaWasAlreadyDropped(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'openai/gpt-oss-120b',
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+        ], true);
+
+        $this->assertArrayNotHasKey('response_format', $request);
+        $this->assertCount(1, $request['tools']);
+    }
+
+    /**
      * `$options['tools']` is a public-ish seam; anything that is not a
      * ToolDefinition must be ignored rather than shipped to the provider as
      * a malformed declaration.

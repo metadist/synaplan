@@ -68,9 +68,9 @@ final class StructuredOutputCapability
 
     /**
      * Models allowed to request `strict: true` mode, keyed by (lowercased)
-     * provider name. Deliberately an allow-list: strict mode's
-     * `additionalProperties: false` + full-required constraint has only been
-     * verified against these.
+     * provider name, with lowercased model names. Deliberately an allow-list:
+     * strict mode's `additionalProperties: false` + full-required constraint
+     * has only been verified against these.
      *
      * @var array<string, list<string>>
      */
@@ -125,7 +125,11 @@ final class StructuredOutputCapability
 
         $provider = strtolower($providerName);
 
-        return in_array($model, self::STRICT_CAPABLE_MODELS[$provider] ?? [], true);
+        // Model ids come from BMODELS, where the same model has shipped with
+        // differing case; every other comparison in this class lowercases, so
+        // this one must too, or a capitalised id silently downgrades to the
+        // non-strict schema.
+        return in_array(strtolower($model), self::STRICT_CAPABLE_MODELS[$provider] ?? [], true);
     }
 
     public function dialect(string $providerName): ?StructuredOutputDialect
@@ -135,7 +139,7 @@ final class StructuredOutputCapability
         return match (true) {
             in_array($provider, self::OPENAI_JSON_SCHEMA_PROVIDERS, true) => StructuredOutputDialect::OPENAI_JSON_SCHEMA,
             in_array($provider, self::OPENAI_RESPONSES_PROVIDERS, true) => StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT,
-            in_array($provider, self::GOOGLE_PROVIDERS, true) => StructuredOutputDialect::GOOGLE_RESPONSE_SCHEMA,
+            in_array($provider, self::GOOGLE_PROVIDERS, true) => StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA,
             in_array($provider, self::OLLAMA_PROVIDERS, true) => StructuredOutputDialect::OLLAMA_FORMAT,
             in_array($provider, self::ANTHROPIC_PROVIDERS, true) => StructuredOutputDialect::ANTHROPIC_TOOL_FORCING,
             default => null,

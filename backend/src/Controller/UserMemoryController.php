@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\UserMemoryActionSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
@@ -51,6 +52,7 @@ class UserMemoryController extends AbstractController
         private readonly ModelConfigService $modelConfigService,
         private readonly RateLimitService $rateLimitService,
         private readonly StructuredOutputConfig $structuredOutputConfig,
+        private readonly JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -800,89 +802,30 @@ class UserMemoryController extends AbstractController
      */
     private function parseAiResponse(string $content, string $input, array $validMemoryIds): array
     {
+        // Formats 1 and 2 arrive as ONE JSON document, possibly fenced,
+        // prose-wrapped or truncated — all of which the shared decoder
+        // handles.
+        $decoded = $this->jsonDecoder->decode($content);
+        if ($decoded->success) {
+            $actions = $this->actionsFromDocument($decoded->data, $input, $validMemoryIds);
+            if (null !== $actions) {
+                return $actions;
+            }
+        }
+
+        // Format 3: NDJSON — one action object per line, which is not a single
+        // JSON document, so the decoder runs per line instead. Fence lines and
+        // prose lines simply fail to decode and are skipped.
         $actions = [];
-
-        // Clean up the content - extract JSON from markdown code blocks if present
-        $cleanContent = $this->extractJsonFromResponse($content);
-
-        // Try standard JSON parse first
-        $parsed = json_decode($cleanContent, true);
-
-        if (null !== $parsed && \JSON_ERROR_NONE === json_last_error()) {
-            // Format 1: {"actions": [...]}
-            if (isset($parsed['actions']) && is_array($parsed['actions'])) {
-                foreach ($parsed['actions'] as $actionData) {
-                    $action = $this->parseActionData($actionData, $input, $validMemoryIds);
-                    if ($action) {
-                        $actions[] = $action;
-                    }
-                }
-
-                return $actions;
-            }
-
-            // Format 2: Single action {"action": "create", "memory": {...}}
-            if (isset($parsed['action'])) {
-                $action = $this->parseActionData($parsed, $input, $validMemoryIds);
-                if ($action) {
-                    $actions[] = $action;
-                }
-
-                return $actions;
-            }
-        }
-
-        // Try to repair common JSON errors and parse again
-        $repairedContent = $this->repairJson($cleanContent);
-        if ($repairedContent !== $cleanContent) {
-            $parsed = json_decode($repairedContent, true);
-
-            if (null !== $parsed && \JSON_ERROR_NONE === json_last_error()) {
-                if (isset($parsed['actions']) && is_array($parsed['actions'])) {
-                    foreach ($parsed['actions'] as $actionData) {
-                        $action = $this->parseActionData($actionData, $input, $validMemoryIds);
-                        if ($action) {
-                            $actions[] = $action;
-                        }
-                    }
-
-                    return $actions;
-                }
-
-                if (isset($parsed['action'])) {
-                    $action = $this->parseActionData($parsed, $input, $validMemoryIds);
-                    if ($action) {
-                        $actions[] = $action;
-                    }
-
-                    return $actions;
-                }
-            }
-        }
-
-        // Format 3: NDJSON - multiple JSON objects on separate lines
-        // This handles when AI returns:
-        // {"action":"create",...}
-        // {"action":"create",...}
-        $lines = preg_split('/\r?\n/', trim($cleanContent));
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) {
+        foreach (preg_split('/\r?\n/', trim($content)) ?: [] as $line) {
+            $lineResult = $this->jsonDecoder->decode($line);
+            if (!$lineResult->success || !isset($lineResult->data['action'])) {
                 continue;
             }
 
-            $lineData = json_decode($line, true);
-            if (null === $lineData) {
-                // Try to repair this line
-                $repairedLine = $this->repairJson($line);
-                $lineData = json_decode($repairedLine, true);
-            }
-
-            if (null !== $lineData && isset($lineData['action'])) {
-                $action = $this->parseActionData($lineData, $input, $validMemoryIds);
-                if ($action) {
-                    $actions[] = $action;
-                }
+            $action = $this->parseActionData($lineResult->data, $input, $validMemoryIds);
+            if ($action) {
+                $actions[] = $action;
             }
         }
 
@@ -890,59 +833,46 @@ class UserMemoryController extends AbstractController
     }
 
     /**
-     * Extract JSON from AI response, handling markdown code blocks.
+     * Read the two single-document shapes out of a decoded response.
+     *
+     * @param array<string, mixed> $parsed
+     * @param int[]                $validMemoryIds
+     *
+     * @return array<int, array<string, mixed>>|null null when the document is
+     *                                               neither shape, so the caller can fall through to NDJSON
      */
-    private function extractJsonFromResponse(string $content): string
+    private function actionsFromDocument(array $parsed, string $input, array $validMemoryIds): ?array
     {
-        $content = trim($content);
+        $actions = [];
 
-        // Remove markdown code blocks if present
-        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $content, $matches)) {
-            $content = trim($matches[1]);
+        // Format 1: {"actions": [...]} — also what UserMemoryActionSchema
+        // constrains the schema path to.
+        if (isset($parsed['actions']) && is_array($parsed['actions'])) {
+            foreach ($parsed['actions'] as $actionData) {
+                if (!is_array($actionData)) {
+                    continue;
+                }
+
+                $action = $this->parseActionData($actionData, $input, $validMemoryIds);
+                if ($action) {
+                    $actions[] = $action;
+                }
+            }
+
+            return $actions;
         }
 
-        return $content;
-    }
+        // Format 2: single action {"action": "create", "memory": {...}}
+        if (isset($parsed['action'])) {
+            $action = $this->parseActionData($parsed, $input, $validMemoryIds);
+            if ($action) {
+                $actions[] = $action;
+            }
 
-    /**
-     * Attempt to repair common JSON errors from AI responses.
-     */
-    private function repairJson(string $json): string
-    {
-        $json = trim($json);
-
-        // Count brackets to find imbalance
-        $openBraces = substr_count($json, '{');
-        $closeBraces = substr_count($json, '}');
-        $openBrackets = substr_count($json, '[');
-        $closeBrackets = substr_count($json, ']');
-
-        // Remove extra closing braces (common AI error: }}} instead of }})
-        while ($closeBraces > $openBraces && str_contains($json, '}}')) {
-            // Find and remove one extra }
-            $json = preg_replace('/\}\}(\]|\})/', '}$1', $json, 1);
-            $closeBraces = substr_count($json, '}');
+            return $actions;
         }
 
-        // Remove extra closing brackets
-        while ($closeBrackets > $openBrackets && str_contains($json, ']]')) {
-            $json = preg_replace('/\]\]/', ']', $json, 1);
-            $closeBrackets = substr_count($json, ']');
-        }
-
-        // Add missing closing braces at end
-        while ($openBraces > $closeBraces) {
-            $json .= '}';
-            ++$closeBraces;
-        }
-
-        // Add missing closing brackets at end
-        while ($openBrackets > $closeBrackets) {
-            $json .= ']';
-            ++$closeBrackets;
-        }
-
-        return $json;
+        return null;
     }
 
     /**

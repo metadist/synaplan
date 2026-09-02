@@ -10,6 +10,7 @@ use App\Service\VectorSearch\QdrantClientInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Lock\LockFactory;
@@ -20,12 +21,15 @@ use Symfony\Component\Lock\LockFactory;
  * embedding-router cascade layer ({@see \App\Service\Message\Routing\EmbeddingRouterService})
  * matches incoming messages against.
  *
- * Wipes and re-embeds the entire (small, ~15-point) collection on every run
- * rather than diffing: the source of truth is code
- * ({@see SystemCapabilityRegistry}), not the collection itself, so a
- * reworded or removed example utterance must never leave a stale anchor
- * behind. Re-run this after editing `SystemCapabilityRegistry::$capabilities`
- * or switching the embedding model (`DEFAULTMODEL.VECTORIZE`).
+ * The source of truth is code ({@see SystemCapabilityRegistry}), not the
+ * collection, so a reworded or removed example utterance must not leave a
+ * stale anchor behind. That pruning happens AFTER the fresh anchors are
+ * upserted, never before: anchor point ids are deterministic
+ * (`route_{topic}_{md5(utterance)}`), so an unchanged utterance is overwritten
+ * in place, and a failed embedding leaves the previous anchor for that
+ * utterance intact instead of emptying the collection. Re-run this after
+ * editing `SystemCapabilityRegistry::$capabilities` or switching the embedding
+ * model (`DEFAULTMODEL.VECTORIZE`).
  *
  * Deliberately NOT wired into `app:seed` or the Docker entrypoint: it makes
  * LIVE embedding calls (small, cheap, but real) and the embedding-router
@@ -50,9 +54,23 @@ final class RoutingAnchorsSyncCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        $this->addOption(
+            'dry-run',
+            null,
+            InputOption::VALUE_NONE,
+            'List the anchors that would be written without embedding or touching Qdrant',
+        );
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        if ($input->getOption('dry-run')) {
+            return $this->dryRun($io);
+        }
 
         $lock = $this->lockFactory->createLock('routing-anchors-sync', self::LOCK_TTL_SECONDS);
         if (!$lock->acquire()) {
@@ -62,15 +80,14 @@ final class RoutingAnchorsSyncCommand extends Command
         }
 
         try {
-            $deleted = $this->qdrant->deleteAllRoutingAnchors();
-            $io->writeln(sprintf('Cleared %d existing routing anchor(s).', $deleted));
-
             $rows = [];
-            $upserted = 0;
+            $keepPointIds = [];
             $failed = 0;
 
             foreach ($this->capabilityRegistry->all() as $capability) {
                 foreach ($capability->exampleUtterances as $utterance) {
+                    $pointId = self::pointId($capability->topic, $utterance);
+
                     try {
                         $embedResult = $this->aiFacade->embed($utterance);
                         $vector = $embedResult['embedding'];
@@ -78,17 +95,19 @@ final class RoutingAnchorsSyncCommand extends Command
                             throw new \RuntimeException('Embedding provider returned an empty vector.');
                         }
 
-                        $pointId = sprintf('route_%s_%s', $capability->topic, md5($utterance));
                         $this->qdrant->upsertRoutingAnchor($pointId, $vector, [
                             'topic' => $capability->topic,
                             'intent' => $capability->intent,
                             'utterance' => $utterance,
                         ]);
 
-                        ++$upserted;
+                        $keepPointIds[] = $pointId;
                         $rows[] = [$capability->topic, $utterance, '<info>OK</info>'];
                     } catch (\Throwable $e) {
                         ++$failed;
+                        // Keep the id: the previous anchor for this utterance
+                        // (if any) is still valid and better than none.
+                        $keepPointIds[] = $pointId;
                         $rows[] = [$capability->topic, $utterance, '<error>FAILED: '.$e->getMessage().'</error>'];
                     }
                 }
@@ -96,27 +115,56 @@ final class RoutingAnchorsSyncCommand extends Command
 
             $io->table(['topic', 'utterance', 'result'], $rows);
 
+            $upserted = count($rows) - $failed;
+            $pruned = $this->qdrant->deleteRoutingAnchorsExcept($keepPointIds);
+            $io->writeln(sprintf('Pruned %d stale routing anchor(s).', $pruned));
+
             if ($failed > 0) {
-                // The collection was already wiped at this point, so a partial
-                // run leaves the failed topics with FEWER anchors than they
-                // should have — which degrades routing quietly rather than
-                // loudly. Say so, and say what to do about it.
                 $io->error(sprintf(
-                    '%d of %d routing anchor(s) could not be embedded. The collection was rebuilt without them, '
-                    .'so the affected topics are under-represented until this command succeeds. '
-                    .'Check the embedding model (DEFAULTMODEL.VECTORIZE) and re-run.',
+                    '%d of %d routing anchor(s) could not be embedded. The previously synced version of each '
+                    .'was kept rather than pruned, so routing still works — but any anchor that never synced '
+                    .'is missing. Check the embedding model (DEFAULTMODEL.VECTORIZE) and re-run.',
                     $failed,
-                    $upserted + $failed,
+                    count($rows),
                 ));
 
                 return Command::FAILURE;
             }
 
-            $io->success(sprintf('Routing anchors synced: %d upserted.', $upserted));
+            $io->success(sprintf('Routing anchors synced: %d upserted, %d pruned.', $upserted, $pruned));
 
             return Command::SUCCESS;
         } finally {
             $lock->release();
         }
+    }
+
+    private function dryRun(SymfonyStyle $io): int
+    {
+        $rows = [];
+
+        foreach ($this->capabilityRegistry->all() as $capability) {
+            foreach ($capability->exampleUtterances as $utterance) {
+                $rows[] = [$capability->topic, $utterance, self::pointId($capability->topic, $utterance)];
+            }
+        }
+
+        $io->table(['topic', 'utterance', 'point id'], $rows);
+        $io->note(sprintf(
+            'Dry run: %d anchor(s) would be embedded and upserted, and every other anchor in the collection '
+            .'would be pruned. No embedding call was made and Qdrant was not touched.',
+            count($rows),
+        ));
+
+        return Command::SUCCESS;
+    }
+
+    /**
+     * Deterministic so a re-sync of an unchanged utterance overwrites its
+     * anchor in place instead of creating a duplicate.
+     */
+    private static function pointId(string $topic, string $utterance): string
+    {
+        return sprintf('route_%s_%s', $topic, md5($utterance));
     }
 }

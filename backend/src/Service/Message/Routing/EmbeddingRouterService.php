@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace App\Service\Message\Routing;
 
 use App\AI\Service\AiFacade;
+use App\Entity\User;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use App\Service\VectorSearch\QdrantClientInterface;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -47,6 +52,10 @@ final readonly class EmbeddingRouterService
         private AiFacade $aiFacade,
         private QdrantClientInterface $qdrant,
         private LoggerInterface $logger,
+        private SystemCapabilityRegistry $capabilityRegistry,
+        private RateLimitService $rateLimitService,
+        private EntityManagerInterface $em,
+        private ModelConfigService $modelConfigService,
     ) {
     }
 
@@ -78,6 +87,8 @@ final readonly class EmbeddingRouterService
             return null;
         }
 
+        $this->recordEmbeddingUsage($embedResult, $trimmed, $userId);
+
         if ([] === $vector) {
             return null;
         }
@@ -88,17 +99,23 @@ final readonly class EmbeddingRouterService
         }
 
         $best = $hits[0];
-        $bestTopic = (string) ($best['payload']['topic'] ?? '');
-        if ('' === $bestTopic) {
-            // Malformed/orphaned anchor payload — never trust an anchor
-            // without a topic, no matter how high its score.
+        $bestTopic = $this->validTopic($best['payload']['topic'] ?? null);
+        if (null === $bestTopic) {
+            // A stale anchor (renamed capability) or a tampered payload must
+            // never inject a topic into routing, no matter how high its score.
+            // The AI sorter is the safe fallback.
+            $this->logger->warning('EmbeddingRouterService: anchor carries an unknown topic, deferring to AI sorter', [
+                'payload_topic' => $best['payload']['topic'] ?? null,
+                'score' => $best['score'] ?? null,
+            ]);
+
             return null;
         }
 
         $discardedAlternatives = [];
         foreach (array_slice($hits, 1) as $hit) {
-            $topic = (string) ($hit['payload']['topic'] ?? '');
-            if ('' === $topic || $topic === $bestTopic) {
+            $topic = $this->validTopic($hit['payload']['topic'] ?? null);
+            if (null === $topic || $topic === $bestTopic) {
                 // Same-topic runner-ups add no routing information (they'd
                 // only confirm the already-chosen topic), so only distinct
                 // topics are worth surfacing as a discarded alternative.
@@ -108,5 +125,55 @@ final readonly class EmbeddingRouterService
         }
 
         return new EmbeddingRouterMatch($bestTopic, (float) $best['score'], $discardedAlternatives);
+    }
+
+    /**
+     * A payload topic is only usable if the capability registry — the source
+     * of truth `app:routing:sync-anchors` builds the collection from — still
+     * declares it.
+     */
+    private function validTopic(mixed $topic): ?string
+    {
+        if (!\is_string($topic) || '' === $topic) {
+            return null;
+        }
+
+        return null !== $this->capabilityRegistry->byTopic($topic) ? $topic : null;
+    }
+
+    /**
+     * Book the embedding against the user's quota and cost meter, exactly as
+     * every other {@see AiFacade::embed()} call site does. Without this, an
+     * enabled embedding router would spend one embedding per message invisibly.
+     *
+     * @param array<string, mixed> $embedResult
+     */
+    private function recordEmbeddingUsage(array $embedResult, string $text, ?int $userId): void
+    {
+        if (null === $userId || $userId <= 0) {
+            return;
+        }
+
+        $user = $this->em->getRepository(User::class)->find($userId);
+        if (null === $user) {
+            return;
+        }
+
+        // The embed call above deliberately passes no model, so it lands on the
+        // default embedding provider — the same one `app:routing:sync-anchors`
+        // built the anchors with. VECTORIZE names that model in every supported
+        // setup and is what CostCalculationService prices against; if an
+        // operator points VECTORIZE elsewhere the cost row is mislabelled, but
+        // routing itself is unaffected.
+        $modelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+
+        $this->rateLimitService->recordUsage($user, 'EMBEDDINGS', [
+            'usage' => $embedResult['usage'] ?? ['prompt_tokens' => 0, 'total_tokens' => 0],
+            'provider' => (null !== $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null) ?? 'unknown',
+            'model' => (null !== $modelId ? $this->modelConfigService->getModelName($modelId) : null) ?? 'unknown',
+            'model_id' => $modelId,
+            'input_text' => $text,
+            'source' => 'EMBEDDING_ROUTER',
+        ]);
     }
 }

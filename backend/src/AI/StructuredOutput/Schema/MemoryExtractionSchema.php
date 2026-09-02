@@ -13,12 +13,10 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  * The model's natural output is a JSON ARRAY of actions, but OpenAI-dialect
  * structured output (and Anthropic tool-forcing, whose tool `input` is
  * always an object) both require an `object` root — a bare top-level array
- * is rejected. The array is therefore wrapped under a `memories` property.
- * No parsing change is needed for this: {@see
- * \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
- * extracts the innermost `[...]` via regex regardless of whether it is
- * wrapped in `{"memories": [...]}` (schema path) or returned bare (legacy
- * prose-instruction fallback for providers without schema support).
+ * is rejected. The array is therefore wrapped under a `memories` property,
+ * which {@see \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
+ * reads by key, falling back to a bare array for providers answering on the
+ * prose-instruction path.
  *
  * `memory_id`/`category`/`key`/`value` are modelled as nullable rather than
  * omittable: `action: "create"` never carries a `memory_id`, `action:

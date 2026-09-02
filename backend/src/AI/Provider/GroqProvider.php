@@ -325,13 +325,24 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         }
 
         $schema = $options['structured_output'] ?? null;
+        $translatedSchema = [];
         if ($schema instanceof StructuredOutputSchema) {
-            $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+            $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema);
+            $requestOptions = array_merge($requestOptions, $translatedSchema);
         }
 
         $tools = self::toolDefinitions($options);
         if ([] !== $tools) {
-            $requestOptions = array_merge($requestOptions, $this->toolCallingTranslator->translate($this->getName(), $model, $stream, $tools));
+            $requestOptions = array_merge($requestOptions, $this->toolCallingTranslator->translate(
+                $this->getName(),
+                $model,
+                $stream,
+                $tools,
+                // Whether the schema was actually MERGED, not merely
+                // requested: streaming drops it here, and a dropped schema
+                // has nothing left to conflict with.
+                withStructuredOutput: [] !== $translatedSchema,
+            ));
         }
 
         return $requestOptions;

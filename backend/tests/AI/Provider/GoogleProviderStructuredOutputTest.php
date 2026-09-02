@@ -15,7 +15,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  * Unit tests for GoogleProvider structured-output request shaping (Phase 2b).
  *
  * The translator returns `{'generationConfig': {responseMimeType,
- * responseSchema}}`, which must be merged INTO the already-built
+ * responseJsonSchema}}`, which must be merged INTO the already-built
  * `generationConfig` (temperature, topP, …) rather than replacing it — these
  * tests guard that merge on both the non-streaming and streaming request
  * paths.
@@ -41,7 +41,8 @@ final class GoogleProviderStructuredOutputTest extends TestCase
         ]);
 
         $this->assertSame('application/json', $captured['generationConfig']['responseMimeType']);
-        $this->assertSame(['type' => 'object'], $captured['generationConfig']['responseSchema']);
+        $this->assertSame(['type' => 'object'], $captured['generationConfig']['responseJsonSchema']);
+        $this->assertArrayNotHasKey('responseSchema', $captured['generationConfig']);
         // The pre-existing generation parameters must survive the merge.
         $this->assertSame(0.3, $captured['generationConfig']['temperature']);
     }
@@ -61,7 +62,7 @@ final class GoogleProviderStructuredOutputTest extends TestCase
         $provider->chat([['role' => 'user', 'content' => 'hi']], ['model' => 'gemini-2.5-flash']);
 
         $this->assertArrayNotHasKey('responseMimeType', $captured['generationConfig']);
-        $this->assertArrayNotHasKey('responseSchema', $captured['generationConfig']);
+        $this->assertArrayNotHasKey('responseJsonSchema', $captured['generationConfig']);
     }
 
     public function testChatStreamMergesResponseSchemaIntoExistingGenerationConfig(): void
@@ -84,7 +85,7 @@ final class GoogleProviderStructuredOutputTest extends TestCase
         );
 
         $this->assertSame('application/json', $captured['generationConfig']['responseMimeType']);
-        $this->assertSame(['type' => 'object'], $captured['generationConfig']['responseSchema']);
+        $this->assertSame(['type' => 'object'], $captured['generationConfig']['responseJsonSchema']);
         // The generation config built above (topP, topK, …) must survive.
         $this->assertArrayHasKey('topP', $captured['generationConfig']);
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Digest;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\MessageDigestSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
@@ -46,6 +47,7 @@ final readonly class MessageDigestService
         private MemoryEmbeddingModelResolver $embeddingResolver,
         private LoggerInterface $logger,
         private StructuredOutputConfig $structuredOutputConfig,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -205,27 +207,25 @@ PROMPT;
             return [];
         }
 
-        if (1 === preg_match('/\[[\s\S]*\]/', $content, $matches)) {
-            $jsonString = $matches[0];
-        } else {
-            $jsonString = $content;
-        }
+        $result = $this->jsonDecoder->decode($content);
 
-        try {
-            $decoded = json_decode($jsonString, true, 32, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
+        if (!$result->success) {
             if (false !== stripos($content, 'null')) {
                 return [];
             }
 
             $this->logger->warning('Failed to parse message digest JSON', [
                 'content_preview' => substr($content, 0, 300),
-                'error' => $e->getMessage(),
+                'error' => $result->errorReason,
             ]);
 
             return [];
         }
 
+        // The schema path wraps the proposals under `digests` (a bare array
+        // root is not expressible in structured output); the prose-instruction
+        // fallback still returns them bare.
+        $decoded = $result->data['digests'] ?? $result->data;
         if (!is_array($decoded)) {
             return [];
         }

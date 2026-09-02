@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Message\Routing;
 
 /**
- * Result of a confident {@see EmbeddingRouterService::match()} lookup.
+ * Result of a confident {@see EmbeddingRouterService::findClosestAnchor()} lookup.
  *
  * `$discardedAlternatives` carries the runner-up anchors (different topic
  * than `$topic`) so a {@see RoutingDecision} built from this match can show,

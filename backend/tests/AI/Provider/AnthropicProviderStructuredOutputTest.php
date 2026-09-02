@@ -6,6 +6,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Provider\AnthropicProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\ToolCalling\ToolDefinition;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -68,6 +69,66 @@ class AnthropicProviderStructuredOutputTest extends TestCase
         $this->assertNotNull($captured);
         $this->assertArrayNotHasKey('tools', $captured);
         $this->assertArrayNotHasKey('tool_choice', $captured);
+    }
+
+    /**
+     * Because the schema travels AS a forced tool call here, a request that
+     * also declares real tools would have both translators write `tools` and
+     * `tool_choice` — the second merge wins and the schema disappears
+     * silently. The guard in ToolCallingTranslator drops the tools instead,
+     * so the caller still gets the JSON it parses against.
+     */
+    public function testDeclaredToolsNeverOverwriteTheForcedSchemaTool(): void
+    {
+        $captured = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = $this->decodeRequestBody($options);
+
+            return new MockResponse((string) json_encode([
+                'content' => [['type' => 'tool_use', 'name' => 'sort_classification', 'input' => ['topic' => 'general']]],
+                'usage' => ['input_tokens' => 5, 'output_tokens' => 5],
+            ]));
+        });
+
+        $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'Classify this']],
+            [
+                'model' => 'claude-haiku-4-5',
+                'structured_output' => new StructuredOutputSchema('sort_classification', ['type' => 'object']),
+                'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object', 'properties' => []])],
+            ],
+        );
+
+        $this->assertNotNull($captured);
+        $this->assertCount(1, $captured['tools']);
+        $this->assertSame('sort_classification', $captured['tools'][0]['name']);
+        $this->assertSame(['type' => 'tool', 'name' => 'sort_classification'], $captured['tool_choice']);
+    }
+
+    public function testDeclaredToolsNeverOverwriteTheForcedSchemaToolWhileStreaming(): void
+    {
+        $captured = null;
+        $sse = $this->buildToolUseSseStream();
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured, $sse): MockResponse {
+            $captured = $this->decodeRequestBody($options);
+
+            return new MockResponse($sse, ['response_headers' => ['content-type' => 'text/event-stream']]);
+        });
+
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [['role' => 'user', 'content' => 'Classify this']],
+            static fn () => null,
+            [
+                'model' => 'claude-haiku-4-5',
+                'structured_output' => new StructuredOutputSchema('sort_classification', ['type' => 'object']),
+                'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object', 'properties' => []])],
+            ],
+        );
+
+        $this->assertNotNull($captured);
+        $this->assertCount(1, $captured['tools']);
+        $this->assertSame('sort_classification', $captured['tools'][0]['name']);
+        $this->assertSame(['type' => 'tool', 'name' => 'sort_classification'], $captured['tool_choice']);
     }
 
     public function testChatReEncodesToolUseInputAsContent(): void

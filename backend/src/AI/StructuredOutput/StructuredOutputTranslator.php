@@ -17,6 +17,7 @@ final readonly class StructuredOutputTranslator
 {
     public function __construct(
         private StructuredOutputCapability $capability,
+        private GoogleJsonSchemaNormalizer $googleNormalizer = new GoogleJsonSchemaNormalizer(),
     ) {
     }
 
@@ -62,10 +63,14 @@ final readonly class StructuredOutputTranslator
                     ],
                 ],
             ],
-            StructuredOutputDialect::GOOGLE_RESPONSE_SCHEMA => [
+            // `responseJsonSchema`, not `responseSchema`: the latter takes an
+            // OpenAPI 3.0 subset that rejects `additionalProperties` and union
+            // types outright, which every schema here uses. Google requires
+            // `responseSchema` to be omitted whenever this field is set.
+            StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA => [
                 'generationConfig' => [
                     'responseMimeType' => 'application/json',
-                    'responseSchema' => $schema->schema,
+                    'responseJsonSchema' => $this->googleNormalizer->normalize($schema->schema),
                 ],
             ],
             StructuredOutputDialect::OLLAMA_FORMAT => [

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\FeedbackContradictionSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
@@ -26,6 +27,7 @@ final readonly class FeedbackContradictionService
         private LoggerInterface $logger,
         private FeedbackConfigService $feedbackConfig,
         private StructuredOutputConfig $structuredOutputConfig,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -422,21 +424,11 @@ PROMPT;
     }
 
     /**
-     * Extract the first JSON object from a string (handles markdown code fences).
+     * @return array<string, mixed>|null
      */
     private function extractJson(string $content): ?array
     {
-        // Strip markdown fences if present
-        $content = preg_replace('/^```(?:json)?\s*/m', '', $content) ?? $content;
-        $content = preg_replace('/^```\s*$/m', '', $content) ?? $content;
-
-        if (preg_match('/\{[\s\S]*\}/', $content, $m)) {
-            $decoded = json_decode($m[0], true);
-
-            return is_array($decoded) ? $decoded : null;
-        }
-
-        return null;
+        return $this->jsonDecoder->decode($content)->data;
     }
 
     private function getContradictionPrompt(): string

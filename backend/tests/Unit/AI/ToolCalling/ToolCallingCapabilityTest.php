@@ -50,9 +50,22 @@ final class ToolCallingCapabilityTest extends TestCase
         }
     }
 
-    public function testGroqCannotCombineToolsWithAJsonSchemaResponseFormat(): void
+    /**
+     * Both tool-capable providers conflict, for different reasons: Groq 400s
+     * on the combination, and Anthropic's structured output IS a forced tool
+     * call, so the two translators would fight over `tools`/`tool_choice`.
+     */
+    public function testNeitherToolCapableProviderCanCombineToolsWithASchema(): void
     {
         self::assertTrue($this->capability->conflictsWithStructuredOutput('groq'));
-        self::assertFalse($this->capability->conflictsWithStructuredOutput('anthropic'));
+        self::assertTrue($this->capability->conflictsWithStructuredOutput('anthropic'));
+        self::assertTrue($this->capability->conflictsWithStructuredOutput('Anthropic'));
+    }
+
+    public function testProvidersWithoutNativeToolCallingReportNoConflict(): void
+    {
+        foreach (['openai', 'google', 'ollama', 'mistral', 'xai', 'triton'] as $provider) {
+            self::assertFalse($this->capability->conflictsWithStructuredOutput($provider), $provider);
+        }
     }
 }

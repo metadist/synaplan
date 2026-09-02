@@ -12,7 +12,7 @@ namespace App\AI\StructuredOutput;
  * `response_format`, so the OpenAI wire dialect never leaks into the internal
  * contract. Each provider's {@see StructuredOutputTranslator} target maps this
  * into its own dialect (response_format.json_schema, text.format,
- * generationConfig.responseSchema, format, or a forced tool call).
+ * generationConfig.responseJsonSchema, format, or a forced tool call).
  *
  * `$schema` is plain JSON Schema (draft-07-ish subset every provider dialect
  * accepts: object/string/number/boolean/array/enum, `properties`,

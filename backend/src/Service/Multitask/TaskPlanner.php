@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\TaskPlanSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
@@ -63,6 +64,7 @@ final readonly class TaskPlanner
         private StructuredOutputConfig $structuredOutputConfig,
         private ?PlannerChannelCatalog $channelCatalog = null,
         private ?SelfAwareConfig $selfAwareConfig = null,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -411,34 +413,10 @@ final readonly class TaskPlanner
     }
 
     /**
-     * Decode the model's JSON, tolerating markdown code fences and surrounding prose.
-     *
      * @return array<string, mixed>|null
      */
     private function decodeJson(string $raw): ?array
     {
-        $text = trim($raw);
-        if (str_starts_with($text, '```')) {
-            $text = (string) preg_replace('/^```(?:json)?\s*/', '', $text);
-            $text = (string) preg_replace('/\s*```$/', '', $text);
-            $text = trim($text);
-        }
-
-        // If the model wrapped the JSON in prose, grab the outermost object.
-        if (!str_starts_with($text, '{')) {
-            $start = strpos($text, '{');
-            $end = strrpos($text, '}');
-            if (false !== $start && false !== $end && $end > $start) {
-                $text = substr($text, $start, $end - $start + 1);
-            }
-        }
-
-        try {
-            $decoded = json_decode($text, true, 512, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->jsonDecoder->decode($raw)->data;
     }
 }

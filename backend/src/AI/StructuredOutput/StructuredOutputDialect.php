@@ -18,8 +18,15 @@ enum StructuredOutputDialect
     /** `text: {format: {type: "json_schema", ...}}` — OpenAI Responses API only; NOT the same nesting as Chat Completions. */
     case OPENAI_RESPONSES_TEXT_FORMAT;
 
-    /** `generationConfig: {responseMimeType: "application/json", responseSchema: {...}}` — Google Gemini. */
-    case GOOGLE_RESPONSE_SCHEMA;
+    /**
+     * `generationConfig: {responseMimeType: "application/json", responseJsonSchema: {...}}` — Google Gemini.
+     *
+     * NOT the older `responseSchema`: that field takes an OpenAPI 3.0 schema
+     * subset which rejects `additionalProperties` and union types, and Google
+     * has frozen it in favour of `responseJsonSchema`. The keyword subset the
+     * latter accepts is enforced by {@see GoogleJsonSchemaNormalizer}.
+     */
+    case GOOGLE_RESPONSE_JSON_SCHEMA;
 
     /** `format: {...}` — Ollama's native structured-output field. */
     case OLLAMA_FORMAT;

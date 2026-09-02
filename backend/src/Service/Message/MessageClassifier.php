@@ -280,6 +280,12 @@ final readonly class MessageClassifier
         // message text via its own dedicated AI call whenever the
         // classification omits it, so a mediamaker match degrades
         // gracefully instead of needing those votes up front.
+        // Set when Phase 8 found a confident topic but refused to commit
+        // because the language was ambiguous. That refusal is a request for
+        // the AI sorter specifically (it resolves BLANG), so Phase 9 — which
+        // would answer with `language: 'en'` — must not intercept it.
+        $embeddingDeclinedForLanguage = false;
+
         if (null === $overrideModelId
             && !empty($text)
             && $this->embeddingRouterConfig->isEnabled($userId)
@@ -325,6 +331,8 @@ final readonly class MessageClassifier
                     ], $embeddingDecision->toClassificationFields());
                 }
 
+                $embeddingDeclinedForLanguage = true;
+
                 $this->logger->info('MessageClassifier: Embedding-router match declined (language ambiguous) — deferring to AI sorter', [
                     'message_id' => $messageId,
                     'topic' => $embeddingMatch->topic,
@@ -356,6 +364,7 @@ final readonly class MessageClassifier
         if ($allowRoutingDeferral
             && null === $overrideModelId
             && !empty($text)
+            && !$embeddingDeclinedForLanguage
             && $this->nativeToolRoutingConfig->isEnabled($userId)
             && !$this->isSelfAwareQuestion($text, $userId)
             && $this->accountChatModelCanRouteNatively($userId)
