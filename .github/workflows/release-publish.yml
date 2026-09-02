@@ -1,0 +1,247 @@
+name: Publish Release
+
+# Automatically publishes a release that "Cut Release Tag" (release-tag.yml)
+# left as a DRAFT, the moment the tag's own CI run goes green. Publishing a
+# GitHub release is what mobile-release-artifacts.yml waits for
+# (`release: published`) to classify everything since the previous release and
+# start the mobile chain (OTA or a store submission) — this workflow is what
+# now raises that signal, instead of a person clicking "Publish release".
+#
+# Every open draft is a candidate on every run, not just the tag that
+# triggered this one: scanning the current draft list instead of trusting the
+# triggering event's payload means a missed or out-of-order CI completion, a
+# retried run, or a release cut while this workflow was disabled all self-heal
+# on the next run, with nothing to lose track of.
+#
+# The triggering run's own conclusion is not proof for any particular draft — so
+# for every draft, this independently re-asks GitHub two things: whether the
+# tagged commit is part of the default branch, and whether the CI run the TAG
+# itself started is green. The tag's own run, not any run for that commit: the
+# run for the push to the default branch was already green before
+# release-tag.yml created the tag, so accepting that one too would publish every
+# draft the moment it exists.
+#
+# Publishing is done through a GitHub App installation token, not the default
+# GITHUB_TOKEN, for the same reason release-tag.yml tags through one: an event
+# raised by GITHUB_TOKEN does not start new workflow runs, so
+# mobile-release-artifacts.yml would never see the `release: published` event.
+# The App token also does the listing, because GitHub shows draft releases only
+# to a token with push access.
+#
+# No checkout: every step below talks to the GitHub API through `gh`, so
+# nothing here ever runs code out of a branch or tag it has not vetted itself.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  # A net under the trigger above: a draft whose CI finished before this
+  # workflow existed, or whose workflow_run event was missed. Costs one no-op
+  # run when nothing is waiting.
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Evaluate every draft and report what would happen, without publishing anything.'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    name: Publish releases whose tag is green
+    runs-on: ubuntu-latest
+    # Every CI run on the repository reaches the workflow_run trigger; only a
+    # failed or cancelled one can be dismissed without even listing drafts. The
+    # schedule and a manual dispatch carry no such event and always proceed to
+    # look for waiting drafts.
+    if: >-
+      github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    env:
+      DRY_RUN: ${{ inputs.dry_run || false }}
+    steps:
+      # The secrets context is not available in an `if` expression, so their
+      # presence is carried through an output — the same workaround
+      # release-tag.yml and release-rollout.yml use.
+      - name: Check publishing credentials
+        id: config
+        env:
+          APP_ID: ${{ secrets.MOBILE_TAG_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+        run: |
+          if test -n "$APP_ID" && test -n "$APP_PRIVATE_KEY"; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Auto-publish is inactive because the GitHub App credentials are not configured." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Create publishing token
+        id: app-token
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ secrets.MOBILE_TAG_APP_ID }}
+          private-key: ${{ secrets.MOBILE_TAG_APP_PRIVATE_KEY }}
+
+      - name: Publish every draft whose tag is green
+        if: steps.config.outputs.configured == 'true'
+        env:
+          # Reading workflow runs is unprivileged and stays on the default
+          # token. Listing releases is not: GitHub only returns DRAFT releases
+          # to a token with push access, so the `contents: read` GITHUB_TOKEN
+          # above would see an empty list and this workflow would never publish
+          # anything. The App token — the same one that created the draft in
+          # release-tag.yml — therefore does both the listing and the publish.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          DISCORD_HOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+        run: |
+          set -euo pipefail
+
+          # A pre-release is reserved for future canary work (see
+          # mobile-release-artifacts.yml) and is never touched here. A tag not
+          # shaped like a plain release (a nightly or environment tag, say)
+          # cannot be a release-tag.yml draft in the first place, but the
+          # filter costs nothing and keeps this workflow honest either way.
+          #
+          # Ordered by version components rather than by tag name, because a
+          # plain sort is lexicographic and would put v4.10.0 before v4.9.0.
+          # The order matters when two drafts are waiting at once:
+          # mobile-release-artifacts.yml diffs a release against the newest
+          # already-PUBLISHED one, so the older tag has to be published first
+          # or the newer one becomes its own predecessor's base.
+          drafts="$(
+            GH_TOKEN="$APP_TOKEN" gh release list --repo "$GITHUB_REPOSITORY" --limit 50 \
+              --json tagName,isDraft,isPrerelease --jq '
+                [.[] | select(.isDraft and (.isPrerelease | not) and (.tagName | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")))]
+                | sort_by(.tagName | ltrimstr("v") | split(".") | map(tonumber))
+                | map(.tagName)'
+          )"
+
+          if [ "$(printf '%s' "$drafts" | jq 'length')" -eq 0 ]; then
+            echo "No draft release is waiting to be published." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Asked of the API instead of read from the event payload: a
+          # scheduled run carries no repository object to read it from.
+          default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.default_branch')"
+
+          # Matches DiscordNotificationService's embed shape (title/fields/footer/timestamp),
+          # the same shape release-rollout.yml posts with.
+          notify() {
+            local title="$1" colour="$2" detail="$3" tag="$4"
+            [ -n "${DISCORD_HOOK:-}" ] || return 0
+            local url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${tag}"
+            local payload
+            payload="$(jq -n \
+              --arg title "$title" --arg detail "$detail" --arg url "$url" \
+              --argjson colour "$colour" --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+              '{
+                embeds: [{
+                  title: $title,
+                  color: $colour,
+                  fields: [
+                    { name: "Details", value: $detail, inline: false },
+                    { name: "Release", value: ("[Open release](" + $url + ")"), inline: true }
+                  ],
+                  footer: { text: "Synaplan release publish" },
+                  timestamp: $ts
+                }]
+              }')"
+            curl --fail-with-body --silent --show-error --retry 3 \
+              -H 'Content-Type: application/json' -d "$payload" "$DISCORD_HOOK" \
+              || echo "::warning::Discord notification failed for ${tag}"
+          }
+
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+
+            # The tag might have been deleted after the draft was created (a
+            # release cut and then withdrawn by hand); that draft is left
+            # alone rather than guessed at. Checked on the command's own exit
+            # status, not on empty output: `gh api` prints its JSON error body
+            # to stdout even on a 404, so an empty-string check alone would
+            # silently treat "not found" as a real (empty) reference.
+            if ! ref_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" 2>/dev/null)"; then
+              echo "\`${tag}\` has a draft release but no matching tag; leaving it as a draft." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            sha="$(printf '%s' "$ref_object" | jq -r '.object.sha')"
+            # release-tag.yml creates a lightweight tag straight on the commit,
+            # but an annotated tag (however it got there) is dereferenced once
+            # more rather than mistaken for a commit.
+            if [ "$(printf '%s' "$ref_object" | jq -r '.object.type')" = tag ]; then
+              sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${sha}" --jq '.object.sha')"
+            fi
+
+            # release-tag.yml refuses to tag a commit that is not part of the
+            # default branch. Every draft is published from here, whoever
+            # created it, so that guarantee is re-established rather than
+            # inherited. Comparing the default branch to the commit, `behind`
+            # means the commit is one of its ancestors and `identical` that it
+            # is its tip; anything else is a commit the default branch never
+            # took. Only `.status` is read, so the commit list stays at one
+            # page.
+            branch_status="$(
+              gh api "repos/${GITHUB_REPOSITORY}/compare/${default_branch}...${sha}?per_page=1" \
+                --jq '.status'
+            )"
+            if [ "$branch_status" != behind ] && [ "$branch_status" != identical ]; then
+              echo "\`${tag}\` (\`${sha}\`) is not part of \`${default_branch}\` (\`${branch_status}\`); left as a draft." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            # The tag's OWN push run has to be green, not just any run for the
+            # commit. release-tag.yml already required a green CI run for this
+            # commit BEFORE it created the tag — the run for the push to the
+            # default branch — so matching on head_sha alone would find that
+            # one again and publish the draft the moment it exists. What this
+            # workflow waits for is the run the tag itself started, which is
+            # the one that builds the release images and the openapi-spec
+            # artifact mobile-release-artifacts.yml downloads next. For a tag
+            # push, head_branch carries the tag name, and that is what tells
+            # the two runs apart. The API filters on head_sha but ignores an
+            # unknown query parameter silently, so the commit is matched again
+            # on the returned runs.
+            green="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=success&per_page=100" |
+                jq --arg sha "$sha" --arg tag "$tag" \
+                  '[.workflow_runs[]
+                    | select(.name == "CI" and .event == "push"
+                             and .head_sha == $sha and .head_branch == $tag)] | length'
+            )"
+
+            if [ "$green" -eq 0 ]; then
+              echo "\`${tag}\` (\`${sha}\`) has no successful CI run for the tag yet; left as a draft." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            if [ "$DRY_RUN" = true ]; then
+              echo "Dry run — \`${tag}\` is green and would be published now." |
+                tee -a "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            GH_TOKEN="$APP_TOKEN" gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false
+            echo "Published \`${tag}\` — mobile-release-artifacts.yml starts from here." |
+              tee -a "$GITHUB_STEP_SUMMARY"
+            notify "Published ${tag}" 3066993 \
+              "CI passed for \`${sha:0:12}\`. The mobile release chain now classifies everything since the previous release." \
+              "$tag"
+          done < <(printf '%s' "$drafts" | jq -r '.[]')

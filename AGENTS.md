@@ -50,6 +50,7 @@ docker compose exec -T db mariadb -usynaplan_user -psynaplan_password synaplan -
 - Git operations (branch, add, commit, push) are allowed.
 - **NEVER** commit or push directly to `main`; never force-push `main` or `master`. All changes go through feature branches + PRs.
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:` — e.g. `feat(frontend): add runtime config API support`.
+- **The commit type is not just style — it drives the release version.** `Cut Release Tag` (`.github/workflows/release-tag.yml`) defaults to `bump: auto`, which reads every commit since the last release tag: any commit whose subject **starts with `feat`** raises the minor version, everything else raises the patch version. Only the start of the subject is matched and the casing is ignored, so `feat:`, `feat(chat):`, `feat!:` and the `Feat/desktop client` shape a squash-merged PR title takes all count alike. A major version is never automatic — it requires explicitly selecting `bump: major`. Getting the type wrong on a feature commit silently ships it as a patch release.
 - **NEVER** add attribution ("Generated with Claude Code", "Co-Authored-By: …", or similar).
 
 ### Merge Conflicts — NEVER Accept One Side Blindly
@@ -134,7 +135,10 @@ mobile support a narrow, reviewable compatibility layer:
   `tests/mobile-impact.test.mjs`, and verify with
   `node scripts/mobile-impact.mjs --base <base> --head <head>`.
 - The app release chain starts only when a GitHub release is **published**
-  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs.
+  (`mobile-release-artifacts.yml`); tags alone feed the platform release jobs. Publishing is no
+  longer a manual click: `release-publish.yml` publishes the draft that `Cut Release Tag` left
+  behind as soon as the CI run for that tag is green, so cutting a tag is in practice the decision
+  to start the chain.
 - Treat these as mobile-risk paths: auth/OAuth and Bearer handling, subscription/IAP and
   entitlement logic, native guards/bootstrap, forced updates, and Capacitor-facing services.
 - Run the complete backend/frontend gate for every affected area. For OpenAPI changes, regenerate
