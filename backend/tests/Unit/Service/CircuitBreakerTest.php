@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
+use App\AI\Exception\StructuredOutputViolationException;
 use App\Service\CircuitBreaker;
 use App\Service\Exception\StreamCancelledException;
 use PHPUnit\Framework\TestCase;
@@ -49,5 +50,29 @@ class CircuitBreakerTest extends TestCase
         }
 
         $this->assertSame('still closed', $breaker->execute(static fn () => 'still closed', 'ai_provider_test'));
+    }
+
+    /**
+     * The provider answered and rejected the model's own JSON against our
+     * schema — it is up. A burst of those (one sorter prompt misbehaving on
+     * one model) must not fail every other Groq call fast for a minute.
+     */
+    public function testSchemaViolationDoesNotCountAsProviderFailure(): void
+    {
+        $breaker = new CircuitBreaker(new ArrayAdapter(), new NullLogger(), failureThreshold: 2);
+
+        for ($attempt = 0; $attempt < 5; ++$attempt) {
+            try {
+                $breaker->execute(
+                    static fn () => throw new StructuredOutputViolationException('groq', 'additionalProperties not allowed', '{}', 'sort_classification'),
+                    'ai_provider_groq',
+                );
+                $this->fail('The violation must reach the caller unchanged');
+            } catch (StructuredOutputViolationException $e) {
+                $this->assertSame('sort_classification', $e->getSchemaName());
+            }
+        }
+
+        $this->assertSame('still closed', $breaker->execute(static fn () => 'still closed', 'ai_provider_groq'));
     }
 }

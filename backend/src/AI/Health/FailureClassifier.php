@@ -6,6 +6,7 @@ namespace App\AI\Health;
 
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\StructuredOutputViolationException;
 use App\Service\Exception\StreamCancelledException;
 
 /**
@@ -122,6 +123,15 @@ final readonly class FailureClassifier
     {
         if ($error instanceof ProviderCancelledException || $error instanceof StreamCancelledException) {
             return FailureKind::Cancelled;
+        }
+
+        // The provider answered promptly and rejected the model's OWN output
+        // against the schema WE asked for. That is a prompt/schema problem on
+        // the request side (Groq's wording: "Please adjust your prompt"), not
+        // model health — counting it would let a burst of echoed input fields
+        // switch off the routing model for everyone.
+        if ($error instanceof StructuredOutputViolationException) {
+            return FailureKind::UserError;
         }
 
         // ProviderException::contentBlocked() carries the provider's own block

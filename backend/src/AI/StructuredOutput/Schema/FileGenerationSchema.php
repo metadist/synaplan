@@ -16,9 +16,14 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  * `{"BFILEPATH": "…", "BFILETEXT": "…"}`, so no envelope adjustment is
  * needed for OpenAI-dialect structured output or Anthropic tool-forcing.
  *
- * Both fields are always present — unlike the action-list schemas
- * elsewhere in this namespace, officemaker has no optional/nullable
- * fields, so this schema needs no nullable-vs-omittable workaround.
+ * `BEXPORT` is the one optional field: the prompt's "PDF export" section
+ * (see {@see \App\Prompt\PromptCatalog}) asks for `"BEXPORT":"pdf"` when
+ * the user wants a PDF, and {@see \App\Service\File\FileGenerationEnvelope}
+ * reads it. It is modelled nullable-and-required, as strict mode demands —
+ * leaving it out of a closed (`additionalProperties: false`) schema made a
+ * best-effort provider 400 the whole turn (`json_validate_failed`) the
+ * moment the model followed the prompt, and a strict provider silently
+ * strip the PDF request instead.
  *
  * `ChatHandler` only attaches this schema when the resolved topic is
  * `officemaker`; every other topic keeps its free-form chat completion.
@@ -29,6 +34,9 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  */
 final class FileGenerationSchema
 {
+    /** The only export target the envelope understands ({@see \App\Service\File\FileGenerationEnvelope}). */
+    public const EXPORT_PDF = 'pdf';
+
     public static function build(): StructuredOutputSchema
     {
         return new StructuredOutputSchema(
@@ -39,8 +47,9 @@ final class FileGenerationSchema
                 'properties' => [
                     'BFILEPATH' => ['type' => 'string'],
                     'BFILETEXT' => ['type' => 'string'],
+                    'BEXPORT' => ['type' => ['string', 'null'], 'enum' => [self::EXPORT_PDF, null]],
                 ],
-                'required' => ['BFILEPATH', 'BFILETEXT'],
+                'required' => ['BFILEPATH', 'BFILETEXT', 'BEXPORT'],
             ],
         );
     }

@@ -78,6 +78,73 @@ final class DocumentExportServiceTest extends TestCase
         self::assertSame('%PDF-ok', file_get_contents((string) $first));
     }
 
+    public function testWordDocumentIsConvertedWithoutSpreadsheetOptions(): void
+    {
+        file_put_contents($this->uploadDir.'/u/brief.docx', 'PK');
+        $converted = $this->uploadDir.'/u/brief.convert-tmp.pdf';
+        file_put_contents($converted, '%PDF-ok');
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+        $converter->expects(self::once())->method('convert')
+            ->with(self::anything(), 'pdf', [])
+            ->willReturn($converted);
+
+        self::assertNotNull($this->service($converter)->exportToPdf($this->file('u/brief.docx', 'brief.docx', 'docx')));
+    }
+
+    /**
+     * #1690: the Calc print layout clips long row labels; a workbook is
+     * exported with Collabora's full-sheet preview and cached under its own
+     * name so an earlier paginated export is not served again.
+     */
+    public function testSpreadsheetIsConvertedAsFullSheetPreviewAndCachedSeparately(): void
+    {
+        file_put_contents($this->uploadDir.'/u/forecast.xlsx', 'PK');
+        $stale = $this->uploadDir.'/u/forecast.export.pdf';
+        file_put_contents($stale, '%PDF-clipped');
+        touch($stale, time() + 60);
+        $converted = $this->uploadDir.'/u/forecast.convert-tmp.pdf';
+        file_put_contents($converted, '%PDF-full-sheet');
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+        $converter->expects(self::once())->method('convert')
+            ->with(self::anything(), 'pdf', [OfficeConverterClient::OPTION_FULL_SHEET_PREVIEW => true])
+            ->willReturn($converted);
+
+        $out = $this->service($converter)->exportToPdf($this->file('u/forecast.xlsx', 'forecast.xlsx', 'xlsx'));
+
+        self::assertSame($this->uploadDir.'/u/forecast.export.sheet.pdf', $out);
+        self::assertSame('%PDF-full-sheet', file_get_contents((string) $out));
+    }
+
+    public function testCachedPathsCoverCurrentAndLegacyNames(): void
+    {
+        self::assertSame('u/brief.export.pdf', DocumentExportService::cachedRelativePath('u/brief.docx'));
+        self::assertSame(['u/brief.export.pdf'], DocumentExportService::cachedRelativePaths('u/brief.docx'));
+
+        self::assertSame('u/forecast.export.sheet.pdf', DocumentExportService::cachedRelativePath('u/forecast.xlsx'));
+        self::assertSame(
+            ['u/forecast.export.sheet.pdf', 'u/forecast.export.pdf'],
+            DocumentExportService::cachedRelativePaths('u/forecast.xlsx'),
+        );
+        self::assertSame(['u/data.export.sheet.pdf', 'u/data.export.pdf'], DocumentExportService::cachedRelativePaths('u/data.ods'));
+    }
+
+    public function testDeleteCachedPdfRemovesEveryCacheName(): void
+    {
+        $current = $this->uploadDir.'/u/forecast.export.sheet.pdf';
+        $legacy = $this->uploadDir.'/u/forecast.export.pdf';
+        file_put_contents($current, '%PDF');
+        file_put_contents($legacy, '%PDF');
+
+        $this->service($this->disabledConverter())->deleteCachedPdf('u/forecast.xlsx');
+
+        self::assertFileDoesNotExist($current);
+        self::assertFileDoesNotExist($legacy);
+    }
+
     public function testUnsupportedTypeReturnsNull(): void
     {
         file_put_contents($this->uploadDir.'/u/song.mp3', 'xx');

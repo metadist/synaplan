@@ -33,6 +33,18 @@ final class OfficeConverterClient
         'txt',
     ];
 
+    /**
+     * Convert option: render every sheet of a workbook as ONE PDF page sized
+     * to its content (Collabora's `FullSheetPreview`, LibreOffice's
+     * `SinglePageSheets` PDF filter option). Without it the Calc print layout
+     * is used as-is: fixed page size, narrow first column, long row labels cut
+     * at the cell border and repeated even narrower on continuation pages
+     * (#1690). Ignored by Writer/Impress sources.
+     */
+    public const OPTION_FULL_SHEET_PREVIEW = 'full_sheet_preview';
+
+    private const FORM_FIELD_FULL_SHEET_PREVIEW = 'FullSheetPreview';
+
     private bool $healthCheckDone = false;
 
     /** @var array<string, mixed>|null */
@@ -104,7 +116,7 @@ final class OfficeConverterClient
      * Convert a file to $targetFormat. Writes the result next to the input
      * (NFS-visible) and returns the absolute path, or null on any failure.
      *
-     * @param array<string, mixed> $options optional `lang`
+     * @param array<string, mixed> $options optional `lang`, {@see self::OPTION_FULL_SHEET_PREVIEW}
      */
     public function convert(string $absoluteInputPath, string $targetFormat, array $options = []): ?string
     {
@@ -167,6 +179,9 @@ final class OfficeConverterClient
         ];
         if (isset($options['lang']) && is_string($options['lang']) && '' !== $options['lang']) {
             $fields['lang'] = $options['lang'];
+        }
+        if (true === ($options[self::OPTION_FULL_SHEET_PREVIEW] ?? false)) {
+            $fields[self::FORM_FIELD_FULL_SHEET_PREVIEW] = 'true';
         }
 
         $formData = new FormDataPart($fields);

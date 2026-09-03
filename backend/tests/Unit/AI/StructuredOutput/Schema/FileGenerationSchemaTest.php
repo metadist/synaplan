@@ -18,17 +18,31 @@ final class FileGenerationSchemaTest extends TestCase
 
     /**
      * Unlike the array-wrapping schemas elsewhere in this namespace, the
-     * officemaker prompt already produces exactly this two-key root object,
-     * so no envelope adjustment is needed.
+     * officemaker prompt already produces this flat root object, so no
+     * envelope adjustment is needed.
      */
-    public function testSchemaIsAFlatObjectWithBothKeysRequired(): void
+    public function testSchemaIsAFlatObjectWithEveryKeyRequired(): void
     {
         $schema = FileGenerationSchema::build();
 
         $this->assertSame('object', $schema->schema['type']);
         $this->assertSame('string', $schema->schema['properties']['BFILEPATH']['type']);
         $this->assertSame('string', $schema->schema['properties']['BFILETEXT']['type']);
-        $this->assertSame(['BFILEPATH', 'BFILETEXT'], $schema->schema['required']);
+        $this->assertSame(['BFILEPATH', 'BFILETEXT', 'BEXPORT'], $schema->schema['required']);
+    }
+
+    /**
+     * The prompt's PDF section asks for `"BEXPORT":"pdf"`; a closed schema
+     * without that key made Groq's best-effort mode reject the whole answer
+     * (`json_validate_failed`) the moment the model complied. Nullable, so
+     * strict mode's all-required rule holds for the no-export case.
+     */
+    public function testExportIsANullablePdfOnlyEnum(): void
+    {
+        $schema = FileGenerationSchema::build();
+
+        $this->assertSame(['string', 'null'], $schema->schema['properties']['BEXPORT']['type']);
+        $this->assertSame(['pdf', null], $schema->schema['properties']['BEXPORT']['enum']);
     }
 
     public function testDefaultsToStrictMode(): void

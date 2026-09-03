@@ -19,7 +19,11 @@ final readonly class OfficePdfRoutingDecorator
 
     private const PLANNER_PDF_UNSUPPORTED = 'Real PDFs are NOT supported — say so in a single `chat` node.';
 
-    private const PLANNER_PDF_SUPPORTED = 'Creating a real PDF is supported: plan `document_generation` the same way as a Word file (the server converts the Office source to PDF).';
+    private const PLANNER_PDF_SUPPORTED = 'Creating a real PDF is supported: plan `document_generation` the same way as a Word file (the server converts the Office source to PDF). Turning a file that ALREADY EXISTS in the conversation into a PDF ("export this as PDF", "hieraus eine PDF") is a single `document_export` node — NOT extract_text + document_generation, which would re-write the file.';
+
+    private const PLANNER_GENERATOR_NODES = 'document_generation, calendar_event), surfaced through `compose_reply`.';
+
+    private const PLANNER_GENERATOR_NODES_WITH_EXPORT = 'document_generation, document_export, calendar_event), surfaced through `compose_reply`.';
 
     private const PLANNER_HARD_RULE_PDF = "If the user asks for output the capability list cannot produce (e.g. a real\n   PDF, a phone call)";
 
@@ -70,6 +74,7 @@ final readonly class OfficePdfRoutingDecorator
         $prompt = str_replace(self::PLANNER_PDF_UNSUPPORTED, self::PLANNER_PDF_SUPPORTED, $prompt);
         $prompt = str_replace(self::PLANNER_HARD_RULE_PDF, self::PLANNER_HARD_RULE_NO_PDF, $prompt);
         $prompt = str_replace(self::PLANNER_OFFICE_FORMATS, self::PLANNER_OFFICE_FORMATS_WITH_PDF, $prompt);
+        $prompt = str_replace(self::PLANNER_GENERATOR_NODES, self::PLANNER_GENERATOR_NODES_WITH_EXPORT, $prompt);
 
         if (!str_contains($prompt, self::SORTER_MARKER)) {
             $prompt .= self::sorterAppendix();
@@ -88,7 +93,7 @@ final readonly class OfficePdfRoutingDecorator
         return <<<'PROMPT'
 
 ## OFFICE_PDF_ROUTING
-When the user asks to CREATE a PDF (not "can you make PDFs?"), set BTOPIC to "officemaker". Do not use general or synaplan for produce-a-PDF requests.
+When the user asks to CREATE a PDF (not "can you make PDFs?"), set BTOPIC to "officemaker". Do not use general or synaplan for produce-a-PDF requests. Turning a file that already exists in the conversation into a PDF is also "officemaker" — the planner then converts that file instead of writing a new one.
 PROMPT;
     }
 }

@@ -24,6 +24,13 @@ final readonly class DocumentThumbnailGenerator
         'pages', 'numbers', 'key',
     ];
 
+    /**
+     * The office types Calc opens as a workbook. PDF export treats these
+     * differently from text documents: a sheet is not paginated content, so
+     * the default print layout clips it (#1690).
+     */
+    public const SPREADSHEET_EXTENSIONS = ['xls', 'xlsx', 'ods', 'numbers'];
+
     private const POSTER_WIDTH = 640;
     private const POSTER_HEIGHT = 360;
     private const JPEG_QUALITY = 82;
@@ -45,6 +52,11 @@ final readonly class DocumentThumbnailGenerator
     public static function isOffice(string $extension): bool
     {
         return in_array(strtolower($extension), self::OFFICE_EXTENSIONS, true);
+    }
+
+    public static function isSpreadsheet(string $extension): bool
+    {
+        return in_array(strtolower($extension), self::SPREADSHEET_EXTENSIONS, true);
     }
 
     public static function supportsExtension(string $extension): bool
