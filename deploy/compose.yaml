@@ -297,7 +297,7 @@ services:
   # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
   # (or `--profile office`). No published port.
   collabora:
-    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
     profiles: [office]
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
