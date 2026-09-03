@@ -103,6 +103,10 @@ import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
 import FileRevisionsPanel from '@/components/files/FileRevisionsPanel.vue'
 import {
+  claimOfficeActionsMenu,
+  releaseOfficeActionsMenu,
+} from '@/components/files/officeActionsMenuExclusive'
+import {
   MENU_WIDTH_PX,
   parseCssPx,
   placeOfficeActionsMenu,
@@ -189,17 +193,22 @@ const updateMenuPosition = () => {
 }
 
 const close = () => {
+  if (!open.value) return
   open.value = false
+  releaseOfficeActionsMenu(close)
 }
 
 const toggle = () => {
-  open.value = !open.value
   if (open.value) {
-    nextTick(() => {
-      updateMenuPosition()
-      nextTick(updateMenuPosition)
-    })
+    close()
+    return
   }
+  claimOfficeActionsMenu(close)
+  open.value = true
+  nextTick(() => {
+    updateMenuPosition()
+    nextTick(updateMenuPosition)
+  })
 }
 
 const onDownload = async () => {
@@ -305,6 +314,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  close()
   document.removeEventListener('click', onDocClick)
   document.removeEventListener('keydown', onKeydown)
   window.removeEventListener('scroll', onReposition, true)
