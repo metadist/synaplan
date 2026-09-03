@@ -131,6 +131,75 @@ final readonly class ConversationFileCatalog
     }
 
     /**
+     * The uploaded document this turn is about, when there is one that
+     * displaces the pictures the assistant generated earlier (#1689).
+     *
+     * A document attached to the current message always wins: the user just
+     * handed it over. Without an attachment, the newest uploaded document of
+     * the thread is in focus as long as it is newer than every generated image —
+     * "review this file" followed by "now make a clean docx of it" is about the
+     * upload, not about the cat drawn three turns earlier. An image generated
+     * AFTER the upload (e.g. an illustration for that very document) keeps the
+     * picture in play, so nothing is returned then.
+     *
+     * Only user-provided documents count; a generated document is the
+     * assistant's own output and does not signal that the user changed topic.
+     *
+     * @param list<ConversationFile> $catalog an unfiltered catalog from {@see build()}
+     */
+    public function documentInFocus(array $catalog): ?ConversationFile
+    {
+        $newestUpload = null;
+        $newestGeneratedImage = null;
+
+        foreach ($catalog as $file) {
+            $isDocument = ConversationFile::CATEGORY_DOCUMENT === $file->category;
+
+            if ($isDocument && ConversationFile::ORIGIN_ATTACHED === $file->origin) {
+                return $file;
+            }
+
+            if ($isDocument && ConversationFile::ORIGIN_UPLOADED === $file->origin) {
+                $newestUpload = self::newerOf($newestUpload, $file);
+                continue;
+            }
+
+            if ($file->isImage() && $file->isGenerated()) {
+                $newestGeneratedImage = self::newerOf($newestGeneratedImage, $file);
+            }
+        }
+
+        if (null === $newestUpload) {
+            return null;
+        }
+
+        if (null !== $newestGeneratedImage && !self::isNewer($newestUpload, $newestGeneratedImage)) {
+            return null;
+        }
+
+        return $newestUpload;
+    }
+
+    private static function newerOf(?ConversationFile $current, ConversationFile $candidate): ConversationFile
+    {
+        return null === $current || self::isNewer($candidate, $current) ? $candidate : $current;
+    }
+
+    /**
+     * Message order first (the thread is what the user sees), file id as the
+     * tie-break inside one message.
+     */
+    private static function isNewer(ConversationFile $a, ConversationFile $b): bool
+    {
+        $byMessage = ($a->messageId ?? 0) <=> ($b->messageId ?? 0);
+        if (0 !== $byMessage) {
+            return $byMessage > 0;
+        }
+
+        return ($a->fileId ?? 0) > ($b->fileId ?? 0);
+    }
+
+    /**
      * Resolve one entry by the reference the model echoed back. Only references
      * this catalog offered are accepted — an invented one resolves to null
      * instead of reaching a provider.

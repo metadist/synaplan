@@ -202,6 +202,66 @@ class ConversationFileCatalogTest extends TestCase
         $this->assertNull($service->latestImage($service->build((new Message())->setUserId(7), [$this->threadMessage(500)])));
     }
 
+    /**
+     * #1689: a document the user hands over now is what the turn is about, not
+     * the picture generated earlier.
+     */
+    public function testDocumentInFocusIsTheAttachedDocument(): void
+    {
+        $trench = $this->file(93, 'trench.png', source: 'generated', messageId: 460);
+        $route = $this->file(94, 'route.docx');
+        $service = $this->catalog($this->repository([$trench]));
+
+        $focus = $service->documentInFocus($service->build(
+            (new Message())->setUserId(7)->setDirection('IN')->addFile($route),
+            [$this->threadMessage(460)],
+        ));
+
+        $this->assertNotNull($focus);
+        $this->assertSame('file:94', $focus->reference);
+    }
+
+    public function testDocumentInFocusIsTheUploadNewerThanEveryGeneratedImage(): void
+    {
+        $trench = $this->file(93, 'trench.png', source: 'generated', messageId: 460);
+        $route = $this->file(94, 'route.docx', messageId: 465);
+        $service = $this->catalog($this->repository([$route, $trench]));
+
+        $focus = $service->documentInFocus($service->build(
+            (new Message())->setUserId(7),
+            [$this->threadMessage(460), $this->threadMessage(465)],
+        ));
+
+        $this->assertNotNull($focus);
+        $this->assertSame('file:94', $focus->reference);
+    }
+
+    public function testNoDocumentInFocusWhenAnImageWasGeneratedAfterTheUpload(): void
+    {
+        $brief = $this->file(94, 'brief.docx', messageId: 460);
+        $illustration = $this->file(95, 'illustration.png', source: 'generated', messageId: 465);
+        $service = $this->catalog($this->repository([$illustration, $brief]));
+
+        $this->assertNull($service->documentInFocus($service->build(
+            (new Message())->setUserId(7),
+            [$this->threadMessage(460), $this->threadMessage(465)],
+        )));
+    }
+
+    public function testGeneratedDocumentsAndOtherMediaNeverTakeFocus(): void
+    {
+        $trench = $this->file(93, 'trench.png', source: 'generated', messageId: 460);
+        $report = $this->file(96, 'report.docx', source: 'generated', messageId: 470);
+        $voice = $this->file(97, 'note.mp3', messageId: 480);
+        $service = $this->catalog($this->repository([$voice, $report, $trench]));
+
+        $this->assertNull($service->documentInFocus($service->build(
+            (new Message())->setUserId(7),
+            [$this->threadMessage(460), $this->threadMessage(470), $this->threadMessage(480)],
+        )));
+        $this->assertNull($service->documentInFocus([]));
+    }
+
     public function testCategoryFilterRestrictsTheCatalog(): void
     {
         $report = $this->file(50, 'report.docx', messageId: 500);
