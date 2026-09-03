@@ -175,6 +175,11 @@ final readonly class StructuredOutputRecovery
     }
 
     /**
+     * A type name outside the seven JSON Schema primitives cannot be checked,
+     * and an unchecked value is not a salvaged one: it fails closed, so the
+     * caller falls through to the corrective retry instead of trusting output
+     * nobody validated.
+     *
      * @param string|list<string> $type
      */
     private static function matchesType(mixed $value, string|array $type): bool
@@ -188,7 +193,7 @@ final readonly class StructuredOutputRecovery
                 'null' => null === $value,
                 'object' => is_array($value) && self::isObjectLike($value),
                 'array' => is_array($value) && array_is_list($value),
-                default => true,
+                default => false,
             };
             if ($matches) {
                 return true;
