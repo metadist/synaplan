@@ -136,6 +136,9 @@ export interface Message {
   documentFidelityLossy?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
+  errorReason?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string

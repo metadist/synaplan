@@ -285,6 +285,9 @@ export interface ApiLoadedMessageRow {
   originalTopic?: string
   originalMediaType?: string
   original_media_type?: string
+  errorReason?: string | null
+  canRetryModel?: boolean | null
+  errorDebug?: string | null
   provider?: string
   aiModels?: Message['aiModels']
   webSearch?: Message['webSearch']
@@ -533,6 +536,9 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     topic: m.topic,
     originalTopic: m.originalTopic || null,
     originalMediaType: m.originalMediaType ?? m.original_media_type ?? null,
+    errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
+    canRetryModel: role === 'assistant' ? (m.canRetryModel ?? undefined) : undefined,
+    errorDebug: role === 'assistant' ? (m.errorDebug ?? null) : null,
     backendMessageId: m.id,
     quotedText: m.quotedText ?? null,
     quotedMessageId: m.quotedMessageId ?? null,
@@ -747,6 +753,11 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   }
   if (persisted.originalMediaType) {
     local.originalMediaType = persisted.originalMediaType
+  }
+  if (persisted.errorReason) {
+    local.errorReason = persisted.errorReason
+    local.canRetryModel = persisted.canRetryModel
+    local.errorDebug = persisted.errorDebug ?? null
   }
   if (persisted.wasMultitask) {
     local.wasMultitask = true

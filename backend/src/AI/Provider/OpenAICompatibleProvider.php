@@ -6,6 +6,7 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
@@ -119,7 +120,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            throw new ProviderException('OpenAI-compatible chat error: '.$e->getMessage(), $this->getName(), null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, $this->getName(), 'chat', 'OpenAI-compatible chat error');
         }
     }
 
@@ -174,7 +175,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            throw new ProviderException('OpenAI-compatible streaming error: '.$e->getMessage(), $this->getName(), null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, $this->getName(), 'chat_stream', 'OpenAI-compatible streaming error');
         }
     }
 

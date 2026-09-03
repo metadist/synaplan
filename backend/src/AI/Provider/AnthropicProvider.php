@@ -4,6 +4,7 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
@@ -384,6 +385,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
             $upstreamStatus = 0;
+            $errorBody = null;
 
             if (method_exists($e, 'getResponse')) {
                 try {
@@ -408,7 +410,12 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
+            $errorType = null;
+            if (isset($errorBody['error']['type']) && is_string($errorBody['error']['type'])) {
+                $errorType = $errorBody['error']['type'];
+            }
+
+            throw (new ProviderFailureFactory())->fromParsed($errorMessage, 'anthropic', 'chat', $upstreamStatus, $errorType, previous: $e);
         }
     }
 
@@ -572,7 +579,11 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'status_code' => $upstreamStatus,
             ]);
 
-            throw new ProviderException($errorMessage, 'anthropic', null, $upstreamStatus, $e);
+            $errorType = is_array($errorBody['error'] ?? null) && isset($errorBody['error']['type']) && is_string($errorBody['error']['type'])
+                ? $errorBody['error']['type']
+                : null;
+
+            throw (new ProviderFailureFactory())->fromParsed($errorMessage, 'anthropic', 'chat_stream', $upstreamStatus, $errorType, previous: $e);
         }
     }
 

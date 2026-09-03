@@ -21,6 +21,8 @@ use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\ChatErrorNotifier;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -84,6 +86,8 @@ class StreamControllerTaskPlanFilesTest extends TestCase
             $this->createMock(UsageTaximeterConfig::class),
             new PremiumFeatureGate(new BillingService('', '')),
             ChatRunServiceFactory::withoutRedis(),
+            $this->createMock(ChatErrorPresenter::class),
+            $this->createMock(ChatErrorNotifier::class),
         );
     }
 

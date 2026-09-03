@@ -823,6 +823,13 @@
     "infoTokens": "Jetons",
     "infoCost": "Coût"
   },
+  "chatError": {
+    "title": "La réponse a échoué",
+    "retry": "Réessayer avec un autre modèle",
+    "retryWith": "Réessayer avec {model}",
+    "chooseModel": "Choisir un autre modèle",
+    "showDetails": "Afficher les détails techniques"
+  },
   "commands": {
     "noResults": "Aucune commande trouvée",
     "availableCommands": "Commandes disponibles",
@@ -4403,13 +4410,6 @@
   },
   "aiProvider": {
     "error": {
-      "prefix": "Erreur",
-      "noModelTitle": "Téléchargement de modèle requis",
-      "quickModels": "Rapides et légers",
-      "mediumModels": "Moyens (meilleure qualité)",
-      "largeModels": "Grands (meilleure qualité)",
-      "exampleCommand": "Commande d’installation",
-      "restartNote": "Après le téléchargement, actualisez la page et réessayez.",
       "visionModelHint": "Aucun modèle capable de vision configuré",
       "visionModelHintDetail": "Votre message contient des images, mais votre modèle de chat actuel ne peut pas les analyser. Allez dans **Réglages → Modèles IA** et activez un modèle avec prise en charge de la vision (p. ex. GPT-4o, Gemini, Llama 4), ou définissez un modèle **Image→Texte** par défaut."
     }

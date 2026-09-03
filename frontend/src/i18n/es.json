@@ -855,6 +855,13 @@
     "infoTokens": "Tokens",
     "infoCost": "Coste"
   },
+  "chatError": {
+    "title": "La respuesta falló",
+    "retry": "Intentarlo de nuevo con otro modelo",
+    "retryWith": "Intentarlo de nuevo con {model}",
+    "chooseModel": "Elegir otro modelo",
+    "showDetails": "Mostrar detalles técnicos"
+  },
   "commands": {
     "noResults": "No se encontraron comandos",
     "availableCommands": "Comandos Disponibles",
@@ -1075,13 +1082,6 @@
   },
   "aiProvider": {
     "error": {
-      "prefix": "Error",
-      "noModelTitle": "Descarga de Modelo Requerida",
-      "quickModels": "Rápido y Ligero",
-      "mediumModels": "Medio (Mejor Calidad)",
-      "largeModels": "Grande (Mejor Calidad)",
-      "exampleCommand": "Comando de Instalación",
-      "restartNote": "Después de descargar, actualiza la página e intenta de nuevo.",
       "visionModelHint": "No hay modelo con visión configurado",
       "visionModelHintDetail": "Tu mensaje incluye imágenes, pero tu modelo de chat actual no puede analizarlas. Ve a **Configuración → Modelos IA** y activa un modelo con soporte de visión (p. ej. GPT-4o, Gemini, Llama 4), o configura un modelo **Pic→Text** predeterminado."
     }

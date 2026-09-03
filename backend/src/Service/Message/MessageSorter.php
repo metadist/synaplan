@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
@@ -130,6 +131,7 @@ final readonly class MessageSorter
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
     ) {
     }
 
@@ -438,13 +440,38 @@ final readonly class MessageSorter
                 'sorting_model_name' => $modelName,
             ], $violationDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
-            // Re-throw ProviderException to preserve install instructions
-            $this->logger->error('MessageSorter: AI Provider failed', [
+            $reason = $this->failureClassifier->classify($e);
+
+            // An auth or quota failure is an account/setup problem: it carries
+            // instructions the user must act on and would hit the answering
+            // call the very same way, so routing to `general` would only hide
+            // the real cause. Every other provider failure is a routing hiccup
+            // that must not kill the whole turn.
+            if (!$reason->suggestsOtherModel()) {
+                $this->logger->error('MessageSorter: AI Provider failed — rethrowing, another model would not help', [
+                    'error' => $e->getMessage(),
+                    'provider' => $e->getProviderName(),
+                    'context' => $e->getContext(),
+                    'reason' => $reason->value,
+                ]);
+
+                throw $e;
+            }
+
+            $this->logger->error('MessageSorter: AI Provider failed — falling back to general', [
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
                 'context' => $e->getContext(),
+                'reason' => $reason->value,
             ]);
-            throw $e;
+
+            $exceptionDecision = RoutingDecision::fallback('general', 'provider_error:'.$reason->value);
+
+            return array_merge([
+                'topic' => 'general',
+                'language' => $messageData['BLANG'] ?? 'en',
+                'raw_response' => '',
+            ], $exceptionDecision->toClassificationFields());
         } catch (\Throwable $e) {
             $this->logger->error('MessageSorter: Classification failed', [
                 'error' => $e->getMessage(),

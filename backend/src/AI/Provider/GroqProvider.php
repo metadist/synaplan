@@ -4,6 +4,7 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
@@ -216,7 +217,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('Groq chat error: '.$e->getMessage(), 'groq', null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'groq', 'chat');
         }
     }
 
@@ -327,7 +328,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('Groq streaming error: '.$e->getMessage(), 'groq', null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'groq', 'chat_stream', 'Groq streaming error');
         }
     }
 

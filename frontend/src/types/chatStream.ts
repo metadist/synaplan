@@ -154,6 +154,9 @@ export interface StreamUpdatePayload {
   topic?: string
   originalTopic?: string | null
   originalMediaType?: string | null
+  errorReason?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   /**
    * Title the server generated for this chat, sent only on the turn that
    * named it (#1500).

@@ -664,6 +664,76 @@ final readonly class DiscordNotificationService
     }
 
     /**
+     * Notify a web-chat / sorting / generation provider failure.
+     *
+     * Always includes the raw provider text so operators can diagnose; the
+     * user-facing chat never sees this payload. Callers go through
+     * {@see Message\ChatErrorNotifier}, which throttles bursts.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public function notifyChatError(
+        string $error,
+        string $reason,
+        ?string $provider = null,
+        ?int $userId = null,
+        array $metadata = [],
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => 'Reason',
+                'value' => $reason,
+                'inline' => true,
+            ],
+            [
+                'name' => 'Provider',
+                'value' => $provider ?: 'unknown',
+                'inline' => true,
+            ],
+            [
+                'name' => 'Error',
+                'value' => '```'.$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        if (null !== $userId) {
+            $fields[] = [
+                'name' => 'User ID',
+                'value' => (string) $userId,
+                'inline' => true,
+            ];
+        }
+
+        if (isset($metadata['model']) && is_string($metadata['model']) && '' !== $metadata['model']) {
+            $fields[] = [
+                'name' => 'Model',
+                'value' => $this->truncate($metadata['model'], 80),
+                'inline' => true,
+            ];
+        }
+
+        if (isset($metadata['chat_id'])) {
+            $fields[] = [
+                'name' => 'Chat ID',
+                'value' => (string) $metadata['chat_id'],
+                'inline' => true,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ Chat Provider Error',
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Chat · throttled per provider + reason'
+        );
+    }
+
+    /**
      * Notify when the embedding fallback provider activates due to a
      * primary-provider failure.
      *

@@ -4,6 +4,7 @@ namespace App\AI\Provider;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -253,7 +254,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('OpenAI chat error: '.$e->getMessage(), 'openai');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'openai', 'chat');
         }
     }
 
@@ -373,7 +374,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('OpenAI streaming error: '.$e->getMessage(), 'openai');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'openai', 'chat_stream', 'OpenAI streaming error');
         }
     }
 
