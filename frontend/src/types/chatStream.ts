@@ -137,6 +137,13 @@ export interface StreamUpdatePayload {
   metadata?: StreamEventMetadata
   links?: StreamLinkItem[]
   generatedFile?: StreamGeneratedFile
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok: boolean
+  }>
+  documentVersion?: number
+  documentFidelityLossy?: boolean
   searchResults?: StreamSearchResult[]
   memoryIds?: number[]
   feedbackIds?: number[]

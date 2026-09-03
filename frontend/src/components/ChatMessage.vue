@@ -324,6 +324,19 @@
                     {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
                   </template>
                 </div>
+                <ul
+                  v-if="documentStepList.length > 0"
+                  class="mt-2 space-y-1"
+                  data-testid="document-step-list"
+                >
+                  <li
+                    v-for="(step, idx) in documentStepList"
+                    :key="idx"
+                    class="text-xs txt-tertiary surface-chip rounded-md px-2 py-1"
+                  >
+                    {{ stepLabel(step) }}
+                  </li>
+                </ul>
               </template>
               <template v-else-if="processingStatus === 'thinking'">
                 <div class="font-medium animate-pulse">
@@ -420,6 +433,15 @@
                     class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
                     >{{ formatFileSize(file.fileSize) }}</span
                   >
+                  <FileOfficeActions
+                    v-if="file.id && showOfficeActions(file)"
+                    :file-id="file.id"
+                    :filename="file.filename"
+                    :guest-session-id="guestSessionId"
+                    :sibling-file-ids="officeSiblingIds"
+                    @click.stop
+                    @preview="openPreview(file)"
+                  />
                 </div>
               </template>
 
@@ -467,6 +489,19 @@
                   class="w-4 h-4"
                 />
               </button>
+            </div>
+            <div
+              v-if="documentChanges && documentChanges.length > 0"
+              class="text-xs txt-tertiary space-y-1"
+              data-testid="document-changes"
+            >
+              <div class="font-medium txt-secondary">{{ $t('message.documentChangesTitle') }}</div>
+              <ul class="space-y-0.5">
+                <li v-for="(step, idx) in documentChanges" :key="idx">{{ stepLabel(step) }}</li>
+              </ul>
+              <p v-if="documentFidelityLossy" class="txt-tertiary">
+                {{ $t('files.fidelityNotice') }}
+              </p>
             </div>
           </div>
 
@@ -1073,10 +1108,16 @@
   </div>
 
   <ExternalLinkWarning :url="pendingUrl" :is-open="warningOpen" @close="closeWarning" />
+  <DocumentPreviewModal
+    :open="previewFile !== null"
+    :file="previewFile"
+    :guest-session-id="guestSessionId"
+    @close="previewFile = null"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -1093,6 +1134,10 @@ import ToolBadge from '@/components/ToolBadge.vue'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import { useNotification } from '@/composables/useNotification'
+import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
+import { kindFromExtension, extensionOf } from '@/services/filePreview'
+import { useGuestStore } from '@/stores/guest'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
@@ -1118,6 +1163,33 @@ import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
 
 const { t, locale } = useI18n()
+const guestStore = useGuestStore()
+const guestSessionId = computed(() => guestStore.sessionId)
+const previewFile = ref<{ id: number; filename: string } | null>(null)
+const DocumentPreviewModal = defineAsyncComponent(
+  () => import('@/components/files/DocumentPreviewModal.vue')
+)
+
+const showOfficeActions = (file: MessageFile): boolean => {
+  if (!file.id) return false
+  const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
+  if ('pdf' === kind) return true
+  return isOfficeConvertEnabled() && 'document' === kind
+}
+
+const openPreview = (file: MessageFile) => {
+  previewFile.value = { id: file.id, filename: file.filename }
+}
+
+const officeSiblingIds = computed(() =>
+  (props.files ?? [])
+    .filter((file) => {
+      if (!file.id) return false
+      const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
+      return 'document' === kind || 'pdf' === kind
+    })
+    .map((file) => file.id)
+)
 
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
@@ -1155,10 +1227,21 @@ interface Props {
     /** Document generation progress (status === 'generating_file'). */
     stage?: string
     filename?: string
+    documentSteps?: Array<{
+      labelKey: string
+      labelParams?: Record<string, unknown>
+      ok?: boolean
+    }>
     /** Picture of the conversation this turn edits (status === 'editing'). */
     edit_source_name?: string
   } | null
   files?: MessageFile[] // Attached files
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok?: boolean
+  }>
+  documentFidelityLossy?: boolean
   searchResults?: Array<{
     title: string
     url: string
@@ -1233,6 +1316,18 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+type DocumentStep = { labelKey: string; labelParams?: Record<string, unknown>; ok?: boolean }
+
+const documentStepList = computed<DocumentStep[]>(() => {
+  const live = props.processingMetadata?.documentSteps
+  if (Array.isArray(live) && live.length > 0) return live
+  return props.documentChanges ?? []
+})
+
+const stepLabel = (step: DocumentStep): string => {
+  return t(step.labelKey, (step.labelParams ?? {}) as Record<string, unknown>)
+}
 
 /**
  * Usage taximeter hover badge: "<tokens> · <cost>" for the complete assistant

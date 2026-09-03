@@ -8,7 +8,9 @@ use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use OpenAI\Contracts\ClientContract;
 use Psr\Log\LoggerInterface;
 
@@ -27,8 +29,10 @@ use Psr\Log\LoggerInterface;
  * via {@see OpenAiCompatibleEndpointRegistry}. This mirrors how the Higgsfield
  * provider resolves per-user credentials at call time.
  */
-final class OpenAICompatibleProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface
+final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     /** @var array<string, ClientContract> keyed by endpoint name */
     private array $clients = [];
 
@@ -108,13 +112,15 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
                 $request['temperature'] = $options['temperature'];
             }
 
+            $request = $this->applyChatCompletionsToolOptions($request, $options);
+
             $response = $client->chat()->create($request);
             $arr = $response->toArray();
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $this->normalizeUsage($arr['usage'] ?? []),
-            ];
+            ], $arr['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -138,6 +144,8 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
             if (isset($options['temperature'])) {
                 $request['temperature'] = $options['temperature'];
             }
+
+            $request = $this->applyChatCompletionsToolOptions($request, $options);
 
             $stream = $client->chat()->createStreamed($request);
 
@@ -170,6 +178,8 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, Embedding
                         $callback($content);
                     }
                 }
+
+                $this->emitChatCompletionsToolDeltas($arr['choices'][0] ?? [], $callback);
             }
 
             if (null !== $finishReason) {

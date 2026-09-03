@@ -73,6 +73,7 @@
             :file="file"
             :playing="activePlayerId === file.id"
             @play="activePlayerId = file.id"
+            @preview="openPreview(file)"
           />
         </div>
         <div class="p-2">
@@ -96,6 +97,12 @@
             hold their size, which keeps the trailing edge fixed.
           -->
           <div class="flex items-center gap-1 mt-1.5 min-w-0">
+            <FileOfficeActions
+              v-if="showOfficeActions(file)"
+              :file-id="file.id"
+              :filename="file.display_name || file.filename"
+              @preview="openPreview(file)"
+            />
             <button
               class="flex-1 min-w-0 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)] hover:bg-[var(--brand)]/20 transition-colors text-[11px] font-medium flex items-center justify-center gap-1"
               :title="$t('files.generated.download')"
@@ -220,22 +227,34 @@
         </button>
       </div>
     </div>
+    <DocumentPreviewModal
+      :open="previewFile !== null"
+      :file="previewFile"
+      @close="previewFile = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { ArrowDownTrayIcon, ChatBubbleLeftRightIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import FilePreview from '@/components/files/FilePreview.vue'
+import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
+import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
+import { previewKindForFile } from '@/services/filePreview'
 import FileVectorPill from '@/components/files/FileVectorPill.vue'
 import filesService, { type FileItem, type FileOriginKind } from '@/services/filesService'
 import { fileDisplayName, vectorStateOf } from '@/utils/fileDisplayName'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { useChatsStore } from '@/stores/chats'
+
+const DocumentPreviewModal = defineAsyncComponent(
+  () => import('@/components/files/DocumentPreviewModal.vue')
+)
 
 const { t, locale } = useI18n()
 const translate = (key: string, values?: Record<string, unknown>): string =>
@@ -246,6 +265,7 @@ const { confirm } = useDialog()
 const chatsStore = useChatsStore()
 
 const files = ref<FileItem[]>([])
+const previewFile = ref<{ id: number; filename: string } | null>(null)
 const loading = ref(false)
 // Only one media player is mounted at a time (#1499): tiles show a poster/icon
 // by default and mount the real <video>/<audio> only for the tile the user taps.
@@ -327,6 +347,16 @@ const nextPage = () => {
 
 const previousPage = () => {
   if (currentPage.value > 1) load(currentPage.value - 1)
+}
+
+const showOfficeActions = (file: FileItem): boolean => {
+  const kind = previewKindForFile(file)
+  if ('pdf' === kind) return true
+  return isOfficeConvertEnabled() && 'document' === kind
+}
+
+const openPreview = (file: FileItem) => {
+  previewFile.value = { id: file.id, filename: file.display_name || file.filename }
 }
 
 const download = async (file: FileItem) => {

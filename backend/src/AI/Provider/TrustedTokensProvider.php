@@ -7,7 +7,9 @@ namespace App\AI\Provider;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,8 +23,9 @@ use Psr\Log\LoggerInterface;
  * @see https://trustedtokens.eu/docs/
  * @see https://api.trustedtokens.eu/v1
  */
-class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInterface
+class TrustedTokensProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
     private const PROVIDER_NAME = 'trustedtokens';
     private const BASE_URI = 'https://api.trustedtokens.eu/v1';
     private const DEFAULT_CHAT_MODEL = 'zai-org/GLM-5.2';
@@ -154,10 +157,10 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
             $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $this->parseUsage($responseArray['usage'] ?? []),
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -203,6 +206,8 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
                 if (isset($response->choices[0]->delta->content)) {
                     $callback($response->choices[0]->delta->content);
                 }
+
+                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
             }
 
             $callback(['type' => 'finish', 'finish_reason' => $finishReason ?? 'stop']);
@@ -332,7 +337,7 @@ class TrustedTokensProvider implements ChatProviderInterface, VisionProviderInte
             $request['stream_options'] = ['include_usage' => true];
         }
 
-        return $request;
+        return $this->applyChatCompletionsToolOptions($request, $options);
     }
 
     /**

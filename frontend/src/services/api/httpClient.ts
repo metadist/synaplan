@@ -147,6 +147,8 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
         features: {
           help: false,
           memoryService: false,
+          officeConvertEnabled: false,
+          documentToolsEnabled: false,
         },
         googleTag: {
           enabled: false,
@@ -212,6 +214,8 @@ export function getConfigSync(): RuntimeConfig {
       },
       features: {
         help: false,
+        officeConvertEnabled: false,
+        documentToolsEnabled: false,
       },
       googleTag: {
         enabled: false,

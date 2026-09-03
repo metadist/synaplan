@@ -8,6 +8,7 @@ use App\Seed\BrandingConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\DesktopAgentConfigSeeder;
+use App\Seed\DocumentToolsConfigSeeder;
 use App\Seed\FileContextConfigSeeder;
 use App\Seed\MarketingNewsConfigSeeder;
 use App\Seed\McpConfigSeeder;
@@ -56,7 +57,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  16. file-context  (BCONFIG: FILE_CONTEXT conversation-file flags, ownerId=0 — default OFF)
  *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default OFF until GA)
  *  18. self-aware    (BCONFIG: SELF_AWARE flags, ownerId=0 — default ON)
- *  19. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  19. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — default OFF)
+ *  20. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -88,6 +90,7 @@ final class SeedAllCommand extends Command
         private readonly FileContextConfigSeeder $fileContextConfigSeeder,
         private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
         private readonly SelfAwareConfigSeeder $selfAwareConfigSeeder,
+        private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -115,7 +118,8 @@ final class SeedAllCommand extends Command
             "  16. file-context flags         (BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF)\n".
             "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default OFF until GA)\n".
             "  18. self-aware flags           (BCONFIG, group=SELF_AWARE, ownerId=0 — default ON)\n".
-            "  19. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  19. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — default OFF)\n".
+            "  20. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -145,6 +149,7 @@ final class SeedAllCommand extends Command
             ['file-context', fn (): SeedResult => $this->fileContextConfigSeeder->seed()],
             ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
             ['self-aware', fn (): SeedResult => $this->selfAwareConfigSeeder->seed()],
+            ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

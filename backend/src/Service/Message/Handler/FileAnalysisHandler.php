@@ -755,7 +755,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             $prompt .= "=== EXTRACTED CONTENT ===\n";
             $prompt .= $doc['text']."\n";
             $prompt .= "=== END OF CONTENT ===\n\n";
-            $prompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points.';
+            $prompt .= 'Answer the user\'s question about this document. If they ask what\'s in the file, summarize the key points. Spreadsheet extracts are sheet-by-sheet Markdown tables with A1 coordinates — cite cells as SheetName!B12 when that helps.';
 
             return $prompt;
         }
