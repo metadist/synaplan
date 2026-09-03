@@ -538,13 +538,14 @@
           </div>
 
           <ChatErrorNotice
-            v-if="errorReason"
+            v-if="role === 'assistant' && errorReason"
             class="m-3"
             :error-reason="errorReason"
             :can-retry-model="canRetryModel"
             :error-debug="errorDebug"
             :recommended-model-label="selectedModel?.label ?? null"
             :recommended-model-id="selectedModel?.id ?? null"
+            :failed-model-id="aiModels?.chat?.model_id ?? null"
             :model-options="modelOptions"
             @retry="handleErrorRetry"
           />
@@ -1754,7 +1755,20 @@ const shortenModel = (name: string): string => {
 // that pre-date the structured metadata. Without this preference the round-robin
 // recommendation cannot identify the current model and always returns the
 // second-highest-rated model. See issue #922.
-const againDataComputed = computed(() => props.againData)
+const againDataComputed = computed(() => {
+  const existing = props.againData
+  const failedId = props.aiModels?.chat?.model_id
+  if (typeof failedId !== 'number' || failedId <= 0) {
+    return existing
+  }
+
+  return {
+    eligible: existing?.eligible ?? [],
+    predictedNext: existing?.predictedNext ?? null,
+    tag: existing?.tag ?? 'CHAT',
+    currentModelId: existing?.currentModelId ?? existing?.current_model_id ?? failedId,
+  }
+})
 const filesComputed = computed(() => props.files)
 const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
 const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)

@@ -52,6 +52,7 @@ const mountNotice = (props: {
   errorDebug?: string | null
   recommendedModelLabel?: string | null
   recommendedModelId?: number | null
+  failedModelId?: number | null
   modelOptions?: { id: number; label: string }[]
 }) =>
   mount(ChatErrorNotice, {
@@ -101,6 +102,24 @@ describe('ChatErrorNotice', () => {
     await select.setValue('7')
     await wrapper.get('[data-testid="btn-chat-error-retry"]').trigger('click')
     expect(wrapper.emitted('retry')?.[0]).toEqual([7])
+  })
+
+  it('defaults to a different model than the one that failed', async () => {
+    const wrapper = mountNotice({
+      errorReason: 'schema_mismatch',
+      canRetryModel: true,
+      recommendedModelLabel: 'gpt-oss-120b',
+      recommendedModelId: 76,
+      failedModelId: 76,
+      modelOptions: [
+        { id: 76, label: 'gpt-oss-120b' },
+        { id: 73, label: 'gpt-4o-mini' },
+      ],
+    })
+
+    expect(wrapper.get('[data-testid="btn-chat-error-retry"]').text()).toContain('gpt-4o-mini')
+    await wrapper.get('[data-testid="btn-chat-error-retry"]').trigger('click')
+    expect(wrapper.emitted('retry')?.[0]).toEqual([73])
   })
 
   it('hides retry for auth failures', () => {

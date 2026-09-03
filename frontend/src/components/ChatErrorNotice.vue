@@ -31,6 +31,7 @@ const props = defineProps<{
   errorDebug?: string | null
   recommendedModelLabel?: string | null
   recommendedModelId?: number | null
+  failedModelId?: number | null
   modelOptions?: RetryModelOption[]
 }>()
 
@@ -57,8 +58,18 @@ const showRetry = computed(
     reason.value !== 'quota_exceeded'
 )
 const canSeeDebug = computed(() => authStore.isAdmin && !!props.errorDebug)
-const pickedModelId = ref<number | undefined>(props.recommendedModelId ?? undefined)
 const options = computed(() => props.modelOptions ?? [])
+const fallbackRetryId = computed(() => {
+  const failedId = props.failedModelId ?? null
+  const recommended = props.recommendedModelId ?? undefined
+  if (recommended != null && recommended !== failedId) {
+    return recommended
+  }
+
+  const other = options.value.find((option) => option.id !== failedId)
+  return other?.id ?? recommended
+})
+const pickedModelId = ref<number | undefined>(fallbackRetryId.value)
 const showModelPicker = computed(() => showRetry.value && options.value.length > 1)
 const pickedLabel = computed(() => {
   const picked = options.value.find((option) => option.id === pickedModelId.value)
@@ -71,14 +82,11 @@ const retryLabel = computed(() => {
   return t('chatError.retry')
 })
 
-watch(
-  () => props.recommendedModelId,
-  (id) => {
-    if (id != null) {
-      pickedModelId.value = id
-    }
+watch(fallbackRetryId, (id) => {
+  if (id != null) {
+    pickedModelId.value = id
   }
-)
+})
 
 const onModelChange = (event: Event) => {
   const value = Number((event.target as HTMLSelectElement).value)
@@ -112,7 +120,7 @@ const retry = () => {
         v-if="showModelPicker"
         id="chat-error-model"
         :value="pickedModelId"
-        class="px-3 py-2 rounded-lg bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm max-w-xs focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
+        class="pill text-xs max-w-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
         data-testid="chat-error-model-select"
         @change="onModelChange"
       >
@@ -120,14 +128,9 @@ const retry = () => {
           {{ option.label }}
         </option>
       </select>
-      <button
-        type="button"
-        class="btn-primary text-sm inline-flex items-center gap-2"
-        data-testid="btn-chat-error-retry"
-        @click="retry"
-      >
+      <button type="button" class="pill text-xs" data-testid="btn-chat-error-retry" @click="retry">
         <Icon icon="mdi:refresh" class="w-4 h-4" />
-        {{ retryLabel }}
+        <span class="font-medium">{{ retryLabel }}</span>
       </button>
     </div>
     <p v-else class="text-sm txt-secondary" data-testid="chat-error-no-retry">

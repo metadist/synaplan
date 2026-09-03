@@ -357,6 +357,14 @@ final readonly class MessageApiFormatter
      */
     private function buildErrorFields(Message $m): array
     {
+        if ('IN' === $m->getDirection()) {
+            return [
+                'errorReason' => null,
+                'canRetryModel' => null,
+                'errorDebug' => null,
+            ];
+        }
+
         $reasonRaw = $m->getMeta('error_reason') ?? $m->getMeta('error_type');
         $reason = is_string($reasonRaw) && '' !== $reasonRaw
             ? ChatFailureReason::tryFrom($reasonRaw)
