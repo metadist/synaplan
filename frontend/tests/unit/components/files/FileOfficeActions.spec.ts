@@ -64,20 +64,22 @@ const i18n = createI18n({
 })
 
 describe('FileOfficeActions', () => {
-  let wrapper: VueWrapper | null = null
+  const wrappers: VueWrapper[] = []
 
   afterEach(() => {
-    wrapper?.unmount()
-    wrapper = null
+    while (wrappers.length > 0) {
+      wrappers.pop()?.unmount()
+    }
     isDocumentToolsEnabled.mockReturnValue(false)
   })
 
-  const mountActions = (filename: string): VueWrapper => {
-    wrapper = mount(FileOfficeActions, {
-      props: { fileId: 7, filename },
+  const mountActions = (filename: string, fileId = 7): VueWrapper => {
+    const wrapper = mount(FileOfficeActions, {
+      props: { fileId, filename },
       attachTo: document.body,
       global: { plugins: [i18n], stubs: { Icon: { template: '<i />' } } },
     })
+    wrappers.push(wrapper)
     return wrapper
   }
 
@@ -138,6 +140,31 @@ describe('FileOfficeActions', () => {
     const panel = document.querySelector('[data-testid="file-revisions-panel"]')
     expect(panel).toBeInstanceOf(HTMLElement)
     expect(document.body.contains(panel)).toBe(true)
-    expect(wrapper?.find('[data-testid="file-office-actions"]').element.contains(panel)).toBe(false)
+    expect(wrappers[0]?.find('[data-testid="file-office-actions"]').element.contains(panel)).toBe(
+      false
+    )
+  })
+
+  it('closes the first kebab when a second one opens', async () => {
+    const first = mountActions('brief.docx', 7)
+    const second = mountActions('report.pdf', 8)
+    await first.find('[data-testid="file-office-actions-trigger"]').trigger('click')
+    await nextTick()
+    await nextTick()
+    expect(document.querySelectorAll('[data-testid="file-office-actions-menu"]')).toHaveLength(1)
+    expect(
+      first.find('[data-testid="file-office-actions-trigger"]').attributes('aria-expanded')
+    ).toBe('true')
+
+    await second.find('[data-testid="file-office-actions-trigger"]').trigger('click')
+    await nextTick()
+    await nextTick()
+    expect(document.querySelectorAll('[data-testid="file-office-actions-menu"]')).toHaveLength(1)
+    expect(
+      first.find('[data-testid="file-office-actions-trigger"]').attributes('aria-expanded')
+    ).toBe('false')
+    expect(
+      second.find('[data-testid="file-office-actions-trigger"]').attributes('aria-expanded')
+    ).toBe('true')
   })
 })
