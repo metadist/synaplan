@@ -20,6 +20,7 @@ function visitor(overrides: Partial<AnnouncementContext> = {}): AnnouncementCont
     androidAppUrl: 'https://play.google.com/store/apps/details?id=com.synaplan.app',
     isNativeApp: false,
     deviceOs: 'other',
+    locale: 'en',
     ...overrides,
   }
 }
@@ -88,65 +89,34 @@ describe('the shipped catalogue', () => {
     expect(mobileApp?.applies(visitor())).toBe(true)
   })
 
-  it('offers both stores, App Store first for a desktop or unrecognized visitor', () => {
-    const actions = mobileApp?.actions?.(visitor({ deviceOs: 'other' })) ?? []
-
-    expect(actions.map((action) => action.labelKey)).toEqual(['appStore', 'googlePlay'])
-  })
-
-  it('leads with Google Play for a visitor on an Android device', () => {
-    const actions = mobileApp?.actions?.(visitor({ deviceOs: 'android' })) ?? []
-
-    expect(actions.map((action) => action.labelKey)).toEqual(['googlePlay', 'appStore'])
-  })
-
-  it('offers only the store the operator actually published', () => {
-    const actions = mobileApp?.actions?.(visitor({ androidAppUrl: '' })) ?? []
-
-    expect(actions.map((action) => action.labelKey)).toEqual(['appStore'])
-  })
-
-  it('tags every store link so the installs can be attributed', () => {
+  it('sends every visitor to the marketing chooser instead of a single store', () => {
     const actions = mobileApp?.actions?.(visitor()) ?? []
 
-    expect(actions.map((action) => action.url)).toEqual([
-      'https://apps.apple.com/app/id1?ct=web-announcement',
-      'https://play.google.com/store/apps/details?id=com.synaplan.app&ct=web-announcement',
-    ])
+    expect(actions).toEqual([{ labelKey: 'getTheApp', url: 'https://www.synaplan.com/app' }])
   })
 
-  it('keeps a query string the operator already configured', () => {
-    const actions =
-      mobileApp?.actions?.(
-        visitor({ iosAppUrl: 'https://apps.apple.com/de/app/id1?l=de', androidAppUrl: '' })
-      ) ?? []
+  it('uses the German marketing page when the UI is German', () => {
+    const actions = mobileApp?.actions?.(visitor({ locale: 'de' })) ?? []
 
-    expect(actions[0]?.url).toBe('https://apps.apple.com/de/app/id1?l=de&ct=web-announcement')
+    expect(actions[0]?.url).toBe('https://www.synaplan.com/de/app')
   })
 
-  it('keeps a fragment after the query instead of appending past it', () => {
-    const actions =
-      mobileApp?.actions?.(
-        visitor({ iosAppUrl: 'https://apps.apple.com/app/id1#reviews', androidAppUrl: '' })
-      ) ?? []
+  it('treats regional German locales as German', () => {
+    const actions = mobileApp?.actions?.(visitor({ locale: 'de-AT' })) ?? []
 
-    expect(actions[0]?.url).toBe('https://apps.apple.com/app/id1?ct=web-announcement#reviews')
+    expect(actions[0]?.url).toBe('https://www.synaplan.com/de/app')
   })
 
-  it('overwrites rather than duplicates a ct the operator already configured', () => {
-    const actions =
-      mobileApp?.actions?.(
-        visitor({ iosAppUrl: 'https://apps.apple.com/app/id1?ct=operator', androidAppUrl: '' })
-      ) ?? []
+  it('keeps other locales on the default English marketing page', () => {
+    const actions = mobileApp?.actions?.(visitor({ locale: 'fr' })) ?? []
 
-    expect(actions[0]?.url).toBe('https://apps.apple.com/app/id1?ct=web-announcement')
+    expect(actions[0]?.url).toBe('https://www.synaplan.com/app')
   })
 
-  it('falls back to plain concatenation for a non-absolute store URL', () => {
-    const actions =
-      mobileApp?.actions?.(visitor({ iosAppUrl: '/local-app', androidAppUrl: '' })) ?? []
+  it('still offers the chooser when the operator published only one store', () => {
+    const actions = mobileApp?.actions?.(visitor({ androidAppUrl: '' })) ?? []
 
-    expect(actions[0]?.url).toBe('/local-app?ct=web-announcement')
+    expect(actions.map((action) => action.labelKey)).toEqual(['getTheApp'])
   })
 
   it('gives every entry an id and expiry that the modal can rely on', () => {
