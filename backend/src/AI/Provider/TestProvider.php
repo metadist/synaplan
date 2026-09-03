@@ -10,6 +10,7 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\Tool\CatalogToolUse;
 
 class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
@@ -81,7 +82,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             return $toolResponse;
         }
 
-        $content = $this->generateContent($messages);
+        $content = $this->generateContent($messages, $options);
         $tokenEstimate = (int) ceil(strlen($content) / 4);
 
         return [
@@ -189,7 +190,11 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         ];
     }
 
-    private function generateContent(array $messages): string
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     */
+    private function generateContent(array $messages, array $options = []): string
     {
         $lastMessage = end($messages);
         [$userContent, $imageCount] = $this->flattenContent($lastMessage['content'] ?? 'hello');
@@ -197,22 +202,32 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
         $systemContent = 'system' === $messages[0]['role'] ? ($messages[0]['content'] ?? '') : '';
 
+        // Schema-aware structured-output path: every real call-site that
+        // expects JSON back (MessageSorter, TaskPlanner, MemoryExtractionService,
+        // …) now unconditionally attaches a StructuredOutputSchema, the same
+        // way a real provider would receive one. Marker detection below still
+        // decides WHICH mock generator runs — this only makes the generator
+        // itself schema-conformant (real booleans, schema-derived enums) and
+        // self-validating instead of a schema-oblivious guess.
+        $schema = $options['structured_output'] ?? null;
+        $schema = $schema instanceof StructuredOutputSchema ? $schema : null;
+
         // Sort/classification prompt (tools:sort): return realistic JSON
         if (str_contains($systemContent, 'BTOPIC') && str_contains($systemContent, 'BWEBSEARCH')) {
-            return $this->mockSortClassification($userContent, $systemContent);
+            return $this->mockSortClassification($userContent, $systemContent, $schema);
         }
 
         // Multi-task planner prompt (tools:plan): return a schema-valid task plan.
         // Deterministic so E2E can exercise the multi-node DAG + task cards.
         if (str_contains($systemContent, 'Multi-Task Planner')) {
-            return $this->mockTaskPlan($userContent);
+            return $this->mockTaskPlan($userContent, $schema);
         }
 
         // Memory extraction (tools:memory_extraction): the user prompt built by
         // MemoryExtractionService carries these two stable markers.
         if (str_contains($userContent, 'Current Message (from the user):')
             && str_contains($userContent, '"action": "create"')) {
-            return $this->mockMemoryExtraction($userContent);
+            return $this->mockMemoryExtraction($userContent, $schema);
         }
 
         // Search-query-style request (e.g. SearchQueryGenerator with tools:search prompt): return cleaned query like fallbackExtraction
@@ -332,12 +347,26 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * can decode. Mirrors what a real LLM would return for the tools:sort
      * prompt: the same JSON object with BTOPIC, BLANG, BWEBSEARCH (and
      * optionally BMEDIA, BDURATION, BRESOLUTION, BINPUTMODE) updated.
+     *
+     * Schema-aware: BWEBSEARCH/BMULTI are real JSON booleans — matching
+     * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}'s
+     * `type: boolean` — instead of the `0`/`1` a hand-rolled stub would
+     * reach for. When a schema is supplied its BTOPIC enum (the caller's
+     * live topic list) takes priority over parsing the system prompt's
+     * quoted strings, and the chosen topic is validated against it before
+     * returning — a locally-invented topic would never survive strict
+     * decoding on a real provider either.
      */
-    private function mockSortClassification(string $userContent, string $systemContent): string
+    private function mockSortClassification(string $userContent, string $systemContent, ?StructuredOutputSchema $schema): string
     {
         $data = json_decode($userContent, true);
         if (!is_array($data)) {
-            return json_encode(['BTOPIC' => 'general', 'BLANG' => 'en', 'BWEBSEARCH' => 0], JSON_THROW_ON_ERROR);
+            $fallback = ['BTOPIC' => 'general', 'BLANG' => 'en', 'BWEBSEARCH' => false];
+            if (null !== $schema) {
+                $this->assertMatchesSchema($fallback, $schema);
+            }
+
+            return json_encode($fallback, JSON_THROW_ON_ERROR);
         }
 
         $text = strtolower($data['BTEXT'] ?? '');
@@ -346,32 +375,89 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         // Keep the inbound BLANG (UI locale / previous detection) when the
         // heuristic cannot confidently detect a language from the text.
         $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
-        $data['BWEBSEARCH'] = $this->needsWebSearch($text) ? 1 : 0;
+        $data['BWEBSEARCH'] = $this->needsWebSearch($text);
         // Always set BMULTI explicitly. The inbound JSON omits it (so a real
         // model that echoes without deciding leaves multi_step = null and the
         // planner still runs). The test stub must vote, from the same
         // predicates mockTaskPlan() routes on, so the two cannot disagree.
-        $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText) ? 1 : 0;
+        $data['BMULTI'] = $this->needsMultiStepPlan($text ?: $fileText);
 
-        $availableTopics = $this->extractAvailableTopics($systemContent);
+        $topicEnum = $this->schemaTopicEnum($schema);
+        $availableTopics = $topicEnum ?? $this->extractAvailableTopics($systemContent);
         $classification = $this->classifyTopic($text ?: $fileText, $data, $availableTopics);
 
         $data['BTOPIC'] = $classification['topic'];
 
-        if (isset($classification['media_type'])) {
-            $data['BMEDIA'] = $classification['media_type'];
+        // A real schema-constrained provider cannot emit a topic outside the
+        // enum; a mock that did would hide a bug in classifyTopic() instead
+        // of surfacing it, so fall back to `general` exactly like
+        // MessageSorter::validateTopic() does server-side.
+        if (null !== $topicEnum && !in_array($data['BTOPIC'], $topicEnum, true)) {
+            $data['BTOPIC'] = 'general';
         }
-        if (isset($classification['duration'])) {
-            $data['BDURATION'] = $classification['duration'];
+
+        // With a schema attached, BMEDIA/BDURATION/BRESOLUTION/BINPUTMODE are
+        // modelled as nullable-but-required (strict mode forbids omittable
+        // keys — see SortClassificationSchema's docblock): a non-media
+        // message must still carry them, explicitly null, not omit them.
+        if (null !== $schema) {
+            $data['BMEDIA'] = $classification['media_type'] ?? null;
+            $data['BDURATION'] = $classification['duration'] ?? null;
+            $data['BRESOLUTION'] = $classification['resolution'] ?? null;
+            $data['BINPUTMODE'] = $classification['input_mode'] ?? null;
+        } else {
+            if (isset($classification['media_type'])) {
+                $data['BMEDIA'] = $classification['media_type'];
+            }
+            if (isset($classification['duration'])) {
+                $data['BDURATION'] = $classification['duration'];
+            }
+            if (isset($classification['resolution'])) {
+                $data['BRESOLUTION'] = $classification['resolution'];
+            }
+            if (isset($classification['input_mode'])) {
+                $data['BINPUTMODE'] = $classification['input_mode'];
+            }
         }
-        if (isset($classification['resolution'])) {
-            $data['BRESOLUTION'] = $classification['resolution'];
-        }
-        if (isset($classification['input_mode'])) {
-            $data['BINPUTMODE'] = $classification['input_mode'];
+
+        if (null !== $schema) {
+            $this->assertMatchesSchema($data, $schema);
         }
 
         return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return list<string>|null the schema's BTOPIC enum, or null when no
+     *                           schema was supplied or it left BTOPIC unconstrained
+     *                           (empty topic list — {@see
+     *                           \App\AI\StructuredOutput\Schema\SortClassificationSchema::build()})
+     */
+    private function schemaTopicEnum(?StructuredOutputSchema $schema): ?array
+    {
+        $enum = $schema?->schema['properties']['BTOPIC']['enum'] ?? null;
+
+        return is_array($enum) ? $enum : null;
+    }
+
+    /**
+     * Lightweight self-check that the mock's own output actually satisfies
+     * the schema it was asked to conform to — a schema-aware mock that never
+     * validates itself could silently drift from the schema it is meant to
+     * exercise. Deliberately shallow (required top-level keys only, no type/
+     * enum re-validation): deep JSON-schema validation belongs to the real
+     * provider integration tests, not this dev-only stub.
+     *
+     * @param array<string, mixed> $data
+     */
+    private function assertMatchesSchema(array $data, StructuredOutputSchema $schema): void
+    {
+        $required = $schema->schema['required'] ?? [];
+        $missing = array_diff($required, array_keys($data));
+
+        if ([] !== $missing) {
+            throw new \LogicException(sprintf('TestProvider: mock output for schema "%s" is missing required key(s): %s', $schema->name, implode(', ', $missing)));
+        }
     }
 
     /**
@@ -382,14 +468,20 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      * with deterministic, TTS-free streaming. Everything else returns a safe
      * single-node chat plan (executor then uses the legacy single-node path —
      * identical to a fallback, so existing tests are unaffected).
+     *
+     * Schema-aware: {@see \App\AI\StructuredOutput\Schema\TaskPlanSchema}
+     * already matches this stub's natural shape (a root object, `strict:
+     * false` for the open-ended `inputs`/`params`), so no field-level change
+     * is needed here — only the self-validation of the required top-level
+     * keys before returning.
      */
-    private function mockTaskPlan(string $userContent): string
+    private function mockTaskPlan(string $userContent, ?StructuredOutputSchema $schema): string
     {
         $data = json_decode($userContent, true);
         $text = is_array($data) ? strtolower((string) ($data['BTEXT'] ?? '')) : strtolower($userContent);
 
         if ($this->isSummarizeTranslateRequest($text)) {
-            return json_encode([
+            $plan = [
                 'version' => 1,
                 'language' => 'en',
                 'reply_node' => 'n3',
@@ -398,12 +490,10 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                     ['id' => 'n2', 'capability' => 'translate', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text'], 'params' => ['target' => 'de']],
                     ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n2'], 'inputs' => ['text' => '$n2.text']],
                 ],
-            ], JSON_THROW_ON_ERROR);
-        }
-
-        // web_search + chat plan — used by @webSearch E2E tests.
-        if ($this->isWebSearchPlanRequest($text)) {
-            return json_encode([
+            ];
+        } elseif ($this->isWebSearchPlanRequest($text)) {
+            // web_search + chat plan — used by @webSearch E2E tests.
+            $plan = [
                 'version' => 1,
                 'language' => 'en',
                 'reply_node' => 'n2',
@@ -411,17 +501,23 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                     ['id' => 'n1', 'capability' => 'web_search', 'inputs' => ['query' => '$message.text']],
                     ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
                 ],
-            ], JSON_THROW_ON_ERROR);
+            ];
+        } else {
+            $plan = [
+                'version' => 1,
+                'language' => 'en',
+                'reply_node' => 'n1',
+                'tasks' => [
+                    ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => '$message.text']],
+                ],
+            ];
         }
 
-        return json_encode([
-            'version' => 1,
-            'language' => 'en',
-            'reply_node' => 'n1',
-            'tasks' => [
-                ['id' => 'n1', 'capability' => 'chat', 'inputs' => ['text' => '$message.text']],
-            ],
-        ], JSON_THROW_ON_ERROR);
+        if (null !== $schema) {
+            $this->assertMatchesSchema($plan, $schema);
+        }
+
+        return json_encode($plan, JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -450,28 +546,45 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
      *
      * The current user message may contain an explicit instruction of the
      * form `memorize: some_key = some value` — exactly that becomes a
-     * `create` action (category `preferences`). Everything else returns `[]`
-     * so ordinary E2E chat turns never pollute the user's memory list.
+     * `create` action (category `preferences`). Everything else returns no
+     * actions so ordinary E2E chat turns never pollute the user's memory
+     * list.
+     *
+     * Schema-aware: {@see \App\AI\StructuredOutput\Schema\MemoryExtractionSchema}
+     * wraps the action list under a `memories` key (OpenAI-dialect structured
+     * output and Anthropic tool-forcing both reject a bare top-level array),
+     * so the schema-aware branch returns that envelope and fills in the
+     * schema's nullable `memory_id`. Without a schema the stub keeps its
+     * original bare-array shape — {@see
+     * \App\Service\MemoryExtractionService::parseMemoriesFromResponse()}
+     * accepts both via regex, so neither shape is a compatibility risk.
      */
-    private function mockMemoryExtraction(string $userContent): string
+    private function mockMemoryExtraction(string $userContent, ?StructuredOutputSchema $schema): string
     {
         $currentMessage = '';
         if (preg_match('/Current Message \(from the user\):\n(.*?)(?:\n\n|$)/s', $userContent, $m)) {
             $currentMessage = $m[1];
         }
 
+        $memories = [];
         if (preg_match('/memorize:\s*([a-z0-9_]+)\s*=\s*([^\n]+)/i', $currentMessage, $m)) {
-            return json_encode([
-                [
-                    'action' => 'create',
-                    'category' => 'preferences',
-                    'key' => strtolower($m[1]),
-                    'value' => trim($m[2]),
-                ],
-            ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            $memories[] = [
+                'action' => 'create',
+                'memory_id' => null,
+                'category' => 'preferences',
+                'key' => strtolower($m[1]),
+                'value' => trim($m[2]),
+            ];
         }
 
-        return '[]';
+        if (null !== $schema) {
+            $wrapped = ['memories' => $memories];
+            $this->assertMatchesSchema($wrapped, $schema);
+
+            return json_encode($wrapped, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        }
+
+        return json_encode($memories, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
     }
 
     private function detectLanguage(string $text, string $fallback = 'en'): string

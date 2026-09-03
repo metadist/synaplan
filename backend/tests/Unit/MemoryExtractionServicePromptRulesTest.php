@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -60,8 +61,17 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
             $this->createMock(RateLimitService::class),
             $promptRepository,
             $entityManager,
-            $this->createMock(LoggerInterface::class)
+            $this->createMock(LoggerInterface::class),
+            $this->alwaysOnStructuredOutputConfig(),
         );
+    }
+
+    private function alwaysOnStructuredOutputConfig(): StructuredOutputConfig
+    {
+        $config = $this->createMock(StructuredOutputConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+
+        return $config;
     }
 
     public function testAnalyzeAndExtractAllowsMultipleCreatesWithSameKeyAndUsesAtomicRulesInPrompt(): void
@@ -137,7 +147,8 @@ final class MemoryExtractionServicePromptRulesTest extends TestCase
             $this->createMock(RateLimitService::class),
             $promptRepository,
             $entityManager,
-            $logger
+            $logger,
+            $this->alwaysOnStructuredOutputConfig(),
         );
 
         $result = $service->analyzeAndExtract($message, [], []);

@@ -11,6 +11,9 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
 use App\AI\Tool\OpenAiToolShapes;
 use App\Service\File\FileHelper;
@@ -53,6 +56,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         private string $uploadDir = '/var/www/backend/var/uploads',
         private bool $storeResponses = false,
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -267,7 +271,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $model = $options['model'];
             $isReasoningModel = $this->usesCompletionTokens($model);
 
-            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options);
+            $requestOptions = $this->buildResponsesRequest($messages, $model, $isReasoningModel, $options, true);
 
             $stream = $this->executeResponsesCreateStreamed($requestOptions);
 
@@ -379,7 +383,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * Extracts the system message into `instructions` and converts
      * user/assistant messages into the `input` field.
      */
-    private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options): array
+    private function buildResponsesRequest(array $messages, string $model, bool $isReasoningModel, array $options, bool $stream = false): array
     {
         $systemMessage = $this->extractSystemMessage($messages);
         $input = $this->convertToResponsesFormat($this->removeSystemMessages($messages));
@@ -412,6 +416,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
         if (isset($options['previous_response_id'])) {
             $requestOptions['previous_response_id'] = $options['previous_response_id'];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
         }
 
         if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {

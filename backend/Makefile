@@ -1,4 +1,4 @@
-.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval summary-eval digest-run digest-eval digest-reindex
+.PHONY: help lint format phpstan phpstan-baseline audit deps migrate migrate-status migrate-diff migrate-generate seed seed-models seed-prompts seed-defaults seed-ratelimits fixtures setup-reset schema-update schema-diff console cache-clear shell test plan-eval sort-eval sort-eval-cascade summary-eval digest-run digest-eval digest-reindex routing-anchors-sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -82,10 +82,24 @@ cache-clear: ## Clear Symfony cache
 test: ## Run all PHPUnit tests
 	# The backend's HTTP timeout also applies to CLI in the container. The full
 	# suite legitimately exceeds it, so disable only the CLI execution limit.
-	docker compose -f ../docker-compose.yml exec -T backend php -d max_execution_time=0 bin/phpunit
+	#
+	# memory_limit likewise: one PHP process runs all ~5000 tests, several of
+	# which boot the kernel, and the peak is past the container's 512M. CI does
+	# not hit this because shivammathur/setup-php ships memory_limit=-1, so
+	# without this the local gate would fail on a suite that is green in CI.
+	docker compose -f ../docker-compose.yml exec -T backend php -d max_execution_time=0 -d memory_limit=-1 bin/phpunit
 
 plan-eval: ## Evaluate the multitask planner against the golden corpus (LIVE model — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:multitask:plan-eval
+
+sort-eval: ## Evaluate the message sorter (tools:sort) against the golden corpus (LIVE model — not part of the CI gate)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval
+
+sort-eval-cascade: ## Evaluate the embedding-router cascade layer against the golden corpus, accuracy/latency per layer (LIVE model + embedding calls)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:sort-eval --cascade
+
+routing-anchors-sync: ## Rebuild the Qdrant routing-anchor collection from SystemCapabilityRegistry (embedding-router; LIVE embedding calls)
+	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:routing:sync-anchors
 
 summary-eval: ## Evaluate the rolling conversation summary against the golden corpus (LIVE models — not part of the CI gate)
 	docker compose -f ../docker-compose.yml exec -T backend php bin/console app:summary:eval

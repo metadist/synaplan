@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FeedbackPreviewSchema;
+use App\AI\StructuredOutput\Schema\SourceSummariesSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -30,6 +33,7 @@ final readonly class FeedbackExampleService
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
         private FeedbackConfigService $feedbackConfig,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -294,17 +298,23 @@ Generate summary and correction options.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.3,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = FeedbackPreviewSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null, // No user-specific model - use tools model
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.3,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));
@@ -948,17 +958,23 @@ Summarize what each source says about this topic.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.2,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = SourceSummariesSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.2,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));
@@ -1143,17 +1159,23 @@ Summarize what each source says about this claim.
 PROMPT;
 
         try {
+            $aiOptions = array_filter([
+                'provider' => $provider,
+                'model' => $modelName,
+                'temperature' => 0.2,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = SourceSummariesSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null,
-                array_filter([
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'temperature' => 0.2,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));

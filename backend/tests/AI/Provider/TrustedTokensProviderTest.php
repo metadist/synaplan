@@ -6,6 +6,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\TrustedTokensProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -86,8 +87,42 @@ class TrustedTokensProviderTest extends TestCase
         );
     }
 
+    // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
+
+    public function testChatOptionsMergeStructuredOutputAsJsonSchema(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'zai-org/GLM-5.2',
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+        ], false);
+
+        $this->assertSame('json_schema', $request['response_format']['type']);
+        $this->assertSame('sort_result', $request['response_format']['json_schema']['name']);
+        $this->assertSame(['type' => 'object'], $request['response_format']['json_schema']['schema']);
+    }
+
+    public function testChatOptionsWithoutStructuredOutputOmitResponseFormat(): void
+    {
+        $request = $this->buildChatOptions([], ['model' => 'zai-org/GLM-5.2'], false);
+
+        $this->assertArrayNotHasKey('response_format', $request);
+    }
+
     private function makeProvider(?string $apiKey = 'test-key'): TrustedTokensProvider
     {
         return new TrustedTokensProvider(new NullLogger(), $apiKey);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $provider = $this->makeProvider();
+
+        return (new \ReflectionClass($provider))->getMethod('buildChatOptions')->invoke($provider, $messages, $options, $stream);
     }
 }

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
+use App\AI\StructuredOutput\Schema\TaskPlanSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -59,9 +62,11 @@ final readonly class TaskPlanner
         private SkillCatalog $skillCatalog,
         private PromptService $promptService,
         private RateLimitService $rateLimitService,
+        private StructuredOutputConfig $structuredOutputConfig,
         private ?PlannerChannelCatalog $channelCatalog = null,
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -92,12 +97,18 @@ final readonly class TaskPlanner
         $messages = $this->buildMessages($systemPrompt, $message, $conversationHistory);
 
         try {
-            $response = $this->aiFacade->chat($messages, $userId, [
+            $aiOptions = [
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1,
                 'max_tokens' => self::PLANNING_MAX_TOKENS,
-            ]);
+            ];
+
+            if ($this->structuredOutputConfig->isEnabled($userId)) {
+                $aiOptions['structured_output'] = TaskPlanSchema::build();
+            }
+
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
             $raw = (string) ($response['content'] ?? '');
 
             // The planner call is a billable LLM request like the sorter's —
@@ -411,34 +422,10 @@ final readonly class TaskPlanner
     }
 
     /**
-     * Decode the model's JSON, tolerating markdown code fences and surrounding prose.
-     *
      * @return array<string, mixed>|null
      */
     private function decodeJson(string $raw): ?array
     {
-        $text = trim($raw);
-        if (str_starts_with($text, '```')) {
-            $text = (string) preg_replace('/^```(?:json)?\s*/', '', $text);
-            $text = (string) preg_replace('/\s*```$/', '', $text);
-            $text = trim($text);
-        }
-
-        // If the model wrapped the JSON in prose, grab the outermost object.
-        if (!str_starts_with($text, '{')) {
-            $start = strpos($text, '{');
-            $end = strrpos($text, '}');
-            if (false !== $start && false !== $end && $end > $start) {
-                $text = substr($text, $start, $end - $start + 1);
-            }
-        }
-
-        try {
-            $decoded = json_decode($text, true, 512, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
-        }
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->jsonDecoder->decode($raw)->data;
     }
 }

@@ -281,6 +281,66 @@ interface QdrantClientInterface
      */
     public function recreateMemoriesCollection(int $vectorDimension, ?string $namespace = null): void;
 
+    // --- Routing Anchor Operations (Phase 8 embedding-router cascade layer) ---
+
+    /**
+     * Add or update a routing-anchor point in Qdrant.
+     *
+     * Anchors are pre-computed embeddings of the example utterances declared
+     * on {@see \App\Service\Message\Capability\SystemCapability}, populated
+     * by `app:routing:sync-anchors`. Unlike memories/documents/digests this
+     * collection is global (system capabilities, not per-user data), so
+     * there is no `$userId` filter anywhere in this section.
+     *
+     * @param string  $pointId Logical point ID (e.g., "route_{topic}_{hash}")
+     * @param float[] $vector  Embedding vector (bge-m3, 1024 floats)
+     * @param array   $payload Metadata (topic, intent, utterance)
+     */
+    public function upsertRoutingAnchor(string $pointId, array $vector, array $payload): void;
+
+    /**
+     * Search for the closest routing anchors by vector similarity.
+     *
+     * Deliberately has no `$minScore` filter with a meaningful default (the
+     * threshold decision belongs to {@see \App\Service\Message\Routing\EmbeddingRouterService},
+     * which is BCONFIG-driven and calibrated via `app:sort-eval`, not the
+     * Qdrant client) — the caller inspects the raw top score itself.
+     *
+     * @param float[] $queryVector Query embedding vector
+     * @param int     $limit       Max results, so the caller can also see
+     *                             runner-up topics for `discardedAlternatives`
+     *
+     * @return array Array of results: [['id' => string, 'score' => float, 'payload' => array], ...], ordered best-first
+     */
+    public function searchRoutingAnchors(array $queryVector, int $limit = 5): array;
+
+    /**
+     * Delete every routing-anchor point.
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteAllRoutingAnchors(): int;
+
+    /**
+     * Delete every routing-anchor point whose logical id is NOT in
+     * `$keepPointIds`.
+     *
+     * This is how `app:routing:sync-anchors` prunes: it upserts the current
+     * anchor set FIRST and only then removes what is left over, so a failed
+     * embedding can never leave the collection under-populated (which would
+     * degrade routing quietly). Anchor point ids are deterministic
+     * (`route_{topic}_{md5(utterance)}`), so re-syncing an unchanged utterance
+     * overwrites it in place and it survives the prune.
+     *
+     * An empty `$keepPointIds` is equivalent to
+     * {@see self::deleteAllRoutingAnchors()}.
+     *
+     * @param list<string> $keepPointIds logical point ids to preserve
+     *
+     * @return int Number of deleted points
+     */
+    public function deleteRoutingAnchorsExcept(array $keepPointIds): int;
+
     // --- Health & Info ---
 
     /**

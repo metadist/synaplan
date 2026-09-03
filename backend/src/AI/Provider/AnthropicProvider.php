@@ -8,8 +8,13 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
 use App\AI\Tool\OpenAiToolShapes;
+use App\AI\Tool\ToolCallAccumulator;
+use App\AI\ToolCalling\ToolCallingCapability;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -28,13 +33,23 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * clients that need a verbatim Anthropic body should still use the Messages
  * gateway at POST /v1/messages (AnthropicPassthroughTranslator).
  *
+ * Anthropic has no native JSON-schema response mode, so structured output is
+ * expressed as a FORCED single tool call ({@see StructuredOutputTranslator}).
+ * That shares the `tools` / `tool_choice` slot with a caller's own tool
+ * declarations, so the two cannot travel together: when a schema is merged,
+ * declared tools are dropped
+ * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
+ *
  * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
  * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
  * invalid_request_error — only "auto" (default) and "none" are accepted.
- * This provider maps `required` / named tools to those types and lets
- * Anthropic's own 400 surface the mismatch, exactly as a direct API call
- * would. The Messages gateway passthrough forwards the client's tool_choice
- * verbatim.
+ * That rules out the structured-output dialect for them, so
+ * {@see StructuredOutputCapability} reports it as unsupported and callers
+ * fall back to the prose-instruction path. Ordinary tool declarations are
+ * unaffected: they send tool_choice `auto`. For `required` / named tools
+ * this provider maps the caller's choice through and lets Anthropic's own
+ * 400 surface the mismatch, exactly as a direct API call would. The Messages
+ * gateway passthrough forwards the client's tool_choice verbatim.
  */
 class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
 {
@@ -104,7 +119,42 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         private int $timeout = 120,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
     ) {
+    }
+
+    /**
+     * Structured output on Anthropic IS a forced tool call, so a caller's own
+     * declarations would overwrite the schema's `tools` / `tool_choice`. The
+     * schema wins: it is the caller's output contract and something
+     * downstream parses against it, whereas "no tool call" is already a valid
+     * outcome of every toolset we declare.
+     *
+     * Keyed off the schema actually being MERGED, not merely requested:
+     * models that reject a forced tool_choice get no schema, and a dropped
+     * schema has nothing left to conflict with.
+     *
+     * @param array<string, mixed> $options
+     * @param array<string, mixed> $translatedSchema
+     *
+     * @return array<string, mixed>
+     */
+    private function dropToolsConflictingWithSchema(array $options, array $translatedSchema, ?string $model): array
+    {
+        if ([] === $translatedSchema
+            || !$this->toolCallingCapability->conflictsWithStructuredOutput($this->getName())
+            || !is_array($options['tools'] ?? null) || [] === $options['tools']
+        ) {
+            return $options;
+        }
+
+        $this->logger->warning('Anthropic: tool declaration dropped, cannot combine tools with structured output', [
+            'model' => $model,
+        ]);
+        unset($options['tools'], $options['tool_choice'], $options['parallel_tool_calls']);
+
+        return $options;
     }
 
     private function resolveApiKey(): ?string
@@ -232,6 +282,19 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 ]);
             }
 
+            $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
+            if ($schema instanceof StructuredOutputSchema) {
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, false, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
+            }
+
+            // Models that reject a forced tool_choice get no schema and answer
+            // in prose instead, so any `tool_use` block coming back from them
+            // really is a tool call.
+            $schemaForcedToolUse = [] !== $translatedSchema;
+
+            $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
 
             $this->logger->info('Anthropic: Chat request', [
@@ -259,6 +322,20 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
                 if ('text' === $type) {
                     $textContent .= $block['text'] ?? '';
+                } elseif ('tool_use' === $type && $schemaForcedToolUse) {
+                    // Structured-output request (see StructuredOutputDialect::ANTHROPIC_TOOL_FORCING):
+                    // Claude has no native JSON-schema response mode, so the schema was
+                    // sent as a forced single tool call. Its `input` IS the desired JSON
+                    // result — re-encode it into `content` so callers can treat this
+                    // response exactly like a schema-following text response from any
+                    // other provider.
+                    //
+                    // Guarded on the schema having been SENT, not merely
+                    // requested: with native tool calling a `tool_use` block is
+                    // a REAL tool call whose arguments are routing plumbing,
+                    // and re-encoding those into the answer text would show the
+                    // user a raw JSON blob instead of an answer.
+                    $textContent .= json_encode($block['input'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 } elseif ('thinking' === $type) {
                     $thinkingContent .= $block['thinking'] ?? '';
                 }
@@ -289,11 +366,18 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'content' => $textContent,
                 'usage' => $usage,
             ];
-            if ([] !== $toolCalls) {
-                $result['tool_calls'] = $toolCalls;
-                $result['finish_reason'] = 'tool_calls';
-            } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
-                $result['finish_reason'] = 'tool_calls';
+
+            // Only real tool calls are reported: with a structured-output
+            // schema the single forced `tool_use` block was already folded
+            // into `content` above, and calling this turn a tool turn would
+            // make the caller wait for a tool result that never comes.
+            if (!$schemaForcedToolUse) {
+                if ([] !== $toolCalls) {
+                    $result['tool_calls'] = $toolCalls;
+                    $result['finish_reason'] = 'tool_calls';
+                } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
+                    $result['finish_reason'] = 'tool_calls';
+                }
             }
 
             return $result;
@@ -374,7 +458,23 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 ]);
             }
 
+            $schema = $options['structured_output'] ?? null;
+            $translatedSchema = [];
+            if ($schema instanceof StructuredOutputSchema) {
+                $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, true, $schema);
+                $requestBody = array_merge($requestBody, $translatedSchema);
+            }
+
+            $options = $this->dropToolsConflictingWithSchema($options, $translatedSchema, $model);
             $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+
+            // Only accumulate when the request really declares tools. A forced
+            // schema tool also streams its `input` as `input_json_delta`, but
+            // those fragments are the ANSWER and must reach the user as
+            // content instead of being folded into a tool call.
+            $toolCalls = isset($requestBody['tools']) && [] === $translatedSchema
+                ? new ToolCallAccumulator()
+                : null;
 
             $this->logger->info('Anthropic: Starting streaming chat', [
                 'model' => $model,
@@ -405,11 +505,21 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             }
 
             // Parse SSE stream and collect usage
-            $usage = $this->parseSSEStream($response, $callback);
+            $usage = $this->parseSSEStream($response, $callback, $toolCalls);
 
-            $this->logger->info('🔵 Anthropic: Streaming completed', ['usage' => $usage]);
+            $completedToolCalls = null !== $toolCalls && !$toolCalls->isEmpty() ? $toolCalls->complete() : [];
 
-            return ['usage' => $usage];
+            $this->logger->info('🔵 Anthropic: Streaming completed', [
+                'usage' => $usage,
+                'tool_calls' => count($completedToolCalls),
+            ]);
+
+            $result = ['usage' => $usage];
+            if ([] !== $completedToolCalls) {
+                $result['tool_calls'] = $completedToolCalls;
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             // Already carries a formatted, user-safe message (e.g. the up-front
             // HTTP error detection above) — surface it as-is without re-wrapping.
@@ -886,8 +996,14 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      * - message_stop: Stream complete
      * - ping: Keep-alive
      * - error: Error occurred
+     *
+     * `$toolCalls` is non-null only when the request declared native tools
+     * and no schema was forced. It flips the meaning of `input_json_delta`:
+     * those fragments then belong to a real tool call and are folded into it
+     * instead of being streamed to the user as answer text (with a schema
+     * they still ARE the answer — see chat()).
      */
-    private function parseSSEStream(ResponseInterface $response, callable $callback): array
+    private function parseSSEStream(ResponseInterface $response, callable $callback, ?ToolCallAccumulator $toolCalls = null): array
     {
         $buffer = '';
         $currentBlockType = null;
@@ -934,13 +1050,15 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                             $this->logger->info('🧠 Anthropic: Thinking block started');
                         } elseif ('tool_use' === $currentBlockType) {
                             $block = is_array($event['data']['content_block'] ?? null) ? $event['data']['content_block'] : [];
-                            $callback([
+                            $chunk = [
                                 'type' => 'tool_call_delta',
                                 'index' => (int) ($event['data']['index'] ?? 0),
                                 'id' => isset($block['id']) && is_string($block['id']) && '' !== $block['id'] ? $block['id'] : null,
                                 'name' => isset($block['name']) && is_string($block['name']) && '' !== $block['name'] ? $block['name'] : null,
                                 'arguments' => '',
-                            ]);
+                            ];
+                            $toolCalls?->addDelta($chunk);
+                            $callback($chunk);
                         }
                         break;
 
@@ -958,13 +1076,29 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                                 'type' => 'reasoning',
                                 'content' => $delta['thinking'] ?? '',
                             ]);
-                        } elseif ('input_json_delta' === $deltaType) {
-                            $callback([
+                        } elseif ('input_json_delta' === $deltaType && null !== $toolCalls) {
+                            // Native tool calling (see chatStream()): these
+                            // fragments are the arguments of a REAL tool call.
+                            // Folded here for this method's caller and passed
+                            // on for stream consumers that fold themselves.
+                            $chunk = [
                                 'type' => 'tool_call_delta',
                                 'index' => (int) ($event['data']['index'] ?? 0),
                                 'id' => null,
                                 'name' => null,
                                 'arguments' => is_string($delta['partial_json'] ?? null) ? $delta['partial_json'] : '',
+                            ];
+                            $toolCalls->addDelta($chunk);
+                            $callback($chunk);
+                        } elseif ('input_json_delta' === $deltaType) {
+                            // Structured-output tool-forcing (see chat()): the tool's
+                            // `input` streams as incremental JSON fragments here instead
+                            // of `text_delta`. Forward them as ordinary content chunks so
+                            // they concatenate into the same complete JSON string the
+                            // non-streaming path returns in `content`.
+                            $callback([
+                                'type' => 'content',
+                                'content' => $delta['partial_json'] ?? '',
                             ]);
                         }
                         // signature_delta carries integrity data only — no forwarding needed

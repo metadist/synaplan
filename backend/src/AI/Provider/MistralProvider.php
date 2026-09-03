@@ -10,6 +10,9 @@ use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -76,6 +79,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         private readonly ?string $apiKey = null,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly ?ProviderKeyStore $keyStore = null,
+        private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -696,6 +700,11 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         if ($stream) {
             $requestOptions['stream'] = true;
             $requestOptions['stream_options'] = ['include_usage' => true];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $options['model'] ?? null, $stream, $schema));
         }
 
         return $this->applyChatCompletionsToolOptions($requestOptions, $options);

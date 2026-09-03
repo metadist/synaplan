@@ -4,6 +4,10 @@ namespace App\Service\Message\Handler;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\FileGenerationSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -35,6 +39,8 @@ use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Routing\RoutingDirective;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\PerfTimer;
@@ -111,6 +117,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private MessageDigestConfig $digestConfig,
         private ConversationFileCatalog $conversationFileCatalog,
         private GeneratedImageVisionFlag $generatedImageVisionFlag,
+        private StructuredOutputConfig $structuredOutputConfig,
+        private ToolCallingTranslator $toolCallingTranslator,
+        private ToolCallParser $toolCallParser,
+        private RoutingToolset $routingToolset,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
         private ?DocumentEditCoordinator $documentEditCoordinator = null,
@@ -126,6 +136,92 @@ final readonly class ChatHandler implements MessageHandlerInterface
     public function getName(): string
     {
         return 'chat';
+    }
+
+    /**
+     * Whether the classifier handed this turn's routing decision to the
+     * answering call (Phase 9, {@see \App\Service\Message\Routing\NativeToolRoutingConfig}).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private static function isRoutingDeferred(array $classification): bool
+    {
+        return !empty($classification['defer_routing_to_chat']);
+    }
+
+    /**
+     * The request options that declare the hand-off tools on the answering
+     * call, or null when this turn's model cannot do native tool calling and
+     * the deferral therefore has to go back to the sorter.
+     *
+     * The classifier pre-checks the ACCOUNT default chat provider before it
+     * defers, but the model actually used here can differ (widget override,
+     * prompt binding, "Again" replay), so this second check is the
+     * authoritative one.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function routingHandoffTools(?string $provider, ?string $modelName, bool $streaming): ?array
+    {
+        if (null === $provider || '' === $provider) {
+            return null;
+        }
+
+        $declaration = $this->toolCallingTranslator->translate(
+            $provider,
+            $modelName,
+            $streaming,
+            $this->routingToolset->build(),
+        );
+
+        if ([] === $declaration) {
+            $this->logger->info('ChatHandler: Routing deferral not honourable by this model — falling back to the AI sorter', [
+                'provider' => $provider,
+                'model' => $modelName,
+                'streaming' => $streaming,
+            ]);
+
+            return null;
+        }
+
+        return $declaration;
+    }
+
+    /**
+     * Turn the model's tool calls into a hand-off directive, or null when it
+     * called nothing the register knows — which is the ordinary, common case
+     * and means "this really was a chat turn".
+     *
+     * @param mixed $toolCalls the `tool_calls` entry of the provider response
+     */
+    private function routingHandoffFor(mixed $toolCalls): ?RoutingDirective
+    {
+        foreach ($this->toolCallParser->fromWireToolCalls($toolCalls) as $call) {
+            $topic = $this->routingToolset->topicForToolCall($call);
+            if (null === $topic) {
+                // A hallucinated tool name is not a reason to fail the turn:
+                // the answer text is still there, so treat it as no hand-off.
+                $this->logger->warning('ChatHandler: Model called an unknown routing tool — ignoring', [
+                    'tool_name' => $call->name,
+                ]);
+
+                continue;
+            }
+
+            $fields = $this->routingToolset->classificationFieldsFor($topic, $call);
+
+            $this->logger->info('ChatHandler: Native routing hand-off', [
+                'topic' => $topic,
+                'fields' => $fields,
+            ]);
+
+            // First recognised call wins. Parallel tool calls would mean the
+            // model wants two different backends for one turn; that is the
+            // multi-step case, which belongs to the DAG planner, not here.
+            return RoutingDirective::handoff($topic, $fields);
+        }
+
+        return null;
     }
 
     /**
@@ -412,6 +508,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
+        // Phase 9: the classifier deferred the routing decision to this call.
+        // Resolved AFTER the vision swap above, because that swap can replace
+        // $provider/$modelName with a model that cannot do tool calling — tools
+        // built for the original model would then be dropped by the translator
+        // and the hand-off would silently never happen. Still before any
+        // context is built, so an unhonourable deferral costs nothing but a
+        // re-route. The streaming twin resolves it at the same point.
+        $routingDeferred = self::isRoutingDeferred($classification);
+        $routingTools = $routingDeferred ? $this->routingHandoffTools($provider, $modelName, false) : null;
+        if ($routingDeferred && null === $routingTools) {
+            return RoutingDirective::reclassify()->toHandlerResult();
+        }
+
         $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
 
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
@@ -581,6 +690,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
         ];
 
+        // officemaker is the only topic whose reply IS the machine-readable
+        // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
+        // its free-form chat completion untouched.
+        if ('officemaker' === $topic && $this->structuredOutputConfig->isEnabled($message->getUserId())) {
+            $aiOptions['structured_output'] = FileGenerationSchema::build();
+        }
+
+        if (null !== $routingTools) {
+            $aiOptions = array_merge($aiOptions, $routingTools);
+        }
+
         // Clamp max_tokens to min(plan_limit, model_max).
         // plan_limit is only set for ANONYMOUS (the only tier with a hard
         // MAX_OUTPUT_TOKENS cap); for all authenticated tiers getMaxOutputTokens()
@@ -622,6 +742,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $message->getUserId(),
                 $aiOptions
             );
+        }
+
+        // Only the plain chat call above can carry a hand-off: the document
+        // tool loop answers the officemaker topic, which is never deferred.
+        if ($routingDeferred) {
+            $handoff = $this->routingHandoffFor($response['tool_calls'] ?? []);
+            if (null !== $handoff) {
+                // The model asked for a different backend, so whatever text it
+                // produced alongside the call is a preamble, not an answer.
+                return $handoff->toHandlerResult();
+            }
         }
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
@@ -1238,6 +1369,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ]);
         }
 
+        // Phase 9 — see handle() for the non-streaming twin. The check has to
+        // pass for the STREAMING capability here: a provider that returns tool
+        // calls in a plain response but not in its SSE stream would swallow the
+        // hand-off and answer with nothing.
+        $routingDeferred = self::isRoutingDeferred($classification);
+        $routingTools = $routingDeferred ? $this->routingHandoffTools($provider, $modelName, true) : null;
+        if ($routingDeferred && null === $routingTools) {
+            return RoutingDirective::reclassify()->toHandlerResult();
+        }
+
         // Load previous_response_id for OpenAI stateful conversations
         if ('openai' === $provider) {
             $previousResponseId = $this->loadPreviousResponseId($thread);
@@ -1263,6 +1404,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'temperature' => 0.7,
             'modelFeatures' => $modelFeatures,
         ], $options);
+
+        // officemaker is the only topic whose reply IS the machine-readable
+        // envelope {"BFILEPATH":…,"BFILETEXT":…} — every other topic keeps
+        // its free-form chat completion untouched.
+        if ('officemaker' === $topic && $this->structuredOutputConfig->isEnabled($message->getUserId())) {
+            $aiOptions['structured_output'] = FileGenerationSchema::build();
+        }
+
+        if (null !== $routingTools) {
+            $aiOptions = array_merge($aiOptions, $routingTools);
+        }
 
         // Clamp max_tokens to min(requested, plan_limit, model_max).
         // plan_limit is only set for ANONYMOUS; authenticated tiers get the
@@ -1357,6 +1509,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             );
         }
         $perfTimer->stop('provider_total');
+
+        if ($routingDeferred) {
+            $handoff = $this->routingHandoffFor($metadata['tool_calls'] ?? []);
+            if (null !== $handoff) {
+                // Checked BEFORE the empty-stream guard below: a hand-off turn
+                // legitimately streams no visible token, and raising "the model
+                // returned an empty response" here would turn a successful
+                // routing decision into a user-facing provider error.
+                return $handoff->toHandlerResult();
+            }
+        }
 
         if (!$sawFirstToken) {
             $responseProvider = is_string($metadata['provider'] ?? null)
@@ -1590,7 +1753,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
 
-        // Thread Messages hinzufügen (letzte N Messages)
+        // Add thread messages (last N messages)
         // IMPORTANT: Exclude the current message from the thread to avoid duplicates
         foreach ($thread as $msg) {
             // Skip if this is the current message (already added at the end).

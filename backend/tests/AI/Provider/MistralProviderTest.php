@@ -6,6 +6,7 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\MistralProvider;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -127,6 +128,27 @@ class MistralProviderTest extends TestCase
     {
         $this->expectExceptionMessageContains('Image file not found');
         $this->makeProvider()->explainImage('does-not-exist.png');
+    }
+
+    // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
+
+    public function testChatOptionsMergeStructuredOutputAsJsonSchema(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'mistral-large-latest',
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+        ], false);
+
+        $this->assertSame('json_schema', $request['response_format']['type']);
+        $this->assertSame('sort_result', $request['response_format']['json_schema']['name']);
+        $this->assertSame(['type' => 'object'], $request['response_format']['json_schema']['schema']);
+    }
+
+    public function testChatOptionsWithoutStructuredOutputOmitResponseFormat(): void
+    {
+        $request = $this->buildChatOptions([], ['model' => 'mistral-large-latest'], false);
+
+        $this->assertArrayNotHasKey('response_format', $request);
     }
 
     public function testTranslateAudioIsNotSupported(): void
@@ -366,5 +388,18 @@ class MistralProviderTest extends TestCase
     {
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessageMatches('/'.preg_quote($needle, '/').'/');
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $provider = $this->makeProvider();
+
+        return (new \ReflectionClass($provider))->getMethod('buildChatOptions')->invoke($provider, $messages, $options, $stream);
     }
 }

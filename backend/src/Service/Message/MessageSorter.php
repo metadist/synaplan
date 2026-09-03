@@ -3,12 +3,18 @@
 namespace App\Service\Message;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
+use App\AI\StructuredOutput\Schema\SortClassificationSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -64,11 +70,14 @@ final readonly class MessageSorter
 
     /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
-     * and the Veo provider. Keep in sync with
-     * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS so the AI never
-     * leaks an unsupported value (e.g. "8K", "1440p") into the pipeline.
+     * and the Veo provider. Sourced from the mediamaker capability's
+     * parameter schema ({@see SystemCapabilityRegistry}) — the single place
+     * this enum is now declared — so the AI never leaks an unsupported value
+     * (e.g. "8K", "1440p") into the pipeline. Keep
+     * MediaGenerationService::SUPPORTED_VIDEO_RESOLUTIONS in sync with the
+     * same registry constant.
      */
-    private const SUPPORTED_VIDEO_RESOLUTIONS = ['720p', '1080p', '4K'];
+    private const SUPPORTED_VIDEO_RESOLUTIONS = SystemCapabilityRegistry::MEDIAMAKER_VIDEO_RESOLUTIONS;
 
     /**
      * Common aliases the AI (or user) might emit, mapped to the canonical
@@ -107,8 +116,10 @@ final readonly class MessageSorter
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private DiscordNotificationService $discord,
+        private StructuredOutputConfig $structuredOutputConfig,
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -144,7 +155,11 @@ final readonly class MessageSorter
                     $promptMetadata = $promptData['metadata'] ?? [];
                 }
 
-                return [
+                // Deterministic: a user-authored selection rule matched, no LLM
+                // ran. Full confidence — see RoutingDecision::deterministic().
+                $ruleBasedDecision = RoutingDecision::deterministic(RoutingLayer::AiSorting, $ruleBasedTopic);
+
+                return array_merge([
                     'topic' => $ruleBasedTopic,
                     'language' => $messageData['BLANG'] ?? 'en',
                     // No LLM ran on the rule-based path, so there is no
@@ -160,7 +175,7 @@ final readonly class MessageSorter
                     'sorting_model_id' => null,
                     'sorting_provider' => null,
                     'sorting_model_name' => null,
-                ];
+                ], $ruleBasedDecision->toClassificationFields());
             }
         }
 
@@ -170,11 +185,13 @@ final readonly class MessageSorter
         if (!$sortingPrompt) {
             $this->logger->error('MessageSorter: Sorting prompt not found');
 
-            return [
+            $missingPromptDecision = RoutingDecision::fallback('general', 'sorting_prompt_missing');
+
+            return array_merge([
                 'topic' => 'general',
                 'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
-            ];
+            ], $missingPromptDecision->toClassificationFields());
         }
 
         // Get all available topics (exclude tools:* internal topics).
@@ -259,13 +276,25 @@ final readonly class MessageSorter
         }
 
         try {
-            // Call AI for sorting
-            $response = $this->aiFacade->chat($messages, $userId, [
+            $aiOptions = [
                 'provider' => $provider,
                 'model' => $modelName,
                 'temperature' => 0.1, // Low temperature for consistent classification
                 'max_tokens' => self::CLASSIFICATION_MAX_TOKENS,
-            ]);
+            ];
+
+            // Enum-constrains BTOPIC/BLANG/BMEDIA/BINPUTMODE/BRESOLUTION on
+            // providers that support it (StructuredOutputCapability decides
+            // per provider/model/streaming — a no-op everywhere else, see
+            // parseResponse()'s server-side BTOPIC validation below for the
+            // fallback path). Gated by the STRUCTURED_OUTPUT.ENABLED kill
+            // switch — see StructuredOutputConfig.
+            if ($this->structuredOutputConfig->isEnabled($userId)) {
+                $aiOptions['structured_output'] = SortClassificationSchema::build($topics, self::SUPPORTED_LANGUAGES);
+            }
+
+            // Call AI for sorting
+            $response = $this->aiFacade->chat($messages, $userId, $aiOptions);
 
             $aiResponse = $response['content'];
 
@@ -278,7 +307,23 @@ final readonly class MessageSorter
             ]);
 
             // Parse JSON response
-            $parsed = $this->parseResponse($aiResponse, $messageData);
+            $parsed = $this->parseResponse($aiResponse, $messageData, $topics);
+
+            // Distinguish a genuine classification from a silent fallback —
+            // see RoutingDecision's docblock for the exact ambiguity this
+            // closes (a JSON parse failure and a confident "general" used to
+            // be indistinguishable in the log, both source=ai_sorting).
+            $routingDecision = $this->buildRoutingDecision($parsed, $recordedSortingUsage);
+
+            if ($routingDecision->isFallback()) {
+                $this->logger->warning('MessageSorter: ⚠️ Classification fell back (low confidence)', [
+                    'topic' => $parsed['topic'],
+                    'confidence' => $routingDecision->confidence,
+                    'fallback_reason' => $routingDecision->fallbackReason,
+                    'discarded_alternatives' => $routingDecision->discardedAlternatives,
+                    'raw_ai_response' => $aiResponse,
+                ]);
+            }
 
             $this->logger->info('MessageSorter: ✅ Classification result', [
                 'topic' => $parsed['topic'],
@@ -289,6 +334,7 @@ final readonly class MessageSorter
                 'duration' => $parsed['duration'] ?? null,
                 'resolution' => $parsed['resolution'] ?? null,
                 'input_mode' => $parsed['input_mode'] ?? null,
+                'confidence' => $routingDecision->confidence,
                 'raw_ai_response' => $aiResponse,
             ]);
 
@@ -319,7 +365,7 @@ final readonly class MessageSorter
             // web-search decision is made by WebSearchTopicPolicy in
             // MessageProcessor, which trusts this vote unless the prompt
             // explicitly opts in/out or the topic cannot consume web context.
-            return [
+            return array_merge([
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
@@ -341,7 +387,7 @@ final readonly class MessageSorter
                     'prompt_tokens' => $recordedSortingUsage->promptTokens,
                     'completion_tokens' => $recordedSortingUsage->completionTokens,
                 ] : null,
-            ];
+            ], $routingDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
             // Re-throw ProviderException to preserve install instructions
             $this->logger->error('MessageSorter: AI Provider failed', [
@@ -355,12 +401,47 @@ final readonly class MessageSorter
                 'error' => $e->getMessage(),
             ]);
 
-            return [
+            $exceptionDecision = RoutingDecision::fallback('general', 'exception:'.$e::class);
+
+            return array_merge([
                 'topic' => 'general',
                 'language' => $messageData['BLANG'] ?? 'en',
                 'raw_response' => '',
-            ];
+            ], $exceptionDecision->toClassificationFields());
         }
+    }
+
+    /**
+     * Build the {@see RoutingDecision} for a completed AI-sorting call from
+     * {@see self::parseResponse()}'s output.
+     *
+     * Two failure modes collapse into the same `topic: general` today, and
+     * this is where they get told apart again: a JSON parse failure
+     * (`parse_failed`) versus the AI returning a `BTOPIC` outside the valid
+     * enum, which {@see self::validateTopic()} already silently corrected to
+     * `general` before this method ever sees it (`raw_topic !== topic`).
+     */
+    private function buildRoutingDecision(array $parsed, ?RecordedUsage $usage): RoutingDecision
+    {
+        $cost = $usage?->chargedCost;
+
+        if ($parsed['parse_failed'] ?? false) {
+            return RoutingDecision::fallback((string) $parsed['topic'], 'json_parse_failed');
+        }
+
+        $rawTopic = $parsed['raw_topic'] ?? null;
+        if (is_string($rawTopic) && $rawTopic !== $parsed['topic']) {
+            return new RoutingDecision(
+                RoutingLayer::AiSorting,
+                (string) $parsed['topic'],
+                confidence: 0.3,
+                discardedAlternatives: [$rawTopic],
+                cost: $cost,
+                fallbackReason: 'invalid_topic',
+            );
+        }
+
+        return new RoutingDecision(RoutingLayer::AiSorting, (string) $parsed['topic'], confidence: 1.0, cost: $cost);
     }
 
     /**
@@ -466,91 +547,31 @@ final readonly class MessageSorter
 
     /**
      * Parse AI response JSON.
+     *
+     * @param list<string> $validTopics Topics valid for this user, used to
+     *                                  server-side validate BTOPIC (see
+     *                                  {@see self::validateTopic()}) — a
+     *                                  belt-and-suspenders check independent
+     *                                  of the schema's enum, since providers
+     *                                  without structured-output support fall
+     *                                  back to the prose instruction and can
+     *                                  still invent a topic
      */
-    private function parseResponse(string $response, array $originalData): array
+    private function parseResponse(string $response, array $originalData, array $validTopics = []): array
     {
-        // Try to extract JSON from response
-        $response = trim($response);
+        $decoded = $this->jsonDecoder->decode($response);
 
-        // Remove markdown code blocks if present
-        if (str_starts_with($response, '```')) {
-            $response = preg_replace('/^```(?:json)?\s*/', '', $response);
-            $response = preg_replace('/\s*```$/', '', $response);
-            $response = trim($response);
-        }
-
-        try {
-            $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
-
-            // Parse BWEBSEARCH (can be 0, 1, true, false)
-            $webSearch = false;
-            if (isset($data['BWEBSEARCH'])) {
-                $webSearch = (bool) $data['BWEBSEARCH'];
-            }
-
-            // Parse BMULTI — the sorter's vote on whether answering this
-            // message takes more than one step. Stays null when the model omitted
-            // the field (older seeded prompt, model that drops unknown keys) so
-            // downstream consumers can tell "no vote" from an explicit "no".
-            $multiStep = null;
-            if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
-                $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
-            }
-
-            // Parse BMEDIA for mediamaker topic (image, video, audio)
-            $mediaType = null;
-            if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
-                $mediaType = $this->normalizeMediaType($data['BMEDIA']);
-            }
-
-            // Parse BDURATION for video generation (integer seconds)
-            $duration = null;
-            if (isset($data['BDURATION']) && is_numeric($data['BDURATION'])) {
-                $duration = (int) $data['BDURATION'];
-                // Sanity check: duration should be between 1 and 120 seconds
-                if ($duration < 1 || $duration > 120) {
-                    $duration = null;
-                }
-            }
-
-            // Parse BINPUTMODE (text_only or reference_images) when present
-            $inputMode = null;
-            if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
-                $inputMode = strtolower(trim($data['BINPUTMODE']));
-                if (!in_array($inputMode, ['text_only', 'reference_images'], true)) {
-                    $inputMode = null;
-                }
-            }
-
-            // Parse BRESOLUTION for video generation. Accept the canonical
-            // values directly and translate common aliases (e.g. "uhd",
-            // "fullhd", "8k") so we never forward unsupported strings to the
-            // provider. Anything we cannot map is dropped (returns null) so
-            // downstream code falls back to the configured default.
-            $resolution = null;
-            if (isset($data['BRESOLUTION']) && (is_string($data['BRESOLUTION']) || is_int($data['BRESOLUTION']))) {
-                $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
-            }
-
-            return [
-                'topic' => $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general',
-                'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
-                'web_search' => $webSearch,
-                'multi_step' => $multiStep,
-                'media_type' => $mediaType,
-                'duration' => $duration,
-                'resolution' => $resolution,
-                'input_mode' => $inputMode,
-            ];
-        } catch (\JsonException $e) {
+        if (!$decoded->success) {
             $this->logger->warning('MessageSorter: Failed to parse JSON response', [
-                'error' => $e->getMessage(),
-                'response' => substr($response, 0, 200),
+                'error' => $decoded->errorReason,
+                'response' => substr(trim($response), 0, 200),
             ]);
 
             // Fallback to original values or defaults
             return [
-                'topic' => $originalData['BTOPIC'] ?? 'general',
+                'topic' => $this->validateTopic($originalData['BTOPIC'] ?? 'general', $validTopics),
+                'raw_topic' => null,
+                'parse_failed' => true,
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
                 'multi_step' => null,
@@ -560,6 +581,107 @@ final readonly class MessageSorter
                 'input_mode' => null,
             ];
         }
+
+        $data = $decoded->data;
+
+        // Parse BWEBSEARCH (can be 0, 1, true, false)
+        $webSearch = false;
+        if (isset($data['BWEBSEARCH'])) {
+            $webSearch = (bool) $data['BWEBSEARCH'];
+        }
+
+        // Parse BMULTI — the sorter's vote on whether answering this
+        // message takes more than one step. Stays null when the model omitted
+        // the field (older seeded prompt, model that drops unknown keys) so
+        // downstream consumers can tell "no vote" from an explicit "no".
+        $multiStep = null;
+        if (array_key_exists('BMULTI', $data) && null !== $data['BMULTI']) {
+            $multiStep = filter_var($data['BMULTI'], \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+        }
+
+        // Parse BMEDIA for mediamaker topic (image, video, audio)
+        $mediaType = null;
+        if (isset($data['BMEDIA']) && is_string($data['BMEDIA'])) {
+            $mediaType = $this->normalizeMediaType($data['BMEDIA']);
+        }
+
+        // Parse BDURATION for video generation (integer seconds)
+        $duration = null;
+        if (isset($data['BDURATION']) && is_numeric($data['BDURATION'])) {
+            $duration = (int) $data['BDURATION'];
+            // Sanity check: duration should be between 1 and 120 seconds
+            if ($duration < 1 || $duration > 120) {
+                $duration = null;
+            }
+        }
+
+        // Parse BINPUTMODE (text_only or reference_images) when present
+        $inputMode = null;
+        if (isset($data['BINPUTMODE']) && is_string($data['BINPUTMODE'])) {
+            $inputMode = strtolower(trim($data['BINPUTMODE']));
+            if (!in_array($inputMode, SystemCapabilityRegistry::MEDIAMAKER_INPUT_MODES, true)) {
+                $inputMode = null;
+            }
+        }
+
+        // Parse BRESOLUTION for video generation. Accept the canonical
+        // values directly and translate common aliases (e.g. "uhd",
+        // "fullhd", "8k") so we never forward unsupported strings to the
+        // provider. Anything we cannot map is dropped (returns null) so
+        // downstream code falls back to the configured default.
+        $resolution = null;
+        if (isset($data['BRESOLUTION']) && (is_string($data['BRESOLUTION']) || is_int($data['BRESOLUTION']))) {
+            $resolution = $this->normalizeResolution((string) $data['BRESOLUTION']);
+        }
+
+        $topic = $data['BTOPIC'] ?? $originalData['BTOPIC'] ?? 'general';
+
+        return [
+            'topic' => $this->validateTopic($topic, $validTopics),
+            // The AI's raw, pre-validation claim — RoutingDecision compares
+            // this against the validated topic above to tell "the AI
+            // confidently chose general" apart from "the AI hallucinated an
+            // out-of-enum topic and validateTopic() corrected it".
+            'raw_topic' => (string) $topic,
+            'parse_failed' => false,
+            'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
+            'web_search' => $webSearch,
+            'multi_step' => $multiStep,
+            'media_type' => $mediaType,
+            'duration' => $duration,
+            'resolution' => $resolution,
+            'input_mode' => $inputMode,
+        ];
+    }
+
+    /**
+     * Server-side validation of BTOPIC, independent of the schema's `enum`
+     * constraint on {@see SortClassificationSchema}.
+     *
+     * The schema only constrains providers with structured-output support
+     * (see {@see \App\AI\StructuredOutput\StructuredOutputCapability}) — every
+     * other provider still answers from prose instructions alone and can
+     * invent a topic outside the list, or a strict-mode-incapable provider
+     * can ignore the enum. Previously this field ran through completely
+     * unvalidated (`$data['BTOPIC'] ?? ... ?? 'general'`), silently routing
+     * to whatever string the model produced. An empty `$validTopics` list
+     * (e.g. a call site that never loaded the topic catalog) skips the check
+     * rather than rejecting every topic.
+     *
+     * @param list<string> $validTopics
+     */
+    private function validateTopic(string $topic, array $validTopics): string
+    {
+        if ([] === $validTopics || in_array($topic, $validTopics, true)) {
+            return $topic;
+        }
+
+        $this->logger->warning('MessageSorter: AI returned invalid BTOPIC, falling back to general', [
+            'invalid_topic' => $topic,
+            'valid_topics' => $validTopics,
+        ]);
+
+        return 'general';
     }
 
     /**

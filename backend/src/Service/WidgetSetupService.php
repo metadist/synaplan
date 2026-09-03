@@ -6,6 +6,9 @@ namespace App\Service;
 
 use App\AI\Exception\ModelNotConfiguredException;
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\Schema\WidgetMemorySuggestionSchema;
+use App\AI\StructuredOutput\Schema\WidgetPromptMetadataSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\DTO\UserMemoryDTO;
 use App\Entity\Prompt;
 use App\Entity\User;
@@ -38,6 +41,7 @@ final readonly class WidgetSetupService
         private RateLimitService $rateLimitService,
         private UrlContentService $urlContentService,
         private LoggerInterface $logger,
+        private StructuredOutputConfig $structuredOutputConfig,
     ) {
     }
 
@@ -281,6 +285,10 @@ PROMPT;
             'model' => $modelConfig['model'],
         ];
 
+        if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+            $aiOptions['structured_output'] = WidgetMemorySuggestionSchema::build();
+        }
+
         try {
             $response = $this->aiFacade->chat([
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -459,6 +467,10 @@ PROMPT;
                     'provider' => $metaModelConfig['provider'],
                     'model' => $metaModelConfig['model'],
                 ];
+
+                if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                    $aiOptions['structured_output'] = WidgetPromptMetadataSchema::build();
+                }
 
                 $response = $this->aiFacade->chat(
                     [['role' => 'user', 'content' => $metadataPrompt]],

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -21,7 +25,9 @@ use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -205,6 +211,10 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
             $digestConfig,
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
+            $this->createMock(StructuredOutputConfig::class),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 }

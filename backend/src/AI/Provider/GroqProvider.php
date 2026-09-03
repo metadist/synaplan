@@ -9,6 +9,11 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Tool\ToolCallAccumulator;
+use App\AI\ToolCalling\ToolCallingCapability;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -45,6 +50,8 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         private ?string $apiKey = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
+        private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
+        private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
     ) {
     }
 
@@ -160,17 +167,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'message_count' => count($messages),
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-
-            if (isset($options['temperature'])) {
-                $requestOptions['temperature'] = $options['temperature'];
-            }
-
-            $requestOptions = $this->applyChatCompletionsToolOptions($requestOptions, $options);
+            $requestOptions = $this->buildChatOptions($messages, $options, false);
 
             $response = $this->client()->chat()->create($requestOptions);
 
@@ -219,19 +216,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'message_count' => count($messages),
             ]);
 
-            $requestOptions = [
-                'model' => $model,
-                'messages' => $messages,
-                'stream' => true,
-                'stream_options' => ['include_usage' => true],
-                'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
-            ];
-
-            if (isset($options['temperature'])) {
-                $requestOptions['temperature'] = $options['temperature'];
-            }
-
-            $requestOptions = $this->applyChatCompletionsToolOptions($requestOptions, $options);
+            $requestOptions = $this->buildChatOptions($messages, $options, true);
 
             $stream = $this->client()->chat()->createStreamed($requestOptions);
 
@@ -244,6 +229,15 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'cache_creation_tokens' => 0,
             ];
             $finishReason = null;
+            $toolCalls = new ToolCallAccumulator();
+            // The routing hand-off reads the COMPLETED calls off this
+            // method's return value, so the deltas are folded here as well as
+            // forwarded to the callback (where `visibleText()` is empty for
+            // them, so no tool JSON leaks into the rendered answer).
+            $foldAndForward = static function (array $chunk) use ($callback, $toolCalls): void {
+                $toolCalls->addDelta($chunk);
+                $callback($chunk);
+            };
 
             foreach ($stream as $response) {
                 ++$chunkCount;
@@ -283,20 +277,28 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                     $callback($content);
                 }
 
-                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
+                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $foldAndForward);
             }
 
             if (null !== $finishReason) {
                 $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
+            $completedToolCalls = $toolCalls->complete();
+
             $this->logger->info('✅ Groq streaming COMPLETE', [
                 'model' => $model,
                 'chunks' => $chunkCount,
                 'usage' => $usage,
+                'tool_calls' => count($completedToolCalls),
             ]);
 
-            return ['usage' => $usage];
+            $result = ['usage' => $usage];
+            if ([] !== $completedToolCalls) {
+                $result['tool_calls'] = $completedToolCalls;
+            }
+
+            return $result;
         } catch (\Exception $e) {
             $this->logger->error('Groq streaming error', [
                 'error' => $e->getMessage(),
@@ -305,6 +307,58 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
             throw new ProviderException('Groq streaming error: '.$e->getMessage(), 'groq', null, 0, $e);
         }
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    private function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $model = $options['model'];
+
+        $requestOptions = [
+            'model' => $model,
+            'messages' => $messages,
+            'max_tokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+        ];
+
+        if ($stream) {
+            $requestOptions['stream'] = true;
+            $requestOptions['stream_options'] = ['include_usage' => true];
+        }
+
+        if (isset($options['temperature'])) {
+            $requestOptions['temperature'] = $options['temperature'];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        $translatedSchema = [];
+        if ($schema instanceof StructuredOutputSchema) {
+            $translatedSchema = $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema);
+            $requestOptions = array_merge($requestOptions, $translatedSchema);
+        }
+
+        // The schema wins: it is the caller's output contract and something
+        // downstream parses against it, whereas "no tool call" is already a
+        // valid outcome of every toolset we declare. Groq 400s on
+        // `response_format` plus `tools` in one request, so the tools go.
+        //
+        // Keyed off the schema actually being MERGED, not merely requested:
+        // streaming drops it above, and a dropped schema cannot conflict.
+        if ([] !== $translatedSchema
+            && $this->toolCallingCapability->conflictsWithStructuredOutput($this->getName())
+            && is_array($options['tools'] ?? null) && [] !== $options['tools']
+        ) {
+            $this->logger->warning('Groq: tool declaration dropped, cannot combine tools with structured output', [
+                'model' => $model,
+            ]);
+            unset($options['tools'], $options['tool_choice'], $options['parallel_tool_calls']);
+        }
+
+        return $this->applyChatCompletionsToolOptions($requestOptions, $options);
     }
 
     // ==================== VISION ====================

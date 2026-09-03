@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Message\Handler;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -23,7 +27,9 @@ use App\Service\File\GeneratedImageVisionFlag;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Handler\ChatHandler;
+use App\Service\Message\Routing\RoutingToolset;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\Prompt\TimeContextBuilder;
@@ -316,6 +322,10 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
             $this->createMock(MessageDigestConfig::class),
             new ConversationFileCatalog($fileRepository, $this->uploadDir),
             $flag,
+            $this->createMock(StructuredOutputConfig::class),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
+            new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Characterization;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Prompt\PromptCatalog;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
@@ -121,6 +122,7 @@ final class PlannerPromptCharacterizationTest extends TestCase
                 new NullLogger(),
             ),
             $this->createMock(RateLimitService::class),
+            $this->createMock(StructuredOutputConfig::class),
         );
     }
 

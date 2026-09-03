@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\JsonResponseDecoder;
+use App\AI\StructuredOutput\Schema\FeedbackContradictionSchema;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use Psr\Log\LoggerInterface;
@@ -23,6 +26,8 @@ final readonly class FeedbackContradictionService
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
         private FeedbackConfigService $feedbackConfig,
+        private StructuredOutputConfig $structuredOutputConfig,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -324,17 +329,23 @@ PROMPT;
         try {
             $toolsConfig = $this->modelConfigService->getToolsModelConfig();
 
+            $aiOptions = array_filter([
+                'provider' => $toolsConfig['provider'],
+                'model' => $toolsConfig['model'],
+                'temperature' => 0.2,
+            ]);
+
+            if ($this->structuredOutputConfig->isEnabled($user->getId())) {
+                $aiOptions['structured_output'] = FeedbackContradictionSchema::build();
+            }
+
             $response = $this->aiFacade->chat(
                 [
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user', 'content' => $userPrompt],
                 ],
                 null,
-                array_filter([
-                    'provider' => $toolsConfig['provider'],
-                    'model' => $toolsConfig['model'],
-                    'temperature' => 0.2,
-                ])
+                $aiOptions
             );
 
             $content = trim((string) ($response['content'] ?? ''));
@@ -413,21 +424,11 @@ PROMPT;
     }
 
     /**
-     * Extract the first JSON object from a string (handles markdown code fences).
+     * @return array<string, mixed>|null
      */
     private function extractJson(string $content): ?array
     {
-        // Strip markdown fences if present
-        $content = preg_replace('/^```(?:json)?\s*/m', '', $content) ?? $content;
-        $content = preg_replace('/^```\s*$/m', '', $content) ?? $content;
-
-        if (preg_match('/\{[\s\S]*\}/', $content, $m)) {
-            $decoded = json_decode($m[0], true);
-
-            return is_array($decoded) ? $decoded : null;
-        }
-
-        return null;
+        return $this->jsonDecoder->decode($content)->data;
     }
 
     private function getContradictionPrompt(): string

@@ -106,6 +106,34 @@ final class QdrantClientMock implements QdrantClientInterface
         return 0;
     }
 
+    // --- Routing Anchor Operations (Phase 8 embedding-router cascade layer) ---
+
+    public function upsertRoutingAnchor(string $pointId, array $vector, array $payload): void
+    {
+        $this->logger->info('QdrantClientMock: upsertRoutingAnchor', ['point_id' => $pointId]);
+    }
+
+    public function searchRoutingAnchors(array $queryVector, int $limit = 5): array
+    {
+        $this->logger->info('QdrantClientMock: searchRoutingAnchors');
+
+        return [];
+    }
+
+    public function deleteAllRoutingAnchors(): int
+    {
+        $this->logger->info('QdrantClientMock: deleteAllRoutingAnchors');
+
+        return 0;
+    }
+
+    public function deleteRoutingAnchorsExcept(array $keepPointIds): int
+    {
+        $this->logger->info('QdrantClientMock: deleteRoutingAnchorsExcept', ['kept_count' => count($keepPointIds)]);
+
+        return 0;
+    }
+
     // --- Document Operations ---
 
     public function upsertDocument(string $pointId, array $vector, array $payload): void

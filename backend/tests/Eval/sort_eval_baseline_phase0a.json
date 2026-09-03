@@ -1,0 +1,19 @@
+{
+    "runs": 28,
+    "topic_accuracy_pct": 92.9,
+    "lang_accuracy_pct": 100,
+    "invalid_topic_rate_pct": 0,
+    "parse_failure_rate_pct": 0,
+    "per_topic": {
+        "general": 85.7,
+        "mediamaker": 100,
+        "officemaker": 100,
+        "docsummary": 100
+    },
+    "confusion": {
+        "general": {
+            "mediamaker": 1,
+            "officemaker": 1
+        }
+    }
+}

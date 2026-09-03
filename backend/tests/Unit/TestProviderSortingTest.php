@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\Provider\TestProvider;
+use App\AI\StructuredOutput\Schema\SortClassificationSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -11,9 +12,18 @@ use PHPUnit\Framework\TestCase;
  * when invoked with a tools:sort-style system prompt, so that
  * MessageSorter::parseResponse() can decode the response instead of
  * falling back to defaults.
+ *
+ * `classifyMessage()` forwards a {@see SortClassificationSchema} through
+ * `$options['structured_output']`, exactly like the real
+ * {@see \App\Service\Message\MessageSorter::classify()} call — every
+ * assertion below therefore exercises the same schema-aware code path a
+ * real request takes, not a schema-oblivious shortcut.
  */
 class TestProviderSortingTest extends TestCase
 {
+    private const TOPICS = ['general', 'mediamaker', 'coding'];
+    private const LANGUAGES = ['de', 'en', 'it', 'es', 'fr', 'nl', 'pt', 'ru', 'sv', 'tr'];
+
     private TestProvider $provider;
     private string $sortSystemPrompt;
 
@@ -49,7 +59,9 @@ PROMPT;
             ['role' => 'user', 'content' => json_encode($messageData, JSON_UNESCAPED_UNICODE)],
         ];
 
-        $result = $this->provider->chat($messages);
+        $result = $this->provider->chat($messages, [
+            'structured_output' => SortClassificationSchema::build(self::TOPICS, self::LANGUAGES),
+        ]);
 
         $decoded = json_decode($result['content'], true);
         $this->assertIsArray($decoded, 'Sort response must be valid JSON, got: '.$result['content']);
@@ -210,7 +222,10 @@ PROMPT;
         );
 
         $this->assertSame('general', $result['BTOPIC']);
-        $this->assertArrayNotHasKey('BMEDIA', $result);
+        // With a schema attached BMEDIA is nullable-but-required (strict
+        // mode forbids an omittable key) — present, but null, not absent.
+        $this->assertArrayHasKey('BMEDIA', $result);
+        $this->assertNull($result['BMEDIA']);
     }
 
     // ================================================
@@ -230,7 +245,7 @@ PROMPT;
     // ================================================
 
     #[DataProvider('webSearchProvider')]
-    public function testWebSearchDetection(string $text, int $expected): void
+    public function testWebSearchDetection(string $text, bool $expected): void
     {
         $result = $this->classifyMessage($text);
 
@@ -240,9 +255,9 @@ PROMPT;
     public static function webSearchProvider(): array
     {
         return [
-            'current events EN' => ['What is the current weather in Berlin?', 1],
-            'current events DE' => ['Wie ist das aktuelle Wetter in München?', 1],
-            'general question' => ['Explain quantum physics', 0],
+            'current events EN' => ['What is the current weather in Berlin?', true],
+            'current events DE' => ['Wie ist das aktuelle Wetter in München?', true],
+            'general question' => ['Explain quantum physics', false],
         ];
     }
 
@@ -281,27 +296,27 @@ PROMPT;
     {
         $result = $this->classifyMessage('What is the capital of France?');
 
-        $this->assertSame(0, $result['BMULTI']);
+        $this->assertSame(false, $result['BMULTI']);
     }
 
     public function testVotesMultiStepForTheRequestTheTaskPlanStubExpands(): void
     {
         // The inbound JSON omits BMULTI; the stub must set it from the same
         // predicates mockTaskPlan() expands on. If this vote stays unset, the
-        // planner still runs (safe), but if it were wrongly left at 0 the DAG
-        // would never run and the @multitask E2E test would lose its cards.
+        // planner still runs (safe), but if it were wrongly left at false the
+        // DAG would never run and the @multitask E2E test would lose its cards.
         $result = $this->classifyMessage(
             'Please summarize the following note for me and then translate that summary into German.'
         );
 
-        $this->assertSame(1, $result['BMULTI']);
+        $this->assertSame(true, $result['BMULTI']);
     }
 
     public function testVotesMultiStepForTheWebSearchPlanPrefix(): void
     {
         $result = $this->classifyMessage('websearch: what happened in AI this week?');
 
-        $this->assertSame(1, $result['BMULTI']);
+        $this->assertSame(true, $result['BMULTI']);
     }
 
     public function testDoesNotTriggerSortForNormalChat(): void
@@ -315,5 +330,107 @@ PROMPT;
 
         $this->assertNull(json_decode($result['content'], true),
             'Normal chat should NOT return JSON sort response');
+    }
+
+    // ================================================
+    // Schema-aware behaviour (Phase 4)
+    // ================================================
+
+    /**
+     * The `structured_output` option is what a real call-site
+     * (`MessageSorter::classify()`) always attaches — the mock must consume
+     * it instead of silently ignoring `$options`.
+     */
+    public function testBWebsearchAndBMultiAreRealJsonBooleansWhenASchemaIsAttached(): void
+    {
+        $result = $this->classifyMessage('Hello there');
+
+        $this->assertIsBool($result['BWEBSEARCH']);
+        $this->assertIsBool($result['BMULTI']);
+    }
+
+    /**
+     * A schema-constrained provider cannot emit a topic outside its BTOPIC
+     * enum. The mock must reproduce that constraint instead of trusting
+     * whatever `classifyTopic()` (or the inbound `BTOPIC`) hands it — a
+     * mock that let an invalid topic through would hide the exact bug the
+     * enum exists to catch.
+     */
+    public function testFallsBackToGeneralWhenTheSchemaTopicEnumDoesNotContainTheClassifiedTopic(): void
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->sortSystemPrompt],
+            ['role' => 'user', 'content' => json_encode([
+                'BTEXT' => 'Tell me more about that',
+                'BLANG' => 'en',
+                'BTOPIC' => 'invented_topic_not_in_enum',
+                'BFILETEXT' => '',
+                'BWEBSEARCH' => 0,
+            ], JSON_UNESCAPED_UNICODE)],
+        ];
+
+        $result = $this->provider->chat($messages, [
+            'structured_output' => SortClassificationSchema::build(self::TOPICS, self::LANGUAGES),
+        ]);
+        $decoded = json_decode($result['content'], true);
+
+        $this->assertSame('general', $decoded['BTOPIC']);
+    }
+
+    /**
+     * `BWEBSEARCH`/`BMULTI` are real JSON booleans even when the caller
+     * attaches no schema at all (marker detection alone triggered the mock) —
+     * a `0`/`1` stub was never a faithful mock of a boolean field to begin
+     * with. Only the self-validation against `assertMatchesSchema()` is
+     * actually schema-gated.
+     */
+    public function testBWebsearchStaysABooleanEvenWithoutASchema(): void
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->sortSystemPrompt],
+            ['role' => 'user', 'content' => json_encode([
+                'BTEXT' => 'What is the current weather in Berlin?',
+                'BLANG' => 'en',
+                'BTOPIC' => '',
+                'BFILETEXT' => '',
+                'BWEBSEARCH' => 0,
+            ], JSON_UNESCAPED_UNICODE)],
+        ];
+
+        $result = $this->provider->chat($messages);
+        $decoded = json_decode($result['content'], true);
+
+        $this->assertIsBool($decoded['BWEBSEARCH']);
+    }
+
+    /**
+     * The self-validation the mock performs against its own output is not
+     * decorative: a schema whose `required` list the mock's output cannot
+     * possibly satisfy must fail loudly, not silently return a
+     * schema-violating response the way a real strict-mode provider never
+     * would.
+     */
+    public function testThrowsWhenTheAttachedSchemaRequiresAKeyTheMockNeverProduces(): void
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->sortSystemPrompt],
+            ['role' => 'user', 'content' => json_encode([
+                'BTEXT' => 'Hello',
+                'BLANG' => 'en',
+                'BTOPIC' => '',
+                'BFILETEXT' => '',
+                'BWEBSEARCH' => 0,
+            ], JSON_UNESCAPED_UNICODE)],
+        ];
+
+        $impossibleSchema = new \App\AI\StructuredOutput\StructuredOutputSchema(
+            name: 'sort_classification',
+            schema: ['required' => ['BTOPIC', 'A_KEY_THE_MOCK_NEVER_PRODUCES']],
+        );
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('A_KEY_THE_MOCK_NEVER_PRODUCES');
+
+        $this->provider->chat($messages, ['structured_output' => $impossibleSchema]);
     }
 }

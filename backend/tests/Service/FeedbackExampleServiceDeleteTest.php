@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\AI\Service\AiFacade;
+use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
@@ -57,6 +58,9 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->feedbackConfig = $this->createMock(FeedbackConfigService::class);
 
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(true);
+
         $this->service = new FeedbackExampleService(
             $this->aiFacade,
             $this->modelConfigService,
@@ -67,6 +71,7 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
             $this->promptRepository,
             $this->logger,
             $this->feedbackConfig,
+            $structuredOutputConfig,
         );
     }
 

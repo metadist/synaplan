@@ -92,6 +92,24 @@ final class QdrantClientMockTest extends TestCase
         $this->assertEquals(0, $this->client->deleteAllMemoriesForUser(1));
     }
 
+    // --- Routing Anchor Operations (Phase 8 embedding-router cascade layer) ---
+
+    public function testUpsertRoutingAnchorDoesNotThrow(): void
+    {
+        $this->expectNotToPerformAssertions();
+        $this->client->upsertRoutingAnchor('route_general_abc', array_fill(0, 1024, 0.5), ['topic' => 'general']);
+    }
+
+    public function testSearchRoutingAnchorsReturnsEmptyArray(): void
+    {
+        $this->assertEmpty($this->client->searchRoutingAnchors(array_fill(0, 1024, 0.5)));
+    }
+
+    public function testDeleteAllRoutingAnchorsReturnsZero(): void
+    {
+        $this->assertEquals(0, $this->client->deleteAllRoutingAnchors());
+    }
+
     // --- Document Operations ---
 
     public function testUpsertDocumentDoesNotThrow(): void

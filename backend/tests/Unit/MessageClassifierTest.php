@@ -2,14 +2,21 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
 use App\Service\File\Office\OfficeConverterClient;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterMatch;
+use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -46,7 +53,12 @@ class MessageClassifierTest extends TestCase
             $this->modelConfigService,
             $this->configRepository,
             $this->em,
-            $this->logger
+            $this->logger,
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($this->configRepository),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
     }
 
@@ -522,6 +534,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -564,6 +581,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -730,6 +752,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -798,6 +825,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -869,6 +901,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -912,6 +949,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -976,6 +1018,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $message = $this->createMock(Message::class);
@@ -1025,6 +1072,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $previousFileMessage = $this->createMock(Message::class);
@@ -1076,6 +1128,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $previousReply = $this->createMock(Message::class);
@@ -1122,6 +1179,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1178,6 +1240,11 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1344,6 +1411,459 @@ class MessageClassifierTest extends TestCase
         $this->assertArrayNotHasKey('input_mode', $this->service->classify($this->plainMessage(306, 'hello there')));
     }
 
+    // ──────────────────────────────────────────────
+    //  Phase 8: embedding-router cascade layer
+    // ──────────────────────────────────────────────
+
+    public function testEmbeddingRouterDisabledByDefaultNeverConsultsTheRouter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: false);
+
+        $result = $classifier->classify($this->plainMessage(400, 'Hello, how are you?'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testConfidentEmbeddingMatchSkipsTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('mediamaker', 0.95, [['topic' => 'general', 'score' => 0.4]]));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true, threshold: 0.88);
+
+        // Deliberately gibberish text: no local-language heuristic anchor
+        // fires for any of the five supported languages, so
+        // resolveConfidentLanguage() falls back to the 'de' already pinned
+        // on the message by plainMessage() rather than guessing.
+        $result = $classifier->classify($this->plainMessage(401, 'zzzqx foobar wibble 12345'));
+
+        $this->assertSame('mediamaker', $result['topic']);
+        $this->assertSame('de', $result['language']);
+        $this->assertSame('embedding_router', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+        $this->assertSame('image_generation', $result['intent']);
+        $this->assertNull($result['web_search']);
+        $this->assertSame(0.95, $result['routing_confidence']);
+        // RoutingDecision::$discardedAlternatives is list<string> (see its
+        // docblock) — EmbeddingRouterMatch's structured {topic,score} pairs
+        // are formatted down to that shape here, matching every other layer.
+        $this->assertSame(['general (0.400)'], $result['routing_discarded_alternatives']);
+    }
+
+    public function testSubThresholdEmbeddingMatchEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        // Below the configured 0.88 threshold.
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('mediamaker', 0.5));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true, threshold: 0.88);
+
+        $result = $classifier->classify($this->plainMessage(402, 'Something ambiguous'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    public function testNoEmbeddingMatchEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(null);
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(403, 'Something with no anchors'));
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * A confident topic match with an undetectable language must still defer
+     * to the AI sorter rather than guess — same guard as the fast-path (a
+     * German "wer bist du?" was once answered in English because an
+     * undetectable language silently defaulted to 'en').
+     */
+    public function testConfidentEmbeddingMatchWithoutConfidentLanguageEscalatesToTheAiSorter(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('general', 0.99));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(404);
+        $message->method('getUserId')->willReturn(10);
+        // No German/English/etc. anchor words, and 'NN' (unknown) on the message.
+        $message->method('getText')->willReturn('xyzzy plugh');
+        $message->method('getLanguage')->willReturn('NN');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * With both new layers on, Phase 8's refusal must reach the AI sorter and
+     * not be intercepted by Phase 9. The refusal is specifically a request for
+     * BLANG resolution, and Phase 9 answers `language: 'en'` — i.e. exactly
+     * the guess Phase 8 declined to make.
+     */
+    public function testAnEmbeddingMatchDeclinedForLanguageReachesTheSorterEvenWithPhase9On(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(new EmbeddingRouterMatch('general', 0.99));
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn(['topic' => 'general', 'language' => 'de']);
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(405);
+        $message->method('getUserId')->willReturn(10);
+        // No language anchor words, and 'NN' (unknown) on the message.
+        $message->method('getText')->willReturn('xyzzy plugh');
+        $message->method('getLanguage')->willReturn('NN');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getDateTime')->willReturn('20260827120000');
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getTopic')->willReturn('');
+        $message->method('getFileText')->willReturn('');
+
+        $result = $classifier->classify($message);
+
+        $this->assertSame('ai_sorting', $result['source']);
+        $this->assertArrayNotHasKey('defer_routing_to_chat', $result);
+        $this->assertSame('de', $result['language']);
+    }
+
+    /**
+     * The complement of the test above: when Phase 8 finds NO match at all it
+     * has expressed no opinion, so Phase 9 is free to take the turn.
+     */
+    public function testPhase9StillTakesTheTurnWhenTheEmbeddingRouterFoundNothing(): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->method('findClosestAnchor')->willReturn(null);
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithBothNewLayers($embeddingRouter, $sorter);
+
+        $result = $classifier->classify($this->plainMessage(406, 'What is the capital of France?'));
+
+        $this->assertTrue($result['defer_routing_to_chat']);
+    }
+
+    public function testNativeToolRoutingDefersTheDecisionToTheAnsweringCall(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(900, 'What is the capital of France?'));
+
+        // The acceptance criterion of Phase 9: a simple chat turn costs no
+        // sorter call at all.
+        self::assertSame('general', $result['topic']);
+        self::assertSame('chat', $result['intent']);
+        self::assertSame('native_tool_calling', $result['source']);
+        self::assertTrue($result['skip_sorting']);
+        self::assertTrue($result['defer_routing_to_chat']);
+        // No sorter means no BWEBSEARCH vote, exactly as on the fast-path.
+        self::assertNull($result['web_search']);
+    }
+
+    public function testDisabledNativeToolRoutingKeepsTheSorterCall(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: false);
+
+        $result = $classifier->classify($this->plainMessage(901, 'What is the capital of France?'));
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * The pre-gate: on an account whose chat provider has no native tool
+     * calling, deferring would buy a guaranteed re-route on every single
+     * message.
+     */
+    public function testNoDeferralWhenTheAccountChatProviderCannotDoToolCalling(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true, chatProvider: 'ollama');
+
+        $result = $classifier->classify($this->plainMessage(902, 'What is the capital of France?'));
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * The second pass after an unhonourable deferral: without this the turn
+     * would defer, come back, and defer again forever.
+     */
+    public function testASecondPassWithDeferralDisallowedGoesToTheSorter(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+        ]);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify(
+            $this->plainMessage(903, 'What is the capital of France?'),
+            [],
+            null,
+            allowRoutingDeferral: false,
+        );
+
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Deferring means "let the answering model decide", but an attachment
+     * rule has already decided — the deferral must sit BELOW every
+     * deterministic layer, not above them.
+     */
+    public function testDeterministicLayersStillWinOverTheDeferral(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(904, '/pic a cat on a bike'));
+
+        self::assertSame('tool_command', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Self-awareness answers by routing to the `synaplan` topic, which only
+     * the AI sorter can pick — the hand-off toolset covers the four system
+     * capabilities and nothing else. Deferring such a question would answer it
+     * from a plain chat turn that knows nothing about the product.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheDeferralStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithNativeToolRouting($sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(905, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('defer_routing_to_chat', $result);
+    }
+
+    /**
+     * Same rule for the Phase 8 layer: a confident anchor match can only ever
+     * be one of the four system topics, so `synaplan` would be unreachable.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('selfAwareGuardUtterances')]
+    public function testTheEmbeddingRouterStepsAsideForSelfAwareMetaQuestions(string $text): void
+    {
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+
+        $embeddingRouter = $this->createMock(EmbeddingRouterService::class);
+        $embeddingRouter->expects($this->never())->method('findClosestAnchor');
+
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'synaplan', 'language' => 'en']);
+
+        $classifier = $this->classifierWithEmbeddingRouter($embeddingRouter, $sorter, enabled: true);
+
+        $result = $classifier->classify($this->plainMessage(906, $text));
+
+        self::assertSame('synaplan', $result['topic']);
+        self::assertSame('ai_sorting', $result['source']);
+    }
+
+    /**
+     * @param string $chatProvider the account's default chat provider, which decides
+     *                             whether the classifier's cheap pre-gate lets the
+     *                             deferral through at all
+     */
+    private function classifierWithNativeToolRouting(
+        MessageSorter $sorter,
+        bool $enabled,
+        string $chatProvider = 'anthropic',
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting
+                ? ($enabled ? '1' : '0')
+                : null
+        );
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn($chatProvider);
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * Both new cascade layers on at once — the configuration in which the
+     * layers can shadow each other.
+     */
+    private function classifierWithBothNewLayers(
+        EmbeddingRouterService $embeddingRouter,
+        MessageSorter $sorter,
+        float $threshold = 0.88,
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting) use ($threshold): ?string {
+                if ('EMBEDDING_ROUTER' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+                if ('EMBEDDING_ROUTER' === $group && 'CONFIDENCE_THRESHOLD' === $setting) {
+                    return (string) $threshold;
+                }
+                if ('NATIVE_TOOL_ROUTING' === $group && 'ENABLED' === $setting) {
+                    return '1';
+                }
+
+                return null;
+            }
+        );
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getDefaultProvider')->willReturn('anthropic');
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $modelConfig,
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $embeddingRouter,
+            new EmbeddingRouterConfig($configRepo),
+            new NativeToolRoutingConfig($configRepo),
+            new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
+    /**
+     * The Phase 9 deferral switched off, which is the default everywhere and
+     * therefore the right baseline for every test that is not about it.
+     */
+    private function disabledNativeToolRouting(): NativeToolRoutingConfig
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn(null);
+
+        return new NativeToolRoutingConfig($configRepo);
+    }
+
+    private function classifierWithEmbeddingRouter(
+        EmbeddingRouterService $embeddingRouter,
+        MessageSorter $sorter,
+        bool $enabled,
+        float $threshold = 0.88,
+    ): MessageClassifier {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting) use ($enabled, $threshold): ?string {
+            if ('EMBEDDING_ROUTER' === $group && 'ENABLED' === $setting) {
+                return $enabled ? '1' : '0';
+            }
+            if ('EMBEDDING_ROUTER' === $group && 'CONFIDENCE_THRESHOLD' === $setting) {
+                return (string) $threshold;
+            }
+
+            return null;
+        });
+
+        return new MessageClassifier(
+            $sorter,
+            $this->messageMetaRepository,
+            $this->createMock(ModelConfigService::class),
+            $configRepo,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $embeddingRouter,
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
+        );
+    }
+
     /**
      * @return list<array{0: string}>
      */
@@ -1432,7 +1952,12 @@ class MessageClassifierTest extends TestCase
             $configRepo,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
-            new \App\Service\SelfAware\SelfAwareConfig($configRepo),
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            new SelfAwareConfig($configRepo),
             $converter,
         );
     }

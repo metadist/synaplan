@@ -14,6 +14,9 @@ use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -127,6 +130,7 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
         private readonly ?string $apiKey = null,
         private readonly string $uploadDir = '/var/www/backend/var/uploads',
         private readonly ?ProviderKeyStore $keyStore = null,
+        private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -752,6 +756,11 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
                 }
                 break;
             }
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $body = array_merge($body, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
         }
 
         return $body;

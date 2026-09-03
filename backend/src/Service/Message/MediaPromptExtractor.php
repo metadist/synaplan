@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\Entity\Message;
 use App\Service\Message\Handler\ChatHandler;
 use Psr\Log\LoggerInterface;
@@ -19,6 +20,7 @@ final readonly class MediaPromptExtractor
     public function __construct(
         private ChatHandler $chatHandler,
         private LoggerInterface $logger,
+        private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
     ) {
     }
 
@@ -161,19 +163,12 @@ final readonly class MediaPromptExtractor
         return $content;
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function decodeJson(string $content): ?array
     {
-        if ('' === $content || (!str_starts_with($content, '{') && !str_starts_with($content, '['))) {
-            return null;
-        }
-
-        try {
-            $decoded = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
-
-            return is_array($decoded) ? $decoded : null;
-        } catch (\JsonException) {
-            return null;
-        }
+        return $this->jsonDecoder->decode($content)->data;
     }
 
     private function normalizeMediaType(mixed $value): ?string

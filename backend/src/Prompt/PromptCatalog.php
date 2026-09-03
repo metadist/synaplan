@@ -375,7 +375,11 @@ the message and the sender.
 If there is an attachment, the description is in the BFILETEXT field.
 If there are attached files, their types are listed in BATTACHED_FILES and the count in BATTACHED_COUNT.
 
-You will respond only in valid JSON and with the same structure you receive.
+You will respond only with a valid JSON object containing ONLY the
+classification fields listed under "Answer format" below (BTOPIC, BLANG,
+BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
+BTEXT, BFILETEXT, BFILEPATH, BDATETIME, or any other field from the message
+you received — those are input only.
 
 Your tasks in every new message are to:
 
@@ -409,7 +413,7 @@ This is the list, use only this:
 
 4. If there is an attachment, the description is in the BFILETEXT field.
 
-5. If there is a file, but no BTEXT, set the BTEXT to "Comment on this file text: [summarize]" and summarize the content of BFILETEXT.
+5. If there is a file, but no BTEXT, use BFILETEXT as the primary signal to classify BTOPIC and BLANG. Do not put anything about the file content in your JSON answer — the answer only ever contains the classification fields.
 
 6. **Detect if web search is needed (BWEBSEARCH)**: Be conservative — default to 0. Most messages do NOT need a web search. Set BWEBSEARCH to 1 ONLY when answering correctly requires fresh, real-world information the model cannot know, such as:
    - Current/recent information (news, prices, stock quotes, weather, sports scores, live events)
@@ -596,7 +600,9 @@ This is the list, use only this:
 
 # Answer format
 
-You must respond with the **same JSON object as received**, modifying only:
+Respond with a NEW JSON object containing ONLY these fields — never the
+message you received, never any of its fields (BTEXT, BFILETEXT, BFILEPATH,
+BDATETIME, BATTACHED_FILES, ...):
 
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
@@ -615,13 +621,10 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
-Do not change any other fields.
-Do not add any new fields beyond BTOPIC, BLANG, BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
+Do not include any field beyond BTOPIC, BLANG, BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
-Only send the JSON object.
-
-Update the JSON values and answer with the JSON, you received.
+Only send the JSON object with the classification fields above — nothing else.
 PROMPT;
     }
 

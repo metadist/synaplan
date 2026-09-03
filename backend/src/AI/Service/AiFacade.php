@@ -195,6 +195,11 @@ class AiFacade
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $response['usage'] ?? [],
             'response_id' => $response['response_id'] ?? null,
+            // Native tool calls, normalised to list<ToolCall> by the provider
+            // ({@see \App\AI\ToolCalling\ToolCallParser}). Always present so a
+            // caller that declared tools can read the key unconditionally;
+            // empty for every provider and every call that declared none.
+            'tool_calls' => $response['tool_calls'] ?? [],
         ];
         if (isset($response['tool_calls']) && is_array($response['tool_calls'])) {
             $out['tool_calls'] = $response['tool_calls'];
@@ -277,6 +282,11 @@ class AiFacade
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
             'usage' => $streamResult['usage'] ?? [],
             'response_id' => $streamResult['response_id'] ?? null,
+            // See chat(): tool calls reassembled from the stream fragments by
+            // {@see \App\AI\ToolCalling\StreamingToolCallAccumulator}. A tool
+            // call is NOT emitted to the stream callback — the client must
+            // never see a routing hand-off as if it were answer text.
+            'tool_calls' => $streamResult['tool_calls'] ?? [],
         ];
     }
 

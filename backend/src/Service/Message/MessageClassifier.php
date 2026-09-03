@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
@@ -11,6 +12,12 @@ use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
 use App\Service\File\Office\OfficeConverterClient;
+use App\Service\Message\Capability\SystemCapabilityRegistry;
+use App\Service\Message\Routing\EmbeddingRouterConfig;
+use App\Service\Message\Routing\EmbeddingRouterService;
+use App\Service\Message\Routing\NativeToolRoutingConfig;
+use App\Service\Message\Routing\RoutingDecision;
+use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,7 +30,11 @@ use Psr\Log\LoggerInterface;
  * 1. Check for "Again" function (user-selected AI/prompt via BMESSAGEMETA)
  * 2. Check for tool commands (e.g., /pic, /vid, /search)
  * 3. Document or audio attachment → analyzefile / file_analysis (skip sorting, #595)
- * 4. Use MessageSorter for AI-based classification
+ * 4. Embedding-router cascade match against the four SYSTEM topics (Phase 8,
+ *    skip sorting when confident — see {@see EmbeddingRouterService})
+ * 5. Defer the decision to the answering call itself (Phase 9, default OFF —
+ *    see {@see NativeToolRoutingConfig} and {@see Routing\RoutingToolset})
+ * 6. Use MessageSorter for AI-based classification
  *
  * Workflow from legacy:
  * - If BMESSAGEMETA has PROMPTID set → use that directly (skip sorting)
@@ -62,6 +73,11 @@ final readonly class MessageClassifier
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
+        private SystemCapabilityRegistry $capabilityRegistry,
+        private EmbeddingRouterService $embeddingRouter,
+        private EmbeddingRouterConfig $embeddingRouterConfig,
+        private NativeToolRoutingConfig $nativeToolRoutingConfig,
+        private ToolCallingCapability $toolCallingCapability,
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficeConverterClient $officeConverter = null,
         private ?DocumentToolsConfig $documentToolsConfig = null,
@@ -71,12 +87,17 @@ final readonly class MessageClassifier
     /**
      * Classify message and determine routing.
      *
-     * @param Message $message             Message entity
-     * @param array   $conversationHistory Previous messages
+     * @param Message $message              Message entity
+     * @param array   $conversationHistory  Previous messages
+     * @param bool    $allowRoutingDeferral whether the Phase 9 native tool-calling layer may
+     *                                      defer the decision to the answering call. Set to
+     *                                      false by {@see InferenceRouter} when a deferral came
+     *                                      back unhonoured, so the second pass takes the AI
+     *                                      sorter instead of deferring again
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null, bool $allowRoutingDeferral = true): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
@@ -113,14 +134,7 @@ final readonly class MessageClassifier
             // "wer bist du?" got an English answer: the directive built
             // downstream from this value told the chat model to reply in
             // English.
-            $confidentLanguage = $this->detectLanguageConfident($text);
-
-            if (null === $confidentLanguage) {
-                $existingLanguage = strtolower(trim($message->getLanguage()));
-                if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
-                    $confidentLanguage = $existingLanguage;
-                }
-            }
+            $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
 
             if (null !== $confidentLanguage) {
                 $this->logger->info('MessageClassifier: Fast-path classification (skipped AI sorter)', [
@@ -135,17 +149,19 @@ final readonly class MessageClassifier
                 // these trivial chats answer immediately without a web round-trip.
                 // An explicit prompt `tool_internet=true` still forces search
                 // later in `MessageProcessor` via `WebSearchTopicPolicy`.
-                return [
+                $fastPathDecision = RoutingDecision::deterministic(RoutingLayer::FastPathHeuristic, 'general');
+
+                return array_merge([
                     'topic' => 'general',
                     'language' => $confidentLanguage,
                     'web_search' => null,
-                    'source' => 'fast_path_heuristic',
+                    'source' => $fastPathDecision->toClassificationSource(),
                     'skip_sorting' => true,
                     'intent' => 'chat',
                     'model_id' => null,
                     'provider' => null,
                     'model_name' => null,
-                ];
+                ], $fastPathDecision->toClassificationFields());
             }
 
             $this->logger->info('MessageClassifier: Fast-path declined (language ambiguous) — deferring to AI sorter', [
@@ -173,14 +189,16 @@ final readonly class MessageClassifier
                 'intent' => $intent,
             ]);
 
-            return [
+            $modelOverrideDecision = RoutingDecision::deterministic(RoutingLayer::ModelOverride, $topic);
+
+            return array_merge([
                 'topic' => $topic,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $intent,
-                'source' => 'model_override_auto',
+                'source' => $modelOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
                 'model_id' => $modelOverride,
-            ];
+            ], $modelOverrideDecision->toClassificationFields());
         }
 
         if ($promptOverride) {
@@ -190,13 +208,15 @@ final readonly class MessageClassifier
                 'model_id' => $modelOverride,
             ]);
 
-            $result = [
+            $promptOverrideDecision = RoutingDecision::deterministic(RoutingLayer::PromptOverride, $promptOverride);
+
+            $result = array_merge([
                 'topic' => $promptOverride,
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => $this->mapTopicToIntent($promptOverride),
-                'source' => 'prompt_override',
+                'source' => $promptOverrideDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $promptOverrideDecision->toClassificationFields());
 
             // Add model_id if user explicitly selected a model (Again)
             if ($modelOverride) {
@@ -215,13 +235,15 @@ final readonly class MessageClassifier
                     'tool' => $toolTopic,
                 ]);
 
-                return [
+                $toolCommandDecision = RoutingDecision::deterministic(RoutingLayer::ToolCommand, $toolTopic);
+
+                return array_merge([
                     'topic' => $toolTopic,
                     'language' => $message->getLanguage() ?: 'en',
                     'intent' => $this->mapTopicToIntent($toolTopic),
-                    'source' => 'tool_command',
+                    'source' => $toolCommandDecision->toClassificationSource(),
                     'skip_sorting' => true,
-                ];
+                ], $toolCommandDecision->toClassificationFields());
             }
         }
 
@@ -244,13 +266,160 @@ final readonly class MessageClassifier
                 'message_id' => $messageId,
             ]);
 
-            return [
+            $attachmentDecision = RoutingDecision::deterministic(RoutingLayer::AttachmentRule, 'analyzefile');
+
+            return array_merge([
                 'topic' => 'analyzefile',
                 'language' => $message->getLanguage() ?: 'en',
                 'intent' => 'file_analysis',
-                'source' => 'attachment_document_or_audio',
+                'source' => $attachmentDecision->toClassificationSource(),
                 'skip_sorting' => true,
-            ];
+            ], $attachmentDecision->toClassificationFields());
+        }
+
+        // Phase 8: embedding-router cascade layer. Sits after every
+        // deterministic layer above (overrides, tool commands, attachments)
+        // and before the AI sorter below. Embeds the message with the same
+        // bge-m3 model used for RAG and matches it via cosine similarity
+        // against pre-computed example-utterance anchors for the four
+        // SYSTEM topics (general, mediamaker, officemaker, docsummary)
+        // stored in Qdrant — see EmbeddingRouterService and the
+        // `app:routing:sync-anchors` command that (re)populates the anchors
+        // from SystemCapabilityRegistry::exampleUtterances. User-defined
+        // topics have no curated anchors, so a confident match is always one
+        // of the four system topics; anything else escalates to the AI
+        // sorter below exactly like today.
+        //
+        // Like the fast-path, a confident match short-circuits the sorter
+        // round-trip entirely — unlike the fast-path this is not restricted
+        // to `general`. Extraction of the sorter's topic-specific votes
+        // (BMEDIA, BRESOLUTION, BINPUTMODE) is intentionally NOT attempted
+        // here: MediaPromptExtractor already re-derives BMEDIA from the
+        // message text via its own dedicated AI call whenever the
+        // classification omits it, so a mediamaker match degrades
+        // gracefully instead of needing those votes up front.
+        // Set when Phase 8 found a confident topic but refused to commit
+        // because the language was ambiguous. That refusal is a request for
+        // the AI sorter specifically (it resolves BLANG), so Phase 9 — which
+        // would answer with `language: 'en'` — must not intercept it.
+        $embeddingDeclinedForLanguage = false;
+
+        if (null === $overrideModelId
+            && !empty($text)
+            && $this->embeddingRouterConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
+        ) {
+            $embeddingMatch = $this->embeddingRouter->findClosestAnchor($text, $userId);
+
+            if (null !== $embeddingMatch && $embeddingMatch->score >= $this->embeddingRouterConfig->getConfidenceThreshold()) {
+                $confidentLanguage = $this->resolveConfidentLanguage($message, $text);
+
+                if (null !== $confidentLanguage) {
+                    $this->logger->info('MessageClassifier: Embedding-router match (skipped AI sorter)', [
+                        'message_id' => $messageId,
+                        'topic' => $embeddingMatch->topic,
+                        'confidence' => $embeddingMatch->score,
+                        'language' => $confidentLanguage,
+                    ]);
+
+                    $embeddingDecision = new RoutingDecision(
+                        RoutingLayer::EmbeddingRouter,
+                        $embeddingMatch->topic,
+                        confidence: $embeddingMatch->score,
+                        discardedAlternatives: array_map(
+                            static fn (array $alternative): string => sprintf('%s (%.3f)', $alternative['topic'], $alternative['score']),
+                            $embeddingMatch->discardedAlternatives
+                        ),
+                    );
+
+                    // `web_search` is intentionally null here for the same
+                    // reason as the fast-path: no AI-sorter round-trip means
+                    // no BWEBSEARCH vote, and under the "trust the model"
+                    // policy a missing vote means no search.
+                    return array_merge([
+                        'topic' => $embeddingMatch->topic,
+                        'language' => $confidentLanguage,
+                        'web_search' => null,
+                        'source' => $embeddingDecision->toClassificationSource(),
+                        'skip_sorting' => true,
+                        'intent' => $this->mapTopicToIntent($embeddingMatch->topic),
+                        'model_id' => null,
+                        'provider' => null,
+                        'model_name' => null,
+                    ], $embeddingDecision->toClassificationFields());
+                }
+
+                $embeddingDeclinedForLanguage = true;
+
+                $this->logger->info('MessageClassifier: Embedding-router match declined (language ambiguous) — deferring to AI sorter', [
+                    'message_id' => $messageId,
+                    'topic' => $embeddingMatch->topic,
+                    'confidence' => $embeddingMatch->score,
+                ]);
+            }
+        }
+
+        // Phase 9: hand the routing decision to the answering call itself.
+        //
+        // Everything above this point is a layer that must decide BEFORE any
+        // model runs — an override, a slash command, an attachment rule, a
+        // cheap embedding match. What is left over is exactly the population
+        // that costs a full AI-sorter round-trip today, and for the most
+        // common member of that population (an ordinary chat turn) the sorter
+        // answers a question the chat model was about to answer anyway.
+        //
+        // So instead of classifying here, emit a deferred classification:
+        // route to `chat`, and let ChatHandler attach the RoutingToolset
+        // hand-off tools to the answering call. No tool call means it really
+        // was a chat turn — one LLM call for the whole turn instead of two.
+        // A hand-off tool call means ChatHandler discards its own answer and
+        // InferenceRouter re-routes to the media/office/summary handler.
+        //
+        // ChatHandler owns the fallback: if the resolved chat provider cannot
+        // do native tool calling ({@see \App\AI\ToolCalling\ToolCallingCapability}),
+        // it asks the sorter after all, so an unsupported provider behaves
+        // exactly as it does today.
+        if ($allowRoutingDeferral
+            && null === $overrideModelId
+            && !empty($text)
+            && !$embeddingDeclinedForLanguage
+            && $this->nativeToolRoutingConfig->isEnabled($userId)
+            && !$this->isSelfAwareQuestion($text, $userId)
+            && $this->accountChatModelCanRouteNatively($userId)
+        ) {
+            $deferredLanguage = $this->resolveConfidentLanguage($message, $text) ?? 'en';
+
+            $this->logger->info('MessageClassifier: Deferring routing to the answering call (native tool calling)', [
+                'message_id' => $messageId,
+                'language' => $deferredLanguage,
+            ]);
+
+            $deferredDecision = RoutingDecision::deterministic(RoutingLayer::NativeToolCalling, 'general');
+
+            return array_merge([
+                'topic' => 'general',
+                // Unlike the fast-path and the embedding router, an ambiguous
+                // language does NOT force an escalation here: those layers
+                // commit to a final topic, whereas this one only defers, and
+                // the answering model replies in the user's language whatever
+                // this field says.
+                'language' => $deferredLanguage,
+                // `web_search` is null for the same reason as on every other
+                // sorter-skipping layer: no sorter, no BWEBSEARCH vote. An
+                // explicit prompt `tool_internet=true` still forces a search
+                // in MessageProcessor via WebSearchTopicPolicy.
+                'web_search' => null,
+                'source' => $deferredDecision->toClassificationSource(),
+                'skip_sorting' => true,
+                'intent' => 'chat',
+                'model_id' => null,
+                'provider' => null,
+                'model_name' => null,
+                // The flag ChatHandler keys on to attach the hand-off tools.
+                // Absent (not false) on every other path, so no existing
+                // caller changes behaviour.
+                'defer_routing_to_chat' => true,
+            ], $deferredDecision->toClassificationFields());
         }
 
         // 4. Classify with the LLM AI sorter (DEFAULTMODEL.SORT).
@@ -264,6 +433,31 @@ final readonly class MessageClassifier
         // handler resolution, BFILEPATH keys) understands directly.
         $canonicalTopic = (string) ($result['topic'] ?? 'general');
 
+        // The sorter already built its own RoutingDecision (rule-based match,
+        // genuine classification, or a fallback — see
+        // MessageSorter::buildRoutingDecision()) and flattened it into
+        // $result via RoutingDecision::toClassificationFields(). A mocked
+        // sorter (tests) or a source outside the AI-sorting layer may omit
+        // these keys entirely, so default to "full confidence, no fallback"
+        // rather than treating an absent key as a low-confidence result.
+        $aiSortingDecision = new RoutingDecision(
+            RoutingLayer::AiSorting,
+            $canonicalTopic,
+            confidence: (float) ($result['routing_confidence'] ?? 1.0),
+            discardedAlternatives: $result['routing_discarded_alternatives'] ?? [],
+            fallbackReason: $result['routing_fallback_reason'] ?? null,
+        );
+
+        if ($aiSortingDecision->isFallback()) {
+            $this->logger->warning('MessageClassifier: ⚠️ AI-sorting result is a fallback, not a confident decision', [
+                'message_id' => $messageId,
+                'topic' => $canonicalTopic,
+                'confidence' => $aiSortingDecision->confidence,
+                'fallback_reason' => $aiSortingDecision->fallbackReason,
+                'discarded_alternatives' => $aiSortingDecision->discardedAlternatives,
+            ]);
+        }
+
         $this->logger->info('MessageClassifier: Classification complete', [
             'message_id' => $messageId,
             'topic' => $canonicalTopic,
@@ -274,10 +468,11 @@ final readonly class MessageClassifier
             'duration' => $result['duration'] ?? null,
             'resolution' => $result['resolution'] ?? null,
             'source' => $source,
+            'confidence' => $aiSortingDecision->confidence,
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        $classification = [
+        $classification = array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
@@ -295,7 +490,7 @@ final readonly class MessageClassifier
             // Usage taximeter: tokens/charged cost of the sorting call (null
             // when the fast path skipped the AI sorter or recording failed).
             'sorting_usage' => $result['sorting_usage'] ?? null,
-        ];
+        ], $aiSortingDecision->toClassificationFields());
 
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
@@ -464,13 +659,25 @@ final readonly class MessageClassifier
 
     /**
      * Map topic to intent for handler routing.
+     *
+     * The four SYSTEM topics (general, mediamaker, officemaker, docsummary)
+     * are looked up from {@see SystemCapabilityRegistry} — the single source
+     * of truth shared with {@see InferenceRouter::getHandler()} and
+     * {@see \App\AI\StructuredOutput\Schema\SortClassificationSchema}.
+     * Everything else here is a deterministic ROUTING ALIAS (tool commands,
+     * "again" model-tag topics, legacy single-model topics): these are not
+     * product capabilities in their own right, just other spellings that
+     * resolve to the same handler, so they stay a local map.
      */
     private function mapTopicToIntent(string $topic): string
     {
-        // Map BPROMPTS topics to InferenceRouter intents
-        $topicToIntent = [
-            // Media generation
-            'mediamaker' => 'image_generation', // Handles images, videos, and audio
+        $systemIntent = $this->capabilityRegistry->topicToIntentMap()[$topic] ?? null;
+        if (null !== $systemIntent) {
+            return $systemIntent;
+        }
+
+        $aliasToIntent = [
+            // Media-generation aliases (tool commands, legacy single-model topics)
             'text2pic' => 'image_generation',
             'text2vid' => 'image_generation',
             'text2sound' => 'image_generation',
@@ -478,22 +685,18 @@ final readonly class MessageClassifier
             'tools:vid' => 'image_generation', // /vid command
             'tools:tts' => 'image_generation', // /tts command (audio via MediaGenerationHandler)
 
-            // Document/Office generation
-            'officemaker' => 'document_generation',
-
-            // Analysis
+            // File-analysis aliases
             'pic2text' => 'file_analysis',
             'analyze' => 'file_analysis',
             'analyzefile' => 'file_analysis',
 
-            // Chat/General
-            'general' => 'chat',
+            // Chat alias
             'chat' => 'chat',
 
             // Add more mappings as needed
         ];
 
-        return $topicToIntent[$topic] ?? 'chat'; // Default to chat
+        return $aliasToIntent[$topic] ?? 'chat'; // Default to chat
     }
 
     /**
@@ -710,10 +913,7 @@ final readonly class MessageClassifier
             return false;
         }
 
-        if (null !== $this->selfAwareConfig
-            && $this->selfAwareConfig->isEnabled($message->getUserId() > 0 ? $message->getUserId() : null)
-            && 1 === preg_match(self::SELF_AWARE_GUARD_PATTERN, $trimmed)
-        ) {
+        if ($this->isSelfAwareQuestion($trimmed, $message->getUserId() > 0 ? $message->getUserId() : null)) {
             return false;
         }
 
@@ -1030,6 +1230,76 @@ final readonly class MessageClassifier
             .'titel|title|überschrift|ueberschrift|heading|spalte|column|zeile|row|zelle|cell)\b/iu',
             $text
         );
+    }
+
+    /**
+     * Is this a meta-question about the product that must reach the AI sorter?
+     *
+     * Self-awareness works by the sorter picking the `synaplan` topic, whose
+     * prompt carries the product knowledge. Every layer that skips the sorter
+     * therefore has to step aside for these messages, or the question gets
+     * answered by a plain chat turn that knows nothing about Synaplan — the
+     * exact failure the self-awareness feature exists to prevent.
+     *
+     * Applies to all three skipping layers (fast path, embedding router,
+     * native tool-calling deferral) rather than just the fast path, because
+     * none of them can produce the `synaplan` topic: the embedding anchors and
+     * the hand-off toolset both come from {@see SystemCapabilityRegistry},
+     * which covers the four system capabilities only.
+     */
+    private function isSelfAwareQuestion(string $text, ?int $userId): bool
+    {
+        return null !== $this->selfAwareConfig
+            && $this->selfAwareConfig->isEnabled($userId)
+            && 1 === preg_match(self::SELF_AWARE_GUARD_PATTERN, $text);
+    }
+
+    /**
+     * Cheap pre-gate for the Phase 9 deferral: can the account's default chat
+     * provider do native tool calling at all?
+     *
+     * NOT the authoritative check — the model that ends up answering can be a
+     * different one (widget override, prompt binding, "Again" replay), which
+     * is why {@see Handler\ChatHandler} re-checks and can still send the turn
+     * back. This only avoids deferring on installs where the answer is a
+     * foregone "no", where every message would otherwise pay for a pointless
+     * re-route.
+     */
+    private function accountChatModelCanRouteNatively(?int $userId): bool
+    {
+        $provider = $this->modelConfigService->getDefaultProvider($userId, 'chat');
+
+        return '' !== $provider && $this->toolCallingCapability->supports($provider, null, false);
+    }
+
+    /**
+     * Resolve a confident 2-letter language code for a deterministic
+     * short-circuit (fast-path heuristic or embedding-router match) that
+     * skips the AI sorter entirely.
+     *
+     * Tries, in order:
+     *   1. {@see detectLanguageConfident()} — a local text heuristic.
+     *   2. A language already pinned on the message (frontend UI locale or a
+     *      previously detected turn; 'NN' is the entity default = unknown).
+     *
+     * Returns null when neither is available. Callers MUST treat null as "do
+     * not shortcut, fall through to the AI sorter" rather than defaulting to
+     * 'en' — see {@see detectLanguageConfident()}'s docblock for the
+     * incident this guards against (a German "wer bist du?" answered in
+     * English because an undetectable language silently defaulted).
+     */
+    private function resolveConfidentLanguage(Message $message, string $text): ?string
+    {
+        $confidentLanguage = $this->detectLanguageConfident($text);
+
+        if (null === $confidentLanguage) {
+            $existingLanguage = strtolower(trim($message->getLanguage()));
+            if ('nn' !== $existingLanguage && 1 === preg_match('/^[a-z]{2}$/', $existingLanguage)) {
+                $confidentLanguage = $existingLanguage;
+            }
+        }
+
+        return $confidentLanguage;
     }
 
     /**

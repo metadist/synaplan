@@ -17,6 +17,9 @@ use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\StructuredOutput\StructuredOutputCapability;
+use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -202,6 +205,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
         // Injectable so unit tests can poll without real sleeps.
         private readonly int $pollIntervalSeconds = self::POLL_INTERVAL_SECONDS,
         private readonly ?ProviderKeyStore $keyStore = null,
+        private readonly StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
     ) {
     }
 
@@ -1222,6 +1226,11 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
             // Without include_usage the final chunk carries no token counts and
             // the usage statistics fall back to a byte-based estimate.
             $request['stream_options'] = ['include_usage' => true];
+        }
+
+        $schema = $options['structured_output'] ?? null;
+        if ($schema instanceof StructuredOutputSchema) {
+            $request = array_merge($request, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
         }
 
         return $this->applyChatCompletionsToolOptions($request, $options);
