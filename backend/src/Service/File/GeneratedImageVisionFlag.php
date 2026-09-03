@@ -20,9 +20,10 @@ use App\Repository\ConfigRepository;
  * budget (two full-size generated PNGs would overflow Anthropic's 1M-token
  * window even after downscaling).
  *
- * To disable globally:
- *   UPDATE BCONFIG SET BVALUE='0'
- *    WHERE BOWNERID=0 AND BGROUP='FILE_CONTEXT' AND BSETTING='VISION_INCLUDE_GENERATED';
+ * To disable globally (creates the row if it is missing):
+ *   INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+ *   VALUES (0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '0')
+ *   ON DUPLICATE KEY UPDATE BVALUE = '0';
  */
 final readonly class GeneratedImageVisionFlag
 {

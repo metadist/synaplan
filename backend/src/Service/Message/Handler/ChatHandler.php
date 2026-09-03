@@ -2231,8 +2231,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * turns of this conversation.
      *
      * Generated images, videos and audio carry no BFILETEXT, so replaying the
-     * thread as plain text leaves no trace of them: a follow-up such as "was ist
-     * da zu sehen?" is then answered from text-only history and the model denies
+     * thread as plain text leaves no trace of them: a follow-up such as "what is
+     * in that picture?" is then answered from text-only history and the model denies
      * the media exists (#1596). Sending the actual pixels is a separate path
      * ({@see generatedImagesForVision()}); this cheap text reference is
      * unconditional so the model still knows the media is real when the

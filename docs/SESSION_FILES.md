@@ -60,9 +60,11 @@ history contains a generated picture; only a user attachment on the current
 turn triggers that fallback.
 
 The switch defaults to **on**. Each included image rides along as a base64
-payload on later requests of the conversation, so an operator can turn it off:
+payload on later requests of the conversation, so an operator can turn it off
+(the upsert also creates the row if it is missing):
 
 ```sql
-UPDATE BCONFIG SET BVALUE='0'
- WHERE BOWNERID=0 AND BGROUP='FILE_CONTEXT' AND BSETTING='VISION_INCLUDE_GENERATED';
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '0')
+ON DUPLICATE KEY UPDATE BVALUE = '0';
 ```
