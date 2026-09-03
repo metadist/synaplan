@@ -13,6 +13,7 @@ use App\Service\EmailChatService;
 use App\Service\EmailWebhookIdempotencyService;
 use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -49,6 +50,7 @@ class WebhookController extends AbstractController
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private ?ChatErrorPresenter $chatErrorPresenter = null,
     ) {
     }
 
@@ -379,21 +381,47 @@ class WebhookController extends AbstractController
             $processingTime = microtime(true) - $startTime;
 
             if (!$result['success']) {
+                $errorView = $this->chatErrorPresenter?->presentFromResult(
+                    $result,
+                    $message->getLanguage() ?: 'en',
+                    false,
+                );
+                $userError = $errorView->userText ?? 'Your message could not be processed. Please try again with a different model.';
+                $rawError = $errorView->rawMessage ?? ($result['error'] ?? 'Unknown error');
+
                 if ($debugDiscord) {
                     $this->discordNotificationService->notifyEmailError(
                         'processing',
                         $fromEmail,
                         $toEmail,
                         $subject,
-                        $result['error'] ?? 'Unknown error',
+                        $rawError,
                         ['user_message' => $body],
                     );
+                }
+
+                try {
+                    $this->internalEmailService->sendAiResponseEmail(
+                        $fromEmail,
+                        $subject,
+                        $userError,
+                        $messageId,
+                        $result['provider'] ?? null,
+                        null,
+                        $processingTime,
+                        null,
+                        $toEmail,
+                    );
+                } catch (\Exception $e) {
+                    $this->logger->error('Failed to send email error response', [
+                        'to' => $fromEmail,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
 
                 return $this->json([
                     'success' => false,
                     'error' => 'Message processing failed',
-                    'details' => $result['error'] ?? 'Unknown error',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
@@ -855,9 +883,15 @@ class WebhookController extends AbstractController
             $result = $this->messageProcessor->process($message);
 
             if (!$result['success']) {
+                $errorView = $this->chatErrorPresenter?->presentFromResult(
+                    $result,
+                    $message->getLanguage() ?: 'en',
+                    false,
+                );
+
                 return $this->json([
                     'success' => false,
-                    'error' => $result['error'] ?? 'Processing failed',
+                    'error' => $errorView->userText ?? 'Processing failed',
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 

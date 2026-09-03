@@ -524,7 +524,18 @@ class ChatController extends AbstractController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean'),
-                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
+                        new OA\Property(
+                            property: 'messages',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                    new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                    new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                ]
+                            )
+                        ),
                         new OA\Property(
                             property: 'pagination',
                             type: 'object',
@@ -687,7 +698,18 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                             ]
                         ),
-                        new OA\Property(property: 'messages', type: 'array', items: new OA\Items()),
+                        new OA\Property(
+                            property: 'messages',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                    new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                    new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
+                                ]
+                            )
+                        ),
                     ]
                 )
             ),

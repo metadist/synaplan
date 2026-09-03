@@ -5,6 +5,7 @@ namespace App\AI\Provider;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
@@ -279,7 +280,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ProviderException('Google chat error: '.$e->getMessage(), 'google');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'google', 'chat');
         }
     }
 
@@ -469,18 +470,20 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'body' => $body,
             ]);
 
+            $factory = new ProviderFailureFactory();
+
             // Friendlier user-facing message for model-overload (503 /
             // UNAVAILABLE) since that's the most common transient failure
             // and the user can act on it (switch model / retry).
             if (503 === $statusCode || (false !== stripos($body, 'UNAVAILABLE') && false !== stripos($body, 'high demand'))) {
-                throw new ProviderException(sprintf('Google AI model "%s" is currently overloaded. Please retry in a few seconds, or switch to another model.', (string) $options['model']), 'google');
+                throw $factory->fromParsed(sprintf('Google AI model "%s" is currently overloaded. Please retry in a few seconds, or switch to another model.', (string) $options['model']), 'google', 'chat_stream', $statusCode, previous: $e);
             }
 
             $detail = '' !== $body ? ' — '.mb_substr($body, 0, 500) : '';
 
-            throw new ProviderException('Google streaming error: '.$e->getMessage().$detail, 'google');
+            throw $factory->fromParsed('Google streaming error: '.$e->getMessage().$detail, 'google', 'chat_stream', $statusCode, previous: $e);
         } catch (\Exception $e) {
-            throw new ProviderException('Google streaming error: '.$e->getMessage(), 'google');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'google', 'chat_stream', 'Google streaming error');
         }
     }
 

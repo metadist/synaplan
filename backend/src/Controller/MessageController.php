@@ -423,6 +423,9 @@ class MessageController extends AbstractController
                                 new OA\Property(property: 'topic', type: 'string', nullable: true),
                                 new OA\Property(property: 'originalTopic', type: 'string', nullable: true),
                                 new OA\Property(property: 'originalMediaType', type: 'string', nullable: true),
+                                new OA\Property(property: 'errorReason', type: 'string', nullable: true, description: 'Structured failure reason when this row is an ERROR reply'),
+                                new OA\Property(property: 'canRetryModel', type: 'boolean', nullable: true, description: 'Whether the user should retry with another model'),
+                                new OA\Property(property: 'errorDebug', type: 'string', nullable: true, description: 'Raw provider diagnostics; only present for admin viewers'),
                                 new OA\Property(property: 'language', type: 'string', nullable: true),
                                 new OA\Property(property: 'createdAt', type: 'string', nullable: true),
                                 new OA\Property(

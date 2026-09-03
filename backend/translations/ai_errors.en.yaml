@@ -1,0 +1,18 @@
+reason:
+  schema_mismatch: 'The AI model could not complete this request in the expected format. Please try again with a different model.'
+  context_length_exceeded: 'This request is too long for the selected model. Please shorten it or try a model with a larger context window.'
+  request_too_large: 'This request is too large for the selected model. Please shorten it or try a different model.'
+  rate_limited: 'The selected model is busy right now. Please wait a moment or try a different model.'
+  quota_exceeded: 'The selected AI service has no remaining credits. Please try again later or contact support.'
+  auth_failed: 'The selected AI service is not set up correctly at the moment. Please try again later or contact support.'
+  model_unavailable: 'The selected model is not available right now. Please try a different model.'
+  content_filtered: 'The AI service declined this request. Please rephrase it or try a different model.'
+  timeout: 'The selected model took too long to answer. Please try again or switch to a different model.'
+  upstream_unavailable: 'The selected AI service is temporarily unavailable. Please try again or switch to a different model.'
+  unknown: 'The selected model could not answer this request. Please try again with a different model.'
+
+hint:
+  retry_other_model: 'You can try again with a different model that fits this request.'
+
+admin:
+  diagnostics: 'Admin diagnostics (visible to you only)'

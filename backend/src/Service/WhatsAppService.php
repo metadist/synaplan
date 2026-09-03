@@ -14,6 +14,7 @@ use App\Service\Digest\MessageReferenceResolver;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
@@ -108,6 +109,7 @@ final class WhatsAppService
         private string $appUrl = '',
         ?string $whatsappGraphApiBaseUrl = null,
         private ?ChatActivityNotifier $chatActivityNotifier = null,
+        private ?ChatErrorPresenter $chatErrorPresenter = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -868,15 +870,21 @@ final class WhatsAppService
         $result = $this->messageProcessor->processStream($message, $streamCallback, null, $processingOptions);
 
         if (!$result['success']) {
-            $errorMessage = $result['error'] ?? 'Processing failed';
-            $this->sendErrorMessage($dto, $errorMessage);
+            $errorView = $this->chatErrorPresenter?->presentFromResult(
+                $result,
+                $message->getLanguage() ?: 'de',
+                false,
+            );
+            $userError = $errorView->userText ?? 'Deine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.';
+            $rawError = $errorView->rawMessage ?? ($result['error'] ?? 'Processing failed');
+            $this->sendErrorMessage($dto, $userError, alreadyUserFacing: true);
 
-            // Discord notification: Processing failed
+            // Discord notification: Processing failed (raw text for operators)
             $this->discord->notifyWhatsAppError(
                 'processing',
                 $dto->from,
                 $message->getText(),
-                $errorMessage,
+                $rawError,
                 ['message_type' => $dto->type],
                 $user->getId(),
             );
@@ -884,7 +892,7 @@ final class WhatsAppService
             return [
                 'success' => false,
                 'message_id' => $dto->messageId,
-                'error' => $errorMessage,
+                'error' => $userError,
             ];
         }
 
@@ -1362,8 +1370,14 @@ final class WhatsAppService
     /**
      * Send a user-friendly error message via WhatsApp.
      */
-    private function sendErrorMessage(IncomingMessageDto $dto, string $error): void
+    private function sendErrorMessage(IncomingMessageDto $dto, string $error, bool $alreadyUserFacing = false): void
     {
+        if ($alreadyUserFacing) {
+            $this->sendMessage($dto->from, $error, $dto->phoneNumberId);
+
+            return;
+        }
+
         $errorMap = [
             'transcription' => "⚠️ *Sprachnachricht konnte nicht verarbeitet werden*\n\nDie Sprachnachricht konnte nicht transkribiert werden. Bitte versuche es erneut oder sende eine Textnachricht.",
             'image' => "⚠️ *Bild konnte nicht analysiert werden*\n\nDas Bild konnte nicht verarbeitet werden. Bitte versuche es erneut.",
@@ -1371,7 +1385,7 @@ final class WhatsAppService
             'no_audio' => "⚠️ *Video ohne Audiospur*\n\nDas Video enthält keine Audiospur, die transkribiert werden kann.",
             'file_too_large' => "⚠️ *Datei zu groß*\n\nDie Datei ist zu groß (max. 128 MB). Bitte sende eine kleinere Datei.",
             'unsupported_format' => "⚠️ *Format nicht unterstützt*\n\nDieses Dateiformat wird nicht unterstützt.",
-            'default' => "⚠️ *Fehler bei der Verarbeitung*\n\nDeine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.\n\nFehler: {error}",
+            'default' => "⚠️ *Fehler bei der Verarbeitung*\n\nDeine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.",
         ];
 
         // Determine error type
@@ -1392,9 +1406,7 @@ final class WhatsAppService
             $messageTemplate = $errorMap['unsupported_format'];
         }
 
-        $errorMessage = str_replace('{error}', $error, $messageTemplate);
-
-        $this->sendMessage($dto->from, $errorMessage, $dto->phoneNumberId);
+        $this->sendMessage($dto->from, $messageTemplate, $dto->phoneNumberId);
     }
 
     private function handleRateLimitExceeded(User $user, IncomingMessageDto $dto, array $rateLimitCheck): array

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
@@ -886,6 +887,57 @@ class MessageSorterTest extends TestCase
         $this->assertStringContainsString(OfficePdfRoutingDecorator::officeMakerDescription(), $system);
         $this->assertStringContainsString('OFFICE_PDF_ROUTING', $system);
         $this->assertStringNotContainsString('Not for any other format.', $system);
+    }
+
+    public function testClassifyFallsBackToGeneralWhenProviderFails(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chat')->willThrowException(new ProviderException(
+            'Groq chat error: Generated JSON does not match the expected schema.',
+            'groq',
+            [
+                'error_code' => 'json_validate_failed',
+                'status_code' => 400,
+            ],
+            400,
+        ));
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('Sort: [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+
+        $promptRepository = $this->createMock(PromptRepository::class);
+        $promptRepository->method('findByTopic')->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'General chat'],
+        ]);
+
+        $modelConfigService = $this->createMock(ModelConfigService::class);
+        $modelConfigService->method('getDefaultModel')->willReturn(1);
+        $modelConfigService->method('getProviderForModel')->willReturn('groq');
+        $modelConfigService->method('getModelName')->willReturn('openai/gpt-oss-120b');
+
+        $structuredOutputConfig = $this->createMock(StructuredOutputConfig::class);
+        $structuredOutputConfig->method('isEnabled')->willReturn(true);
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $modelConfigService,
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $structuredOutputConfig,
+        );
+
+        $result = $sorter->classify(['BTEXT' => 'ok, make me a PDF', 'BLANG' => 'de']);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('de', $result['language']);
+        $this->assertSame('provider_error:schema_mismatch', $result['routing_fallback_reason']);
+        $this->assertSame(0.0, $result['routing_confidence']);
     }
 
     /**

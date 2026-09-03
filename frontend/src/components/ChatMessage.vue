@@ -537,14 +537,27 @@
             />
           </div>
 
-          <MessagePart
-            v-for="(part, index) in contentParts"
-            :key="part.partId ?? `${part.type}-${index}`"
-            :part="part"
-            :is-streaming="isStreaming"
-            :memories="memories"
-            :docs="docs"
+          <ChatErrorNotice
+            v-if="errorReason"
+            class="m-3"
+            :error-reason="errorReason"
+            :can-retry-model="canRetryModel"
+            :error-debug="errorDebug"
+            :recommended-model-label="selectedModel?.label ?? null"
+            :recommended-model-id="selectedModel?.id ?? null"
+            :model-options="modelOptions"
+            @retry="handleErrorRetry"
           />
+          <template v-else>
+            <MessagePart
+              v-for="(part, index) in contentParts"
+              :key="part.partId ?? `${part.type}-${index}`"
+              :part="part"
+              :is-streaming="isStreaming"
+              :memories="memories"
+              :docs="docs"
+            />
+          </template>
 
           <!-- Continue Button (truncated response) -->
           <div
@@ -1143,6 +1156,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1303,6 +1317,9 @@ interface Props {
   /** User text that produced this plan — used to save it as a scheduled task. */
   scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'
+  errorReason?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string
@@ -1843,6 +1860,12 @@ const isMultitaskTurn = computed(
 const handleSimpleAgain = () => {
   if (props.backendMessageId) {
     emit('again', props.backendMessageId)
+  }
+}
+
+const handleErrorRetry = (modelId?: number) => {
+  if (props.backendMessageId) {
+    emit('again', props.backendMessageId, modelId ?? selectedModel.value?.id)
   }
 }
 

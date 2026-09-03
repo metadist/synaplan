@@ -21,6 +21,7 @@ use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
 use App\Service\Media\GeneratedFileMetadataNormalizer;
 use App\Service\Media\GeneratedFileRegistrar;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
@@ -73,6 +74,7 @@ class WidgetPublicController extends AbstractController
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatRunService $chatRunService,
         private string $uploadDir,
+        private ?ChatErrorPresenter $chatErrorPresenter = null,
     ) {
     }
 
@@ -940,11 +942,21 @@ class WidgetPublicController extends AbstractController
                     );
 
                     if (!($result['success'] ?? false)) {
-                        $errorMessage = $result['error'] ?? 'Processing failed';
+                        $errorLang = is_array($result['classification'] ?? null) && isset($result['classification']['language'])
+                            ? (string) $result['classification']['language']
+                            : 'en';
+                        $errorView = $this->chatErrorPresenter?->presentFromResult($result, $errorLang, false);
+                        $errorMessage = $errorView->userText ?? 'Processing failed';
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
 
-                        $this->sendSse('error', ['error' => $errorMessage]);
+                        $payload = ['error' => $errorMessage];
+                        if (null !== $errorView) {
+                            $payload['errorReason'] = $errorView->reason->value;
+                            $payload['canRetryModel'] = $errorView->canRetryWithOtherModel;
+                        }
+
+                        $this->sendSse('error', $payload);
 
                         return;
                     }
@@ -1372,7 +1384,7 @@ class WidgetPublicController extends AbstractController
 
             return [
                 'success' => false,
-                'error' => 'Text extraction failed: '.$e->getMessage(),
+                'error' => 'Text extraction failed',
             ];
         }
 

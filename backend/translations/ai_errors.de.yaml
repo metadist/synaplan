@@ -1,0 +1,18 @@
+reason:
+  schema_mismatch: 'Das KI-Modell konnte diese Anfrage nicht im erwarteten Format abschließen. Bitte versuche es mit einem anderen Modell erneut.'
+  context_length_exceeded: 'Diese Anfrage ist für das gewählte Modell zu lang. Bitte kürze sie oder wähle ein Modell mit einem größeren Kontextfenster.'
+  request_too_large: 'Diese Anfrage ist für das gewählte Modell zu groß. Bitte kürze sie oder wähle ein anderes Modell.'
+  rate_limited: 'Das gewählte Modell ist gerade ausgelastet. Bitte warte einen Moment oder versuche ein anderes Modell.'
+  quota_exceeded: 'Für den gewählten KI-Dienst ist gerade kein Guthaben mehr vorhanden. Bitte versuche es später erneut oder wende dich an den Support.'
+  auth_failed: 'Der gewählte KI-Dienst ist derzeit nicht korrekt eingerichtet. Bitte versuche es später erneut oder wende dich an den Support.'
+  model_unavailable: 'Das gewählte Modell ist gerade nicht verfügbar. Bitte wähle ein anderes Modell.'
+  content_filtered: 'Der KI-Dienst hat diese Anfrage abgelehnt. Bitte formuliere sie um oder wähle ein anderes Modell.'
+  timeout: 'Das gewählte Modell hat zu lange für eine Antwort gebraucht. Bitte versuche es erneut oder wähle ein anderes Modell.'
+  upstream_unavailable: 'Der gewählte KI-Dienst ist vorübergehend nicht erreichbar. Bitte versuche es erneut oder wähle ein anderes Modell.'
+  unknown: 'Das gewählte Modell konnte diese Anfrage nicht beantworten. Bitte versuche es mit einem anderen Modell erneut.'
+
+hint:
+  retry_other_model: 'Du kannst es mit einem anderen Modell erneut versuchen, das zu deiner Anfrage passt.'
+
+admin:
+  diagnostics: 'Admin-Diagnose (nur für dich sichtbar)'

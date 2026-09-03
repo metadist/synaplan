@@ -1,0 +1,18 @@
+reason:
+  schema_mismatch: 'Le modèle d’IA n’a pas pu terminer cette demande au format attendu. Réessaie avec un autre modèle.'
+  context_length_exceeded: 'Cette demande est trop longue pour le modèle sélectionné. Raccourcis-la ou choisis un modèle avec une plus grande fenêtre de contexte.'
+  request_too_large: 'Cette demande est trop volumineuse pour le modèle sélectionné. Raccourcis-la ou choisis un autre modèle.'
+  rate_limited: 'Le modèle sélectionné est occupé pour le moment. Attends un instant ou essaie un autre modèle.'
+  quota_exceeded: 'Le service d’IA sélectionné n’a plus de crédit. Réessaie plus tard ou contacte le support.'
+  auth_failed: 'Le service d’IA sélectionné n’est pas correctement configuré pour le moment. Réessaie plus tard ou contacte le support.'
+  model_unavailable: 'Le modèle sélectionné n’est pas disponible pour le moment. Essaie un autre modèle.'
+  content_filtered: 'Le service d’IA a refusé cette demande. Reformule-la ou essaie un autre modèle.'
+  timeout: 'Le modèle sélectionné a mis trop de temps à répondre. Réessaie ou change de modèle.'
+  upstream_unavailable: 'Le service d’IA sélectionné est temporairement indisponible. Réessaie ou change de modèle.'
+  unknown: 'Le modèle sélectionné n’a pas pu répondre à cette demande. Réessaie avec un autre modèle.'
+
+hint:
+  retry_other_model: 'Tu peux réessayer avec un autre modèle adapté à ta demande.'
+
+admin:
+  diagnostics: 'Diagnostic administrateur (visible uniquement pour toi)'

@@ -2,6 +2,7 @@
 
 namespace App\Service\Message;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\SortClassificationSchema;
@@ -389,13 +390,21 @@ final readonly class MessageSorter
                 ] : null,
             ], $routingDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
-            // Re-throw ProviderException to preserve install instructions
-            $this->logger->error('MessageSorter: AI Provider failed', [
+            $reason = (new ChatFailureClassifier())->classify($e);
+            $this->logger->error('MessageSorter: AI Provider failed — falling back to general', [
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
                 'context' => $e->getContext(),
+                'reason' => $reason->value,
             ]);
-            throw $e;
+
+            $exceptionDecision = RoutingDecision::fallback('general', 'provider_error:'.$reason->value);
+
+            return array_merge([
+                'topic' => 'general',
+                'language' => $messageData['BLANG'] ?? 'en',
+                'raw_response' => '',
+            ], $exceptionDecision->toClassificationFields());
         } catch (\Throwable $e) {
             $this->logger->error('MessageSorter: Classification failed', [
                 'error' => $e->getMessage(),
