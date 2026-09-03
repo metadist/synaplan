@@ -50,7 +50,7 @@ class WebhookController extends AbstractController
         private GeneratedFileMetadataNormalizer $generatedFileMetadataNormalizer,
         private RawMimeEmailParser $rawMimeEmailParser,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
-        private ?ChatErrorPresenter $chatErrorPresenter = null,
+        private ChatErrorPresenter $chatErrorPresenter,
     ) {
     }
 
@@ -381,13 +381,13 @@ class WebhookController extends AbstractController
             $processingTime = microtime(true) - $startTime;
 
             if (!$result['success']) {
-                $errorView = $this->chatErrorPresenter?->presentFromResult(
+                $errorView = $this->chatErrorPresenter->presentFromResult(
                     $result,
                     $message->getLanguage() ?: 'en',
                     false,
                 );
-                $userError = $errorView->userText ?? 'Your message could not be processed. Please try again with a different model.';
-                $rawError = $errorView->rawMessage ?? ($result['error'] ?? 'Unknown error');
+                $userError = $errorView->userText;
+                $rawError = $errorView->rawMessage;
 
                 if ($debugDiscord) {
                     $this->discordNotificationService->notifyEmailError(
@@ -883,7 +883,7 @@ class WebhookController extends AbstractController
             $result = $this->messageProcessor->process($message);
 
             if (!$result['success']) {
-                $errorView = $this->chatErrorPresenter?->presentFromResult(
+                $errorView = $this->chatErrorPresenter->presentFromResult(
                     $result,
                     $message->getLanguage() ?: 'en',
                     false,
@@ -891,7 +891,7 @@ class WebhookController extends AbstractController
 
                 return $this->json([
                     'success' => false,
-                    'error' => $errorView->userText ?? 'Processing failed',
+                    'error' => $errorView->userText,
                 ], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 

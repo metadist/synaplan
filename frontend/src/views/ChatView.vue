@@ -215,6 +215,7 @@
               :error-reason="message.errorReason"
               :can-retry-model="message.canRetryModel"
               :error-debug="message.errorDebug"
+              :error-after-content="message.errorAfterContent"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :quoted-text="message.quotedText"
@@ -4027,6 +4028,10 @@ const streamAIResponse = async (
               message.errorReason = reason
               message.canRetryModel = data.canRetryModel === true
               message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+              // Everything streamed before this event is a real partial answer,
+              // so keep it visible above the error notice instead of dropping
+              // the text the user already watched being written.
+              message.errorAfterContent = hasContent === true
             }
             if (message && hasContent) {
               historyStore.finishStreamingMessage(messageId)

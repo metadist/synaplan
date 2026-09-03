@@ -875,9 +875,12 @@ final class WhatsAppService
                 $message->getLanguage() ?: 'de',
                 false,
             );
-            $userError = $errorView->userText ?? 'Deine Nachricht konnte nicht verarbeitet werden. Bitte versuche es erneut.';
             $rawError = $errorView->rawMessage ?? ($result['error'] ?? 'Processing failed');
-            $this->sendErrorMessage($dto, $userError, alreadyUserFacing: true);
+            // Without a presenter (hand-built service in unit tests) hand the raw
+            // error to sendErrorMessage() so its own localized templates apply
+            // instead of duplicating that copy here.
+            $userError = $errorView->userText ?? $rawError;
+            $this->sendErrorMessage($dto, $userError, alreadyUserFacing: null !== $errorView);
 
             // Discord notification: Processing failed (raw text for operators)
             $this->discord->notifyWhatsAppError(

@@ -139,6 +139,13 @@ export interface Message {
   errorReason?: string | null
   canRetryModel?: boolean
   errorDebug?: string | null
+  /**
+   * The turn failed AFTER the assistant had already streamed part of an answer,
+   * so that partial text must stay visible next to the error notice. Only the
+   * `error` SSE event implies this — the `complete` error branch streams the
+   * localized error text itself as content, which the notice already renders.
+   */
+  errorAfterContent?: boolean
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string

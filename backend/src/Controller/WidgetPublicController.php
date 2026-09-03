@@ -74,7 +74,7 @@ class WidgetPublicController extends AbstractController
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
         private ChatRunService $chatRunService,
         private string $uploadDir,
-        private ?ChatErrorPresenter $chatErrorPresenter = null,
+        private ChatErrorPresenter $chatErrorPresenter,
     ) {
     }
 
@@ -945,18 +945,15 @@ class WidgetPublicController extends AbstractController
                         $errorLang = is_array($result['classification'] ?? null) && isset($result['classification']['language'])
                             ? (string) $result['classification']['language']
                             : 'en';
-                        $errorView = $this->chatErrorPresenter?->presentFromResult($result, $errorLang, false);
-                        $errorMessage = $errorView->userText ?? 'Processing failed';
+                        $errorView = $this->chatErrorPresenter->presentFromResult($result, $errorLang, false);
                         $incomingMessage->setStatus('failed');
                         $this->em->flush();
 
-                        $payload = ['error' => $errorMessage];
-                        if (null !== $errorView) {
-                            $payload['errorReason'] = $errorView->reason->value;
-                            $payload['canRetryModel'] = $errorView->canRetryWithOtherModel;
-                        }
-
-                        $this->sendSse('error', $payload);
+                        $this->sendSse('error', [
+                            'error' => $errorView->userText,
+                            'errorReason' => $errorView->reason->value,
+                            'canRetryModel' => $errorView->canRetryWithOtherModel,
+                        ]);
 
                         return;
                     }
