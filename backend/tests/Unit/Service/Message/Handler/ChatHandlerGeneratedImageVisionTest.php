@@ -66,23 +66,23 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
         @rmdir($this->uploadDir);
     }
 
-    public function testGeneratedImageIsAttachedToTheAssistantTurnThatProducedIt(): void
+    public function testGeneratedImageIsAttachedToTheFollowUpUserTurn(): void
     {
         $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
 
         $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
 
-        $assistant = $this->firstAssistantMessage($messages);
-        $this->assertIsArray($assistant['content'], 'The generated picture must ride along as image content');
-        $this->assertSame('text', $assistant['content'][0]['type']);
-        $this->assertStringStartsWith('data:image/png;base64,', $assistant['content'][1]['image_url']['url']);
+        $this->assertIsString($this->firstAssistantMessage($messages)['content'], 'Anthropic rejects image blocks on assistant turns');
+        $user = $this->lastUserMessage($messages);
+        $this->assertIsArray($user['content'], 'The generated picture must ride along on the follow-up user turn');
+        $this->assertSame('text', $user['content'][0]['type']);
+        $this->assertStringStartsWith('data:image/png;base64,', $user['content'][1]['image_url']['url']);
     }
 
     /**
-     * With the flag off no pixels are sent (the token-costly opt-in stays off),
-     * but the assistant turn must still carry a cheap text reference to the
-     * media it produced — otherwise the model denies it exists on a follow-up
-     * (#1596).
+     * With the kill-switch off no pixels are sent, but the assistant turn must
+     * still carry a cheap text reference to the media it produced — otherwise
+     * the model denies it exists on a follow-up (#1596).
      */
     public function testGeneratedMediaIsReferencedInTextWhileTheFlagIsOff(): void
     {
@@ -124,14 +124,15 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
     {
         $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
 
-        $content = $this->firstAssistantMessage(
-            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
-        )['content'];
+        $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
 
-        $this->assertIsArray($content);
-        $this->assertSame('text', $content[0]['type']);
-        $this->assertStringContainsString('cat.png', $content[0]['text']);
-        $this->assertStringStartsWith('data:image/png;base64,', $content[1]['image_url']['url']);
+        $assistant = $this->firstAssistantMessage($messages)['content'];
+        $this->assertIsString($assistant);
+        $this->assertStringContainsString('cat.png', $assistant);
+
+        $user = $this->lastUserMessage($messages)['content'];
+        $this->assertIsArray($user);
+        $this->assertStringStartsWith('data:image/png;base64,', $user[1]['image_url']['url']);
     }
 
     public function testOnlyTheNewestImagesFitTheBudget(): void
@@ -145,8 +146,10 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
 
         $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
 
+        $content = $this->lastUserMessage($messages)['content'];
+        $this->assertIsArray($content);
         $images = array_filter(
-            $this->firstAssistantMessage($messages)['content'],
+            $content,
             static fn (array $part): bool => 'image_url' === $part['type'],
         );
         $this->assertCount(GeneratedImageVisionFlag::MAX_GENERATED_IMAGES, $images);
@@ -176,6 +179,35 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
         $messages = $this->buildStreamingMessages($handler, ['include_generated_images' => true]);
 
         $this->assertIsString($this->firstAssistantMessage($messages)['content']);
+    }
+
+    /**
+     * A stored display URL (`/api/v1/files/uploads/<rel>`) must resolve to the
+     * file under the upload dir — StreamController persists that prefix on the
+     * OUT message, and ChatHandler used to prefix $uploadDir on top of it.
+     */
+    public function testDisplayUrlPathIsResolvedForGeneratedVision(): void
+    {
+        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500, filePath: '/api/v1/files/uploads/cat.png')]);
+
+        $content = $this->lastUserMessage(
+            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
+        )['content'];
+
+        $this->assertIsArray($content);
+        $this->assertStringStartsWith('data:image/png;base64,', $content[1]['image_url']['url']);
+    }
+
+    public function testImageToBase64DataUrlStripsTheServePrefix(): void
+    {
+        $handler = $this->handler([]);
+        file_put_contents($this->uploadDir.'/cat.png', base64_decode(self::PNG));
+
+        $method = new \ReflectionMethod(ChatHandler::class, 'imageToBase64DataUrl');
+        $dataUrl = $method->invoke($handler, '/api/v1/files/uploads/cat.png');
+
+        $this->assertIsString($dataUrl);
+        $this->assertStringStartsWith('data:image/png;base64,', $dataUrl);
     }
 
     public function testFlagAndModelCapabilityBothDecideWhetherImagesAreIncluded(): void
@@ -271,6 +303,27 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
         $this->fail('The assistant turn was dropped from the request');
     }
 
+    /**
+     * @param array<int, array{role: string, content: string|array<int, array<string, mixed>>}> $messages
+     *
+     * @return array{role: string, content: string|array<int, array<string, mixed>>}
+     */
+    private function lastUserMessage(array $messages): array
+    {
+        $last = null;
+        foreach ($messages as $message) {
+            if ('user' === $message['role']) {
+                $last = $message;
+            }
+        }
+
+        if (null === $last) {
+            $this->fail('The user turn was dropped from the request');
+        }
+
+        return $last;
+    }
+
     private function message(int $id, string $direction, string $text): Message
     {
         $message = (new Message())->setUserId(7)->setDirection($direction)->setText($text);
@@ -279,11 +332,11 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
         return $message;
     }
 
-    private function imageFile(int $id, string $path, int $messageId, string $source = 'generated'): File
+    private function imageFile(int $id, string $path, int $messageId, string $source = 'generated', ?string $filePath = null): File
     {
         file_put_contents($this->uploadDir.'/'.$path, base64_decode(self::PNG));
 
-        return $this->buildFile($id, $path, $messageId, $source);
+        return $this->buildFile($id, $filePath ?? $path, $messageId, $source);
     }
 
     private function file(int $id, string $path, int $messageId, string $source = 'generated'): File

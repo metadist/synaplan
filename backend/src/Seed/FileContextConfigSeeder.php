@@ -28,13 +28,13 @@ final readonly class FileContextConfigSeeder
     public function seed(): SeedResult
     {
         $rows = [
-            // OFF: every generated image included costs a base64 payload on each
-            // following request of the conversation.
+            // ON: a follow-up like "what is in that picture?" needs the pixels
+            // (#1596). The operator can flip this to 0 to stop sending base64.
             [
                 'ownerId' => 0,
                 'group' => GeneratedImageVisionFlag::CONFIG_GROUP,
                 'setting' => GeneratedImageVisionFlag::KEY_VISION_INCLUDE_GENERATED,
-                'value' => '0',
+                'value' => '1',
             ],
         ];
 

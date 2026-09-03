@@ -48,18 +48,21 @@ too.
 
 The UI shows an "Editing <filename>" status while this runs.
 
-## Generated images in vision chat (off by default)
+## Generated images in vision chat
 
-"Draw a cat" → "what breed is it?" needs the model to *see* its own output. Only
-user turns contribute image content by default, so this is behind a flag:
+"Draw a cat" → "what is in it?" needs the model to *see* its own output
+(#1596). When the selected chat model is vision-capable, the newest generated
+image of the conversation (at most
+`GeneratedImageVisionFlag::MAX_GENERATED_IMAGES`, currently 1) is attached to
+the current user turn — Anthropic rejects image blocks on assistant turns. A
+chat model without vision is not swapped for a vision model just because
+history contains a generated picture; only a user attachment on the current
+turn triggers that fallback.
+
+The switch defaults to **on**. Each included image rides along as a base64
+payload on later requests of the conversation, so an operator can turn it off:
 
 ```sql
-INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-  VALUES (0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '1');
+UPDATE BCONFIG SET BVALUE='0'
+ WHERE BOWNERID=0 AND BGROUP='FILE_CONTEXT' AND BSETTING='VISION_INCLUDE_GENERATED';
 ```
-
-When enabled **and** the selected chat model is vision-capable, the newest
-generated images of the conversation (at most
-`GeneratedImageVisionFlag::MAX_GENERATED_IMAGES`) are attached to the assistant
-turns that produced them. It defaults to off because each image rides along as a
-base64 payload on every following request of the conversation.

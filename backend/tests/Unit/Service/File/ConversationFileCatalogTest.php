@@ -100,6 +100,25 @@ class ConversationFileCatalogTest extends TestCase
         $this->assertSame(['file:88'], $this->references($catalog));
     }
 
+    /**
+     * BFILES.BFILEPATH can still hold the public serve URL on older rows.
+     * The catalog must strip that prefix so both the absolute path and the
+     * relativePath handed to vision resolve under the upload dir (#1596).
+     */
+    public function testStoredServePrefixIsNormalizedOnCollect(): void
+    {
+        file_put_contents($this->uploadDir.'/cat.png', 'content');
+        $generated = $this->file(377, 'cat.png', source: 'generated', messageId: 500, onDisk: false);
+        $generated->setFilePath('/api/v1/files/uploads/cat.png');
+
+        $catalog = $this->catalog($this->repository([$generated]))
+            ->build((new Message())->setUserId(7), [$this->threadMessage(500)]);
+
+        $this->assertCount(1, $catalog);
+        $this->assertSame('cat.png', $catalog[0]->relativePath);
+        $this->assertSame(realpath($this->uploadDir.'/cat.png'), $catalog[0]->absolutePath);
+    }
+
     public function testUpstreamNodePathResolvesToItsFileRow(): void
     {
         $generated = $this->file(88, 'render.png', source: 'generated');

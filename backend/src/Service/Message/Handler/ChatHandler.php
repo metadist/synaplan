@@ -1579,8 +1579,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($content, $imageUrls);
-            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
-                $messageContent = $this->buildMultimodalContent($content, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $content;
             }
@@ -1600,7 +1598,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ];
         }
 
-        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
+        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options, $generatedImages);
 
         $messages[] = [
             'role' => 'user',
@@ -1645,9 +1643,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
     /**
      * Build the content for the current user message (files, search results, images).
      *
+     * @param list<string> $extraImageUrls generated-image data URLs to attach
+     *                                     to this user turn (Anthropic rejects
+     *                                     image blocks on assistant turns)
+     *
      * @return string|array Content string or multimodal array when images are included
      */
-    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
+    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = [], array $extraImageUrls = []): string|array
     {
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText();
@@ -1688,16 +1690,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $content .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
-        if ($includeImages) {
-            $imageUrls = $this->extractImageDataUrls($currentMessage);
+        $imageUrls = $includeImages ? $this->extractImageDataUrls($currentMessage) : [];
 
-            // Every attached image failed conversion (unreadable, or too large
-            // even after downscaling). Fail loudly instead of sending a
-            // text-only request the model would answer with "I see no image".
-            if ([] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
-                throw new VisionImageUnprocessableException();
-            }
+        // Every attached image failed conversion (unreadable, or too large
+        // even after downscaling). Fail loudly instead of sending a
+        // text-only request the model would answer with "I see no image".
+        if ($includeImages && [] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
+            throw new VisionImageUnprocessableException();
+        }
 
+        $imageUrls = array_merge($imageUrls, $extraImageUrls);
+        if ([] !== $imageUrls) {
             return $this->buildMultimodalContent($content, $imageUrls);
         }
 
@@ -1853,8 +1856,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($stamped, $imageUrls);
-            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
-                $messageContent = $this->buildMultimodalContent($stamped, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $stamped;
             }
@@ -1909,16 +1910,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Extract images from current message for vision support (only if enabled)
         $textContent = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        if ($includeImages) {
-            $imageUrls = $this->extractImageDataUrls($currentMessage);
+        $imageUrls = $includeImages ? $this->extractImageDataUrls($currentMessage) : [];
+        $imageUrls = array_merge($imageUrls, $generatedImages);
+        if ([] !== $imageUrls) {
             $messageContent = $this->buildMultimodalContent($textContent, $imageUrls);
 
-            if (!empty($imageUrls)) {
-                $this->logger->info('🖼️ ChatHandler: Images included for vision (non-streaming)', [
-                    'message_id' => $currentMessage->getId(),
-                    'image_count' => count($imageUrls),
-                ]);
-            }
+            $this->logger->info('ChatHandler: Images included for vision (non-streaming)', [
+                'message_id' => $currentMessage->getId(),
+                'image_count' => count($imageUrls),
+            ]);
         } else {
             $messageContent = $textContent;
         }
@@ -2085,9 +2085,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private function imageToBase64DataUrl(string $relativePath): ?string
     {
-        // Security: Validate path to prevent directory traversal attacks
-        // Strip leading slashes and reject paths with .. segments
-        $sanitizedPath = ltrim($relativePath, '/');
+        // Security: Validate path to prevent directory traversal attacks.
+        // Display URLs (`/api/v1/files/uploads/<rel>`) must be reduced to the
+        // upload-dir-relative form before we prefix $uploadDir — otherwise a
+        // stored serve path never resolves (#1596).
+        $sanitizedPath = $this->conversationFileCatalog->normalizeRelativePath($relativePath);
         $absolutePath = $this->uploadDir.'/'.$sanitizedPath;
 
         // Use FileHelper to safely resolve and validate path within upload directory
@@ -2225,31 +2227,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Base64 data URLs for images the ASSISTANT generated earlier in this
-     * conversation, keyed by the message that produced them.
-     *
-     * Without this, "draw a cat" → "what breed is it?" is answered from the
-     * text prompt alone: only user turns ever contributed image content, so the
-     * model could not see its own picture. Off unless
-     * FILE_CONTEXT.VISION_INCLUDE_GENERATED is set and the chosen model is
-     * vision-capable, and capped at MAX_GENERATED_IMAGES — every image rides
-     * along as a base64 payload on each following request of the conversation.
-     *
-     * @param array<int, Message> $thread
-     *
-     * @return array<int, list<string>>
-     */
-    /**
      * Always-on prose references for media the assistant produced in earlier
      * turns of this conversation.
      *
      * Generated images, videos and audio carry no BFILETEXT, so replaying the
      * thread as plain text leaves no trace of them: a follow-up such as "was ist
      * da zu sehen?" is then answered from text-only history and the model denies
-     * the media exists (#1596). Sending the actual pixels is a separate,
-     * opt-in/token-costly path ({@see generatedImagesForVision()}); this cheap
-     * text reference is unconditional so the model at least knows the media is
-     * real. It also gives async media turns whose text was cleared
+     * the media exists (#1596). Sending the actual pixels is a separate path
+     * ({@see generatedImagesForVision()}); this cheap text reference is
+     * unconditional so the model still knows the media is real when the
+     * kill-switch is off or the chat model cannot see images. It also gives
+     * async media turns whose text was cleared
      * ({@see \App\Service\Media\MediaJobMessageSync}) non-empty content, so they
      * survive the empty-assistant filter (#1115) instead of vanishing entirely.
      *
@@ -2293,6 +2281,22 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $references;
     }
 
+    /**
+     * Base64 data URLs for images the ASSISTANT generated earlier in this
+     * conversation. Attached to the current USER turn — Anthropic (and most
+     * providers) reject `image` blocks on assistant turns, which is what
+     * surfaced as "I cannot see the picture" after the flag was turned on.
+     *
+     * Without this, "draw a cat" → "what is in it?" is answered from the text
+     * prompt alone (#1596). On when FILE_CONTEXT.VISION_INCLUDE_GENERATED is
+     * enabled (the default) and the chosen model is vision-capable, and capped
+     * at MAX_GENERATED_IMAGES so a single inline image stays under the
+     * 450K-character vision budget.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return list<string>
+     */
     private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
     {
         if (true !== ($options['include_generated_images'] ?? false)) {
@@ -2306,11 +2310,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ConversationFile::CATEGORY_IMAGE,
         );
 
-        $byMessage = [];
-        $included = 0;
+        $urls = [];
 
         foreach ($catalog as $file) {
-            if ($included >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
+            if (count($urls) >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
                 break;
             }
             if (!$file->isGenerated() || null === $file->messageId) {
@@ -2325,23 +2328,28 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 continue;
             }
 
-            $byMessage[$file->messageId][] = $dataUrl;
-            ++$included;
+            $urls[] = $dataUrl;
         }
 
-        if ($included > 0) {
+        if ([] !== $urls) {
             $this->logger->info('ChatHandler: Including generated images for vision', [
                 'message_id' => $currentMessage->getId(),
-                'image_count' => $included,
+                'image_count' => count($urls),
             ]);
         }
 
-        return $byMessage;
+        return $urls;
     }
 
     /**
      * Whether generated images may be shown to the model: the operator flag is
      * on and the model that will actually answer can read images.
+     *
+     * A chat model without vision is NOT swapped here. The vision fallback
+     * only fires when the current message itself carries an image attachment;
+     * a generated picture sitting in history is not enough to change the
+     * user's chosen model. In that case the always-on prose reference from
+     * {@see generatedMediaReferences()} is the only trace the model gets.
      */
     private function shouldIncludeGeneratedImages(?int $modelId, ?int $effectiveUserId): bool
     {

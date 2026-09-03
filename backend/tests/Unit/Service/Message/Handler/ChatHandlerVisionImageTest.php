@@ -68,7 +68,7 @@ class ChatHandlerVisionImageTest extends TestCase
             $this->createMock(\App\Service\Vision\VisionModelResolver::class),
             $this->createMock(\App\Service\Digest\DigestSearchService::class),
             $this->createMock(\App\Service\Digest\MessageDigestConfig::class),
-            $this->createMock(\App\Service\File\ConversationFileCatalog::class),
+            $this->catalogThatNormalizesPaths(),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
         );
     }
@@ -179,6 +179,20 @@ class ChatHandlerVisionImageTest extends TestCase
         $this->expectException(\App\Service\Exception\VisionImageUnprocessableException::class);
 
         $method->invoke($this->handler, $message, true, []);
+    }
+
+    private function catalogThatNormalizesPaths(): \App\Service\File\ConversationFileCatalog
+    {
+        $catalog = $this->createMock(\App\Service\File\ConversationFileCatalog::class);
+        $catalog->method('normalizeRelativePath')->willReturnCallback(
+            static function (string $path): string {
+                $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
+
+                return ltrim(null === $stripped ? $path : $stripped, '/');
+            },
+        );
+
+        return $catalog;
     }
 
     private function invokeImageToBase64DataUrl(string $relativePath): ?string
