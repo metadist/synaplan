@@ -1,9 +1,12 @@
 # Secure Compute — a sandboxed workspace for the AI — master plan
 
-**Status:** Draft 2026-09-03. Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+**Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
+Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 The sidecar (Phase A) can start as a spike at any time; the Synaplan
 integration (Phase B) depends on track 4's approval policy and track 2's tool
 allow-list.
+Sprint files: [`01_phase_a0_spike_and_threat_model.md`](./01_phase_a0_spike_and_threat_model.md) …
+[`08_phase_b4_hardening_and_ga.md`](./08_phase_b4_hardening_and_ga.md).
 **Owner surface:** none new for users — results appear as ordinary files and
 a run card in the chat. Operate → Feature status shows compute health;
 Operate → System config holds limits.
@@ -28,22 +31,22 @@ Operate → System config holds limits.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **New repo `synaplan-compute`, Go, single static binary, own image.** Not PHP: it needs the Docker/containerd API, process trees, log streaming and cgroup limits. Rust is an acceptable alternative; Go is proposed for Docker SDK maturity and the existing Go precedent. | Go sidecar | |
-| 2 | **The PHP backend never touches Docker.** Only the compute container has the socket (or a containerd/`runsc` handle). PHP holds `ComputeClient` (HTTP) and nothing else. | Locked | |
-| 3 | **Every run is an ephemeral, hardened container:** `--network none` by default, read-only rootfs, `tmpfs /tmp`, `cap-drop ALL`, `no-new-privileges`, seccomp default profile, non-root uid, `pids-limit`, memory and CPU limits, wall-clock timeout that kills the whole tree. | Tier 1 hardening baseline | |
-| 4 | **Isolation tiers:** T1 = hardened Docker (baseline, everywhere); T2 = gVisor `runsc` runtime when installed (recommended for Synaplan Cloud and hosters); T3 = microVM (Firecracker / Kata) documented for hosters who need it. The API is identical across tiers; the tier is reported in health. | T1 always, T2 recommended | |
-| 5 | **No secrets inside the sandbox.** The compute service holds no Synaplan credentials; PHP **pushes** input files into a run and **pulls** artefacts out. Egress is off unless a run's policy allows an allow-list of hosts (track 4 policy, S4). | Push in, pull out, no egress | |
-| 6 | **Runtime images are ours, pinned and minimal.** v1: `synaplan-compute-python` (Python 3.12 + pandas, numpy, matplotlib, openpyxl, python-docx, python-pptx, pypdf, pillow). Optional `synaplan-compute-node`. No package installation at run time in v1 (offline by construction). | Python first | |
-| 7 | **Workspaces:** `run` (ephemeral, deleted after artefact pull) and `user` (persistent per Synaplan user, quota in MB, mounted read-write into that user's runs only). Workspace ids are opaque; PHP maps user → workspace id and never passes a path. | Two kinds | |
-| 8 | **Contract `protocol: 1`, frozen after Phase A** with committed fixtures, the same discipline as the desktop job contract. A run request is `{ workspace, image, entry: {program, args[]}, files[], limits, egress }`. No free-form shell string crosses the API; if the model wants a shell it writes a script file and runs `python`/`node`/`sh` on that file **inside** the sandbox — the sandbox is the boundary, the API is not a shell. | Frozen contract | |
-| 9 | **Results are untrusted.** Artefacts: size cap, MIME allow-list, filename sanitizing, provenance `source: compute` on `BFILES`; stdout/stderr truncated and escaped; nothing from a run is executed by PHP. | Locked | |
-| 10 | **Policy: `code_run` is `write`-class.** Interactive default `auto` for the user's own chat (the sandbox is the safety); unattended default `approve`; egress or persistent-workspace writes never loosen below the tool policy. Configurable per assistant / group via track 4. | Interactive auto, unattended approve | |
-| 11 | **Quotas per user:** concurrent runs, runs/hour, CPU-seconds/day, workspace MB — enforced by PHP (rate-limit lanes per `BUSERLEVEL`, IAM group overrides) *and* by the compute service (hard caps). | Two layers | |
-| 12 | **Audit every run** (`BCOMPUTERUNS`: who, assistant, image, limits, exit code, duration, bytes in/out, artefact ids, egress hosts). Metadata only, no stdout content in the audit table. | Locked | |
-| 13 | **Evaluate before building:** a one-week spike (S0) compares own Go sidecar vs. existing open-source runners (E2B infra, Piston, a Jupyter-kernel gateway, WASM/pyodide) on isolation, footprint, ops complexity and license. Default expectation: own sidecar wins on footprint and ops; the spike records the go/no-go in `STATUS.md`. | Spike first | |
-| 14 | **Deployment:** compose profile `compute` for dev/self-host (same host, T1); `synaplan-platform` recommends a **separate compute node** (or at least a separate Docker daemon) for T2/T3. Documented, private repo. | Separate node recommended | |
-| 15 | **Schema (ask recorded):** `BCOMPUTERUNS`, `BCOMPUTEWORKSPACES` (Phase B S2/S3). Galera-safe `addSql`. | Ask recorded | |
-| 16 | **Mobile:** all `backend-only` except the run card (`ota-candidate`). | Locked | |
+| 1 | **New repo `synaplan-compute`, Go, single static binary, own image.** Not PHP: it needs the Docker/containerd API, process trees, log streaming and cgroup limits. Rust is an acceptable alternative; Go is proposed for Docker SDK maturity and the existing Go precedent. | Go sidecar | ✅ 2026-09-03 |
+| 2 | **The PHP backend never touches Docker.** Only the compute container has the socket (or a containerd/`runsc` handle). PHP holds `ComputeClient` (HTTP) and nothing else. | Locked | ✅ 2026-09-03 |
+| 3 | **Every run is an ephemeral, hardened container:** `--network none` by default, read-only rootfs, `tmpfs /tmp`, `cap-drop ALL`, `no-new-privileges`, seccomp default profile, non-root uid, `pids-limit`, memory and CPU limits, wall-clock timeout that kills the whole tree. | Tier 1 hardening baseline | ✅ 2026-09-03 |
+| 4 | **Isolation tiers:** T1 = hardened Docker (baseline, everywhere); T2 = gVisor `runsc` runtime when installed (recommended for Synaplan Cloud and hosters); T3 = microVM (Firecracker / Kata) documented for hosters who need it. The API is identical across tiers; the tier is reported in health. | T1 always, T2 recommended | ✅ 2026-09-03 |
+| 5 | **No secrets inside the sandbox.** The compute service holds no Synaplan credentials; PHP **pushes** input files into a run and **pulls** artefacts out. Egress is off unless a run's policy allows an allow-list of hosts (track 4 policy, S4). | Push in, pull out, no egress | ✅ 2026-09-03 |
+| 6 | **Runtime images are ours, pinned and minimal.** v1 ships **two** images: `synaplan-compute-python` (Python 3.12 + pandas, numpy, matplotlib, openpyxl, python-docx, python-pptx, pypdf, pillow) and `synaplan-compute-node` (Node 22 LTS + a small curated set: `xlsx`, `docx`, `pdf-lib`, `sharp`). LibreOffice image is v2. No package installation at run time in v1 (offline by construction). | Python + Node | ✅ 2026-09-03 (Node promoted to v1) |
+| 7 | **Workspaces:** `run` (ephemeral, deleted after artefact pull) and `user` (persistent per Synaplan user, quota in MB, mounted read-write into that user's runs only). Workspace ids are opaque; PHP maps user → workspace id and never passes a path. | Two kinds | ✅ 2026-09-03 |
+| 8 | **Contract `protocol: 1`, frozen after Phase A** with committed fixtures, the same discipline as the desktop job contract. A run request is `{ workspace, image, entry: {program, args[]}, files[], limits, egress }`. No free-form shell string crosses the API; if the model wants a shell it writes a script file and runs `python`/`node`/`sh` on that file **inside** the sandbox — the sandbox is the boundary, the API is not a shell. | Frozen contract | ✅ 2026-09-03 |
+| 9 | **Results are untrusted.** Artefacts: size cap, MIME allow-list, filename sanitizing, provenance `source: compute` on `BFILES`; stdout/stderr truncated and escaped; nothing from a run is executed by PHP. | Locked | ✅ 2026-09-03 |
+| 10 | **Policy: `code_run` is `write`-class.** Interactive default `auto` for the user's own chat (the sandbox is the safety); unattended default `approve`; egress or persistent-workspace writes never loosen below the tool policy. Configurable per assistant / group via track 4. | Interactive auto, unattended approve | ✅ 2026-09-03 |
+| 11 | **Quotas per user:** concurrent runs, runs/hour, CPU-seconds/day, workspace MB — enforced by PHP (rate-limit lanes per `BUSERLEVEL`, IAM group overrides) *and* by the compute service (hard caps). | Two layers | ✅ 2026-09-03 |
+| 12 | **Audit every run** (`BCOMPUTERUNS`: who, assistant, image, limits, exit code, duration, bytes in/out, artefact ids, egress hosts). Metadata only, no stdout content in the audit table. | Locked | ✅ 2026-09-03 |
+| 13 | **Evaluate before building:** a one-week spike (S0) compares own Go sidecar vs. existing open-source runners (E2B infra, Piston, a Jupyter-kernel gateway, WASM/pyodide) on isolation, footprint, ops complexity and license. Default expectation: own sidecar wins on footprint and ops; the spike records the go/no-go in `STATUS.md`. | Spike first | ✅ 2026-09-03 |
+| 14 | **Deployment:** compose profile `compute` for dev/self-host (same host, T1); **Synaplan Cloud (`web.synaplan.com`) requires T2 on a separate compute node** (dedicated host or separate Docker daemon with gVisor) before the flag is enabled there — T1 on the shared web hosts is not an accepted Cloud posture. `synaplan-platform` documents the node (private repo). | T2 + separate node required for Cloud | ✅ 2026-09-03 (tightened) |
+| 15 | **Schema (ask recorded):** `BCOMPUTERUNS`, `BCOMPUTEWORKSPACES` (Phase B S2/S3). Galera-safe `addSql`. | Ask recorded | ✅ 2026-09-03 |
+| 16 | **Mobile:** all `backend-only` except the run card (`ota-candidate`). | Locked | ✅ 2026-09-03 |
 
 ---
 
@@ -220,6 +223,12 @@ trabajo / Espace de travail / Çalışma alanı. Never "sandbox", "container",
 | **B3 — Workspaces & egress** | `BCOMPUTEWORKSPACES`, "Open workspace" file browser (reuses Files UI), per-run egress allow-list through `SsrfGuard`, admin limits UI, docs (`docs/COMPUTE.md`, docs site, platform guide) | A user's workspace persists across runs and is visible in Files; egress works only for allowed hosts |
 | **B4 — Hardening & GA** | Load test, capacity signals in Feature status, cleanup jobs, seeder flag on for new installs | Success criteria met |
 
+Sprint files: [`A0`](./01_phase_a0_spike_and_threat_model.md) ·
+[`A1`](./02_phase_a1_runner_mvp.md) · [`A2`](./03_phase_a2_workspaces_and_tiers.md) ·
+[`A3`](./04_phase_a3_freeze.md) · [`B1`](./05_phase_b1_client_and_capability.md) ·
+[`B2`](./06_phase_b2_tools_and_policy.md) · [`B3`](./07_phase_b3_workspaces_and_egress.md) ·
+[`B4`](./08_phase_b4_hardening_and_ga.md).
+
 Cut line: B3 egress first (offline-only is a fine v1), then persistent
 workspaces (run-only). Never cut the hostile corpus or C2.
 
@@ -270,17 +279,15 @@ workspaces (run-only). Never cut the hostile corpus or C2.
 
 ---
 
-## 11. Open questions (decide in A0)
+## 11. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Go or Rust? (Proposed: Go — Docker SDK, `synaplan-opencloud` precedent,
-   team familiarity. Record the reason either way.)
-2. Do we adopt an existing OSS runner if the spike shows parity? (Proposed:
-   only if its isolation is at least T1-equivalent, its license is
-   permissive, and it adds no mandatory infrastructure such as Firecracker
-   or a Kubernetes control plane.)
-3. Should `sh` be in the in-sandbox program allow-list at all in v1?
-   (Proposed: yes — the boundary is the container, and refusing `sh` inside
-   it buys nothing while breaking common scripts. The **API** still carries
-   no shell string.)
-4. Default interactive policy `auto` vs `approve`? (Proposed: `auto` for the
-   user's own chat; hosters can set `approve` instance-wide.)
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Go or Rust? | **Go** — Docker SDK maturity, `synaplan-opencloud/backend` precedent, team familiarity. A0 still prototypes in Go only; Rust is not re-evaluated unless A0 finds a blocking gap. |
+| 2 | Adopt an existing OSS runner? | **Only if the A0 spike shows parity** on isolation (≥ T1), file push/pull, egress policy, multi-arch images, permissive license, and no mandatory extra infrastructure (Firecracker, Kubernetes). Otherwise own sidecar. |
+| 3 | `sh` in the in-sandbox allow-list? | **Yes.** The container is the boundary; the API still carries no shell string (row 8). |
+| 4 | Default interactive policy | **`auto`** for the user's own chat; hosters can set `approve` instance-wide; unattended stays `approve`. |
+| 5 | Persistent user workspaces | **Yes, B3**, default off per instance (`COMPUTE.WORKSPACES_ENABLED`). |
+| 6 | Egress | **Offline by default; per-run allow-list via track-4 policy in B3.** |
+| 7 | Runtime images | **Python + Node in v1**; LibreOffice image v2 (row 6 updated). |
+| 8 | Cloud posture | **T2 on a separate compute node is required** before enabling on `web.synaplan.com` (row 14 tightened). |

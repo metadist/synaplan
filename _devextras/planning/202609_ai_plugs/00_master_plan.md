@@ -1,7 +1,10 @@
 # AI Plugs — interchangeable providers behind capability ports — master plan
 
-**Status:** Draft 2026-09-03. Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+**Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
+Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 Independent of tracks 1 and 2; S1 can run in parallel with IAM.
+Sprint files: [`01_sprint_1_ports_and_refactor.md`](./01_sprint_1_ports_and_refactor.md) …
+[`06_sprint_6_plugin_adapters.md`](./06_sprint_6_plugin_adapters.md).
 **Owner surface:** Operate → **AI infrastructure** (today's *Provider setup*,
 renamed and extended). No new nav item.
 **Flags:** per plug, e.g. `PLUGS.EXTRACTION.CHAIN`, `PLUGS.WEB_SEARCH.PROVIDER`,
@@ -24,21 +27,21 @@ renamed and extended). No new nav item.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **A "plug" is a capability port with interchangeable adapters.** v1 ports: **content extraction**, **web search**, **rerank**. Existing AI provider interfaces (`ChatProviderInterface`, `EmbeddingProviderInterface`, …) are already ports and are not renamed. | Three new ports | |
-| 2 | **Same mechanics as `ProviderRegistry`:** one interface per port, adapters tagged (`app.plug.extractor`, `app.plug.web_search`, `app.plug.rerank`), a registry with `#[AutowireIterator]`, selection from `BCONFIG` via a `PlugConfigService`. | Tagged services | |
-| 3 | **Refactor first.** S1 wraps `TikaClient` and `BraveSearchService` in adapters with **byte-identical** results before any new adapter exists. | Locked | |
-| 4 | **Extraction is a chain, not a single choice:** ordered adapters per MIME family with the existing quality gate (`TIKA_MIN_LENGTH` / `TIKA_MIN_ENTROPY` generalized to `ExtractionQualityGate`). Default chain = today's `FileProcessor` order. | Chain | |
-| 5 | **Docling runs as a sidecar** (official `docling-serve` image), compose profile `docling`, env `DOCLING_BASE_URL`. PHP holds a thin client. No Python in the PHP image. | Sidecar | |
-| 6 | **Web search default stays Brave.** New adapters: **SearXNG** first (self-hosted, sovereign, compose profile `searxng`), then Tavily, Exa, Firecrawl, Perplexity. One `SearchResultSet` DTO; provider-specific extras go to `meta`. | Brave default, SearXNG first | |
-| 7 | **Rerank models are catalog entries** (`BMODELS.BTAG = rerank`, binding `DEFAULTMODEL.RERANK`), never hard-coded names. Adapters: OpenAI-compatible-style `/rerank` (TEI, Jina, Cohere, Voyage), plus an `LlmReranker` fallback that uses the chat model (off by default; cost). | Catalog-managed | |
-| 8 | **Rerank is default off until an eval proves it.** RAG eval set (20–50 questions per corpus) run with and without rerank; enable by default only if recall@k improves without a latency regression above the budget in §4.3. | Eval-gated | |
-| 9 | **Model import from OpenAI-compatible endpoints and Ollama** is a UI on the existing "test connection" (`GET /models`, `/api/tags`): preview → select → create `BMODELS` rows with guessed tags (editable). Idempotent on `(service, endpoint, providerId)`. | Import UI | |
-| 10 | **Multiple OpenAI-compatible endpoints already exist** (`OpenAiCompatibleEndpointRegistry`). This track adds import, per-endpoint capability probing and health, not a new registry. | Reuse | |
-| 11 | **Plugins may contribute adapters** via manifest v2 `provides.plugs` (`{ port, class }`); boot-time declaration check like `provides.skills`. | Manifest v2 | |
-| 12 | **Admin UI = one page, tabs per port.** `ProviderSetupView` becomes **AI infrastructure**: Models & keys · Extraction · Web search · Reranking. Each tab: active adapter/chain, health, test button. | One page | |
-| 13 | **Secrets go where provider keys go:** `ProviderKeyStore`-style encrypted `BCONFIG` groups (`plug_keys`), env vars bootstrap-only, UI wins. | Locked | |
-| 14 | **Contract tests with recorded fixtures** for every adapter (no live network in CI); a golden extraction corpus in `backend/tests/Fixtures/extraction/`. | Locked | |
-| 15 | **Mobile:** backend `backend-only`; admin page `ota-candidate`. Docker profile additions are "ask first" and listed in §8. | Locked | |
+| 1 | **A "plug" is a capability port with interchangeable adapters.** v1 ports: **content extraction**, **web search**, **rerank**. Existing AI provider interfaces (`ChatProviderInterface`, `EmbeddingProviderInterface`, …) are already ports and are not renamed. | Three new ports | ✅ 2026-09-03 |
+| 2 | **Same mechanics as `ProviderRegistry`:** one interface per port, adapters tagged (`app.plug.extractor`, `app.plug.web_search`, `app.plug.rerank`), a registry with `#[AutowireIterator]`, selection from `BCONFIG` via a `PlugConfigService`. | Tagged services | ✅ 2026-09-03 |
+| 3 | **Refactor first.** S1 wraps `TikaClient` and `BraveSearchService` in adapters with **byte-identical** results before any new adapter exists. | Locked | ✅ 2026-09-03 |
+| 4 | **Extraction is a chain, not a single choice:** ordered adapters per MIME family with the existing quality gate (`TIKA_MIN_LENGTH` / `TIKA_MIN_ENTROPY` generalized to `ExtractionQualityGate`). Default chain = today's `FileProcessor` order. | Chain | ✅ 2026-09-03 |
+| 5 | **Docling runs as a sidecar** (official `docling-serve` image), compose profile `docling`, env `DOCLING_BASE_URL`. PHP holds a thin client. No Python in the PHP image. | Sidecar | ✅ 2026-09-03 |
+| 6 | **Web search default stays Brave.** New adapters: **SearXNG** first (self-hosted, sovereign, compose profile `searxng`), then Tavily, Exa, Firecrawl, Perplexity. One `SearchResultSet` DTO; provider-specific extras go to `meta`. | Brave default, SearXNG first | ✅ 2026-09-03 |
+| 7 | **Rerank models are catalog entries** (`BMODELS.BTAG = rerank`, binding `DEFAULTMODEL.RERANK`), never hard-coded names. Adapters: OpenAI-compatible-style `/rerank` (TEI, Jina, Cohere, Voyage), plus an `LlmReranker` fallback that uses the chat model (off by default; cost). | Catalog-managed | ✅ 2026-09-03 |
+| 8 | **Rerank is default off until an eval proves it.** RAG eval set (20–50 questions per corpus) run with and without rerank; enable by default only if recall@k improves without a latency regression above the budget in §4.3. | Eval-gated | ✅ 2026-09-03 |
+| 9 | **Model import from OpenAI-compatible endpoints and Ollama** is a UI on the existing "test connection" (`GET /models`, `/api/tags`): preview → select → create `BMODELS` rows with guessed tags (editable). Idempotent on `(service, endpoint, providerId)`. | Import UI | ✅ 2026-09-03 |
+| 10 | **Multiple OpenAI-compatible endpoints already exist** (`OpenAiCompatibleEndpointRegistry`). This track adds import, per-endpoint capability probing and health, not a new registry. | Reuse | ✅ 2026-09-03 |
+| 11 | **Plugins may contribute adapters** via manifest v2 `provides.plugs` (`{ port, class }`); boot-time declaration check like `provides.skills`. | Manifest v2 | ✅ 2026-09-03 |
+| 12 | **Admin UI = one page, tabs per port.** `ProviderSetupView` becomes **AI infrastructure**: Models & keys · Extraction · Web search · Reranking. Each tab: active adapter/chain, health, test button. | One page | ✅ 2026-09-03 |
+| 13 | **Secrets go where provider keys go:** `ProviderKeyStore`-style encrypted `BCONFIG` groups (`plug_keys`), env vars bootstrap-only, UI wins. | Locked | ✅ 2026-09-03 |
+| 14 | **Contract tests with recorded fixtures** for every adapter (no live network in CI); a golden extraction corpus in `backend/tests/Fixtures/extraction/`. | Locked | ✅ 2026-09-03 |
+| 15 | **Mobile:** backend `backend-only`; admin page `ota-candidate`. Docker profile additions are "ask first" and listed in §8. | Locked | ✅ 2026-09-03 |
 
 ---
 
@@ -153,7 +156,9 @@ track behaves like a fresh install before it.
 
 ### 4.3 Rerank in the RAG path
 
-`RagRetriever` (existing search entry) → candidates `k × multiplier` →
+`VectorSearchService::semanticSearch()` / `semanticSearchByVector()` (the
+existing search entry; there is no separate retriever class) → candidates
+`k × multiplier` →
 `RerankRegistry::active()?->rerank()` → top `k` → context. On timeout or
 error: fall back to the embedding order and record a metric. Eval gate
 (decision 8): the platform-self-awareness eval harness runs the question set
@@ -162,7 +167,9 @@ attach the numbers.
 
 ### 4.4 Model import (S5)
 
-`POST /api/v1/admin/models/import/preview` `{ source: "openai_compatible:<endpoint>" | "ollama" }`
+`POST /api/v1/admin/models/import/endpoint/preview` `{ source: "openai_compatible:<endpoint>" | "ollama" }`
+(the shorter `/import/preview|apply` pair already exists for the AI-generated
+SQL import from pricing pages and is left untouched)
 → rows `{ providerId, guessedTags[], exists: bool }` (tags guessed from name
 patterns and, for OpenAI-compatible, from a capability probe: one tiny chat
 call, one embeddings call — opt-in, costs tokens) → `POST …/import/apply`
@@ -228,6 +235,11 @@ renders whatever is installed, including plugin-contributed adapters.
 | **S5 — Model import** | Preview/apply API, capability probe, Import UI for OpenAI-compatible endpoints and Ollama, scheduled re-check marking vanished models "unavailable" (soft) | Admin imports 12 models from a vLLM endpoint in one minute |
 | **S6 — Plugin adapters** | Manifest v2 `provides.plugs`, boot check, docs for adapter authors, one reference plugin adapter | A third-party search adapter ships as a plugin with zero core edits |
 
+Sprint files: [`01`](./01_sprint_1_ports_and_refactor.md) ·
+[`02`](./02_sprint_2_docling.md) · [`03`](./03_sprint_3_web_search_providers.md) ·
+[`04`](./04_sprint_4_rerank.md) · [`05`](./05_sprint_5_model_import.md) ·
+[`06`](./06_sprint_6_plugin_adapters.md).
+
 Cut line: S6, then S5 probe (keep name-based guessing). Never cut C1.
 
 ---
@@ -273,15 +285,16 @@ Cut line: S6, then S5 probe (keep name-based guessing). Never cut C1.
 
 ---
 
-## 12. Open questions (decide in S0)
+## 12. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Perplexity returns an *answer*, not results. Model it as a search
-   provider with `capabilities.answer = true`, or as a chat provider
-   (`PerplexityProvider` with `chat` tag)? (Proposed: both allowed; the
-   search adapter exposes citations as results.)
-2. Should the extraction chain be configurable per user (BUSINESS tier) or
-   only per instance? (Proposed: instance only in v1.)
-3. Do we keep `TIKA_*` env vars as bootstrap for the quality gate, or
-   migrate to `PLUGS.*` only with a one-time migration that copies env values
-   into `BCONFIG`? (Proposed: bootstrap-only env, UI wins, same as provider
-   keys.)
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Perplexity: search plug or chat provider? | **Both.** `PerplexityAdapter` (web search port, `capabilities.answer = true`, citations exposed as results, answer as a flagged extra) **and** a `PerplexityProvider` chat provider as an optional `BMODELS` entry. Independent toggles. |
+| 2 | Extraction chain per user? | **Instance only** in v1. Web search provider keeps the per-user override (§4.2). |
+| 3 | `TIKA_*` env vars | **Bootstrap-only**, UI wins — same rule as provider keys. No migration copies env into `BCONFIG`; the seeder reads env once on first boot as it does for keys. (Default stands; not contested.) |
+| 4 | Docling | **Sidecar** (`docling-serve`, compose profile `docling`), S2. |
+| 5 | First new search adapter | **SearXNG**, then Tavily, Exa, Firecrawl, Perplexity (S3). |
+| 6 | Rerank default | **Off until the eval report wins**; `LlmReranker` fallback included, off by default. |
+| 7 | Admin page | **Rename Provider setup → AI infrastructure**, tabs Models & keys / Extraction / Web search / Reranking. |
+| 8 | Capability probe on model import | **Opt-in checkbox** on the preview step; name-based guessing always runs. |
+| 9 | Bundle section (roadmap §8) | S5 registers a `model_preferences` section (`DEFAULTMODEL.*` bindings by catalog key, `PLUGS.WEB_SEARCH.PROVIDER` per-user override) with the track-2 bundle registry. Keys are never exported. |

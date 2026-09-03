@@ -1,8 +1,12 @@
 # More Nextcloud — link a platform user to an existing Synaplan account — master plan
 
-**Status:** Draft 2026-09-03. Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+**Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
+Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 Needs `BEXTERNALIDENTITIES` from track 1 S1; otherwise independent and
 small. Can be pulled forward when a hoster asks.
+Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md) ·
+[`02_sprint_2_nextcloud_app.md`](./02_sprint_2_nextcloud_app.md) ·
+[`03_sprint_3_parity_and_fallbacks.md`](./03_sprint_3_parity_and_fallbacks.md).
 **Owner surface:** Synaplan: Manage → Connections → **Linked platforms**
 (new child replacing nothing; see decision 11). Nextcloud: personal settings
 **Synaplan** + the existing admin settings.
@@ -27,20 +31,20 @@ small. Can be pulled forward when a hoster asks.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **Three modes per Nextcloud instance, admin-chosen:** `shared` (today's default, one key), `provision` (today's per-user: admin key creates accounts), **`link`** (new: each user connects their own existing Synaplan account; optional auto-provision for users who have none). Existing modes are byte-identical. | Add `link`, keep both others | |
-| 2 | **Linking is an authorization-code style handshake, not a pasted key.** NC personal settings → "Connect Synaplan" → browser opens Synaplan `/connect/platform?client=nextcloud&instance=…&state=…` → user signs in (existing login incl. OIDC/Google/…) → confirms "Connect Nextcloud at *host* as *uid*" → Synaplan redirects to the NC callback with a one-time `link_code` → **NC server** exchanges the code (server-to-server, with the NC instance secret) for a **scoped per-user API key** → stored in NC user preferences as today. The key never travels through the browser. | Auth-code handshake | |
-| 3 | **One generic flow for all partner clients.** `AddinConnectView.vue` is generalized to `PlatformConnectView.vue` with a registered `client` (`outlook`, `nextcloud`, `owncloud`, later `opencloud`); each client has a redirect-URI policy. Synamail keeps working (its relay redirect is one client policy). | Generalize | |
-| 4 | **Instance registration.** A Nextcloud instance registers once with Synaplan (`POST /api/v1/platform-links/instances` by the NC admin using the existing admin key **or** a Synaplan admin approving a pending registration in the UI) and receives an `instance_id` + `instance_secret`. Redirect URIs must be `https://<that instance host>/…`; `SsrfGuard` rules apply to the host. | Registered instances | |
-| 5 | **External identities are rows, not JSON.** `BEXTERNALIDENTITIES` (track 1 S1): `(source=nextcloud, instance_id, external_id) → user_id, api_key_id`. `BUSERDETAILS.external_*` stays as a read fallback; provisioning writes both until a later cleanup. | Table from IAM | |
-| 6 | **A Synaplan user may link many platform identities**; a platform identity links to exactly one Synaplan user. Re-linking replaces the row and revokes the previous key. | 1:n | |
-| 7 | **Email conflicts become a link offer**, not a hard failure, in `link` mode: if provisioning finds the email already taken, the NC app shows "An account with this email exists — connect it" and starts the handshake. `provision` mode keeps today's conflict exception (C2). | Offer to link | |
-| 8 | **Minted key scopes = today's** (`chat`, `files`, `rag`) plus `memories` only if the NC admin enabled memories. Keys are labelled `Nextcloud: <host> (<uid>)` and appear in the user's API keys list with a *linked platform* badge; revoking there disconnects NC. | Same scopes | |
-| 9 | **Preserve configuration by construction:** linking never creates or changes a Synaplan user; the user's models, knowledge, memories, assistants stay untouched. There is **no account merge** (moving data from a provisioned `external` account into an existing one) in v1 — the user re-links and the old account stays, admin can delete it. | No merge | |
-| 10 | **Synaplan side UI = Connections → Linked platforms:** list of my linked platforms (icon, host, uid, key label, last used), Disconnect. Admin (Operate → People → user detail) sees the same as metadata. | One child | |
-| 11 | **NC admin settings shrink for `link` mode:** Synaplan URL + "Register this instance" button; the admin key becomes optional (needed only for auto-provision and the activated-users table). | Simplify | |
-| 12 | **ownCloud.online app gets parity in the same track** (same PHP pattern); OpenCloud keeps OIDC token exchange (Mode A) and gains `link` as its Mode C later only if asked. | NC + OCO | |
-| 13 | **Schema (ask recorded):** `BPLATFORMINSTANCES` (S1); `BEXTERNALIDENTITIES` from track 1. Galera-safe `addSql`. | Ask recorded | |
-| 14 | **Mobile:** Synaplan PHP `backend-only`; `PlatformConnectView` + Linked platforms page `ota-candidate`; NC/OCO apps are their own release channels. | Locked | |
+| 1 | **Three modes per Nextcloud instance, admin-chosen:** `shared` (today's default, one key), `provision` (today's per-user: admin key creates accounts), **`link`** (new: each user connects their own existing Synaplan account; optional auto-provision for users who have none). Existing modes are byte-identical. | Add `link`, keep both others | ✅ 2026-09-03 |
+| 2 | **Linking is an authorization-code style handshake, not a pasted key.** NC personal settings → "Connect Synaplan" → browser opens Synaplan `/connect/platform?client=nextcloud&instance=…&state=…` → user signs in (existing login incl. OIDC/Google/…) → confirms "Connect Nextcloud at *host* as *uid*" → Synaplan redirects to the NC callback with a one-time `link_code` → **NC server** exchanges the code (server-to-server, with the NC instance secret) for a **scoped per-user API key** → stored in NC user preferences as today. The key never travels through the browser. | Auth-code handshake | ✅ 2026-09-03 |
+| 3 | **One generic flow for all partner clients.** `AddinConnectView.vue` is generalized to `PlatformConnectView.vue` with a registered `client` (`outlook`, `nextcloud`, `owncloud`, later `opencloud`); each client has a redirect-URI policy. Synamail keeps working (its relay redirect is one client policy). | Generalize | ✅ 2026-09-03 |
+| 4 | **Instance registration.** A Nextcloud instance registers once with Synaplan (`POST /api/v1/platform-links/instances` by the NC admin using the existing admin key **or** a Synaplan admin approving a pending registration in the UI) and receives an `instance_id` + `instance_secret`. Redirect URIs must be `https://<that instance host>/…`; `SsrfGuard` rules apply to the host. | Registered instances | ✅ 2026-09-03 |
+| 5 | **External identities are rows, not JSON.** `BEXTERNALIDENTITIES` (track 1 S1): `(source=nextcloud, instance_id, external_id) → user_id, api_key_id`. `BUSERDETAILS.external_*` stays as a read fallback; provisioning writes both until a later cleanup. | Table from IAM | ✅ 2026-09-03 |
+| 6 | **A Synaplan user may link many platform identities**; a platform identity links to exactly one Synaplan user. Re-linking replaces the row and revokes the previous key. | 1:n | ✅ 2026-09-03 |
+| 7 | **Email conflicts become a link offer**, not a hard failure, in `link` mode: if provisioning finds the email already taken, the NC app shows "An account with this email exists — connect it" and starts the handshake. `provision` mode keeps today's conflict exception (C2). | Offer to link | ✅ 2026-09-03 |
+| 8 | **Minted key scopes = today's** (`chat`, `files`, `rag`) plus `memories` only if the NC admin enabled memories. Keys are labelled `Nextcloud: <host> (<uid>)` and appear in the user's API keys list with a *linked platform* badge; revoking there disconnects NC. | Same scopes | ✅ 2026-09-03 |
+| 9 | **Preserve configuration by construction:** linking never creates or changes a Synaplan user; the user's models, knowledge, memories, assistants stay untouched. There is **no account merge** (moving data from a provisioned `external` account into an existing one) in v1 — the user re-links and the old account stays, admin can delete it. | No merge | ✅ 2026-09-03 |
+| 10 | **Synaplan side UI = Connections → Linked platforms:** list of my linked platforms (icon, host, uid, key label, last used), Disconnect. Admin (Operate → People → user detail) sees the same as metadata. | One child | ✅ 2026-09-03 |
+| 11 | **NC admin settings shrink for `link` mode:** Synaplan URL + "Register this instance" button; the admin key becomes optional (needed only for auto-provision and the activated-users table). | Simplify | ✅ 2026-09-03 |
+| 12 | **ownCloud.online app gets parity in the same track.** Verified 2026-09-03: `synaplan-owncloud-online/lib/Service/UserAccountService.php` is the same shared-key / per-user provisioning model (`source="owncloud"`, `external_id="<instanceId>:<uid>"`), so `link` mode applies 1:1. **OpenCloud is out of this track**: `synaplan-opencloud/backend/internal/tokenexchange/` already gives every user a real identity via RFC 8693 token exchange against the shared Keycloak realm (static API key only as a fallback for single-tenant setups) — that is the stronger model and needs no handshake. Track 1 S4 owns the regression check that token-exchanged users pick up groups and shares. `link` as an OpenCloud Mode C is v2, only on request. | NC + OCO; OpenCloud out | ✅ 2026-09-03 |
+| 13 | **Schema (ask recorded):** `BPLATFORMINSTANCES` (S1); `BEXTERNALIDENTITIES` from track 1. Galera-safe `addSql`. | Ask recorded | ✅ 2026-09-03 |
+| 14 | **Mobile:** Synaplan PHP `backend-only`; `PlatformConnectView` + Linked platforms page `ota-candidate`; NC/OCO apps are their own release channels. | Locked | ✅ 2026-09-03 |
 
 ---
 
@@ -250,13 +254,15 @@ no active hoster). Never cut C1/C5/C6.
 
 ---
 
-## 11. Open questions (decide in S0)
+## 11. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Registration by the NC admin with the **admin key** vs. a Synaplan admin
-   approving a **pending** registration in the UI — support both, or one?
-   (Proposed: both; hosters automate with the key, small teams click.)
-2. Should the confirm screen let the user pick *which* Synaplan account when
-   they have several sessions? (Proposed: no — the signed-in account; "not
-   you? sign out" link.)
-3. Auto-provision inside `link` mode when the user has no account: on by
-   default or admin opt-in? (Proposed: opt-in; it needs the admin key.)
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Instance registration | **Both**: admin API key (automation) and a pending-approval list in Operate → People → Linked platforms (small teams click). |
+| 2 | Account picker on the confirm screen | **No** — the signed-in account, with a "Not you? Sign out" link (default stands; not contested). |
+| 3 | Auto-provision inside `link` mode | **Admin opt-in** per instance; needs the admin key. |
+| 4 | Handshake | **Authorization-code style** confirmed; pairing-code variant only as the S3 headless fallback. |
+| 5 | Email conflict in `provision` mode | **Offer link mode** to the user when the instance also has `link` available; pure `provision` installs keep the hard fail (C2). |
+| 6 | Account merge | **Not in v1**; documented re-link workaround. |
+| 7 | `AddinConnectView` | **Generalize to `PlatformConnectView`**; every step of Synamail's `docs/AUTH_FLOW.md` is an acceptance test of S1, and that document is updated in the same change. |
+| 8 | Scope of parity | **Nextcloud + ownCloud Online**; OpenCloud out (row 12). |

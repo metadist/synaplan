@@ -1,7 +1,9 @@
 # IAM — groups, sharing, directory — master plan
 
-**Status:** Draft 2026-09-03. Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
-Nothing below is decided until §0 is ticked.
+**Status:** Decisions ticked 2026-09-03 (product-owner questionnaire; log in
+[`STATUS.md`](./STATUS.md)). Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+Sprint files: [`01_sprint_1_groups_core.md`](./01_sprint_1_groups_core.md) …
+[`05_sprint_5_group_policies.md`](./05_sprint_5_group_policies.md).
 **Owner surface:** Operate → **People** (admin) and a **Share** action on
 resource cards (everyone). No new top-level nav item.
 **Flags:** `IAM.GROUPS_ENABLED`, `IAM.SHARING_ENABLED`, `IAM.DIRECTORY_SYNC_ENABLED`
@@ -23,26 +25,28 @@ resource cards (everyone). No new top-level nav item.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **Instance = organization.** Multi-tenancy inside one database is **not** built. Hosters serve many customers with many instances (the `synaplan-platform` model today). Inside an instance, IAM = people, groups, shares. | One org per instance | |
-| 2 | **Ownership never moves.** Every resource keeps exactly one owner (`BOWNERID` / `BUSERID` as today). Sharing is additive; deleting a share never deletes data. Ownership transfer is a v2 admin action (audited), not part of sharing. | Locked | |
-| 3 | **Four permission levels, fixed vocabulary:** `read` (see it), `use` (let the AI use it for me / talk to it), `edit` (change it), `manage` (re-share, delete). Owner has all. No custom roles in v1. | Locked | |
-| 4 | **Three subject types:** a user, a group, `everyone` (all signed-in users of the instance). Anonymous / widget visitors are never a share subject. | Locked | |
-| 5 | **Groups are flat in v1.** `BGROUPS.BPARENTID` is created nullable for v2 nesting (departments) but not exposed. | Flat, column reserved | |
-| 6 | **Group roles: `member` and `manager`.** A manager adds/removes members and shares group-owned nothing (groups own nothing — see 2). Instance admins manage all groups. | Two roles | |
-| 7 | **Directory groups come from the OIDC `groups` claim** (configurable claim path), upserted at login, membership reconciled per login. Directory groups are read-only in the UI. SCIM 2.0 is v2. Role mapping (`OIDC_ROLE_CLAIMS`, admin promotion) is **unchanged**. | OIDC first, SCIM later | |
-| 8 | **Admin privacy: admins manage, they do not read.** Admins see resource *metadata* (name, owner, size, shares) but not content unless (a) it is shared with them, or (b) they use audited impersonation. `IAM.ADMIN_IMPERSONATION` = `audited` (today's behavior + audit row) with an instance option `disabled`. | Metadata only + audited impersonation | |
-| 9 | **One decision point:** `AccessGate` service + one Symfony voter (`IamVoter`, attributes `IAM_READ` / `IAM_USE` / `IAM_EDIT` / `IAM_MANAGE`). Controllers and services never compare user ids by hand for shared kinds. Existing `userId === ownerId` checks stay valid (owner wins) and are migrated to the voter kind by kind. | Locked | |
-| 10 | **Resource kinds are a registry**, not an enum: `ShareableResourceKindInterface` tagged `app.iam.resource_kind`. v1 kinds: `knowledge_folder`, `conversation`, `assistant`, `saved_task`, `widget`. Plugins add kinds via manifest v2 `provides.resourceKinds`. | Registry | |
-| 11 | **MVP = groups + share a knowledge folder and a conversation with a group.** "Add this chat with its files to my team" is the acceptance demo. Assistants, tasks, widgets follow in S3. | Knowledge + conversation first | |
-| 12 | **Shared knowledge enters RAG only through an explicit `use` share.** Vector queries filter on `(userId, groupKey)` pairs; there is never a query without an owner filter. CORE-5 stays true: no share row ⇒ no cross-user chunk, ever. | Locked | |
-| 13 | **Schema (this plan is the "ask first"):** `BGROUPS`, `BGROUPMEMBERS`, `BSHARES`, `BAUDITLOG`, `BEXTERNALIDENTITIES` (S1), `BGROUPCONFIG` + `BCONFIG.BLOCKED` (S5). Galera-safe `addSql` only. | Ask recorded | |
-| 14 | **Group-level policy is a config layer**, resolved user → groups → global, for a small allow-list of settings (default models, allowed models, feature flags, rate-limit tier). `BCONFIG.BLOCKED = 1` on a global row means "user override ignored". Not in MVP (S5). | Config layer, S5 | |
-| 15 | **API-key scopes gain `iam:read` / `iam:manage`.** Empty / legacy scopes stay full access (CORE-3 grandfather). No new firewall. | Additive scopes | |
-| 16 | **UI words (en):** People, Groups, Share, "Shared with me", Can view / Can use / Can edit / Can manage. Never "ACL", "tenant", "principal", "grant" in primary copy. All five locales fixed in §7 before the first UI PR. | Locked | |
-| 17 | **No new top-level nav item.** Operate gains one child **People** (users + groups; the `users` tab of `AdminView.vue` moves there). Manage lists gain a "Shared with me" filter, not a new page. | Lean nav | |
-| 18 | **Widget, mobile, `/v1` gateways, OIDC login, API keys unchanged.** New PHP paths are `backend-only`; People page + Share dialog are `ota-candidate`. | Locked | |
+| 1 | **Instance = organization.** Multi-tenancy inside one database is **not** built. Hosters serve many customers with many instances (the `synaplan-platform` model today). Inside an instance, IAM = people, groups, shares. **Moving between instances is solved by export/import of a user's own resources** (assistants, instructions, tasks, MCP servers, custom tools, model preferences, connections — never secrets), not by tenancy; the bundle format is owned by track 2 (roadmap §8). Groups and shares are instance-local and are not exported. | One org per instance + portability | ✅ 2026-09-03 |
+| 2 | **Ownership never moves.** Every resource keeps exactly one owner (`BOWNERID` / `BUSERID` as today). Sharing is additive; deleting a share never deletes data. Ownership transfer is a v2 admin action (audited), not part of sharing. | Locked | ✅ 2026-09-03 |
+| 3 | **Four permission levels, fixed vocabulary:** `read` (see it), `use` (let the AI use it for me / talk to it), `edit` (change it), `manage` (re-share, delete). Owner has all. No custom roles in v1. | Locked | ✅ 2026-09-03 |
+| 4 | **Three subject types:** a user, a group, `everyone` (all signed-in users of the instance). Anonymous / widget visitors are never a share subject. | Locked | ✅ 2026-09-03 |
+| 5 | **Groups are flat in v1.** `BGROUPS.BPARENTID` is created nullable for v2 nesting (departments) but not exposed. | Flat, column reserved | ✅ 2026-09-03 |
+| 6 | **Group roles: `member` and `manager`.** A manager adds/removes members and shares group-owned nothing (groups own nothing — see 2). Instance admins manage all groups. | Two roles | ✅ 2026-09-03 |
+| 7 | **Directory groups come from the OIDC `groups` claim** (configurable claim path), upserted at login, membership reconciled per login. Directory groups are read-only in the UI. SCIM 2.0 is v2. Role mapping (`OIDC_ROLE_CLAIMS`, admin promotion) is **unchanged**. | OIDC first, SCIM later | ✅ 2026-09-03 |
+| 8 | **Admin privacy: admins manage, they do not read.** Admins see resource *metadata* (name, owner, size, shares) but not content unless (a) it is shared with them, or (b) they use audited impersonation. `IAM.ADMIN_IMPERSONATION` = `audited` (today's behavior + audit row) with an instance option `disabled`. | Metadata only + audited impersonation | ✅ 2026-09-03 |
+| 9 | **One decision point:** `AccessGate` service + one Symfony voter (`IamVoter`, attributes `IAM_READ` / `IAM_USE` / `IAM_EDIT` / `IAM_MANAGE`). Controllers and services never compare user ids by hand for shared kinds. Existing `userId === ownerId` checks stay valid (owner wins) and are migrated to the voter kind by kind. | Locked | ✅ 2026-09-03 |
+| 10 | **Resource kinds are a registry**, not an enum: `ShareableResourceKindInterface` tagged `app.iam.resource_kind`. v1 kinds: `knowledge_folder`, `conversation`, `assistant`, `saved_task`, `widget`. Plugins add kinds via manifest v2 `provides.resourceKinds`. | Registry | ✅ 2026-09-03 |
+| 11 | **MVP = groups + share a knowledge folder and a conversation with a group.** "Add this chat with its files to my team" is the acceptance demo. Assistants, tasks, widgets follow in S3. | Knowledge + conversation first | ✅ 2026-09-03 |
+| 12 | **Shared knowledge enters RAG only through an explicit `use` share.** Vector queries filter on `(userId, groupKey)` pairs; there is never a query without an owner filter. CORE-5 stays true: no share row ⇒ no cross-user chunk, ever. | Locked | ✅ 2026-09-03 |
+| 13 | **Schema (this plan is the "ask first"):** `BGROUPS`, `BGROUPMEMBERS`, `BSHARES`, `BAUDITLOG`, `BEXTERNALIDENTITIES` (S1), `BGROUPCONFIG` + `BCONFIG.BLOCKED` (S5). Galera-safe `addSql` only. | Ask recorded | ✅ 2026-09-03 |
+| 14 | **Group-level policy is a config layer**, resolved user → groups → global, for a small allow-list of settings (default models, allowed models, feature flags, rate-limit tier). `BCONFIG.BLOCKED = 1` on a global row means "user override ignored". Not in MVP (S5). | Config layer, S5 | ✅ 2026-09-03 |
+| 15 | **API-key scopes gain `iam:read` / `iam:manage`.** Empty / legacy scopes stay full access (CORE-3 grandfather). No new firewall. | Additive scopes | ✅ 2026-09-03 |
+| 16 | **UI words (en):** People, Groups, Share, "Shared with me", Can view / Can use / Can edit / Can manage. Never "ACL", "tenant", "principal", "grant" in primary copy. All five locales fixed in §7 before the first UI PR. | Locked | ✅ 2026-09-03 |
+| 17 | **No new top-level nav item.** Operate gains one child **People** (users + groups; the `users` tab of `AdminView.vue` moves there). Manage lists gain a "Shared with me" filter, not a new page. | Lean nav | ✅ 2026-09-03 |
+| 18 | **Widget, mobile, `/v1` gateways, OIDC login, API keys unchanged.** New PHP paths are `backend-only`; People page + Share dialog are `ota-candidate`. | Locked | ✅ 2026-09-03 |
 
-If a row is rejected, update every section below that assumed the default.
+All 18 rows accepted as proposed on 2026-09-03; row 1 gained the
+portability clause. Any later change to a row is a new decision entry in
+`STATUS.md` and a same-change rewrite of the sections that assumed it.
 
 ---
 
@@ -282,12 +286,12 @@ Named tests live in the sprint files; the list is binding.
 
 | Sprint | Content | Exit |
 | ------ | ------- | ---- |
-| **S0 — Concept & UI** | Tick §0; wireframes for People and ShareDialog; five-locale vocabulary; sprint files + work breakdown | Product owner signs the three sentences and the wireframes |
-| **S1 — Groups core** | Migrations (`BGROUPS`, `BGROUPMEMBERS`, `BAUDITLOG`, `BEXTERNALIDENTITIES`); `AccessGate` + `IamVoter` (owner-only behavior); kind registry with `knowledge_folder` and `conversation` descriptors; admin group API; **People** page (Users moved, Groups new); `iam:*` scopes; flag `IAM.GROUPS_ENABLED` | Admin creates "Sales", adds three people; nothing else changes |
-| **S2 — Sharing MVP** | `BSHARES`; ShareDialog; share a **knowledge folder** (`use`) → `RagScopeResolver` + both vector stores; share a **conversation** (`read`, `use` = continue as copy incl. its files); "Shared with me" filters; flag `IAM.SHARING_ENABLED` | Acceptance demo: "add this chat with its files to my team", team member continues it and RAG finds the files |
-| **S3 — More kinds** | `assistant` (BPROMPTS — coordinates with track 2 S3), `saved_task` (read/use = run a copy), `widget` (read/edit for co-editing); plugin-declared kinds via manifest v2 | Admin publishes a system-like assistant to one group only |
-| **S4 — Directory & privacy** | OIDC groups claim sync; audit log + Audit tab; admin metadata-only enforcement; impersonation audit + `disabled` option | A user logging in via Keycloak lands in the right groups; admin sees who shared what, not the content |
-| **S5 — Group policies** | `BGROUPCONFIG`, `BCONFIG.BLOCKED`, resolution user → groups → global for allow-listed settings; Policies tab | "Support may only use these two models" holds; a locked default cannot be overridden |
+| **S0 — Concept & UI** ✅ | §0 ticked 2026-09-03; five-locale vocabulary (§7); sprint files written. Wireframes for People and ShareDialog are the first deliverable of S1 (reviewed in the S1 PR that adds the page shell). | Done except wireframes |
+| **S1 — Groups core** ([file](./01_sprint_1_groups_core.md)) | Migrations (`BGROUPS`, `BGROUPMEMBERS`, `BAUDITLOG`, `BEXTERNALIDENTITIES`); `AccessGate` + `IamVoter` (owner-only behavior); kind registry with `knowledge_folder` and `conversation` descriptors; admin group API; **People** page (Users moved, Groups new); `iam:*` scopes; flag `IAM.GROUPS_ENABLED` | Admin creates "Sales", adds three people; nothing else changes |
+| **S2 — Sharing MVP** ([file](./02_sprint_2_sharing_mvp.md)) | `BSHARES`; ShareDialog; share a **knowledge folder** (`use`) → `RagScopeResolver` + both vector stores; share a **conversation** (`read`, `use` = continue as copy incl. its files); "Shared with me" filters; flag `IAM.SHARING_ENABLED` | Acceptance demo: "add this chat with its files to my team", team member continues it and RAG finds the files |
+| **S3 — More kinds** ([file](./03_sprint_3_more_kinds.md)) | `assistant` (BPROMPTS — coordinates with track 2 S3), `saved_task` (read/use = run a copy), `widget` (read/edit for co-editing); plugin-declared kinds via manifest v2 | Admin publishes a system-like assistant to one group only |
+| **S4 — Directory & privacy** ([file](./04_sprint_4_directory_and_privacy.md)) | OIDC groups claim sync; audit log + Audit tab; admin metadata-only enforcement; impersonation audit + `disabled` option; regression check that OpenCloud token-exchanged users (RFC 8693 bearer, same Keycloak realm) resolve to the same `BUSER` and therefore see their groups and shares | A user logging in via Keycloak lands in the right groups; admin sees who shared what, not the content |
+| **S5 — Group policies** ([file](./05_sprint_5_group_policies.md)) | `BGROUPCONFIG`, `BCONFIG.BLOCKED`, resolution user → groups → global for allow-listed settings; Policies tab | "Support may only use these two models" holds; a locked default cannot be overridden |
 | **v2 candidates** | SCIM 2.0; nested groups; ownership transfer; support access (time-boxed read grant to an admin); per-group budgets | Decided per hoster demand |
 
 Cut line: if scope slips, cut **S5** first, then **S4 audit tab** (keep the
@@ -343,17 +347,12 @@ is worse than no sharing.
 
 ---
 
-## 13. Open questions (decide in S0)
+## 13. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Should `everyone` shares require admin rights, or may any owner share
-   with the whole organization? (Proposed: any owner; admins can disable via
-   `IAM.EVERYONE_SHARES = admins_only`.)
-2. Do we show shared-knowledge sources in the chat with the owner's name, or
-   only "shared"? (Proposed: name — transparency beats anonymity inside one
-   organization.)
-3. Conversation `use` = "continue as copy" creates a new chat owned by the
-   member with copied file *references* (not copies of the binary). Is a
-   reference acceptable when the owner later deletes the file? (Proposed:
-   yes; the copy shows "file no longer available".)
-4. Who owns the audit retention default — 365 days? Hoster-configurable via
-   `IAM.AUDIT_RETENTION_DAYS`.
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Who may share with `everyone`? | **Any owner.** `IAM.EVERYONE_SHARES` = `any_owner` (default) \| `admins_only`, instance setting in Operate → System config. |
+| 2 | Label of shared knowledge sources in a chat answer | **Owner's name** (avatar + name on the source chip). |
+| 3 | Conversation `use` = continue as copy — files by reference? | **Yes.** The copy references the owner's `BFILES` rows; a deleted file renders "file no longer available" in the copied chat. No binary duplication. |
+| 4 | Audit retention default | **365 days**, `IAM.AUDIT_RETENTION_DAYS` (default stands; not contested). |
+| 5 | Cross-instance portability (raised with row 1) | **Export/import of a user's own resources**, bundle format owned by track 2 S6; groups/shares stay instance-local. See roadmap §8. |

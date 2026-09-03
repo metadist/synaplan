@@ -1,8 +1,11 @@
 # Tools, Approval & Workflows — master plan
 
-**Status:** Draft 2026-09-03. Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+**Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
+Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 Depends on track 2 (policies attach to assistants) and track 1 (policies per
 group; tools are shareable). S1 (registry refactor) can start earlier.
+Sprint files: [`01_sprint_1_registry_refactor.md`](./01_sprint_1_registry_refactor.md) …
+[`05_sprint_5_workflow_builder_and_webhook.md`](./05_sprint_5_workflow_builder_and_webhook.md).
 **Owner surface:** Manage → Automations (Saved Tasks, workflows, approvals
 inbox) and Manage → Connections (custom tools live beside MCP servers).
 **Flags:** `TOOLS.REGISTRY_ENABLED` (S1, refactor guard), `TOOLS.APPROVALS_ENABLED`,
@@ -25,20 +28,20 @@ inbox) and Manage → Connections (custom tools live beside MCP servers).
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **One `ToolDescriptor`, one `ToolRegistry`.** Every callable the AI can invoke — gateway builtins, MCP client tools, document tools, DAG skills (via `SkillDescriptor` adapter), plugin commands (opt-in), custom HTTP tools — is described once: `name`, `title`, `description`, `inputSchema`, `sideEffect`, `source`, `owner`. The three loops (`GatewayToolLoop`, `OpenAiGatewayToolLoop`, `ChatToolLoop`) and the planner read from it. | Locked | |
-| 2 | **Side-effect classes: `read`, `write`, `destructive`.** MCP `readOnlyHint` / `destructiveHint` map onto them; unknown = `write`. Custom tools declare their class; the declaration is reviewed by whoever shares the tool. | Three classes | |
-| 3 | **Policy outcomes: `auto`, `approve`, `block`.** Instance defaults: `read → auto`, `write → approve`, `destructive → block`. Overridable per assistant (track 2 definition `tools.policy`), per group (IAM policy layer), per tool. Most restrictive wins. | Defaults as stated | |
-| 4 | **Interactive approval reuses the Phase M confirm card**, generalized: one `ApprovalCard.vue` for every write-class action in a live chat. `BMCPSERVERS.BALLOWWRITE` keeps its meaning (a hard `block` on that server when off). | Generalize, do not fork | |
-| 5 | **Unattended approval pauses the run.** A Saved Task run that hits `approve` writes a `BAPPROVALS` row, sets the node to `waiting_approval`, notifies the owner (in-app + email; mobile push later), and **resumes from that node** when approved. `allow_unattended` becomes "auto-approve write-class actions for this task" and remains available. | Pause and resume | |
-| 6 | **Approvals expire** (default 72 h, per task configurable); an expired approval fails the node with a readable reason and pauses the task after three consecutive failures (existing rule). | 72 h | |
-| 7 | **Custom tools v1 = HTTP and OpenAPI import.** `BTOOLS` rows of type `http` (method, URL template, headers, auth from `BCREDENTIALS`, input JSON schema, response mapping, side-effect class) and `openapi` (import operations from a spec into many `http` tools). Executed through `SsrfGuard`. No code, no scripting. | HTTP + OpenAPI | |
-| 8 | **Tools are shareable resources** (IAM kind `tool`, `use` to call it, `edit` to change it). A shared tool's credentials stay the owner's (`BCREDENTIALS` reference); the call runs with the owner's credential and the caller's identity in the audit log. | IAM kind | |
-| 9 | **Workflow builder v1 is a step list, not a canvas.** Linear-first editor over `BSAVEDTASKS.BGRAPH` (steps = skills, tools, assistants; each with inputs from previous steps; optional branches via a simple condition step). A node canvas (Vue Flow or similar) is v2 and a dependency decision. | Step list first | |
-| 10 | **Workflow nodes are skills and tools, nothing new.** No new execution engine; `DagExecutor` runs what the builder saves. An assistant is a node (`chat` with a `RuntimeProfile`). | Reuse the DAG | |
-| 11 | **n8n stays an interface.** Outbound webhook node and inbound `webhook` trigger (constant exists, ingress added here, S5) are the seams; n8n is not embedded. | Locked (from saved-tasks plan) | |
-| 12 | **Schema (ask recorded):** `BAPPROVALS` (S2), `BTOOLS` (S4), `BSAVEDTASK_RUNS` gains `BWAITINGNODE` (S3). Galera-safe `addSql`. | Ask recorded | |
-| 13 | **Characterization:** the registry refactor (S1) must not change routing snapshots or the planner's `[CAPABILITYLIST]` text. | Locked | |
-| 14 | **Mobile:** backend `backend-only`; approvals inbox, tool editor, builder `ota-candidate`. Push notifications for approvals are a mobile-app item, not this track. | Locked | |
+| 1 | **One `ToolDescriptor`, one `ToolRegistry`.** Every callable the AI can invoke — gateway builtins, MCP client tools, document tools, DAG skills (via `SkillDescriptor` adapter), plugin commands (opt-in), custom HTTP tools — is described once: `name`, `title`, `description`, `inputSchema`, `sideEffect`, `source`, `owner`. The three loops (`GatewayToolLoop`, `OpenAiGatewayToolLoop`, `ChatToolLoop`) and the planner read from it. | Locked | ✅ 2026-09-03 |
+| 2 | **Side-effect classes: `read`, `write`, `destructive`.** MCP `readOnlyHint` / `destructiveHint` map onto them; unknown = `write`. Custom tools declare their class; the declaration is reviewed by whoever shares the tool. | Three classes | ✅ 2026-09-03 |
+| 3 | **Policy outcomes: `auto`, `approve`, `block`.** Instance defaults: `read → auto`, `write → approve`, `destructive → block`. Overridable per assistant (track 2 definition `tools.policy`), per group (IAM policy layer), per tool. Most restrictive wins. | Defaults as stated | ✅ 2026-09-03 |
+| 4 | **Interactive approval reuses the Phase M confirm card**, generalized: one `ApprovalCard.vue` for every write-class action in a live chat. `BMCPSERVERS.BALLOWWRITE` keeps its meaning (a hard `block` on that server when off). | Generalize, do not fork | ✅ 2026-09-03 |
+| 5 | **Unattended approval pauses the run.** A Saved Task run that hits `approve` writes a `BAPPROVALS` row, sets the node to `waiting_approval`, notifies the owner (in-app + email; mobile push later), and **resumes from that node** when approved. `allow_unattended` becomes "auto-approve write-class actions for this task" and remains available. | Pause and resume | ✅ 2026-09-03 |
+| 6 | **Approvals expire** (default 72 h, per task configurable); an expired approval fails the node with a readable reason and pauses the task after three consecutive failures (existing rule). | 72 h | ✅ 2026-09-03 |
+| 7 | **Custom tools v1 = HTTP and OpenAPI import.** `BTOOLS` rows of type `http` (method, URL template, headers, auth from `BCREDENTIALS`, input JSON schema, response mapping, side-effect class) and `openapi` (import operations from a spec into many `http` tools). Executed through `SsrfGuard`. No code, no scripting. | HTTP + OpenAPI | ✅ 2026-09-03 |
+| 8 | **Tools are shareable resources** (IAM kind `tool`, `use` to call it, `edit` to change it). A shared tool's credentials stay the owner's (`BCREDENTIALS` reference); the call runs with the owner's credential and the caller's identity in the audit log. | IAM kind | ✅ 2026-09-03 |
+| 9 | **Workflow builder v1 is a step list, not a canvas.** Linear-first editor over `BSAVEDTASKS.BGRAPH` (steps = skills, tools, assistants; each with inputs from previous steps; optional branches via a simple condition step). A node canvas (Vue Flow or similar) is v2 and a dependency decision. | Step list first | ✅ 2026-09-03 |
+| 10 | **Workflow nodes are skills and tools, nothing new.** No new execution engine; `DagExecutor` runs what the builder saves. An assistant is a node (`chat` with a `RuntimeProfile`). | Reuse the DAG | ✅ 2026-09-03 |
+| 11 | **n8n stays an interface.** Outbound webhook node and inbound `webhook` trigger (constant exists, ingress added here, S5) are the seams; n8n is not embedded. | Locked (from saved-tasks plan) | ✅ 2026-09-03 |
+| 12 | **Schema (ask recorded):** `BAPPROVALS` (S2), `BTOOLS` (S4), `BSAVEDTASK_RUNS` gains `BWAITINGNODE` (S3). Galera-safe `addSql`. | Ask recorded | ✅ 2026-09-03 |
+| 13 | **Characterization:** the registry refactor (S1) must not change routing snapshots or the planner's `[CAPABILITYLIST]` text. | Locked | ✅ 2026-09-03 |
+| 14 | **Mobile:** backend `backend-only`; approvals inbox, tool editor, builder `ota-candidate`. Push notifications for approvals are a mobile-app item, not this track. | Locked | ✅ 2026-09-03 |
 
 ---
 
@@ -252,6 +255,12 @@ without a decision).
 | **S5 — Workflow builder v1 + webhook trigger** | Steps editor on Saved Tasks, condition step, templates via IAM, inbound webhook trigger, outbound webhook node hardening (n8n recipe in docs) | A non-technical user builds "every Monday: search mail → summarize → create ticket (approve) → mail me" |
 | **v2** | Node canvas (dependency decision), parallel branches UI, tool marketplace via plugin registry, custom tools exposed through Synaplan MCP with explicit consent | Decided later |
 
+Sprint files: [`01`](./01_sprint_1_registry_refactor.md) ·
+[`02`](./02_sprint_2_policy_and_interactive_approval.md) ·
+[`03`](./03_sprint_3_unattended_approval.md) ·
+[`04`](./04_sprint_4_custom_tools.md) ·
+[`05`](./05_sprint_5_workflow_builder_and_webhook.md).
+
 Cut line: S5 webhook trigger first, then the OpenAPI import (keep manual
 HTTP tools). Never cut S3 — an approval that only works while the tab is
 open is not governance.
@@ -300,15 +309,16 @@ open is not governance.
 
 ---
 
-## 12. Open questions (decide in S0)
+## 12. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Should document tools (editing the user's own generated document) be
-   `write → auto` by default? (Proposed: yes, per-tool exception; they act
-   on the user's own artefact within the chat.)
-2. "Always allow for this assistant" from the card: owner-only, or any user
-   for their own future calls? (Proposed: the user's own future calls only,
-   stored as a per-user override that can never loosen `block`.)
-3. Approval notifications by email: instant, or digested? (Proposed:
-   instant for the first, digest for more within an hour.)
-4. Does the inbox belong under Automations or as a badge on the History
-   rail item? (Proposed: Automations child; History stays clean.)
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Document tools `write → auto`? | **Yes**, per-tool exception declared on the descriptor (`policyException: own_artefact`); they act on the user's own generated document inside the chat. |
+| 2 | "Always allow for this assistant" from the card | **The user's own future calls only**, stored as a per-user override that can never loosen `block` (default stands; not contested). |
+| 3 | Approval notifications | **In-app + email; instant or daily digest as a user setting** (default: instant for the first pending item, digest for further items within the hour). |
+| 4 | Inbox placement | **Manage → Automations → Approvals** with a badge on the Automations rail child; History stays clean. |
+| 5 | Default policies | `read → auto`, `write → approve`, `destructive → block` confirmed. |
+| 6 | Unattended approval | **Pause and resume** confirmed; `allow_unattended` keeps its "auto for write-class" meaning. Expiry default **72 h**. |
+| 7 | Workflow builder v1 | **Step list**, no new dependency; node canvas is v2. |
+| 8 | Custom tools v1 | **HTTP + OpenAPI import.** No MCP re-export of custom tools in v1. |
+| 9 | Bundle sections (roadmap §8) | S4 registers `custom_tools` (spec without credentials; `BCREDENTIALID` becomes a "needs a credential" checklist item) and S5 registers `saved_tasks` (graph + triggers, schedule paused on import) with the track-2 bundle registry. MCP server configs (`mcp_servers`, URL + auth *type* only, never tokens) are registered in S1 since the registry adapter for MCP already touches that entity. |

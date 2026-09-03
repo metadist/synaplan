@@ -1,8 +1,12 @@
 # Agent Builder — reusable, published assistants — master plan
 
-**Status:** Draft 2026-09-03. Track 2 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
+**Status:** Decisions ticked 2026-09-03 (log in [`STATUS.md`](./STATUS.md)).
+Track 2 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 Depends on track 1 (IAM) S1–S2 for publishing; S1–S2 of this track can start
 before that with owner-only assistants.
+Sprint files: [`01_sprint_1_entity_and_pinned_runtime.md`](./01_sprint_1_entity_and_pinned_runtime.md) …
+[`06_sprint_6_portability_and_packs.md`](./06_sprint_6_portability_and_packs.md).
+**This track also owns the cross-track export/import bundle** (roadmap §8).
 **Owner surface:** Manage → Assistants (existing nav group). The builder
 replaces the current **Instructions** page; the gallery is a new child.
 **Flag:** `AGENTS.ENABLED` — default off in code and seeder.
@@ -22,20 +26,20 @@ replaces the current **Instructions** page; the gallery is a new child.
 
 | # | Decision | Proposed default | Agree? |
 | - | -------- | ---------------- | ------ |
-| 1 | **User-facing word: Assistant.** Code name `agent` (`BAGENTS`, `AgentService`, `/api/v1/agents`). Matches the glossary in `AGENTS.md` ("AI assistant — the AI that answers inside a widget") and the existing nav group **Assistants**. | Assistant / `agent` | |
-| 2 | **The Messages-gateway page currently labelled "AI Agents" (`/channels/agents`) is renamed** to avoid the collision — proposed **"Coding clients"** (en) under Connections. Route unchanged. | Rename | |
-| 3 | **An assistant composes; it does not replace `BPROMPTS`.** `BAGENTS.BPROMPTID` points at the instruction row; models, knowledge, tools, skills, parameters and tasks live in a versioned JSON definition (`agent.v1` schema). `BPROMPTMETA` stays the runtime store for widgets that are not migrated. | Compose | |
-| 4 | **Versioned and publishable.** `BAGENTVERSIONS` holds immutable snapshots; users always run the latest *published* version; the owner edits a draft. "Update without rebuilding" = publish a new version. | Versions | |
-| 5 | **Publishing = an IAM share** (`assistant` kind, permission `use`; `edit` for co-maintainers). "Assign to a department" = share with that group. No second permission model. | IAM only | |
-| 6 | **Talking to an assistant pins it.** A chat started from an assistant carries `agentId`; `MessageClassifier` short-circuits exactly as it does today for a pinned `PROMPTID`. Assistants are **not** added to the sorter's topic list unless the owner opts in ("also let the router pick this"). | Pinned by default | |
-| 7 | **Execution identity = the person talking.** Budget, rate limits, memories and files are the user's. The assistant's knowledge is the owner's shared folders (via IAM `use`), read-only for the user. Scheduled tasks created from an assistant run as the task owner (existing Saved Task rule). | User runs, owner's knowledge | |
-| 8 | **Clone is a first-class action** (copy definition + prompt as a new draft owned by the cloner; lineage kept in `BPARENTID`). Cloning a shared assistant needs `read`. | Clone | |
-| 9 | **Portable definitions.** Export/import JSON (`agent.v1`) for backup, moving between instances, and plugin packs (`provides.agents` in manifest v2). Never includes secrets, file binaries or other users' ids. | JSON, no secrets | |
-| 10 | **The builder is a form, not a chat.** The existing AI Setup Assistant (`WidgetSetupService`, `tools:widget-setup-interview`) is reused as an optional "help me write this" helper inside the form, not as the primary editor. | Form first | |
-| 11 | **Widgets and channels bind an assistant** (S5): `BWIDGETS.BAGENTID` (nullable) beside the existing `BTASKPROMPT` topic; a widget with an agent id ignores the topic. Email handler and WhatsApp bindings follow the same pattern. | Additive binding | |
-| 12 | **Schema (ask recorded):** `BAGENTS`, `BAGENTVERSIONS` (S1), `BWIDGETS.BAGENTID` (S5). Galera-safe `addSql`. | Ask recorded | |
-| 13 | **Characterization discipline:** with the flag off or with no pinned assistant, `MessageClassifier` / `MessageSorter` output is unchanged; snapshots are not re-recorded by this track. | Locked | |
-| 14 | **Mobile:** new PHP `backend-only`; builder + gallery `ota-candidate`. | Locked | |
+| 1 | **User-facing word: Assistant.** Code name `agent` (`BAGENTS`, `AgentService`, `/api/v1/agents`). Matches the glossary in `AGENTS.md` ("AI assistant — the AI that answers inside a widget") and the existing nav group **Assistants**. | Assistant / `agent` | ✅ 2026-09-03 |
+| 2 | **The Messages-gateway page currently labelled "AI Agents" (`/channels/agents`) is renamed** to avoid the collision — proposed **"Coding clients"** (en) under Connections. Route unchanged. | Rename | ✅ 2026-09-03 |
+| 3 | **An assistant composes; it does not replace `BPROMPTS`.** `BAGENTS.BPROMPTID` points at the instruction row; models, knowledge, tools, skills, parameters and tasks live in a versioned JSON definition (`agent.v1` schema). `BPROMPTMETA` stays the runtime store for widgets that are not migrated. | Compose | ✅ 2026-09-03 |
+| 4 | **Versioned and publishable.** `BAGENTVERSIONS` holds immutable snapshots; users always run the latest *published* version; the owner edits a draft. "Update without rebuilding" = publish a new version. | Versions | ✅ 2026-09-03 |
+| 5 | **Publishing = an IAM share** (`assistant` kind, permission `use`; `edit` for co-maintainers). "Assign to a department" = share with that group. No second permission model. | IAM only | ✅ 2026-09-03 |
+| 6 | **Talking to an assistant pins it.** A chat started from an assistant carries `agentId`; `MessageClassifier` short-circuits exactly as it does today for a pinned `PROMPTID`. Assistants are **not** added to the sorter's topic list unless the owner opts in ("also let the router pick this"). | Pinned by default | ✅ 2026-09-03 |
+| 7 | **Execution identity = the person talking.** Budget, rate limits, memories and files are the user's. The assistant's knowledge is the owner's shared folders (via IAM `use`), read-only for the user. Scheduled tasks created from an assistant run as the task owner (existing Saved Task rule). | User runs, owner's knowledge | ✅ 2026-09-03 |
+| 8 | **Clone is a first-class action** (copy definition + prompt as a new draft owned by the cloner; lineage kept in `BPARENTID`). Cloning a shared assistant needs `read`. | Clone | ✅ 2026-09-03 |
+| 9 | **Portable definitions — and the instance-to-instance bundle.** `agent.v1` is one section of a larger **`synaplan-bundle.v1`** archive this track defines in S6: assistants + instructions first; later tracks add their own sections (saved tasks / workflows, MCP server configs, custom tools, model preferences by catalog key, connections). **Secrets, credentials, API keys, file binaries and other users' ids are never exported**; import shows a "needs a key / needs a model" checklist. Every user exports/imports their own resources; admins additionally export/import instance-level settings. Plugin packs (`provides.agents`) use the same section format. | Bundle, no secrets, user + admin | ✅ 2026-09-03 |
+| 10 | **The builder is a form, not a chat.** The existing AI Setup Assistant (`WidgetSetupService`, `tools:widget-setup-interview`) is reused as an optional "help me write this" helper inside the form, not as the primary editor. | Form first | ✅ 2026-09-03 |
+| 11 | **Widgets and channels bind an assistant** (S5): `BWIDGETS.BAGENTID` (nullable) beside the existing `BTASKPROMPT` topic; a widget with an agent id ignores the topic. Email handler and WhatsApp bindings follow the same pattern. | Additive binding | ✅ 2026-09-03 |
+| 12 | **Schema (ask recorded):** `BAGENTS`, `BAGENTVERSIONS` (S1), `BWIDGETS.BAGENTID` (S5). Galera-safe `addSql`. | Ask recorded | ✅ 2026-09-03 |
+| 13 | **Characterization discipline:** with the flag off or with no pinned assistant, `MessageClassifier` / `MessageSorter` output is unchanged; snapshots are not re-recorded by this track. | Locked | ✅ 2026-09-03 |
+| 14 | **Mobile:** new PHP `backend-only`; builder + gallery `ota-candidate`. | Locked | ✅ 2026-09-03 |
 
 ---
 
@@ -232,10 +236,21 @@ Collabora's AI sidebar or a coding client picks a curated assistant.
 | **S3 — Publish & versions** | `BAGENTVERSIONS`, publish flow, changelog, IAM `assistant` kind (with track 1 S3), gallery "shared with me", owner usage view | Admin publishes to "Support"; a member uses v1 while the admin edits v2; publish v2 → member gets it on next message |
 | **S4 — Knowledge, tools, skills** | Shared folders picker (IAM `use`), tool allow/deny mapped to track 4's registry (or to today's flags until that ships), skill allow-list enforced in `TaskPlanValidator` per assistant | An assistant restricted to `chat` + `rag_search` never plans `email_me` |
 | **S5 — Tasks & channels** | Task templates → Saved Tasks; `BWIDGETS.BAGENTID`; email handler / WhatsApp binding; widget setup offers "pick an assistant" | A widget runs a published assistant; a weekly digest task ships with it |
-| **S6 — Portability & packs** | Export/import; plugin `provides.agents`; `assistant:<slug>` model alias in `/v1/models`; `list_assistants` MCP tool | An assistant exported on instance A works on instance B with a different model catalog |
+| **S6 — Portability & packs** | `synaplan-bundle.v1` format + `BundleExporter` / `BundleImporter` with a section registry (this track ships the `agents` and `prompts` sections; later tracks register theirs); Settings → **Export & import** (user) and Operate → System config → Export & import (admin, instance settings); plugin `provides.agents`; `assistant:<slug>` model alias in `/v1/models`; `list_assistants` MCP tool | An assistant exported on instance A works on instance B with a different model catalog; the import checklist names every missing model or key |
 
-Cut line: S6 first, then S5 channels (keep tasks). Never cut the test panel
-or versions — editing a live assistant under users is the bug we are fixing.
+Sprint files: [`01`](./01_sprint_1_entity_and_pinned_runtime.md) ·
+[`02`](./02_sprint_2_builder_and_gallery.md) ·
+[`03`](./03_sprint_3_publish_and_versions.md) ·
+[`04`](./04_sprint_4_knowledge_tools_skills.md) ·
+[`05`](./05_sprint_5_tasks_and_channels.md) ·
+[`06`](./06_sprint_6_portability_and_packs.md).
+
+Cut line: S5 channels first (keep tasks). **S6 is no longer the first cut**
+— the export/import bundle became a product-owner requirement on
+2026-09-03 (roadmap §8); if capacity is short, S6 ships the `agents` +
+`prompts` sections only and the other sections follow in their tracks. Never
+cut the test panel or versions — editing a live assistant under users is the
+bug we are fixing.
 
 ---
 
@@ -279,15 +294,14 @@ or versions — editing a live assistant under users is the bug we are fixing.
 
 ---
 
-## 12. Open questions (decide in S0)
+## 12. Decisions from the 2026-09-03 review (formerly open questions)
 
-1. Do assistants keep a per-user memory (`behaviour.memory = user`, today's
-   behavior) or may the owner switch to "shared memory for this assistant"?
-   (Proposed: v1 user memory only; shared memory is an IAM-sensitive v2.)
-2. Router opt-in (`BROUTABLE`): let the sorter pick published assistants for
-   users who did not start a chat from one? (Proposed: allowed, off by
-   default; re-record snapshots only in a dedicated PR if it changes the
-   topic list shape.)
-3. What happens to a user's chat when the owner **archives** the assistant?
-   (Proposed: the chat continues with the last version, badge "archived";
-   no new chats.)
+| # | Question | Decision |
+| - | -------- | -------- |
+| 1 | Memory for assistants | **User's own memory only** (`behaviour.memory = user`, the only accepted value in `agent.v1`). Shared assistant memory is v2 and IAM-sensitive. |
+| 2 | Router opt-in (`BROUTABLE`) | **Allowed, off by default.** Turning it on for the first routable assistant changes the sorter's topic list; that lands in a dedicated PR with re-recorded, reviewed snapshots. |
+| 3 | Owner archives a published assistant | **Existing chats continue on the last published version** with an "archived" badge; no new chats can be started from it; gallery hides it under a filter. |
+| 4 | Builder UX | **Form first**; AI Setup Assistant is an optional helper inside the Instructions section. |
+| 5 | Nav | `/ai/assistants` **replaces** `/ai/instructions` (301 in the router); instructions are edited inside the assistant. |
+| 6 | Gateway page label | `/channels/agents` → **"Coding clients"** (de: Coding-Clients, es: Clientes de programación, fr: Clients de codage, tr: Kodlama istemcileri). |
+| 7 | Bundle ownership (from IAM row 1) | This track defines `synaplan-bundle.v1` in S6 and ships the user-facing Export & import section in Settings; admins get the instance-level variant in Operate → System config. |
