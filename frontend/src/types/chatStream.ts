@@ -140,7 +140,7 @@ export interface StreamUpdatePayload {
   documentChanges?: Array<{
     labelKey: string
     labelParams?: Record<string, unknown>
-    ok?: boolean
+    ok: boolean
   }>
   documentVersion?: number
   documentFidelityLossy?: boolean

@@ -1691,7 +1691,7 @@ function applyDocumentStep(messageId: string, data: StreamUpdatePayload): void {
 
 function applyDocumentComplete(message: Message, data: StreamUpdatePayload): void {
   if (Array.isArray(data.documentChanges)) {
-    message.documentChanges = data.documentChanges as Message['documentChanges']
+    message.documentChanges = data.documentChanges
   }
   if (typeof data.documentVersion === 'number') {
     message.documentVersion = data.documentVersion

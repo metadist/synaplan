@@ -26,16 +26,12 @@ final class PdfRasterizer
     }
 
     /**
-     * Convert PDF to PNG images.
+     * Convert PDF pages to PNG images.
      *
-     * @param string $absolutePdfPath Absolute path to PDF file
+     * @param string   $absolutePdfPath Absolute path to the PDF file
+     * @param int|null $pageCap         Override the configured page cap (e.g. 1 for a poster)
      *
-     * @return array Array of absolute paths to generated PNG files
-     */
-    /**
-     * @param int|null $pageCap Override the configured page cap (e.g. 1 for a poster)
-     *
-     * @return array<int, string>
+     * @return array<int, string> Absolute paths to the generated PNG files
      */
     public function pdfToPng(string $absolutePdfPath, ?int $pageCap = null): array
     {

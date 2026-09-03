@@ -31,13 +31,9 @@ final class DocumentTextProjector
         $parts = [];
         foreach ($model->sheets as $sheet) {
             $parts[] = '## '.$sheet->name;
-            $rows = [];
             foreach ($sheet->cells as $address => $cell) {
                 $parts[] = $address.': '.($cell->formula ?? (string) $cell->value);
-                $split = preg_match('/^([A-Z]+)([0-9]+)$/', $address, $m) ? [(int) $m[2], $m[1]] : [0, $address];
-                $rows[$split[0]][$split[1]] = (string) ($cell->value ?? $cell->formula ?? '');
             }
-            unset($rows);
         }
 
         return implode("\n", $parts);
