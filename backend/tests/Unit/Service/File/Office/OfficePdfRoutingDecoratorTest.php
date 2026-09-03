@@ -53,6 +53,9 @@ final class OfficePdfRoutingDecoratorTest extends TestCase
         self::assertStringContainsString('Erstelle mir ein PDF', $decorated[1]['description']);
 
         $prompt = <<<'PROMPT'
+4. NEVER invent file paths. The ONLY way a file reaches the user is as the `file` output
+   of a generator node (text2sound, image_generation, video_generation,
+   document_generation, calendar_event), surfaced through `compose_reply`.
 5. If the user asks for output the capability list cannot produce (e.g. a real
    PDF, a phone call), use a single `chat` node and tell them plainly what is
    not possible. Do NOT pretend.
@@ -63,6 +66,9 @@ PROMPT;
         $out = $decorator->decoratePrompt($prompt);
         self::assertStringNotContainsString('Real PDFs are NOT supported', $out);
         self::assertStringContainsString('Creating a real PDF is supported', $out);
+        // #1691: an existing file becomes a PDF through document_export, never by re-authoring it.
+        self::assertStringContainsString('single `document_export` node — NOT extract_text + document_generation', $out);
+        self::assertStringContainsString('document_generation, document_export, calendar_event), surfaced through `compose_reply`.', $out);
         self::assertStringContainsString('Office document (XLSX, DOCX, PPTX, CSV, PDF)', $out);
         self::assertStringNotContainsString('e.g. a real', $out);
         self::assertStringContainsString('OFFICE_PDF_ROUTING', $out);

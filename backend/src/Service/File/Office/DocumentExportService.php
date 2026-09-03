@@ -95,6 +95,14 @@ final readonly class DocumentExportService
     }
 
     /**
+     * Whether office sources can be exported at all on this install.
+     */
+    public function isEnabled(): bool
+    {
+        return $this->converter->isEnabled();
+    }
+
+    /**
      * Absolute path of a PDF the caller can stream, or null.
      */
     public function exportToPdf(File $file): ?string

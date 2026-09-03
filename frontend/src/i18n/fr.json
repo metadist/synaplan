@@ -4219,6 +4219,7 @@
       "video_generation": "Vidéo",
       "text2sound": "Audio",
       "document_generation": "Document",
+      "document_export": "Export PDF",
       "calendar_event": "Invitation d’agenda",
       "email_me": "Résultat par e-mail",
       "save_to_folder": "Enregistrer dans le dossier"

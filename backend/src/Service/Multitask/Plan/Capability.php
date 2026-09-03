@@ -63,6 +63,14 @@ enum Capability: string
     /** Office document generation (ChatHandler officemaker + DocumentGeneratorService). */
     case DocumentGeneration = 'document_generation';
 
+    /**
+     * Convert an office file that already exists in the conversation to PDF with
+     * the office engine (DocumentExportService, no model) — the same conversion
+     * as the file chip's "Download as PDF", so the original layout survives
+     * instead of being re-authored from a text extract (#1691).
+     */
+    case DocumentExport = 'document_export';
+
     /** Calendar event / meeting invite as a downloadable .ics file (CalendarEventService, no model). */
     case CalendarEvent = 'calendar_event';
 
@@ -96,7 +104,7 @@ enum Capability: string
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',
-            self::DocumentGeneration => 'document',
+            self::DocumentGeneration, self::DocumentExport => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
             self::SaveToFolder => 'folder',
