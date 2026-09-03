@@ -9,6 +9,8 @@ use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Repository\PromptRepository;
 use App\Service\DiscordNotificationService;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\Message\MessageSorter;
 use App\Service\ModelConfigService;
 use App\Service\PromptService;
@@ -831,6 +833,59 @@ class MessageSorterTest extends TestCase
         $sorter->classify(['BTEXT' => 'make the car blue', 'BLANG' => 'en', 'BTOPIC' => ''], $history, null);
 
         return $sent;
+    }
+
+    public function testOfficeEngineRewritesOfficemakerDescriptionAndAddsPdfRoutingRule(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'officemaker']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+            ['topic' => 'officemaker', 'description' => 'Not for any other format.'],
+        ]);
+
+        $sent = [];
+        $aiFacade->method('chat')->willReturnCallback(
+            function (array $messages) use (&$sent): array {
+                $sent = $messages;
+
+                return ['content' => '{"BTOPIC":"officemaker","BLANG":"en"}', 'provider' => 'groq'];
+            }
+        );
+
+        $decorator = new OfficePdfRoutingDecorator(
+            new OfficeConverterClient(
+                new \Symfony\Component\HttpClient\MockHttpClient(),
+                new \Psr\Log\NullLogger(),
+                'http://collabora:9980',
+                60000,
+            ),
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+            null,
+            $decorator,
+        );
+
+        $sorter->classify(['BTEXT' => 'Create a PDF agenda', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+
+        $system = (string) $sent[0]['content'];
+        $this->assertStringContainsString(OfficePdfRoutingDecorator::officeMakerDescription(), $system);
+        $this->assertStringContainsString('OFFICE_PDF_ROUTING', $system);
+        $this->assertStringNotContainsString('Not for any other format.', $system);
     }
 
     /**

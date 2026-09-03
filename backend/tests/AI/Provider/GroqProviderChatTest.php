@@ -7,7 +7,6 @@ namespace App\Tests\AI\Provider;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\GroqProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\AI\ToolCalling\ToolDefinition;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -88,11 +87,12 @@ class GroqProviderChatTest extends TestCase
 
     // ==================== NATIVE TOOL CALLING (Phase 9) ====================
 
-    public function testChatOptionsDeclareToolsInTheOpenAiFunctionEnvelope(): void
+    public function testChatOptionsForwardToolDeclarationsAndTheirChoice(): void
     {
         $request = $this->buildChatOptions([], [
             'model' => 'openai/gpt-oss-120b',
-            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+            'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object']]]],
+            'tool_choice' => 'auto',
         ], false);
 
         $this->assertSame('function', $request['tools'][0]['type']);
@@ -108,7 +108,8 @@ class GroqProviderChatTest extends TestCase
     {
         $request = $this->buildChatOptions([], [
             'model' => 'openai/gpt-oss-120b',
-            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+            'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object']]]],
+            'tool_choice' => 'auto',
         ], true);
 
         $this->assertCount(1, $request['tools']);
@@ -135,7 +136,8 @@ class GroqProviderChatTest extends TestCase
         $request = $this->buildChatOptions([], [
             'model' => 'openai/gpt-oss-120b',
             'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
-            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+            'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object']]]],
+            'tool_choice' => 'auto',
         ], false);
 
         $this->assertArrayNotHasKey('tools', $request);
@@ -154,7 +156,8 @@ class GroqProviderChatTest extends TestCase
         $request = $this->buildChatOptions([], [
             'model' => 'openai/gpt-oss-120b',
             'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
-            'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object'])],
+            'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object']]]],
+            'tool_choice' => 'auto',
         ], true);
 
         $this->assertArrayNotHasKey('response_format', $request);
@@ -162,18 +165,19 @@ class GroqProviderChatTest extends TestCase
     }
 
     /**
-     * `$options['tools']` is a public-ish seam; anything that is not a
-     * ToolDefinition must be ignored rather than shipped to the provider as
-     * a malformed declaration.
+     * An empty toolset is not a declaration: sending `tools: []` makes Groq
+     * reject the request, so the guard must not fire on a caller that merely
+     * carries the key.
      */
-    public function testChatOptionsIgnoreNonToolDefinitionEntries(): void
+    public function testAnEmptyToolListDoesNotUnsetTheSchema(): void
     {
         $request = $this->buildChatOptions([], [
             'model' => 'openai/gpt-oss-120b',
-            'tools' => ['not-a-tool', ['name' => 'raw_array']],
+            'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
+            'tools' => [],
         ], false);
 
-        $this->assertArrayNotHasKey('tools', $request);
+        $this->assertSame('sort_result', $request['response_format']['json_schema']['name']);
     }
 
     private function makeProvider(?string $apiKey = 'test-key'): GroqProvider

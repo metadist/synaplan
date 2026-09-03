@@ -7,6 +7,7 @@ namespace App\Service\File;
 use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
@@ -28,6 +29,7 @@ final readonly class FileUploadService
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
     ) {
     }
 
@@ -349,6 +351,7 @@ final readonly class FileUploadService
 
         $this->em->persist($file);
         $this->em->flush();
+        $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
         return $file;
     }
@@ -396,8 +399,10 @@ final readonly class FileUploadService
         // Fresh content supersedes any prior "source changed" marker.
         $file->setStale(false);
         $file->setVectorState(File::VECTOR_STATE_PENDING);
+        $file->setThumbPath(null);
 
         $this->em->flush();
+        $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
         return $file;
     }

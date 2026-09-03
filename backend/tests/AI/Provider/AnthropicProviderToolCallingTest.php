@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\AI\Provider;
 
 use App\AI\Provider\AnthropicProvider;
-use App\AI\ToolCalling\ToolCall;
-use App\AI\ToolCalling\ToolDefinition;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -19,13 +17,29 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * {@see AnthropicProviderStructuredOutputTest} but must be read back the
  * OPPOSITE way: there, the single forced `tool_use` block IS the answer and
  * gets folded into `content`; here it is a routing hand-off that must reach
- * the caller as a {@see ToolCall} and never appear in the answer text.
+ * the caller in `tool_calls` and never appear in the answer text.
  */
 class AnthropicProviderToolCallingTest extends TestCase
 {
-    private function tool(): ToolDefinition
+    /**
+     * The declaration shape callers pass in `$options['tools']` — OpenAI's
+     * function envelope, which this provider maps to Anthropic's naming.
+     *
+     * @return array<string, mixed>
+     */
+    private function toolOptions(): array
     {
-        return new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object', 'properties' => []]);
+        return [
+            'tools' => [[
+                'type' => 'function',
+                'function' => [
+                    'name' => 'handoff_mediamaker',
+                    'description' => 'Generate media.',
+                    'parameters' => ['type' => 'object', 'properties' => []],
+                ],
+            ]],
+            'tool_choice' => 'auto',
+        ];
     }
 
     public function testChatRequestDeclaresToolsWithAnAutoToolChoice(): void
@@ -42,11 +56,12 @@ class AnthropicProviderToolCallingTest extends TestCase
 
         $this->makeProvider($client)->chat(
             [['role' => 'user', 'content' => 'Hi']],
-            ['model' => 'claude-haiku-4-5', 'tools' => [$this->tool()]],
+            ['model' => 'claude-haiku-4-5'] + $this->toolOptions(),
         );
 
         $this->assertSame('handoff_mediamaker', $captured['tools'][0]['name']);
         $this->assertArrayHasKey('input_schema', $captured['tools'][0]);
+        $this->assertArrayNotHasKey('parameters', $captured['tools'][0]);
         $this->assertSame(['type' => 'auto'], $captured['tool_choice']);
     }
 
@@ -57,22 +72,24 @@ class AnthropicProviderToolCallingTest extends TestCase
                 ['type' => 'text', 'text' => 'Sure, generating that.'],
                 ['type' => 'tool_use', 'id' => 'toolu_1', 'name' => 'handoff_mediamaker', 'input' => ['media_type' => 'image']],
             ],
+            'stop_reason' => 'tool_use',
             'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
         ])));
 
         $result = $this->makeProvider($client)->chat(
             [['role' => 'user', 'content' => 'Make an image of a cat']],
-            ['model' => 'claude-haiku-4-5', 'tools' => [$this->tool()]],
+            ['model' => 'claude-haiku-4-5'] + $this->toolOptions(),
         );
 
         $this->assertSame('Sure, generating that.', $result['content']);
         $this->assertStringNotContainsString('media_type', $result['content']);
+        $this->assertSame('tool_calls', $result['finish_reason']);
 
         $calls = $result['tool_calls'];
         $this->assertCount(1, $calls);
-        $this->assertInstanceOf(ToolCall::class, $calls[0]);
-        $this->assertSame('handoff_mediamaker', $calls[0]->name);
-        $this->assertSame(['media_type' => 'image'], $calls[0]->arguments);
+        $this->assertSame('toolu_1', $calls[0]['id']);
+        $this->assertSame('handoff_mediamaker', $calls[0]['function']['name']);
+        $this->assertSame(['media_type' => 'image'], json_decode($calls[0]['function']['arguments'], true));
     }
 
     public function testAnOrdinaryAnswerReportsNoToolCalls(): void
@@ -84,18 +101,18 @@ class AnthropicProviderToolCallingTest extends TestCase
 
         $result = $this->makeProvider($client)->chat(
             [['role' => 'user', 'content' => 'Capital of France?']],
-            ['model' => 'claude-haiku-4-5', 'tools' => [$this->tool()]],
+            ['model' => 'claude-haiku-4-5'] + $this->toolOptions(),
         );
 
         $this->assertSame('Paris.', $result['content']);
-        $this->assertSame([], $result['tool_calls']);
+        $this->assertSame([], $result['tool_calls'] ?? []);
     }
 
     /**
      * The streaming counterpart of the "stays out of the answer text" rule:
      * with a schema, `input_json_delta` fragments ARE the answer and stream
-     * as content; with real tools they are routing plumbing and must not
-     * reach the user's screen.
+     * as content; with real tools they are routing plumbing that travels as
+     * `tool_call_delta` (empty visible text) and must not reach the screen.
      */
     public function testStreamedToolCallIsAccumulatedInsteadOfStreamedAsContent(): void
     {
@@ -110,7 +127,7 @@ class AnthropicProviderToolCallingTest extends TestCase
             static function (mixed $chunk) use (&$received): void {
                 $received[] = $chunk;
             },
-            ['model' => 'claude-haiku-4-5', 'tools' => [$this->tool()]],
+            ['model' => 'claude-haiku-4-5'] + $this->toolOptions(),
         );
 
         $contentChunks = array_filter($received, static fn ($c) => is_array($c) && 'content' === ($c['type'] ?? null));
@@ -118,8 +135,9 @@ class AnthropicProviderToolCallingTest extends TestCase
 
         $calls = $result['tool_calls'];
         $this->assertCount(1, $calls);
-        $this->assertSame('handoff_mediamaker', $calls[0]->name);
-        $this->assertSame(['media_type' => 'image'], $calls[0]->arguments);
+        $this->assertSame('toolu_1', $calls[0]['id']);
+        $this->assertSame('handoff_mediamaker', $calls[0]['function']['name']);
+        $this->assertSame(['media_type' => 'image'], json_decode($calls[0]['function']['arguments'], true));
     }
 
     private static function toolUseSseStream(): string

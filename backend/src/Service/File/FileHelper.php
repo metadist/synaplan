@@ -338,6 +338,27 @@ final class FileHelper
     }
 
     /**
+     * Reduce a stored media path to the upload-dir-relative form BFILES holds.
+     *
+     * Node file descriptors and older BFILES rows carry the public serve URL
+     * (`/api/v1/files/uploads/<rel>`, sometimes with scheme and host) instead of
+     * the raw path, so prefixing the upload dir on top of it never resolves.
+     *
+     * Pure string work only: `..` segments survive on purpose and are rejected
+     * later by {@see resolvePathNfs()} against the upload root.
+     */
+    public static function normalizeUploadRelativePath(string $path): string
+    {
+        if (1 === preg_match('#^https?://[^/]+(/.*)$#i', $path, $matches)) {
+            $path = $matches[1];
+        }
+
+        $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
+
+        return ltrim($stripped ?? $path, '/');
+    }
+
+    /**
      * Normalize a path by resolving . and .. components.
      *
      * Unlike realpath(), this doesn't require the file to exist and doesn't

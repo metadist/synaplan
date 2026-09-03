@@ -7,6 +7,7 @@ use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
@@ -1892,6 +1893,32 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('ai_sorting', $result['source']);
     }
 
+    public function testFastPathKeepsPdfRequestsOnGeneralWhenEngineOff(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->never())->method('classify');
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter, false);
+        $result = $classifier->classify($this->plainMessage(412, 'gib es mir als pdf'));
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('fast_path_heuristic', $result['source']);
+    }
+
+    public function testFastPathDefersPdfRequestsWhenEngineOn(): void
+    {
+        $sorter = $this->createMock(MessageSorter::class);
+        $sorter->expects($this->once())
+            ->method('classify')
+            ->willReturn(['topic' => 'officemaker', 'language' => 'de']);
+
+        $classifier = $this->classifierWithFastPathEnabled($sorter, true);
+        $result = $classifier->classify($this->plainMessage(413, 'gib es mir als pdf'));
+
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame('ai_sorting', $result['source']);
+    }
+
     public function testFastPathStillClassifiesOrdinaryChat(): void
     {
         $sorter = $this->createMock(MessageSorter::class);
@@ -1904,7 +1931,7 @@ class MessageClassifierTest extends TestCase
         $this->assertSame('fast_path_heuristic', $result['source']);
     }
 
-    private function classifierWithFastPathEnabled(MessageSorter $sorter): MessageClassifier
+    private function classifierWithFastPathEnabled(MessageSorter $sorter, bool $officeEngineOn = false): MessageClassifier
     {
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturnCallback(static function (int $owner, string $group, string $setting): ?string {
@@ -1914,6 +1941,9 @@ class MessageClassifierTest extends TestCase
 
             return 'CLASSIFIER' === $group && 'FAST_PATH_ENABLED' === $setting ? '1' : null;
         });
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn($officeEngineOn);
 
         return new MessageClassifier(
             $sorter,
@@ -1928,6 +1958,7 @@ class MessageClassifierTest extends TestCase
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
             new SelfAwareConfig($configRepo),
+            $converter,
         );
     }
 

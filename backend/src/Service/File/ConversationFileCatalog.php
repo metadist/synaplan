@@ -207,13 +207,7 @@ final readonly class ConversationFileCatalog
      */
     public function normalizeRelativePath(string $path): string
     {
-        if (1 === preg_match('#^https?://[^/]+(/.*)$#i', $path, $matches)) {
-            $path = $matches[1];
-        }
-
-        $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
-
-        return ltrim(null === $stripped ? $path : $stripped, '/');
+        return FileHelper::normalizeUploadRelativePath($path);
     }
 
     /**
@@ -250,7 +244,7 @@ final readonly class ConversationFileCatalog
         }
         $seenPaths[$path] = true;
 
-        $relative = ltrim($file->getFilePath(), '/');
+        $relative = $this->normalizeRelativePath($file->getFilePath());
 
         $entries[] = new ConversationFile(
             null !== $id ? 'file:'.$id : 'attached:'.$attachmentIndex,
@@ -411,7 +405,7 @@ final readonly class ConversationFileCatalog
     private function resolvePath(string $storedPath): ?string
     {
         $uploadRoot = realpath($this->uploadDir);
-        $path = realpath($this->uploadDir.'/'.ltrim($storedPath, '/'));
+        $path = realpath($this->uploadDir.'/'.$this->normalizeRelativePath($storedPath));
         if (false === $uploadRoot || false === $path || !is_file($path)) {
             return null;
         }

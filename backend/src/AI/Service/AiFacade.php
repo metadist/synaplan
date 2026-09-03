@@ -189,7 +189,7 @@ class AiFacade
             throw new ProviderException('AI provider failed', 'unknown', null, 0, $e);
         }
 
-        return [
+        $out = [
             'content' => $response['content'] ?? '',
             'provider' => $provider->getName(),
             'model' => $options['model'] ?? $provider->getDefaultModels()['chat'] ?? 'unknown',
@@ -201,6 +201,14 @@ class AiFacade
             // empty for every provider and every call that declared none.
             'tool_calls' => $response['tool_calls'] ?? [],
         ];
+        if (isset($response['tool_calls']) && is_array($response['tool_calls'])) {
+            $out['tool_calls'] = $response['tool_calls'];
+        }
+        if (isset($response['finish_reason']) && is_string($response['finish_reason']) && '' !== $response['finish_reason']) {
+            $out['finish_reason'] = $response['finish_reason'];
+        }
+
+        return $out;
     }
 
     /**

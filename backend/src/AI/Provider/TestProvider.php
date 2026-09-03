@@ -8,10 +8,12 @@ use App\AI\Interface\FileAnalysisProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputSchema;
+use App\AI\Tool\CatalogToolUse;
 
-class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
+class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
     private const FAKE_TOKENS_PER_EMBED = 8;
 
@@ -68,8 +70,18 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         return []; // Test provider requires no configuration
     }
 
+    public function supportsToolCalling(string $model): bool
+    {
+        return CatalogToolUse::supports($this->getName(), $model);
+    }
+
     public function chat(array $messages, array $options = []): array
     {
+        $toolResponse = $this->maybeToolResponse($messages, $options);
+        if (null !== $toolResponse) {
+            return $toolResponse;
+        }
+
         $content = $this->generateContent($messages, $options);
         $tokenEstimate = (int) ceil(strlen($content) / 4);
 
@@ -85,6 +97,103 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
         ];
     }
 
+    /**
+     * Deterministic tool-calling surface for gateway / loop tests.
+     *
+     * TOOLTEST:<name>:<json> on the last user message (when `tools` are
+     * present) returns a matching tool_call. A trailing `role: tool` turn
+     * answers "Tool result received: …" so T3/T4 can drive a two-round
+     * exchange without a live upstream.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>|null
+     */
+    private function maybeToolResponse(array $messages, array $options): ?array
+    {
+        $last = [] !== $messages ? $messages[array_key_last($messages)] : null;
+        if (!is_array($last)) {
+            return null;
+        }
+
+        if ('tool' === ($last['role'] ?? '')) {
+            $received = is_string($last['content'] ?? null) ? $last['content'] : '';
+
+            return $this->wrapChatText('Tool result received: '.$received);
+        }
+
+        if (!isset($options['tools']) || !is_array($options['tools']) || [] === $options['tools']) {
+            return null;
+        }
+
+        $lastUser = null;
+        for ($i = count($messages) - 1; $i >= 0; --$i) {
+            if ('user' === ($messages[$i]['role'] ?? '')) {
+                $lastUser = $messages[$i];
+                break;
+            }
+        }
+        if (!is_array($lastUser)) {
+            return null;
+        }
+
+        [$userContent] = $this->flattenContent($lastUser['content'] ?? '');
+        $trimmed = ltrim($userContent);
+        if (1 !== preg_match('/^TOOLTEST:([^:]+):(.*)$/s', $trimmed, $match)) {
+            return null;
+        }
+
+        $name = $match[1];
+        $arguments = '' !== $match[2] ? $match[2] : '{}';
+        if (null === json_decode($arguments)) {
+            $arguments = '{}';
+        }
+
+        return [
+            'content' => '',
+            'tool_calls' => [[
+                'id' => 'call_test_1',
+                'type' => 'function',
+                'function' => [
+                    'name' => $name,
+                    'arguments' => $arguments,
+                ],
+            ]],
+            'finish_reason' => 'tool_calls',
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => 8,
+                'total_tokens' => 18,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * @return array{content: string, usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cached_tokens: int, cache_creation_tokens: int}}
+     */
+    private function wrapChatText(string $content): array
+    {
+        $tokenEstimate = (int) ceil(strlen($content) / 4);
+
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => 10,
+                'completion_tokens' => $tokenEstimate,
+                'total_tokens' => 10 + $tokenEstimate,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+        ];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     */
     private function generateContent(array $messages, array $options = []): string
     {
         $lastMessage = end($messages);
@@ -649,6 +758,31 @@ class TestProvider implements ChatProviderInterface, EmbeddingProviderInterface,
     public function chatStream(array $messages, callable $callback, array $options = []): array
     {
         $result = $this->chat($messages, $options);
+        if (isset($result['tool_calls'])) {
+            foreach ($result['tool_calls'] as $index => $call) {
+                $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                $arguments = (string) ($fn['arguments'] ?? '{}');
+                $mid = (int) max(1, (int) ceil(strlen($arguments) / 2));
+                $callback([
+                    'type' => 'tool_call_delta',
+                    'index' => $index,
+                    'id' => $call['id'] ?? null,
+                    'name' => $fn['name'] ?? null,
+                    'arguments' => substr($arguments, 0, $mid),
+                ]);
+                $callback([
+                    'type' => 'tool_call_delta',
+                    'index' => $index,
+                    'id' => null,
+                    'name' => null,
+                    'arguments' => substr($arguments, $mid),
+                ]);
+            }
+            $callback(['type' => 'finish', 'finish_reason' => 'tool_calls']);
+
+            return ['usage' => $result['usage']];
+        }
+
         foreach (str_split($result['content'], 10) as $chunk) {
             $callback($chunk);
             usleep(50000);

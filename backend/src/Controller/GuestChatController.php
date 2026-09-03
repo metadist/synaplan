@@ -8,6 +8,9 @@ use App\Entity\Chat;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\Chat\Run\ChatRunService;
+use App\Service\File\Office\DocumentExportService;
+use App\Service\File\Office\DocumentThumbnailGenerator;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\GuestChatConfig;
 use App\Service\GuestSessionService;
 use App\Service\Media\MediaCancellationStore;
@@ -44,6 +47,8 @@ class GuestChatController extends AbstractController
         private ChatRunService $chatRunService,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private DocumentExportService $documentExportService,
+        private OfficeConverterClient $officeConverter,
     ) {
     }
 
@@ -578,6 +583,63 @@ class GuestChatController extends AbstractController
         $response->setContentDisposition(
             ResponseHeaderBag::DISPOSITION_ATTACHMENT,
             $file->getFileName()
+        );
+
+        return $response;
+    }
+
+    #[Route('/files/{sessionId}/{fileId}/export', name: 'file_export', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/guest/files/{sessionId}/{fileId}/export',
+        summary: 'Export a guest-chat file as PDF',
+        tags: ['Guest']
+    )]
+    #[OA\Parameter(name: 'sessionId', in: 'path', required: true, schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'fileId', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Parameter(name: 'format', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['pdf']))]
+    #[OA\Parameter(name: 'inline', in: 'query', required: false, schema: new OA\Schema(type: 'integer', enum: [0, 1]))]
+    #[OA\Response(response: 200, description: 'File content')]
+    #[OA\Response(response: 400, description: 'Unsupported format')]
+    #[OA\Response(response: 403, description: 'Guest chat disabled or file not in session')]
+    #[OA\Response(response: 404, description: 'Session or file not found')]
+    #[OA\Response(response: 410, description: 'Session expired')]
+    #[OA\Response(response: 503, description: 'Office conversion is not configured')]
+    public function exportFile(string $sessionId, int $fileId, Request $request): Response
+    {
+        if ($denied = $this->denyWhenDisabled()) {
+            return $denied;
+        }
+        if (!Uuid::isValid($sessionId)) {
+            return $this->json(['error' => 'Invalid session ID'], Response::HTTP_BAD_REQUEST);
+        }
+        $session = $this->guestSessionService->getSession($sessionId);
+        if (!$session) {
+            return $this->json(['error' => 'Session not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($session->isExpired()) {
+            return $this->json(['error' => 'Session expired', 'reason' => 'expired'], Response::HTTP_GONE);
+        }
+        $chatId = $session->getChatId();
+        $file = $this->fileRepository->find($fileId);
+        if (!$chatId || !$file || !$this->messageRepository->isFileInChat($chatId, $fileId)) {
+            return $this->json(['error' => 'File not associated with this session'], Response::HTTP_FORBIDDEN);
+        }
+        if ('pdf' !== strtolower((string) $request->query->get('format', ''))) {
+            return $this->json(['error' => 'Unsupported export format'], Response::HTTP_BAD_REQUEST);
+        }
+        $needsEngine = !DocumentThumbnailGenerator::isPdf(DocumentThumbnailGenerator::extensionOf($file));
+        if ($needsEngine && !$this->officeConverter->isEnabled()) {
+            return $this->json(['error' => 'Office conversion is not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+        $path = $this->documentExportService->exportToPdf($file);
+        if (null === $path) {
+            return $this->json(['error' => 'Export failed'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+        $inline = '1' === (string) $request->query->get('inline');
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(
+            $inline ? ResponseHeaderBag::DISPOSITION_INLINE : ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            DocumentExportService::pdfDownloadName($file),
         );
 
         return $response;

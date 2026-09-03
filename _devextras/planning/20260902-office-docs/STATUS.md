@@ -5,43 +5,48 @@ table when a branch is opened, merged, or a decision is taken. The Collabora
 side (editor, Synaplan inside Collabora, partner platforms) is tracked in
 `../20260902-collabora-integration/STATUS.md`.
 
+Local CI mirror (2026-09-02, `feat/office-tools-v1`, uncommitted): `make lint`,
+`make -C backend phpstan`, unfiltered `make test` (4796 PHPUnit + 1524 Vitest),
+`vue-tsc`, `doctrine:schema:validate`, and `tests/*.test.mjs` are green.
+Characterization snapshots did not drift (engine off / `DOCUMENT_TOOLS` off).
+
 ## Phase T — tool calling (first)
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| T1 — Provider contract, consistent `tool_use` flags + migration, `ToolCallAccumulator`, `OpenAiToolShapes`, TestProvider | `feat/chat-provider-tool-contract` | planned | Dual gate; catalog matrix test |
-| T2 — Chat Completions providers (Groq, OpenAICompatible, Mistral, xAI, TrustedTokens, HuggingFace) | `feat/tools-chat-completions-providers` | planned | Shared trait; `supportsToolCalling` = catalog flag |
-| T3 — `/v1/chat/completions` tools pass-through (non-stream + stream), dual-gate 400 | `feat/openai-gateway-tools` | planned | Collabora client tools work from here |
-| T4 — Server-side MCP + `web_search` loop on `/v1/chat/completions` | `feat/openai-gateway-server-tools` | planned | Injected on dual-gated models; client tools still relayed |
-| T5 — OpenAI Responses API provider | `feat/tools-openai-responses` | planned | |
-| T6 — Anthropic + Google (+ Ollama optional) | `feat/tools-anthropic-google-providers` | planned | |
-| T7 — Wrap-up docs, admin badge, STATUS cross-record | — | planned | |
+| T1 — Provider contract, consistent `tool_use` flags + migration, `ToolCallAccumulator`, `OpenAiToolShapes`, TestProvider | `feat/office-tools-v1` | done (uncommitted) | Dual gate; catalog matrix test |
+| T2 — Chat Completions providers (Groq, OpenAICompatible, Mistral, xAI, TrustedTokens, HuggingFace) | `feat/office-tools-v1` | done (uncommitted) | Shared trait; `supportsToolCalling` = catalog flag |
+| T3 — `/v1/chat/completions` tools pass-through (non-stream + stream), dual-gate 400 | `feat/office-tools-v1` | done (uncommitted) | Collabora client tools work from here |
+| T4 — Server-side MCP + `web_search` loop on `/v1/chat/completions` | `feat/office-tools-v1` | done (uncommitted) | Injected on dual-gated models; client tools still relayed |
+| T5 — OpenAI Responses API provider | `feat/office-tools-v1` | done (uncommitted) | `function_call` / `function_call_output`; stream deltas |
+| T6 — Anthropic + Google (+ Ollama optional) | `feat/office-tools-v1` | done (uncommitted) | Ollama left optional (no catalog `tool_use` rows) |
+| T7 — Wrap-up docs, admin badge, STATUS cross-record | `feat/office-tools-v1` | done (uncommitted) | Tools badge from `hasFeature('tool_use')` |
 
 ## Phase A — engine and UX quick wins
 
 | Step | Branch | State | Notes |
 | ---- | ------ | ----- | ----- |
-| A0 — Converter client + `collabora/code` sidecar | `feat/office-converter-client` | planned | **Dual-repo:** OSS profile `office` (dev + minimal + `deploy/compose.yaml`); platform PR turns the sidecar **on** (per-node, Centrifugo analog). Shared with the Collabora plan |
-| A0-docs — LibreOffice/Collabora required for new office features | `feat/docs-office-libreoffice` in **`synaplan-docs`** | planned | New `docs/office-documents.md` + cross-links (quickstart, FAQ, architecture, using-synaplan, desktop-tools). Ships with A0 so operators see the requirement before the features land |
-| A1 — Thumbnails for office docs and PDFs | `feat/office-thumbnails` | planned | Office half of #1499 |
-| A2 — Download as PDF | `feat/office-pdf-export` | planned | New endpoint `GET /api/v1/files/{id}/export?format=pdf` |
-| A3 — Inline preview modal | `feat/office-inline-preview` | planned | Frontend only, uses A2 |
-| A4 — officemaker delivers PDF | `feat/officemaker-pdf` | planned | Includes the `GeneratedDocumentStore` refactor; snapshot re-record |
-| A5 — DOCX default styling | `fix/docx-default-styles` | planned | #1396, independent of the engine |
-| A6 — Analysable ingestion (legacy formats + structured text for xlsx/pptx) | `feat/office-ingestion-analysis` | planned | A6b needs no engine |
-| A7 — Combine documents as one PDF | `feat/office-combine-pdf` | planned | `pdfunite` from poppler-utils; first merge feature |
+| A0 — Converter client + `collabora/code` sidecar | `feat/office-tools-v1` | done (uncommitted, OSS) | `OfficeConverterClient`; profile `office` on dev + minimal + `deploy/compose.yaml`; empty `OFFICE_CONVERT_URL` by default. Platform wiring: `feat/office-collabora-sidecar` in `synaplan-platform` |
+| A0-docs — LibreOffice/Collabora required for new office features | `feat/docs-office-libreoffice` in **`synaplan-docs`** | done (uncommitted) | New `docs/office-documents.md` + cross-links (quickstart, FAQ, architecture, using-synaplan, desktop-tools). Ships with A0 so operators see the requirement before the features land |
+| A1 — Thumbnails for office docs and PDFs | `feat/office-tools-v1` | done (uncommitted) | Messenger `async_index`; PDF via rasterizer without engine |
+| A2 — Download as PDF | `feat/office-tools-v1` | done (uncommitted) | `GET /api/v1/files/{id}/export` + guest twin; menu hidden when engine off |
+| A3 — Inline preview modal | `feat/office-tools-v1` | done (uncommitted) | `DocumentPreviewModal`; native WebView falls back to PDF download |
+| A4 — officemaker delivers PDF | `feat/office-tools-v1` | done (uncommitted) | `GeneratedDocumentStore` + optional `BEXPORT`; classifier PDF only when engine on. `OfficePdfRoutingDecorator` rewrites sorter/planner PDF copy at runtime (catalog still says “no PDF” for OSS). General bounce rule does not loop create↔generate. Store keeps PDF export on follow-up edits when the conversation already asked for / attached a PDF. Snapshots unchanged (engine off in test) |
+| A5 — DOCX default styling | `feat/office-tools-v1` | done (uncommitted) | `DocxStyleSheet` registered before HTML; footer page numbers |
+| A6 — Analysable ingestion (legacy formats + structured text for xlsx/pptx) | `feat/office-tools-v1` | done (uncommitted) | A6a convert-then-Tika; A6b `StructuredTextExtractor` (A1 coords, slide notes) |
+| A7 — Combine documents as one PDF | `feat/office-tools-v1` | done (uncommitted) | `POST /api/v1/files/combine`; PDF-only works without engine |
 
 ## Phase B — structured editing and merge
 
 | Slice | Branch | State | Notes |
 | ----- | ------ | ----- | ----- |
-| B1 — xlsx end to end (model, renderer, revisions, tools, Groq, loop) | — | planned | See `02_phase_b_structured_editing.md`; provenance columns decided before migration |
-| B2 — more providers + `tools` model feature | — | planned | Shared with Collabora Epic 1.1 (`ToolCallingChatProviderInterface`) |
-| B3 — docx | — | planned | |
-| B4 — pptx | — | planned | |
-| B5 — importers + fidelity report | — | planned | |
-| B6 — version history UI + admin toggle | — | planned | |
-| B7 — true merge on the model | — | planned | "Combine as DOCX/XLSX/PPTX" |
+| B1 — xlsx end to end (model, renderer, revisions, tools, Groq, loop) | `feat/office-tools-v1` | done (uncommitted) | `SpreadsheetModel` + `XlsxRenderer` + xlsx tools + `ChatToolLoop`; flag default OFF |
+| B2 — more providers + `tools` model feature | `feat/office-tools-v1` | done (uncommitted) | Shared with Phase T (`ToolCallingChatProviderInterface`) |
+| B3 — docx | `feat/office-tools-v1` | done (uncommitted) | `WordModel` + `DocxRenderer` + docx tools |
+| B4 — pptx | `feat/office-tools-v1` | done (uncommitted) | `DeckModel` + pptx tools |
+| B5 — importers + fidelity report | `feat/office-tools-v1` | done (uncommitted) | IOFactory xlsx; best-effort docx/pptx; classifier guard default-off |
+| B6 — version history UI + admin toggle | `feat/office-tools-v1` | done (uncommitted) | `GET/POST /files/{id}/revisions`; i18n; `documentToolsEnabled` |
+| B7 — true merge on the model | `feat/office-tools-v1` | done (uncommitted) | `merge_documents` + combine `format` + Files UI |
 
 ## Decisions
 

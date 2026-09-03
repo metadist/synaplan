@@ -6,16 +6,14 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
-use App\AI\ToolCalling\StreamingToolCallAccumulator;
+use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
-use App\AI\ToolCalling\ToolCallingDialect;
-use App\AI\ToolCalling\ToolCallingTranslator;
-use App\AI\ToolCalling\ToolCallParser;
-use App\AI\ToolCalling\ToolDefinition;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 
@@ -26,8 +24,10 @@ use Psr\Log\LoggerInterface;
  * @see https://console.groq.com/docs/
  * @see https://console.groq.com/docs/speech-to-text
  */
-class GroqProvider implements ChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
+class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     /**
      * Fallback vision model when the caller passed none. Qwen 3.6 27B replaced
      * the retired Llama 4 Scout (shut down 2026-07-17); normal flows resolve the
@@ -51,8 +51,7 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?ProviderKeyStore $keyStore = null,
         private StructuredOutputTranslator $structuredOutputTranslator = new StructuredOutputTranslator(new StructuredOutputCapability()),
-        private ToolCallingTranslator $toolCallingTranslator = new ToolCallingTranslator(new ToolCallingCapability()),
-        private ToolCallParser $toolCallParser = new ToolCallParser(),
+        private ToolCallingCapability $toolCallingCapability = new ToolCallingCapability(),
     ) {
     }
 
@@ -185,11 +184,10 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'cache_creation_tokens' => 0,
             ];
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $usage,
-                'tool_calls' => $this->toolCallParser->parse(ToolCallingDialect::OPENAI_FUNCTIONS, $responseArray),
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (\Exception $e) {
             $this->logger->error('Groq chat error', [
                 'error' => $e->getMessage(),
@@ -231,16 +229,19 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
                 'cache_creation_tokens' => 0,
             ];
             $finishReason = null;
-            $toolCalls = new StreamingToolCallAccumulator();
+            $toolCalls = new ToolCallAccumulator();
+            // The routing hand-off reads the COMPLETED calls off this
+            // method's return value, so the deltas are folded here as well as
+            // forwarded to the callback (where `visibleText()` is empty for
+            // them, so no tool JSON leaks into the rendered answer).
+            $foldAndForward = static function (array $chunk) use ($callback, $toolCalls): void {
+                $toolCalls->addDelta($chunk);
+                $callback($chunk);
+            };
 
             foreach ($stream as $response) {
                 ++$chunkCount;
                 $responseArray = $response->toArray();
-
-                // Tool-call fragments are accumulated, never forwarded to the
-                // callback: a routing hand-off is pipeline plumbing, not
-                // content the user should see appear in the answer.
-                $toolCalls->pushOpenAiChunk($responseArray);
 
                 // Capture usage from the final chunk
                 if (isset($responseArray['usage'])) {
@@ -275,20 +276,29 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
 
                     $callback($content);
                 }
+
+                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $foldAndForward);
             }
 
             if (null !== $finishReason) {
                 $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
             }
 
+            $completedToolCalls = $toolCalls->complete();
+
             $this->logger->info('✅ Groq streaming COMPLETE', [
                 'model' => $model,
                 'chunks' => $chunkCount,
                 'usage' => $usage,
-                'tool_calls' => count($toolCalls->toolCalls()),
+                'tool_calls' => count($completedToolCalls),
             ]);
 
-            return ['usage' => $usage, 'tool_calls' => $toolCalls->toolCalls()];
+            $result = ['usage' => $usage];
+            if ([] !== $completedToolCalls) {
+                $result['tool_calls'] = $completedToolCalls;
+            }
+
+            return $result;
         } catch (\Exception $e) {
             $this->logger->error('Groq streaming error', [
                 'error' => $e->getMessage(),
@@ -331,39 +341,24 @@ class GroqProvider implements ChatProviderInterface, VisionProviderInterface, Sp
             $requestOptions = array_merge($requestOptions, $translatedSchema);
         }
 
-        $tools = self::toolDefinitions($options);
-        if ([] !== $tools) {
-            $requestOptions = array_merge($requestOptions, $this->toolCallingTranslator->translate(
-                $this->getName(),
-                $model,
-                $stream,
-                $tools,
-                // Whether the schema was actually MERGED, not merely
-                // requested: streaming drops it here, and a dropped schema
-                // has nothing left to conflict with.
-                withStructuredOutput: [] !== $translatedSchema,
-            ));
+        // The schema wins: it is the caller's output contract and something
+        // downstream parses against it, whereas "no tool call" is already a
+        // valid outcome of every toolset we declare. Groq 400s on
+        // `response_format` plus `tools` in one request, so the tools go.
+        //
+        // Keyed off the schema actually being MERGED, not merely requested:
+        // streaming drops it above, and a dropped schema cannot conflict.
+        if ([] !== $translatedSchema
+            && $this->toolCallingCapability->conflictsWithStructuredOutput($this->getName())
+            && is_array($options['tools'] ?? null) && [] !== $options['tools']
+        ) {
+            $this->logger->warning('Groq: tool declaration dropped, cannot combine tools with structured output', [
+                'model' => $model,
+            ]);
+            unset($options['tools'], $options['tool_choice'], $options['parallel_tool_calls']);
         }
 
-        return $requestOptions;
-    }
-
-    /**
-     * @param array<string, mixed> $options
-     *
-     * @return list<ToolDefinition>
-     */
-    private static function toolDefinitions(array $options): array
-    {
-        $tools = $options['tools'] ?? null;
-        if (!is_array($tools)) {
-            return [];
-        }
-
-        return array_values(array_filter(
-            $tools,
-            static fn (mixed $tool): bool => $tool instanceof ToolDefinition,
-        ));
+        return $this->applyChatCompletionsToolOptions($requestOptions, $options);
     }
 
     // ==================== VISION ====================

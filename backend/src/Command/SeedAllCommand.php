@@ -8,6 +8,7 @@ use App\Seed\BrandingConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\DesktopAgentConfigSeeder;
+use App\Seed\DocumentToolsConfigSeeder;
 use App\Seed\EmbeddingRouterConfigSeeder;
 use App\Seed\FileContextConfigSeeder;
 use App\Seed\MarketingNewsConfigSeeder;
@@ -62,7 +63,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  19. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
  *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
  *  21. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
- *  22. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — default OFF)
+ *  23. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -97,6 +99,7 @@ final class SeedAllCommand extends Command
         private readonly StructuredOutputConfigSeeder $structuredOutputConfigSeeder,
         private readonly EmbeddingRouterConfigSeeder $embeddingRouterConfigSeeder,
         private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
+        private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -127,7 +130,8 @@ final class SeedAllCommand extends Command
             "  19. structured-output flag     (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
             "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
             "  21. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
-            "  22. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — default OFF)\n".
+            "  23. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -160,6 +164,7 @@ final class SeedAllCommand extends Command
             ['structured-output', fn (): SeedResult => $this->structuredOutputConfigSeeder->seed()],
             ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
             ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
+            ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

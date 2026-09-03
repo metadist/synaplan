@@ -341,6 +341,14 @@
                   <div class="flex items-center gap-2">
                     <ServiceIcon :service="model.service" :size="16" />
                     <span class="txt-primary text-sm font-medium">{{ model.name }}</span>
+                    <span
+                      v-if="model.features?.includes('tool_use')"
+                      class="pill text-[10px] whitespace-nowrap"
+                      :title="$t('config.aiModels.toolUseTooltip')"
+                      data-testid="badge-model-tool-use"
+                    >
+                      {{ $t('config.aiModels.toolUseBadge') }}
+                    </span>
                   </div>
                 </td>
                 <td class="py-3 px-2 sm:px-3">

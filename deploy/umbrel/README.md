@@ -127,6 +127,10 @@ exists, so a changed value cannot lock anyone out.
   its own app. Users add a provider key under Admin > AI Providers after the
   first login; the app ships without one, so this step is required before the
   first answer.
+- **No Collabora sidecar.** Office convert-to (thumbnails, PDF export, preview,
+  combine) stays off. Umbrel devices cannot spare the extra ~2 GB, and this
+  package has no Compose profiles. Self-host with `deploy/compose.yaml` and
+  `COMPOSE_PROFILES=office` if you need the engine.
 - **No consistent backup hook.** Umbrel backs up the app data directory as a
   filesystem snapshot of the running stack. The quiesced dumps from
   `../scripts/pre-backup.sh` cannot be wired in because umbrelOS has no

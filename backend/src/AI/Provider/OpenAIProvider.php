@@ -9,16 +9,19 @@ use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Tool\CatalogToolUse;
+use App\AI\Tool\OpenAiToolShapes;
 use App\Service\File\FileHelper;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
+class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface
 {
     private const DEFAULT_MAX_TOKENS = 4096;
 
@@ -135,6 +138,15 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         return null !== $this->client();
     }
 
+    public function supportsToolCalling(string $model): bool
+    {
+        if (CatalogToolUse::hasChatRow($this->getName(), $model)) {
+            return CatalogToolUse::supports($this->getName(), $model);
+        }
+
+        return true;
+    }
+
     public function getRequiredEnvVars(): array
     {
         return [
@@ -219,6 +231,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $responseArray = $response->toArray();
 
             $usage = $this->normalizeResponsesUsage($responseArray);
+            $toolCalls = $this->extractResponsesToolCalls($responseArray);
 
             $this->logger->info('OpenAI: Chat completed via Responses API', [
                 'model' => $model,
@@ -226,11 +239,17 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 'usage' => $usage,
             ]);
 
-            return [
+            $result = [
                 'content' => $response->outputText ?? '',
                 'response_id' => $this->storeResponses ? $response->id : null,
                 'usage' => $usage,
             ];
+            if ([] !== $toolCalls) {
+                $result['tool_calls'] = $toolCalls;
+                $result['finish_reason'] = 'tool_calls';
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -266,6 +285,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
 
             $responseId = null;
             $finishReason = null;
+            $sawFunctionCall = false;
 
             foreach ($stream as $event) {
                 $eventType = $event->event;
@@ -297,11 +317,38 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                         }
                         break;
 
+                    case 'response.output_item.added':
+                        if ($this->emitResponsesFunctionCallStart($eventData, $callback)) {
+                            $sawFunctionCall = true;
+                        }
+                        break;
+
+                    case 'response.function_call_arguments.delta':
+                        $sawFunctionCall = true;
+                        $callback([
+                            'type' => 'tool_call_delta',
+                            'index' => (int) ($eventData['output_index'] ?? 0),
+                            'id' => null,
+                            'name' => null,
+                            'arguments' => is_string($eventData['delta'] ?? null) ? $eventData['delta'] : '',
+                        ]);
+                        break;
+
+                    case 'response.output_item.done':
+                        $item = is_array($eventData['item'] ?? null) ? $eventData['item'] : [];
+                        if ('function_call' === ($item['type'] ?? '')) {
+                            $sawFunctionCall = true;
+                        }
+                        break;
+
                     case 'response.completed':
                         $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
                         $responseId = $eventData['response']['id'] ?? $responseId;
                         $status = $eventData['response']['status'] ?? 'completed';
                         $finishReason = ('completed' === $status) ? 'stop' : 'length';
+                        if ($sawFunctionCall || $this->responsesOutputHasFunctionCall($eventData['response']['output'] ?? [])) {
+                            $finishReason = 'tool_calls';
+                        }
                         break;
 
                     case 'response.failed':
@@ -310,7 +357,7 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     case 'response.incomplete':
                         $usage = $this->normalizeResponsesUsage($eventData['response'] ?? []);
                         $responseId = $eventData['response']['id'] ?? $responseId;
-                        $finishReason = 'length';
+                        $finishReason = $sawFunctionCall ? 'tool_calls' : 'length';
                         break;
                 }
             }
@@ -374,6 +421,19 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         $schema = $options['structured_output'] ?? null;
         if ($schema instanceof StructuredOutputSchema) {
             $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $model, $stream, $schema));
+        }
+
+        if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {
+            $requestOptions['tools'] = OpenAiToolShapes::toResponsesTools($options['tools']);
+        }
+        if (array_key_exists('tool_choice', $options)) {
+            $mappedChoice = OpenAiToolShapes::toResponsesToolChoice($options['tool_choice']);
+            if (null !== $mappedChoice) {
+                $requestOptions['tool_choice'] = $mappedChoice;
+            }
+        }
+        if (array_key_exists('parallel_tool_calls', $options)) {
+            $requestOptions['parallel_tool_calls'] = (bool) $options['parallel_tool_calls'];
         }
 
         return $requestOptions;
@@ -720,51 +780,167 @@ class OpenAIProvider implements ChatProviderInterface, EmbeddingProviderInterfac
     }
 
     /**
-     * Convert Chat Completions message format to Responses API format.
+     * Convert Chat Completions message format to Responses API input items.
      *
      * Chat Completions uses: {type: "text", text: "..."} and {type: "image_url", image_url: {url: "..."}}
      * Responses API uses:    {type: "input_text"/"output_text", text: "..."} and {type: "input_image", image_url: "..."}
+     * Tool history becomes `function_call` / `function_call_output` items.
      */
     private function convertToResponsesFormat(array $messages): array
     {
-        foreach ($messages as &$message) {
-            $role = $message['role'] ?? 'user';
-            $isAssistant = 'assistant' === $role;
-            $textType = $isAssistant ? 'output_text' : 'input_text';
+        $items = [];
 
-            if (!is_array($message['content'] ?? null)) {
-                $text = $message['content'] ?? '';
-                $message['content'] = [
-                    [
-                        'type' => $textType,
-                        'text' => $text,
-                    ],
+        foreach ($messages as $message) {
+            $role = $message['role'] ?? 'user';
+
+            if ('tool' === $role) {
+                $output = $message['content'] ?? '';
+                if (!is_string($output)) {
+                    $output = json_encode($output, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+                }
+                $items[] = [
+                    'type' => 'function_call_output',
+                    'call_id' => (string) ($message['tool_call_id'] ?? ''),
+                    'output' => $output,
                 ];
                 continue;
             }
 
-            $converted = [];
-            foreach ($message['content'] as $part) {
-                $type = $part['type'] ?? '';
-                if ('text' === $type) {
-                    $converted[] = [
-                        'type' => $textType,
-                        'text' => $part['text'] ?? '',
-                    ];
-                } elseif ('image_url' === $type) {
-                    $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
-                    $converted[] = [
-                        'type' => 'input_image',
-                        'image_url' => $url,
-                    ];
-                } else {
-                    $converted[] = $part;
-                }
+            $isAssistant = 'assistant' === $role;
+            $textType = $isAssistant ? 'output_text' : 'input_text';
+            $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            $contentParts = $this->convertResponsesContentParts($message['content'] ?? '', $textType, [] !== $toolCalls);
+
+            if ([] !== $contentParts) {
+                $items[] = [
+                    'role' => $role,
+                    'content' => $contentParts,
+                ];
             }
-            $message['content'] = $converted;
+
+            foreach ($toolCalls as $call) {
+                if (!is_array($call)) {
+                    continue;
+                }
+                $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                $args = $fn['arguments'] ?? '{}';
+                if (!is_string($args) || '' === $args) {
+                    $args = '{}';
+                }
+                $items[] = [
+                    'type' => 'function_call',
+                    'call_id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                    'name' => (string) ($fn['name'] ?? 'tool'),
+                    'arguments' => $args,
+                ];
+            }
         }
 
-        return $messages;
+        return $items;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function convertResponsesContentParts(mixed $content, string $textType, bool $hasToolCalls): array
+    {
+        if (!is_array($content)) {
+            $text = is_string($content) ? $content : '';
+            if ('' === $text && $hasToolCalls) {
+                return [];
+            }
+
+            return [[
+                'type' => $textType,
+                'text' => $text,
+            ]];
+        }
+
+        $converted = [];
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+            if ('text' === $type) {
+                $converted[] = [
+                    'type' => $textType,
+                    'text' => $part['text'] ?? '',
+                ];
+            } elseif ('image_url' === $type) {
+                $url = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+                $converted[] = [
+                    'type' => 'input_image',
+                    'image_url' => $url,
+                ];
+            } else {
+                $converted[] = $part;
+            }
+        }
+
+        return $converted;
+    }
+
+    /**
+     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}}>
+     */
+    private function extractResponsesToolCalls(array $responseArray): array
+    {
+        $calls = [];
+        foreach ($responseArray['output'] ?? [] as $item) {
+            if (!is_array($item) || 'function_call' !== ($item['type'] ?? '')) {
+                continue;
+            }
+            $args = $item['arguments'] ?? '{}';
+            if (!is_string($args) || '' === $args) {
+                $args = '{}';
+            }
+            $calls[] = [
+                'id' => (string) ($item['call_id'] ?? $item['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                'type' => 'function',
+                'function' => [
+                    'name' => (string) ($item['name'] ?? 'tool'),
+                    'arguments' => $args,
+                ],
+            ];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * @param array<string, mixed> $eventData
+     */
+    private function emitResponsesFunctionCallStart(array $eventData, callable $callback): bool
+    {
+        $item = is_array($eventData['item'] ?? null) ? $eventData['item'] : [];
+        if ('function_call' !== ($item['type'] ?? '')) {
+            return false;
+        }
+
+        $callback([
+            'type' => 'tool_call_delta',
+            'index' => (int) ($eventData['output_index'] ?? 0),
+            'id' => isset($item['call_id']) && is_string($item['call_id']) && '' !== $item['call_id'] ? $item['call_id'] : null,
+            'name' => isset($item['name']) && is_string($item['name']) && '' !== $item['name'] ? $item['name'] : null,
+            'arguments' => is_string($item['arguments'] ?? null) ? $item['arguments'] : '',
+        ]);
+
+        return true;
+    }
+
+    private function responsesOutputHasFunctionCall(mixed $output): bool
+    {
+        if (!is_array($output)) {
+            return false;
+        }
+        foreach ($output as $item) {
+            if (is_array($item) && 'function_call' === ($item['type'] ?? '')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

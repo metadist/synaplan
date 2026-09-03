@@ -6,17 +6,20 @@ use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\FileGenerationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
-use App\AI\ToolCalling\ToolCall;
-use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Prompt\PromptCatalog;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Document\DocumentEditCoordinator;
+use App\Service\Document\DocumentEditResult;
 use App\Service\Exception\VisionImageUnprocessableException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
@@ -28,7 +31,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
+use App\Service\File\GeneratedDocumentBundle;
+use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -112,8 +118,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ConversationFileCatalog $conversationFileCatalog,
         private GeneratedImageVisionFlag $generatedImageVisionFlag,
         private StructuredOutputConfig $structuredOutputConfig,
-        private ToolCallingCapability $toolCallingCapability,
+        private ToolCallingTranslator $toolCallingTranslator,
+        private ToolCallParser $toolCallParser,
         private RoutingToolset $routingToolset,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
+        private ?GeneratedDocumentStore $generatedDocumentStore = null,
+        private ?DocumentEditCoordinator $documentEditCoordinator = null,
         iterable $pluginContextProviders = [],
         #[Autowire(lazy: true)]
         private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
@@ -140,16 +150,16 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * The hand-off tools to attach to the answering call, or null when this
-     * turn's model cannot do native tool calling and the deferral therefore
-     * has to go back to the sorter.
+     * The request options that declare the hand-off tools on the answering
+     * call, or null when this turn's model cannot do native tool calling and
+     * the deferral therefore has to go back to the sorter.
      *
      * The classifier pre-checks the ACCOUNT default chat provider before it
      * defers, but the model actually used here can differ (widget override,
      * prompt binding, "Again" replay), so this second check is the
      * authoritative one.
      *
-     * @return list<\App\AI\ToolCalling\ToolDefinition>|null
+     * @return array<string, mixed>|null
      */
     private function routingHandoffTools(?string $provider, ?string $modelName, bool $streaming): ?array
     {
@@ -157,7 +167,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
             return null;
         }
 
-        if (!$this->toolCallingCapability->supports($provider, $modelName, $streaming)) {
+        $declaration = $this->toolCallingTranslator->translate(
+            $provider,
+            $modelName,
+            $streaming,
+            $this->routingToolset->build(),
+        );
+
+        if ([] === $declaration) {
             $this->logger->info('ChatHandler: Routing deferral not honourable by this model — falling back to the AI sorter', [
                 'provider' => $provider,
                 'model' => $modelName,
@@ -167,7 +184,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             return null;
         }
 
-        return $this->routingToolset->build();
+        return $declaration;
     }
 
     /**
@@ -175,15 +192,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * called nothing the register knows — which is the ordinary, common case
      * and means "this really was a chat turn".
      *
-     * @param list<mixed> $toolCalls
+     * @param mixed $toolCalls the `tool_calls` entry of the provider response
      */
-    private function routingHandoffFor(array $toolCalls): ?RoutingDirective
+    private function routingHandoffFor(mixed $toolCalls): ?RoutingDirective
     {
-        foreach ($toolCalls as $call) {
-            if (!$call instanceof ToolCall) {
-                continue;
-            }
-
+        foreach ($this->toolCallParser->fromWireToolCalls($toolCalls) as $call) {
             $topic = $this->routingToolset->topicForToolCall($call);
             if (null === $topic) {
                 // A hallucinated tool name is not a reason to fail the turn:
@@ -521,7 +534,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $docsList = [];
         $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
-        $systemPrompt = $decorated['prompt'];
+        $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
+        $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
 
         if (!empty($ragContext)) {
@@ -683,8 +697,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['structured_output'] = FileGenerationSchema::build();
         }
 
-        if ($routingDeferred) {
-            $aiOptions['tools'] = $routingTools;
+        if (null !== $routingTools) {
+            $aiOptions = array_merge($aiOptions, $routingTools);
         }
 
         // Clamp max_tokens to min(plan_limit, model_max).
@@ -704,12 +718,34 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
-        $response = $this->aiFacade->chat(
+        $documentEdit = $this->tryDocumentToolsEdit(
+            $topic,
+            $modelId,
             $messages,
-            $message->getUserId(),
-            $aiOptions
+            $message,
+            $aiOptions,
+            $progressCallback,
+            !empty($options['incognito']),
         );
 
+        if (null !== $documentEdit) {
+            $response = [
+                'content' => $documentEdit->content,
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'usage' => $documentEdit->usage,
+                'response_id' => null,
+            ];
+        } else {
+            $response = $this->aiFacade->chat(
+                $messages,
+                $message->getUserId(),
+                $aiOptions
+            );
+        }
+
+        // Only the plain chat call above can carry a hand-off: the document
+        // tool loop answers the officemaker topic, which is never deferred.
         if ($routingDeferred) {
             $handoff = $this->routingHandoffFor($response['tool_calls'] ?? []);
             if (null !== $handoff) {
@@ -729,6 +765,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'usage' => $response['usage'] ?? [],
             'response_id' => $response['response_id'] ?? null,
         ];
+        if (null !== $documentEdit) {
+            $content = $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+        }
 
         // Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
@@ -737,28 +776,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             // Store the file (ephemeral in incognito mode so it is cleaned up
             // after the session)
-            $generatedFile = $this->storeGeneratedFile($fileData, $message, !empty($options['incognito']));
+            $bundle = $this->storeGeneratedDocument($fileData, $message, !empty($options['incognito']));
 
-            if ($generatedFile) {
-                // Attach file to message (in-memory only for transient
+            if ($bundle) {
+                // Attach file(s) to message (in-memory only for transient
                 // incognito messages — flush() never touches unmanaged entities)
-                $message->addFile($generatedFile);
+                foreach ($bundle->files() as $generatedFile) {
+                    $message->addFile($generatedFile);
+                }
                 $this->em->flush();
 
-                // Return message key for translation in frontend
-                $content = "__FILE_GENERATED__:{$fileData['filename']}";
+                $primary = $bundle->primary();
+                $content = "__FILE_GENERATED__:{$primary->getFileName()}";
 
                 $metadata['generated_file'] = [
-                    'id' => $generatedFile->getId(),
-                    'filename' => $generatedFile->getFileName(),
-                    'path' => $generatedFile->getFilePath(),
-                    'size' => $generatedFile->getFileSize(),
-                    'type' => $generatedFile->getFileType(),
+                    'id' => $primary->getId(),
+                    'filename' => $primary->getFileName(),
+                    'path' => $primary->getFilePath(),
+                    'size' => $primary->getFileSize(),
+                    'type' => $primary->getFileType(),
                 ];
 
                 $this->logger->info('ChatHandler: File generation successful', [
-                    'file_id' => $generatedFile->getId(),
-                    'filename' => $generatedFile->getFileName(),
+                    'file_id' => $primary->getId(),
+                    'filename' => $primary->getFileName(),
                 ]);
             } else {
                 $content = '__FILE_GENERATION_FAILED__';
@@ -1150,7 +1191,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $docsList = [];
         $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
-        $systemPrompt = $decorated['prompt'];
+        $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
+        $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
 
         // Append RAG context to system prompt if available
@@ -1370,8 +1412,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['structured_output'] = FileGenerationSchema::build();
         }
 
-        if ($routingDeferred) {
-            $aiOptions['tools'] = $routingTools;
+        if (null !== $routingTools) {
+            $aiOptions = array_merge($aiOptions, $routingTools);
         }
 
         // Clamp max_tokens to min(requested, plan_limit, model_max).
@@ -1440,12 +1482,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
         };
 
         $perfTimer->start('provider_total');
-        $metadata = $this->aiFacade->chatStream(
+        $documentEdit = $this->tryDocumentToolsEdit(
+            $topic,
+            $modelId,
             $messages,
-            $wrappedStreamCallback, // Use wrapped callback
-            $message->getUserId(),
-            $aiOptions
+            $message,
+            $aiOptions,
+            $progressCallback,
+            !empty($options['incognito']),
         );
+        if (null !== $documentEdit) {
+            $metadata = [
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'usage' => $documentEdit->usage,
+                'response_id' => null,
+            ];
+            $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+            $wrappedStreamCallback($documentEdit->content);
+        } else {
+            $metadata = $this->aiFacade->chatStream(
+                $messages,
+                $wrappedStreamCallback, // Use wrapped callback
+                $message->getUserId(),
+                $aiOptions
+            );
+        }
         $perfTimer->stop('provider_total');
 
         if ($routingDeferred) {
@@ -1521,6 +1583,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId,
                 'usage' => $metadata['usage'] ?? [],
                 'response_id' => $metadata['response_id'] ?? null,
+                'generated_file' => $metadata['generated_file'] ?? null,
+                'documentChanges' => $metadata['documentChanges'] ?? null,
+                'documentVersion' => $metadata['documentVersion'] ?? null,
+                'documentFidelityLossy' => $metadata['documentFidelityLossy'] ?? false,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
@@ -1736,8 +1802,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($content, $imageUrls);
-            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
-                $messageContent = $this->buildMultimodalContent($content, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $content;
             }
@@ -1757,7 +1821,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ];
         }
 
-        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options);
+        $messageContent = $this->buildCurrentMessageContent(
+            $currentMessage,
+            $includeImages,
+            $options,
+            $generatedImages['urls'],
+            $generatedImages['notice'],
+        );
 
         $messages[] = [
             'role' => 'user',
@@ -1802,10 +1872,21 @@ final readonly class ChatHandler implements MessageHandlerInterface
     /**
      * Build the content for the current user message (files, search results, images).
      *
+     * @param list<string> $extraImageUrls generated-image data URLs to attach
+     *                                     to this user turn (Anthropic rejects
+     *                                     image blocks on assistant turns)
+     * @param string       $extraImageNote provenance sentence for those images,
+     *                                     see generatedImagesForVision()
+     *
      * @return string|array Content string or multimodal array when images are included
      */
-    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = []): string|array
-    {
+    private function buildCurrentMessageContent(
+        Message $currentMessage,
+        bool $includeImages,
+        array $options = [],
+        array $extraImageUrls = [],
+        string $extraImageNote = '',
+    ): string|array {
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText();
 
@@ -1845,16 +1926,23 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $content .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
-        if ($includeImages) {
-            $imageUrls = $this->extractImageDataUrls($currentMessage);
+        $imageUrls = $includeImages ? $this->extractImageDataUrls($currentMessage) : [];
 
-            // Every attached image failed conversion (unreadable, or too large
-            // even after downscaling). Fail loudly instead of sending a
-            // text-only request the model would answer with "I see no image".
-            if ([] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
-                throw new VisionImageUnprocessableException();
+        // Every attached image failed conversion (unreadable, or too large
+        // even after downscaling). Fail loudly instead of sending a
+        // text-only request the model would answer with "I see no image".
+        if ($includeImages && [] === $imageUrls && $this->hasAttachedImages($currentMessage)) {
+            throw new VisionImageUnprocessableException();
+        }
+
+        if ([] !== $extraImageUrls) {
+            $imageUrls = array_merge($imageUrls, $extraImageUrls);
+            if ('' !== $extraImageNote) {
+                $content .= "\n\n".$extraImageNote;
             }
+        }
 
+        if ([] !== $imageUrls) {
             return $this->buildMultimodalContent($content, $imageUrls);
         }
 
@@ -2010,8 +2098,6 @@ final readonly class ChatHandler implements MessageHandlerInterface
             if ('user' === $role && $includeImages) {
                 $imageUrls = $this->extractImageDataUrls($msg);
                 $messageContent = $this->buildMultimodalContent($stamped, $imageUrls);
-            } elseif ('assistant' === $role && [] !== ($generatedImages[$msg->getId()] ?? [])) {
-                $messageContent = $this->buildMultimodalContent($stamped, $generatedImages[$msg->getId()]);
             } else {
                 $messageContent = $stamped;
             }
@@ -2063,19 +2149,25 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $msgArr['BTEXT'] .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
+        // The provenance sentence has to go INTO the JSON body: the text part of
+        // this turn is the encoded $msgArr, so appending after json_encode()
+        // would hand the model a payload it can no longer parse.
+        if ([] !== $generatedImages['urls'] && '' !== $generatedImages['notice']) {
+            $msgArr['BTEXT'] .= "\n\n".$generatedImages['notice'];
+        }
+
         // Extract images from current message for vision support (only if enabled)
         $textContent = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        if ($includeImages) {
-            $imageUrls = $this->extractImageDataUrls($currentMessage);
+        $imageUrls = $includeImages ? $this->extractImageDataUrls($currentMessage) : [];
+        $imageUrls = array_merge($imageUrls, $generatedImages['urls']);
+        if ([] !== $imageUrls) {
             $messageContent = $this->buildMultimodalContent($textContent, $imageUrls);
 
-            if (!empty($imageUrls)) {
-                $this->logger->info('🖼️ ChatHandler: Images included for vision (non-streaming)', [
-                    'message_id' => $currentMessage->getId(),
-                    'image_count' => count($imageUrls),
-                ]);
-            }
+            $this->logger->info('ChatHandler: Images included for vision (non-streaming)', [
+                'message_id' => $currentMessage->getId(),
+                'image_count' => count($imageUrls),
+            ]);
         } else {
             $messageContent = $textContent;
         }
@@ -2242,9 +2334,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
      */
     private function imageToBase64DataUrl(string $relativePath): ?string
     {
-        // Security: Validate path to prevent directory traversal attacks
-        // Strip leading slashes and reject paths with .. segments
-        $sanitizedPath = ltrim($relativePath, '/');
+        // Security: Validate path to prevent directory traversal attacks.
+        // Display URLs (`/api/v1/files/uploads/<rel>`) must be reduced to the
+        // upload-dir-relative form before we prefix $uploadDir — otherwise a
+        // stored serve path never resolves (#1596).
+        $sanitizedPath = FileHelper::normalizeUploadRelativePath($relativePath);
         $absolutePath = $this->uploadDir.'/'.$sanitizedPath;
 
         // Use FileHelper to safely resolve and validate path within upload directory
@@ -2382,31 +2476,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Base64 data URLs for images the ASSISTANT generated earlier in this
-     * conversation, keyed by the message that produced them.
-     *
-     * Without this, "draw a cat" → "what breed is it?" is answered from the
-     * text prompt alone: only user turns ever contributed image content, so the
-     * model could not see its own picture. Off unless
-     * FILE_CONTEXT.VISION_INCLUDE_GENERATED is set and the chosen model is
-     * vision-capable, and capped at MAX_GENERATED_IMAGES — every image rides
-     * along as a base64 payload on each following request of the conversation.
-     *
-     * @param array<int, Message> $thread
-     *
-     * @return array<int, list<string>>
-     */
-    /**
      * Always-on prose references for media the assistant produced in earlier
      * turns of this conversation.
      *
      * Generated images, videos and audio carry no BFILETEXT, so replaying the
-     * thread as plain text leaves no trace of them: a follow-up such as "was ist
-     * da zu sehen?" is then answered from text-only history and the model denies
-     * the media exists (#1596). Sending the actual pixels is a separate,
-     * opt-in/token-costly path ({@see generatedImagesForVision()}); this cheap
-     * text reference is unconditional so the model at least knows the media is
-     * real. It also gives async media turns whose text was cleared
+     * thread as plain text leaves no trace of them: a follow-up such as "what is
+     * in that picture?" is then answered from text-only history and the model denies
+     * the media exists (#1596). Sending the actual pixels is a separate path
+     * ({@see generatedImagesForVision()}); this cheap text reference is
+     * unconditional so the model still knows the media is real when the
+     * kill-switch is off or the chat model cannot see images. It also gives
+     * async media turns whose text was cleared
      * ({@see \App\Service\Media\MediaJobMessageSync}) non-empty content, so they
      * survive the empty-assistant filter (#1115) instead of vanishing entirely.
      *
@@ -2450,10 +2530,40 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $references;
     }
 
+    /**
+     * Base64 data URLs for images the ASSISTANT generated earlier in this
+     * conversation, plus the sentence that tells the model where they came from.
+     *
+     * The pixels ride on the current USER turn — Anthropic (and most providers)
+     * reject `image` blocks on assistant turns, which is what surfaced as "I
+     * cannot see the picture" after the flag was turned on. That placement makes
+     * the picture look like a fresh upload, so `notice` names the file and its
+     * provenance; without it the model answers about "the image you sent me"
+     * and, on an unrelated follow-up, may describe a picture nobody asked about.
+     *
+     * Without this path, "draw a cat" → "what is in it?" is answered from the
+     * text prompt alone (#1596). On when FILE_CONTEXT.VISION_INCLUDE_GENERATED
+     * is enabled (the default) and the chosen model is vision-capable, and
+     * capped at MAX_GENERATED_IMAGES so a single inline image stays under the
+     * 450K-character vision budget.
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     *
+     * @return array{urls: list<string>, notice: string}
+     */
     private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
     {
         if (true !== ($options['include_generated_images'] ?? false)) {
-            return [];
+            return ['urls' => [], 'notice' => ''];
+        }
+
+        // An image the user attached to THIS turn is what they are asking
+        // about. Adding a historic picture on top would send two inline
+        // payloads — MAX_VISION_BASE64_LENGTH is enforced per image, so the
+        // request would carry twice the intended budget — and leave the model
+        // guessing which of the two the question refers to.
+        if ($this->hasAttachedImages($currentMessage)) {
+            return ['urls' => [], 'notice' => ''];
         }
 
         $catalog = $this->conversationFileCatalog->build(
@@ -2463,14 +2573,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ConversationFile::CATEGORY_IMAGE,
         );
 
-        $byMessage = [];
-        $included = 0;
+        $urls = [];
+        $names = [];
 
         foreach ($catalog as $file) {
-            if ($included >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
+            if (count($urls) >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
                 break;
             }
-            if (!$file->isGenerated() || null === $file->messageId) {
+            if (!$file->isGenerated()) {
                 continue;
             }
             if (!$this->isVisionSupportedImage($file->relativePath)) {
@@ -2482,23 +2592,53 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 continue;
             }
 
-            $byMessage[$file->messageId][] = $dataUrl;
-            ++$included;
+            $urls[] = $dataUrl;
+            $names[] = $file->displayName;
         }
 
-        if ($included > 0) {
-            $this->logger->info('ChatHandler: Including generated images for vision', [
-                'message_id' => $currentMessage->getId(),
-                'image_count' => $included,
-            ]);
+        if ([] === $urls) {
+            return ['urls' => [], 'notice' => ''];
         }
 
-        return $byMessage;
+        $this->logger->info('ChatHandler: Including generated images for vision', [
+            'message_id' => $currentMessage->getId(),
+            'image_count' => count($urls),
+        ]);
+
+        return [
+            'urls' => $urls,
+            'notice' => $this->generatedImageProvenanceNotice($names),
+        ];
+    }
+
+    /**
+     * Tell the model that the image blocks on this user turn are its own
+     * earlier output rather than something the user just uploaded.
+     *
+     * @param list<string> $displayNames
+     */
+    private function generatedImageProvenanceNotice(array $displayNames): string
+    {
+        $quoted = implode(', ', array_map(static fn (string $name): string => '"'.$name.'"', $displayNames));
+
+        if (1 === count($displayNames)) {
+            return '(The image attached to this message is not a new upload from the user — it is '
+                .$quoted.', which YOU generated earlier in this conversation. Treat it as your own earlier output when answering.)';
+        }
+
+        return '(The images attached to this message are not new uploads from the user — they are '
+            .$quoted.', which YOU generated earlier in this conversation. Treat them as your own earlier output when answering.)';
     }
 
     /**
      * Whether generated images may be shown to the model: the operator flag is
      * on and the model that will actually answer can read images.
+     *
+     * A chat model without vision is NOT swapped here. The vision fallback
+     * only fires when the current message itself carries an image attachment;
+     * a generated picture sitting in history is not enough to change the
+     * user's chosen model. In that case the always-on prose reference from
+     * {@see generatedMediaReferences()} is the only trace the model gets.
      */
     private function shouldIncludeGeneratedImages(?int $modelId, ?int $effectiveUserId): bool
     {
@@ -2773,6 +2913,120 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $fileData;
     }
 
+    private function appendOfficePdfExportHint(string $systemPrompt, string $topic): string
+    {
+        if ('officemaker' !== $topic) {
+            return $systemPrompt;
+        }
+        if (null === $this->generatedDocumentStore || !$this->generatedDocumentStore->pdfExportEnabled()) {
+            return $systemPrompt;
+        }
+
+        return $systemPrompt.PromptCatalog::officeMakerPdfExportAppendix();
+    }
+
+    private function appendOfficeToolsHint(string $systemPrompt, string $topic, ?int $modelId, Message $message): string
+    {
+        if ('officemaker' !== $topic || null === $this->documentEditCoordinator || null === $modelId) {
+            return $systemPrompt;
+        }
+        $model = $this->modelRepository->find($modelId);
+        if (!$this->documentEditCoordinator->shouldRun($topic, $model, $message)) {
+            return $systemPrompt;
+        }
+
+        return $systemPrompt.PromptCatalog::officeMakerToolsAppendix();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $aiOptions
+     */
+    private function tryDocumentToolsEdit(
+        string $topic,
+        ?int $modelId,
+        array $messages,
+        Message $message,
+        array $aiOptions,
+        ?callable $progressCallback,
+        bool $ephemeral,
+    ): ?DocumentEditResult {
+        if (null === $this->documentEditCoordinator || null === $modelId) {
+            return null;
+        }
+        $model = $this->modelRepository->find($modelId);
+        if (!$this->documentEditCoordinator->shouldRun($topic, $model, $message)) {
+            return null;
+        }
+        $progress = null;
+        if (null !== $progressCallback) {
+            $progress = static function (string $status, string $label, array $meta = []) use ($progressCallback): void {
+                $progressCallback([
+                    'status' => $status,
+                    'message' => $label,
+                    'metadata' => $meta,
+                    'timestamp' => time(),
+                ]);
+            };
+        }
+        $result = $this->documentEditCoordinator->run($messages, $message, $aiOptions, $progress, $ephemeral);
+        if (null === $result) {
+            return null;
+        }
+        if ('' === trim($result->content) && null === $result->file) {
+            return null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function applyDocumentEditResult(DocumentEditResult $result, Message $message, array &$metadata): string
+    {
+        if (null !== $result->file) {
+            $message->addFile($result->file);
+            $this->em->flush();
+            $metadata['generated_file'] = [
+                'id' => $result->file->getId(),
+                'filename' => $result->file->getFileName(),
+                'path' => $result->file->getFilePath(),
+                'size' => $result->file->getFileSize(),
+                'type' => $result->file->getFileType(),
+                'mime' => $result->file->getFileMime(),
+            ];
+        }
+        $metadata['documentChanges'] = array_map(
+            static fn ($step): array => [
+                'labelKey' => $step->labelKey,
+                'labelParams' => $step->labelParams,
+                'ok' => $step->ok,
+            ],
+            $result->steps,
+        );
+        if (null !== $result->version) {
+            $metadata['documentVersion'] = $result->version;
+        }
+        $metadata['documentFidelityLossy'] = $result->fidelityLossy;
+
+        return $result->content;
+    }
+
+    /**
+     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
+     */
+    private function storeGeneratedDocument(array $fileData, Message $message, bool $ephemeral = false): ?GeneratedDocumentBundle
+    {
+        if (null !== $this->generatedDocumentStore) {
+            return $this->generatedDocumentStore->store($fileData, $message, $ephemeral);
+        }
+
+        $file = $this->storeGeneratedFile($fileData, $message, $ephemeral);
+
+        return null !== $file ? new GeneratedDocumentBundle($file) : null;
+    }
+
     /**
      * Store AI-generated file in the file system and create File entity.
      *
@@ -2869,6 +3123,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             $this->em->persist($file);
             $this->em->flush();
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             $this->logger->info('ChatHandler: File generated and stored successfully', [
                 'file_id' => $file->getId(),

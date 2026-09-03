@@ -77,6 +77,22 @@
       </button>
     </template>
 
+    <!-- Office / PDF first-page poster (A1). Falls back to snippet / icon. -->
+    <button
+      v-else-if="documentPosterSrc"
+      type="button"
+      class="absolute inset-0 w-full h-full"
+      data-testid="file-preview-document-poster"
+      @click="emit('preview')"
+    >
+      <img
+        :src="documentPosterSrc"
+        :alt="displayName"
+        class="w-full h-full object-cover"
+        loading="lazy"
+      />
+    </button>
+
     <!-- Text / document with an extracted snippet -->
     <div
       v-else-if="snippet"
@@ -112,7 +128,7 @@ const props = defineProps<{
   playing?: boolean
 }>()
 
-const emit = defineEmits<{ play: [] }>()
+const emit = defineEmits<{ play: []; preview: [] }>()
 
 const { t, locale } = useI18n()
 
@@ -138,6 +154,9 @@ const rawThumbUrl = computed(() =>
 
 const imageSrc = computed(() => mediaSrc(rawDownloadUrl.value))
 const posterSrc = computed(() => (rawThumbUrl.value ? mediaSrc(rawThumbUrl.value) : null))
+const documentPosterSrc = computed(() =>
+  posterSrc.value && ('document' === kind.value || 'pdf' === kind.value) ? posterSrc.value : null
+)
 </script>
 
 <style scoped>

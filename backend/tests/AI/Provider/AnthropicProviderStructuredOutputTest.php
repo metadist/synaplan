@@ -6,7 +6,6 @@ namespace App\Tests\AI\Provider;
 
 use App\AI\Provider\AnthropicProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\AI\ToolCalling\ToolDefinition;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -95,7 +94,7 @@ class AnthropicProviderStructuredOutputTest extends TestCase
             [
                 'model' => 'claude-haiku-4-5',
                 'structured_output' => new StructuredOutputSchema('sort_classification', ['type' => 'object']),
-                'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object', 'properties' => []])],
+                'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object', 'properties' => []]]]],
             ],
         );
 
@@ -121,7 +120,7 @@ class AnthropicProviderStructuredOutputTest extends TestCase
             [
                 'model' => 'claude-haiku-4-5',
                 'structured_output' => new StructuredOutputSchema('sort_classification', ['type' => 'object']),
-                'tools' => [new ToolDefinition('handoff_mediamaker', 'Generate media.', ['type' => 'object', 'properties' => []])],
+                'tools' => [['type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'description' => 'Generate media.', 'parameters' => ['type' => 'object', 'properties' => []]]]],
             ],
         );
 

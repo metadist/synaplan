@@ -4,6 +4,8 @@ namespace App\Service\File;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Service\File\Office\OfficeConverterClient;
+use App\Service\File\Office\StructuredTextExtractor;
 use App\Service\WhisperService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
@@ -76,6 +78,19 @@ final readonly class FileProcessor
         'flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'wav', 'webm',
     ];
 
+    private const LEGACY_OFFICE_TARGETS = [
+        'doc' => 'docx',
+        'xls' => 'xlsx',
+        'ppt' => 'pptx',
+        'rtf' => 'docx',
+        'odt' => 'docx',
+        'ods' => 'xlsx',
+        'odp' => 'pptx',
+        'pages' => 'docx',
+        'numbers' => 'xlsx',
+        'key' => 'pptx',
+    ];
+
     private const OFFICE_EXT_TO_MIME = [
         'xls' => 'application/vnd.ms-excel',
         'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -83,6 +98,10 @@ final readonly class FileProcessor
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'ppt' => 'application/vnd.ms-powerpoint',
         'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'rtf' => 'application/rtf',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
         'csv' => 'text/csv',
         'md' => 'text/markdown',
         'html' => 'text/html',
@@ -102,6 +121,8 @@ final readonly class FileProcessor
         private int $tikaMinLength,
         private float $tikaMinEntropy,
         private string $ffmpegBinary = '/usr/bin/ffmpeg',
+        private ?OfficeConverterClient $officeConverter = null,
+        private ?StructuredTextExtractor $structuredTextExtractor = null,
     ) {
     }
 
@@ -135,6 +156,95 @@ final readonly class FileProcessor
 
         $this->logger->info('FileProcessor: Starting extraction', $meta);
 
+        $convertedTmp = $this->convertLegacyOffice($absolutePath, $ext);
+        if (null !== $convertedTmp) {
+            $absolutePath = $convertedTmp;
+            $ext = strtolower(pathinfo($convertedTmp, PATHINFO_EXTENSION));
+            $mime = $this->ensureOfficeMime(mime_content_type($absolutePath) ?: $mime, $ext);
+            $meta['mime'] = $mime;
+            $meta['ext'] = $ext;
+            $meta['converted_from'] = strtolower($fileExtension);
+        }
+
+        try {
+            $structured = $this->extractStructured($absolutePath, $ext, $meta);
+            if (null !== $structured) {
+                return $structured;
+            }
+
+            return $this->extractAfterOfficePrep($relativePath, $absolutePath, $ext, $mime, $meta, $userId, $describe);
+        } finally {
+            if (null !== $convertedTmp && is_file($convertedTmp)) {
+                @unlink($convertedTmp);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function extractStructured(string $absolutePath, string $ext, array $meta): ?array
+    {
+        if (null === $this->structuredTextExtractor || !$this->structuredTextExtractor->supports($ext)) {
+            return null;
+        }
+
+        $text = $this->structuredTextExtractor->extract($absolutePath, $ext);
+        if (null === $text || '' === trim($text)) {
+            return null;
+        }
+
+        $text = $this->textCleaner->clean($text);
+        $this->logger->info('FileProcessor: Structured office extraction', [
+            'strategy' => 'structured_office',
+            'bytes' => strlen($text),
+            'ext' => $ext,
+        ]);
+
+        return [$text, ['strategy' => 'structured_office'] + $meta];
+    }
+
+    private function convertLegacyOffice(string $absolutePath, string $ext): ?string
+    {
+        $target = self::LEGACY_OFFICE_TARGETS[$ext] ?? null;
+        if (null === $target || null === $this->officeConverter || !$this->officeConverter->isEnabled()) {
+            return null;
+        }
+
+        $converted = $this->officeConverter->convert($absolutePath, $target);
+        if (null === $converted || !is_file($converted)) {
+            $this->logger->info('FileProcessor: legacy office convert skipped', [
+                'ext' => $ext,
+                'target' => $target,
+            ]);
+
+            return null;
+        }
+
+        $this->logger->info('FileProcessor: converted legacy office file', [
+            'from' => $ext,
+            'to' => $target,
+        ]);
+
+        return $converted;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    private function extractAfterOfficePrep(
+        string $relativePath,
+        string $absolutePath,
+        string $ext,
+        string $mime,
+        array $meta,
+        ?int $userId,
+        bool $describe,
+    ): array {
         // Strategy 1: Native plain text
         if ($this->isPlainTextMime($mime)) {
             $text = @file_get_contents($absolutePath) ?: '';
@@ -205,10 +315,54 @@ final readonly class FileProcessor
             }
         }
 
+        $viaPdf = $this->extractOfficeViaConvertedPdf($absolutePath, $ext, $meta, $userId);
+        if (null !== $viaPdf) {
+            return $viaPdf;
+        }
+
         // Tika failed or produced unusable output
         $this->logger->warning('FileProcessor: Extraction failed', ['strategy' => 'tika_failed'] + $meta);
 
         return ['', ['strategy' => 'tika_failed'] + $meta];
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function extractOfficeViaConvertedPdf(string $absolutePath, string $ext, array $meta, ?int $userId): ?array
+    {
+        $convertible = isset(self::LEGACY_OFFICE_TARGETS[$ext])
+            || in_array($ext, ['docx', 'xlsx', 'pptx'], true);
+        if (!$convertible || null === $this->officeConverter || !$this->officeConverter->isEnabled()) {
+            return null;
+        }
+
+        $pdf = $this->officeConverter->convert($absolutePath, 'pdf');
+        if (null === $pdf || !is_file($pdf)) {
+            return null;
+        }
+
+        try {
+            [$tikaText, $tikaMeta] = $this->tikaClient->extractText($pdf, 'application/pdf');
+            if (is_string($tikaText)) {
+                $tikaText = $this->textCleaner->clean($tikaText);
+                if (mb_strlen(trim($tikaText)) > 0
+                    && !$this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy)) {
+                    $this->logger->info('FileProcessor: Tika extraction after office→PDF convert', [
+                        'strategy' => 'tika_office_pdf',
+                        'bytes' => strlen($tikaText),
+                    ]);
+
+                    return [$tikaText, ['strategy' => 'tika_office_pdf'] + $meta + $tikaMeta];
+                }
+            }
+
+            return $this->extractFromPdfViaVision($pdf, $userId, $meta + ['strategy' => 'office_pdf_vision']);
+        } finally {
+            @unlink($pdf);
+        }
     }
 
     /**

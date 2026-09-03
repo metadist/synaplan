@@ -20,6 +20,9 @@ use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
+use App\Service\File\GeneratedDocumentBundle;
+use App\Service\File\GeneratedDocumentStore;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\GuestChatConfig;
@@ -116,6 +119,8 @@ class StreamController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private PremiumFeatureGate $premiumFeatureGate,
         private ChatRunService $chatRunService,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
+        private ?GeneratedDocumentStore $generatedDocumentStore = null,
     ) {
     }
 
@@ -1603,6 +1608,7 @@ class StreamController extends AbstractController
 
                 $finalText = $responseText;
                 $generatedFile = null;
+                $generatedBundle = null;
 
                 if ($originalOutgoingMessage) {
                     // Continuation: append new text to the original message
@@ -1648,10 +1654,11 @@ class StreamController extends AbstractController
                             ],
                         ]);
 
-                        $generatedFile = $this->storeGeneratedFileInStream($fileEnvelope, $incomingMessage, $incognito);
+                        $generatedBundle = $this->storeGeneratedDocumentInStream($fileEnvelope, $incomingMessage, $incognito);
+                        $generatedFile = $generatedBundle?->primary();
 
                         if ($generatedFile) {
-                            $finalText = "__FILE_GENERATED__:{$fileEnvelope['filename']}";
+                            $finalText = "__FILE_GENERATED__:{$generatedFile->getFileName()}";
                             $this->logger->info('StreamController: File generation successful', [
                                 'file_id' => $generatedFile->getId(),
                                 'filename' => $generatedFile->getFileName(),
@@ -1721,6 +1728,17 @@ class StreamController extends AbstractController
                     // text must not be saved as an empty bubble — surface the
                     // failure marker the frontend translates
                     // (message.fileGenerationFailed) instead.
+                    if (null === $generatedFile && isset($response['metadata']['generated_file']) && is_array($response['metadata']['generated_file'])) {
+                        $fromToolsId = (int) ($response['metadata']['generated_file']['id'] ?? 0);
+                        if ($fromToolsId > 0) {
+                            $fromTools = $this->em->getRepository(File::class)->find($fromToolsId);
+                            if ($fromTools && $fromTools->getUserId() === $user->getId()) {
+                                $generatedFile = $fromTools;
+                                $finalText = "__FILE_GENERATED__:{$generatedFile->getFileName()}";
+                            }
+                        }
+                    }
+
                     if ('' === trim($finalText) && 'officemaker' === ($classification['topic'] ?? '')) {
                         $finalText = '__FILE_GENERATION_FAILED__';
                         $this->logger->error('StreamController: document generation produced neither file nor text');
@@ -1749,7 +1767,14 @@ class StreamController extends AbstractController
                         $this->em->flush();
                     }
 
-                    if ($generatedFile) {
+                    if ($generatedBundle) {
+                        foreach ($generatedBundle->files() as $storedFile) {
+                            $outgoingMessage->addFile($storedFile);
+                        }
+                        if (!$incognito) {
+                            $this->em->flush();
+                        }
+                    } elseif ($generatedFile) {
                         $outgoingMessage->addFile($generatedFile);
                         if (!$incognito) {
                             $this->em->flush();
@@ -2161,6 +2186,16 @@ class StreamController extends AbstractController
                     $this->logger->debug('StreamController: Including feedback IDs in complete event', [
                         'count' => count($completeData['feedbackIds']),
                     ]);
+                }
+
+                if (isset($response['metadata']['documentChanges']) && is_array($response['metadata']['documentChanges'])) {
+                    $completeData['documentChanges'] = $response['metadata']['documentChanges'];
+                }
+                if (isset($response['metadata']['documentVersion'])) {
+                    $completeData['documentVersion'] = (int) $response['metadata']['documentVersion'];
+                }
+                if (!empty($response['metadata']['documentFidelityLossy'])) {
+                    $completeData['documentFidelityLossy'] = true;
                 }
 
                 // Include generated file info if present
@@ -3390,6 +3425,20 @@ class StreamController extends AbstractController
         return $entities;
     }
 
+    /**
+     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
+     */
+    private function storeGeneratedDocumentInStream(array $fileData, Message $message, bool $ephemeral = false): ?GeneratedDocumentBundle
+    {
+        if (null !== $this->generatedDocumentStore) {
+            return $this->generatedDocumentStore->store($fileData, $message, $ephemeral);
+        }
+
+        $file = $this->storeGeneratedFileInStream($fileData, $message, $ephemeral);
+
+        return null !== $file ? new GeneratedDocumentBundle($file) : null;
+    }
+
     private function storeGeneratedFileInStream(array $fileData, Message $message, bool $ephemeral = false): ?File
     {
         $userId = $message->getUserId();
@@ -3492,6 +3541,7 @@ class StreamController extends AbstractController
 
             $this->em->persist($file);
             $this->em->flush();
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             $this->logger->info('StreamController: File generated and stored successfully', [
                 'file_id' => $file->getId(),

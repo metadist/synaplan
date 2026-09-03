@@ -7,12 +7,12 @@ namespace App\AI\ToolCalling;
 /**
  * A provider-agnostic description of one tool the model may call.
  *
- * Call-sites pass a list of these via `$options['tools']` to
- * {@see \App\AI\Service\AiFacade::chat()} / `chatStream()` — deliberately NOT
- * in any provider's wire shape, so neither the OpenAI `function` envelope nor
- * Anthropic's `input_schema` naming leaks into the internal contract. Each
- * provider's {@see ToolCallingTranslator} target maps this into its own
- * dialect.
+ * Call-sites build these and hand them to {@see ToolCallingTranslator}, which
+ * emits the request options {@see \App\AI\Service\AiFacade::chat()} takes.
+ * The indirection is deliberate: a toolset such as
+ * {@see \App\Service\Message\Routing\RoutingToolset} describes what the model
+ * may do without the OpenAI `function` envelope or Anthropic's `input_schema`
+ * naming leaking into it.
  *
  * `$parameters` is plain JSON Schema for the tool's argument object (the same
  * conservative subset {@see \App\AI\StructuredOutput\StructuredOutputSchema}

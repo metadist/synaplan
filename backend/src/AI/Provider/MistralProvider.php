@@ -7,7 +7,9 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -30,8 +32,9 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * @see https://docs.mistral.ai/
  * @see https://docs.mistral.ai/studio-api/audio/overview
  */
-class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, VisionProviderInterface
+class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
     private const PROVIDER_NAME = 'mistral';
     private const BASE_URI = 'https://api.mistral.ai/v1';
     private const TRANSCRIBE_ENDPOINT = 'https://api.mistral.ai/v1/audio/transcriptions';
@@ -189,10 +192,10 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
             $response = $this->client()->chat()->create($requestOptions);
             $responseArray = $response->toArray();
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $response->choices[0]->message->content ?? '',
                 'usage' => $this->parseUsage($responseArray['usage'] ?? []),
-            ];
+            ], $responseArray['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -239,6 +242,8 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
                 if (isset($response->choices[0]->delta->content)) {
                     $callback($response->choices[0]->delta->content);
                 }
+
+                $this->emitChatCompletionsToolDeltas($responseArray['choices'][0] ?? [], $callback);
             }
 
             $callback(['type' => 'finish', 'finish_reason' => $finishReason ?? 'stop']);
@@ -702,7 +707,7 @@ class MistralProvider implements ChatProviderInterface, SpeechToTextProviderInte
             $requestOptions = array_merge($requestOptions, $this->structuredOutputTranslator->translate($this->getName(), $options['model'] ?? null, $stream, $schema));
         }
 
-        return $requestOptions;
+        return $this->applyChatCompletionsToolOptions($requestOptions, $options);
     }
 
     /**

@@ -248,16 +248,16 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'Channels → Email / Microsoft 365',
             'channels',
         );
+        $pdfReady = $this->officeEngineConfigured();
         $facts[] = new CapabilityFact(
             'document_generation',
             'Documents',
             CapabilityState::Available,
-            'DOCX, XLSX, PPTX, CSV',
+            $pdfReady ? 'DOCX, XLSX, PPTX, CSV, PDF' : 'DOCX, XLSX, PPTX, CSV',
             null,
             null,
             'using-synaplan',
         );
-        $pdfReady = $this->envNonEmpty('OFFICE_CONVERT_URL');
         $facts[] = $this->fact(
             'pdf_export',
             'PDF export',
@@ -476,6 +476,20 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         }
 
         return '' !== trim($value);
+    }
+
+    /**
+     * Same gate as {@see \App\Service\File\Office\OfficeConverterClient::isEnabled()}.
+     */
+    private function officeEngineConfigured(): bool
+    {
+        $value = $_ENV['OFFICE_CONVERT_URL'] ?? $_SERVER['OFFICE_CONVERT_URL'] ?? getenv('OFFICE_CONVERT_URL');
+        if (!is_string($value)) {
+            return false;
+        }
+        $url = trim($value);
+
+        return '' !== $url && 'disabled' !== $url;
     }
 
     private function userHasWebDav(int $userId): bool

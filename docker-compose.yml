@@ -13,6 +13,22 @@
 #   docker compose down
 #   docker compose -f docker-compose-minimal.yml up -d
 #
+# Lean by design -- core vs optional building blocks
+# ---------------------------------------------------
+# Core (always):     frontend, backend, worker, db (MariaDB), redis
+# On by default,     ollama (local AI), qdrant (memories / vectors),
+#   switchable:      centrifugo (live support), tika (text extraction)
+#                    -> stop one:  docker compose stop <name>
+#                       (Synaplan keeps running; the matching feature hides)
+#                    -> keep it off across restarts: give it a profile in a
+#                       docker-compose.override.yml, e.g.
+#                         services: { qdrant: { profiles: [optional] } }
+# Opt-in profiles:   office (Collabora CODE, office files, ~2 GB RAM)
+#                    tts    (Piper text-to-speech)
+#                    oidc   (Keycloak, SSO test realm)
+#                    -> docker compose --profile office --profile tts up -d
+# The boot page at http://localhost:5173 shows which blocks are running.
+#
 services:
   # ----------------------------------------------------------------------------
   # Startup notes (one-shot) - human-readable guidance for `docker compose up`.
@@ -62,6 +78,18 @@ services:
 
          Chat needs one AI provider key -- the app greets you with
          a first-run setup screen and guides you (free key: Groq).
+
+         LEAN BY DESIGN -- optional building blocks
+           Core is small: app + MariaDB + Redis. Everything else is a
+           block you switch on when you need it, off when you don't:
+             Ollama      local AI            on   (docker compose stop ollama)
+             Qdrant      memories / vectors  on   (docker compose stop qdrant)
+             Centrifugo  live support        on   (REALTIME_ENABLED=false)
+             Tika        text extraction     on   (docker compose stop tika)
+             Collabora   office files        off  (--profile office)
+             TTS         spoken answers      off  (--profile tts)
+           Off = Synaplan keeps running, the feature simply stays hidden.
+           The status screen lists the live state of every block.
 
          Follow this readiness check:  docker compose logs -f startup-notes
          Follow the whole stack:       docker compose logs -f
@@ -137,6 +165,10 @@ services:
       # Probed by the boot-status onboarding page (see /boot-status mount).
       BOOT_STATUS_OLLAMA_URL: http://ollama:11434
       BOOT_STATUS_DB_HOST: db
+      # Optional building blocks the boot page lists with a live on/off state
+      # (TCP probe per entry). A profile that is not enabled leaves the host
+      # name unresolvable, so the block shows as "off" with its enable command.
+      BOOT_STATUS_COMPANIONS: qdrant=qdrant:6333,centrifugo=centrifugo:8000,tika=tika:9998,collabora=collabora:9980,tts=tts:10200
     ports:
       - "5173:5173"
     volumes:
@@ -264,6 +296,12 @@ services:
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
+      # Collabora CODE convert-to. Local default is the compose service name.
+      # Override with OFFICE_CONVERT_URL for an external CODE, or set
+      # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
+      # needs `--profile office` (it is not started by a plain `up -d`).
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -417,6 +455,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
+      OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
+      OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
@@ -851,6 +891,30 @@ services:
       - ./_docker/keycloak/setup.sh:/setup/setup.sh:ro
     profiles: [oidc]
     restart: "no"
+    networks:
+      - synaplan-network
+
+  # Optional Collabora CODE — LibreOffice convert-to over HTTP.
+  # Not started by default (keeps ~2 GB RAM off the core stack). Enable with:
+  #   docker compose --profile office up -d
+  # Docs: docs/DEVELOPMENT.md ("Office conversion")
+  # No published port: the backend talks to collabora:9980 on the compose network.
+  collabora:
+    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    container_name: synaplan-collabora
+    profiles: [office]
+    restart: unless-stopped
+    mem_limit: 2g
+    environment:
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+    # CODE 25.04 dropped curl (CollaboraOnline/online#11856). Same /dev/tcp
+    # probe as deploy/compose.yaml's ollama service; coolwsd --probe is 26.04+.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9980 && printf 'GET /hosting/capabilities HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     networks:
       - synaplan-network
 

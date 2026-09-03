@@ -53,6 +53,12 @@
         <env name="WHISPER_ENABLED" value="false" />
         <env name="FFMPEG_BINARY" value="/usr/bin/ffmpeg" />
         <env name="SYNAPLAN_TTS_URL" value="" />
+        <!-- Office engine off in tests. Docker compose sets OFFICE_CONVERT_URL
+             when the Collabora sidecar is up; without force=true, kernel tests
+             (runtime config, sorter snapshots) would see the live engine. -->
+        <env name="OFFICE_CONVERT_URL" value="" force="true" />
+        <server name="OFFICE_CONVERT_URL" value="" force="true" />
+        <env name="OFFICE_CONVERT_TIMEOUT_MS" value="60000" force="true" />
     </php>
 
     <testsuites>

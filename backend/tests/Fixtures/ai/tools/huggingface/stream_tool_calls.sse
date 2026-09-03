@@ -1,0 +1,7 @@
+data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_hf_1","type":"function","function":{"name":"lookup","arguments":"{\"id\":"}}]}}]}
+
+data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"12}"}}]}}]}
+
+data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":20,"completion_tokens":8,"total_tokens":28}}
+
+data: [DONE]

@@ -6,9 +6,9 @@ use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\AI\ToolCalling\ToolCall;
 use App\AI\ToolCalling\ToolCallingCapability;
-use App\AI\ToolCalling\ToolDefinition;
+use App\AI\ToolCalling\ToolCallingTranslator;
+use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
@@ -114,7 +114,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
             $this->alwaysOnStructuredOutputConfig(),
-            new ToolCallingCapability(),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
             new RoutingToolset(new SystemCapabilityRegistry()),
         );
     }
@@ -174,8 +175,12 @@ class ChatHandlerTest extends TestCase
             ->expects($this->once())
             ->method('chat')
             ->with($this->anything(), 1, $this->callback(function (array $options): bool {
-                $names = array_map(static fn (ToolDefinition $t): string => $t->name, $options['tools']);
+                $names = array_map(
+                    static fn (array $tool): string => $tool['function']['name'],
+                    $options['tools'],
+                );
                 self::assertSame(['handoff_mediamaker', 'handoff_officemaker', 'handoff_docsummary'], $names);
+                self::assertSame('auto', $options['tool_choice']);
 
                 return true;
             }))
@@ -199,7 +204,7 @@ class ChatHandlerTest extends TestCase
             'content' => 'Sure, let me generate that.',
             'provider' => 'anthropic',
             'model' => 'claude-sonnet-5',
-            'tool_calls' => [new ToolCall('toolu_1', 'handoff_mediamaker', ['media_type' => 'image'])],
+            'tool_calls' => [['id' => 'toolu_1', 'type' => 'function', 'function' => ['name' => 'handoff_mediamaker', 'arguments' => '{"media_type":"image"}']]],
         ]);
 
         $directive = RoutingDirective::fromHandlerResult(
@@ -220,7 +225,7 @@ class ChatHandlerTest extends TestCase
             'content' => 'Paris.',
             'provider' => 'anthropic',
             'model' => 'claude-sonnet-5',
-            'tool_calls' => [new ToolCall('toolu_1', 'search_the_web', [])],
+            'tool_calls' => [['id' => 'toolu_1', 'type' => 'function', 'function' => ['name' => 'search_the_web', 'arguments' => '{}']]],
         ]);
 
         $result = $this->handler->handle($message, [], $this->deferredClassification());
@@ -1825,7 +1830,8 @@ class ChatHandlerTest extends TestCase
             $this->createMock(\App\Service\File\ConversationFileCatalog::class),
             $this->createMock(\App\Service\File\GeneratedImageVisionFlag::class),
             $structuredOutputConfig,
-            new ToolCallingCapability(),
+            new ToolCallingTranslator(new ToolCallingCapability()),
+            new ToolCallParser(),
             new RoutingToolset(new SystemCapabilityRegistry()),
         );
 
