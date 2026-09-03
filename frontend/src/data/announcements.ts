@@ -24,11 +24,12 @@ export interface AnnouncementContext {
   /** True inside the native shell, false in a browser. */
   isNativeApp: boolean
   /**
-   * Best-effort OS of the browser itself (not the native shell), used only to
-   * decide which store button leads for this visitor. 'other' covers desktop
-   * and anything we cannot tell apart.
+   * Best-effort OS of the browser itself (not the native shell). Kept on the
+   * context so a later announcement can still order platform-specific actions.
    */
   deviceOs: 'ios' | 'android' | 'other'
+  /** UI locale, used to pick the marketing-site language prefix. */
+  locale: string
 }
 
 /** One call-to-action button the modal renders. */
@@ -64,48 +65,22 @@ export interface Announcement {
   image?: string
 }
 
+const MARKETING_SITE = 'https://www.synaplan.com'
+
 /**
- * Tags a store link so the stores can attribute the install to this
- * campaign. Goes through `URL` rather than string concatenation so a
- * fragment (`#...`) stays after the query instead of swallowing it, and so
- * re-tagging never leaves two `ct` parameters if the operator already set
- * one — it overwrites theirs instead of duplicating it.
+ * Official download chooser on the marketing site. German UI gets `/de/app`;
+ * every other locale lands on the default English page — the website only
+ * ships those two languages.
  */
-function withCampaign(url: string, campaign: string): string {
-  try {
-    const tagged = new URL(url)
-    tagged.searchParams.set('ct', campaign)
-    return tagged.toString()
-  } catch {
-    // Not an absolute URL (e.g. a relative path an operator pasted by
-    // mistake). Falling back to the simple form still gets them a working
-    // link instead of a thrown error breaking the whole announcement.
-    return `${url}${url.includes('?') ? '&' : '?'}ct=${campaign}`
-  }
+function marketingAppUrl(locale: string): string {
+  const prefix = locale.toLowerCase().startsWith('de') ? '/de' : ''
+
+  return `${MARKETING_SITE}${prefix}/app`
 }
 
-/**
- * Store buttons for this visitor: only the stores the operator published,
- * ordered so a visitor's own platform leads — reaching for the wrong store on
- * a phone is the one mistake this ordering exists to avoid. Desktop visitors
- * (`deviceOs: 'other'`) see the App Store first, matching the tie-break used
- * elsewhere (`ForceUpdateScreen`, `SubscriptionView`).
- */
-function storeActions({
-  iosAppUrl,
-  androidAppUrl,
-  deviceOs,
-}: AnnouncementContext): AnnouncementAction[] {
-  const appStore: AnnouncementAction | null = iosAppUrl
-    ? { labelKey: 'appStore', url: withCampaign(iosAppUrl, 'web-announcement') }
-    : null
-  const googlePlay: AnnouncementAction | null = androidAppUrl
-    ? { labelKey: 'googlePlay', url: withCampaign(androidAppUrl, 'web-announcement') }
-    : null
-
-  const ordered = 'android' === deviceOs ? [googlePlay, appStore] : [appStore, googlePlay]
-
-  return ordered.filter((action): action is AnnouncementAction => null !== action)
+/** One button to the chooser page, so nobody is sent to the wrong store. */
+function marketingAppActions({ locale }: AnnouncementContext): AnnouncementAction[] {
+  return [{ labelKey: 'getTheApp', url: marketingAppUrl(locale) }]
 }
 
 export const announcements: Announcement[] = [
@@ -118,7 +93,7 @@ export const announcements: Announcement[] = [
     // inside it.
     applies: ({ iosAppUrl, androidAppUrl, isNativeApp }) =>
       ('' !== iosAppUrl || '' !== androidAppUrl) && !isNativeApp,
-    actions: storeActions,
+    actions: marketingAppActions,
     // No illustration: the one we have is an iPhone-only mockup, which would
     // misrepresent the announcement for an Android visitor. The modal falls
     // back to the instance's own brand mark instead (see `image` above).

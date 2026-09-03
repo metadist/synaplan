@@ -112,28 +112,14 @@ describe('AnnouncementModal', () => {
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
   })
 
-  it('greets a web visitor of an instance that has both apps, App Store leading', async () => {
+  it('greets a web visitor of an instance that has an app with a link to the chooser', async () => {
     const wrapper = await mountModal()
 
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
     expect(
-      wrapper.find('[data-testid="link-announcement-action-appStore"]').attributes('href')
-    ).toBe('https://apps.apple.com/app/id6784278288?ct=web-announcement')
-    expect(
-      wrapper.find('[data-testid="link-announcement-action-googlePlay"]').attributes('href')
-    ).toBe('https://play.google.com/store/apps/details?id=com.synaplan.app&ct=web-announcement')
-  })
-
-  it('leads with Google Play for a visitor on an Android device', async () => {
-    runtime.deviceOs = 'android'
-
-    const wrapper = await mountModal()
-    const actions = wrapper.findAll('a[data-testid^="link-announcement-action-"]')
-
-    expect(actions.map((action) => action.attributes('data-testid'))).toEqual([
-      'link-announcement-action-googlePlay',
-      'link-announcement-action-appStore',
-    ])
+      wrapper.find('[data-testid="link-announcement-action-getTheApp"]').attributes('href')
+    ).toBe('https://www.synaplan.com/app')
+    expect(wrapper.findAll('a[data-testid^="link-announcement-action-"]')).toHaveLength(1)
   })
 
   it('falls back to the brand mark when the announcement has no illustration', async () => {
@@ -158,8 +144,7 @@ describe('AnnouncementModal', () => {
     const wrapper = await mountModal()
 
     expect(wrapper.find(`[data-testid="${modal}"]`).exists()).toBe(true)
-    expect(wrapper.find('[data-testid="link-announcement-action-appStore"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="link-announcement-action-googlePlay"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="link-announcement-action-getTheApp"]').exists()).toBe(true)
   })
 
   it('does not advertise the app inside the app', async () => {
@@ -191,9 +176,9 @@ describe('AnnouncementModal', () => {
     expect((await mountModal()).find(`[data-testid="${modal}"]`).exists()).toBe(false)
   })
 
-  it('counts following a store link as having seen it', async () => {
+  it('counts following the chooser link as having seen it', async () => {
     const wrapper = await mountModal()
-    await wrapper.find('[data-testid="link-announcement-action-appStore"]').trigger('click')
+    await wrapper.find('[data-testid="link-announcement-action-getTheApp"]').trigger('click')
 
     expect(JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]')).toContain('mobile-apps-launch')
   })

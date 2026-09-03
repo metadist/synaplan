@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { detectBrowserOs } from '@/utils/detectBrowserOs'
@@ -79,6 +80,7 @@ const seen = ref<string[]>(loadSeen())
 
 export function useAnnouncements() {
   const config = useConfigStore()
+  const { locale } = useI18n()
 
   const current = computed<ActiveAnnouncement | null>(() => {
     const context: AnnouncementContext = {
@@ -86,6 +88,7 @@ export function useAnnouncements() {
       androidAppUrl: config.mobile.androidAppUrl,
       isNativeApp: isNativeApp(),
       deviceOs: detectBrowserOs(),
+      locale: locale.value,
     }
 
     const announcement = selectAnnouncement(announcements, seen.value, context, Date.now())
