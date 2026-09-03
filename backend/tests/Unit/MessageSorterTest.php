@@ -2,8 +2,11 @@
 
 namespace App\Tests\Unit;
 
+use App\AI\Exception\ProviderException;
+use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\StructuredOutput\StructuredOutputRecovery;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Entity\Message;
 use App\Entity\Prompt;
@@ -678,6 +681,143 @@ class MessageSorterTest extends TestCase
 
         $this->assertInstanceOf(StructuredOutputSchema::class, $options['structured_output'] ?? null);
         $this->assertSame(['general', 'mediamaker', 'docsummary'], $options['structured_output']->schema['properties']['BTOPIC']['enum']);
+    }
+
+    /**
+     * A routing model whose JSON keeps failing the schema even after the
+     * facade's salvage + corrective retry must NOT fail the turn: routing has
+     * a safe default. Before this, the sorter re-threw every ProviderException
+     * and the user saw a raw "Groq chat error: Generated JSON does not match
+     * the expected schema …" bubble instead of an answer.
+     */
+    public function testClassifyFallsBackToGeneralWhenStructuredOutputIsUnrecoverable(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'officemaker']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([
+            ['topic' => 'general', 'description' => 'catch-all'],
+        ]);
+
+        $aiFacade->method('chat')->willThrowException(new StructuredOutputViolationException(
+            'groq',
+            "additionalProperties 'BDATETIME', 'BTEXT' not allowed",
+            '{"BDATETIME":"20260903124200","BTEXT":"ok, mach mir ein PDF"}',
+            'sort_classification',
+        ));
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+        );
+
+        $result = $sorter->classify(['BTEXT' => 'ok, mach mir ein PDF', 'BLANG' => 'de', 'BTOPIC' => ''], [], null);
+
+        $this->assertSame('general', $result['topic']);
+        $this->assertSame('de', $result['language'], 'the incoming language is kept, not reset to en');
+        $this->assertFalse($result['web_search']);
+        $this->assertNull($result['multi_step']);
+        $this->assertSame('schema_violation', $result['routing_fallback_reason']);
+        $this->assertLessThan(1.0, $result['routing_confidence'], 'a fallback is not a confident decision');
+    }
+
+    /**
+     * Every OTHER provider failure still propagates: a missing API key
+     * carries setup instructions the user must see, and silently routing to
+     * `general` would only move the same failure to the answering call.
+     */
+    public function testClassifyStillRethrowsOtherProviderFailures(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([]);
+
+        $aiFacade->method('chat')->willThrowException(ProviderException::missingApiKey('groq', 'GROQ_API_KEY'));
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+        );
+
+        $this->expectException(ProviderException::class);
+        $this->expectExceptionMessage('GROQ_API_KEY');
+
+        $sorter->classify(['BTEXT' => 'hello', 'BLANG' => 'en', 'BTOPIC' => ''], [], null);
+    }
+
+    /**
+     * An answer that took the healing loop is still a full-confidence
+     * classification (it IS schema-valid) — but the recovery is logged at
+     * warning level so a recurring one surfaces as a prompt/schema problem.
+     */
+    public function testClassifyLogsWhenTheAnswerCameFromTheHealingLoop(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $promptRepository = $this->createMock(PromptRepository::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('getPrompt')->willReturn('SORT [DYNAMICLIST] [KEYLIST] [LANGLIST]');
+        $promptRepository->expects($this->any())->method('findByTopic')->with('tools:sort', 0)->willReturn($prompt);
+        $promptRepository->method('getAllTopics')->willReturn(['general', 'officemaker']);
+        $promptRepository->method('getTopicsWithDescriptions')->willReturn([]);
+
+        $aiFacade->method('chat')->willReturn([
+            'content' => '{"BTOPIC":"officemaker","BLANG":"de","BWEBSEARCH":false,"BMULTI":false,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}',
+            'provider' => 'groq',
+            'model' => 'openai/gpt-oss-120b',
+            StructuredOutputRecovery::RESPONSE_KEY => StructuredOutputRecovery::RECOVERY_SALVAGED,
+        ]);
+
+        $recoveryLogged = false;
+        $logger->method('warning')->willReturnCallback(
+            static function (string $message, array $context = []) use (&$recoveryLogged): void {
+                if (str_contains($message, 'healing loop')) {
+                    $recoveryLogged = StructuredOutputRecovery::RECOVERY_SALVAGED === ($context['recovery'] ?? null);
+                }
+            }
+        );
+
+        $sorter = new MessageSorter(
+            $aiFacade,
+            $promptRepository,
+            $this->createMock(ModelConfigService::class),
+            $this->createMock(PromptService::class),
+            $this->createMock(RateLimitService::class),
+            $this->createMock(EntityManagerInterface::class),
+            $logger,
+            $this->createMock(DiscordNotificationService::class),
+            $this->alwaysOnStructuredOutputConfig(),
+        );
+
+        $result = $sorter->classify(['BTEXT' => 'ok, mach mir ein PDF', 'BLANG' => 'de', 'BTOPIC' => ''], [], null);
+
+        $this->assertTrue($recoveryLogged);
+        $this->assertSame('officemaker', $result['topic']);
+        $this->assertSame(1.0, $result['routing_confidence']);
     }
 
     /**

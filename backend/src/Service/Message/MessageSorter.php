@@ -2,10 +2,12 @@
 
 namespace App\Service\Message;
 
+use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\SortClassificationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
+use App\AI\StructuredOutput\StructuredOutputRecovery;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
@@ -67,6 +69,14 @@ final readonly class MessageSorter
      * the existing history window instead of growing it.
      */
     private const FILE_ANNOTATION_BUDGET = 600;
+
+    /**
+     * {@see RoutingDecision} fallback reason when the routing model's answer
+     * kept failing the schema even after {@see AiFacade::chat()}'s salvage and
+     * corrective retry. Distinct from `json_parse_failed` (the model answered,
+     * we could not read it) so the two show up separately in routing logs.
+     */
+    private const FALLBACK_REASON_SCHEMA_VIOLATION = 'schema_violation';
 
     /**
      * Canonical video resolutions accepted downstream by MediaGenerationService
@@ -298,6 +308,19 @@ final readonly class MessageSorter
 
             $aiResponse = $response['content'];
 
+            $recovery = $response[StructuredOutputRecovery::RESPONSE_KEY] ?? null;
+            if (is_string($recovery)) {
+                // The answer is schema-valid, but it took the healing loop to
+                // get there. Logged at warning level on purpose: a recurring
+                // recovery means the sorter prompt or schema needs fixing.
+                $this->logger->warning('MessageSorter: classification came from the structured-output healing loop', [
+                    'recovery' => $recovery,
+                    'provider' => $response['provider'] ?? $provider,
+                    'model' => $response['model'] ?? $modelName,
+                    'user_id' => $userId,
+                ]);
+            }
+
             $recordedSortingUsage = $this->recordSortingUsage($userId, $modelId, $response);
 
             $this->logger->info('MessageSorter: AI response received', [
@@ -388,6 +411,32 @@ final readonly class MessageSorter
                     'completion_tokens' => $recordedSortingUsage->completionTokens,
                 ] : null,
             ], $routingDecision->toClassificationFields());
+        } catch (StructuredOutputViolationException $e) {
+            // The facade already tried salvage + one corrective retry. The
+            // routing model still could not produce a schema-valid vote — but
+            // routing has a safe default, and a routing hiccup must never kill
+            // the whole turn (the user saw a raw "Groq chat error" bubble for
+            // exactly this). Fall back to `general` and let the answering
+            // model handle the message.
+            $this->logger->error('MessageSorter: structured output unrecoverable, falling back to general', [
+                'error' => $e->getMessage(),
+                'provider' => $e->getProviderName(),
+                'schema' => $e->getSchemaName(),
+                'user_id' => $userId,
+            ]);
+
+            $violationDecision = RoutingDecision::fallback('general', self::FALLBACK_REASON_SCHEMA_VIOLATION);
+
+            return array_merge([
+                'topic' => 'general',
+                'language' => $messageData['BLANG'] ?? 'en',
+                'web_search' => false,
+                'multi_step' => null,
+                'raw_response' => '',
+                'sorting_model_id' => $modelId,
+                'sorting_provider' => $provider,
+                'sorting_model_name' => $modelName,
+            ], $violationDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
             // Re-throw ProviderException to preserve install instructions
             $this->logger->error('MessageSorter: AI Provider failed', [
