@@ -9,7 +9,7 @@ office documents: `../20260902-office-docs/`.
 | ----------- | ------------- | ----- | ----- |
 | 0.1 — WOPI host endpoints | `feat/wopi-host` | planned | Needs office-docs A0 (sidecar) and a public editor hostname per cluster |
 | 0.2 — Editor view + "Open in editor" | `feat/office-editor-view` | planned | `useCollaboraFrame.ts` is the single postMessage seam |
-| 1.1 — Tool-calling-transparent `/v1/chat/completions` | office-docs Phase T (T1–T7) | planned, high prio | Built once in `../20260902-office-docs/03_phase_t_tool_calling_gateway.md`; Collabora editor tools after T3; MCP + web search after T4 |
+| 1.1 — Tool-calling-transparent `/v1/chat/completions` | office-docs Phase T (T1–T7) | done in `feat/office-tools-v1` (uncommitted) | `ToolCallingChatProviderInterface` + `OpenAiGatewayToolLoop` exist. Collabora editor tools work after T3; MCP + web search after T4. Do not re-add them here. |
 | 1.2 — Sidebar provisioning (WOPI `UserPrivateInfo`, `coolwsd.xml`, per user) | `feat/collabora-ai-provisioning` | planned | Per-user gateway API key minted lazily |
 | 1.3 — Knowledge / memories / metering tag through the gateway | — | planned | Each flag-gated, default off |
 | 2.1 — `synaplan-collabora` repo + build + auth | new repo | planned | Extension framework is experimental (manifest 0.1) |

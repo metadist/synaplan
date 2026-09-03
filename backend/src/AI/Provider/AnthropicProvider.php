@@ -5,8 +5,11 @@ namespace App\AI\Provider;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Tool\CatalogToolUse;
+use App\AI\Tool\OpenAiToolShapes;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -20,20 +23,20 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * - Extended Thinking (reasoning)
  * - System messages
  *
- * Tool use / function calling is NOT implemented here. Claude Code and other
- * Anthropic-protocol clients that need tools should use the Messages gateway
- * at POST /v1/messages (AnthropicPassthroughTranslator), which forwards the
- * request body verbatim — including tools — to the upstream Anthropic API.
+ * Tool use / function calling is implemented for the ChatProvider contract
+ * (tools / tool_choice / tool_calls). Claude Code and other Anthropic-protocol
+ * clients that need a verbatim Anthropic body should still use the Messages
+ * gateway at POST /v1/messages (AnthropicPassthroughTranslator).
  *
  * Note on Claude Fable 5.1 / Claude Mythos 5.1: those models reject forced
  * tool_choice ({"type": "any"} or {"type": "tool", "name": ...}) with a 400
  * invalid_request_error — only "auto" (default) and "none" are accepted.
- * This provider is unaffected since it never sends tool_choice. The Messages
- * Gateway passthrough forwards the client's tool_choice verbatim and lets
+ * This provider maps `required` / named tools to those types and lets
  * Anthropic's own 400 surface the mismatch, exactly as a direct API call
- * would.
+ * would. The Messages gateway passthrough forwards the client's tool_choice
+ * verbatim.
  */
-class AnthropicProvider implements ChatProviderInterface, VisionProviderInterface
+class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
 {
     private const API_VERSION = '2023-06-01';
     private const BASE_URL = 'https://api.anthropic.com/v1';
@@ -116,6 +119,15 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
     public function getName(): string
     {
         return 'anthropic';
+    }
+
+    public function supportsToolCalling(string $model): bool
+    {
+        if (CatalogToolUse::hasChatRow($this->getName(), $model)) {
+            return CatalogToolUse::supports($this->getName(), $model);
+        }
+
+        return true;
     }
 
     public function getDisplayName(): string
@@ -220,6 +232,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 ]);
             }
 
+            $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
+
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
                 'message_count' => count($conversationMessages),
@@ -238,6 +252,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             // Extract content blocks
             $textContent = '';
             $thinkingContent = '';
+            $toolCalls = $this->extractAnthropicToolCalls($data['content'] ?? []);
 
             foreach ($data['content'] ?? [] as $block) {
                 $type = $block['type'] ?? '';
@@ -270,10 +285,18 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 'has_thinking' => !empty($thinkingContent),
             ]);
 
-            return [
+            $result = [
                 'content' => $textContent,
                 'usage' => $usage,
             ];
+            if ([] !== $toolCalls) {
+                $result['tool_calls'] = $toolCalls;
+                $result['finish_reason'] = 'tool_calls';
+            } elseif ('tool_use' === ($data['stop_reason'] ?? null)) {
+                $result['finish_reason'] = 'tool_calls';
+            }
+
+            return $result;
         } catch (\Exception $e) {
             $errorMessage = $e->getMessage();
             $upstreamStatus = 0;
@@ -350,6 +373,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                     'thinking' => $requestBody['thinking'],
                 ]);
             }
+
+            $requestBody = $this->applyAnthropicToolOptions($requestBody, $options);
 
             $this->logger->info('Anthropic: Starting streaming chat', [
                 'model' => $model,
@@ -806,9 +831,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
             $last = &$merged[count($merged) - 1];
 
             if ($messages[$i]['role'] === $last['role']) {
-                $prevContent = is_string($last['content']) ? $last['content'] : json_encode($last['content']);
-                $curContent = is_string($messages[$i]['content']) ? $messages[$i]['content'] : json_encode($messages[$i]['content']);
-                $last['content'] = $prevContent."\n\n".$curContent;
+                $last['content'] = $this->concatAnthropicContent($last['content'], $messages[$i]['content']);
             } else {
                 $merged[] = $messages[$i];
             }
@@ -909,6 +932,15 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
                         if ('thinking' === $currentBlockType) {
                             $this->logger->info('🧠 Anthropic: Thinking block started');
+                        } elseif ('tool_use' === $currentBlockType) {
+                            $block = is_array($event['data']['content_block'] ?? null) ? $event['data']['content_block'] : [];
+                            $callback([
+                                'type' => 'tool_call_delta',
+                                'index' => (int) ($event['data']['index'] ?? 0),
+                                'id' => isset($block['id']) && is_string($block['id']) && '' !== $block['id'] ? $block['id'] : null,
+                                'name' => isset($block['name']) && is_string($block['name']) && '' !== $block['name'] ? $block['name'] : null,
+                                'arguments' => '',
+                            ]);
                         }
                         break;
 
@@ -925,6 +957,14 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $callback([
                                 'type' => 'reasoning',
                                 'content' => $delta['thinking'] ?? '',
+                            ]);
+                        } elseif ('input_json_delta' === $deltaType) {
+                            $callback([
+                                'type' => 'tool_call_delta',
+                                'index' => (int) ($event['data']['index'] ?? 0),
+                                'id' => null,
+                                'name' => null,
+                                'arguments' => is_string($delta['partial_json'] ?? null) ? $delta['partial_json'] : '',
                             ]);
                         }
                         // signature_delta carries integrity data only — no forwarding needed
@@ -947,6 +987,7 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                             $finishReason = match ($stopReason) {
                                 'max_tokens' => 'length',
                                 'end_turn' => 'stop',
+                                'tool_use' => 'tool_calls',
                                 default => $stopReason,
                             };
                         }
@@ -1021,7 +1062,8 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
      * Convert OpenAI-style messages to Anthropic format.
      *
      * Handles multimodal content (images) by converting from OpenAI's image_url format
-     * to Anthropic's image source format.
+     * to Anthropic's image source format, and maps assistant `tool_calls` / `role: tool`
+     * onto `tool_use` / `tool_result` blocks.
      *
      * @param array $messages OpenAI-style messages with potential image_url content
      *
@@ -1041,6 +1083,43 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
                 continue;
             }
 
+            if ('tool' === $role) {
+                $result = is_string($content) ? $content : (json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+                $converted[] = [
+                    'role' => 'user',
+                    'content' => [[
+                        'type' => 'tool_result',
+                        'tool_use_id' => (string) ($message['tool_call_id'] ?? ''),
+                        'content' => $result,
+                    ]],
+                ];
+                continue;
+            }
+
+            $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            if ('assistant' === $role && [] !== $toolCalls) {
+                $blocks = $this->anthropicContentBlocks($content);
+                foreach ($toolCalls as $call) {
+                    if (!is_array($call)) {
+                        continue;
+                    }
+                    $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                    $args = $fn['arguments'] ?? '{}';
+                    $decoded = is_string($args) ? json_decode($args, true) : $args;
+                    $blocks[] = [
+                        'type' => 'tool_use',
+                        'id' => (string) ($call['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                        'name' => (string) ($fn['name'] ?? 'tool'),
+                        'input' => is_array($decoded) ? $decoded : [],
+                    ];
+                }
+                $converted[] = [
+                    'role' => 'assistant',
+                    'content' => $blocks,
+                ];
+                continue;
+            }
+
             // If content is a string, keep as-is
             if (is_string($content)) {
                 $converted[] = $message;
@@ -1049,55 +1128,151 @@ class AnthropicProvider implements ChatProviderInterface, VisionProviderInterfac
 
             // If content is an array (multimodal), convert to Anthropic format
             if (is_array($content)) {
-                $anthropicContent = [];
-
-                foreach ($content as $part) {
-                    $type = $part['type'] ?? '';
-
-                    if ('text' === $type) {
-                        $anthropicContent[] = [
-                            'type' => 'text',
-                            'text' => $part['text'] ?? '',
-                        ];
-                    } elseif ('image_url' === $type) {
-                        // Convert OpenAI image_url to Anthropic image source
-                        $imageUrl = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
-
-                        if (str_starts_with($imageUrl, 'data:')) {
-                            // Parse data URL: data:image/jpeg;base64,/9j/4AAQ...
-                            if (preg_match('/^data:([^;]+);base64,(.+)$/', $imageUrl, $matches)) {
-                                $mimeType = $matches[1];
-                                $base64Data = $matches[2];
-
-                                $anthropicContent[] = [
-                                    'type' => 'image',
-                                    'source' => [
-                                        'type' => 'base64',
-                                        'media_type' => $mimeType,
-                                        'data' => $base64Data,
-                                    ],
-                                ];
-                            }
-                        } elseif (str_starts_with($imageUrl, 'http')) {
-                            // URL-based images (Anthropic supports these too)
-                            $anthropicContent[] = [
-                                'type' => 'image',
-                                'source' => [
-                                    'type' => 'url',
-                                    'url' => $imageUrl,
-                                ],
-                            ];
-                        }
-                    }
-                }
-
                 $converted[] = [
                     'role' => $role,
-                    'content' => $anthropicContent,
+                    'content' => $this->anthropicContentBlocks($content),
                 ];
             }
         }
 
         return $converted;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function anthropicContentBlocks(mixed $content): array
+    {
+        if (is_string($content)) {
+            return '' === $content ? [] : [['type' => 'text', 'text' => $content]];
+        }
+        if (!is_array($content)) {
+            return [];
+        }
+
+        $anthropicContent = [];
+        foreach ($content as $part) {
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = $part['type'] ?? '';
+
+            if ('text' === $type) {
+                $anthropicContent[] = [
+                    'type' => 'text',
+                    'text' => $part['text'] ?? '',
+                ];
+            } elseif ('image_url' === $type) {
+                $imageUrl = $part['image_url']['url'] ?? ($part['image_url'] ?? '');
+
+                if (is_string($imageUrl) && str_starts_with($imageUrl, 'data:')) {
+                    if (preg_match('/^data:([^;]+);base64,(.+)$/', $imageUrl, $matches)) {
+                        $anthropicContent[] = [
+                            'type' => 'image',
+                            'source' => [
+                                'type' => 'base64',
+                                'media_type' => $matches[1],
+                                'data' => $matches[2],
+                            ],
+                        ];
+                    }
+                } elseif (is_string($imageUrl) && str_starts_with($imageUrl, 'http')) {
+                    $anthropicContent[] = [
+                        'type' => 'image',
+                        'source' => [
+                            'type' => 'url',
+                            'url' => $imageUrl,
+                        ],
+                    ];
+                }
+            }
+        }
+
+        return $anthropicContent;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyAnthropicToolOptions(array $requestBody, array $options): array
+    {
+        if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {
+            $requestBody['tools'] = OpenAiToolShapes::toAnthropicTools($options['tools']);
+        }
+        if (array_key_exists('tool_choice', $options)) {
+            $mapped = OpenAiToolShapes::toAnthropicToolChoice($options['tool_choice']);
+            if (null !== $mapped) {
+                $requestBody['tool_choice'] = $mapped;
+            }
+        }
+
+        return $requestBody;
+    }
+
+    /**
+     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}}>
+     */
+    private function extractAnthropicToolCalls(mixed $content): array
+    {
+        if (!is_array($content)) {
+            return [];
+        }
+
+        $calls = [];
+        foreach ($content as $block) {
+            if (!is_array($block) || 'tool_use' !== ($block['type'] ?? '')) {
+                continue;
+            }
+            $input = $block['input'] ?? [];
+            $calls[] = [
+                'id' => (string) ($block['id'] ?? ('call_'.bin2hex(random_bytes(6)))),
+                'type' => 'function',
+                'function' => [
+                    'name' => (string) ($block['name'] ?? 'tool'),
+                    'arguments' => is_string($input)
+                        ? ('' !== $input ? $input : '{}')
+                        : (json_encode($input, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}'),
+                ],
+            ];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * Concatenate two Anthropic content payloads when consecutive same-role
+     * turns are merged. String+string keeps the historical "\\n\\n" join so
+     * existing text-only threads stay byte-identical; any array side is
+     * flattened to blocks so a `tool_result` is not JSON-stringified.
+     */
+    private function concatAnthropicContent(mixed $left, mixed $right): array|string
+    {
+        if (is_string($left) && is_string($right)) {
+            return $left."\n\n".$right;
+        }
+
+        return array_merge($this->anthropicContentAsBlocks($left), $this->anthropicContentAsBlocks($right));
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function anthropicContentAsBlocks(mixed $content): array
+    {
+        if (is_string($content)) {
+            return '' === $content ? [] : [['type' => 'text', 'text' => $content]];
+        }
+        if (!is_array($content)) {
+            return [];
+        }
+        if ([] === $content || array_is_list($content)) {
+            /* @var list<array<string, mixed>> $content */
+            return $content;
+        }
+
+        return [$content];
     }
 }

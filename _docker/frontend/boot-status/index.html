@@ -112,6 +112,22 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .blocks { margin-top: 18px; }
+  .blocks h2 { font-size: 17px; margin: 0 0 4px; }
+  .blocks .lead { font-size: 14px; margin: 0 0 6px; max-width: none; }
+  .block { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .block:last-child { border-bottom: none; padding-bottom: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 99px; flex: none; margin-top: 7px; background: var(--muted); opacity: .45; }
+  .block.on .dot { background: var(--ok); opacity: 1; }
+  .block.pending .dot { background: var(--warn); opacity: 1; }
+  .block-body { flex: 1; min-width: 0; }
+  .block-title { font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .block-role { color: var(--muted); font-size: 14px; }
+  .block-state { font-size: 13px; margin-top: 4px; color: var(--muted); }
+  .block.on .block-state { color: var(--ok); }
+  .block-state .kbd { font-size: 12px; }
+  .blocks .hint { margin-top: 12px; }
+
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
   .info h3 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
   .info p, .info ul { margin: 0; color: var(--muted); font-size: 14px; }
@@ -207,6 +223,23 @@
         <div class="step-detail" id="detail-frontend">Preparing the user interface…</div>
       </div>
     </div>
+  </div>
+
+  <div class="card blocks" id="blocks">
+    <h2>Lean by design — switch on only what you need</h2>
+    <p class="lead">
+      The core is small: the app, its database and Redis. Everything below is an
+      <b>optional building block</b>. Each one adds a capability and costs RAM —
+      turn it on when you need it, off when you don't. This list shows what
+      <em>this</em> installation is running right now.
+    </p>
+    <div id="blockList"></div>
+    <p class="hint">
+      Opt-in blocks use Compose profiles (<span class="kbd">docker compose --profile office up -d</span>).
+      Blocks that are on by default can be stopped with <span class="kbd">docker compose stop &lt;name&gt;</span>;
+      Synaplan keeps working and simply hides the matching feature.
+      Details: <a href="https://github.com/metadist/synaplan#lean-by-design-core-vs-optional-building-blocks" target="_blank" rel="noopener">README → Lean by design</a>.
+    </p>
   </div>
 
   <div class="grid">
@@ -314,6 +347,94 @@
     'starting-app':           { p: 92, text: 'Starting the app — one moment…' },
   }
 
+  // ---- optional building blocks -------------------------------------------
+
+  // The server only reports reachability per id (BOOT_STATUS_COMPANIONS in
+  // compose); the human-readable copy lives here. `defaultOn` blocks ship in
+  // the compose file and start with the stack; the others sit behind a
+  // Compose profile and are off until asked for.
+  const BLOCKS = [
+    { id: 'ollama', name: 'Ollama', role: 'Local AI on your own hardware — embeddings for document search, optional local chat',
+      defaultOn: true, stop: 'docker compose stop ollama' },
+    { id: 'qdrant', name: 'Qdrant', role: 'Vector database — AI memories, feedback analysis, large-scale RAG (document search itself runs on MariaDB VECTOR without it)',
+      defaultOn: true, stop: 'docker compose stop qdrant' },
+    { id: 'centrifugo', name: 'Centrifugo', role: 'Live support — human takeover of widget chats, typing indicators, operator notifications',
+      defaultOn: true, stop: 'REALTIME_ENABLED=false docker compose up -d' },
+    { id: 'tika', name: 'Apache Tika', role: 'Text extraction from PDF, Word, Excel and 1000+ formats for RAG',
+      defaultOn: true, stop: 'docker compose stop tika' },
+    { id: 'collabora', name: 'Collabora CODE', role: 'Office files — thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM)',
+      defaultOn: false, start: 'docker compose --profile office up -d' },
+    { id: 'tts', name: 'Text-to-speech', role: 'Spoken answers — four built-in voices (en, de, es, tr)',
+      defaultOn: false, start: 'docker compose --profile tts up -d' },
+  ]
+
+  const kbd = (text) => {
+    const el = document.createElement('span')
+    el.className = 'kbd'
+    el.textContent = text
+    return el
+  }
+
+  let blocksBuilt = false
+  const buildBlocks = () => {
+    const list = $('blockList')
+    for (const b of BLOCKS) {
+      const row = document.createElement('div')
+      row.className = 'block'
+      row.id = 'block-' + b.id
+      const dot = document.createElement('span')
+      dot.className = 'dot'
+      const body = document.createElement('div')
+      body.className = 'block-body'
+      const title = document.createElement('div')
+      title.className = 'block-title'
+      title.append(document.createTextNode(b.name))
+      const tag = document.createElement('span')
+      tag.className = 'tag'
+      tag.textContent = b.defaultOn ? 'on by default' : 'opt-in'
+      title.append(tag)
+      const role = document.createElement('div')
+      role.className = 'block-role'
+      role.textContent = b.role
+      const state = document.createElement('div')
+      state.className = 'block-state'
+      state.id = 'blockstate-' + b.id
+      body.append(title, role, state)
+      row.append(dot, body)
+      list.append(row)
+    }
+    blocksBuilt = true
+  }
+
+  const renderBlocks = (s) => {
+    if (!blocksBuilt) buildBlocks()
+    const feed = s.companions || {}
+    // Ollama is probed separately (it also drives the model-download step).
+    if (s.localAi) feed.ollama = { reachable: Boolean(s.localAi.reachable) }
+    for (const b of BLOCKS) {
+      const row = $('block-' + b.id)
+      const state = $('blockstate-' + b.id)
+      const probe = feed[b.id]
+      row.classList.remove('on', 'pending')
+      state.replaceChildren()
+      if (!probe) {
+        // Not wired into this compose file at all (e.g. Ollama in the minimal stack).
+        state.append(document.createTextNode(
+          b.defaultOn ? 'Not part of this stack — included in the standard docker-compose.yml' : 'Off — enable with '))
+        if (!b.defaultOn) state.append(kbd(b.start))
+      } else if (probe.reachable) {
+        row.classList.add('on')
+        state.append(document.createTextNode('Running'))
+        if (b.stop) state.append(document.createTextNode(' — switch off: '), kbd(b.stop))
+      } else if (b.defaultOn) {
+        row.classList.add('pending')
+        state.append(document.createTextNode('Starting with the stack — or stopped by you (that is fine, the feature just stays hidden)'))
+      } else {
+        state.append(document.createTextNode('Off — enable with '), kbd(b.start))
+      }
+    }
+  }
+
   // ---- handover to the real app -------------------------------------------
 
   // All page fetches carry an explicit timeout: on some setups (Windows
@@ -393,6 +514,8 @@
         setStep('ai', 'active', 'Waiting for the AI engine…', true)
       }
     }
+
+    renderBlocks(s)
 
     // Step 4: frontend (this container)
     const fPhase = s.frontend && (FRONTEND_PHASES[s.frontend.detail] || FRONTEND_PHASES[s.frontend.phase])

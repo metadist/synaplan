@@ -821,6 +821,87 @@ export const getFileContent = async (
  * @param fileId File ID
  * @param filename Original filename for download
  */
+export const exportUrl = (fileId: number, format = 'pdf', inline = false): string => {
+  const params = new URLSearchParams({ format })
+  if (inline) params.set('inline', '1')
+  return `${getApiBaseUrl()}/api/v1/files/${fileId}/export?${params.toString()}`
+}
+
+export const exportFile = async (
+  fileId: number,
+  format: 'pdf',
+  filename: string
+): Promise<void> => {
+  const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/export`, {
+    responseType: 'blob',
+    params: { format },
+  })
+  await saveOrDownloadBlob(blob, filename)
+}
+
+export const exportGuestFile = async (
+  sessionId: string,
+  fileId: number,
+  format: 'pdf',
+  filename: string
+): Promise<void> => {
+  const blob = await httpClient<Blob>(
+    `/api/v1/guest/files/${encodeURIComponent(sessionId)}/${fileId}/export`,
+    {
+      responseType: 'blob',
+      params: { format },
+    }
+  )
+  await saveOrDownloadBlob(blob, filename)
+}
+
+const CombineFilesResponseSchema = z.object({
+  id: z.number(),
+  filename: z.string(),
+  file_type: z.string(),
+  file_size: z.number(),
+})
+
+export const combineFiles = async (
+  fileIds: number[],
+  filename?: string,
+  format: 'pdf' | 'docx' | 'xlsx' | 'pptx' = 'pdf'
+): Promise<z.infer<typeof CombineFilesResponseSchema>> => {
+  return httpClient('/api/v1/files/combine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileIds, filename, format }),
+    schema: CombineFilesResponseSchema,
+  })
+}
+
+const FileRevisionsResponseSchema = z.object({
+  revisions: z.array(
+    z.object({
+      version: z.number(),
+      summary: z.string(),
+      source: z.string(),
+      created: z.number(),
+    })
+  ),
+})
+
+export type FileRevision = z.infer<typeof FileRevisionsResponseSchema>['revisions'][number]
+
+export const listFileRevisions = async (
+  fileId: number
+): Promise<z.infer<typeof FileRevisionsResponseSchema>> => {
+  return httpClient(`/api/v1/files/${fileId}/revisions`, {
+    schema: FileRevisionsResponseSchema,
+  })
+}
+
+export const restoreFileRevision = async (fileId: number, version: number): Promise<void> => {
+  await httpClient(`/api/v1/files/${fileId}/revisions/${version}/restore`, {
+    method: 'POST',
+  })
+}
+
 export const downloadFile = async (fileId: number, filename: string): Promise<void> => {
   const blob = await httpClient<Blob>(`/api/v1/files/${fileId}/download`, {
     responseType: 'blob',
@@ -1110,6 +1191,12 @@ export default {
   getFileContent,
   downloadFile,
   downloadGuestFile,
+  exportFile,
+  exportGuestFile,
+  exportUrl,
+  combineFiles,
+  listFileRevisions,
+  restoreFileRevision,
   shareFile,
   unshareFile,
   getShareInfo,

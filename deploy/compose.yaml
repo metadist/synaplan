@@ -20,6 +20,11 @@ x-app-command: &app-command
         export WHISPER_ENABLED=false
         ;;
     esac
+    case ",$${COMPOSE_PROFILES:-}," in
+      *,office,*)
+        export OFFICE_CONVERT_URL=http://collabora:9980
+        ;;
+    esac
     exec /usr/local/bin/docker-entrypoint.sh
 x-app-environment: &app-environment
   APP_ENV: prod
@@ -73,6 +78,9 @@ x-app-environment: &app-environment
   REALTIME_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
   QDRANT_URL: http://qdrant:6333
   TIKA_BASE_URL: http://tika:9998
+  # Empty until the `office` profile sets it in x-app-command.
+  OFFICE_CONVERT_URL: "${OFFICE_CONVERT_URL:-}"
+  OFFICE_CONVERT_TIMEOUT_MS: "${OFFICE_CONVERT_TIMEOUT_MS:-60000}"
   COMPOSE_PROFILES: "${COMPOSE_PROFILES:-}"
   OLLAMA_BASE_URL: ""
   AUTO_DOWNLOAD_MODELS: "false"
@@ -282,6 +290,26 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    restart: unless-stopped
+    networks: [internal]
+
+  # Optional Collabora CODE — LibreOffice convert-to. Off by default so the
+  # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
+  # (or `--profile office`). No published port.
+  collabora:
+    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    profiles: [office]
+    environment:
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
+    mem_limit: 2g
+    # CODE 25.04 dropped curl (CollaboraOnline/online#11856). Same /dev/tcp
+    # probe as the ollama service below; coolwsd --probe is 26.04+.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9980 && printf 'GET /hosting/capabilities HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
     restart: unless-stopped
     networks: [internal]
 

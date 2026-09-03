@@ -116,6 +116,7 @@ framework:
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
             'App\Message\AdvanceMediaJobCommand': async_index
+            'App\Message\GenerateDocumentThumbnailMessage': async_index
 
 when@test:
     framework:

@@ -58,6 +58,24 @@ class DocumentGeneratorServiceTest extends TestCase
         $this->assertGreaterThan(1000, filesize($path), 'A real DOCX is far larger than its text source');
     }
 
+    public function testDocxRegistersDefaultStylesAndHeadingName(): void
+    {
+        $path = $this->tmpDir.'/styled.docx';
+        $this->service->write("# Quarterly report\n\nA short body paragraph.", 'docx', $path);
+
+        $zip = new \ZipArchive();
+        $this->assertTrue(true === $zip->open($path), 'DOCX must be a valid OOXML zip');
+        $styles = (string) $zip->getFromName('word/styles.xml');
+        $footer = (string) $zip->getFromName('word/footer1.xml');
+        $zip->close();
+
+        $this->assertStringContainsString('Calibri', $styles);
+        $this->assertStringContainsString('Heading1', $styles);
+        $this->assertStringContainsString('1E3A5F', $styles);
+        $this->assertStringContainsString('Heading1', $this->readDocxDocument($path));
+        $this->assertStringContainsString('PAGE', $footer);
+    }
+
     public function testDocxFallbackForUnparsableContentStillProducesValidFile(): void
     {
         $path = $this->tmpDir.'/plain.docx';

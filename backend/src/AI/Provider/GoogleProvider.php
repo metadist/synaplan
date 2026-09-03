@@ -9,8 +9,11 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Tool\CatalogToolUse;
+use App\AI\Tool\OpenAiToolShapes;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
@@ -25,7 +28,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - Veo 2.0 (Video Generation)
  * - Text-to-Speech with Gemini
  */
-class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
+class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
@@ -122,6 +125,15 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         return 'google';
     }
 
+    public function supportsToolCalling(string $model): bool
+    {
+        if (CatalogToolUse::hasChatRow($this->getName(), $model)) {
+            return CatalogToolUse::supports($this->getName(), $model);
+        }
+
+        return true;
+    }
+
     public function getDisplayName(): string
     {
         return 'Google AI';
@@ -203,6 +215,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                     'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
                 ],
             ];
+            $payload = $this->applyGoogleToolOptions($payload, $options);
 
             $this->logger->info('Google: Generating chat completion', [
                 'model' => $model,
@@ -236,16 +249,27 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
             ];
 
             $textContent = '';
+            $toolCalls = [];
             foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
+                if (isset($part['functionCall']) && is_array($part['functionCall'])) {
+                    $toolCalls[] = $this->geminiFunctionCallToToolCall($part['functionCall']);
+                    continue;
+                }
                 if (isset($part['text']) && empty($part['thought'])) {
                     $textContent .= $part['text'];
                 }
             }
 
-            return [
+            $result = [
                 'content' => $textContent,
                 'usage' => $usage,
             ];
+            if ([] !== $toolCalls) {
+                $result['tool_calls'] = $toolCalls;
+                $result['finish_reason'] = 'tool_calls';
+            }
+
+            return $result;
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -298,6 +322,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'contents' => $contents,
                 'generationConfig' => $generationConfig,
             ];
+            $payload = $this->applyGoogleToolOptions($payload, $options);
 
             $this->logger->info('Google: Streaming chat completion', [
                 'model' => $model,
@@ -333,6 +358,8 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                 'cache_creation_tokens' => 0,
             ];
             $finishReason = null;
+            $sawFunctionCall = false;
+            $toolIndex = 0;
 
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk->isLast()) {
@@ -348,16 +375,6 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                     if ($data) {
                         $this->checkGeminiFinishReason($data);
-
-                        // Capture finishReason from the last chunk (Gemini uses "MAX_TOKENS" or "STOP")
-                        $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
-                        if (null !== $geminiFinishReason) {
-                            $finishReason = match ($geminiFinishReason) {
-                                'MAX_TOKENS' => 'length',
-                                'STOP', 'END_TURN' => 'stop',
-                                default => $geminiFinishReason,
-                            };
-                        }
                     }
 
                     // Capture usage from each chunk (last chunk has final values)
@@ -377,6 +394,20 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
                     $parts = $data['candidates'][0]['content']['parts'] ?? [];
                     foreach ($parts as $part) {
+                        if (isset($part['functionCall']) && is_array($part['functionCall'])) {
+                            $call = $this->geminiFunctionCallToToolCall($part['functionCall']);
+                            $callback([
+                                'type' => 'tool_call_delta',
+                                'index' => $toolIndex,
+                                'id' => $call['id'],
+                                'name' => $call['function']['name'],
+                                'arguments' => $call['function']['arguments'],
+                            ]);
+                            ++$toolIndex;
+                            $sawFunctionCall = true;
+                            continue;
+                        }
+
                         if (!isset($part['text']) || '' === $part['text']) {
                             continue;
                         }
@@ -386,6 +417,18 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
                         } else {
                             $callback($part['text']);
                         }
+                    }
+
+                    // Finish reason after parts so FUNCTION_CALL / STOP+functionCall
+                    // in the same chunk map to tool_calls.
+                    $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
+                    if (null !== $geminiFinishReason) {
+                        $finishReason = match ($geminiFinishReason) {
+                            'MAX_TOKENS' => 'length',
+                            'FUNCTION_CALL' => 'tool_calls',
+                            'STOP', 'END_TURN' => $sawFunctionCall ? 'tool_calls' : 'stop',
+                            default => $geminiFinishReason,
+                        };
                     }
                 }
             }
@@ -786,7 +829,7 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
 
         $finishReason = $candidate['finishReason'] ?? null;
 
-        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN'], true)) {
+        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN', 'FUNCTION_CALL'], true)) {
             $textResponse = null;
             $parts = $candidate['content']['parts'] ?? [];
             foreach ($parts as $part) {
@@ -1886,11 +1929,62 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
     {
         $contents = [];
 
+        $toolNamesById = [];
+
         foreach ($messages as $message) {
-            $role = 'assistant' === ($message['role'] ?? 'user') ? 'model' : 'user';
+            $rawRole = $message['role'] ?? 'user';
             $content = $message['content'] ?? '';
 
+            if ('tool' === $rawRole) {
+                $toolCallId = (string) ($message['tool_call_id'] ?? '');
+                $name = is_string($message['name'] ?? null) && '' !== $message['name']
+                    ? (string) $message['name']
+                    : ($toolNamesById[$toolCallId] ?? ($toolCallId ?: 'tool'));
+                $result = $content;
+                if (is_array($result)) {
+                    $result = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
+                }
+                $contents[] = [
+                    'role' => 'user',
+                    'parts' => [[
+                        'functionResponse' => [
+                            'name' => $name,
+                            'response' => ['content' => (string) $result],
+                        ],
+                    ]],
+                ];
+                continue;
+            }
+
+            $role = 'assistant' === $rawRole ? 'model' : 'user';
             $parts = [];
+            $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+            foreach ($toolCalls as $call) {
+                if (!is_array($call)) {
+                    continue;
+                }
+                $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
+                $name = (string) ($fn['name'] ?? 'tool');
+                $id = (string) ($call['id'] ?? '');
+                if ('' !== $id) {
+                    $toolNamesById[$id] = $name;
+                }
+                $args = $fn['arguments'] ?? [];
+                if (is_string($args)) {
+                    $decoded = json_decode($args, true);
+                    $args = is_array($decoded) ? $decoded : [];
+                }
+                if (!is_array($args)) {
+                    $args = [];
+                }
+                $parts[] = [
+                    'functionCall' => [
+                        'name' => $name,
+                        'args' => $args,
+                    ],
+                ];
+            }
+
             if (is_string($content)) {
                 // Skip blank turns: Gemini rejects empty text parts with a 400
                 // ("empty text parameter"), so a blank history row (WhatsApp
@@ -1994,6 +2088,53 @@ class GoogleProvider implements ChatProviderInterface, ImageGenerationProviderIn
         }
 
         return $contents;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyGoogleToolOptions(array $payload, array $options): array
+    {
+        if (isset($options['tools']) && is_array($options['tools']) && [] !== $options['tools']) {
+            $payload['tools'] = [[
+                'functionDeclarations' => OpenAiToolShapes::toGeminiDeclarations($options['tools']),
+            ]];
+        }
+        if (array_key_exists('tool_choice', $options)) {
+            $config = OpenAiToolShapes::toGeminiToolConfig($options['tool_choice']);
+            if (null !== $config) {
+                $payload['toolConfig'] = $config;
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $functionCall
+     *
+     * @return array{id: string, type: 'function', function: array{name: string, arguments: string}}
+     */
+    private function geminiFunctionCallToToolCall(array $functionCall): array
+    {
+        $args = $functionCall['args'] ?? $functionCall['arguments'] ?? [];
+        if (is_string($args)) {
+            $arguments = '' !== $args ? $args : '{}';
+        } else {
+            $arguments = json_encode($args, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
+        }
+
+        return [
+            'id' => 'call_'.bin2hex(random_bytes(6)),
+            'type' => 'function',
+            'function' => [
+                'name' => (string) ($functionCall['name'] ?? 'tool'),
+                'arguments' => $arguments,
+            ],
+        ];
     }
 
     /**

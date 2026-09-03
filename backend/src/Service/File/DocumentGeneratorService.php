@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\File;
 
+use App\Service\File\Office\DocxStyleSheet;
 use App\Service\File\Presentation\PptxRenderer;
 use App\Service\File\Presentation\SlideMarkdownParser;
 use PhpOffice\PhpPresentation\IOFactory as PresentationIOFactory;
@@ -126,10 +127,9 @@ final readonly class DocumentGeneratorService
             $usedFallback = false;
             try {
                 $phpWord = new PhpWord();
-                if ($withToc) {
-                    $this->registerTitleStyles($phpWord);
-                }
-                $section = $phpWord->addSection();
+                DocxStyleSheet::apply($phpWord);
+                $section = $phpWord->addSection(DocxStyleSheet::sectionSettings());
+                DocxStyleSheet::decorateSection($section);
                 $this->addDocxContent($section, $content, $images, $withToc);
             } catch (\Throwable $e) {
                 $this->logger->warning('DocumentGeneratorService: DOCX HTML parsing failed, using plain text fallback', [
@@ -326,22 +326,6 @@ final readonly class DocumentGeneratorService
     }
 
     /**
-     * Register Heading1..6 title styles (with outline levels) so TOC-mode
-     * Titles render as real Word headings and the TOC field can pick them up.
-     */
-    private function registerTitleStyles(PhpWord $phpWord): void
-    {
-        $sizes = [1 => 16, 2 => 14, 3 => 12, 4 => 11, 5 => 11, 6 => 11];
-        foreach ($sizes as $depth => $size) {
-            $phpWord->addTitleStyle(
-                $depth,
-                ['bold' => true, 'size' => $size],
-                ['spaceBefore' => 240, 'spaceAfter' => 120, 'keepNext' => true],
-            );
-        }
-    }
-
-    /**
      * Build a DOCX from the raw content as plain paragraphs. Used as the
      * always-valid fallback when HTML conversion fails or yields no text, so
      * this path must never throw on the document body itself.
@@ -353,7 +337,9 @@ final readonly class DocumentGeneratorService
         $content = $this->stripTocMarker($content);
 
         $phpWord = new PhpWord();
-        $section = $phpWord->addSection();
+        DocxStyleSheet::apply($phpWord);
+        $section = $phpWord->addSection(DocxStyleSheet::sectionSettings());
+        DocxStyleSheet::decorateSection($section);
 
         foreach ($this->splitImageMarkers($content) as $part) {
             if ($part['image']) {

@@ -148,6 +148,31 @@ final class PromptCatalogTest extends TestCase
 
         $this->assertNotNull($plan);
         $this->assertStringContainsString('topic_id: "synaplan"', $plan['prompt']);
+        // Engine-off default: the planner still refuses real PDFs. The live
+        // OfficePdfRoutingDecorator rewrites this only when OFFICE_CONVERT_URL is set.
+        $this->assertStringContainsString('Real PDFs are NOT supported', $plan['prompt']);
+    }
+
+    public function testGeneralPromptDoesNotBounceAlreadyPhrasedCreateRequests(): void
+    {
+        $general = null;
+        foreach (PromptCatalog::all() as $entry) {
+            if ('general' === $entry['topic']) {
+                $general = $entry;
+                break;
+            }
+        }
+
+        $this->assertNotNull($general);
+        $this->assertStringContainsString('do not bounce them', $general['prompt']);
+        $this->assertStringContainsString('PDF', $general['prompt']);
+    }
+
+    public function testOfficeMakerPdfAppendixKeepsBexportOnFollowUpEdits(): void
+    {
+        $appendix = PromptCatalog::officeMakerPdfExportAppendix();
+        $this->assertStringContainsString('earlier in this conversation', $appendix);
+        $this->assertStringContainsString('Keep BEXPORT', $appendix);
     }
 
     public function testTopicsAreUniquePerLanguage(): void

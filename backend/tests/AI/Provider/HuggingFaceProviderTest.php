@@ -541,6 +541,66 @@ class HuggingFaceProviderTest extends TestCase
         }
     }
 
+    public function testChatReturnsToolCallsFromRecordedFixture(): void
+    {
+        $json = (string) file_get_contents(
+            dirname(__DIR__, 2).'/Fixtures/ai/tools/huggingface/chat_tool_calls.json'
+        );
+        $client = new MockHttpClient(static fn () => new MockResponse($json, [
+            'response_headers' => ['content-type' => 'application/json'],
+        ]));
+
+        $result = $this->makeProvider(httpClient: $client)->chat(
+            [['role' => 'user', 'content' => 'lookup 12']],
+            [
+                'model' => 'moonshotai/Kimi-K2.5',
+                'tools' => [[
+                    'type' => 'function',
+                    'function' => ['name' => 'lookup', 'parameters' => ['type' => 'object']],
+                ]],
+            ],
+        );
+
+        $this->assertSame('', $result['content']);
+        $this->assertSame('tool_calls', $result['finish_reason']);
+        $this->assertSame('lookup', $result['tool_calls'][0]['function']['name']);
+        $this->assertSame('{"id":12}', $result['tool_calls'][0]['function']['arguments']);
+    }
+
+    public function testChatStreamEmitsToolCallDeltasFromRecordedSse(): void
+    {
+        $sse = (string) file_get_contents(
+            dirname(__DIR__, 2).'/Fixtures/ai/tools/huggingface/stream_tool_calls.sse'
+        );
+        $client = new MockHttpClient(static fn () => new MockResponse($sse, [
+            'response_headers' => ['content-type' => 'text/event-stream'],
+        ]));
+
+        $chunks = [];
+        $this->makeProvider(httpClient: $client)->chatStream(
+            [['role' => 'user', 'content' => 'lookup 12']],
+            static function (mixed $chunk) use (&$chunks): void {
+                $chunks[] = $chunk;
+            },
+            [
+                'model' => 'moonshotai/Kimi-K2.5',
+                'tools' => [[
+                    'type' => 'function',
+                    'function' => ['name' => 'lookup', 'parameters' => ['type' => 'object']],
+                ]],
+            ],
+        );
+
+        $deltas = array_values(array_filter(
+            $chunks,
+            static fn (mixed $c): bool => is_array($c) && 'tool_call_delta' === ($c['type'] ?? null)
+        ));
+        $this->assertNotEmpty($deltas);
+        $finish = $chunks[array_key_last($chunks)];
+        $this->assertSame('finish', $finish['type']);
+        $this->assertSame('tool_calls', $finish['finish_reason']);
+    }
+
     // ==================== HELPERS ====================
 
     private function makeProvider(

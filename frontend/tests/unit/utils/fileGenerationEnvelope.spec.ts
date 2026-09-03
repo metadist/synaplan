@@ -7,6 +7,7 @@ describe('looksLikeFileGenerationEnvelope', () => {
     '```json\n{"BFILEPATH":"report.docx","BFILETEXT":"content"}\n```',
     'Here is your presentation: {"BFILEPATH":"slides.pptx","BFILETEXT":"content"}',
     'Here is your presentation: {"BFILEPATH":',
+    '{"BFILEPATH":"report.docx","BFILETEXT":"content","BEXPORT":"pdf"}',
   ])('detects file generation content in %s', (content) => {
     expect(looksLikeFileGenerationEnvelope(content)).toBe(true)
   })

@@ -127,6 +127,13 @@ export interface Message {
   /** Backend id of the message the quote was taken from. */
   quotedMessageId?: number | null
   files?: MessageFile[] // Attached files
+  documentChanges?: Array<{
+    labelKey: string
+    labelParams?: Record<string, unknown>
+    ok: boolean
+  }>
+  documentVersion?: number
+  documentFidelityLossy?: boolean
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorType?: 'rate_limit' | 'connection' | 'unknown'

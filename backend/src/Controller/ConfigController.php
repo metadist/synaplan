@@ -175,6 +175,8 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
                         new OA\Property(property: 'selfAware', type: 'boolean', example: true, description: 'When true, the web chat can answer what this installation can do and cite official documentation. Off restores the previous chat behaviour.'),
                         new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
+                        new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
+                        new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. Off by default.'),
                     ]
                 ),
                 new OA\Property(
@@ -473,6 +475,11 @@ class ConfigController extends AbstractController
             'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
+            'officeConvertEnabled' => $this->isOfficeConvertConfigured(),
+            'documentToolsEnabled' => true === filter_var(
+                $this->configRepository->getValue(0, 'DOCUMENT_TOOLS', 'ENABLED') ?? '0',
+                \FILTER_VALIDATE_BOOL
+            ),
         ];
 
         // Speech-to-text configuration
@@ -2176,6 +2183,25 @@ class ConfigController extends AbstractController
             'version' => $tikaVersion,
         ];
 
+        // Collabora CODE convert-to (optional office engine)
+        $officeUrl = $this->officeConvertUrl();
+        $officeConfigured = $this->isOfficeConvertConfigured();
+        $officeHealthy = $officeConfigured && $this->checkServiceHealth(rtrim($officeUrl, '/').'/hosting/capabilities');
+        $features['office-convert'] = [
+            'id' => 'office-convert',
+            'category' => 'Processing Services',
+            'name' => 'Office converter (Collabora)',
+            'enabled' => $officeConfigured,
+            'status' => $officeConfigured ? ($officeHealthy ? 'healthy' : 'unhealthy') : 'disabled',
+            'message' => $officeConfigured
+                ? ($officeHealthy
+                    ? 'LibreOffice convert-to is ready'
+                    : 'Collabora CODE is not responding at OFFICE_CONVERT_URL')
+                : 'Optional. Set OFFICE_CONVERT_URL and start the office Compose profile',
+            'setup_required' => !$officeConfigured,
+            'url' => $officeConfigured ? $officeUrl : '',
+        ];
+
         // Qdrant - User memories with vector search
         $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
         $memoryServiceAvailable = $this->memoryService->isAvailable();
@@ -2361,6 +2387,20 @@ class ConfigController extends AbstractController
     /**
      * Check if a service is healthy by making a simple HTTP request.
      */
+    private function officeConvertUrl(): string
+    {
+        $fromEnv = $_ENV['OFFICE_CONVERT_URL'] ?? $_SERVER['OFFICE_CONVERT_URL'] ?? getenv('OFFICE_CONVERT_URL');
+
+        return trim(is_string($fromEnv) ? $fromEnv : '');
+    }
+
+    private function isOfficeConvertConfigured(): bool
+    {
+        $url = $this->officeConvertUrl();
+
+        return '' !== $url && 'disabled' !== $url;
+    }
+
     private function checkServiceHealth(string $url, ?string $httpUser = null, ?string $httpPass = null): bool
     {
         try {

@@ -6,6 +6,7 @@ namespace App\Service\Media;
 
 use App\Entity\File;
 use App\Repository\FileRepository;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,6 +21,7 @@ final readonly class GeneratedFileRegistrar
         private FileRepository $files,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
     ) {
     }
 
@@ -121,6 +123,7 @@ final readonly class GeneratedFileRegistrar
             }
 
             $this->files->save($file);
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             return $file;
         } catch (\Throwable $e) {

@@ -43,7 +43,7 @@ cd synaplan
 docker compose up -d
 ```
 
-1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). The same notes print in `docker compose logs -f startup-notes`.
+1. **Open <http://localhost:5173> immediately.** A live status screen appears within seconds and shows every boot step — database, backend, AI model download, interface — then switches to the app automatically the moment it is ready (first start: 5–15 minutes; every later start: seconds). It also lists which [optional building blocks](#lean-by-design-core-vs-optional-building-blocks) (Qdrant, Centrifugo, Collabora, …) this install is running and how to switch each on or off. The same notes print in `docker compose logs -f startup-notes`.
 2. **Log in** as `admin@synaplan.com` / `admin123` — the status screen shows these too.
 3. **Connect an AI provider — the app takes you there.** Until a key is in place, chat answers in demo mode and points you to the setup. Open **AI provider setup**, paste one key (free: [Groq](https://console.groq.com)), and you are chatting. **You never touch a config file.**
 
@@ -270,7 +270,7 @@ docker compose -f docker-compose-minimal.yml up -d
 - **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
 - **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule (**Channels → Saved Tasks**)
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; four baked voices, UI language selects the voice)
-- **Documents** — PDF, Word, Excel, images with OCR
+- **Documents** — PDF, Word, Excel, images with OCR; optional Collabora CODE sidecar for office thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/index.php/office-documents))
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
@@ -305,11 +305,30 @@ Synaplan is provider-neutral: connect the providers you want in **Admin → AI P
 
 ---
 
-## Qdrant Vector Database
+## Lean by design: core vs optional building blocks
 
-Qdrant runs as an internal Docker service — no configuration needed. It powers AI memories, RAG document search, and the feedback system.
+`docker compose up -d` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Admin → System Status** (`/admin/features`) does the same after login.
 
-Starts automatically with `docker compose up -d`. Synaplan works fully without it (memories and vector search will be disabled).
+| Block | Gives you | Default | Switch |
+|-------|-----------|---------|--------|
+| **Core** — `frontend`, `backend`, `worker`, `db` (MariaDB), `redis` | The app, its API, async jobs, storage, cache and queues | always on | — |
+| **Ollama** (`ollama`) | Local AI on your hardware: `bge-m3` embeddings for document search, optional local chat (`ENABLE_LOCAL_GPT_OSS=true`) | on (standard) · absent (minimal) | `docker compose stop ollama` — or use `docker-compose-minimal.yml` |
+| **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on (standard) · absent (minimal) | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
+| **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false docker compose up -d` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
+| **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
+| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](#office-documents-optional-collabora-code) | **off** | `docker compose --profile office up -d` |
+| **Text-to-speech** (`tts`) | Spoken answers, four built-in voices — [details](#text-to-speech-optional) | **off** | `docker compose --profile tts up -d` |
+| **Keycloak** (`keycloak`) | SSO test realm for OIDC development ([configuration](docs/CONFIGURATION.md)) | **off** | `docker compose --profile oidc up -d` |
+
+**Keep a default-on block off across restarts.** `docker compose stop` is undone by the next `up -d`. To make a block opt-in permanently, give it a profile in a `docker-compose.override.yml` (not tracked by git) — plain `up -d` then skips it, `--profile optional` brings it back:
+
+```yaml
+services:
+  qdrant:
+    profiles: [optional]
+```
+
+Production follows the same rule set: [`deploy/compose.yaml`](deploy/README.md) ships the core plus Qdrant, Centrifugo and Tika, with `office` and `local-ai` as profiles (`COMPOSE_PROFILES=office,local-ai` in `deploy/.env`); Kubernetes installs wire the same services via [synaplan-charts](https://github.com/metadist/synaplan-charts). The other dev-only containers (`phpmyadmin`, `mailhog`, `frontend-widgets`, `startup-notes`) never ship to production.
 
 ---
 
@@ -342,6 +361,41 @@ docker run -d --name synaplan-tts -p 127.0.0.1:10200:10200 ghcr.io/metadist/syna
 The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://host.docker.internal:10200`).
 
 **The UI language selects the voice.** Chat sends the active frontend locale (`en` / `de` / `es` / `tr`); if the backend detects a different reply language, that wins. Piper then maps the short code to the matching baked voice (German UI → Thorsten, Spanish → davefx, …). There is no separate voice picker. Add more Piper models by dropping `.onnx` + `.onnx.json` into the extra-voices volume — see [synaplan-tts README](https://github.com/metadist/synaplan-tts#adding-more-voices) and [docs.synaplan.com/tts](https://docs.synaplan.com/index.php/tts).
+
+---
+
+## Office documents (Optional Collabora CODE)
+
+Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,
+legacy / Apple format conversion, and “Combine as PDF” need a **Collabora CODE**
+sidecar (`collabora/code`). Chat, Tika RAG and officemaker DOCX / XLSX / PPTX
+work without it. The sidecar is **off by default** (`--profile office`) so
+`docker compose up -d` does not pull the image or spend the extra ~2 GB RAM.
+
+```bash
+# Dev / minimal — compose already defaults OFFICE_CONVERT_URL to http://collabora:9980
+docker compose --profile office up -d
+
+# Production (deploy/) — env, not backend/.env
+# in deploy/.env:  COMPOSE_PROFILES=office
+docker compose --env-file deploy/.env -f deploy/compose.yaml --profile office up -d
+
+# Already running CODE (Nextcloud, OpenCloud, another compose)
+OFFICE_CONVERT_URL=http://<existing-collabora-host>:9980 docker compose up -d
+```
+
+Do **not** put `OFFICE_CONVERT_URL` in `backend/.env`: Compose injects the
+variable, so the file cannot override it. Deployments set the env on the host
+or in compose. `OFFICE_CONVERT_URL=disabled` turns the engine off.
+
+**Collabora never sees Synaplan users.** Convert-to is a server-to-server POST
+of a file; identity stays in Synaplan (login + file ownership). No Collabora
+accounts, no WOPI token on this path. HTTP 403 is usually CODE’s
+`net.post_allow.host` rejecting the compose subnet.
+
+Full operator guide: [docs.synaplan.com/office-documents](https://docs.synaplan.com/index.php/office-documents).
+Kubernetes / reuse in other projects:
+[synaplan-charts `docs/collabora-office-engine.md`](https://github.com/metadist/synaplan-charts/blob/docs/collabora-office-engine/docs/collabora-office-engine.md).
 
 ---
 
@@ -384,6 +438,7 @@ In-repo guides (for developers working on this codebase):
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |
 | [Realtime / WebSockets](docs/REALTIME.md) | Centrifugo + Redis realtime layer, multi-node deployment |
 | [Observability](docs/OBSERVABILITY.md) | Request correlation ids, redacted event ring, admin logs API |
+| [Office documents](https://docs.synaplan.com/index.php/office-documents) | Optional Collabora CODE sidecar (PDF export, previews, convert-to) |
 | [RAG System](docs/RAG.md) | Document search and processing |
 | [Chat Widget](docs/WIDGET.md) | Embed chat on websites |
 | [WhatsApp](docs/WHATSAPP.md) | Meta Business API setup |

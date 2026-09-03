@@ -9,12 +9,20 @@ use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Document\DocumentKind;
+use App\Service\Document\DocumentOfficeMergeService;
+use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
+use App\Service\File\Office\DocumentCombineException;
+use App\Service\File\Office\DocumentCombineService;
+use App\Service\File\Office\DocumentExportService;
+use App\Service\File\Office\DocumentThumbnailGenerator;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\UploadOptions;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
@@ -52,6 +60,11 @@ class FileController extends AbstractController
         private MediaAccessTokenService $mediaAccessTokenService,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private DocumentExportService $documentExportService,
+        private OfficeConverterClient $officeConverter,
+        private DocumentCombineService $documentCombineService,
+        private DocumentRevisionService $documentRevisionService,
+        private DocumentOfficeMergeService $documentOfficeMergeService,
     ) {
     }
 
@@ -95,6 +108,78 @@ class FileController extends AbstractController
             'token' => $this->mediaAccessTokenService->generate($user),
             'expiresIn' => MediaAccessTokenService::TTL,
         ]);
+    }
+
+    #[Route('/combine', name: 'combine', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/combine',
+        summary: 'Combine office documents and PDFs into one PDF',
+        description: 'Exports each input to PDF (when needed) and merges them with pdfunite. PDF-only sets work without the office engine; mixed office sets answer 503 when the engine is off.',
+        tags: ['Files'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['fileIds'],
+                properties: [
+                    new OA\Property(property: 'fileIds', type: 'array', items: new OA\Items(type: 'integer'), example: [12, 15, 18]),
+                    new OA\Property(property: 'filename', type: 'string', example: 'pack.pdf'),
+                    new OA\Property(property: 'format', type: 'string', enum: ['pdf', 'docx', 'xlsx', 'pptx'], example: 'pdf'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Combined PDF created',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 99),
+                        new OA\Property(property: 'filename', type: 'string', example: 'pack.pdf'),
+                        new OA\Property(property: 'file_type', type: 'string', example: 'pdf'),
+                        new OA\Property(property: 'file_size', type: 'integer', example: 24576),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid selection'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'One or more files were not found'),
+            new OA\Response(response: 503, description: 'Office engine required for mixed office inputs'),
+        ]
+    )]
+    public function combineFiles(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $payload = $request->toArray();
+        $fileIds = $payload['fileIds'] ?? $payload['file_ids'] ?? [];
+        if (!is_array($fileIds)) {
+            return $this->json(['error' => 'fileIds must be an array'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $filename = $payload['filename'] ?? null;
+        $filename = is_string($filename) ? $filename : null;
+        $format = strtolower(is_string($payload['format'] ?? null) ? $payload['format'] : 'pdf');
+
+        try {
+            if ('pdf' === $format) {
+                $file = $this->documentCombineService->combineToPdf($user, $fileIds, $filename);
+            } elseif (DocumentKind::isKnown($format)) {
+                $file = $this->documentOfficeMergeService->combine($user, $fileIds, $format, $filename);
+            } else {
+                return $this->json(['error' => 'Unsupported combine format', 'reason' => 'unsupported'], Response::HTTP_BAD_REQUEST);
+            }
+        } catch (DocumentCombineException $e) {
+            return $this->json(['error' => $e->getMessage(), 'reason' => $e->reason], $e->getCode());
+        }
+
+        return $this->json([
+            'id' => $file->getId(),
+            'filename' => $file->getFileName(),
+            'file_type' => $file->getFileType(),
+            'file_size' => $file->getFileSize(),
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/upload', name: 'upload', methods: ['POST'])]
@@ -528,11 +613,141 @@ class FileController extends AbstractController
         return $response;
     }
 
+    #[Route('/{id}/export', name: 'export', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/export',
+        summary: 'Export a file to another format (PDF)',
+        description: 'Converts an office document to PDF via Collabora CODE. An already-PDF file is returned as-is. Answers 503 when the office engine is disabled and the source is not a PDF.',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'format', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['pdf'], example: 'pdf')),
+            new OA\Parameter(name: 'inline', in: 'query', required: false, description: 'Set to 1 to send Content-Disposition: inline (preview)', schema: new OA\Schema(type: 'integer', enum: [0, 1])),
+            new OA\Parameter(name: MediaAccessTokenService::QUERY_PARAM, in: 'query', required: false, description: 'Read-only media token from /api/v1/files/media-token, for clients that cannot send an Authorization header', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'File content'),
+            new OA\Response(response: 400, description: 'Unsupported format'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Access denied'),
+            new OA\Response(response: 404, description: 'File not found'),
+            new OA\Response(response: 503, description: 'Office conversion is not configured'),
+        ]
+    )]
+    public function exportFile(int $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        $user ??= $this->mediaAccessTokenService->resolveUser($request);
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+        if ('pdf' !== strtolower((string) $request->query->get('format', ''))) {
+            return $this->json(['error' => 'Unsupported export format'], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->streamExportedPdf($file, '1' === (string) $request->query->get('inline'));
+    }
+
+    #[Route('/{id}/revisions', name: 'revisions', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/files/{id}/revisions',
+        summary: 'List structured document versions',
+        tags: ['Files'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Revision list',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(
+                            property: 'revisions',
+                            type: 'array',
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: 'version', type: 'integer', example: 2),
+                                    new OA\Property(property: 'summary', type: 'string', example: 'Formatted column D'),
+                                    new OA\Property(property: 'source', type: 'string', example: 'model'),
+                                    new OA\Property(property: 'created', type: 'integer', example: 1756828800),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File not found'),
+        ]
+    )]
+    public function listRevisions(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $rows = [];
+        foreach ($this->documentRevisionService->listFor($file) as $revision) {
+            $rows[] = [
+                'version' => $revision->getVersion(),
+                'summary' => $revision->getSummary(),
+                'source' => $revision->getSource(),
+                'created' => $revision->getCreated(),
+            ];
+        }
+
+        return $this->json(['revisions' => $rows]);
+    }
+
+    #[Route('/{id}/revisions/{version}/restore', name: 'revisions_restore', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/files/{id}/revisions/{version}/restore',
+        summary: 'Restore a previous structured document version',
+        tags: ['Files'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'version', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Version restored'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'File or version not found'),
+        ]
+    )]
+    public function restoreRevision(int $id, int $version, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $file = $this->fileRepository->find($id);
+        if (!$file || $file->getUserId() !== $user->getId()) {
+            return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        $restored = $this->documentRevisionService->restore($file, $version);
+        if (null === $restored) {
+            return $this->json(['error' => 'Version not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'id' => $restored->getId(),
+            'filename' => $restored->getFileName(),
+            'file_size' => $restored->getFileSize(),
+        ]);
+    }
+
     #[Route('/{id}/thumb', name: 'thumb', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/files/{id}/thumb',
         summary: 'Serve a file thumbnail (e.g. a video poster frame)',
-        description: 'Returns the generated thumbnail image for a file (currently video poster frames produced by ThumbnailService). Responds 404 when the file has no thumbnail, letting the client fall back to a type icon.',
+        description: 'Returns the generated thumbnail image for a file (video poster frames from ThumbnailService, plus office/PDF first-page posters from DocumentThumbnailGenerator). Responds 404 when the file has no thumbnail, letting the client fall back to a type icon.',
         tags: ['Files'],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
@@ -909,6 +1124,7 @@ class FileController extends AbstractController
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
+        $this->documentRevisionService->deleteForFile($file);
         $this->vectorStorageFacade->deleteByFile($user->getId(), $file->getId());
 
         if ($file->getFilePath()) {
@@ -1449,6 +1665,35 @@ class FileController extends AbstractController
         };
 
         return $this->json($result, $statusCode);
+    }
+
+    private function streamExportedPdf(File $file, bool $inline): Response
+    {
+        $ext = DocumentThumbnailGenerator::extensionOf($file);
+        $needsEngine = !DocumentThumbnailGenerator::isPdf($ext);
+        if ($needsEngine && !$this->officeConverter->isEnabled()) {
+            return $this->json(['error' => 'Office conversion is not configured'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
+
+        $path = $this->documentExportService->exportToPdf($file);
+        if (null === $path) {
+            return $this->json(
+                ['error' => 'Export failed'],
+                $needsEngine ? Response::HTTP_SERVICE_UNAVAILABLE : Response::HTTP_NOT_FOUND,
+            );
+        }
+
+        $response = new BinaryFileResponse($path);
+        $response->setContentDisposition(
+            $inline ? ResponseHeaderBag::DISPOSITION_INLINE : ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+            DocumentExportService::pdfDownloadName($file),
+        );
+        $response->setPrivate();
+        $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
     }
 
     private function isFileAccessibleByUser(File $file, User $user): bool

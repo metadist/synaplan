@@ -10,8 +10,10 @@ use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
+use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -32,8 +34,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  *
  * @see https://huggingface.co/docs/inference-providers/index
  */
-class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
+class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
 {
+    use ChatCompletionsToolSupport;
+
     private const PROVIDER_NAME = 'huggingface';
     private const DISPLAY_NAME = 'HuggingFace';
 
@@ -210,10 +214,10 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
 
             $data = $this->postChatCompletion($body);
 
-            return [
+            return $this->mergeChatCompletionsToolResult([
                 'content' => $data['choices'][0]['message']['content'] ?? '',
                 'usage' => $this->parseUsage($data['usage'] ?? []),
-            ];
+            ], $data['choices'][0] ?? []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -835,6 +839,10 @@ class HuggingFaceProvider implements ChatProviderInterface, EmbeddingProviderInt
                 if ('' !== $delta) {
                     ++$chunkCount;
                     $callback($delta);
+                }
+
+                if (is_array($choice)) {
+                    $this->emitChatCompletionsToolDeltas($choice, $callback);
                 }
             }
         }

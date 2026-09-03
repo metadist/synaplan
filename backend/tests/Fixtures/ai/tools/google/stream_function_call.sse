@@ -1,0 +1,2 @@
+data: {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"Berlin"}}}]},"finishReason":"FUNCTION_CALL"}],"usageMetadata":{"promptTokenCount":20,"candidatesTokenCount":8}}
+

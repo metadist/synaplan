@@ -27,6 +27,9 @@ const DOCUMENT_EXTENSIONS = [
   'odg',
   'odf',
   'rtf',
+  'pages',
+  'numbers',
+  'key',
 ]
 
 export const extensionOf = (name: string | undefined | null): string =>

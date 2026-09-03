@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\AI\Exception\ProviderException;
+use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Service\AiFacade;
 use App\Controller\OpenAICompatibleController;
 use App\Entity\User;
 use App\Repository\ModelRepository;
+use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
@@ -162,6 +164,8 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['isSessionSummaryEnabled' => false]),
             $this->createMock(MessageBusInterface::class),
             new NullLogger(),
+            $this->createMock(OpenAiToolCallingGate::class),
+            $this->createMock(OpenAiGatewayToolLoop::class),
         );
     }
 

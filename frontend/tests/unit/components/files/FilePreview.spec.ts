@@ -87,4 +87,29 @@ describe('FilePreview lazy playback', () => {
     expect(wrapper.find('[data-testid="file-preview-icon"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="file-preview-snippet"]').exists()).toBe(false)
   })
+
+  it('renders an office poster when thumb_url is set', () => {
+    const wrapper = mountPreview(
+      file({ filename: 'brief.docx', thumb_url: '/api/v1/files/42/thumb' })
+    )
+    const poster = wrapper.find('[data-testid="file-preview-document-poster"]')
+    expect(poster.exists()).toBe(true)
+    expect(poster.find('img').attributes('src')).toBe('http://api.test/api/v1/files/42/thumb')
+    expect(wrapper.find('[data-testid="file-preview-icon"]').exists()).toBe(false)
+  })
+
+  it('emits preview when the office poster is clicked', async () => {
+    const wrapper = mountPreview(
+      file({ filename: 'brief.docx', thumb_url: '/api/v1/files/42/thumb' })
+    )
+    await wrapper.find('[data-testid="file-preview-document-poster"]').trigger('click')
+    expect(wrapper.emitted('preview')).toHaveLength(1)
+  })
+
+  it('renders a PDF poster when thumb_url is set', () => {
+    const wrapper = mountPreview(
+      file({ filename: 'report.pdf', thumb_url: '/api/v1/files/42/thumb' })
+    )
+    expect(wrapper.find('[data-testid="file-preview-document-poster"]').exists()).toBe(true)
+  })
 })

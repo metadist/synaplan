@@ -2,6 +2,7 @@
 
 namespace App\Service\File;
 
+use App\Service\File\Office\DocumentExportService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -17,7 +18,7 @@ final readonly class FileStorageService
     public const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
     public const ALLOWED_EXTENSIONS = [
         'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
-        'odt', 'ods', 'odp', 'odg', 'odf', 'ics',
+        'odt', 'ods', 'odp', 'odg', 'odf', 'rtf', 'pages', 'numbers', 'key', 'ics',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         // Apple HEIC/HEIF photos — transcoded to JPEG on store so browsers and
         // vision providers (which reject HEIC) can consume them.
@@ -26,7 +27,6 @@ final readonly class FileStorageService
         // Video formats analysable via audio transcription + key-frame vision (#983)
         'mov', 'avi', 'mkv',
     ];
-    private const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv'];
 
     /**
      * Maximum file size for a single upload, in bytes.
@@ -346,10 +346,11 @@ final readonly class FileStorageService
             return false;
         }
 
-        // Delete associated thumbnail for video files
-        $extension = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-        if (in_array($extension, self::VIDEO_EXTENSIONS, true)) {
-            $this->thumbnailService->deleteThumbnail($relativePath);
+        $this->thumbnailService->deleteThumbnail($relativePath);
+        $exportRelative = DocumentExportService::cachedRelativePath($relativePath);
+        $exportAbsolute = $this->getAbsolutePath($exportRelative);
+        if (is_file($exportAbsolute)) {
+            @unlink($exportAbsolute);
         }
 
         return @unlink($absolutePath);

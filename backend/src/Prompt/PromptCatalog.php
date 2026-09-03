@@ -30,7 +30,7 @@ class PromptCatalog
      *    - synaplan            ← questions about Synaplan itself (what it can do, how to use a feature)
      *    - mediamaker          ← create/edit images, videos and audio
      *    - docsummary          ← summarize a document or attached file text
-     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents
+     *    - officemaker         ← generate XLSX/DOCX/PPTX/CSV documents (PDF when the office engine is on)
      *
      *  Internal helper prompts (excluded from the routing pool):
      *    - tools:sort          ← AI classifier (DYNAMICLIST template)
@@ -112,7 +112,7 @@ class PromptCatalog
                 'topic' => 'officemaker',
                 'language' => 'en',
                 'shortDescription' => 'The user asks to generate OR to modify/reformat a single Excel, PowerPoint or Word document (CSV, XLSX, DOCX, PPTX). This includes follow-up requests that change the content or formatting of a document the assistant generated earlier in the same conversation (e.g. "make the title bold/bigger in the file", "add a column", "change the document"). Not for any other format. Handles exactly ONE document.',
-                'prompt' => self::officeMakerPrompt(),
+                'prompt' => self::officeMakerPrompt(false),
             ],
             [
                 'topic' => 'tools:enhance',
@@ -264,11 +264,14 @@ You answer the user's question. That's it. Be direct, accurate, and on-point.
    never write the URL yourself).
 
 3. If the user asks for a file (audio, image, video, document, spreadsheet,
-   slide deck, calendar invite): check the PLATFORM CAPABILITIES block. If
-   the format is AVAILABLE NOW, reply that you will write the text and ask
-   the user to rephrase as "create/generate …" so the request reaches the
-   generator. If it is NEEDS SETUP or NOT AVAILABLE, say so in one sentence
-   and offer the listed alternative. Never pretend to attach anything.
+   slide deck, PDF, calendar invite): check the PLATFORM CAPABILITIES block.
+   If the format is AVAILABLE NOW and the user did not already use a
+   create/generate/erstelle verb, reply that you will write the text and ask
+   them to rephrase as "create/generate …" so the request reaches the
+   generator. If they already used that verb, do not bounce them — say
+   plainly that this turn cannot attach a file (never invent one). If it is
+   NEEDS SETUP or NOT AVAILABLE, say so in one sentence and offer the listed
+   alternative. Never pretend to attach anything.
 
 4. If the user asks for current information you don't have (news, prices,
    weather, recent events), say so plainly. The system handles web search
@@ -1189,7 +1192,7 @@ PROMPT;
 You are an expert document summarization assistant. The user has requested a summary of a document or text.
 
 ## Your Task
-Analyze the provided document text and create a summary based on the user's specifications.
+Analyze the provided document text and create a summary based on the user's specifications. Spreadsheet context is sheet-by-sheet with A1 coordinates — cite cells as SheetName!B12 when that helps.
 
 ## Summary Configuration
 The configuration will be provided in the request and may include:
@@ -1352,13 +1355,49 @@ PROMPT;
     }
 
     /**
-     * The theme and transition names come from the renderer enums: they are the
-     * vocabulary the PPTX directive accepts, and a hand-copied list here would
-     * silently start offering names the renderer no longer knows.
+     * Extra officemaker instructions when the LibreOffice engine can export PDF.
+     * Appended at runtime so existing seeded prompts stay valid without a re-seed.
      */
-    private static function officeMakerPrompt(): string
+    public static function officeMakerPdfExportAppendix(): string
     {
-        return str_replace(
+        return <<<'PROMPT'
+
+## PDF export (BEXPORT)
+
+When the user asked for a PDF — in this turn OR earlier in this conversation
+— still return an editable Office source in BFILEPATH (`.docx`, `.xlsx` or
+`.pptx` — pick the format that fits the content) and set `"BEXPORT":"pdf"`.
+The server converts the source to PDF and attaches both files. Keep BEXPORT
+on follow-up edits of that document so the PDF is re-exported. Never put
+`.pdf` in BFILEPATH.
+
+Example:
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nBody","BEXPORT":"pdf"}
+
+Do not set BEXPORT unless the user asked for a PDF in this conversation.
+PROMPT;
+    }
+
+    /**
+     * Extra officemaker instructions when DOCUMENT_TOOLS is on and the model
+     * can call tools. Appended at runtime so the seeded catalog stays valid.
+     */
+    public static function officeMakerToolsAppendix(): string
+    {
+        return <<<'PROMPT'
+
+## Structured editing tools
+
+This turn uses document tools (set_cells, add_sheet, add_chart, insert_block,
+add_slide, merge_documents, and the other listed tools). Call those tools to
+create or edit the file. Do NOT return a BFILEPATH / BFILETEXT JSON envelope.
+After the tools finish, write a short plain-language summary of what you changed.
+PROMPT;
+    }
+
+    private static function officeMakerPrompt(bool $pdfExportEnabled = false): string
+    {
+        $prompt = str_replace(
             ['%themes%', '%transitions%'],
             [
                 implode(' | ', PptxTheme::names()),
@@ -1497,6 +1536,12 @@ For a sales data CSV request, respond with EXACTLY this format (no backticks!):
 - End your response directly with }
 PROMPT
         );
+
+        if ($pdfExportEnabled) {
+            $prompt .= self::officeMakerPdfExportAppendix();
+        }
+
+        return $prompt;
     }
 
     private static function enhancePrompt(): string

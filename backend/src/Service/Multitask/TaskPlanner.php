@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -60,6 +61,7 @@ final readonly class TaskPlanner
         private RateLimitService $rateLimitService,
         private ?PlannerChannelCatalog $channelCatalog = null,
         private ?SelfAwareConfig $selfAwareConfig = null,
+        private ?OfficePdfRoutingDecorator $officePdfRouting = null,
     ) {
     }
 
@@ -242,6 +244,10 @@ final readonly class TaskPlanner
         // their sub-catalog is injected at all (plan 09 §3.2).
         $capabilityList = $this->skillCatalog->renderCapabilityList($userId, $this->catalogContext($userId, $options));
 
+        if (null !== $this->officePdfRouting) {
+            $topicsWithDesc = $this->officePdfRouting->decorateTopics($topicsWithDesc);
+        }
+
         $dynamicList = [];
         foreach ($topicsWithDesc as $item) {
             $dynamicList[] = "- \"{$item['topic']}\": {$item['description']}";
@@ -257,6 +263,9 @@ final readonly class TaskPlanner
         $text = str_replace('[CHANNELLIST]', $channelList, $text);
         $text = str_replace('[DYNAMICLIST]', implode("\n", $dynamicList), $text);
         $text = str_replace('[KEYLIST]', $keyList, $text);
+        if (null !== $this->officePdfRouting) {
+            $text = $this->officePdfRouting->decoratePrompt($text);
+        }
 
         return $text."\n\n".$this->timeContextBlock($message, $options);
     }

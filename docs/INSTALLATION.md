@@ -195,6 +195,21 @@ Enabling the profile installs the local AI services; a local chat model remains
 an additional opt-in. Leave `COMPOSE_PROFILES` empty to keep the Cloud-AI
 default.
 
+### Optional office conversion (Collabora)
+
+The optional `office` profile starts a Collabora CODE sidecar (~2 GB RAM) for
+office thumbnails, PDF export, preview, and combine. It is **off by default**
+so the official 8 GB Cloud-AI floor stays valid. Umbrel / AWS Marketplace /
+Elestio stay off unless you opt in.
+
+```bash
+COMPOSE_PROFILES=office \
+  docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
+```
+
+The deploy entrypoint sets `OFFICE_CONVERT_URL=http://collabora:9980` when
+`office` is in `COMPOSE_PROFILES`. See [Development Guide](DEVELOPMENT.md#office-conversion-optional).
+
 ### Evaluate on Elestio
 
 Use Elestio's custom Docker Compose import for evaluation:

@@ -9,10 +9,13 @@ use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\User;
 use App\Message\ExtractMemoriesCommand;
+use App\Prompt\PromptCatalog;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Document\DocumentEditCoordinator;
+use App\Service\Document\DocumentEditResult;
 use App\Service\Exception\VisionImageUnprocessableException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\FeedbackConfigService;
@@ -24,7 +27,10 @@ use App\Service\File\DocumentImageCatalog;
 use App\Service\File\DocumentImageReferenceResolver;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
+use App\Service\File\GeneratedDocumentBundle;
+use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Knowledge\KnowledgeContextFormatter;
@@ -105,6 +111,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private MessageDigestConfig $digestConfig,
         private ConversationFileCatalog $conversationFileCatalog,
         private GeneratedImageVisionFlag $generatedImageVisionFlag,
+        private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
+        private ?GeneratedDocumentStore $generatedDocumentStore = null,
+        private ?DocumentEditCoordinator $documentEditCoordinator = null,
         iterable $pluginContextProviders = [],
         #[Autowire(lazy: true)]
         private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
@@ -416,7 +425,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $docsList = [];
         $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
-        $systemPrompt = $decorated['prompt'];
+        $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
+        $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
 
         if (!empty($ragContext)) {
@@ -588,11 +598,31 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
 
-        $response = $this->aiFacade->chat(
+        $documentEdit = $this->tryDocumentToolsEdit(
+            $topic,
+            $modelId,
             $messages,
-            $message->getUserId(),
-            $aiOptions
+            $message,
+            $aiOptions,
+            $progressCallback,
+            !empty($options['incognito']),
         );
+
+        if (null !== $documentEdit) {
+            $response = [
+                'content' => $documentEdit->content,
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'usage' => $documentEdit->usage,
+                'response_id' => null,
+            ];
+        } else {
+            $response = $this->aiFacade->chat(
+                $messages,
+                $message->getUserId(),
+                $aiOptions
+            );
+        }
 
         $this->notify($progressCallback, 'generating', 'Response generated.');
 
@@ -604,6 +634,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'usage' => $response['usage'] ?? [],
             'response_id' => $response['response_id'] ?? null,
         ];
+        if (null !== $documentEdit) {
+            $content = $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+        }
 
         // Check for file generation format first (for OfficeM maker)
         $fileData = $this->extractFileGenerationData($content);
@@ -612,28 +645,30 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             // Store the file (ephemeral in incognito mode so it is cleaned up
             // after the session)
-            $generatedFile = $this->storeGeneratedFile($fileData, $message, !empty($options['incognito']));
+            $bundle = $this->storeGeneratedDocument($fileData, $message, !empty($options['incognito']));
 
-            if ($generatedFile) {
-                // Attach file to message (in-memory only for transient
+            if ($bundle) {
+                // Attach file(s) to message (in-memory only for transient
                 // incognito messages — flush() never touches unmanaged entities)
-                $message->addFile($generatedFile);
+                foreach ($bundle->files() as $generatedFile) {
+                    $message->addFile($generatedFile);
+                }
                 $this->em->flush();
 
-                // Return message key for translation in frontend
-                $content = "__FILE_GENERATED__:{$fileData['filename']}";
+                $primary = $bundle->primary();
+                $content = "__FILE_GENERATED__:{$primary->getFileName()}";
 
                 $metadata['generated_file'] = [
-                    'id' => $generatedFile->getId(),
-                    'filename' => $generatedFile->getFileName(),
-                    'path' => $generatedFile->getFilePath(),
-                    'size' => $generatedFile->getFileSize(),
-                    'type' => $generatedFile->getFileType(),
+                    'id' => $primary->getId(),
+                    'filename' => $primary->getFileName(),
+                    'path' => $primary->getFilePath(),
+                    'size' => $primary->getFileSize(),
+                    'type' => $primary->getFileType(),
                 ];
 
                 $this->logger->info('ChatHandler: File generation successful', [
-                    'file_id' => $generatedFile->getId(),
-                    'filename' => $generatedFile->getFileName(),
+                    'file_id' => $primary->getId(),
+                    'filename' => $primary->getFileName(),
                 ]);
             } else {
                 $content = '__FILE_GENERATION_FAILED__';
@@ -1025,7 +1060,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         $docsList = [];
         $decorated = $this->decorateSelfAwarePrompt($systemPrompt, $topic, $message, $classification, $options, $progressCallback);
-        $systemPrompt = $decorated['prompt'];
+        $systemPrompt = $this->appendOfficePdfExportHint($decorated['prompt'], $topic);
+        $systemPrompt = $this->appendOfficeToolsHint($systemPrompt, $topic, $modelId, $message);
         $docsList = $decorated['docs'];
 
         // Append RAG context to system prompt if available
@@ -1294,12 +1330,32 @@ final readonly class ChatHandler implements MessageHandlerInterface
         };
 
         $perfTimer->start('provider_total');
-        $metadata = $this->aiFacade->chatStream(
+        $documentEdit = $this->tryDocumentToolsEdit(
+            $topic,
+            $modelId,
             $messages,
-            $wrappedStreamCallback, // Use wrapped callback
-            $message->getUserId(),
-            $aiOptions
+            $message,
+            $aiOptions,
+            $progressCallback,
+            !empty($options['incognito']),
         );
+        if (null !== $documentEdit) {
+            $metadata = [
+                'provider' => $provider ?? 'unknown',
+                'model' => $modelName ?? 'unknown',
+                'usage' => $documentEdit->usage,
+                'response_id' => null,
+            ];
+            $this->applyDocumentEditResult($documentEdit, $message, $metadata);
+            $wrappedStreamCallback($documentEdit->content);
+        } else {
+            $metadata = $this->aiFacade->chatStream(
+                $messages,
+                $wrappedStreamCallback, // Use wrapped callback
+                $message->getUserId(),
+                $aiOptions
+            );
+        }
         $perfTimer->stop('provider_total');
 
         if (!$sawFirstToken) {
@@ -1364,6 +1420,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'model_id' => $modelId,
                 'usage' => $metadata['usage'] ?? [],
                 'response_id' => $metadata['response_id'] ?? null,
+                'generated_file' => $metadata['generated_file'] ?? null,
+                'documentChanges' => $metadata['documentChanges'] ?? null,
+                'documentVersion' => $metadata['documentVersion'] ?? null,
+                'documentFidelityLossy' => $metadata['documentFidelityLossy'] ?? false,
                 'memories' => $loadedMemories,
                 'feedbacks' => $loadedFeedbacks,
                 'digests' => $loadedDigests,
@@ -2624,6 +2684,120 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $fileData;
     }
 
+    private function appendOfficePdfExportHint(string $systemPrompt, string $topic): string
+    {
+        if ('officemaker' !== $topic) {
+            return $systemPrompt;
+        }
+        if (null === $this->generatedDocumentStore || !$this->generatedDocumentStore->pdfExportEnabled()) {
+            return $systemPrompt;
+        }
+
+        return $systemPrompt.PromptCatalog::officeMakerPdfExportAppendix();
+    }
+
+    private function appendOfficeToolsHint(string $systemPrompt, string $topic, ?int $modelId, Message $message): string
+    {
+        if ('officemaker' !== $topic || null === $this->documentEditCoordinator || null === $modelId) {
+            return $systemPrompt;
+        }
+        $model = $this->modelRepository->find($modelId);
+        if (!$this->documentEditCoordinator->shouldRun($topic, $model, $message)) {
+            return $systemPrompt;
+        }
+
+        return $systemPrompt.PromptCatalog::officeMakerToolsAppendix();
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $aiOptions
+     */
+    private function tryDocumentToolsEdit(
+        string $topic,
+        ?int $modelId,
+        array $messages,
+        Message $message,
+        array $aiOptions,
+        ?callable $progressCallback,
+        bool $ephemeral,
+    ): ?DocumentEditResult {
+        if (null === $this->documentEditCoordinator || null === $modelId) {
+            return null;
+        }
+        $model = $this->modelRepository->find($modelId);
+        if (!$this->documentEditCoordinator->shouldRun($topic, $model, $message)) {
+            return null;
+        }
+        $progress = null;
+        if (null !== $progressCallback) {
+            $progress = static function (string $status, string $label, array $meta = []) use ($progressCallback): void {
+                $progressCallback([
+                    'status' => $status,
+                    'message' => $label,
+                    'metadata' => $meta,
+                    'timestamp' => time(),
+                ]);
+            };
+        }
+        $result = $this->documentEditCoordinator->run($messages, $message, $aiOptions, $progress, $ephemeral);
+        if (null === $result) {
+            return null;
+        }
+        if ('' === trim($result->content) && null === $result->file) {
+            return null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function applyDocumentEditResult(DocumentEditResult $result, Message $message, array &$metadata): string
+    {
+        if (null !== $result->file) {
+            $message->addFile($result->file);
+            $this->em->flush();
+            $metadata['generated_file'] = [
+                'id' => $result->file->getId(),
+                'filename' => $result->file->getFileName(),
+                'path' => $result->file->getFilePath(),
+                'size' => $result->file->getFileSize(),
+                'type' => $result->file->getFileType(),
+                'mime' => $result->file->getFileMime(),
+            ];
+        }
+        $metadata['documentChanges'] = array_map(
+            static fn ($step): array => [
+                'labelKey' => $step->labelKey,
+                'labelParams' => $step->labelParams,
+                'ok' => $step->ok,
+            ],
+            $result->steps,
+        );
+        if (null !== $result->version) {
+            $metadata['documentVersion'] = $result->version;
+        }
+        $metadata['documentFidelityLossy'] = $result->fidelityLossy;
+
+        return $result->content;
+    }
+
+    /**
+     * @param array{filename: string, content: string, extension: string, export?: string} $fileData
+     */
+    private function storeGeneratedDocument(array $fileData, Message $message, bool $ephemeral = false): ?GeneratedDocumentBundle
+    {
+        if (null !== $this->generatedDocumentStore) {
+            return $this->generatedDocumentStore->store($fileData, $message, $ephemeral);
+        }
+
+        $file = $this->storeGeneratedFile($fileData, $message, $ephemeral);
+
+        return null !== $file ? new GeneratedDocumentBundle($file) : null;
+    }
+
     /**
      * Store AI-generated file in the file system and create File entity.
      *
@@ -2720,6 +2894,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
             $this->em->persist($file);
             $this->em->flush();
+            $this->documentThumbnailDispatcher?->dispatchIfNeeded($file);
 
             $this->logger->info('ChatHandler: File generated and stored successfully', [
                 'file_id' => $file->getId(),

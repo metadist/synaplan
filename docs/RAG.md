@@ -32,9 +32,11 @@ Upload → Extract → Vectorize → Store → Search → Generate
 ## Supported Formats
 
 ### Documents
-- PDF, Word (.doc, .docx)
-- Excel (.xls, .xlsx)
-- PowerPoint (.ppt, .pptx)
+- PDF, Word (.doc, .docx, .rtf, .odt)
+- Excel (.xls, .xlsx, .ods)
+- PowerPoint (.ppt, .pptx, .odp)
+- Apple iWork (.pages, .numbers, .key) — converted via the office engine when it is on
+- Spreadsheets and decks are extracted sheet-by-sheet / slide-by-slide (A1 coordinates, speaker notes)
 - Plain text, Markdown, HTML
 
 ### Images (with OCR)
