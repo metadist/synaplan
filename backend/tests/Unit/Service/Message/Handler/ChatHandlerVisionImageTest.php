@@ -158,6 +158,42 @@ class ChatHandlerVisionImageTest extends TestCase
     }
 
     /**
+     * The stored path is normalized (serve URL → upload-dir-relative) before
+     * the upload dir is prefixed, so it must resolve either way (#1596).
+     */
+    public function testServePrefixResolvesToTheSameFileAsTheRelativePath(): void
+    {
+        $png = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        );
+        file_put_contents($this->uploadDir.'/tiny.png', $png);
+
+        $this->assertSame(
+            $this->invokeImageToBase64DataUrl('tiny.png'),
+            $this->invokeImageToBase64DataUrl('/api/v1/files/uploads/tiny.png'),
+        );
+    }
+
+    /**
+     * Normalization strips the serve prefix but deliberately leaves `..` in
+     * place; the upload-root check must still refuse to read outside the dir.
+     * BFILEPATH is DB content, and generated-image vision now reads it by
+     * default, so this stays pinned.
+     */
+    public function testTraversalOutsideTheUploadDirIsRefused(): void
+    {
+        file_put_contents(dirname($this->uploadDir).'/outside.png', 'secret');
+
+        try {
+            $this->assertNull($this->invokeImageToBase64DataUrl('../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('/api/v1/files/uploads/../outside.png'));
+            $this->assertNull($this->invokeImageToBase64DataUrl('https://evil.example.com/api/v1/files/uploads/../outside.png'));
+        } finally {
+            @unlink(dirname($this->uploadDir).'/outside.png');
+        }
+    }
+
+    /**
      * When the CURRENT message carries images but none survives conversion,
      * the handler must fail loudly instead of sending a text-only request the
      * model would answer with "I don't see an image".
