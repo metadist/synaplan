@@ -21,7 +21,7 @@
       <div
         v-if="open"
         ref="menuRef"
-        class="fixed z-[200] w-52 surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
+        class="fixed z-[200] w-52 overflow-y-auto scroll-thin surface-card rounded-xl border border-light-border/30 dark:border-dark-border/20 shadow-xl py-1.5"
         :style="menuStyle"
         data-testid="file-office-actions-menu"
         @click.stop
@@ -102,10 +102,11 @@ import * as filesService from '@/services/filesService'
 import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
 import FileRevisionsPanel from '@/components/files/FileRevisionsPanel.vue'
-
-const MENU_WIDTH_PX = 208
-const MENU_GAP_PX = 4
-const VIEWPORT_PAD_PX = 8
+import {
+  MENU_WIDTH_PX,
+  parseCssPx,
+  placeOfficeActionsMenu,
+} from '@/components/files/officeActionsMenuPlacement'
 
 const props = withDefaults(
   defineProps<{
@@ -162,23 +163,28 @@ const canShowRevisions = computed(
   () => isDocumentToolsEnabled() && !props.guestSessionId && null !== officeFormat.value
 )
 
+const keyboardInsetPx = (): number =>
+  parseCssPx(getComputedStyle(document.documentElement).getPropertyValue('--keyboard-inset-height'))
+
 const updateMenuPosition = () => {
   if (!triggerRef.value) return
   const rect = triggerRef.value.getBoundingClientRect()
-  const menuHeight = menuRef.value?.offsetHeight ?? 0
-  const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP_PX
-  const spaceAbove = rect.top - MENU_GAP_PX
-  const openAbove = menuHeight > 0 && spaceBelow < menuHeight && spaceAbove > spaceBelow
-
-  const maxLeft = window.innerWidth - MENU_WIDTH_PX - VIEWPORT_PAD_PX
-  const left = Math.max(VIEWPORT_PAD_PX, Math.min(rect.right - MENU_WIDTH_PX, maxLeft))
+  const vv = window.visualViewport
+  const placed = placeOfficeActionsMenu({
+    trigger: { top: rect.top, bottom: rect.bottom, right: rect.right },
+    menuHeight: menuRef.value?.offsetHeight ?? 0,
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    keyboardInsetPx: keyboardInsetPx(),
+    visualViewport: vv ? { offsetTop: vv.offsetTop, height: vv.height } : null,
+  })
 
   menuStyle.value = {
-    left: `${left}px`,
+    left: `${placed.left}px`,
     width: `${MENU_WIDTH_PX}px`,
-    ...(openAbove
-      ? { top: 'auto', bottom: `${window.innerHeight - rect.top + MENU_GAP_PX}px` }
-      : { top: `${rect.bottom + MENU_GAP_PX}px`, bottom: 'auto' }),
+    maxHeight: `${placed.maxHeight}px`,
+    top: placed.top,
+    bottom: placed.bottom,
   }
 }
 
@@ -189,7 +195,10 @@ const close = () => {
 const toggle = () => {
   open.value = !open.value
   if (open.value) {
-    nextTick(updateMenuPosition)
+    nextTick(() => {
+      updateMenuPosition()
+      nextTick(updateMenuPosition)
+    })
   }
 }
 
@@ -290,6 +299,9 @@ onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   window.addEventListener('scroll', onReposition, true)
   window.addEventListener('resize', onReposition)
+  window.addEventListener('synaplan:keyboardinset', onReposition)
+  window.visualViewport?.addEventListener('resize', onReposition)
+  window.visualViewport?.addEventListener('scroll', onReposition)
 })
 
 onUnmounted(() => {
@@ -297,5 +309,8 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   window.removeEventListener('scroll', onReposition, true)
   window.removeEventListener('resize', onReposition)
+  window.removeEventListener('synaplan:keyboardinset', onReposition)
+  window.visualViewport?.removeEventListener('resize', onReposition)
+  window.visualViewport?.removeEventListener('scroll', onReposition)
 })
 </script>
