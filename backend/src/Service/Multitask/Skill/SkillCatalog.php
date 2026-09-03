@@ -75,6 +75,12 @@ final class SkillCatalog
                 continue;
             }
 
+            // Engine-gated blocks (document_export needs the office converter)
+            // are omitted the same way when the install lacks the engine.
+            if (null !== $descriptor && !$descriptor->isAvailable()) {
+                continue;
+            }
+
             $note = null !== $descriptor && null !== $descriptor->dynamicNote
                 ? ($descriptor->dynamicNote)($userId, $context)
                 : null;

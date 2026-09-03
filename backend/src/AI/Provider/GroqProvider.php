@@ -12,6 +12,7 @@ use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\StructuredOutput\StructuredOutputViolationDetector;
 use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
 use OpenAI;
@@ -189,6 +190,27 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'usage' => $usage,
             ], $responseArray['choices'][0] ?? []);
         } catch (\Exception $e) {
+            // A schema-validation 400 is the model's output failing OUR schema,
+            // not a provider fault: surface it typed, with the rejected output
+            // attached, so AiFacade can salvage or repair it instead of the
+            // turn dying on a generic "Groq chat error".
+            $schema = $options['structured_output'] ?? null;
+            $violation = StructuredOutputViolationDetector::fromSdkError(
+                $e,
+                $this->getName(),
+                $schema instanceof StructuredOutputSchema ? $schema : null,
+            );
+            if (null !== $violation) {
+                $this->logger->warning('Groq rejected the generated JSON against the requested schema', [
+                    'model' => $options['model'],
+                    'schema' => $violation->getSchemaName(),
+                    'validation_error' => $violation->getValidationError(),
+                    'has_failed_generation' => null !== $violation->getFailedGeneration(),
+                ]);
+
+                throw $violation;
+            }
+
             $this->logger->error('Groq chat error', [
                 'error' => $e->getMessage(),
                 'model' => $options['model'] ?? 'unknown',

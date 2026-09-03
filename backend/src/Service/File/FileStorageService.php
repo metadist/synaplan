@@ -347,10 +347,11 @@ final readonly class FileStorageService
         }
 
         $this->thumbnailService->deleteThumbnail($relativePath);
-        $exportRelative = DocumentExportService::cachedRelativePath($relativePath);
-        $exportAbsolute = $this->getAbsolutePath($exportRelative);
-        if (is_file($exportAbsolute)) {
-            @unlink($exportAbsolute);
+        foreach (DocumentExportService::cachedRelativePaths($relativePath) as $exportRelative) {
+            $exportAbsolute = $this->getAbsolutePath($exportRelative);
+            if (is_file($exportAbsolute)) {
+                @unlink($exportAbsolute);
+            }
         }
 
         return @unlink($absolutePath);

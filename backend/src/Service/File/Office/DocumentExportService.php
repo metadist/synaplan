@@ -19,6 +19,14 @@ final readonly class DocumentExportService
 {
     public const CACHE_SUFFIX = '.export.pdf';
 
+    /**
+     * Spreadsheets are exported with the full-sheet layout (#1690), which is a
+     * different artifact from the paginated print layout — so it gets its own
+     * cache name and a workbook exported before that change is converted again
+     * instead of serving the clipped PDF until the source changes.
+     */
+    public const SHEET_CACHE_SUFFIX = '.export.sheet.pdf';
+
     public function __construct(
         private OfficeConverterClient $converter,
         private DocumentGeneratorService $documentGenerator,
@@ -30,14 +38,53 @@ final readonly class DocumentExportService
 
     public static function cachedRelativePath(string $sourceRelativePath): string
     {
+        $extension = pathinfo($sourceRelativePath, PATHINFO_EXTENSION);
+        $suffix = DocumentThumbnailGenerator::isSpreadsheet($extension) ? self::SHEET_CACHE_SUFFIX : self::CACHE_SUFFIX;
+
+        return self::siblingPath($sourceRelativePath, $suffix);
+    }
+
+    /**
+     * Every cache name this source may have been exported under, current
+     * first. Cleanup must remove all of them, not only the one currently
+     * served.
+     *
+     * @return list<string>
+     */
+    public static function cachedRelativePaths(string $sourceRelativePath): array
+    {
+        return array_values(array_unique([
+            self::cachedRelativePath($sourceRelativePath),
+            self::siblingPath($sourceRelativePath, self::CACHE_SUFFIX),
+        ]));
+    }
+
+    /**
+     * Convert options for a source of this type: workbooks render each sheet
+     * on one content-sized page so long row labels are never cut at the cell
+     * border (#1690); Writer/Impress sources keep the plain conversion.
+     *
+     * @return array<string, mixed>
+     */
+    public static function conversionOptions(string $extension): array
+    {
+        if (DocumentThumbnailGenerator::isSpreadsheet($extension)) {
+            return [OfficeConverterClient::OPTION_FULL_SHEET_PREVIEW => true];
+        }
+
+        return [];
+    }
+
+    private static function siblingPath(string $sourceRelativePath, string $suffix): string
+    {
         $pathInfo = pathinfo($sourceRelativePath);
         $dir = $pathInfo['dirname'] ?? '';
         $basename = '' !== $pathInfo['filename'] ? $pathInfo['filename'] : 'file';
         if ('.' === $dir || '' === $dir) {
-            return $basename.self::CACHE_SUFFIX;
+            return $basename.$suffix;
         }
 
-        return $dir.'/'.$basename.self::CACHE_SUFFIX;
+        return $dir.'/'.$basename.$suffix;
     }
 
     public static function pdfDownloadName(File $file): string
@@ -45,6 +92,14 @@ final readonly class DocumentExportService
         $base = pathinfo($file->getFileName(), PATHINFO_FILENAME);
 
         return ('' !== $base ? $base : 'document').'.pdf';
+    }
+
+    /**
+     * Whether office sources can be exported at all on this install.
+     */
+    public function isEnabled(): bool
+    {
+        return $this->converter->isEnabled();
     }
 
     /**
@@ -66,9 +121,11 @@ final readonly class DocumentExportService
 
     public function deleteCachedPdf(string $sourceRelativePath): void
     {
-        $absolute = $this->uploadDir.'/'.ltrim(self::cachedRelativePath($sourceRelativePath), '/');
-        if (is_file($absolute)) {
-            @unlink($absolute);
+        foreach (self::cachedRelativePaths($sourceRelativePath) as $relative) {
+            $absolute = $this->uploadDir.'/'.ltrim($relative, '/');
+            if (is_file($absolute)) {
+                @unlink($absolute);
+            }
         }
     }
 
@@ -103,7 +160,7 @@ final readonly class DocumentExportService
             return $cacheAbsolute;
         }
 
-        $converted = $this->converter->convert($source, 'pdf');
+        $converted = $this->converter->convert($source, 'pdf', self::conversionOptions($ext));
         if (null === $converted || !is_file($converted)) {
             return null;
         }

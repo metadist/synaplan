@@ -6,6 +6,7 @@ namespace App\Service\File;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
@@ -164,7 +165,11 @@ final readonly class GeneratedDocumentStore
         }
 
         $sourceAbsolute = $this->uploadDir.'/'.ltrim($source->getFilePath(), '/');
-        $converted = $this->converter->convert($sourceAbsolute, 'pdf');
+        $converted = $this->converter->convert(
+            $sourceAbsolute,
+            'pdf',
+            DocumentExportService::conversionOptions($fileData['extension']),
+        );
         if (null === $converted || !is_file($converted)) {
             $this->logger->warning('GeneratedDocumentStore: PDF export failed, keeping source only', [
                 'file_id' => $source->getId(),
@@ -173,26 +178,49 @@ final readonly class GeneratedDocumentStore
             return null;
         }
 
+        return $this->storePdfFor($source, $converted, $content, $ephemeral, keepOriginal: false);
+    }
+
+    /**
+     * Register a PDF rendered from $source as its own generated {@see File}
+     * row, named after the source ("report.docx" → "report.pdf").
+     *
+     * Shared by the officemaker BEXPORT path (a one-off convert-to output that
+     * is moved into place) and the `document_export` node (#1691), which hands
+     * over the cached export the file chip serves — that one is copied so the
+     * cache keeps working.
+     *
+     * @param string $fileText searchable body stored on the PDF row
+     */
+    public function storePdfFor(File $source, string $pdfAbsolutePath, string $fileText, bool $ephemeral = false, bool $keepOriginal = true): ?File
+    {
         $pdfName = pathinfo($source->getFileName(), PATHINFO_FILENAME);
         $pdfName = ('' !== $pdfName ? $pdfName : 'document').'.pdf';
         $paths = $this->allocatePath($source->getUserId(), $pdfName, 'pdf');
         if (null === $paths) {
-            @unlink($converted);
+            if (!$keepOriginal) {
+                @unlink($pdfAbsolutePath);
+            }
 
             return null;
         }
 
-        if (!@rename($converted, $paths['absolute']) && !@copy($converted, $paths['absolute'])) {
-            $this->logger->warning('GeneratedDocumentStore: failed to move PDF export', [
-                'from' => $converted,
+        $placed = $keepOriginal
+            ? @copy($pdfAbsolutePath, $paths['absolute'])
+            : (@rename($pdfAbsolutePath, $paths['absolute']) || @copy($pdfAbsolutePath, $paths['absolute']));
+        if (!$placed) {
+            $this->logger->warning('GeneratedDocumentStore: failed to place PDF export', [
+                'from' => $pdfAbsolutePath,
                 'to' => $paths['absolute'],
             ]);
-            @unlink($converted);
+            if (!$keepOriginal) {
+                @unlink($pdfAbsolutePath);
+            }
 
             return null;
         }
-        if ($converted !== $paths['absolute']) {
-            @unlink($converted);
+        if (!$keepOriginal && $pdfAbsolutePath !== $paths['absolute']) {
+            @unlink($pdfAbsolutePath);
         }
         FileHelper::setFilePermissions($paths['absolute']);
 
@@ -208,7 +236,7 @@ final readonly class GeneratedDocumentStore
             $pdfName,
             $fileSize,
             self::mimeTypeForExtension('pdf'),
-            $content,
+            $fileText,
             $ephemeral,
         );
         $this->em->persist($pdf);

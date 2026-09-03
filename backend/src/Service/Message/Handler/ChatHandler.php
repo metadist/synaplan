@@ -299,10 +299,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
         }
 
-        $images = $this->documentImageCatalog->build($message, $thread, $extraPaths);
+        // When the turn is about an uploaded document, the pictures generated
+        // earlier in the thread are out of scope: offering them here is how a
+        // "clean copy of my .docx" came back as a document about the WW1
+        // trench image (#1689). This turn's own images — attached now or
+        // produced by an upstream node — stay available.
+        $documentInFocus = $this->documentInFocus($message, $thread);
+        $images = $this->documentImageCatalog->build($message, null === $documentInFocus ? $thread : [], $extraPaths);
         $this->logger->info('ChatHandler: Document image catalog built', [
             'available_images' => count($images),
             'upstream_images' => count($extraPaths),
+            'document_in_focus' => $documentInFocus?->reference,
         ]);
 
         return $this->documentImageCatalog->renderPromptBlock($images);
@@ -2566,6 +2573,20 @@ final readonly class ChatHandler implements MessageHandlerInterface
             return ['urls' => [], 'notice' => ''];
         }
 
+        // Same for a document the user handed over: a .docx attached now (or
+        // uploaded after the picture was drawn) is what this turn is about.
+        // Inlining the historic image next to it made the model describe the
+        // picture as "the attached file" and rewrite the upload around it (#1689).
+        $documentInFocus = $this->documentInFocus($currentMessage, $thread);
+        if (null !== $documentInFocus) {
+            $this->logger->info('ChatHandler: Skipping generated images for vision, document in focus', [
+                'message_id' => $currentMessage->getId(),
+                'document' => $documentInFocus->reference,
+            ]);
+
+            return ['urls' => [], 'notice' => ''];
+        }
+
         $catalog = $this->conversationFileCatalog->build(
             $currentMessage,
             $thread,
@@ -2609,6 +2630,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'urls' => $urls,
             'notice' => $this->generatedImageProvenanceNotice($names),
         ];
+    }
+
+    /**
+     * The uploaded document this turn is about, if it displaces the images the
+     * assistant generated earlier ({@see ConversationFileCatalog::documentInFocus()}).
+     *
+     * @param array<int, Message|array{role: string, content: string}> $thread
+     */
+    private function documentInFocus(Message $currentMessage, array $thread): ?ConversationFile
+    {
+        return $this->conversationFileCatalog->documentInFocus(
+            $this->conversationFileCatalog->build($currentMessage, $thread),
+        );
     }
 
     /**

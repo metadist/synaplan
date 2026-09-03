@@ -1862,6 +1862,7 @@
       "video_generation": "Video",
       "text2sound": "Ses",
       "document_generation": "Belge",
+      "document_export": "PDF dışa aktarma",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet"

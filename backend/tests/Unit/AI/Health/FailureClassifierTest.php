@@ -6,6 +6,7 @@ namespace App\Tests\Unit\AI\Health;
 
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Health\FailureClassifier;
 use App\AI\Health\FailureKind;
 use App\Service\Exception\StreamCancelledException;
@@ -45,6 +46,26 @@ final class FailureClassifierTest extends TestCase
         );
 
         self::assertSame(FailureKind::Transient, $kind);
+    }
+
+    /**
+     * A schema-rejected generation is a prompt/schema problem on our side,
+     * not model health. Its message carries no recognised pattern and its
+     * status is 400, which would otherwise be filed by status alone — the
+     * type must decide before any text or status matching.
+     */
+    public function testSchemaViolationIsAUserErrorThatDoesNotCountAgainstTheModel(): void
+    {
+        $kind = $this->classifier->classify(new StructuredOutputViolationException(
+            'groq',
+            "jsonschema: '' does not validate with /additionalProperties: additionalProperties 'BTEXT' not allowed",
+            '{"BTEXT":"hi","BTOPIC":"general"}',
+            'sort_classification',
+        ));
+
+        self::assertSame(FailureKind::UserError, $kind);
+        self::assertFalse($kind->countsAgainstModel());
+        self::assertFalse($kind->justifiesAutoDisable());
     }
 
     public function testMissingApiKeyIsCredential(): void

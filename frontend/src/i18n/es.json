@@ -1862,6 +1862,7 @@
       "video_generation": "Vídeo",
       "text2sound": "Audio",
       "document_generation": "Documento",
+      "document_export": "Exportación a PDF",
       "calendar_event": "Invitación de calendario",
       "email_me": "Envío por correo",
       "save_to_folder": "Guardar en carpeta"

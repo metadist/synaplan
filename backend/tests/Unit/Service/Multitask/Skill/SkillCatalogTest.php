@@ -84,14 +84,16 @@ final class SkillCatalogTest extends TestCase
         // DYNAMIC blocks (requiresDynamicNote) that additionally need a
         // per-user sub-catalog / availability note — without one they stay
         // invisible regardless of their flags, so those three plus
-        // save_to_folder (also dynamic) are missing.
+        // save_to_folder (also dynamic) are missing. document_export is
+        // engine-gated: without the office converter it is omitted too.
         $default = SkillCatalogFactory::real()->renderCapabilityList();
         self::assertStringContainsString('- "url_fetch": ', $default);
         self::assertStringNotContainsString('"mcp_fetch"', $default);
         self::assertStringNotContainsString('"mcp_action"', $default);
         self::assertStringNotContainsString('"email_search"', $default);
         self::assertStringNotContainsString('"save_to_folder"', $default);
-        self::assertCount(count(Capability::cases()) - 4, explode("\n", $default));
+        self::assertStringNotContainsString('"document_export"', $default);
+        self::assertCount(count(Capability::cases()) - 5, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.

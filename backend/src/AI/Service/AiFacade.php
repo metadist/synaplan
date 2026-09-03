@@ -4,12 +4,16 @@ namespace App\AI\Service;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\StructuredOutputViolationException;
 use App\AI\Health\ModelHealthRecorder;
+use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Provider\GoogleProvider;
+use App\AI\StructuredOutput\StructuredOutputRecovery;
+use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\CircuitBreaker;
 use App\Service\DiscordNotificationService;
 use App\Service\Exception\StreamCancelledException;
@@ -60,6 +64,7 @@ class AiFacade
         private ModelHealthRecorder $health,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private string $embeddingFallbackProvider = '',
+        private StructuredOutputRecovery $structuredOutputRecovery = new StructuredOutputRecovery(),
     ) {
     }
 
@@ -180,6 +185,12 @@ class AiFacade
                 userId: $userId,
                 fallback: null // NO FALLBACK - let ProviderException bubble up
             );
+        } catch (StructuredOutputViolationException $e) {
+            // The provider answered — it just rejected the model's own JSON
+            // against the schema we asked for. Heal in-process before anyone
+            // sees an error: salvage the rejected output, else retry once
+            // with a corrective turn. Anything else still bubbles up typed.
+            $response = $this->recoverStructuredOutput($e, $provider, $messages, $options, $userId);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -201,6 +212,11 @@ class AiFacade
             // empty for every provider and every call that declared none.
             'tool_calls' => $response['tool_calls'] ?? [],
         ];
+        if (isset($response[StructuredOutputRecovery::RESPONSE_KEY]) && is_string($response[StructuredOutputRecovery::RESPONSE_KEY])) {
+            // Tells the caller its answer came from the healing loop so it can
+            // log/score it; absent on a first-try success.
+            $out[StructuredOutputRecovery::RESPONSE_KEY] = $response[StructuredOutputRecovery::RESPONSE_KEY];
+        }
         if (isset($response['tool_calls']) && is_array($response['tool_calls'])) {
             $out['tool_calls'] = $response['tool_calls'];
         }
@@ -209,6 +225,113 @@ class AiFacade
         }
 
         return $out;
+    }
+
+    /**
+     * Self-healing loop for a schema-rejected generation — cheapest step first,
+     * bounded to a single extra provider call:
+     *
+     *   1. salvage the rejected output locally (drop forbidden keys, re-validate);
+     *   2. otherwise retry ONCE with the rejection fed back as a correction;
+     *   3. if that is rejected too, salvage that one, else give up typed so the
+     *      call site can apply its own safe default.
+     *
+     * Every step is logged with the schema name so a recurring violation shows
+     * up as a prompt/schema problem to fix, not as silent retries.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed> provider-shaped response (`content`, `usage`, …)
+     *                              plus {@see StructuredOutputRecovery::RESPONSE_KEY}
+     */
+    private function recoverStructuredOutput(
+        StructuredOutputViolationException $violation,
+        ChatProviderInterface $provider,
+        array $messages,
+        array $options,
+        ?int $userId,
+    ): array {
+        $schema = $options['structured_output'] ?? null;
+        if (!$schema instanceof StructuredOutputSchema) {
+            // A violation without a schema on OUR side is not something we
+            // can validate against — nothing to heal with.
+            throw $violation;
+        }
+
+        $logContext = [
+            'provider' => $provider->getName(),
+            'model' => $options['model'] ?? null,
+            'schema' => $schema->name,
+            'user_id' => $userId,
+            'validation_error' => $violation->getValidationError(),
+        ];
+
+        $salvaged = $this->structuredOutputRecovery->salvage($violation->getFailedGeneration(), $schema);
+        if (null !== $salvaged) {
+            $this->logger->warning('AI chat: salvaged a schema-rejected generation without a retry', $logContext);
+
+            return $this->salvagedResponse($salvaged);
+        }
+
+        $this->logger->warning('AI chat: schema-rejected generation not salvageable, retrying once with a corrective turn', $logContext + [
+            'failed_generation' => mb_substr((string) $violation->getFailedGeneration(), 0, 500),
+        ]);
+
+        $repairMessages = $this->structuredOutputRecovery->repairMessages($messages, $violation, $schema);
+
+        try {
+            $response = $this->executeWithHealth(
+                callback: fn () => $provider->chat($repairMessages, $options),
+                serviceName: 'ai_provider_'.$provider->getName(),
+                capability: 'chat',
+                provider: $provider,
+                options: $options,
+                userId: $userId,
+                fallback: null,
+            );
+        } catch (StructuredOutputViolationException $retryViolation) {
+            $salvaged = $this->structuredOutputRecovery->salvage($retryViolation->getFailedGeneration(), $schema);
+            if (null !== $salvaged) {
+                $this->logger->warning('AI chat: salvaged the corrective retry\'s schema-rejected generation', $logContext);
+
+                return $this->salvagedResponse($salvaged);
+            }
+
+            $this->logger->error('AI chat: structured output unrecoverable after salvage and one corrective retry', $logContext + [
+                'retry_validation_error' => $retryViolation->getValidationError(),
+                'retry_failed_generation' => mb_substr((string) $retryViolation->getFailedGeneration(), 0, 500),
+            ]);
+
+            throw $retryViolation;
+        }
+
+        $this->logger->warning('AI chat: corrective retry repaired the structured output', $logContext);
+        $response[StructuredOutputRecovery::RESPONSE_KEY] = StructuredOutputRecovery::RECOVERY_REPAIRED;
+
+        return $response;
+    }
+
+    /**
+     * A salvaged answer never reached the usage counters: the provider's 400
+     * carries no `usage` block, so the tokens it burned are reported as zero
+     * rather than guessed.
+     *
+     * @return array<string, mixed>
+     */
+    private function salvagedResponse(string $content): array
+    {
+        return [
+            'content' => $content,
+            'usage' => [
+                'prompt_tokens' => 0,
+                'completion_tokens' => 0,
+                'total_tokens' => 0,
+                'cached_tokens' => 0,
+                'cache_creation_tokens' => 0,
+            ],
+            StructuredOutputRecovery::RESPONSE_KEY => StructuredOutputRecovery::RECOVERY_SALVAGED,
+        ];
     }
 
     /**
