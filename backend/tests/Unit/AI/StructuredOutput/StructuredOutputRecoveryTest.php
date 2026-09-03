@@ -80,6 +80,38 @@ final class StructuredOutputRecoveryTest extends TestCase
         self::assertNull($this->recovery->salvage($generation, self::sortSchema()));
     }
 
+    public function testSalvageFailsClosedOnATypeItCannotCheck(): void
+    {
+        // A type name outside the JSON Schema primitives (a typo in a schema
+        // class, say) must not turn salvage into a rubber stamp: the value is
+        // unverified, so the caller has to take the corrective retry instead.
+        $schema = new StructuredOutputSchema('typo', [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => ['count' => ['type' => 'interger']],
+            'required' => ['count'],
+        ]);
+
+        self::assertNull($this->recovery->salvage('{"count":3}', $schema));
+        self::assertNull($this->recovery->salvage('{"count":"three"}', $schema));
+    }
+
+    public function testSalvageStillMatchesAUnionWhenOneCandidateIsUnknown(): void
+    {
+        // Fail-closed is per candidate: the known members of a type list keep
+        // matching, only a value that fits none of them is rejected.
+        $schema = new StructuredOutputSchema('union', [
+            'type' => 'object',
+            'additionalProperties' => false,
+            'properties' => ['id' => ['type' => ['integer', 'null', 'uuid']]],
+            'required' => ['id'],
+        ]);
+
+        self::assertSame('{"id":7}', $this->recovery->salvage('{"id":7}', $schema));
+        self::assertSame('{"id":null}', $this->recovery->salvage('{"id":null}', $schema));
+        self::assertNull($this->recovery->salvage('{"id":"6f1c"}', $schema));
+    }
+
     public function testSalvageAcceptsANullableUnionAndItsEnum(): void
     {
         $generation = str_replace(
