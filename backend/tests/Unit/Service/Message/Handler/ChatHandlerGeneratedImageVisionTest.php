@@ -182,6 +182,53 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
     }
 
     /**
+     * The pixels ride on the USER turn, where they look like a fresh upload.
+     * Without a provenance line the model answers about "the image you sent me"
+     * instead of the picture it produced itself.
+     */
+    public function testTheUserTurnSaysWhereTheGeneratedImageCameFrom(): void
+    {
+        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+
+        $content = $this->lastUserMessage(
+            $this->buildStreamingMessages($handler, ['include_generated_images' => true]),
+        )['content'];
+
+        $this->assertIsArray($content);
+        $text = $content[0]['text'];
+        $this->assertStringContainsString('not a new upload from the user', $text);
+        $this->assertStringContainsString('"cat.png"', $text);
+        $this->assertStringContainsString('YOU generated earlier in this conversation', $text);
+    }
+
+    /**
+     * An image the user attaches to THIS turn is what the question is about.
+     * Adding the historic picture on top would send two inline payloads —
+     * MAX_VISION_BASE64_LENGTH is enforced per image, so the request would
+     * carry twice the intended budget — and leave the model guessing which one
+     * "what is in it?" refers to.
+     */
+    public function testAFreshUploadDisplacesTheHistoricGeneratedImage(): void
+    {
+        $upload = $this->imageFile(2, 'photo.png', 501, source: 'web_upload');
+        $handler = $this->handler([$this->imageFile(1, 'cat.png', 500)]);
+
+        $content = $this->lastUserMessage($this->buildStreamingMessages(
+            $handler,
+            ['include_generated_images' => true, 'include_images' => true],
+            currentAttachments: [$upload],
+        ))['content'];
+
+        $this->assertIsArray($content);
+        $images = array_values(array_filter(
+            $content,
+            static fn (array $part): bool => 'image_url' === $part['type'],
+        ));
+        $this->assertCount(1, $images, 'Only the freshly uploaded image belongs on this turn');
+        $this->assertStringNotContainsString('not a new upload from the user', $content[0]['text']);
+    }
+
+    /**
      * A stored display URL (`/api/v1/files/uploads/<rel>`) must resolve to the
      * file under the upload dir — StreamController persists that prefix on the
      * OUT message, and ChatHandler used to prefix $uploadDir on top of it.
@@ -274,13 +321,17 @@ final class ChatHandlerGeneratedImageVisionTest extends TestCase
 
     /**
      * @param array<string, mixed> $options
+     * @param list<File>           $currentAttachments files the user attached to the follow-up turn
      *
      * @return array<int, array{role: string, content: string|array<int, array<string, mixed>>}>
      */
-    private function buildStreamingMessages(ChatHandler $handler, array $options): array
+    private function buildStreamingMessages(ChatHandler $handler, array $options, array $currentAttachments = []): array
     {
         $assistantTurn = $this->message(500, 'OUT', 'Here is your cat.');
         $current = $this->message(501, 'IN', 'What breed is it?');
+        foreach ($currentAttachments as $attachment) {
+            $current->addFile($attachment);
+        }
 
         $method = new \ReflectionMethod(ChatHandler::class, 'buildStreamingMessages');
 

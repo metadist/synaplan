@@ -59,6 +59,24 @@ chat model without vision is not swapped for a vision model just because
 history contains a generated picture; only a user attachment on the current
 turn triggers that fallback.
 
+Three rules follow from that placement:
+
+- **A fresh upload wins.** If the user attaches an image to the current turn,
+  no historic generated image is added. That attachment is what the question is
+  about, and `MAX_VISION_BASE64_LENGTH` is enforced *per image*, so a second
+  inline payload would put twice the intended budget on the wire.
+- **The turn says where the pixels came from.** On the user turn the picture
+  looks like a fresh upload, so the text part carries a line naming the file and
+  its origin (`… not a new upload from the user — it is "cat.png", which YOU
+  generated earlier …`). Without it the model answers about "the image you sent
+  me", or comments on a picture nobody asked about after a topic change.
+- **Reach is the thread window, not the last turn.** As long as the picture is
+  the newest generated image the catalog sees (`THREAD_LOOKUP_LIMIT`, 30
+  messages), it rides along on every turn. A tighter recency window was
+  considered and rejected: it creates a cliff where the model suddenly stops
+  seeing a picture the user is still discussing, and providers cap image tokens
+  per image (~1.5K), so one image per request is a bounded cost.
+
 The switch defaults to **on**. Each included image rides along as a base64
 payload on later requests of the conversation, so an operator can turn it off
 (the upsert also creates the row if it is missing):

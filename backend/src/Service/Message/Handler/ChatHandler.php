@@ -1658,7 +1658,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             ];
         }
 
-        $messageContent = $this->buildCurrentMessageContent($currentMessage, $includeImages, $options, $generatedImages);
+        $messageContent = $this->buildCurrentMessageContent(
+            $currentMessage,
+            $includeImages,
+            $options,
+            $generatedImages['urls'],
+            $generatedImages['notice'],
+        );
 
         $messages[] = [
             'role' => 'user',
@@ -1706,11 +1712,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
      * @param list<string> $extraImageUrls generated-image data URLs to attach
      *                                     to this user turn (Anthropic rejects
      *                                     image blocks on assistant turns)
+     * @param string       $extraImageNote provenance sentence for those images,
+     *                                     see generatedImagesForVision()
      *
      * @return string|array Content string or multimodal array when images are included
      */
-    private function buildCurrentMessageContent(Message $currentMessage, bool $includeImages, array $options = [], array $extraImageUrls = []): string|array
-    {
+    private function buildCurrentMessageContent(
+        Message $currentMessage,
+        bool $includeImages,
+        array $options = [],
+        array $extraImageUrls = [],
+        string $extraImageNote = '',
+    ): string|array {
         $content = $currentMessage->getText();
         $allFilesText = $currentMessage->getAllFilesText();
 
@@ -1759,7 +1772,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
             throw new VisionImageUnprocessableException();
         }
 
-        $imageUrls = array_merge($imageUrls, $extraImageUrls);
+        if ([] !== $extraImageUrls) {
+            $imageUrls = array_merge($imageUrls, $extraImageUrls);
+            if ('' !== $extraImageNote) {
+                $content .= "\n\n".$extraImageNote;
+            }
+        }
+
         if ([] !== $imageUrls) {
             return $this->buildMultimodalContent($content, $imageUrls);
         }
@@ -1967,11 +1986,18 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $msgArr['BTEXT'] .= "\n\n".$this->formatQuotedReferenceForPrompt($options);
         }
 
+        // The provenance sentence has to go INTO the JSON body: the text part of
+        // this turn is the encoded $msgArr, so appending after json_encode()
+        // would hand the model a payload it can no longer parse.
+        if ([] !== $generatedImages['urls'] && '' !== $generatedImages['notice']) {
+            $msgArr['BTEXT'] .= "\n\n".$generatedImages['notice'];
+        }
+
         // Extract images from current message for vision support (only if enabled)
         $textContent = json_encode($msgArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $imageUrls = $includeImages ? $this->extractImageDataUrls($currentMessage) : [];
-        $imageUrls = array_merge($imageUrls, $generatedImages);
+        $imageUrls = array_merge($imageUrls, $generatedImages['urls']);
         if ([] !== $imageUrls) {
             $messageContent = $this->buildMultimodalContent($textContent, $imageUrls);
 
@@ -2149,7 +2175,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Display URLs (`/api/v1/files/uploads/<rel>`) must be reduced to the
         // upload-dir-relative form before we prefix $uploadDir — otherwise a
         // stored serve path never resolves (#1596).
-        $sanitizedPath = $this->conversationFileCatalog->normalizeRelativePath($relativePath);
+        $sanitizedPath = FileHelper::normalizeUploadRelativePath($relativePath);
         $absolutePath = $this->uploadDir.'/'.$sanitizedPath;
 
         // Use FileHelper to safely resolve and validate path within upload directory
@@ -2343,24 +2369,38 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
     /**
      * Base64 data URLs for images the ASSISTANT generated earlier in this
-     * conversation. Attached to the current USER turn — Anthropic (and most
-     * providers) reject `image` blocks on assistant turns, which is what
-     * surfaced as "I cannot see the picture" after the flag was turned on.
+     * conversation, plus the sentence that tells the model where they came from.
      *
-     * Without this, "draw a cat" → "what is in it?" is answered from the text
-     * prompt alone (#1596). On when FILE_CONTEXT.VISION_INCLUDE_GENERATED is
-     * enabled (the default) and the chosen model is vision-capable, and capped
-     * at MAX_GENERATED_IMAGES so a single inline image stays under the
+     * The pixels ride on the current USER turn — Anthropic (and most providers)
+     * reject `image` blocks on assistant turns, which is what surfaced as "I
+     * cannot see the picture" after the flag was turned on. That placement makes
+     * the picture look like a fresh upload, so `notice` names the file and its
+     * provenance; without it the model answers about "the image you sent me"
+     * and, on an unrelated follow-up, may describe a picture nobody asked about.
+     *
+     * Without this path, "draw a cat" → "what is in it?" is answered from the
+     * text prompt alone (#1596). On when FILE_CONTEXT.VISION_INCLUDE_GENERATED
+     * is enabled (the default) and the chosen model is vision-capable, and
+     * capped at MAX_GENERATED_IMAGES so a single inline image stays under the
      * 450K-character vision budget.
      *
      * @param array<int, Message|array{role: string, content: string}> $thread
      *
-     * @return list<string>
+     * @return array{urls: list<string>, notice: string}
      */
     private function generatedImagesForVision(Message $currentMessage, array $thread, array $options): array
     {
         if (true !== ($options['include_generated_images'] ?? false)) {
-            return [];
+            return ['urls' => [], 'notice' => ''];
+        }
+
+        // An image the user attached to THIS turn is what they are asking
+        // about. Adding a historic picture on top would send two inline
+        // payloads — MAX_VISION_BASE64_LENGTH is enforced per image, so the
+        // request would carry twice the intended budget — and leave the model
+        // guessing which of the two the question refers to.
+        if ($this->hasAttachedImages($currentMessage)) {
+            return ['urls' => [], 'notice' => ''];
         }
 
         $catalog = $this->conversationFileCatalog->build(
@@ -2371,12 +2411,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         );
 
         $urls = [];
+        $names = [];
 
         foreach ($catalog as $file) {
             if (count($urls) >= GeneratedImageVisionFlag::MAX_GENERATED_IMAGES) {
                 break;
             }
-            if (!$file->isGenerated() || null === $file->messageId) {
+            if (!$file->isGenerated()) {
                 continue;
             }
             if (!$this->isVisionSupportedImage($file->relativePath)) {
@@ -2389,16 +2430,41 @@ final readonly class ChatHandler implements MessageHandlerInterface
             }
 
             $urls[] = $dataUrl;
+            $names[] = $file->displayName;
         }
 
-        if ([] !== $urls) {
-            $this->logger->info('ChatHandler: Including generated images for vision', [
-                'message_id' => $currentMessage->getId(),
-                'image_count' => count($urls),
-            ]);
+        if ([] === $urls) {
+            return ['urls' => [], 'notice' => ''];
         }
 
-        return $urls;
+        $this->logger->info('ChatHandler: Including generated images for vision', [
+            'message_id' => $currentMessage->getId(),
+            'image_count' => count($urls),
+        ]);
+
+        return [
+            'urls' => $urls,
+            'notice' => $this->generatedImageProvenanceNotice($names),
+        ];
+    }
+
+    /**
+     * Tell the model that the image blocks on this user turn are its own
+     * earlier output rather than something the user just uploaded.
+     *
+     * @param list<string> $displayNames
+     */
+    private function generatedImageProvenanceNotice(array $displayNames): string
+    {
+        $quoted = implode(', ', array_map(static fn (string $name): string => '"'.$name.'"', $displayNames));
+
+        if (1 === count($displayNames)) {
+            return '(The image attached to this message is not a new upload from the user — it is '
+                .$quoted.', which YOU generated earlier in this conversation. Treat it as your own earlier output when answering.)';
+        }
+
+        return '(The images attached to this message are not new uploads from the user — they are '
+            .$quoted.', which YOU generated earlier in this conversation. Treat them as your own earlier output when answering.)';
     }
 
     /**

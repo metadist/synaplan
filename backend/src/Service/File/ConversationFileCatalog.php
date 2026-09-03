@@ -207,13 +207,7 @@ final readonly class ConversationFileCatalog
      */
     public function normalizeRelativePath(string $path): string
     {
-        if (1 === preg_match('#^https?://[^/]+(/.*)$#i', $path, $matches)) {
-            $path = $matches[1];
-        }
-
-        $stripped = preg_replace('#^/?api/v1/files/uploads/#', '', $path);
-
-        return ltrim(null === $stripped ? $path : $stripped, '/');
+        return FileHelper::normalizeUploadRelativePath($path);
     }
 
     /**

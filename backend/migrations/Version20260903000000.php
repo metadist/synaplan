@@ -14,17 +14,22 @@ use Doctrine\Migrations\AbstractMigration;
  * {@see \App\Seed\FileContextConfigSeeder} inserts the same `1` row, but
  * BCONFIG defaults are bootstrap-only (AGENTS.md): the seeder only fills in a
  * MISSING row. Installs that already have the Sprint-4 bootstrap value `'0'`
- * would stay off without the UPDATE below.
+ * would stay off without the upsert below.
  *
- * The UPDATE cannot tell an operator-set global `'0'` from the seeder `'0'`.
+ * The upsert cannot tell an operator-set global `'0'` from the seeder `'0'`.
  * The flag shipped at the end of August, was never a user-facing switch, and
  * has no UI — flipping the global row is the intended rollout. Per-user rows
  * are left untouched so an individual opt-out survives.
  *
- * INSERT ... SELECT ... WHERE NOT EXISTS, not INSERT IGNORE: idempotent same
- * as {@see Version20260901000000}, and safe to re-run. Written as raw SQL
- * with no `Schema` object reads/writes, per the Galera production rules in
- * AGENTS.md (`$schema->hasTable()` throws on that cluster).
+ * ONE `INSERT ... ON DUPLICATE KEY UPDATE`, not `INSERT ... SELECT ... WHERE
+ * NOT EXISTS` plus a separate UPDATE: production runs migrations on every
+ * backend container start of web1/web2/web3 against the same Galera schema, so
+ * two nodes can pass `NOT EXISTS` at once and `uniq_config_owner_group_setting`
+ * then fails the second INSERT with a duplicate key. The upsert is atomic,
+ * covers the missing row and the `'0'` row in one statement, and is the form
+ * AGENTS.md prescribes for seed-shaped DML. Written as raw SQL with no `Schema`
+ * object reads/writes, per the Galera production rules in AGENTS.md
+ * (`$schema->hasTable()` throws on that cluster).
  */
 final class Version20260903000000 extends AbstractMigration
 {
@@ -38,21 +43,8 @@ final class Version20260903000000 extends AbstractMigration
     {
         $this->addSql(<<<'SQL'
             INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-            SELECT 0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '1'
-              FROM DUAL
-             WHERE NOT EXISTS (
-                 SELECT 1 FROM BCONFIG
-                  WHERE BOWNERID = 0 AND BGROUP = 'FILE_CONTEXT' AND BSETTING = 'VISION_INCLUDE_GENERATED'
-             )
-        SQL);
-
-        $this->addSql(<<<'SQL'
-            UPDATE BCONFIG
-               SET BVALUE = '1'
-             WHERE BOWNERID = 0
-               AND BGROUP = 'FILE_CONTEXT'
-               AND BSETTING = 'VISION_INCLUDE_GENERATED'
-               AND BVALUE = '0'
+            VALUES (0, 'FILE_CONTEXT', 'VISION_INCLUDE_GENERATED', '1')
+            ON DUPLICATE KEY UPDATE BVALUE = '1'
         SQL);
     }
 
