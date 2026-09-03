@@ -824,58 +824,11 @@
     "infoCost": "Cost"
   },
   "chatError": {
+    "title": "The answer failed",
     "retry": "Try again with another model",
     "retryWith": "Try again with {model}",
     "chooseModel": "Choose another model",
-    "showDetails": "Show technical details",
-    "adminDetails": "Admin diagnostics",
-    "noRetryHint": "Please try again later or contact support.",
-    "reason": {
-      "schema_mismatch": {
-        "title": "The model could not complete this request",
-        "body": "The selected model could not answer in the expected format. Please try again with a different model."
-      },
-      "context_length_exceeded": {
-        "title": "This request is too long",
-        "body": "The selected model cannot handle a request this long. Please shorten it or try a model with a larger context window."
-      },
-      "request_too_large": {
-        "title": "This request is too large",
-        "body": "The selected model cannot handle a request this large. Please shorten it or try a different model."
-      },
-      "rate_limited": {
-        "title": "The model is busy",
-        "body": "The selected model is busy right now. Please wait a moment or try a different model."
-      },
-      "quota_exceeded": {
-        "title": "The AI service is out of credits",
-        "body": "The selected AI service has no remaining credits. Please try again later or contact support."
-      },
-      "auth_failed": {
-        "title": "The AI service is not set up",
-        "body": "The selected AI service is not set up correctly at the moment. Please try again later or contact support."
-      },
-      "model_unavailable": {
-        "title": "This model is not available",
-        "body": "The selected model is not available right now. Please try a different model."
-      },
-      "content_filtered": {
-        "title": "The request was declined",
-        "body": "The AI service declined this request. Please rephrase it or try a different model."
-      },
-      "timeout": {
-        "title": "The model took too long",
-        "body": "The selected model took too long to answer. Please try again or switch to a different model."
-      },
-      "upstream_unavailable": {
-        "title": "The AI service is unavailable",
-        "body": "The selected AI service is temporarily unavailable. Please try again or switch to a different model."
-      },
-      "unknown": {
-        "title": "The model could not answer",
-        "body": "The selected model could not answer this request. Please try again with a different model."
-      }
-    }
+    "showDetails": "Show technical details"
   },
   "commands": {
     "noResults": "No commands found",

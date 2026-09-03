@@ -25,14 +25,17 @@ final readonly class ChatErrorView
     }
 
     /**
+     * `adminDetail` is only filled when the caller asked for diagnostics, so it
+     * is safe to forward unconditionally.
+     *
      * @return array{errorReason: string, canRetryModel: bool, errorDebug: ?string}
      */
-    public function toSseFields(?string $adminDetailOverride = null): array
+    public function toSseFields(): array
     {
         return [
             'errorReason' => $this->reason->value,
             'canRetryModel' => $this->canRetryWithOtherModel,
-            'errorDebug' => $adminDetailOverride,
+            'errorDebug' => $this->adminDetail,
         ];
     }
 }

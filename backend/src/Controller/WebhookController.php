@@ -419,10 +419,13 @@ class WebhookController extends AbstractController
                     ]);
                 }
 
+                // The sender already has our reply, so a webhook redelivery would
+                // only reprocess a turn we finished. Report the outcome without
+                // asking the provider to retry.
                 return $this->json([
                     'success' => false,
                     'error' => 'Message processing failed',
-                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                ]);
             }
 
             $aiResponse = $result['response'];

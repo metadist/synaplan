@@ -820,58 +820,11 @@
     "infoCost": "Kosten"
   },
   "chatError": {
+    "title": "Die Antwort ist fehlgeschlagen",
     "retry": "Mit einem anderen Modell erneut versuchen",
     "retryWith": "Mit {model} erneut versuchen",
     "chooseModel": "Anderes Modell wählen",
-    "showDetails": "Technische Details anzeigen",
-    "adminDetails": "Admin-Diagnose",
-    "noRetryHint": "Bitte versuche es später erneut oder wende dich an den Support.",
-    "reason": {
-      "schema_mismatch": {
-        "title": "Das Modell konnte diese Anfrage nicht abschließen",
-        "body": "Das gewählte Modell konnte nicht im erwarteten Format antworten. Bitte versuche es mit einem anderen Modell erneut."
-      },
-      "context_length_exceeded": {
-        "title": "Diese Anfrage ist zu lang",
-        "body": "Das gewählte Modell kann eine so lange Anfrage nicht verarbeiten. Bitte kürze sie oder wähle ein Modell mit einem größeren Kontextfenster."
-      },
-      "request_too_large": {
-        "title": "Diese Anfrage ist zu groß",
-        "body": "Das gewählte Modell kann eine so große Anfrage nicht verarbeiten. Bitte kürze sie oder wähle ein anderes Modell."
-      },
-      "rate_limited": {
-        "title": "Das Modell ist ausgelastet",
-        "body": "Das gewählte Modell ist gerade ausgelastet. Bitte warte einen Moment oder versuche ein anderes Modell."
-      },
-      "quota_exceeded": {
-        "title": "Kein Guthaben mehr",
-        "body": "Für den gewählten KI-Dienst ist gerade kein Guthaben mehr vorhanden. Bitte versuche es später erneut oder wende dich an den Support."
-      },
-      "auth_failed": {
-        "title": "Der KI-Dienst ist nicht eingerichtet",
-        "body": "Der gewählte KI-Dienst ist derzeit nicht korrekt eingerichtet. Bitte versuche es später erneut oder wende dich an den Support."
-      },
-      "model_unavailable": {
-        "title": "Dieses Modell ist nicht verfügbar",
-        "body": "Das gewählte Modell ist gerade nicht verfügbar. Bitte wähle ein anderes Modell."
-      },
-      "content_filtered": {
-        "title": "Die Anfrage wurde abgelehnt",
-        "body": "Der KI-Dienst hat diese Anfrage abgelehnt. Bitte formuliere sie um oder wähle ein anderes Modell."
-      },
-      "timeout": {
-        "title": "Das Modell hat zu lange gebraucht",
-        "body": "Das gewählte Modell hat zu lange für eine Antwort gebraucht. Bitte versuche es erneut oder wähle ein anderes Modell."
-      },
-      "upstream_unavailable": {
-        "title": "Der KI-Dienst ist nicht erreichbar",
-        "body": "Der gewählte KI-Dienst ist vorübergehend nicht erreichbar. Bitte versuche es erneut oder wähle ein anderes Modell."
-      },
-      "unknown": {
-        "title": "Das Modell konnte nicht antworten",
-        "body": "Das gewählte Modell konnte diese Anfrage nicht beantworten. Bitte versuche es mit einem anderen Modell erneut."
-      }
-    }
+    "showDetails": "Technische Details anzeigen"
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",

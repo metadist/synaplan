@@ -215,7 +215,6 @@
               :error-reason="message.errorReason"
               :can-retry-model="message.canRetryModel"
               :error-debug="message.errorDebug"
-              :error-after-content="message.errorAfterContent"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :quoted-text="message.quotedText"
@@ -4021,24 +4020,19 @@ const streamAIResponse = async (
               (p) => p.type === 'text' && p.content && p.content.trim() !== ''
             )
             if (message) {
-              const reason =
+              message.errorReason =
                 typeof data.errorReason === 'string' && data.errorReason !== ''
                   ? data.errorReason
                   : 'unknown'
-              message.errorReason = reason
               message.canRetryModel = data.canRetryModel === true
               message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
-              // Everything streamed before this event is a real partial answer,
-              // so keep it visible above the error notice instead of dropping
-              // the text the user already watched being written.
-              message.errorAfterContent = hasContent === true
             }
-            if (message && hasContent) {
-              historyStore.finishStreamingMessage(messageId)
-            } else {
-              historyStore.updateStreamingMessage(messageId, '')
-              historyStore.finishStreamingMessage(messageId)
+            if (!hasContent) {
+              // `errorMsg` is the localized text the backend also persists as the
+              // message body, so the live bubble and the reloaded row match.
+              historyStore.updateStreamingMessage(messageId, errorMsg)
             }
+            historyStore.finishStreamingMessage(messageId)
 
             // Clean up streaming resources after error
             streamingAbortController = null

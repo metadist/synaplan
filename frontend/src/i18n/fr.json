@@ -824,58 +824,11 @@
     "infoCost": "Coût"
   },
   "chatError": {
+    "title": "La réponse a échoué",
     "retry": "Réessayer avec un autre modèle",
     "retryWith": "Réessayer avec {model}",
     "chooseModel": "Choisir un autre modèle",
-    "showDetails": "Afficher les détails techniques",
-    "adminDetails": "Diagnostic administrateur",
-    "noRetryHint": "Réessaie plus tard ou contacte le support.",
-    "reason": {
-      "schema_mismatch": {
-        "title": "Le modèle n’a pas pu terminer cette demande",
-        "body": "Le modèle sélectionné n’a pas pu répondre au format attendu. Réessaie avec un autre modèle."
-      },
-      "context_length_exceeded": {
-        "title": "Cette demande est trop longue",
-        "body": "Le modèle sélectionné ne peut pas traiter une demande aussi longue. Raccourcis-la ou choisis un modèle avec une plus grande fenêtre de contexte."
-      },
-      "request_too_large": {
-        "title": "Cette demande est trop volumineuse",
-        "body": "Le modèle sélectionné ne peut pas traiter une demande aussi volumineuse. Raccourcis-la ou choisis un autre modèle."
-      },
-      "rate_limited": {
-        "title": "Le modèle est occupé",
-        "body": "Le modèle sélectionné est occupé pour le moment. Attends un instant ou essaie un autre modèle."
-      },
-      "quota_exceeded": {
-        "title": "Le service d’IA n’a plus de crédit",
-        "body": "Le service d’IA sélectionné n’a plus de crédit. Réessaie plus tard ou contacte le support."
-      },
-      "auth_failed": {
-        "title": "Le service d’IA n’est pas configuré",
-        "body": "Le service d’IA sélectionné n’est pas correctement configuré pour le moment. Réessaie plus tard ou contacte le support."
-      },
-      "model_unavailable": {
-        "title": "Ce modèle n’est pas disponible",
-        "body": "Le modèle sélectionné n’est pas disponible pour le moment. Essaie un autre modèle."
-      },
-      "content_filtered": {
-        "title": "La demande a été refusée",
-        "body": "Le service d’IA a refusé cette demande. Reformule-la ou essaie un autre modèle."
-      },
-      "timeout": {
-        "title": "Le modèle a mis trop de temps",
-        "body": "Le modèle sélectionné a mis trop de temps à répondre. Réessaie ou change de modèle."
-      },
-      "upstream_unavailable": {
-        "title": "Le service d’IA est indisponible",
-        "body": "Le service d’IA sélectionné est temporairement indisponible. Réessaie ou change de modèle."
-      },
-      "unknown": {
-        "title": "Le modèle n’a pas pu répondre",
-        "body": "Le modèle sélectionné n’a pas pu répondre à cette demande. Réessaie avec un autre modèle."
-      }
-    }
+    "showDetails": "Afficher les détails techniques"
   },
   "commands": {
     "noResults": "Aucune commande trouvée",

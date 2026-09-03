@@ -102,6 +102,7 @@ final class WhatsAppService
         private UserMemoryService $memoryService,
         private MessageReferenceResolver $messageReferenceResolver,
         private ConversationSummaryRefreshDispatcher $summaryRefreshDispatcher,
+        private ChatErrorPresenter $chatErrorPresenter,
         string $whatsappAccessToken,
         bool $whatsappEnabled,
         private string $uploadsDir,
@@ -109,7 +110,6 @@ final class WhatsAppService
         private string $appUrl = '',
         ?string $whatsappGraphApiBaseUrl = null,
         private ?ChatActivityNotifier $chatActivityNotifier = null,
-        private ?ChatErrorPresenter $chatErrorPresenter = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -870,24 +870,20 @@ final class WhatsAppService
         $result = $this->messageProcessor->processStream($message, $streamCallback, null, $processingOptions);
 
         if (!$result['success']) {
-            $errorView = $this->chatErrorPresenter?->presentFromResult(
+            $errorView = $this->chatErrorPresenter->presentFromResult(
                 $result,
                 $message->getLanguage() ?: 'de',
                 false,
             );
-            $rawError = $errorView->rawMessage ?? ($result['error'] ?? 'Processing failed');
-            // Without a presenter (hand-built service in unit tests) hand the raw
-            // error to sendErrorMessage() so its own localized templates apply
-            // instead of duplicating that copy here.
-            $userError = $errorView->userText ?? $rawError;
-            $this->sendErrorMessage($dto, $userError, alreadyUserFacing: null !== $errorView);
+            $userError = $errorView->userText;
+            $this->sendMessage($dto->from, $userError, $dto->phoneNumberId);
 
             // Discord notification: Processing failed (raw text for operators)
             $this->discord->notifyWhatsAppError(
                 'processing',
                 $dto->from,
                 $message->getText(),
-                $rawError,
+                $errorView->rawMessage,
                 ['message_type' => $dto->type],
                 $user->getId(),
             );
@@ -1373,14 +1369,8 @@ final class WhatsAppService
     /**
      * Send a user-friendly error message via WhatsApp.
      */
-    private function sendErrorMessage(IncomingMessageDto $dto, string $error, bool $alreadyUserFacing = false): void
+    private function sendErrorMessage(IncomingMessageDto $dto, string $error): void
     {
-        if ($alreadyUserFacing) {
-            $this->sendMessage($dto->from, $error, $dto->phoneNumberId);
-
-            return;
-        }
-
         $errorMap = [
             'transcription' => "⚠️ *Sprachnachricht konnte nicht verarbeitet werden*\n\nDie Sprachnachricht konnte nicht transkribiert werden. Bitte versuche es erneut oder sende eine Textnachricht.",
             'image' => "⚠️ *Bild konnte nicht analysiert werden*\n\nDas Bild konnte nicht verarbeitet werden. Bitte versuche es erneut.",

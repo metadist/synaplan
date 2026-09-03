@@ -22,35 +22,19 @@ const i18n = createI18n({
     en: {
       error: { adminOnly: 'Admin only' },
       chatError: {
+        title: 'The answer failed',
         retry: 'Try again with another model',
         retryWith: 'Try again with {model}',
         chooseModel: 'Choose another model',
         showDetails: 'Show technical details',
-        noRetryHint: 'Please try again later or contact support.',
-        reason: {
-          schema_mismatch: {
-            title: 'The model could not complete this request',
-            body: 'Please try another model.',
-          },
-          auth_failed: {
-            title: 'The AI service is not set up',
-            body: 'Contact support.',
-          },
-          unknown: {
-            title: 'The model could not answer',
-            body: 'Please try again.',
-          },
-        },
       },
     },
   },
 })
 
 const mountNotice = (props: {
-  errorReason: string
   canRetryModel?: boolean
   errorDebug?: string | null
-  recommendedModelLabel?: string | null
   recommendedModelId?: number | null
   failedModelId?: number | null
   modelOptions?: { id: number; label: string }[]
@@ -68,19 +52,24 @@ describe('ChatErrorNotice', () => {
     isAdmin.value = false
   })
 
-  it('shows the localized reason and emits retry with the recommended model', async () => {
+  it('frames the failure without repeating the persisted error text', () => {
+    const wrapper = mountNotice({ canRetryModel: true, recommendedModelId: 42 })
+
+    expect(wrapper.get('[data-testid="chat-error-title"]').text()).toBe('The answer failed')
+    expect(wrapper.find('[data-testid="chat-error-debug"]').exists()).toBe(false)
+  })
+
+  it('emits retry with the recommended model', async () => {
     const wrapper = mountNotice({
-      errorReason: 'schema_mismatch',
       canRetryModel: true,
-      recommendedModelLabel: 'GPT-4o',
       recommendedModelId: 42,
+      modelOptions: [
+        { id: 42, label: 'GPT-4o' },
+        { id: 7, label: 'Llama 4' },
+      ],
     })
 
-    expect(wrapper.get('[data-testid="chat-error-title"]').text()).toContain(
-      'The model could not complete this request'
-    )
     expect(wrapper.get('[data-testid="btn-chat-error-retry"]').text()).toContain('GPT-4o')
-    expect(wrapper.find('[data-testid="chat-error-debug"]').exists()).toBe(false)
 
     await wrapper.get('[data-testid="btn-chat-error-retry"]').trigger('click')
     expect(wrapper.emitted('retry')?.[0]).toEqual([42])
@@ -88,13 +77,12 @@ describe('ChatErrorNotice', () => {
 
   it('lets the user pick another model before retry', async () => {
     const wrapper = mountNotice({
-      errorReason: 'schema_mismatch',
       canRetryModel: true,
-      recommendedModelLabel: 'GPT-4o',
       recommendedModelId: 42,
       modelOptions: [
         { id: 42, label: 'GPT-4o' },
         { id: 7, label: 'Llama 4' },
+        { id: 9, label: 'Mistral Large' },
       ],
     })
 
@@ -104,11 +92,32 @@ describe('ChatErrorNotice', () => {
     expect(wrapper.emitted('retry')?.[0]).toEqual([7])
   })
 
-  it('defaults to a different model than the one that failed', async () => {
+  it('never offers the model that just failed', async () => {
     const wrapper = mountNotice({
-      errorReason: 'schema_mismatch',
       canRetryModel: true,
-      recommendedModelLabel: 'gpt-oss-120b',
+      recommendedModelId: 76,
+      failedModelId: 76,
+      modelOptions: [
+        { id: 76, label: 'gpt-oss-120b' },
+        { id: 73, label: 'gpt-4o-mini' },
+        { id: 12, label: 'claude-sonnet' },
+      ],
+    })
+
+    const labels = wrapper
+      .get('[data-testid="chat-error-model-select"]')
+      .findAll('option')
+      .map((option) => option.text())
+    expect(labels).toEqual(['gpt-4o-mini', 'claude-sonnet'])
+
+    expect(wrapper.get('[data-testid="btn-chat-error-retry"]').text()).toContain('gpt-4o-mini')
+    await wrapper.get('[data-testid="btn-chat-error-retry"]').trigger('click')
+    expect(wrapper.emitted('retry')?.[0]).toEqual([73])
+  })
+
+  it('hides the model picker when only one alternative is left', () => {
+    const wrapper = mountNotice({
+      canRetryModel: true,
       recommendedModelId: 76,
       failedModelId: 76,
       modelOptions: [
@@ -117,27 +126,20 @@ describe('ChatErrorNotice', () => {
       ],
     })
 
+    expect(wrapper.find('[data-testid="chat-error-model-select"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="btn-chat-error-retry"]').text()).toContain('gpt-4o-mini')
-    await wrapper.get('[data-testid="btn-chat-error-retry"]').trigger('click')
-    expect(wrapper.emitted('retry')?.[0]).toEqual([73])
   })
 
-  it('hides retry for auth failures', () => {
-    const wrapper = mountNotice({
-      errorReason: 'auth_failed',
-      canRetryModel: false,
-      errorDebug: 'API key missing',
-    })
+  it('hides retry when the backend says another model would not help', () => {
+    const wrapper = mountNotice({ canRetryModel: false, errorDebug: 'API key missing' })
 
     expect(wrapper.find('[data-testid="btn-chat-error-retry"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="chat-error-no-retry"]').text()).toContain('later')
     expect(wrapper.find('[data-testid="btn-chat-error-details"]').exists()).toBe(false)
   })
 
   it('shows admin diagnostics only for admins', async () => {
     isAdmin.value = true
     const wrapper = mountNotice({
-      errorReason: 'schema_mismatch',
       canRetryModel: true,
       errorDebug: 'Groq chat error: json_validate_failed',
     })

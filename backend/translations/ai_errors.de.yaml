@@ -9,7 +9,7 @@ reason:
   content_filtered: 'Der KI-Dienst hat diese Anfrage abgelehnt. Bitte formuliere sie um oder wähle ein anderes Modell.'
   timeout: 'Das gewählte Modell hat zu lange für eine Antwort gebraucht. Bitte versuche es erneut oder wähle ein anderes Modell.'
   upstream_unavailable: 'Der gewählte KI-Dienst ist vorübergehend nicht erreichbar. Bitte versuche es erneut oder wähle ein anderes Modell.'
-  unknown: 'Das gewählte Modell konnte diese Anfrage nicht beantworten. Bitte versuche es mit einem anderen Modell erneut.'
+  unknown: 'Bei der Beantwortung dieser Anfrage ist etwas schiefgelaufen. Bitte versuche es erneut.'
 
 hint:
   retry_other_model: 'Du kannst es mit einem anderen Modell erneut versuchen, das zu deiner Anfrage passt.'

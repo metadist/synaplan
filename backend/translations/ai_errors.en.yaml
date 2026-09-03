@@ -9,7 +9,7 @@ reason:
   content_filtered: 'The AI service declined this request. Please rephrase it or try a different model.'
   timeout: 'The selected model took too long to answer. Please try again or switch to a different model.'
   upstream_unavailable: 'The selected AI service is temporarily unavailable. Please try again or switch to a different model.'
-  unknown: 'The selected model could not answer this request. Please try again with a different model.'
+  unknown: 'Something went wrong while answering this request. Please try again.'
 
 hint:
   retry_other_model: 'You can try again with a different model that fits this request.'

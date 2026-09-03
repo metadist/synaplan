@@ -131,6 +131,7 @@ final readonly class MessageSorter
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
     ) {
     }
 
@@ -439,7 +440,7 @@ final readonly class MessageSorter
                 'sorting_model_name' => $modelName,
             ], $violationDecision->toClassificationFields());
         } catch (\App\AI\Exception\ProviderException $e) {
-            $reason = (new ChatFailureClassifier())->classify($e);
+            $reason = $this->failureClassifier->classify($e);
 
             // An auth or quota failure is an account/setup problem: it carries
             // instructions the user must act on and would hit the answering

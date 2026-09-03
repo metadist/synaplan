@@ -617,11 +617,58 @@ final readonly class DiscordNotificationService
      *
      * @param array<string, mixed> $metadata
      */
+    public function notifyWidgetError(
+        string $widgetId,
+        string $error,
+        array $metadata = [],
+    ): void {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $fields = [
+            [
+                'name' => '🔧 Widget ID',
+                'value' => $widgetId,
+                'inline' => true,
+            ],
+            [
+                'name' => '❌ Error',
+                'value' => '```'.$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR).'```',
+                'inline' => false,
+            ],
+        ];
+
+        if (isset($metadata['session_id'])) {
+            $fields[] = [
+                'name' => '🔑 Session',
+                'value' => $this->truncate((string) $metadata['session_id'], 50),
+                'inline' => true,
+            ];
+        }
+
+        if (isset($metadata['file'], $metadata['line'])) {
+            $fields[] = [
+                'name' => '📍 Location',
+                'value' => '`'.basename((string) $metadata['file']).':'.$metadata['line'].'`',
+                'inline' => true,
+            ];
+        }
+
+        $this->sendEmbed(
+            title: '⚠️ Widget Message Error',
+            color: self::COLOR_ERROR,
+            fields: $fields,
+            footer: 'Synaplan Widget'
+        );
+    }
+
     /**
      * Notify a web-chat / sorting / generation provider failure.
      *
      * Always includes the raw provider text so operators can diagnose; the
-     * user-facing chat never sees this payload.
+     * user-facing chat never sees this payload. Callers go through
+     * {@see Message\ChatErrorNotifier}, which throttles bursts.
      *
      * @param array<string, mixed> $metadata
      */
@@ -679,56 +726,10 @@ final readonly class DiscordNotificationService
         }
 
         $this->sendEmbed(
-            title: 'Chat Provider Error',
+            title: '⚠️ Chat Provider Error',
             color: self::COLOR_ERROR,
             fields: $fields,
-            footer: 'Synaplan Chat'
-        );
-    }
-
-    public function notifyWidgetError(
-        string $widgetId,
-        string $error,
-        array $metadata = [],
-    ): void {
-        if (!$this->isEnabled()) {
-            return;
-        }
-
-        $fields = [
-            [
-                'name' => '🔧 Widget ID',
-                'value' => $widgetId,
-                'inline' => true,
-            ],
-            [
-                'name' => '❌ Error',
-                'value' => '```'.$this->truncate(AiResponseSanitizer::stripForDisplay($error), self::MAX_ERROR).'```',
-                'inline' => false,
-            ],
-        ];
-
-        if (isset($metadata['session_id'])) {
-            $fields[] = [
-                'name' => '🔑 Session',
-                'value' => $this->truncate((string) $metadata['session_id'], 50),
-                'inline' => true,
-            ];
-        }
-
-        if (isset($metadata['file'], $metadata['line'])) {
-            $fields[] = [
-                'name' => '📍 Location',
-                'value' => '`'.basename((string) $metadata['file']).':'.$metadata['line'].'`',
-                'inline' => true,
-            ];
-        }
-
-        $this->sendEmbed(
-            title: '⚠️ Widget Message Error',
-            color: self::COLOR_ERROR,
-            fields: $fields,
-            footer: 'Synaplan Widget'
+            footer: 'Synaplan Chat · throttled per provider + reason'
         );
     }
 

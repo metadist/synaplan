@@ -537,24 +537,20 @@
             />
           </div>
 
-          <template v-if="showContentParts">
-            <MessagePart
-              v-for="(part, index) in contentParts"
-              :key="part.partId ?? `${part.type}-${index}`"
-              :part="part"
-              :is-streaming="isStreaming"
-              :memories="memories"
-              :docs="docs"
-            />
-          </template>
+          <MessagePart
+            v-for="(part, index) in contentParts"
+            :key="part.partId ?? `${part.type}-${index}`"
+            :part="part"
+            :is-streaming="isStreaming"
+            :memories="memories"
+            :docs="docs"
+          />
 
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
-            :error-reason="errorReason"
             :can-retry-model="canRetryModel"
             :error-debug="errorDebug"
-            :recommended-model-label="selectedModel?.label ?? null"
             :recommended-model-id="selectedModel?.id ?? null"
             :failed-model-id="aiModels?.chat?.model_id ?? null"
             :model-options="modelOptions"
@@ -1322,7 +1318,6 @@ interface Props {
   errorReason?: string | null
   canRetryModel?: boolean
   errorDebug?: string | null
-  errorAfterContent?: boolean
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string
@@ -1543,14 +1538,6 @@ const contentParts = computed(() => {
     return part
   })
 })
-
-// A failed turn whose content IS the localized error text (the `complete` error
-// branch and every reloaded error row) would print that sentence twice next to
-// ChatErrorNotice. Content survives only when it is a genuine partial answer
-// the provider interrupted — see `errorAfterContent`.
-const showContentParts = computed(
-  () => !props.errorReason || props.role !== 'assistant' || props.errorAfterContent === true
-)
 
 // Multitask routing, #1229 smart collapse: mark a task card's prose redundant
 // when that text is already part of the final answer in the message body —

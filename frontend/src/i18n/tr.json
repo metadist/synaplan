@@ -856,58 +856,11 @@
     "infoCost": "Maliyet"
   },
   "chatError": {
+    "title": "Yanıt alınamadı",
     "retry": "Başka bir modelle tekrar dene",
     "retryWith": "{model} ile tekrar dene",
     "chooseModel": "Başka bir model seç",
-    "showDetails": "Teknik ayrıntıları göster",
-    "adminDetails": "Yönetici tanılama",
-    "noRetryHint": "Lütfen daha sonra tekrar dene veya destekle iletişime geç.",
-    "reason": {
-      "schema_mismatch": {
-        "title": "Model bu isteği tamamlayamadı",
-        "body": "Seçilen model beklenen biçimde yanıt veremedi. Lütfen başka bir modelle tekrar dene."
-      },
-      "context_length_exceeded": {
-        "title": "Bu istek çok uzun",
-        "body": "Seçilen model bu kadar uzun bir isteği işleyemez. Lütfen kısalt veya daha geniş bağlam penceresi olan bir model dene."
-      },
-      "request_too_large": {
-        "title": "Bu istek çok büyük",
-        "body": "Seçilen model bu kadar büyük bir isteği işleyemez. Lütfen kısalt veya başka bir model dene."
-      },
-      "rate_limited": {
-        "title": "Model meşgul",
-        "body": "Seçilen model şu anda meşgul. Lütfen biraz bekle veya başka bir model dene."
-      },
-      "quota_exceeded": {
-        "title": "Yapay zeka hizmetinin kredisi bitti",
-        "body": "Seçilen yapay zeka hizmetinin kredisi kalmadı. Lütfen daha sonra tekrar dene veya destekle iletişime geç."
-      },
-      "auth_failed": {
-        "title": "Yapay zeka hizmeti ayarlı değil",
-        "body": "Seçilen yapay zeka hizmeti şu anda doğru şekilde ayarlı değil. Lütfen daha sonra tekrar dene veya destekle iletişime geç."
-      },
-      "model_unavailable": {
-        "title": "Bu model kullanılamıyor",
-        "body": "Seçilen model şu anda kullanılamıyor. Lütfen başka bir model dene."
-      },
-      "content_filtered": {
-        "title": "İstek reddedildi",
-        "body": "Yapay zeka hizmeti bu isteği reddetti. Lütfen yeniden ifade et veya başka bir model dene."
-      },
-      "timeout": {
-        "title": "Model çok uzun sürdü",
-        "body": "Seçilen model yanıt vermek için çok uzun sürdü. Lütfen tekrar dene veya başka bir modele geç."
-      },
-      "upstream_unavailable": {
-        "title": "Yapay zeka hizmeti kullanılamıyor",
-        "body": "Seçilen yapay zeka hizmeti geçici olarak kullanılamıyor. Lütfen tekrar dene veya başka bir modele geç."
-      },
-      "unknown": {
-        "title": "Model yanıt veremedi",
-        "body": "Seçilen model bu isteği yanıtlayamadı. Lütfen başka bir modelle tekrar dene."
-      }
-    }
+    "showDetails": "Teknik ayrıntıları göster"
   },
   "commands": {
     "noResults": "Komut bulunamadı",

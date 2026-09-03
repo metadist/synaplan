@@ -16,7 +16,6 @@ use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\ConversationSummaryRefreshDispatcher;
-use App\Service\DiscordNotificationService;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\File\DocumentGeneratorService;
 use App\Service\File\DocumentImageReferenceResolver;
@@ -33,6 +32,7 @@ use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\ChatErrorNotifier;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessageForwardingService;
@@ -122,10 +122,10 @@ class StreamController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private PremiumFeatureGate $premiumFeatureGate,
         private ChatRunService $chatRunService,
+        private ChatErrorPresenter $chatErrorPresenter,
+        private ChatErrorNotifier $chatErrorNotifier,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
-        private ?ChatErrorPresenter $chatErrorPresenter = null,
-        private ?DiscordNotificationService $discordNotificationService = null,
     ) {
     }
 
@@ -1412,7 +1412,7 @@ class StreamController extends AbstractController
                     $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
                     $errorMessage = $errorView->userText;
 
-                    $this->notifyChatProviderError($errorView, $intendedChat['provider'] ?? ($result['provider'] ?? null), $user->getId(), [
+                    $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? ($result['provider'] ?? null), $user->getId(), [
                         'model' => $intendedChat['name'] ?? null,
                         'chat_id' => $chat?->getId(),
                     ]);
@@ -1503,7 +1503,7 @@ class StreamController extends AbstractController
                         'originalMediaType' => $originalMediaType,
                         'language' => $errorLang,
                         'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
-                        ...$errorView->toSseFields($isAdmin ? $errorView->adminDetail : null),
+                        ...$errorView->toSseFields(),
                     ];
 
                     if (isset($result['error_hint'])) {
@@ -2377,7 +2377,7 @@ class StreamController extends AbstractController
 
                 $isAdmin = $this->isGranted('ROLE_ADMIN');
                 $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage(), 'provider' => $e->getProviderName(), 'context' => $e->getContext()], $uiLanguage, $isAdmin);
-                $this->notifyChatProviderError($errorView, $intendedChat['provider'] ?? $e->getProviderName(), $user->getId(), [
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? $e->getProviderName(), $user->getId(), [
                     'model' => $intendedChat['name'] ?? null,
                     'chat_id' => $chat?->getId(),
                 ]);
@@ -2391,7 +2391,7 @@ class StreamController extends AbstractController
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
-                    ...$errorView->toSseFields($isAdmin ? $errorView->adminDetail : null),
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
@@ -2417,7 +2417,7 @@ class StreamController extends AbstractController
 
                 $isAdmin = $this->isGranted('ROLE_ADMIN');
                 $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage()], $uiLanguage, $isAdmin);
-                $this->notifyChatProviderError($errorView, $intendedChat['provider'] ?? 'system', $user->getId(), [
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? 'system', $user->getId(), [
                     'model' => $intendedChat['name'] ?? null,
                     'chat_id' => $chat?->getId(),
                 ]);
@@ -2431,7 +2431,7 @@ class StreamController extends AbstractController
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
-                    ...$errorView->toSseFields($isAdmin ? $errorView->adminDetail : null),
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
@@ -2584,7 +2584,7 @@ class StreamController extends AbstractController
                 $errorLang = $this->resolveErrorLanguage($result, $message->getLanguage() ?: 'en');
                 $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
                 $errorMessage = $errorView->userText;
-                $this->notifyChatProviderError($errorView, $result['provider'] ?? null, $user->getId(), [
+                $this->chatErrorNotifier->notify($errorView, $result['provider'] ?? null, $user->getId(), [
                     'model' => $intendedModelId ? $this->modelConfigService->getModelName($intendedModelId) : null,
                     'chat_id' => $chat?->getId(),
                 ]);
@@ -2666,7 +2666,7 @@ class StreamController extends AbstractController
                     'originalMediaType' => $originalMediaType,
                     'language' => $errorLang,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
-                    ...$errorView->toSseFields($isAdmin ? $errorView->adminDetail : null),
+                    ...$errorView->toSseFields(),
                 ]);
 
                 return;
@@ -3959,7 +3959,7 @@ class StreamController extends AbstractController
      */
     private function presentChatFailure(array $result, string $lang, bool $includeDiagnostics): ChatErrorView
     {
-        return $this->resolveChatErrorPresenter()->presentFromResult($result, $lang, $includeDiagnostics);
+        return $this->chatErrorPresenter->presentFromResult($result, $lang, $includeDiagnostics);
     }
 
     /**
@@ -3977,35 +3977,9 @@ class StreamController extends AbstractController
 
     private function persistChatErrorMeta(Message $outgoing, ChatErrorView $view): void
     {
-        $outgoing->setMeta('error_type', $view->reason->value);
+        // `canRetryWithOtherModel` is derived from the reason, so persisting it
+        // separately would only create a second source of truth to keep in sync.
         $outgoing->setMeta('error_reason', $view->reason->value);
         $outgoing->setMeta('error_debug', $view->rawMessage);
-        $outgoing->setMeta('can_retry_model', $view->canRetryWithOtherModel ? '1' : '0');
-    }
-
-    /**
-     * @param array<string, mixed> $metadata
-     */
-    private function notifyChatProviderError(ChatErrorView $view, ?string $provider, ?int $userId, array $metadata = []): void
-    {
-        $this->discordNotificationService?->notifyChatError(
-            $view->rawMessage,
-            $view->reason->value,
-            $provider,
-            $userId,
-            $metadata,
-        );
-    }
-
-    private function resolveChatErrorPresenter(): ChatErrorPresenter
-    {
-        if (null !== $this->chatErrorPresenter) {
-            return $this->chatErrorPresenter;
-        }
-
-        return new ChatErrorPresenter(
-            new \Symfony\Component\Translation\IdentityTranslator(),
-            new \App\AI\Exception\ChatFailureClassifier(),
-        );
     }
 }

@@ -9,7 +9,7 @@ reason:
   content_filtered: 'Yapay zeka hizmeti bu isteği reddetti. Lütfen yeniden ifade et veya başka bir model dene.'
   timeout: 'Seçilen model yanıt vermek için çok uzun sürdü. Lütfen tekrar dene veya başka bir modele geç.'
   upstream_unavailable: 'Seçilen yapay zeka hizmeti geçici olarak kullanılamıyor. Lütfen tekrar dene veya başka bir modele geç.'
-  unknown: 'Seçilen model bu isteği yanıtlayamadı. Lütfen başka bir modelle tekrar dene.'
+  unknown: 'Bu istek yanıtlanırken bir sorun oluştu. Lütfen tekrar dene.'
 
 hint:
   retry_other_model: 'Bu isteğe uygun başka bir modelle tekrar deneyebilirsin.'

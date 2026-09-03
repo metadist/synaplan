@@ -856,58 +856,11 @@
     "infoCost": "Coste"
   },
   "chatError": {
+    "title": "La respuesta falló",
     "retry": "Intentarlo de nuevo con otro modelo",
     "retryWith": "Intentarlo de nuevo con {model}",
     "chooseModel": "Elegir otro modelo",
-    "showDetails": "Mostrar detalles técnicos",
-    "adminDetails": "Diagnóstico de administrador",
-    "noRetryHint": "Inténtalo más tarde o contacta con soporte.",
-    "reason": {
-      "schema_mismatch": {
-        "title": "El modelo no pudo completar esta solicitud",
-        "body": "El modelo seleccionado no pudo responder en el formato esperado. Prueba de nuevo con otro modelo."
-      },
-      "context_length_exceeded": {
-        "title": "Esta solicitud es demasiado larga",
-        "body": "El modelo seleccionado no puede procesar una solicitud tan larga. Acórtala o prueba un modelo con una ventana de contexto mayor."
-      },
-      "request_too_large": {
-        "title": "Esta solicitud es demasiado grande",
-        "body": "El modelo seleccionado no puede procesar una solicitud tan grande. Acórtala o prueba otro modelo."
-      },
-      "rate_limited": {
-        "title": "El modelo está ocupado",
-        "body": "El modelo seleccionado está ocupado ahora mismo. Espera un momento o prueba otro modelo."
-      },
-      "quota_exceeded": {
-        "title": "El servicio de IA no tiene crédito",
-        "body": "El servicio de IA seleccionado no tiene crédito restante. Inténtalo más tarde o contacta con soporte."
-      },
-      "auth_failed": {
-        "title": "El servicio de IA no está configurado",
-        "body": "El servicio de IA seleccionado no está configurado correctamente en este momento. Inténtalo más tarde o contacta con soporte."
-      },
-      "model_unavailable": {
-        "title": "Este modelo no está disponible",
-        "body": "El modelo seleccionado no está disponible ahora mismo. Prueba otro modelo."
-      },
-      "content_filtered": {
-        "title": "La solicitud fue rechazada",
-        "body": "El servicio de IA rechazó esta solicitud. Reformúlala o prueba otro modelo."
-      },
-      "timeout": {
-        "title": "El modelo tardó demasiado",
-        "body": "El modelo seleccionado tardó demasiado en responder. Inténtalo de nuevo o cambia de modelo."
-      },
-      "upstream_unavailable": {
-        "title": "El servicio de IA no está disponible",
-        "body": "El servicio de IA seleccionado no está disponible temporalmente. Inténtalo de nuevo o cambia de modelo."
-      },
-      "unknown": {
-        "title": "El modelo no pudo responder",
-        "body": "El modelo seleccionado no pudo responder a esta solicitud. Prueba de nuevo con otro modelo."
-      }
-    }
+    "showDetails": "Mostrar detalles técnicos"
   },
   "commands": {
     "noResults": "No se encontraron comandos",

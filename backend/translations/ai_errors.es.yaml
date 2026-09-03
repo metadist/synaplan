@@ -9,7 +9,7 @@ reason:
   content_filtered: 'El servicio de IA rechazó esta solicitud. Reformúlala o prueba otro modelo.'
   timeout: 'El modelo seleccionado tardó demasiado en responder. Inténtalo de nuevo o cambia de modelo.'
   upstream_unavailable: 'El servicio de IA seleccionado no está disponible temporalmente. Inténtalo de nuevo o cambia de modelo.'
-  unknown: 'El modelo seleccionado no pudo responder a esta solicitud. Prueba de nuevo con otro modelo.'
+  unknown: 'Algo salió mal al responder a esta solicitud. Inténtalo de nuevo.'
 
 hint:
   retry_other_model: 'Puedes intentarlo de nuevo con otro modelo que se ajuste a tu solicitud.'

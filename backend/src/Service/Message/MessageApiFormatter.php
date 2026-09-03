@@ -27,7 +27,7 @@ final readonly class MessageApiFormatter
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private DataUrlFixer $dataUrlFixer,
-        private ?Security $security = null,
+        private Security $security,
     ) {
     }
 
@@ -379,8 +379,7 @@ final readonly class MessageApiFormatter
         }
 
         $resolved = $reason ?? ChatFailureReason::Unknown;
-        $isAdmin = $this->security?->isGranted('ROLE_ADMIN') ?? false;
-        $debug = $isAdmin ? ($m->getMeta('error_debug') ?: null) : null;
+        $debug = $this->security->isGranted('ROLE_ADMIN') ? ($m->getMeta('error_debug') ?: null) : null;
 
         return [
             'errorReason' => $resolved->value,
