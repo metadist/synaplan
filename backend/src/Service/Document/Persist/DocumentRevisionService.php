@@ -172,9 +172,11 @@ final readonly class DocumentRevisionService
 
     private function invalidateExportCache(File $file): void
     {
-        $export = $this->uploadDir.'/'.ltrim(DocumentExportService::cachedRelativePath($file->getFilePath()), '/');
-        if (is_file($export)) {
-            @unlink($export);
+        foreach (DocumentExportService::cachedRelativePaths($file->getFilePath()) as $relative) {
+            $export = $this->uploadDir.'/'.ltrim($relative, '/');
+            if (is_file($export)) {
+                @unlink($export);
+            }
         }
     }
 }

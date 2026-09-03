@@ -64,6 +64,22 @@ final class OfficeConverterClientTest extends TestCase
         @unlink($input);
     }
 
+    public function testConvertPostsOnlyTheFileByDefault(): void
+    {
+        $body = $this->captureConvertBody([]);
+
+        self::assertStringContainsString('name="data"', $body);
+        self::assertStringNotContainsString('FullSheetPreview', $body);
+    }
+
+    public function testFullSheetPreviewOptionIsSentAsCollaboraFormField(): void
+    {
+        $body = $this->captureConvertBody([OfficeConverterClient::OPTION_FULL_SHEET_PREVIEW => true]);
+
+        self::assertStringContainsString('name="data"', $body);
+        self::assertMatchesRegularExpression('/name="FullSheetPreview"\r\n\r\ntrue\r\n/', $body);
+    }
+
     public function testConvertReturnsNullOnHttp500WithoutRetry(): void
     {
         $calls = 0;
@@ -167,6 +183,61 @@ final class OfficeConverterClientTest extends TestCase
         self::assertSame(1, $calls);
         self::assertSame($first, $second);
         self::assertTrue($first['convert-to']['available']);
+    }
+
+    /**
+     * Run one conversion and return the raw multipart body that was POSTed.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function captureConvertBody(array $options): string
+    {
+        $body = '';
+        $http = new MockHttpClient(function (string $method, string $url, array $requestOptions) use (&$body): MockResponse {
+            if (str_contains($url, '/hosting/capabilities')) {
+                return new MockResponse('{"convert-to":{"available":true}}', [
+                    'http_code' => 200,
+                    'response_headers' => ['content-type' => 'application/json'],
+                ]);
+            }
+            $body = self::drainBody($requestOptions['body'] ?? '');
+
+            return new MockResponse('%PDF-ok', ['http_code' => 200]);
+        });
+
+        $input = $this->touchInput();
+        $output = $this->client($http)->convert($input, 'pdf', $options);
+
+        self::assertNotNull($output);
+        @unlink((string) $output);
+        @unlink($input);
+
+        return $body;
+    }
+
+    private static function drainBody(mixed $body): string
+    {
+        if (is_string($body)) {
+            return $body;
+        }
+        if (is_callable($body)) {
+            $out = '';
+            while ('' !== ($chunk = (string) $body(1024 * 1024))) {
+                $out .= $chunk;
+            }
+
+            return $out;
+        }
+        if (is_iterable($body)) {
+            $out = '';
+            foreach ($body as $chunk) {
+                $out .= (string) $chunk;
+            }
+
+            return $out;
+        }
+
+        return '';
     }
 
     private function client(MockHttpClient $http, string $url = 'http://collabora:9980'): OfficeConverterClient

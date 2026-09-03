@@ -6,6 +6,7 @@ namespace App\Service\File;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailDispatcher;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Presentation\PptxRequestDirectiveResolver;
@@ -164,7 +165,11 @@ final readonly class GeneratedDocumentStore
         }
 
         $sourceAbsolute = $this->uploadDir.'/'.ltrim($source->getFilePath(), '/');
-        $converted = $this->converter->convert($sourceAbsolute, 'pdf');
+        $converted = $this->converter->convert(
+            $sourceAbsolute,
+            'pdf',
+            DocumentExportService::conversionOptions($fileData['extension']),
+        );
         if (null === $converted || !is_file($converted)) {
             $this->logger->warning('GeneratedDocumentStore: PDF export failed, keeping source only', [
                 'file_id' => $source->getId(),
