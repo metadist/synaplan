@@ -1,5 +1,5 @@
 /**
- * SPA-side seam for iOS App Shortcuts (Kurzbefehle).
+ * SPA-side seam for iOS App Shortcuts.
  *
  * The native shell (synaplan-apps) injects `app/synaplan-native.js` BEFORE the
  * SPA bundle and exposes `window.SynaplanShortcuts`. That API wraps the
@@ -60,7 +60,10 @@ export function isShortcutBridgeAvailable(): boolean {
 
 /**
  * Pull (and clear) any Shortcuts action that arrived before the SPA mounted.
- * Returns the first pending action, or null.
+ * Returns the first action this build understands, or null.
+ *
+ * The queue is scanned rather than only its head: an action added by a newer
+ * app binary must not swallow the tap the user actually made.
  */
 export async function consumePendingShortcut(): Promise<ShortcutActionPayload | null> {
   const api = getApi()
@@ -69,10 +72,16 @@ export async function consumePendingShortcut(): Promise<ShortcutActionPayload | 
   }
   try {
     const pending = await api.consumePending()
-    if (!Array.isArray(pending) || 0 === pending.length) {
+    if (!Array.isArray(pending)) {
       return null
     }
-    return normalizePayload(pending[0])
+    for (const raw of pending) {
+      const payload = normalizePayload(raw)
+      if (payload) {
+        return payload
+      }
+    }
+    return null
   } catch {
     return null
   }

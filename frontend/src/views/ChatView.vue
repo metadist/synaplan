@@ -784,41 +784,24 @@ function handleGuestFeatureGate(key: string) {
   featureGateOpen.value = true
 }
 
-// MOBILE-APP SEAM: iOS Shortcuts (Kurzbefehle) land here after the native
-// bootstrap pulls/pushes the pending action. `open` is a no-op (the app is
-// already visible). Photos are attached, never auto-sent.
+// MOBILE-APP SEAM: iOS App Shortcuts land here after the native bootstrap
+// pulls (cold start) or pushes (warm start) the pending action. `open` is a
+// no-op — the app is already visible. Photos are attached, never auto-sent.
 let stopShortcutListen: (() => void) | null = null
 const handledShortcutTokens = new Set<string>()
+// The composer is `v-if`-gated behind provider setup, so a shortcut can arrive
+// before it exists. The action is parked here and run by the watcher below
+// once the composer is mounted, instead of polling for the ref: dictation and
+// the camera are useless without an input to hand their result to, and a
+// captured photo with nowhere to go would be silently discarded.
+const queuedShortcut = ref<Exclude<ShortcutActionName, 'open'> | null>(null)
 
-async function waitForChatInput(): Promise<InstanceType<typeof ChatInput> | null> {
-  if (chatInputRef.value) {
-    return chatInputRef.value
-  }
-  await nextTick()
-  if (chatInputRef.value) {
-    return chatInputRef.value
-  }
-  await new Promise((resolve) => setTimeout(resolve, 300))
-  return chatInputRef.value
-}
-
-async function handleNativeShortcut(action: ShortcutActionName, token: string): Promise<void> {
-  if (token && handledShortcutTokens.has(token)) {
-    return
-  }
-  if (token) {
-    handledShortcutTokens.add(token)
-  }
-  if ('open' === action) {
-    return
-  }
-
-  const input = await waitForChatInput()
+async function runNativeShortcut(
+  input: InstanceType<typeof ChatInput>,
+  action: Exclude<ShortcutActionName, 'open'>
+): Promise<void> {
   if ('dictate' === action) {
-    await input?.startDictation()
-    return
-  }
-  if ('photo' !== action) {
+    await input.startDictation()
     return
   }
   if (isGuestMode.value) {
@@ -830,21 +813,45 @@ async function handleNativeShortcut(action: ShortcutActionName, token: string): 
     return
   }
   const file = await captureNativePhoto()
-  if (file && chatInputRef.value) {
-    await chatInputRef.value.uploadFiles([file])
+  if (file) {
+    await chatInputRef.value?.uploadFiles([file])
   }
 }
+
+function handleNativeShortcut(action: ShortcutActionName, token: string): void {
+  if (token && handledShortcutTokens.has(token)) {
+    return
+  }
+  if (token) {
+    handledShortcutTokens.add(token)
+  }
+  if ('open' !== action) {
+    queuedShortcut.value = action
+  }
+}
+
+watch(
+  [chatInputRef, queuedShortcut],
+  ([input, action]) => {
+    if (!input || !action) {
+      return
+    }
+    queuedShortcut.value = null
+    void runNativeShortcut(input, action)
+  },
+  { flush: 'post' }
+)
 
 function initChatShortcuts(): void {
   if (!isNativeApp()) {
     return
   }
   stopShortcutListen = onShortcutAction((payload) => {
-    void handleNativeShortcut(payload.action, payload.token)
+    handleNativeShortcut(payload.action, payload.token)
   })
   void consumePendingShortcut().then((pending) => {
     if (pending) {
-      void handleNativeShortcut(pending.action, pending.token)
+      handleNativeShortcut(pending.action, pending.token)
     }
   })
 }
