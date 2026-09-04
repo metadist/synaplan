@@ -83,7 +83,7 @@ final readonly class DocumentCombineService
             $pdfPaths[] = $pdf;
         }
 
-        $outputName = $this->sanitizeFilename($filename);
+        $outputName = $this->sanitizeFilename($filename, $ordered);
         $relative = $this->userUploadPathBuilder->buildUserBaseRelativePath($user->getId())
             .'/'.date('Y').'/'.date('m').'/'.$outputName;
         $absolute = $this->uploadDir.'/'.$relative;
@@ -105,7 +105,7 @@ final readonly class DocumentCombineService
         $file->setUserId($user->getId());
         $file->setFilePath($relative);
         $file->setFileType('pdf');
-        $file->setFileName($this->displayName($filename));
+        $file->setFileName(self::resolvedDisplayName($filename, $ordered));
         $file->setFileSize($size);
         $file->setFileMime(GeneratedDocumentStore::mimeTypeForExtension('pdf'));
         $file->setFileText($manifest);
@@ -160,10 +160,27 @@ final readonly class DocumentCombineService
         return implode("\n", $lines);
     }
 
-    private function displayName(?string $filename): string
+    /**
+     * Product filename for a combined PDF. An explicit title wins; otherwise
+     * the first source stem is used, so neither the file chip's Combine action
+     * nor a chat merge persists the bare fallback `combined.pdf` (#1694). Both
+     * callers reach this through {@see combineToPdf()}; it is public only to be
+     * assertable without an office engine.
+     *
+     * @param list<File> $sources
+     */
+    public static function resolvedDisplayName(?string $filename, array $sources = []): string
     {
         $base = pathinfo((string) $filename, PATHINFO_FILENAME);
         $base = trim($base);
+        if ('' === $base) {
+            $first = $sources[0] ?? null;
+            $stem = $first instanceof File ? pathinfo($first->getFileName(), PATHINFO_FILENAME) : '';
+            $base = trim($stem);
+            if ('' !== $base) {
+                $base .= '_combined';
+            }
+        }
         if ('' === $base) {
             $base = 'combined';
         }
@@ -171,9 +188,12 @@ final readonly class DocumentCombineService
         return $base.'.pdf';
     }
 
-    private function sanitizeFilename(?string $filename): string
+    /**
+     * @param list<File> $sources
+     */
+    private function sanitizeFilename(?string $filename, array $sources = []): string
     {
-        $base = pathinfo($this->displayName($filename), PATHINFO_FILENAME);
+        $base = pathinfo(self::resolvedDisplayName($filename, $sources), PATHINFO_FILENAME);
         $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $base) ?? 'combined';
 
         return $sanitized.'_'.time().'.pdf';

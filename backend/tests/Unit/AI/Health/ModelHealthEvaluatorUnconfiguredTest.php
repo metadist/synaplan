@@ -56,19 +56,41 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         self::assertSame([], $run->alertsRaised, 'Unconfigured Triton must not page operators');
     }
 
+    public function testUnconfiguredOllamaDoesNotRaiseAnIncident(): void
+    {
+        $models = [
+            self::model(10, 'llama3.2', 'ollama'),
+            self::model(11, 'bge-m3', 'ollama'),
+            self::model(12, 'whisper', 'ollama'),
+        ];
+
+        $run = $this->evaluatorFor($models, ProbeResult::skipped('OLLAMA_BASE_URL is not configured.'), 'ollama')
+            ->run(dryRun: true);
+
+        self::assertCount(3, $run->verdicts);
+        foreach ($run->verdicts as $verdict) {
+            self::assertSame(ModelHealthState::Unconfigured, $verdict->state);
+            self::assertFalse($verdict->safeToDisable);
+        }
+        self::assertSame(['ollama' => 'OLLAMA_BASE_URL is not configured.'], $run->skippedProviders);
+        self::assertSame([], $run->alertsRaised, 'Unconfigured Ollama must not page operators');
+    }
+
     /**
      * @param list<Model> $catalog
      */
-    private function evaluatorFor(array $catalog, ProbeResult $probeResult): ModelHealthEvaluator
+    private function evaluatorFor(array $catalog, ProbeResult $probeResult, string $service = 'triton'): ModelHealthEvaluator
     {
-        $probe = new class($probeResult) implements ModelListProbeInterface {
-            public function __construct(private readonly ProbeResult $result)
-            {
+        $probe = new class($probeResult, $service) implements ModelListProbeInterface {
+            public function __construct(
+                private readonly ProbeResult $result,
+                private readonly string $service,
+            ) {
             }
 
             public function supports(string $service): bool
             {
-                return 'triton' === mb_strtolower($service);
+                return $this->service === mb_strtolower($service);
             }
 
             public function probe(string $service): ProbeResult
@@ -88,7 +110,7 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         }
 
         $models = $this->createStub(ModelRepository::class);
-        $models->method('findAllServices')->willReturn(['triton']);
+        $models->method('findAllServices')->willReturn([$service]);
         $models->method('findByServiceIndexedByProviderId')->willReturn($indexed);
 
         $configRepository = $this->createStub(ConfigRepository::class);
@@ -125,10 +147,10 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         );
     }
 
-    private static function model(int $id, string $providerId): Model
+    private static function model(int $id, string $providerId, string $service = 'triton'): Model
     {
         $model = new Model();
-        $model->setService('triton')
+        $model->setService($service)
             ->setProviderId($providerId)
             ->setName($providerId)
             ->setTag('chat');

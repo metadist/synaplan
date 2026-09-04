@@ -1391,6 +1391,7 @@
       "text2sound": "Audio",
       "document_generation": "Dokument",
       "document_export": "PDF-Export",
+      "document_combine": "Zusammengeführtes PDF",
       "calendar_event": "Kalendereinladung",
       "email_me": "E-Mail-Versand",
       "save_to_folder": "Im Ordner speichern"

@@ -11,6 +11,7 @@ use App\Entity\MessageMeta;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
@@ -18,6 +19,7 @@ use App\Service\Message\Routing\EmbeddingRouterConfig;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Tests\Characterization\Support\RoutingSnapshot;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -136,6 +138,24 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'attach_pdf', 'text' => 'Summarize this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
             ['id' => 'attach_docx', 'text' => 'What is in here?', 'language' => 'en', 'files' => [['type' => 'docx', 'name' => 'contract.docx']]],
             ['id' => 'attach_audio_mp3', 'text' => 'Transcribe', 'language' => 'de', 'files' => [['type' => 'mp3', 'name' => 'voice.mp3']]],
+            ['id' => 'attach_merge_pdf', 'text' => 'führe beide dateien in eine pdf zusammen', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+                ['type' => 'pdf', 'name' => 'Finanzmodell.pdf'],
+            ]],
+            ['id' => 'attach_export_pdf', 'text' => 'hieraus eine pdf', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+            ]],
+            // Neither of these is a merge: the first is a save_to_folder
+            // request, the second plausibly wants one PDF per file. Both stay
+            // on analyzefile so the planner can decide.
+            ['id' => 'attach_save_pdfs_to_folder', 'text' => 'Speichere die PDFs im Ordner Projekte', 'language' => 'de', 'files' => [
+                ['type' => 'pdf', 'name' => 'a.pdf'],
+                ['type' => 'pdf', 'name' => 'b.pdf'],
+            ]],
+            ['id' => 'attach_convert_both_to_pdf', 'text' => 'convert both files to PDF', 'language' => 'en', 'files' => [
+                ['type' => 'xlsx', 'name' => 'sheet.xlsx'],
+                ['type' => 'docx', 'name' => 'text.docx'],
+            ]],
 
             // ---- Sorter-driven: media generation params — migration-risk #3 ----
             ['id' => 'sort_image', 'text' => 'make an image of a cat', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image']],
@@ -253,6 +273,13 @@ final class RoutingCharacterizationTest extends TestCase
             }
         );
 
+        // The attachment merge/export layer only routes when the multi-task
+        // engine can execute it and the office engine can convert (#1694), so
+        // both are on here — otherwise those corpus cases would lock the
+        // fallback instead of the contract.
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn(true);
+
         $classifier = new MessageClassifier(
             $sorter,
             $metaRepo,
@@ -265,6 +292,8 @@ final class RoutingCharacterizationTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            officeConverter: $converter,
+            multitaskConfig: new MultitaskRoutingConfig($configRepo),
         );
 
         $message = $this->buildMessage($case);

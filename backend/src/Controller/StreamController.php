@@ -2211,8 +2211,7 @@ class StreamController extends AbstractController
 
                         $this->sendSSE('tts_generating', ['language' => $language]);
 
-                        $ttsText = TtsTextSanitizer::sanitize($responseText);
-                        $ttsText = mb_substr($ttsText, 0, 4000);
+                        $ttsText = TtsTextSanitizer::prepareForSynthesis($responseText);
 
                         if (!empty(trim($ttsText))) {
                             $ttsResult = $this->aiFacade->synthesize($ttsText, $user->getId(), [

@@ -1873,6 +1873,7 @@
       "text2sound": "Ses",
       "document_generation": "Belge",
       "document_export": "PDF dışa aktarma",
+      "document_combine": "Birleştirilmiş PDF",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet"

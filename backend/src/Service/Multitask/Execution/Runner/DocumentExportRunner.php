@@ -198,11 +198,13 @@ final readonly class DocumentExportRunner implements TaskRunner
         }
 
         // `attached:N` entries are the current message's own attachments, in
-        // marker order, and may not have an id yet.
+        // marker order, and may not have an id yet. Ownership is re-checked so
+        // both branches enforce the same rule.
         if (1 === preg_match('/^attached:(\d+)$/', $entry->reference, $m)) {
             $attachments = $this->conversationFiles->attachments($context->message);
+            $file = $attachments[(int) $m[1] - 1] ?? null;
 
-            return $attachments[(int) $m[1] - 1] ?? null;
+            return null !== $file && $file->getUserId() === $userId ? $file : null;
         }
 
         return null;

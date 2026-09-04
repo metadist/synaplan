@@ -4236,6 +4236,7 @@
       "text2sound": "Audio",
       "document_generation": "Document",
       "document_export": "PDF export",
+      "document_combine": "Combined PDF",
       "calendar_event": "Calendar invite",
       "email_me": "Email result",
       "save_to_folder": "Save to folder"

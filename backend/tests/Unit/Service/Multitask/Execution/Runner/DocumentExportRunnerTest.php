@@ -140,6 +140,28 @@ final class DocumentExportRunnerTest extends TestCase
         self::assertStringContainsString('could not convert "book.xlsx"', (string) $result->error);
     }
 
+    /**
+     * Both reference branches enforce ownership — an attachment without an id
+     * is referenced as `attached:N` and must be checked just like `file:ID`.
+     */
+    public function testAttachmentOfAnotherUserIsRejected(): void
+    {
+        $foreign = $this->file(null, 'foreign.xlsx', 'x', userId: 8);
+        $message = (new Message())->setUserId(7)->setDirection('IN')
+            ->setText('hieraus eine pdf')
+            ->addFile($foreign);
+
+        $export = $this->createMock(DocumentExportService::class);
+        $export->method('isEnabled')->willReturn(true);
+        $export->expects(self::never())->method('exportToPdf');
+
+        $result = $this->runner($export, $this->createMock(GeneratedDocumentStore::class), $this->repository())
+            ->run(new TaskNode('n1', Capability::DocumentExport), $this->context($message));
+
+        self::assertFalse($result->isSuccessful());
+        self::assertStringContainsString('foreign.xlsx', (string) $result->error);
+    }
+
     public function testCapabilityIsOfferedToThePlannerOnlyWhenTheEngineIsConfigured(): void
     {
         $off = $this->createMock(DocumentExportService::class);
@@ -206,12 +228,12 @@ final class DocumentExportRunnerTest extends TestCase
         return $message;
     }
 
-    private function file(int $id, string $name, string $text, ?int $messageId = null): File
+    private function file(?int $id, string $name, string $text, ?int $messageId = null, int $userId = 7): File
     {
         file_put_contents($this->uploadDir.'/'.$name, 'content');
 
         $file = (new File())
-            ->setUserId(7)
+            ->setUserId($userId)
             ->setFilePath($name)
             ->setFileType(pathinfo($name, PATHINFO_EXTENSION))
             ->setFileName($name)
@@ -220,7 +242,9 @@ final class DocumentExportRunnerTest extends TestCase
             ->setFileText($text)
             ->setStatus('processed');
         $file->setMessageId($messageId);
-        (new \ReflectionProperty(File::class, 'id'))->setValue($file, $id);
+        if (null !== $id) {
+            (new \ReflectionProperty(File::class, 'id'))->setValue($file, $id);
+        }
 
         return $file;
     }
