@@ -230,6 +230,7 @@ import { ref, computed, watch, toRef } from 'vue'
 import { useChatsStore } from '@/stores/chats'
 import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
+import { buildChatShareUrl } from '@/utils/urlHelper'
 
 const { success: showSuccess, error: showError } = useNotification()
 const chatsStore = useChatsStore()
@@ -261,20 +262,11 @@ const shareInfo = ref<{
 } | null>(null)
 
 const fullShareUrl = computed(() => {
-  if (!shareInfo.value?.shareUrl) return ''
-  const baseUrl = window.location.origin
-  return `${baseUrl}/shared/${shareInfo.value.shareToken}`
+  const token = shareInfo.value?.shareToken
+  if (!token) return ''
+  // Platform origin, never the Capacitor WebView origin (capacitor://localhost).
+  return buildChatShareUrl(token)
 })
-
-watch(
-  () => props.isOpen,
-  async (open) => {
-    if (open && props.chatId) {
-      await loadShareInfo()
-    }
-    copied.value = false
-  }
-)
 
 const loadShareInfo = async () => {
   if (!props.chatId) return
@@ -289,6 +281,17 @@ const loadShareInfo = async () => {
     loading.value = false
   }
 }
+
+watch(
+  () => props.isOpen,
+  async (open) => {
+    if (open && props.chatId) {
+      await loadShareInfo()
+    }
+    copied.value = false
+  },
+  { immediate: true }
+)
 
 const makePublic = async () => {
   if (!props.chatId) return
