@@ -330,7 +330,7 @@ class ModelCatalog
      *
      * Several providers charge a higher per-token rate for the ENTIRE request
      * once the prompt crosses a token threshold: Gemini 2.5/3.1 Pro above 200k,
-     * GPT-5.x above 272k. Prices are per 1M tokens — the
+     * GPT-5.x / GPT-6 above 272k. Prices are per 1M tokens — the
      * same unit as the catalog base `priceIn`/`priceOut`. Kept here keyed by
      * providerId (not duplicated into each model's chat + vision rows) because
      * the tier is a property of the underlying model, not of the individual
@@ -338,27 +338,37 @@ class ModelCatalog
      * threshold, billing the whole request (input + output) at the above rate,
      * mirroring how the providers meter it (#1319).
      *
-     * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float}>
+     * `cache_price_in_above` is the cached-input rate above the threshold, which
+     * every provider raises alongside input and output (OpenAI: "2x input and
+     * cache rates"; Gemini and xAI list an explicit long-context cache row). It
+     * is absent only for models that offer no cached-input discount at all.
+     *
+     * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float, cache_price_in_above?: float}>
      */
     private const CONTEXT_PRICING = [
-        'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5],
-        'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0],
+        'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5, 'cache_price_in_above' => 0.50],
+        'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0, 'cache_price_in_above' => 1.00],
+        // gpt-5.5-pro offers no cached-input discount at all, so the tier has no
+        // cache rate to raise ("GPT-5.5 Pro does not offer a cached input discount").
         'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
         // Price cut 2026-08-21 (see the chat row below): long-context tier fell 10/45 -> 8/30.
-        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 8.0, 'price_out_above' => 30.0],
-        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
-        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.40, 'price_out_above' => 1.80],
-        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0],
-        'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0],
-        'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
-        'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0],
+        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 8.0, 'price_out_above' => 30.0, 'cache_price_in_above' => 0.80],
+        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
+        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.40, 'price_out_above' => 1.80, 'cache_price_in_above' => 0.04],
+        // Official OpenAI pricing 2026-09-04: base $10/$50, >272k is 2x input
+        // and 1.5x output for the full request (https://developers.openai.com/api/docs/models/gpt-6-astra).
+        'gpt-6-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 20.0, 'price_out_above' => 75.0, 'cache_price_in_above' => 2.00],
+        'gemini-2.5-pro' => ['threshold_tokens' => 200000, 'price_in_above' => 2.5, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.25],
+        'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
+        'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
+        'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
     ];
 
     /**
      * Long-context pricing tier for a providerId, or null when the model has no
      * context-size tier. Prices are per 1M tokens. See CONTEXT_PRICING (#1319).
      *
-     * @return array{threshold_tokens: int, price_in_above: float, price_out_above: float}|null
+     * @return array{threshold_tokens: int, price_in_above: float, price_out_above: float, cache_price_in_above?: float}|null
      */
     public static function contextPricing(string $providerId): ?array
     {
@@ -1310,6 +1320,7 @@ class ModelCatalog
                 'max_tokens' => 16384,
                 'params' => ['model' => 'gpt-5.4'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.25,
                 'meta' => ['context_window' => '270000', 'max_output' => '16384'],
             ],
         ],
@@ -1332,6 +1343,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.4'],
                 'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.25,
                 'meta' => ['supports_images' => true],
             ],
         ],
@@ -1354,6 +1366,7 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.5'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.50,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -1382,6 +1395,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.5'],
                 'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.50,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
@@ -1464,6 +1478,12 @@ class ModelCatalog
         // 2026-07-30 price cut: Terra 2.50/15 -> 2.00/12 (-20%), Luna 1.00/6 ->
         // 0.20/1.20 (-80%); Sol unchanged. Long-context (>272k) tiers updated in
         // CONTEXT_PRICING accordingly.
+        //
+        // Caching: GPT-5.6 is the first family OpenAI charges for cache WRITES
+        // (1.25x the uncached input rate); reads are 0.1x. Earlier families incur
+        // "no additional cache-write charge", which is why cache_write_multiplier
+        // is set here but not on the gpt-5.5 / gpt-5.4 rows.
+        // See https://developers.openai.com/api/docs/guides/prompt-caching.
         // ----------------------------------------------------------------
         [
             'id' => 251,
@@ -1488,6 +1508,8 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.6-sol'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.40,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -1516,6 +1538,8 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.6-sol'],
                 'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.40,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
@@ -1543,6 +1567,8 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.6-terra'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -1570,6 +1596,8 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.6-terra'],
                 'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.20,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
@@ -1597,6 +1625,8 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.6-luna'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.02,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '1050000',
@@ -1624,11 +1654,87 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.6-luna'],
                 'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.02,
+                'cache_write_multiplier' => 1.25,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
                     'context_window' => '1050000',
                     'max_output' => '128000',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6 Astra — GA rollout 2026-09-04 (Trusted Access first;
+        // Plus/Pro/Business/Enterprise and API in the following days).
+        // OpenAI's most capable model for end-to-end reasoning, coding,
+        // research and documents. Responses API; image input; reasoning.effort
+        // is low / medium / high / xhigh / max (no none/minimal skip tier).
+        // Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6-astra
+        // (verified 2026-09-04): $10 in / $50 out, cached input $1,
+        // cache writes $12.50. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 340,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Astra',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-astra',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Astra - OpenAI\'s most capable model for complex reasoning, coding, research, and documents. Fast, with a very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6-astra'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $1/1M (0.1x). Authored here
+                // because LiteLLM will not know a just-launched SKU, and the
+                // non-Anthropic CostCalculationService fallback is 50%.
+                'cache_read_price_per_1M' => 1.00,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 341,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6 Astra (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6-astra',
+            'priceIn' => 10,
+            'inUnit' => 'per1M',
+            'priceOut' => 50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6 Astra for image analysis and vision tasks. OpenAI\'s most capable option for understanding images and extracting text.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6-astra'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 1.00,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-04-30',
                 ],
             ],
         ],
@@ -1691,6 +1797,7 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.4-mini'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                'cache_read_price_per_1M' => 0.075,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '400000',
@@ -1718,6 +1825,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.4-mini'],
                 'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.075,
                 'meta' => [
                     'api' => 'responses',
                     'supports_images' => true,
@@ -1745,6 +1853,7 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.4-nano'],
                 'features' => ['reasoning', 'tool_use'],
+                'cache_read_price_per_1M' => 0.02,
                 'meta' => [
                     'api' => 'responses',
                     'context_window' => '400000',
@@ -2126,6 +2235,7 @@ class ModelCatalog
                 'params' => ['model' => 'gemini-2.5-pro'],
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
                 'features' => ['tool_use'],
+                'cache_read_price_per_1M' => 0.125,
             ],
         ],
         [
@@ -2147,6 +2257,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-2.5-pro'],
                 'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.125,
             ],
         ],
         [
@@ -2302,6 +2413,7 @@ class ModelCatalog
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-3.1-pro-preview'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.20,
                 'meta' => ['context_window' => '1048576', 'max_output' => '65536'],
             ],
         ],
@@ -2324,6 +2436,7 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-3.1-pro-preview'],
                 'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.20,
                 'meta' => ['supports_images' => true, 'supports_video' => true],
             ],
         ],

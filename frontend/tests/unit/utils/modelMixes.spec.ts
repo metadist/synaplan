@@ -101,6 +101,19 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.TEXT2PIC).toBeUndefined()
   })
 
+  it('prefers GPT-6 Astra over GPT-5.6 Sol when the installation serves both', () => {
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [
+        model({ id: 251, service: 'OpenAI', providerId: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' }),
+        model({ id: 340, service: 'OpenAI', providerId: 'gpt-6-astra', name: 'GPT-6 Astra' }),
+      ],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('openai'), models)
+
+    expect(resolved.defaults.CHAT).toBe(340)
+  })
+
   it('prefers Claude Fable 5.1 over Fable 5 when the installation serves both', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [

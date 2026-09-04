@@ -67,9 +67,14 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
     icon: { kind: 'service', service: 'OpenAI' },
     resetsToRecommended: false,
     candidates: {
-      CHAT: [openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
-      ANALYZE: [openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
-      PIC2TEXT: [openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
+      CHAT: [openai('gpt-6-astra'), openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
+      ANALYZE: [openai('gpt-6-astra'), openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
+      PIC2TEXT: [
+        openai('gpt-6-astra'),
+        openai('gpt-5.6-sol'),
+        openai('gpt-5.5'),
+        openai('gpt-5.4'),
+      ],
       TEXT2PIC: [openai('gpt-image-1.5'), openai('gpt-image-1')],
       PIC2PIC: [openai('gpt-image-1.5'), openai('gpt-image-1')],
       TEXT2SOUND: [openai('tts-1-hd'), openai('tts-1')],

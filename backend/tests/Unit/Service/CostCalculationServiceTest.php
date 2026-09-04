@@ -639,6 +639,109 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.136000', $result->cacheSavings);
     }
 
+    /**
+     * OpenAI bills long context at "2x input and cache rates", so a cached
+     * token above the threshold costs $2/1M on Astra, not the $1 short-context
+     * rate. Before `cache_price_in_above` existed the tier lifted input and
+     * output but left cache reads at the cheap rate, under-billing them 2x.
+     */
+    public function testAstraBillsCachedTokensAtTheLongContextCacheRate(): void
+    {
+        $model = $this->createModelMock('OpenAI', 10.0, 50.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 1.00,
+        ], 'gpt-6-astra');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 300000 prompt tokens (past the 272k threshold), 200000 of them cached:
+        //   regular 100000 * 20/1M = 2.000000
+        //   cached  200000 *  2/1M = 0.400000
+        //   output    1000 * 75/1M = 0.075000
+        $result = $this->service->calculateCost(300000, 1000, 200000, 0, 340);
+
+        $this->assertSame('2.475000', $result->totalCost);
+        $this->assertSame('2.400000', $result->inputCost);
+        $this->assertSame('2.00000000', $result->priceSnapshot['cache_price_in']);
+    }
+
+    public function testAstraKeepsTheShortContextCacheRateBelowTheThreshold(): void
+    {
+        $model = $this->createModelMock('OpenAI', 10.0, 50.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 1.00,
+        ], 'gpt-6-astra');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 100000 prompt tokens, 80000 cached:
+        //   regular 20000 * 10/1M = 0.200000
+        //   cached  80000 *  1/1M = 0.080000
+        //   output   1000 * 50/1M = 0.050000
+        $result = $this->service->calculateCost(100000, 1000, 80000, 0, 340);
+
+        $this->assertSame('0.330000', $result->totalCost);
+        $this->assertSame('1.00000000', $result->priceSnapshot['cache_price_in']);
+    }
+
+    /**
+     * GPT-5.6 and later are the first OpenAI families billed for cache WRITES,
+     * at 1.25x the uncached input rate. The multiplier used to be Anthropic-only,
+     * so written tokens went out at 1.0x.
+     */
+    public function testAstraBillsCacheWritesAtTheAuthoredMultiplier(): void
+    {
+        $model = $this->createModelMock('OpenAI', 10.0, 50.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 1.00,
+            'cache_write_multiplier' => 1.25,
+        ], 'gpt-6-astra');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 100000 prompt tokens, 40000 written to cache, 20000 read from it:
+        //   regular 40000 * 10/1M        = 0.400000
+        //   cached  20000 *  1/1M        = 0.020000
+        //   writes  40000 * 10/1M * 1.25 = 0.500000
+        //   output   1000 * 50/1M        = 0.050000
+        $result = $this->service->calculateCost(100000, 1000, 20000, 40000, 340);
+
+        $this->assertSame('0.970000', $result->totalCost);
+        $this->assertSame('0.920000', $result->inputCost);
+    }
+
+    /**
+     * The flip side: GPT-5.5 and earlier incur "no additional cache-write
+     * charge", so those rows author no multiplier and their written tokens must
+     * stay at 1.0x. A provider-wide OpenAI multiplier would over-bill them.
+     */
+    public function testGpt55BillsCacheWritesAtPlainInputRate(): void
+    {
+        $model = $this->createModelMock('OpenAI', 5.0, 30.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 0.50,
+        ], 'gpt-5.5');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 100000 prompt tokens, 40000 written to cache:
+        //   regular 60000 * 5/1M  = 0.300000
+        //   writes  40000 * 5/1M  = 0.200000  (no uplift)
+        //   output   1000 * 30/1M = 0.030000
+        $result = $this->service->calculateCost(100000, 1000, 0, 40000, 204);
+
+        $this->assertSame('0.530000', $result->totalCost);
+        $this->assertSame('0.500000', $result->inputCost);
+    }
+
     public function testGrokImagineImageCostsTwoCentsPerImage(): void
     {
         $model = $this->createModelMock('xAI', 0.0, 0.02, '-', 'perpic', [
