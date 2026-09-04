@@ -268,16 +268,6 @@ const fullShareUrl = computed(() => {
   return buildChatShareUrl(token)
 })
 
-watch(
-  () => props.isOpen,
-  async (open) => {
-    if (open && props.chatId) {
-      await loadShareInfo()
-    }
-    copied.value = false
-  }
-)
-
 const loadShareInfo = async () => {
   if (!props.chatId) return
 
@@ -291,6 +281,17 @@ const loadShareInfo = async () => {
     loading.value = false
   }
 }
+
+watch(
+  () => props.isOpen,
+  async (open) => {
+    if (open && props.chatId) {
+      await loadShareInfo()
+    }
+    copied.value = false
+  },
+  { immediate: true }
+)
 
 const makePublic = async () => {
   if (!props.chatId) return

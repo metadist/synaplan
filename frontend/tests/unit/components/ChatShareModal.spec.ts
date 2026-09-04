@@ -91,4 +91,30 @@ describe('ChatShareModal share URL', () => {
 
     wrapper.unmount()
   })
+
+  it('loads the platform link when the modal is already open on mount', async () => {
+    const wrapper = mount(ChatShareModal, {
+      props: {
+        isOpen: true,
+        chatId: 42,
+        chatTitle: 'Weekly recap',
+      },
+      global: {
+        mocks: {
+          $t: (key: string) => key,
+        },
+        stubs: {
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="share-link-input"]').text()).toBe(
+      'https://web.synaplan.com/shared/share_tok_1'
+    )
+
+    wrapper.unmount()
+  })
 })
