@@ -58,7 +58,7 @@ final class DocumentCombineRunnerTest extends TestCase
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
         $users = $this->createMock(UserRepository::class);
-        $users->method('find')->with(7)->willReturn($user);
+        $users->method('find')->willReturn($user);
 
         $combine = $this->createMock(DocumentCombineService::class);
         $combine->expects(self::once())

@@ -811,9 +811,6 @@ final readonly class MessageClassifier
     {
         $eligible = [];
         foreach ($message->getFiles() as $file) {
-            if (!$file instanceof File) {
-                continue;
-            }
             $ext = DocumentThumbnailGenerator::extensionOf($file);
             if (DocumentThumbnailGenerator::isOffice($ext) || DocumentThumbnailGenerator::isPdf($ext)) {
                 $eligible[] = $file;
