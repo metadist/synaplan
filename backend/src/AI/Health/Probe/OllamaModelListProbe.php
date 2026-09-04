@@ -19,8 +19,10 @@ use App\AI\Service\ProviderRegistry;
  */
 final readonly class OllamaModelListProbe implements ModelListProbeInterface
 {
-    public function __construct(private ProviderRegistry $registry)
-    {
+    public function __construct(
+        private ProviderRegistry $registry,
+        private string $baseUrl = '',
+    ) {
     }
 
     public function supports(string $service): bool
@@ -31,8 +33,8 @@ final readonly class OllamaModelListProbe implements ModelListProbeInterface
     public function probe(string $service): ProbeResult
     {
         $provider = $this->ollamaProvider();
-        if (null === $provider) {
-            return ProbeResult::skipped('Ollama is not registered in this installation.');
+        if (null === $provider || '' === trim($this->baseUrl)) {
+            return ProbeResult::skipped('Ollama is not configured.');
         }
 
         try {
