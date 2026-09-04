@@ -170,7 +170,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Assume the build role
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-ami-${{ github.run_id }}
@@ -317,7 +317,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Assume the build role
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-verify-${{ github.run_id }}
@@ -492,7 +492,7 @@ jobs:
       # succeeds even where the first one has long expired.
       - name: Refresh the credentials
         if: always()
-        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_AMI_BUILD_ROLE_ARN }}
           role-session-name: synaplan-teardown-${{ github.run_id }}
