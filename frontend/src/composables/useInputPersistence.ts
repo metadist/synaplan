@@ -393,3 +393,128 @@ export function useAttachmentPersist<T extends PersistedChatAttachment>(
 
   return { clearAttachments: clear }
 }
+
+export const PASTED_BLOCKS_MAX_BYTES = 100 * 1024
+
+interface PersistedPastedBlocks {
+  blocks: Array<{ id: string; content: string }>
+  timestamp: number
+}
+
+/**
+ * Persist composer pasted-text blocks per chat. Skipped in incognito.
+ * Caps payload size so a multi-megabyte paste cannot blow localStorage.
+ */
+export function usePastedBlocksPersist(
+  blocksRef: Ref<Array<{ id: string; content: string }>>,
+  baseKey: string,
+  chatId?: Ref<number | null>,
+  disabled?: Ref<boolean>
+) {
+  const PASTED_PREFIX = `${STORAGE_KEY_PREFIX}pasted_${baseKey}`
+
+  function storageKey(idOverride?: number | null): string {
+    const id = idOverride !== undefined ? idOverride : chatId?.value
+    if (id !== undefined && id !== null) {
+      return `${PASTED_PREFIX}_${id}`
+    }
+    return PASTED_PREFIX
+  }
+
+  const isDisabled = () => disabled?.value === true
+
+  function payloadBytes(blocks: Array<{ id: string; content: string }>): number {
+    return new Blob([JSON.stringify(blocks)]).size
+  }
+
+  function save(blocks: Array<{ id: string; content: string }>, idOverride?: number | null) {
+    const key = storageKey(idOverride)
+    if (blocks.length === 0 || payloadBytes(blocks) > PASTED_BLOCKS_MAX_BYTES) {
+      try {
+        localStorage.removeItem(key)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    const data: PersistedPastedBlocks = { blocks, timestamp: Date.now() }
+    try {
+      localStorage.setItem(key, JSON.stringify(data))
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        try {
+          localStorage.removeItem(key)
+        } catch {
+          /* ignore */
+        }
+        return
+      }
+      console.error('Failed to save pasted text blocks:', error)
+    }
+  }
+
+  function load(idOverride?: number | null): Array<{ id: string; content: string }> {
+    try {
+      const stored = localStorage.getItem(storageKey(idOverride))
+      if (!stored) return []
+      const data: PersistedPastedBlocks = JSON.parse(stored)
+      if (Date.now() - data.timestamp > MAX_AGE_MS) {
+        clear(idOverride)
+        return []
+      }
+      if (!Array.isArray(data.blocks)) return []
+      return data.blocks.filter((block): block is { id: string; content: string } =>
+        Boolean(block && typeof block.id === 'string' && typeof block.content === 'string')
+      )
+    } catch {
+      return []
+    }
+  }
+
+  function clear(idOverride?: number | null) {
+    try {
+      localStorage.removeItem(storageKey(idOverride))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!isDisabled()) {
+    const restored = load()
+    if (restored.length > 0 && blocksRef.value.length === 0) {
+      blocksRef.value = restored
+    }
+  }
+
+  if (chatId) {
+    watch(
+      chatId,
+      (newId, oldId) => {
+        if (newId === oldId) return
+        if (isDisabled()) {
+          blocksRef.value = []
+          return
+        }
+        save(blocksRef.value, oldId)
+        blocksRef.value = load(newId)
+      },
+      { immediate: false }
+    )
+  }
+
+  watch(
+    blocksRef,
+    (blocks) => {
+      if (isDisabled()) return
+      save(blocks)
+    },
+    { deep: true }
+  )
+
+  onBeforeUnmount(() => {
+    if (isDisabled()) return
+    save(blocksRef.value)
+  })
+
+  return { clearPastedBlocks: clear }
+}

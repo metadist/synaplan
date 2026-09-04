@@ -807,7 +807,17 @@
     "modelDropdown": {
       "default": "Default"
     },
-    "removeTool": "Remove tool"
+    "removeTool": "Remove tool",
+    "pastedText": {
+      "label": "Pasted",
+      "title": "Pasted text",
+      "remove": "Remove pasted text",
+      "open": "Open pasted text",
+      "meta": "{lines} lines · {chars} characters",
+      "modalTitle": "Pasted content",
+      "save": "Save",
+      "cancel": "Cancel"
+    }
   },
   "chatMessage": {
     "again": "Again",

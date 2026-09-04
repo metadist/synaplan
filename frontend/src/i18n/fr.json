@@ -807,7 +807,17 @@
     "modelDropdown": {
       "default": "Par défaut"
     },
-    "removeTool": "Retirer l’outil"
+    "removeTool": "Retirer l’outil",
+    "pastedText": {
+      "label": "Collé",
+      "title": "Texte collé",
+      "remove": "Retirer le texte collé",
+      "open": "Ouvrir le texte collé",
+      "meta": "{lines} lignes · {chars} caractères",
+      "modalTitle": "Contenu collé",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    }
   },
   "chatMessage": {
     "again": "Encore",

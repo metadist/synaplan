@@ -21,6 +21,7 @@ import MessageLink from './MessageLink.vue'
 import MessageCommandList from './MessageCommandList.vue'
 import MessageThinking from './MessageThinking.vue'
 import MessageTtsLoading from './MessageTtsLoading.vue'
+import MessagePastedText from './MessagePastedText.vue'
 
 interface Props {
   part: Part
@@ -61,6 +62,8 @@ const componentType = computed(() => {
       return MessageThinking
     case 'tts_loading':
       return MessageTtsLoading
+    case 'pastedText':
+      return MessagePastedText
     default:
       return MessageText
   }
@@ -115,6 +118,8 @@ const componentProps = computed(() => {
         thinkingTime: props.part.thinkingTime,
         isStreaming: props.part.isStreaming,
       }
+    case 'pastedText':
+      return { content: props.part.content || '' }
     default:
       return { content: props.part.content || '', memories: props.memories, docs: props.docs }
   }

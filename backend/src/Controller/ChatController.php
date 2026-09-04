@@ -12,6 +12,7 @@ use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
+use App\Service\PastedContentText;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -141,7 +142,9 @@ class ChatController extends AbstractController
                     // Tool commands (/pic, /vid, …) are kept in the stored message
                     // text for backend routing, but the raw prefix must never leak
                     // into the chat list preview — only the user's actual query.
-                    $content = $this->stripToolCommandPrefix($message->getText() ?? '');
+                    $content = PastedContentText::strip(
+                        $this->stripToolCommandPrefix($message->getText() ?? ''),
+                    );
                     $firstMessagePreview = mb_strlen($content) > 30
                         ? mb_substr($content, 0, 30).'…'
                         : $content;

@@ -93,6 +93,8 @@ const mountInput = (): VueWrapper =>
         ModelDropdown: true,
         KnowledgeFolderPicker: true,
         FileSelectionModal: true,
+        PastedTextCard: true,
+        PastedTextModal: true,
         QuoteChip: true,
       },
     },
