@@ -162,8 +162,10 @@ final readonly class DocumentCombineService
 
     /**
      * Product filename for a combined PDF. An explicit title wins; otherwise
-     * the first source stem is used so the file chip Combine action and chat
-     * merge do not persist the fallback `combined.pdf` (#1694).
+     * the first source stem is used, so neither the file chip's Combine action
+     * nor a chat merge persists the bare fallback `combined.pdf` (#1694). Both
+     * callers reach this through {@see combineToPdf()}; it is public only to be
+     * assertable without an office engine.
      *
      * @param list<File> $sources
      */

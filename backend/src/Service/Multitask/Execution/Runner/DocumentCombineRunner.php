@@ -40,6 +40,9 @@ final readonly class DocumentCombineRunner implements TaskRunner
 {
     private const SERVE_PREFIX = '/api/v1/files/uploads/';
 
+    /** Merging is only defined for two or more sources. */
+    private const MIN_SOURCES = 2;
+
     public function __construct(
         private DocumentCombineService $combineService,
         private ConversationFileCatalog $conversationFiles,
@@ -75,12 +78,33 @@ final readonly class DocumentCombineRunner implements TaskRunner
         }
 
         $catalog = $this->conversationFiles->build($context->message, $context->thread);
-        $entries = $this->requestedEntries($node, $context, $catalog);
-        if (count($entries) < 2) {
+
+        // An explicit file list is an instruction, not a hint: if one of the
+        // named files cannot be resolved we say so instead of quietly merging
+        // whatever else is lying around in the conversation.
+        $requested = $this->requestedItems($node, $context);
+        if ([] !== $requested) {
+            $entries = [];
+            foreach ($requested as $item) {
+                $entry = $this->resolveItem($item, $catalog);
+                if (null === $entry) {
+                    return NodeResult::failed('document_combine: "'.self::describeItem($item).'" is not an office or PDF file in this conversation');
+                }
+                $entries[] = $entry;
+            }
+        } else {
             $entries = $this->defaultEntries($catalog);
         }
-        if (count($entries) < 2) {
+
+        if (count($entries) < self::MIN_SOURCES) {
             return NodeResult::failed('document_combine: need at least two office or PDF files to merge');
+        }
+
+        if ([] === $requested) {
+            $this->logger->info('DocumentCombineRunner: no file list given, picked the most recent combinable files', [
+                'node_id' => $node->id,
+                'references' => array_map(static fn (ConversationFile $entry): string => $entry->reference, $entries),
+            ]);
         }
 
         $sources = [];
@@ -119,7 +143,11 @@ final readonly class DocumentCombineRunner implements TaskRunner
         $relative = ltrim($combined->getFilePath(), '/');
 
         return NodeResult::ok(
-            'Combined PDF created: '.$combined->getFileName(),
+            // Name the sources: with no explicit file list the runner picked
+            // them itself, and the user can only verify the result if the
+            // answer says what went into it.
+            'Combined PDF created: '.$combined->getFileName()
+                .' (from '.implode(', ', array_map(static fn (File $file): string => (string) $file->getFileName(), $sources)).')',
             [[
                 'path' => self::SERVE_PREFIX.$relative,
                 'type' => 'document',
@@ -137,11 +165,13 @@ final readonly class DocumentCombineRunner implements TaskRunner
     }
 
     /**
-     * @param list<ConversationFile> $catalog
+     * The files the planner (or an upstream node) named, verbatim. Strings are
+     * `file:ID` / `attached:N` references, arrays are upstream file descriptors
+     * — the shape {@see DocumentExportRunner} accepts for a single file.
      *
-     * @return list<ConversationFile>
+     * @return list<mixed>
      */
-    private function requestedEntries(TaskNode $node, NodeContext $context, array $catalog): array
+    private function requestedItems(TaskNode $node, NodeContext $context): array
     {
         $inputs = $context->resolveInputs($node);
         $requested = $node->params['files'] ?? $inputs['files'] ?? null;
@@ -150,23 +180,64 @@ final readonly class DocumentCombineRunner implements TaskRunner
             $requested = null !== $single ? [$single] : [];
         }
 
-        $entries = [];
-        foreach ($requested as $item) {
-            if (is_string($item) && '' !== trim($item)) {
-                $entry = $this->conversationFiles->findByReference($catalog, $item);
-                if (null !== $entry && self::isCombinable($entry)) {
-                    $entries[] = $entry;
+        return array_values(array_filter(
+            $requested,
+            static fn ($item): bool => !is_string($item) || '' !== trim($item),
+        ));
+    }
+
+    /**
+     * @param list<ConversationFile> $catalog
+     */
+    private function resolveItem(mixed $item, array $catalog): ?ConversationFile
+    {
+        if (is_string($item)) {
+            $entry = $this->conversationFiles->findByReference($catalog, $item);
+
+            return null !== $entry && self::isCombinable($entry) ? $entry : null;
+        }
+
+        if (is_array($item)) {
+            $path = $item['local_path'] ?? $item['path'] ?? null;
+            if (!is_string($path) || '' === trim($path)) {
+                return null;
+            }
+            $relative = $this->conversationFiles->normalizeRelativePath($path);
+            foreach ($catalog as $entry) {
+                if ($entry->relativePath === $relative && self::isCombinable($entry)) {
+                    return $entry;
                 }
             }
         }
 
-        return $entries;
+        return null;
+    }
+
+    private static function describeItem(mixed $item): string
+    {
+        if (is_string($item)) {
+            return $item;
+        }
+        if (is_array($item)) {
+            $path = $item['local_path'] ?? $item['path'] ?? null;
+            if (is_string($path) && '' !== trim($path)) {
+                return basename($path);
+            }
+        }
+
+        return 'unknown file';
     }
 
     /**
-     * Current attachments first (the files the user just handed over), then
-     * other combinable conversation files. Two attached office/PDF files is
-     * the #1694 reproduction.
+     * The files to merge when nobody named any: the attachments of this turn,
+     * which is the #1694 reproduction ("führe beide dateien in eine pdf
+     * zusammen" with two files on the message).
+     *
+     * Capped at {@see MIN_SOURCES}. The catalog carries up to
+     * ConversationFileCatalog::MAX_FILES_PER_CATEGORY thread documents, and
+     * folding every document of a long conversation into the user's PDF is
+     * never what "merge these" meant. Thread files are ordered newest-first, so
+     * the fill-up slice is reversed to merge in chronological order.
      *
      * @param list<ConversationFile> $catalog
      *
@@ -187,7 +258,13 @@ final readonly class DocumentCombineRunner implements TaskRunner
             }
         }
 
-        return count($attached) >= 2 ? $attached : array_merge($attached, $rest);
+        if (count($attached) >= self::MIN_SOURCES) {
+            return $attached;
+        }
+
+        $fill = array_slice($rest, 0, self::MIN_SOURCES - count($attached));
+
+        return array_merge($attached, array_reverse($fill));
     }
 
     private static function isCombinable(ConversationFile $entry): bool
@@ -211,10 +288,16 @@ final readonly class DocumentCombineRunner implements TaskRunner
             return $file instanceof File && $file->getUserId() === $userId ? $file : null;
         }
 
+        // `attached:N` entries are the current message's own attachments, in
+        // marker order, and may not have an id yet. Ownership is re-checked
+        // here so both branches enforce the same rule — DocumentCombineService
+        // filters by user as well, but authorization must not depend on a
+        // guarantee two layers down.
         if (1 === preg_match('/^attached:(\d+)$/', $entry->reference, $m)) {
             $attachments = $this->conversationFiles->attachments($context->message);
+            $file = $attachments[(int) $m[1] - 1] ?? null;
 
-            return $attachments[(int) $m[1] - 1] ?? null;
+            return null !== $file && $file->getUserId() === $userId ? $file : null;
         }
 
         return null;

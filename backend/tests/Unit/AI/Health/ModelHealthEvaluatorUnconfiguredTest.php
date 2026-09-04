@@ -64,7 +64,7 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
             self::model(12, 'whisper', 'ollama'),
         ];
 
-        $run = $this->evaluatorFor($models, ProbeResult::skipped('Ollama is not configured.'), 'ollama')
+        $run = $this->evaluatorFor($models, ProbeResult::skipped('OLLAMA_BASE_URL is not configured.'), 'ollama')
             ->run(dryRun: true);
 
         self::assertCount(3, $run->verdicts);
@@ -72,7 +72,7 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
             self::assertSame(ModelHealthState::Unconfigured, $verdict->state);
             self::assertFalse($verdict->safeToDisable);
         }
-        self::assertSame(['ollama' => 'Ollama is not configured.'], $run->skippedProviders);
+        self::assertSame(['ollama' => 'OLLAMA_BASE_URL is not configured.'], $run->skippedProviders);
         self::assertSame([], $run->alertsRaised, 'Unconfigured Ollama must not page operators');
     }
 

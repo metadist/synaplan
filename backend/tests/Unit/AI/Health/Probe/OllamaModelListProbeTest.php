@@ -21,7 +21,9 @@ final class OllamaModelListProbeTest extends TestCase
 
         self::assertTrue($result->isSkipped(), 'An empty OLLAMA_BASE_URL must not be treated as an outage');
         self::assertFalse($result->isFailed());
-        self::assertStringContainsString('not configured', $result->message);
+        // Names the variable the operator has to set — the two skip reasons are
+        // reported separately because they need different actions.
+        self::assertSame('OLLAMA_BASE_URL is not configured.', $result->message);
     }
 
     public function testWhitespaceBaseUrlIsSkipped(): void
@@ -40,7 +42,7 @@ final class OllamaModelListProbeTest extends TestCase
         $result = (new OllamaModelListProbe($registry, 'http://ollama:11434'))->probe('ollama');
 
         self::assertTrue($result->isSkipped());
-        self::assertStringContainsString('not configured', $result->message);
+        self::assertSame('Ollama is not registered in this installation.', $result->message);
     }
 
     public function testConfiguredUnreachableOllamaIsFailed(): void

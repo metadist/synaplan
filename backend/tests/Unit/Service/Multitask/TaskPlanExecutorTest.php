@@ -497,7 +497,7 @@ final class TaskPlanExecutorTest extends TestCase
             $this->message(),
             [],
             [
-                'topic' => 'document_combine',
+                'topic' => 'officemaker',
                 'intent' => 'document_combine',
                 'language' => 'de',
                 'source' => 'attachment_document_combine',
@@ -508,6 +508,49 @@ final class TaskPlanExecutorTest extends TestCase
 
         self::assertSame('Combined PDF created: Finanzmodell_combined.pdf', $result['content']);
         self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    /**
+     * A failed merge (no office engine, missing pdfunite, file gone) must not
+     * reach the legacy router as `document_combine`: there is no handler for
+     * that intent, so ChatHandler would answer without a matching prompt and
+     * claim a PDF that does not exist (#1694). The fallback is the attachment
+     * analysis these turns had before the merge route existed.
+     */
+    public function testFailedDocumentCombineFallsBackToFileAnalysisNotAPromptlessChat(): void
+    {
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+
+        $delegated = null;
+        $this->router->expects(self::once())
+            ->method('routeStream')
+            ->willReturnCallback(function (...$args) use (&$delegated): array {
+                $delegated = $args[2];
+
+                return ['content' => 'file analysis answer'];
+            });
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            [
+                'topic' => 'officemaker',
+                'intent' => 'document_combine',
+                'language' => 'de',
+                'source' => 'attachment_document_combine',
+                'skip_sorting' => true,
+            ],
+            static function (): void {},
+        );
+
+        self::assertSame(['content' => 'file analysis answer'], $result);
+        self::assertSame('analyzefile', $delegated['topic'] ?? null);
+        self::assertSame('file_analysis', $delegated['intent'] ?? null);
+        self::assertSame('attachment_document_or_audio', $delegated['source'] ?? null);
+        self::assertSame('de', $delegated['language'] ?? null, 'The rest of the classification survives');
     }
 
     public function testSavedTaskRunPlansAndRunsTheDag(): void

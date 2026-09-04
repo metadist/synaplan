@@ -41,6 +41,16 @@
         "source": "attachment_document_or_audio",
         "topic": "analyzefile"
     },
+    "attach_convert_both_to_pdf": {
+        "intent": "file_analysis",
+        "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "source": "attachment_document_or_audio",
+        "topic": "analyzefile"
+    },
     "attach_docx": {
         "intent": "file_analysis",
         "language": "en",
@@ -56,18 +66,28 @@
         "language": "de",
         "skip_sorting": true,
         "source": "attachment_document_export",
-        "topic": "document_export"
+        "topic": "officemaker"
     },
     "attach_merge_pdf": {
         "intent": "document_combine",
         "language": "de",
         "skip_sorting": true,
         "source": "attachment_document_combine",
-        "topic": "document_combine"
+        "topic": "officemaker"
     },
     "attach_pdf": {
         "intent": "file_analysis",
         "language": "en",
+        "routing_confidence": 1,
+        "routing_discarded_alternatives": [],
+        "routing_fallback_reason": null,
+        "skip_sorting": true,
+        "source": "attachment_document_or_audio",
+        "topic": "analyzefile"
+    },
+    "attach_save_pdfs_to_folder": {
+        "intent": "file_analysis",
+        "language": "de",
         "routing_confidence": 1,
         "routing_discarded_alternatives": [],
         "routing_fallback_reason": null,

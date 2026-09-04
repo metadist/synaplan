@@ -64,8 +64,19 @@ final readonly class TtsTextSanitizer
     }
 
     /**
+     * How far back the cut may search for a natural end. A fifth of the window
+     * is enough for a sentence in normal prose and still leaves the listener
+     * the bulk of the text.
+     */
+    private const BOUNDARY_SEARCH_RATIO = 0.2;
+
+    /**
      * Cap speakable text at the shared TTS input limit. Multibyte-safe, no
      * ellipsis — the spoken prefix is the content, not a UI snippet.
+     *
+     * Cuts on the last sentence end inside the window, falling back to the last
+     * word break and only then to a hard cut: a voice note that stops mid-word
+     * sounds broken, not shortened.
      */
     public static function truncateForSynthesis(string $text, int $maxLength = self::MAX_SYNTHESIS_CHARS): string
     {
@@ -73,7 +84,23 @@ final readonly class TtsTextSanitizer
             return $text;
         }
 
-        return mb_substr($text, 0, $maxLength);
+        $window = mb_substr($text, 0, $maxLength);
+        $earliestCut = (int) ($maxLength * (1 - self::BOUNDARY_SEARCH_RATIO));
+
+        // Drop the trailing run that carries no sentence end, i.e. cut right
+        // after the last '.', '!', '?' or '…' in the window.
+        $sentence = preg_replace('/[^.!?…]*\z/u', '', $window);
+        if (null !== $sentence && mb_strlen($sentence) >= $earliestCut) {
+            return rtrim($sentence);
+        }
+
+        // No sentence end close enough: drop the last (probably cut off) word.
+        $word = preg_replace('/\s+\S*\z/u', '', $window);
+        if (null !== $word && mb_strlen($word) >= $earliestCut) {
+            return rtrim($word);
+        }
+
+        return $window;
     }
 
     /**

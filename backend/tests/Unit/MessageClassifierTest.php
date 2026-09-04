@@ -3,6 +3,7 @@
 namespace App\Tests\Unit;
 
 use App\AI\ToolCalling\ToolCallingCapability;
+use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
@@ -16,7 +17,9 @@ use App\Service\Message\Routing\EmbeddingRouterMatch;
 use App\Service\Message\Routing\EmbeddingRouterService;
 use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SelfAware\SelfAwareConfig;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -184,7 +187,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
         $message->method('getFileType')->willReturn('');
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -343,9 +346,9 @@ class MessageClassifierTest extends TestCase
         $message->method('getFile')->willReturn(0);
 
         // Mock that the message has files (images)
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileMime')->willReturn('image/png');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -369,10 +372,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Summarize this');
         $message->method('getLanguage')->willReturn('en');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('pdf');
         $file->method('getFileName')->willReturn('report.pdf');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -389,26 +392,12 @@ class MessageClassifierTest extends TestCase
 
     public function testMergeAttachmentsIntoPdfRoutesToDocumentCombine(): void
     {
-        $message = $this->createMock(Message::class);
-        $message->method('getId')->willReturn(483);
-        $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn('führe beide dateien in eine pdf zusammen');
-        $message->method('getLanguage')->willReturn('de');
+        $message = $this->attachmentMessage(483, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
 
-        $xlsx = $this->createMock(\App\Entity\File::class);
-        $xlsx->method('getFileType')->willReturn('xlsx');
-        $xlsx->method('getFileName')->willReturn('Finanzmodell_Pro_Forma_Forecast.xlsx');
-        $pdf = $this->createMock(\App\Entity\File::class);
-        $pdf->method('getFileType')->willReturn('pdf');
-        $pdf->method('getFileName')->willReturn('Finanzmodell_Pro_Forma_Forecast.pdf');
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection([$xlsx, $pdf]));
+        $result = $this->classifierForAttachmentRouting()->classify($message);
 
-        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
-        $this->messageSorter->expects($this->never())->method('classify');
-
-        $result = $this->service->classify($message);
-
-        $this->assertSame('document_combine', $result['topic']);
+        // BTOPIC stays a real prompt topic; the capability comes from the intent.
+        $this->assertSame('officemaker', $result['topic']);
         $this->assertSame('document_combine', $result['intent']);
         $this->assertSame('attachment_document_combine', $result['source']);
         $this->assertTrue($result['skip_sorting']);
@@ -416,25 +405,102 @@ class MessageClassifierTest extends TestCase
 
     public function testExportSingleAttachmentAsPdfRoutesToDocumentExport(): void
     {
-        $message = $this->createMock(Message::class);
-        $message->method('getId')->willReturn(481);
-        $message->method('getUserId')->willReturn(10);
-        $message->method('getText')->willReturn('hieraus eine pdf');
-        $message->method('getLanguage')->willReturn('de');
+        $message = $this->attachmentMessage(481, 'hieraus eine pdf', ['xlsx']);
 
-        $xlsx = $this->createMock(\App\Entity\File::class);
-        $xlsx->method('getFileType')->willReturn('xlsx');
-        $xlsx->method('getFileName')->willReturn('Finanzmodell.xlsx');
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection([$xlsx]));
+        $result = $this->classifierForAttachmentRouting()->classify($message);
 
-        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
-        $this->messageSorter->expects($this->never())->method('classify');
-
-        $result = $this->service->classify($message);
-
-        $this->assertSame('document_export', $result['topic']);
+        $this->assertSame('officemaker', $result['topic']);
         $this->assertSame('document_export', $result['intent']);
         $this->assertSame('attachment_document_export', $result['source']);
+    }
+
+    /**
+     * "Save these PDFs to folder X" is a save_to_folder request. The old
+     * `speichern.{0,40}pdf` pattern read it as an export and merged the
+     * attachments instead.
+     */
+    public function testSavingAttachedPdfsToAFolderIsNotAMerge(): void
+    {
+        $message = $this->attachmentMessage(484, 'Speichere die PDFs im Ordner Projekte', ['pdf', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
+     * Converting two files "to PDF" plausibly means two PDFs. Without an
+     * explicit merge verb or a single-file target the planner decides.
+     */
+    public function testConvertingTwoAttachmentsToPdfIsNotAMerge(): void
+    {
+        $message = $this->attachmentMessage(485, 'convert both files to PDF', ['xlsx', 'docx']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    public function testExportPhrasingWithAnExplicitSingleTargetStillMerges(): void
+    {
+        $message = $this->attachmentMessage(486, 'convert both files into one pdf', ['xlsx', 'docx']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('document_combine', $result['intent']);
+    }
+
+    /**
+     * The deterministic route skips the planner, so a second intent in the same
+     * turn would be lost (#1192). Compound requests stay with the planner.
+     */
+    public function testMergeCombinedWithAnotherIntentGoesToThePlanner(): void
+    {
+        $message = $this->attachmentMessage(487, 'führe beide dateien in eine pdf zusammen und lies es vor', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting()->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('attachment_document_or_audio', $result['source']);
+    }
+
+    public function testMergeIsNotRoutedWithoutTheOfficeEngine(): void
+    {
+        $message = $this->attachmentMessage(488, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(officeEngineOn: false)->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
+    }
+
+    /**
+     * Two PDFs need no converter, so an install without the office engine can
+     * still merge them.
+     */
+    public function testMergingTwoPdfsNeedsNoOfficeEngine(): void
+    {
+        $message = $this->attachmentMessage(489, 'merge these two files', ['pdf', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(officeEngineOn: false)->classify($message);
+
+        $this->assertSame('document_combine', $result['intent']);
+    }
+
+    /**
+     * Without the multi-task engine no runner can produce the PDF and the
+     * legacy router would answer with a chat turn that only claims it did.
+     */
+    public function testMergeIsNotRoutedWhenMultitaskRoutingIsDisabled(): void
+    {
+        $message = $this->attachmentMessage(490, 'führe beide dateien in eine pdf zusammen', ['xlsx', 'pdf']);
+
+        $result = $this->classifierForAttachmentRouting(multitaskOn: false)->classify($message);
+
+        $this->assertSame('analyzefile', $result['topic']);
+        $this->assertSame('file_analysis', $result['intent']);
     }
 
     public function testAudioAttachmentForcesAnalyzefileRoute(): void
@@ -445,10 +511,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Transcribe');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('mp3');
         $file->method('getFileName')->willReturn('voice.mp3');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -474,10 +540,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('What is in this clip?');
         $message->method('getLanguage')->willReturn('en');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('mp4');
         $file->method('getFileName')->willReturn('clip.mp4');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -506,10 +572,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('fasse zusammen');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('audio'); // generic kind, not 'mp3'
         $file->method('getFileName')->willReturn('tts_123.mp3');
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -536,10 +602,10 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('was steht drin');
         $message->method('getLanguage')->willReturn('de');
 
-        $file = $this->createMock(\App\Entity\File::class);
+        $file = $this->createMock(File::class);
         $file->method('getFileType')->willReturn('document');
         $file->method('getFileName')->willReturn('generated-doc'); // no extension
-        $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+        $files = new ArrayCollection([$file]);
         $message->method('getFiles')->willReturn($files);
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
@@ -597,7 +663,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Hello, how are you today?');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message);
 
@@ -644,7 +710,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Please draw a sunset over a mountain.');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20250116120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -673,7 +739,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -706,7 +772,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getTopic')->willReturn('');
         $message->method('getFileText')->willReturn('');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $this->messageMetaRepository->method('findOneBy')->willReturn(null);
 
@@ -815,7 +881,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -888,7 +954,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($lang);
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -964,7 +1030,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn($lang);
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1012,7 +1078,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1081,7 +1147,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1139,7 +1205,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Kannst du den Titel bitte fett machen');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1195,7 +1261,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Thanks, that helps a lot!');
         $message->method('getLanguage')->willReturn('en');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message, [$previousReply]);
 
@@ -1250,7 +1316,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Kannst du den Titel in der Datei jetzt zentrieren');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260518120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1311,7 +1377,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('Super, danke dir vielmals');
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
 
         $result = $classifier->classify($message, [$fileTurn, $interleavedReply]);
 
@@ -1568,7 +1634,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('xyzzy plugh');
         $message->method('getLanguage')->willReturn('NN');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260827120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -1603,7 +1669,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn('xyzzy plugh');
         $message->method('getLanguage')->willReturn('NN');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260827120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
@@ -2012,6 +2078,68 @@ class MessageClassifierTest extends TestCase
         );
     }
 
+    /**
+     * Classifier wired for the attachment merge/export layer: it only routes
+     * when the multi-task engine can execute the node and — for office sources
+     * — the converter is up.
+     */
+    private function classifierForAttachmentRouting(bool $officeEngineOn = true, bool $multitaskOn = true): MessageClassifier
+    {
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): string => MultitaskRoutingConfig::CONFIG_GROUP === $group
+                && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $setting
+                    ? ($multitaskOn ? '1' : '0')
+                    : '0'
+        );
+
+        $converter = $this->createMock(OfficeConverterClient::class);
+        $converter->method('isEnabled')->willReturn($officeEngineOn);
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        return new MessageClassifier(
+            $this->messageSorter,
+            $this->messageMetaRepository,
+            $this->modelConfigService,
+            $configRepo,
+            $this->em,
+            $this->logger,
+            new SystemCapabilityRegistry(),
+            $this->createMock(EmbeddingRouterService::class),
+            new EmbeddingRouterConfig($configRepo),
+            $this->disabledNativeToolRouting(),
+            new ToolCallingCapability(),
+            officeConverter: $converter,
+            multitaskConfig: new MultitaskRoutingConfig($configRepo),
+        );
+    }
+
+    /**
+     * @param list<string> $extensions
+     */
+    private function attachmentMessage(int $id, string $text, array $extensions): Message&MockObject
+    {
+        $files = [];
+        foreach ($extensions as $index => $extension) {
+            $file = $this->createMock(File::class);
+            $file->method('getFileType')->willReturn($extension);
+            $file->method('getFileName')->willReturn('Finanzmodell_'.$index.'.'.$extension);
+            $files[] = $file;
+        }
+
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn($id);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('de');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFiles')->willReturn(new ArrayCollection($files));
+
+        return $message;
+    }
+
     private function plainMessage(int $id, string $text): Message&MockObject
     {
         $message = $this->createMock(Message::class);
@@ -2020,7 +2148,7 @@ class MessageClassifierTest extends TestCase
         $message->method('getText')->willReturn($text);
         $message->method('getLanguage')->willReturn('de');
         $message->method('getFile')->willReturn(0);
-        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
+        $message->method('getFiles')->willReturn(new ArrayCollection());
         $message->method('getDateTime')->willReturn('20260827120000');
         $message->method('getFilePath')->willReturn('');
         $message->method('getTopic')->willReturn('');
