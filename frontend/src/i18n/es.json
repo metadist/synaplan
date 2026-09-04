@@ -810,6 +810,8 @@
       "notSupported": "La entrada de voz no está disponible aquí.",
       "unknown": "No se pudo iniciar el micrófono. Inténtalo de nuevo."
     },
+    "dictationUnavailable": "El dictado por voz no está disponible en este servidor.",
+    "cameraUnavailable": "No se pudo abrir la cámara. Aún puedes adjuntar una foto desde el menú +.",
     "dropFiles": "Suelta los archivos aquí",
     "dropFilesHint": "Imágenes, documentos, archivos de audio...",
     "filesPasted": "{count} archivo pegado | {count} archivos pegados",

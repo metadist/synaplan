@@ -774,6 +774,8 @@
       "notSupported": "La saisie vocale n’est pas disponible ici.",
       "unknown": "Le microphone n’a pas pu être démarré. Veuillez réessayer."
     },
+    "dictationUnavailable": "La dictée vocale n’est pas disponible sur ce serveur.",
+    "cameraUnavailable": "L’appareil photo n’a pas pu être ouvert. Vous pouvez toujours joindre une photo depuis le menu +.",
     "dropFiles": "Déposez les fichiers ici",
     "dropFilesHint": "Images, documents, fichiers audio…",
     "filesPasted": "{count} fichier collé | {count} fichiers collés",

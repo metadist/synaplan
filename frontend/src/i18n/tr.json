@@ -810,6 +810,8 @@
       "notSupported": "Sesli giriş burada kullanılamıyor.",
       "unknown": "Mikrofon başlatılamadı. Lütfen tekrar dene."
     },
+    "dictationUnavailable": "Sesli dikte bu sunucuda kullanılamıyor.",
+    "cameraUnavailable": "Kamera açılamadı. Fotoğrafı yine + menüsünden ekleyebilirsin.",
     "dropFiles": "Dosyaları buraya bırakın",
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",

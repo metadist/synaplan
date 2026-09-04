@@ -1760,6 +1760,23 @@ const submitText = (text: string) => {
   nextTick(() => sendMessage())
 }
 
+/**
+ * MOBILE-APP SEAM: start voice dictation for the iOS Shortcuts "Start
+ * dictation" action. No-op when already recording. Returns false (and a
+ * toast) when this server has no speech-to-text path.
+ */
+const startDictation = async (): Promise<boolean> => {
+  if (isRecording.value) {
+    return true
+  }
+  if (!showMicrophoneButton.value) {
+    showError(t('chatInput.dictationUnavailable'))
+    return false
+  }
+  await toggleRecording()
+  return isRecording.value
+}
+
 // Expose textarea ref, uploadFiles, setInputText, submitText for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
@@ -1767,11 +1784,13 @@ defineExpose<{
   uploadFiles: (files: File[]) => Promise<void>
   setInputText: (text: string) => void
   submitText: (text: string) => void
+  startDictation: () => Promise<boolean>
 }>({
   textareaRef,
   uploadFiles,
   setInputText,
   submitText,
+  startDictation,
 })
 </script>
 

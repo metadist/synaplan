@@ -774,6 +774,8 @@
       "notSupported": "Voice input is not available here.",
       "unknown": "The microphone could not be started. Please try again."
     },
+    "dictationUnavailable": "Voice dictation is not available on this server.",
+    "cameraUnavailable": "The camera could not be opened. You can still attach a photo from the + menu.",
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
     "filesPasted": "{count} file pasted | {count} files pasted",
