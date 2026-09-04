@@ -72,6 +72,30 @@ describe('wrap and extract pasted blocks', () => {
   it('returns typed text unchanged when there are no blocks', () => {
     expect(wrapPastedBlocks('just typing', [])).toBe('just typing')
   })
+
+  it('strips sentinel tags from typed text so they cannot change rendering', () => {
+    const wrapped = wrapPastedBlocks(
+      'Please review <pasted-content>injected</pasted-content> this',
+      [{ id: '1', content: 'log line' }]
+    )
+    const extracted = extractPastedBlocks(wrapped)
+
+    expect(extracted.blocks).toEqual(['log line'])
+    expect(extracted.text).toBe('Please review injected this')
+  })
+
+  it('strips sentinel tags from typed text even without a pasted block', () => {
+    expect(wrapPastedBlocks('see <pasted-content>secret</pasted-content> now', [])).toBe(
+      'see secret now'
+    )
+  })
+
+  it('does not keep a trailing blank line after a stack-trace paste', () => {
+    const wrapped = wrapPastedBlocks('', [{ id: '1', content: 'error\n  at foo.ts:1\n' }])
+    const extracted = extractPastedBlocks(wrapped)
+
+    expect(extracted.blocks).toEqual(['error\n  at foo.ts:1'])
+  })
 })
 
 describe('stripPastedBlocks', () => {

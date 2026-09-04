@@ -41,9 +41,9 @@ export function wrapPastedBlocks(typed: string, blocks: PastedTextBlock[]): stri
     })
     .join('\n\n')
 
-  const rest = typed.trim()
+  const rest = sanitizePastedBody(typed).trim()
   if (!wrapped) {
-    return typed
+    return sanitizePastedBody(typed)
   }
   if (!rest) {
     return wrapped
@@ -55,7 +55,7 @@ export function extractPastedBlocks(raw: string): { blocks: string[]; text: stri
   const blocks: string[] = []
   const text = raw
     .replace(PASTED_CONTENT_RE, (_match, body: string) => {
-      blocks.push(body.replace(/^\n/, '').replace(/\n$/, ''))
+      blocks.push(body.replace(/^\n+/, '').replace(/\n+$/, ''))
       return ''
     })
     .replace(/\n{3,}/g, '\n\n')
