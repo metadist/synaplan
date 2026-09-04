@@ -95,6 +95,8 @@ final class ClassificationPlanMapperTest extends TestCase
         yield 'audio' => [['intent' => 'image_generation', 'media_type' => 'audio'], Capability::Text2Sound];
         yield 'file analysis' => [['intent' => 'file_analysis'], Capability::FileAnalysis];
         yield 'document generation' => [['intent' => 'document_generation'], Capability::DocumentGeneration];
+        yield 'document export' => [['intent' => 'document_export'], Capability::DocumentExport];
+        yield 'document combine' => [['intent' => 'document_combine'], Capability::DocumentCombine];
         yield 'unknown intent falls back to chat' => [['intent' => 'mystery'], Capability::Chat];
     }
 

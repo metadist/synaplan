@@ -136,6 +136,13 @@ final class RoutingCharacterizationTest extends TestCase
             ['id' => 'attach_pdf', 'text' => 'Summarize this', 'language' => 'en', 'files' => [['type' => 'pdf', 'name' => 'report.pdf']]],
             ['id' => 'attach_docx', 'text' => 'What is in here?', 'language' => 'en', 'files' => [['type' => 'docx', 'name' => 'contract.docx']]],
             ['id' => 'attach_audio_mp3', 'text' => 'Transcribe', 'language' => 'de', 'files' => [['type' => 'mp3', 'name' => 'voice.mp3']]],
+            ['id' => 'attach_merge_pdf', 'text' => 'führe beide dateien in eine pdf zusammen', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+                ['type' => 'pdf', 'name' => 'Finanzmodell.pdf'],
+            ]],
+            ['id' => 'attach_export_pdf', 'text' => 'hieraus eine pdf', 'language' => 'de', 'files' => [
+                ['type' => 'xlsx', 'name' => 'Finanzmodell.xlsx'],
+            ]],
 
             // ---- Sorter-driven: media generation params — migration-risk #3 ----
             ['id' => 'sort_image', 'text' => 'make an image of a cat', 'language' => 'en', 'fastPath' => false, 'sorter' => ['topic' => 'mediamaker', 'language' => 'en', 'media_type' => 'image']],

@@ -51,6 +51,20 @@
         "source": "attachment_document_or_audio",
         "topic": "analyzefile"
     },
+    "attach_export_pdf": {
+        "intent": "document_export",
+        "language": "de",
+        "skip_sorting": true,
+        "source": "attachment_document_export",
+        "topic": "document_export"
+    },
+    "attach_merge_pdf": {
+        "intent": "document_combine",
+        "language": "de",
+        "skip_sorting": true,
+        "source": "attachment_document_combine",
+        "topic": "document_combine"
+    },
     "attach_pdf": {
         "intent": "file_analysis",
         "language": "en",

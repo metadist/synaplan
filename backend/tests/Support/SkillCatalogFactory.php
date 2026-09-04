@@ -7,6 +7,7 @@ namespace App\Tests\Support;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
+use App\Service\Multitask\Execution\Runner\DocumentCombineRunner;
 use App\Service\Multitask\Execution\Runner\DocumentExportRunner;
 use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
@@ -52,6 +53,7 @@ final class SkillCatalogFactory
         Text2SoundRunner::class,
         DocumentGenerationRunner::class,
         DocumentExportRunner::class,
+        DocumentCombineRunner::class,
         CalendarEventRunner::class,
         EmailMeRunner::class,
         SaveToFolderRunner::class,

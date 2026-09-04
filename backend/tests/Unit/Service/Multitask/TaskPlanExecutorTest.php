@@ -484,6 +484,32 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame('document', $result['metadata']['file']['type']);
     }
 
+    public function testAttachmentDocumentCombineRunsDagWithoutPlannerOrLegacyRouter(): void
+    {
+        $this->planner->expects(self::never())->method('plan');
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Combined PDF created: Finanzmodell_combined.pdf',
+            'files' => [['path' => '/api/v1/files/uploads/combined.pdf', 'type' => 'document']],
+        ]));
+        $this->router->expects(self::never())->method('routeStream');
+
+        $result = $this->executor->executeStream(
+            $this->message(),
+            [],
+            [
+                'topic' => 'document_combine',
+                'intent' => 'document_combine',
+                'language' => 'de',
+                'source' => 'attachment_document_combine',
+                'skip_sorting' => true,
+            ],
+            static function (): void {},
+        );
+
+        self::assertSame('Combined PDF created: Finanzmodell_combined.pdf', $result['content']);
+        self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
     public function testSavedTaskRunPlansAndRunsTheDag(): void
     {
         // Regression: Saved Task runs (source=saved_task) pin their prompt and

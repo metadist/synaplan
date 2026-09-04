@@ -11,6 +11,7 @@ use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -259,6 +260,20 @@ final readonly class MessageClassifier
                     'language' => $message->getLanguage() ?: 'en',
                     'intent' => 'document_generation',
                     'source' => 'attachment_office_edit',
+                    'skip_sorting' => true,
+                ];
+            }
+            $combineRoute = $this->attachmentDocumentFileIntent($message);
+            if (null !== $combineRoute) {
+                $this->logger->info('MessageClassifier: Routing attachment merge/export to '.$combineRoute, [
+                    'message_id' => $messageId,
+                ]);
+
+                return [
+                    'topic' => $combineRoute,
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => $combineRoute,
+                    'source' => 'attachment_'.$combineRoute,
                     'skip_sorting' => true,
                 ];
             }
@@ -690,6 +705,10 @@ final readonly class MessageClassifier
             'analyze' => 'file_analysis',
             'analyzefile' => 'file_analysis',
 
+            // Attachment merge/export of existing files (#1694 / #1691)
+            'document_combine' => 'document_combine',
+            'document_export' => 'document_export',
+
             // Chat alias
             'chat' => 'chat',
 
@@ -731,14 +750,79 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message has at least one attached document, audio, or video
-     * file (i.e. an analyzable non-image attachment). Routes to
-     * FileAnalysisHandler so the ANALYZE default model is used (#595, video
-     * added in #983). Video is included because its audio track is transcribed
-     * to text the chat model can reason about (#722); without this gate a
-     * video-only message fell through to the AI sorter and was answered as a
-     * plain (text-less) chat.
+     * Merge/export-as-PDF of attached office/PDF files must not be forced onto
+     * analyzefile (#1694). Two or more combine-eligible files plus a merge /
+     * combine / export-as-PDF prompt maps to `document_combine`. A single office
+     * file plus export-as-PDF maps to `document_export` (the #1691 conversion).
+     * Read or summarize prompts still return null and take analyzefile.
      */
+    private function attachmentDocumentFileIntent(Message $message): ?string
+    {
+        $text = trim((string) $message->getText());
+        if ('' === $text) {
+            return null;
+        }
+
+        $eligible = $this->combineEligibleAttachments($message);
+        if ([] === $eligible) {
+            return null;
+        }
+
+        $wantsMerge = 1 === preg_match(
+            '/(?:'
+            .'(?:merge|combine|zusammenführen|zusammenfügen|fusionner|combinar|birleştir)\b.{0,80}\bpdfs?\b'
+            .'|'
+            .'\bpdfs?\b.{0,80}\b(?:merge|combine|zusammenführen|zusammenfügen|fusionner|combinar|birleştir)\b'
+            .'|'
+            .'(?:führe|führ)\b.{0,80}\bzusammen\b'
+            .'|'
+            .'\bin\s+(?:eine[nm]?\s+)?pdfs?\s+zusammen\b'
+            .')/iu',
+            $text,
+        );
+        $wantsExport = 1 === preg_match(
+            '/(?:'
+            .'(?:export|convert|speichern|exportar|enregistrer).{0,40}\bpdfs?\b'
+            .'|'
+            .'\b(?:als|as|hieraus)\s+(?:eine[nm]?\s+)?pdfs?\b'
+            .'|'
+            .'\b(?:to|into)\s+(?:a\s+|one\s+|eine[nm]?\s+)?(?:single\s+)?pdfs?\b'
+            .')/iu',
+            $text,
+        );
+
+        if (count($eligible) >= 2 && ($wantsMerge || $wantsExport)) {
+            return 'document_combine';
+        }
+        if (1 === count($eligible) && $wantsExport && !$wantsMerge) {
+            $ext = DocumentThumbnailGenerator::extensionOf($eligible[0]);
+            if (DocumentThumbnailGenerator::isOffice($ext)) {
+                return 'document_export';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<File>
+     */
+    private function combineEligibleAttachments(Message $message): array
+    {
+        $eligible = [];
+        foreach ($message->getFiles() as $file) {
+            if (!$file instanceof File) {
+                continue;
+            }
+            $ext = DocumentThumbnailGenerator::extensionOf($file);
+            if (DocumentThumbnailGenerator::isOffice($ext) || DocumentThumbnailGenerator::isPdf($ext)) {
+                $eligible[] = $file;
+            }
+        }
+
+        return $eligible;
+    }
+
     /**
      * When DOCUMENT_TOOLS.ALLOW_UPLOAD_EDIT is on, an office attachment plus
      * an edit-intent prompt goes to officemaker instead of analyzefile.

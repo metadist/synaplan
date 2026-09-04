@@ -56,6 +56,7 @@ final readonly class TaskPlanExecutor
     private const DAG_ONLY_CAPABILITIES = [
         Capability::CalendarEvent,
         Capability::DocumentExport,
+        Capability::DocumentCombine,
         Capability::UrlFetch,
         Capability::McpFetch,
         Capability::EmailSearch,
@@ -233,6 +234,19 @@ final readonly class TaskPlanExecutor
     }
 
     /**
+     * @param array<string, mixed> $classification
+     */
+    private function isDeterministicDocumentFileIntent(array $classification): bool
+    {
+        $intent = $classification['intent'] ?? null;
+        $source = $classification['source'] ?? null;
+
+        return in_array($intent, ['document_combine', 'document_export'], true)
+            && is_string($source)
+            && str_starts_with($source, 'attachment_');
+    }
+
+    /**
      * Decide whether to run the planner and, if so, produce a plan. Returns null
      * to mean "use the single-node legacy path" (deterministic/simple branches).
      *
@@ -262,7 +276,9 @@ final readonly class TaskPlanExecutor
         //     about the steps. A single-intent instruction still collapses to a
         //     one-node plan → legacy path, identical to a normal chat turn.
         $source = $classification['source'] ?? null;
-        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)) {
+        $deterministicFileIntent = $this->isDeterministicDocumentFileIntent($classification);
+        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)
+            && !$deterministicFileIntent) {
             return null;
         }
 
@@ -273,6 +289,13 @@ final readonly class TaskPlanExecutor
         // (planning-doc §3.4 invariant).
         if (!empty($classification['is_widget_mode'])) {
             return null;
+        }
+
+        // Attachment merge/export (#1694 / #1691): the classifier already
+        // decided. Do not send these to the planner or the analyzefile legacy
+        // router — neither produces a real PDF.
+        if ($deterministicFileIntent) {
+            return new TaskPlanResult($this->mapper->toSingleNodePlan($classification), fallback: false);
         }
 
         $authored = $this->authoredSavedTaskPlan($message, $classification);

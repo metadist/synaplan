@@ -387,6 +387,56 @@ class MessageClassifierTest extends TestCase
         $this->assertTrue($result['skip_sorting']);
     }
 
+    public function testMergeAttachmentsIntoPdfRoutesToDocumentCombine(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(483);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('führe beide dateien in eine pdf zusammen');
+        $message->method('getLanguage')->willReturn('de');
+
+        $xlsx = $this->createMock(\App\Entity\File::class);
+        $xlsx->method('getFileType')->willReturn('xlsx');
+        $xlsx->method('getFileName')->willReturn('Finanzmodell_Pro_Forma_Forecast.xlsx');
+        $pdf = $this->createMock(\App\Entity\File::class);
+        $pdf->method('getFileType')->willReturn('pdf');
+        $pdf->method('getFileName')->willReturn('Finanzmodell_Pro_Forma_Forecast.pdf');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection([$xlsx, $pdf]));
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('document_combine', $result['topic']);
+        $this->assertSame('document_combine', $result['intent']);
+        $this->assertSame('attachment_document_combine', $result['source']);
+        $this->assertTrue($result['skip_sorting']);
+    }
+
+    public function testExportSingleAttachmentAsPdfRoutesToDocumentExport(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getId')->willReturn(481);
+        $message->method('getUserId')->willReturn(10);
+        $message->method('getText')->willReturn('hieraus eine pdf');
+        $message->method('getLanguage')->willReturn('de');
+
+        $xlsx = $this->createMock(\App\Entity\File::class);
+        $xlsx->method('getFileType')->willReturn('xlsx');
+        $xlsx->method('getFileName')->willReturn('Finanzmodell.xlsx');
+        $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection([$xlsx]));
+
+        $this->messageMetaRepository->method('findOneBy')->willReturn(null);
+        $this->messageSorter->expects($this->never())->method('classify');
+
+        $result = $this->service->classify($message);
+
+        $this->assertSame('document_export', $result['topic']);
+        $this->assertSame('document_export', $result['intent']);
+        $this->assertSame('attachment_document_export', $result['source']);
+    }
+
     public function testAudioAttachmentForcesAnalyzefileRoute(): void
     {
         $message = $this->createMock(Message::class);
