@@ -15,12 +15,15 @@ use PHPUnit\Framework\TestCase;
  * API normaliser hard-coded cache_creation_tokens=0 which silently
  * dropped prompt-cache write costs from invoices. This test locks in
  * the corrected mapping against the real OpenAI shape:
- *   usage.input_tokens_details.cache_creation_tokens
+ *   usage.input_tokens_details.cache_write_tokens
  *   usage.input_tokens_details.cached_tokens
+ *
+ * The internal key keeps Anthropic's `cache_creation_tokens` name; only the
+ * OpenAI-side key differs.
  */
 final class OpenAIProviderUsageNormalizationTest extends TestCase
 {
-    public function testNormalizeResponsesUsageMapsCacheCreationTokens(): void
+    public function testNormalizeResponsesUsageMapsCacheWriteTokens(): void
     {
         $responseData = [
             'usage' => [
@@ -29,7 +32,7 @@ final class OpenAIProviderUsageNormalizationTest extends TestCase
                 'total_tokens' => 1801,
                 'input_tokens_details' => [
                     'cached_tokens' => 200,
-                    'cache_creation_tokens' => 100,
+                    'cache_write_tokens' => 100,
                 ],
             ],
         ];
@@ -41,6 +44,27 @@ final class OpenAIProviderUsageNormalizationTest extends TestCase
         self::assertSame(1801, $result['total_tokens']);
         self::assertSame(200, $result['cached_tokens']);
         self::assertSame(100, $result['cache_creation_tokens']);
+    }
+
+    /**
+     * Regression guard: the normaliser used to read `cache_creation_tokens`
+     * (Anthropic's name) off the OpenAI payload. That key never appears there,
+     * so written tokens stayed 0 and were billed as ordinary input at 1.0x
+     * instead of the 1.25x cache-write rate. Reading the wrong key again must
+     * not silently start "working".
+     */
+    public function testNormalizeResponsesUsageIgnoresAnthropicCacheKey(): void
+    {
+        $result = $this->invokeNormalize([
+            'usage' => [
+                'input_tokens' => 500,
+                'input_tokens_details' => [
+                    'cache_creation_tokens' => 100,
+                ],
+            ],
+        ]);
+
+        self::assertSame(0, $result['cache_creation_tokens']);
     }
 
     public function testNormalizeResponsesUsageDefaultsToZeroWhenFieldsMissing(): void

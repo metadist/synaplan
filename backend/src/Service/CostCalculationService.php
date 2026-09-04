@@ -20,6 +20,13 @@ final readonly class CostCalculationService
     // at 2x base input price, not the 1.25x default. Applies uniformly across the whole Anthropic
     // lineup (Anthropic docs footnote: only cache *reads* vary per model, e.g. Fable 5.1's 0.025x).
     private const CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H = 2.0;
+    // Last-resort cache-read rate for rows that author no `cache_read_price_per_1M`.
+    // It matches the GPT-4o generation (gpt-4o-mini: $0.075 on $0.15) but NOT the
+    // GPT-5+ / Gemini Pro lines, which read at 0.1x — those author an explicit
+    // price, because falling back to 50% here overcharged them 5x (#1319 follow-up).
+    // It cuts in on a MISSING rate, not on a missing discount: a model billing
+    // cached tokens at full price (gpt-5.5-pro) must author its input rate here,
+    // otherwise this default halves its bill.
     private const CACHE_READ_DISCOUNT_DEFAULT = 0.50;
 
     public function __construct(
@@ -75,7 +82,7 @@ final readonly class CostCalculationService
 
         // Long-context tier: several providers bill the WHOLE request at a
         // higher per-token rate once the prompt crosses a token threshold
-        // (Gemini/Claude >200k, GPT-5.x >272k). Switch both input and output to
+        // (Gemini/Claude >200k, GPT-5.x / GPT-6 >272k). Switch both input and output to
         // the above-threshold rate — matching how the provider (and LiteLLM)
         // meter it — so we don't under-bill large-context requests (#1319). The
         // tier is read from the current catalog (not the historical snapshot):
@@ -87,6 +94,14 @@ final readonly class CostCalculationService
             $priceOut = $contextTier['price_out_above'];
             $priceSnapshot['price_in'] = number_format($priceIn, 8, '.', '');
             $priceSnapshot['price_out'] = number_format($priceOut, 8, '.', '');
+
+            // The cached-input rate rises with the tier too (OpenAI bills long
+            // context at "2x input and cache rates"), so a request above the
+            // threshold must not keep paying the short-context cache price.
+            if (isset($contextTier['cache_price_in_above'])) {
+                $cachePriceIn = number_format($contextTier['cache_price_in_above'], 8, '.', '');
+                $priceSnapshot['cache_price_in'] = $cachePriceIn;
+            }
         }
 
         $pricePerInputToken = $this->convertToPerToken($priceIn, $priceSnapshot['in_unit']);
@@ -97,7 +112,7 @@ final readonly class CostCalculationService
         // ('Anthropic') never silently misses the provider-specific rate (#1313).
         $provider = ModelCatalog::normalizeProvider($model->getService());
         $cacheReadDiscount = $this->getCacheReadDiscount($provider);
-        $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider);
+        $cacheWriteMultiplier = $this->getCacheWriteMultiplier($provider, $model);
         $cacheWriteMultiplier1h = $this->getCacheWriteMultiplier1h($provider);
 
         // Override with explicit cache price if available
@@ -476,9 +491,24 @@ final readonly class CostCalculationService
             : self::CACHE_READ_DISCOUNT_DEFAULT;
     }
 
-    /** @param string $provider canonical provider key (see ModelCatalog::normalizeProvider) */
-    private function getCacheWriteMultiplier(string $provider): float
+    /**
+     * Multiplier applied to the input rate for tokens WRITTEN to the cache.
+     *
+     * Whether a cache write is billed at all is a per-model property, not a
+     * per-provider one: OpenAI started charging 1.25x with the GPT-5.6 family
+     * (and GPT-6), while GPT-5.5 and earlier incur "no additional cache-write
+     * charge". So the catalog value wins, and the Anthropic-wide rate stays as
+     * the fallback for rows that don't author one.
+     *
+     * @param string $provider canonical provider key (see ModelCatalog::normalizeProvider)
+     */
+    private function getCacheWriteMultiplier(string $provider, Model $model): float
     {
+        $authored = $model->getJson()['cache_write_multiplier'] ?? null;
+        if (is_numeric($authored)) {
+            return (float) $authored;
+        }
+
         return 'anthropic' === $provider
             ? self::CACHE_WRITE_MULTIPLIER_ANTHROPIC
             : 1.0;

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Model;
 use App\Model\ModelCatalog;
 use App\Service\CostCalculationService;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ModelCatalogTest extends TestCase
@@ -306,6 +307,193 @@ class ModelCatalogTest extends TestCase
     public function testFindBidByKeyReturnsNullForUnknownKey(): void
     {
         $this->assertNull(ModelCatalog::findBidByKey('nonexistent:provider:chat'));
+    }
+
+    /**
+     * GPT-6 Astra — OpenAI flagship added 2026-09-04. Chat + vision share the
+     * same upstream id, official $10/$50 per-1M pricing, $1/1M cached input,
+     * and the >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
+     */
+    public function testGpt6AstraModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $astra = ModelCatalog::find('openai:gpt-6-astra');
+
+        $this->assertCount(2, $astra, 'Expected gpt-6-astra chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($astra, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-astra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6-astra:pic2text'));
+        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-6-astra'));
+
+        foreach ($astra as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6-astra', $variant['providerId']);
+            $this->assertSame('gpt-6-astra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(1.0, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+            $this->assertSame('1050000', $variant['json']['meta']['context_window'] ?? null);
+            $this->assertContains('reasoning', $variant['json']['features'] ?? []);
+        }
+
+        $chat = ModelCatalog::find('openai:gpt-6-astra:chat')[0];
+        $this->assertContains('tool_use', $chat['json']['features'] ?? []);
+        $this->assertSame('medium', $chat['json']['meta']['reasoning_effort_default'] ?? null);
+
+        $tier = ModelCatalog::contextPricing('gpt-6-astra');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(20.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(75.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(2.0, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * Official cached-input rates per 1M tokens, verified against
+     * https://developers.openai.com/api/docs/pricing and
+     * https://ai.google.dev/gemini-api/docs/pricing on 2026-09-04.
+     *
+     * Every one of these reads at 0.1x the input rate. CostCalculationService
+     * falls back to 50% when a row authors nothing, which over-billed cached
+     * tokens 5x across the whole GPT-5+ and Gemini Pro lineup — so an explicit
+     * price on each row is what keeps billing correct, not a nice-to-have.
+     *
+     * @return array<string, array{0: string, 1: float}>
+     */
+    public static function cachedInputRateProvider(): array
+    {
+        return [
+            'gpt-6-astra' => ['openai:gpt-6-astra', 1.00],
+            'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
+            'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
+            'gpt-5.6-luna' => ['openai:gpt-5.6-luna', 0.02],
+            'gpt-5.5' => ['openai:gpt-5.5', 0.50],
+            'gpt-5.4' => ['openai:gpt-5.4', 0.25],
+            'gpt-5.4-mini' => ['openai:gpt-5.4-mini', 0.075],
+            'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
+            'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
+            'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
+        ];
+    }
+
+    #[DataProvider('cachedInputRateProvider')]
+    public function testCachedInputRateIsAuthoredOnEveryVariant(string $key, float $expected): void
+    {
+        $variants = ModelCatalog::find($key);
+        $this->assertNotEmpty($variants, "No catalog rows for {$key}");
+
+        foreach ($variants as $variant) {
+            $authored = $variant['json']['cache_read_price_per_1M'] ?? null;
+            $this->assertNotNull(
+                $authored,
+                sprintf('%s (%s) authors no cache_read_price_per_1M and would fall back to 50%%', $key, $variant['tag']),
+            );
+            $this->assertEqualsWithDelta($expected, (float) $authored, 1e-9);
+        }
+    }
+
+    /**
+     * Every provider that raises input and output above a context threshold
+     * raises the cached-input rate with it, always to exactly 2x the short-context
+     * rate.
+     *
+     * Both halves are required. A tiered row that authors no base cache rate
+     * silently falls back to the 50% default discount, and a tier that omits
+     * `cache_price_in_above` keeps charging the short-context cache rate on a
+     * long-context request. Models without a cached-input discount (gpt-5.5-pro)
+     * satisfy this by stating their plain input rate on both sides.
+     */
+    public function testLongContextTiersDoubleTheCachedInputRate(): void
+    {
+        $providerIds = array_unique(array_column(ModelCatalog::all(), 'providerId'));
+
+        $checked = 0;
+        foreach ($providerIds as $providerId) {
+            $tier = ModelCatalog::contextPricing($providerId);
+            if (null === $tier) {
+                continue;
+            }
+
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $row): bool => $row['providerId'] === $providerId,
+            ));
+            $baseCache = $rows[0]['json']['cache_read_price_per_1M'] ?? null;
+
+            $this->assertNotNull(
+                $baseCache,
+                sprintf('%s has a long-context tier but authors no cache-read rate', $providerId),
+            );
+            $this->assertArrayHasKey(
+                'cache_price_in_above',
+                $tier,
+                sprintf('%s caches reads but its long-context tier does not raise the cache rate', $providerId),
+            );
+            $this->assertEqualsWithDelta(
+                2 * (float) $baseCache,
+                $tier['cache_price_in_above'],
+                1e-9,
+                sprintf('%s long-context cache rate should be 2x the short-context rate', $providerId),
+            );
+            ++$checked;
+        }
+
+        $this->assertGreaterThan(0, $checked, 'Expected at least one tiered model with a cache rate');
+    }
+
+    /**
+     * gpt-5.5-pro is the one catalog model OpenAI ships without a cached-input
+     * discount. "No discount" is expressed as the FULL input rate on every row
+     * and at the long-context tier, never as a missing key: an absent rate hands
+     * billing to CostCalculationService's 50% fallback, which would halve the
+     * bill on any payload that reports cached tokens.
+     */
+    public function testGpt55ProAuthorsCachedInputAtTheFullRate(): void
+    {
+        $rows = ModelCatalog::find('openai:gpt-5.5-pro');
+        $this->assertCount(2, $rows, 'Expected gpt-5.5-pro chat + vision variants');
+
+        foreach ($rows as $row) {
+            $this->assertEqualsWithDelta(
+                (float) $row['priceIn'],
+                (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0),
+                1e-9,
+                sprintf('gpt-5.5-pro (%s) must bill cached tokens at the plain input rate', $row['tag']),
+            );
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-5.5-pro');
+        $this->assertNotNull($tier);
+        $this->assertEqualsWithDelta($tier['price_in_above'], $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * The 1.25x cache-write charge starts with GPT-5.6; GPT-5.5 and earlier incur
+     * "no additional cache-write charge". Authoring the multiplier on the wrong
+     * row silently over-bills, so pin which rows carry it.
+     */
+    public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
+    {
+        $charging = ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+
+        foreach (ModelCatalog::all() as $row) {
+            $authored = $row['json']['cache_write_multiplier'] ?? null;
+
+            if (in_array($row['providerId'], $charging, true)) {
+                $this->assertEqualsWithDelta(1.25, (float) $authored, 1e-9, sprintf(
+                    '%s (%s) must bill cache writes at 1.25x',
+                    $row['providerId'],
+                    $row['tag'],
+                ));
+                continue;
+            }
+
+            $this->assertNull($authored, sprintf(
+                '%s (%s) authors a cache-write multiplier but is not billed for cache writes',
+                $row['providerId'],
+                $row['tag'],
+            ));
+        }
     }
 
     public function testGpt55ModelsAreAvailableWithExpectedApiIds(): void
