@@ -803,7 +803,17 @@
     "modelDropdown": {
       "default": "Standard"
     },
-    "removeTool": "Werkzeug entfernen"
+    "removeTool": "Werkzeug entfernen",
+    "pastedText": {
+      "label": "Eingefügt",
+      "title": "Eingefügter Text",
+      "remove": "Eingefügten Text entfernen",
+      "open": "Eingefügten Text öffnen",
+      "meta": "{lines} Zeilen · {chars} Zeichen",
+      "modalTitle": "Eingefügter Inhalt",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    }
   },
   "chatMessage": {
     "again": "Nochmal",

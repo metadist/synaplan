@@ -843,7 +843,17 @@
     "modelDropdown": {
       "default": "Standart"
     },
-    "removeTool": "Aracı kaldır"
+    "removeTool": "Aracı kaldır",
+    "pastedText": {
+      "label": "Yapıştırıldı",
+      "title": "Yapıştırılan metin",
+      "remove": "Yapıştırılan metni kaldır",
+      "open": "Yapıştırılan metni aç",
+      "meta": "{lines} satır · {chars} karakter",
+      "modalTitle": "Yapıştırılan içerik",
+      "save": "Kaydet",
+      "cancel": "İptal"
+    }
   },
   "chatMessage": {
     "again": "Tekrar",

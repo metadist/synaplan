@@ -913,6 +913,22 @@
     0 0 1px var(--v2-glow);
 }
 
+.design-v2 [data-testid='modal-pasted-text'] {
+  background: rgba(255, 255, 255, 0.97) !important;
+  backdrop-filter: blur(var(--v2-blur-lg));
+  -webkit-backdrop-filter: blur(var(--v2-blur-lg));
+  border: 1px solid var(--v2-border) !important;
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.12),
+    0 0 1px var(--v2-glow);
+}
+.design-v2.dark [data-testid='modal-pasted-text'] {
+  background: rgba(12, 18, 34, 0.98) !important;
+  box-shadow:
+    0 16px 64px rgba(0, 0, 0, 0.5),
+    0 0 1px var(--v2-glow);
+}
+
 /* ----------------------------------------------------------
    18. Statistics Page — Fancy V2
    ---------------------------------------------------------- */
