@@ -23,7 +23,7 @@ variable "synaplan_version" {
   # Raised by scripts/set-release-version.mjs after every published release, so
   # a build with no arguments produces the AMI for the release this branch
   # ships. The release workflow still passes it explicitly.
-  default     = "4.5.0"
+  default     = "4.6.0"
   description = "Released SemVer version to bake in, without a leading v. Never a mutable tag: the first boot pins deploy/.env to exactly this value."
 
   validation {
