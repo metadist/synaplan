@@ -448,7 +448,30 @@ jobs:
         # Blocking gate: fail on high/critical advisories in production
         # dependencies only (--omit=dev). Dev tooling and lower severities do
         # not ship to users and would otherwise block PRs without fixes.
-        run: npm audit --omit=dev --audit-level=high
+        # The npm audit API 503s often enough to fail this job before lint
+        # or tests run; retry that transport failure only, never a real finding.
+        run: |
+          set +e
+          attempt=1
+          max_attempts=3
+          while [ "$attempt" -le "$max_attempts" ]; do
+            output="$(npm audit --omit=dev --audit-level=high 2>&1)"
+            status=$?
+            printf '%s\n' "$output"
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            fi
+            if printf '%s\n' "$output" | grep -Eq 'audit endpoint returned an error|503 Service Unavailable|ECONNRESET|ETIMEDOUT'; then
+              if [ "$attempt" -lt "$max_attempts" ]; then
+                echo "npm audit registry unavailable (attempt ${attempt}/${max_attempts}), retrying..."
+                sleep 20
+                attempt=$((attempt + 1))
+                continue
+              fi
+            fi
+            exit "$status"
+          done
+          exit 1
 
       - name: Download OpenAPI spec artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8

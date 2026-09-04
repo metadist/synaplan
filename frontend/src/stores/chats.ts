@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
-import { useConfigStore } from '@/stores/config'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { buildChatShareUrl } from '@/utils/urlHelper'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -434,9 +434,6 @@ export const useChatsStore = defineStore('chats', () => {
     try {
       const data = await httpClient<{ chat: Record<string, unknown> }>(`/api/v1/chats/${chatId}`)
 
-      // Import config store for building share URL
-      const config = useConfigStore()
-
       const chat = data.chat
       const shareTok = typeof chat.shareToken === 'string' ? chat.shareToken : null
       const isShared = Boolean(chat.isShared)
@@ -444,7 +441,7 @@ export const useChatsStore = defineStore('chats', () => {
       return {
         isShared,
         shareToken: shareTok,
-        shareUrl: shareTok ? `${config.appBaseUrl}/shared/${shareTok}` : null,
+        shareUrl: shareTok ? buildChatShareUrl(shareTok) : null,
       }
     } catch (err: unknown) {
       error.value = getErrorMessage(err) || 'Failed to get share info'
