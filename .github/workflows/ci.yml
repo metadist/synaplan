@@ -448,10 +448,20 @@ jobs:
         # Blocking gate: fail on high/critical advisories in production
         # dependencies only (--omit=dev). Dev tooling and lower severities do
         # not ship to users and would otherwise block PRs without fixes.
-        # The npm audit API 503s often enough to fail this job before lint
-        # or tests run; retry that transport failure only, never a real finding.
+        # The npm audit API 503s / times out often enough to fail this job
+        # before lint or tests run (run 33849302560 exhausted 3 retries on
+        # registry 503). Retry that transport failure only; after the last
+        # attempt still cannot reach the advisory API, warn and continue so
+        # an upstream outage does not fail the required gate. Real findings
+        # still fail immediately.
+        env:
+          npm_config_fetch_retries: "1"
+          npm_config_fetch_retry_maxtimeout: "10000"
         run: |
           set +e
+          is_registry_outage() {
+            printf '%s\n' "$1" | grep -Eq 'audit endpoint returned an error|503 Service Unavailable|network timeout|ECONNRESET|ETIMEDOUT'
+          }
           attempt=1
           max_attempts=3
           while [ "$attempt" -le "$max_attempts" ]; do
@@ -461,13 +471,15 @@ jobs:
             if [ "$status" -eq 0 ]; then
               exit 0
             fi
-            if printf '%s\n' "$output" | grep -Eq 'audit endpoint returned an error|503 Service Unavailable|ECONNRESET|ETIMEDOUT'; then
+            if is_registry_outage "$output"; then
               if [ "$attempt" -lt "$max_attempts" ]; then
                 echo "npm audit registry unavailable (attempt ${attempt}/${max_attempts}), retrying..."
-                sleep 20
+                sleep 15
                 attempt=$((attempt + 1))
                 continue
               fi
+              echo "::warning::npm audit registry unavailable after ${max_attempts} attempts; skipping the advisory gate for this run"
+              exit 0
             fi
             exit "$status"
           done
