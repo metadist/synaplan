@@ -395,8 +395,13 @@ class ModelCatalogTest extends TestCase
     /**
      * Every provider that raises input and output above a context threshold
      * raises the cached-input rate with it, always to exactly 2x the short-context
-     * rate. gpt-5.5-pro is the sole exception — it offers no cached discount at
-     * all, so there is no rate to lift.
+     * rate.
+     *
+     * Both halves are required. A tiered row that authors no base cache rate
+     * silently falls back to the 50% default discount, and a tier that omits
+     * `cache_price_in_above` keeps charging the short-context cache rate on a
+     * long-context request. Models without a cached-input discount (gpt-5.5-pro)
+     * satisfy this by stating their plain input rate on both sides.
      */
     public function testLongContextTiersDoubleTheCachedInputRate(): void
     {
@@ -415,15 +420,10 @@ class ModelCatalogTest extends TestCase
             ));
             $baseCache = $rows[0]['json']['cache_read_price_per_1M'] ?? null;
 
-            if (null === $baseCache) {
-                $this->assertArrayNotHasKey(
-                    'cache_price_in_above',
-                    $tier,
-                    sprintf('%s has a long-context cache rate but no base cache rate', $providerId),
-                );
-                continue;
-            }
-
+            $this->assertNotNull(
+                $baseCache,
+                sprintf('%s has a long-context tier but authors no cache-read rate', $providerId),
+            );
             $this->assertArrayHasKey(
                 'cache_price_in_above',
                 $tier,
@@ -439,6 +439,32 @@ class ModelCatalogTest extends TestCase
         }
 
         $this->assertGreaterThan(0, $checked, 'Expected at least one tiered model with a cache rate');
+    }
+
+    /**
+     * gpt-5.5-pro is the one catalog model OpenAI ships without a cached-input
+     * discount. "No discount" is expressed as the FULL input rate on every row
+     * and at the long-context tier, never as a missing key: an absent rate hands
+     * billing to CostCalculationService's 50% fallback, which would halve the
+     * bill on any payload that reports cached tokens.
+     */
+    public function testGpt55ProAuthorsCachedInputAtTheFullRate(): void
+    {
+        $rows = ModelCatalog::find('openai:gpt-5.5-pro');
+        $this->assertCount(2, $rows, 'Expected gpt-5.5-pro chat + vision variants');
+
+        foreach ($rows as $row) {
+            $this->assertEqualsWithDelta(
+                (float) $row['priceIn'],
+                (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0),
+                1e-9,
+                sprintf('gpt-5.5-pro (%s) must bill cached tokens at the plain input rate', $row['tag']),
+            );
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-5.5-pro');
+        $this->assertNotNull($tier);
+        $this->assertEqualsWithDelta($tier['price_in_above'], $tier['cache_price_in_above'] ?? 0.0, 1e-9);
     }
 
     /**

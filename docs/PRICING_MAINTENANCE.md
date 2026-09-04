@@ -464,7 +464,7 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Grok above 200k, GPT-5.x / GPT-6 above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches input, output **and the cached-input rate** to the above values when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
-The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that. `gpt-5.5-pro` is the only tiered model with no `cache_price_in_above`, because it offers no cached-input discount at all.
+The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that, and also that no tiered model omits its cache rate. `gpt-5.5-pro` is the one model OpenAI sells **without** a cached-input discount; it still states a cache rate, equal to its plain input rate (30 / 60), because an omitted rate would fall through to the 50% default discount and halve the bill.
 
 | Model | Threshold | Base in/out (cache) | Above in/out (cache) |
 | ----- | --------- | ------------------- | -------------------- |
@@ -472,7 +472,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-5.6-terra | 272k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
 | gpt-5.5 | 272k | 5.00 / 30 (0.50) | 10.00 / 45 (1.00) |
 | gpt-5.6-sol | 272k | 4.00 / 20 (0.40) | 8.00 / 30 (0.80) |
-| gpt-5.5-pro | 272k | 30 / 180 (—) | 60 / 270 (—) |
+| gpt-5.5-pro | 272k | 30 / 180 (30 — no discount) | 60 / 270 (60) |
 | gpt-5.6-luna | 272k | 0.20 / 1.20 (0.02) | 0.40 / 1.80 (0.04) |
 | gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
 | gemini-2.5-pro | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
@@ -484,7 +484,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 
 Cache billing has three independent knobs, and getting any of them wrong is invisible in normal testing because a cache hit needs a repeated prefix:
 
-1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup.
+1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount (`gpt-5.5-pro`) gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
 2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6. Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
 3. **Long-context cache rate** — `cache_price_in_above` in `CONTEXT_PRICING`, see the table above.
 

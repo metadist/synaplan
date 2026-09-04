@@ -340,17 +340,20 @@ class ModelCatalog
      *
      * `cache_price_in_above` is the cached-input rate above the threshold, which
      * every provider raises alongside input and output (OpenAI: "2x input and
-     * cache rates"; Gemini and xAI list an explicit long-context cache row). It
-     * is absent only for models that offer no cached-input discount at all.
+     * cache rates"; Gemini and xAI list an explicit long-context cache row).
+     * Every tiered model carries one: a model without a cached-input discount
+     * states its plain input rate rather than omitting the key, because omitting
+     * it hands billing back to the 50% fallback discount.
      *
      * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float, cache_price_in_above?: float}>
      */
     private const CONTEXT_PRICING = [
         'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5, 'cache_price_in_above' => 0.50],
         'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0, 'cache_price_in_above' => 1.00],
-        // gpt-5.5-pro offers no cached-input discount at all, so the tier has no
-        // cache rate to raise ("GPT-5.5 Pro does not offer a cached input discount").
-        'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0],
+        // gpt-5.5-pro offers no cached-input discount, so its cache rate equals
+        // the plain input rate at both tiers — never omit it, or the 50% fallback
+        // in CostCalculationService would halve the bill on any cached token.
+        'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0, 'cache_price_in_above' => 60.00],
         // Price cut 2026-08-21 (see the chat row below): long-context tier fell 10/45 -> 8/30.
         'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 8.0, 'price_out_above' => 30.0, 'cache_price_in_above' => 0.80],
         'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
@@ -1424,6 +1427,12 @@ class ModelCatalog
                 'max_tokens' => 128000,
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision', 'tool_use'],
+                // "GPT-5.5 Pro does not offer a cached input discount" — and it
+                // does not list prompt_caching as a supported feature, so cached
+                // tokens should never appear. Authored at the FULL input rate
+                // anyway: leaving it unset would let the 50% fallback discount
+                // halve the bill the moment a payload does report cached tokens.
+                'cache_read_price_per_1M' => 30.00,
                 'supportsStreaming' => false,
                 // Responses API takes system prompts via `instructions` — only
                 // streaming is unsupported. Without this flag the legacy
@@ -1458,6 +1467,8 @@ class ModelCatalog
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gpt-5.5-pro'],
                 'features' => ['reasoning', 'vision'],
+                // No cached-input discount — see the chat row above.
+                'cache_read_price_per_1M' => 30.00,
                 'supportsStreaming' => false,
                 'supportsSystemMessages' => true,
                 'meta' => [

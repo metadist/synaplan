@@ -24,6 +24,9 @@ final readonly class CostCalculationService
     // It matches the GPT-4o generation (gpt-4o-mini: $0.075 on $0.15) but NOT the
     // GPT-5+ / Gemini Pro lines, which read at 0.1x — those author an explicit
     // price, because falling back to 50% here overcharged them 5x (#1319 follow-up).
+    // It cuts in on a MISSING rate, not on a missing discount: a model billing
+    // cached tokens at full price (gpt-5.5-pro) must author its input rate here,
+    // otherwise this default halves its bill.
     private const CACHE_READ_DISCOUNT_DEFAULT = 0.50;
 
     public function __construct(

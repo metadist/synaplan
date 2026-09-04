@@ -742,6 +742,32 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.500000', $result->inputCost);
     }
 
+    /**
+     * gpt-5.5-pro is billed without a cached-input discount, so a cache hit must
+     * cost exactly as much as an uncached token and report zero savings. The row
+     * authors its cache rate at the full input price precisely to keep the 50%
+     * fallback discount out of the calculation.
+     */
+    public function testGpt55ProBillsCachedTokensAtTheFullInputRate(): void
+    {
+        $model = $this->createModelMock('OpenAI', 30.0, 180.0, 'per1M', 'per1M', [
+            'cache_read_price_per_1M' => 30.00,
+        ], 'gpt-5.5-pro');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // 10000 prompt tokens, 8000 of them cached — the split is irrelevant:
+        //   10000 * 30/1M = 0.300000, output 1000 * 180/1M = 0.180000
+        $result = $this->service->calculateCost(10000, 1000, 8000, 0, 206);
+
+        $this->assertSame('0.480000', $result->totalCost);
+        $this->assertSame('0.300000', $result->inputCost);
+        $this->assertSame('0.000000', $result->cacheSavings);
+    }
+
     public function testGrokImagineImageCostsTwoCentsPerImage(): void
     {
         $model = $this->createModelMock('xAI', 0.0, 0.02, '-', 'perpic', [
