@@ -843,7 +843,17 @@
     "modelDropdown": {
       "default": "Estándar"
     },
-    "removeTool": "Quitar herramienta"
+    "removeTool": "Quitar herramienta",
+    "pastedText": {
+      "label": "Pegado",
+      "title": "Texto pegado",
+      "remove": "Quitar texto pegado",
+      "open": "Abrir texto pegado",
+      "meta": "{lines} líneas · {chars} caracteres",
+      "modalTitle": "Contenido pegado",
+      "save": "Guardar",
+      "cancel": "Cancelar"
+    }
   },
   "chatMessage": {
     "again": "Otra vez",

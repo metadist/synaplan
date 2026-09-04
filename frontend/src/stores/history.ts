@@ -47,6 +47,7 @@ export type PartType =
   | 'commandList'
   | 'thinking'
   | 'tts_loading'
+  | 'pastedText'
 
 export interface Part {
   /**

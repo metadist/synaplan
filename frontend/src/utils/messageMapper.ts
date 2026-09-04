@@ -13,6 +13,7 @@ import { parseAIResponse } from '@/utils/responseParser'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
+import { extractPastedBlocks } from '@/utils/pastedContent'
 import {
   buildUploadUrl,
   isAudioFileType,
@@ -250,11 +251,19 @@ export function parseContentWithThinking(
       }
     })
   } else if (content) {
-    // For user messages, just add as text
-    parts.push({
-      type: 'text',
-      content,
+    const extracted = extractPastedBlocks(content)
+    extracted.blocks.forEach((block) => {
+      parts.push({
+        type: 'pastedText',
+        content: block,
+      })
     })
+    if (extracted.text) {
+      parts.push({
+        type: 'text',
+        content: extracted.text,
+      })
+    }
   }
 
   return parts.length > 0 ? parts : [{ type: 'text', content: '' }]

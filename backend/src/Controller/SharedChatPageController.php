@@ -8,6 +8,7 @@ use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Service\Branding\BrandingService;
 use App\Service\File\OgImageService;
+use App\Service\PastedContentText;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -178,7 +179,8 @@ class SharedChatPageController extends AbstractController
         // Use first user message as context
         foreach ($messages as $message) {
             if ('IN' === $message->getDirection()) {
-                $text = strip_tags($message->getText());
+                $text = PastedContentText::strip($message->getText());
+                $text = strip_tags($text);
 
                 // Remove slash commands from description
                 $text = $this->cleanSlashCommands($text);

@@ -525,6 +525,7 @@ import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaP
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
+import { stripPastedBlocks } from '@/utils/pastedContent'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
@@ -535,6 +536,7 @@ import {
   parseMediaJobPayload,
   applyMediaJobUpdateToMessage,
   mapApiMessageRow,
+  parseContentWithThinking,
   IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -2153,7 +2155,7 @@ const handleSendMessage = async (
   let backendContent = backendMessage
 
   if (messageToSend.startsWith('/')) {
-    const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
+    const commandMatch = messageToSend.match(/^\/(\w+)\s+([\s\S]*)$/)
     if (commandMatch) {
       const cmd = commandMatch[1]
       const args = commandMatch[2] || ''
@@ -2186,9 +2188,10 @@ const handleSendMessage = async (
   // badge). Without this the only visible artifact of a voice upload was
   // the transcribed text — there was no way to replay the original
   // recording from the web chat.
-  const optimisticParts: import('@/stores/history').Part[] = [
-    { type: 'text', content: displayContent },
-  ]
+  const optimisticParts: import('@/stores/history').Part[] = parseContentWithThinking(
+    displayContent,
+    'user'
+  )
   if (files && files.length > 0) {
     for (const file of files) {
       if (!isAudioFileType(file.fileType, file.fileMime)) continue
@@ -2223,7 +2226,7 @@ const handleSendMessage = async (
   // Mirrors the backend preview format (30 chars + ellipsis).
   // Incognito: the turn belongs to no chat — never touch the sidebar.
   if (chatsStore.activeChatId && !incognitoStore.active) {
-    const previewSource = displayContent.trim()
+    const previewSource = stripPastedBlocks(displayContent).trim()
     const preview =
       previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
     chatsStore.bumpChatActivity(chatsStore.activeChatId, {
