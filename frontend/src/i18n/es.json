@@ -134,6 +134,7 @@
     "adminModelStatus": "Estado de modelos",
     "adminConfig": "Configuración del Sistema",
     "adminSetup": "Configuración de Proveedores de IA",
+    "adminPeople": "Personas",
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
@@ -698,6 +699,7 @@
     "adminModelStatus": "Estado de Modelos",
     "adminSystemConfig": "Configuración del Sistema",
     "adminProviderSetup": "Proveedores de IA",
+    "adminPeople": "Personas",
     "profile": "Perfil",
     "more": "Más",
     "moreDescription": "Más secciones y cuenta",
@@ -3183,7 +3185,12 @@
       "errorActivating": "Error al activar clave API",
       "errorDeleting": "Error al eliminar clave API",
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
-      "usageCount": "solicitudes"
+      "usageCount": "solicitudes",
+      "scopes": {
+        "hint": "Déjelo sin marcar para acceso completo. Marcar una casilla limita esta clave a Personas.",
+        "iamRead": "Personas — ver grupos",
+        "iamManage": "Personas — administrar grupos"
+      }
     },
     "desktop": {
       "title": "Escritorio",
@@ -4494,5 +4501,64 @@
       "operator": "Clave del operador",
       "none": "Sin configurar"
     }
+  },
+  "people": {
+    "title": "Personas",
+    "subtitle": "Usuarios y grupos de esta instancia.",
+    "tabs": {
+      "users": "Usuarios",
+      "groups": "Grupos"
+    },
+    "usersMoved": "Los usuarios están ahora en la página Personas.",
+    "openPeople": "Abrir Personas",
+    "users": {
+      "groups": "Grupos",
+      "identities": "Inicio de sesión"
+    },
+    "groups": {
+      "name": "Nombre",
+      "kind": "Tipo",
+      "members": "Miembros",
+      "memberCount": "{count} miembros",
+      "fromLogin": "De su inicio de sesión",
+      "manual": "Manual",
+      "create": "Crear grupo",
+      "createTitle": "Crear un grupo",
+      "createPrompt": "Nombre del grupo",
+      "rename": "Renombrar",
+      "renameTitle": "Renombrar grupo",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar el grupo \"{name}\"? Las personas permanecen; solo se quita el grupo.",
+      "empty": "Aún no hay grupos. Cree uno para compartir más adelante.",
+      "loadError": "No se pudieron cargar los grupos.",
+      "saveError": "No se pudo guardar el grupo.",
+      "created": "Grupo creado.",
+      "renamed": "Grupo renombrado.",
+      "deleted": "Grupo eliminado.",
+      "directoryReadOnly": "Este grupo viene de su inicio de sesión y no se puede cambiar aquí.",
+      "addMember": "Añadir una persona",
+      "addMemberPlaceholder": "Buscar por correo",
+      "addMemberNotFound": "Ningún usuario coincide con ese correo.",
+      "removeMember": "Quitar",
+      "removeConfirm": "¿Quitar a {email} de este grupo?",
+      "roleMember": "Miembro",
+      "roleManager": "Responsable",
+      "memberAdded": "Persona añadida al grupo.",
+      "memberRemoved": "Persona quitada del grupo.",
+      "sharedWith": "Compartido con este grupo",
+      "sharedEmpty": "Todavía no hay nada compartido con este grupo."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Puede ver",
+      "use": "Puede usar",
+      "edit": "Puede editar",
+      "manage": "Puede administrar"
+    },
+    "share": "Compartir",
+    "sharedWithMe": "Compartido conmigo",
+    "everyone": "Todos en esta organización",
+    "owner": "Propietario"
   }
 }

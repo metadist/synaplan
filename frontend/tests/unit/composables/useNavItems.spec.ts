@@ -14,10 +14,12 @@ import {
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
 
+const runtimeFeatures = { savedTasks: true, iamGroups: false }
+
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
   getApiBaseUrl: () => 'http://localhost:8000',
-  getConfigSync: () => ({ features: { savedTasks: true } }),
+  getConfigSync: () => ({ features: runtimeFeatures }),
 }))
 
 const pluginList: { name: string }[] = []
@@ -66,6 +68,7 @@ const navMessages = {
     adminModelStatus: 'Model Status',
     adminProviderSetup: 'AI providers',
     adminSystemConfig: 'System configuration',
+    adminPeople: 'People',
   },
   pageTitles: {
     configApiDocs: 'API docs',
@@ -143,6 +146,8 @@ describe('groupNavChildren', () => {
 describe('useNavItems rail', () => {
   beforeEach(() => {
     pluginList.length = 0
+    runtimeFeatures.savedTasks = true
+    runtimeFeatures.iamGroups = false
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -180,6 +185,16 @@ describe('useNavItems rail', () => {
     expect(keys).toContain('admin')
     const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
     expect(operate?.label).toBe('Operate')
+    const childKeys = (operate?.children ?? []).map((child: { key: string }) => child.key)
+    expect(childKeys).not.toContain('admin-people')
+  })
+
+  it('shows People under Operate only when IAM groups are enabled', () => {
+    runtimeFeatures.iamGroups = true
+    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    const childKeys = (operate?.children ?? []).map((child: { key: string }) => child.key)
+    expect(childKeys).toContain('admin-people')
   })
 
   it('plugins stay a top-level rail entry when installed', () => {

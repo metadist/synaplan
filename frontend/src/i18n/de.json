@@ -136,6 +136,7 @@
     "adminModelStatus": "Modell-Status",
     "adminConfig": "Systemkonfiguration",
     "adminSetup": "KI-Anbieter einrichten",
+    "adminPeople": "Personen",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -706,6 +707,7 @@
     "adminModelStatus": "Modell-Status",
     "adminSystemConfig": "Systemkonfiguration",
     "adminProviderSetup": "KI-Anbieter",
+    "adminPeople": "Personen",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
     "menu": "Menü",
@@ -2382,7 +2384,12 @@
       "errorActivating": "Fehler beim Aktivieren des API-Schlüssels",
       "errorDeleting": "Fehler beim Löschen des API-Schlüssels",
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
-      "usageCount": "Anfragen"
+      "usageCount": "Anfragen",
+      "scopes": {
+        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen begrenzt diesen Schlüssel auf Personen.",
+        "iamRead": "Personen — Gruppen ansehen",
+        "iamManage": "Personen — Gruppen verwalten"
+      }
     },
     "desktop": {
       "title": "Desktop",
@@ -5414,5 +5421,64 @@
       "operator": "Operator-Schlüssel",
       "none": "Nicht konfiguriert"
     }
+  },
+  "people": {
+    "title": "Personen",
+    "subtitle": "Benutzer und Gruppen auf dieser Instanz.",
+    "tabs": {
+      "users": "Benutzer",
+      "groups": "Gruppen"
+    },
+    "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
+    "openPeople": "Personen öffnen",
+    "users": {
+      "groups": "Gruppen",
+      "identities": "Anmeldung"
+    },
+    "groups": {
+      "name": "Name",
+      "kind": "Art",
+      "members": "Mitglieder",
+      "memberCount": "{count} Mitglieder",
+      "fromLogin": "Aus Ihrer Anmeldung",
+      "manual": "Manuell",
+      "create": "Gruppe erstellen",
+      "createTitle": "Gruppe erstellen",
+      "createPrompt": "Gruppenname",
+      "rename": "Umbenennen",
+      "renameTitle": "Gruppe umbenennen",
+      "delete": "Löschen",
+      "deleteConfirm": "Die Gruppe \"{name}\" löschen? Die Personen bleiben; nur die Gruppe wird entfernt.",
+      "empty": "Noch keine Gruppen. Erstellen Sie eine, um später zu teilen.",
+      "loadError": "Gruppen konnten nicht geladen werden.",
+      "saveError": "Die Gruppe konnte nicht gespeichert werden.",
+      "created": "Gruppe erstellt.",
+      "renamed": "Gruppe umbenannt.",
+      "deleted": "Gruppe gelöscht.",
+      "directoryReadOnly": "Diese Gruppe kommt aus Ihrer Anmeldung und kann hier nicht geändert werden.",
+      "addMember": "Person hinzufügen",
+      "addMemberPlaceholder": "Nach E-Mail suchen",
+      "addMemberNotFound": "Kein Benutzer passt zu dieser E-Mail.",
+      "removeMember": "Entfernen",
+      "removeConfirm": "{email} aus dieser Gruppe entfernen?",
+      "roleMember": "Mitglied",
+      "roleManager": "Manager",
+      "memberAdded": "Person zur Gruppe hinzugefügt.",
+      "memberRemoved": "Person aus der Gruppe entfernt.",
+      "sharedWith": "Mit dieser Gruppe geteilt",
+      "sharedEmpty": "Mit dieser Gruppe ist noch nichts geteilt."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Darf ansehen",
+      "use": "Darf nutzen",
+      "edit": "Darf bearbeiten",
+      "manage": "Darf verwalten"
+    },
+    "share": "Teilen",
+    "sharedWithMe": "Mit mir geteilt",
+    "everyone": "Alle in dieser Organisation",
+    "owner": "Eigentümer"
   }
 }

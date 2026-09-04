@@ -368,6 +368,43 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
+## People and groups
+
+Groups, the People page under Operate, and the group API are gated by
+`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The seeder inserts the
+flag as `0`. Existing installs stay unchanged until an operator turns it on.
+
+When the flag is off:
+
+- Operate has no People child.
+- `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.
+- The Operate Overview **Users** tab is unchanged.
+
+When the flag is on:
+
+- Operate shows **People** (`/admin/people`) with **Users** and **Groups**.
+- An admin can create a manual group, add people by email, and set the role
+  to member or manager.
+- Groups that come from company login (`kind=directory`) are read-only here.
+- Sharing a folder or conversation with a group is a later step and stays off
+  (`IAM.SHARING_ENABLED`).
+
+Enable on a running instance:
+
+```sql
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'IAM', 'GROUPS_ENABLED', '1')
+ON DUPLICATE KEY UPDATE BVALUE = '1';
+```
+
+Then reload the app (or wait for the next runtime-config fetch). Rollback is
+the same statement with `'0'`. Group rows stay in the database.
+
+API keys: empty or legacy webhook-only scopes keep full access. A key that
+opts into `iam:read` or `iam:manage` is limited to those People routes.
+
+---
+
 ## Self-awareness (`SELF_AWARE`)
 
 The assistant can answer "what can you do here?" from a live capability

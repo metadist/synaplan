@@ -136,6 +136,7 @@
     "adminModelStatus": "État des modèles",
     "adminConfig": "Configuration système",
     "adminSetup": "Configuration des fournisseurs IA",
+    "adminPeople": "Personnes",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement réussi",
     "subscriptionCancel": "Abonnement annulé",
@@ -710,6 +711,7 @@
     "adminModelStatus": "État des modèles",
     "adminSystemConfig": "Configuration système",
     "adminProviderSetup": "Fournisseurs IA",
+    "adminPeople": "Personnes",
     "more": "Plus",
     "moreDescription": "Autres sections et compte",
     "menu": "Menu",
@@ -2296,7 +2298,12 @@
       "errorActivating": "Échec de l’activation de la clé API",
       "errorDeleting": "Échec de la suppression de la clé API",
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
-      "usageCount": "requêtes"
+      "usageCount": "requêtes",
+      "scopes": {
+        "hint": "Laissez décoché pour un accès complet. Cocher une case limite cette clé à Personnes.",
+        "iamRead": "Personnes — voir les groupes",
+        "iamManage": "Personnes — gérer les groupes"
+      }
     },
     "desktop": {
       "title": "Ordinateur",
@@ -5480,5 +5487,64 @@
       "operator": "Clé opérateur",
       "none": "Aucune configurée"
     }
+  },
+  "people": {
+    "title": "Personnes",
+    "subtitle": "Utilisateurs et groupes de cette instance.",
+    "tabs": {
+      "users": "Utilisateurs",
+      "groups": "Groupes"
+    },
+    "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
+    "openPeople": "Ouvrir Personnes",
+    "users": {
+      "groups": "Groupes",
+      "identities": "Connexion"
+    },
+    "groups": {
+      "name": "Nom",
+      "kind": "Type",
+      "members": "Membres",
+      "memberCount": "{count} membres",
+      "fromLogin": "Depuis votre connexion",
+      "manual": "Manuel",
+      "create": "Créer un groupe",
+      "createTitle": "Créer un groupe",
+      "createPrompt": "Nom du groupe",
+      "rename": "Renommer",
+      "renameTitle": "Renommer le groupe",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer le groupe « {name} » ? Les personnes restent ; seul le groupe est retiré.",
+      "empty": "Aucun groupe pour le moment. Créez-en un pour partager plus tard.",
+      "loadError": "Impossible de charger les groupes.",
+      "saveError": "Impossible d’enregistrer le groupe.",
+      "created": "Groupe créé.",
+      "renamed": "Groupe renommé.",
+      "deleted": "Groupe supprimé.",
+      "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être modifié ici.",
+      "addMember": "Ajouter une personne",
+      "addMemberPlaceholder": "Rechercher par e-mail",
+      "addMemberNotFound": "Aucun utilisateur ne correspond à cet e-mail.",
+      "removeMember": "Retirer",
+      "removeConfirm": "Retirer {email} de ce groupe ?",
+      "roleMember": "Membre",
+      "roleManager": "Responsable",
+      "memberAdded": "Personne ajoutée au groupe.",
+      "memberRemoved": "Personne retirée du groupe.",
+      "sharedWith": "Partagé avec ce groupe",
+      "sharedEmpty": "Rien n’est encore partagé avec ce groupe."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Peut voir",
+      "use": "Peut utiliser",
+      "edit": "Peut modifier",
+      "manage": "Peut gérer"
+    },
+    "share": "Partager",
+    "sharedWithMe": "Partagé avec moi",
+    "everyone": "Tout le monde dans cette organisation",
+    "owner": "Propriétaire"
   }
 }

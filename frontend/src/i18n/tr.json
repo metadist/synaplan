@@ -134,6 +134,7 @@
     "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
     "adminSetup": "AI Sağlayıcı Kurulumu",
+    "adminPeople": "Kişiler",
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
@@ -698,6 +699,7 @@
     "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
     "adminProviderSetup": "AI Sağlayıcıları",
+    "adminPeople": "Kişiler",
     "profile": "Profil",
     "more": "Daha fazla",
     "moreDescription": "Diğer bölümler ve hesap",
@@ -3184,7 +3186,12 @@
       "errorActivating": "API anahtarı etkinleştirilemedi",
       "errorDeleting": "API anahtarı silinemedi",
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
-      "usageCount": "istek"
+      "usageCount": "istek",
+      "scopes": {
+        "hint": "Tam erişim için işaretlemeyin. Bir kutuyu işaretlemek bu anahtarı Kişiler ile sınırlar.",
+        "iamRead": "Kişiler — grupları görüntüle",
+        "iamManage": "Kişiler — grupları yönet"
+      }
     },
     "desktop": {
       "title": "Masaüstü",
@@ -4495,5 +4502,64 @@
       "operator": "Operatör anahtarı",
       "none": "Yapılandırılmadı"
     }
+  },
+  "people": {
+    "title": "Kişiler",
+    "subtitle": "Bu kuruluştaki kullanıcılar ve gruplar.",
+    "tabs": {
+      "users": "Kullanıcılar",
+      "groups": "Gruplar"
+    },
+    "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
+    "openPeople": "Kişiler’i aç",
+    "users": {
+      "groups": "Gruplar",
+      "identities": "Giriş"
+    },
+    "groups": {
+      "name": "Ad",
+      "kind": "Tür",
+      "members": "Üyeler",
+      "memberCount": "{count} üye",
+      "fromLogin": "Girişinizden",
+      "manual": "Elle",
+      "create": "Grup oluştur",
+      "createTitle": "Grup oluştur",
+      "createPrompt": "Grup adı",
+      "rename": "Yeniden adlandır",
+      "renameTitle": "Grubu yeniden adlandır",
+      "delete": "Sil",
+      "deleteConfirm": "\"{name}\" grubunu silmek istiyor musunuz? Kişiler kalır; yalnızca grup kaldırılır.",
+      "empty": "Henüz grup yok. Daha sonra paylaşmak için bir tane oluşturun.",
+      "loadError": "Gruplar yüklenemedi.",
+      "saveError": "Grup kaydedilemedi.",
+      "created": "Grup oluşturuldu.",
+      "renamed": "Grup yeniden adlandırıldı.",
+      "deleted": "Grup silindi.",
+      "directoryReadOnly": "Bu grup girişinizden gelir ve burada değiştirilemez.",
+      "addMember": "Kişi ekle",
+      "addMemberPlaceholder": "E-postayla ara",
+      "addMemberNotFound": "Bu e-postayla eşleşen kullanıcı yok.",
+      "removeMember": "Kaldır",
+      "removeConfirm": "{email} bu gruptan kaldırılsın mı?",
+      "roleMember": "Üye",
+      "roleManager": "Yönetici",
+      "memberAdded": "Kişi gruba eklendi.",
+      "memberRemoved": "Kişi gruptan kaldırıldı.",
+      "sharedWith": "Bu grupla paylaşılanlar",
+      "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Görüntüleyebilir",
+      "use": "Kullanabilir",
+      "edit": "Düzenleyebilir",
+      "manage": "Yönetebilir"
+    },
+    "share": "Paylaş",
+    "sharedWithMe": "Benimle paylaşılan",
+    "everyone": "Bu kuruluştaki herkes",
+    "owner": "Sahip"
   }
 }

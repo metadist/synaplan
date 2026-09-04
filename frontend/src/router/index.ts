@@ -496,6 +496,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminSetup' },
     },
     {
+      path: '/admin/people',
+      name: 'admin-people',
+      component: () => import('@/views/PeopleView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminPeople' },
+    },
+    {
       path: '/subscription',
       name: 'subscription',
       component: () => import('@/views/SubscriptionView.vue'),

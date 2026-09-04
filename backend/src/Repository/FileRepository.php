@@ -383,6 +383,23 @@ class FileRepository extends ServiceEntityRepository
         return $map;
     }
 
+    public function existsForUserAndGroupKey(int $userId, string $groupKey): bool
+    {
+        $count = (int) $this->createQueryBuilder('f')
+            ->select('COUNT(f.id)')
+            ->where('f.userId = :userId')
+            ->andWhere('f.groupKey = :groupKey')
+            ->andWhere('f.ephemeral = false')
+            ->andWhere('f.groupKey IS NOT NULL')
+            ->andWhere("f.groupKey != ''")
+            ->setParameter('userId', $userId)
+            ->setParameter('groupKey', $groupKey)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
     /**
      * @return array<string, int> group name => file count
      */

@@ -14,6 +14,7 @@ import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
+import { isIamGroupsEnabled } from './useIamFeature'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -366,6 +367,13 @@ export function useNavItems() {
         path: '/admin/config',
         label: t('nav.adminSystemConfig'),
       })
+      if (isIamGroupsEnabled()) {
+        adminChildren.push({
+          key: 'admin-people',
+          path: '/admin/people',
+          label: t('nav.adminPeople'),
+        })
+      }
 
       items.push({
         key: 'admin',

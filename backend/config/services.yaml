@@ -220,6 +220,8 @@ services:
             tags: ['app.model_list_probe']
         App\Service\Document\Tool\DocumentToolInterface:
             tags: ['app.document_tool']
+        App\Service\Iam\ResourceKind\ShareableResourceKindInterface:
+            tags: ['app.iam.resource_kind']
 
     App\:
         resource: '../src/'
@@ -834,6 +836,7 @@ services:
             $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
             $oidcRoleClaims: '%env(string:OIDC_ROLE_CLAIMS)%'
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
 
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:

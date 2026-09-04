@@ -69,6 +69,12 @@ final class ApiKeyScope
     /** `/api/v1/rag*` — semantic search over the owner's documents. */
     public const ADDIN_RAG = 'rag:*';
 
+    /** `GET /api/v1/groups*` — list groups the key's owner belongs to. */
+    public const IAM_READ = 'iam:read';
+
+    /** `/api/v1/admin/groups*` — create/rename/delete groups and memberships. Implies iam:read. */
+    public const IAM_MANAGE = 'iam:manage';
+
     /**
      * Paths any authenticated key may reach regardless of scopes: identity
      * introspection of the key's own account ("who am I"), needed by every
@@ -171,6 +177,8 @@ final class ApiKeyScope
      *                              Synamail contact profiling)
      *   /api/v1/chats            → chats:*
      *   /api/v1/rag              → rag:*
+     *   /api/v1/groups           → iam:read
+     *   /api/v1/admin/groups     → iam:manage (implies iam:read)
      *   /api/v1/auth/me          → any key (self-service identity, see
      *                              SELF_SERVICE_PATHS)
      *   everything else          → denied for a restricted key (a scoped key
@@ -250,6 +258,14 @@ final class ApiKeyScope
             return [self::ADDIN_RAG];
         }
 
+        if (self::matchesPrefix($path, '/api/v1/groups')) {
+            return [self::IAM_READ];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/admin/groups')) {
+            return [self::IAM_MANAGE];
+        }
+
         return [];
     }
 
@@ -271,6 +287,10 @@ final class ApiKeyScope
         }
 
         if (str_starts_with($required, 'desktop:') && \in_array(self::DESKTOP_ALL, $scopes, true)) {
+            return true;
+        }
+
+        if (self::IAM_READ === $required && \in_array(self::IAM_MANAGE, $scopes, true)) {
             return true;
         }
 
