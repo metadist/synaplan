@@ -21,6 +21,7 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\InternalEmailService;
 use App\Service\ModelConfigService;
+use App\Service\TtsTextSanitizer;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -1513,6 +1514,9 @@ class AiFacade
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
 
+        // Last-line defence for callers that skip TtsTextSanitizer (#1665).
+        $text = TtsTextSanitizer::truncateForSynthesis($text);
+
         $this->logger->info('AI TTS request', [
             'provider' => $provider->getName(),
             'user_id' => $userId,
@@ -1582,6 +1586,8 @@ class AiFacade
         }
 
         $provider = $this->registry->getTextToSpeechProvider($providerName);
+
+        $text = TtsTextSanitizer::truncateForSynthesis($text);
 
         $this->logger->info('AI TTS stream request', [
             'provider' => $provider->getName(),

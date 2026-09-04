@@ -10,10 +10,15 @@ namespace App\Service;
  * Strips non-speakable artifacts from AI response text before TTS synthesis.
  * Removes: <think> tags, [Memory:ID] badges, code blocks, markdown formatting, HTML tags.
  *
- * Call TtsTextSanitizer::sanitize($text) BEFORE passing text to AiFacade::synthesize().
+ * Call TtsTextSanitizer::prepareForSynthesis($text) BEFORE passing text to
+ * AiFacade::synthesize() so every caller stays inside provider input limits
+ * (OpenAI TTS rejects more than 4096 characters — #1665).
  */
 final readonly class TtsTextSanitizer
 {
+    /** OpenAI TTS input max is 4096; stay under that for every provider. */
+    public const MAX_SYNTHESIS_CHARS = 4000;
+
     /**
      * Strip non-speakable artifacts from AI response text.
      */
@@ -56,5 +61,26 @@ final readonly class TtsTextSanitizer
         $text = trim($text);
 
         return $text;
+    }
+
+    /**
+     * Cap speakable text at the shared TTS input limit. Multibyte-safe, no
+     * ellipsis — the spoken prefix is the content, not a UI snippet.
+     */
+    public static function truncateForSynthesis(string $text, int $maxLength = self::MAX_SYNTHESIS_CHARS): string
+    {
+        if (mb_strlen($text) <= $maxLength) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $maxLength);
+    }
+
+    /**
+     * Sanitize then cap — the usual pre-synthesize treatment.
+     */
+    public static function prepareForSynthesis(string $text): string
+    {
+        return self::truncateForSynthesis(self::sanitize($text));
     }
 }

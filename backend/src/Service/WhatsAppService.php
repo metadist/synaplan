@@ -1324,16 +1324,12 @@ final class WhatsAppService
      */
     private function generateTtsResponse(string $text, int $userId, string $language = 'en'): ?array
     {
-        // Sanitize: strip [Memory:ID], markdown, code blocks, <think> tags
-        $text = TtsTextSanitizer::sanitize($text);
-
-        // Limit text length for TTS (max ~4000 chars for most providers)
-        $maxLength = 4000;
-        if (strlen($text) > $maxLength) {
-            $text = substr($text, 0, $maxLength - 3).'...';
+        $originalLength = mb_strlen($text);
+        $text = TtsTextSanitizer::prepareForSynthesis($text);
+        if (mb_strlen($text) < $originalLength) {
             $this->logger->info('WhatsApp: TTS text truncated', [
-                'original_length' => strlen($text),
-                'max_length' => $maxLength,
+                'original_length' => $originalLength,
+                'max_length' => TtsTextSanitizer::MAX_SYNTHESIS_CHARS,
             ]);
         }
 
