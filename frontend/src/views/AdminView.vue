@@ -143,8 +143,8 @@
           </div>
         </div>
 
-        <!-- Users Tab: full table when IAM is off; a link to People when on -->
-        <div v-if="activeTab === 'users'" data-testid="section-users">
+        <!-- Users tab: UsersTab owns data-testid="section-users" (Playwright strict). -->
+        <div v-if="activeTab === 'users'">
           <div
             v-if="iamGroupsEnabled"
             class="surface-card rounded-lg p-8"
