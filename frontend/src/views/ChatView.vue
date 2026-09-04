@@ -566,6 +566,13 @@ import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
 import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  consumePendingShortcut,
+  onShortcutAction,
+  type ShortcutActionName,
+} from '@/services/api/nativeShortcuts'
+import { captureNativePhoto, isNativeCameraAvailable } from '@/services/api/nativeCamera'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -777,6 +784,71 @@ function handleGuestFeatureGate(key: string) {
   featureGateOpen.value = true
 }
 
+// MOBILE-APP SEAM: iOS Shortcuts (Kurzbefehle) land here after the native
+// bootstrap pulls/pushes the pending action. `open` is a no-op (the app is
+// already visible). Photos are attached, never auto-sent.
+let stopShortcutListen: (() => void) | null = null
+const handledShortcutTokens = new Set<string>()
+
+async function waitForChatInput(): Promise<InstanceType<typeof ChatInput> | null> {
+  if (chatInputRef.value) {
+    return chatInputRef.value
+  }
+  await nextTick()
+  if (chatInputRef.value) {
+    return chatInputRef.value
+  }
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  return chatInputRef.value
+}
+
+async function handleNativeShortcut(action: ShortcutActionName, token: string): Promise<void> {
+  if (token && handledShortcutTokens.has(token)) {
+    return
+  }
+  if (token) {
+    handledShortcutTokens.add(token)
+  }
+  if ('open' === action) {
+    return
+  }
+
+  const input = await waitForChatInput()
+  if ('dictate' === action) {
+    await input?.startDictation()
+    return
+  }
+  if ('photo' !== action) {
+    return
+  }
+  if (isGuestMode.value) {
+    handleGuestFeatureGate('attach')
+    return
+  }
+  if (!isNativeCameraAvailable()) {
+    showErrorToast(t('chatInput.cameraUnavailable'))
+    return
+  }
+  const file = await captureNativePhoto()
+  if (file && chatInputRef.value) {
+    await chatInputRef.value.uploadFiles([file])
+  }
+}
+
+function initChatShortcuts(): void {
+  if (!isNativeApp()) {
+    return
+  }
+  stopShortcutListen = onShortcutAction((payload) => {
+    void handleNativeShortcut(payload.action, payload.token)
+  })
+  void consumePendingShortcut().then((pending) => {
+    if (pending) {
+      void handleNativeShortcut(pending.action, pending.token)
+    }
+  })
+}
+
 function handleExamplePick(prompt: string) {
   chatInputRef.value?.submitText(prompt)
 }
@@ -903,6 +975,7 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  initChatShortcuts()
   // Subscribe to the per-user realtime channel so finished renders resolve
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
@@ -1234,6 +1307,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
   window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
+  if (stopShortcutListen) {
+    stopShortcutListen()
+    stopShortcutListen = null
+  }
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
