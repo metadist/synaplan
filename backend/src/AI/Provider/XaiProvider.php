@@ -7,6 +7,7 @@ namespace App\AI\Provider;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
@@ -330,7 +331,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('xAI chat error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, self::PROVIDER_NAME, 'chat', 'xAI chat error');
         }
     }
 
@@ -371,7 +372,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'model' => $options['model'] ?? 'unknown',
             ]);
 
-            throw new ProviderException('xAI streaming error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, self::PROVIDER_NAME, 'chat_stream', 'xAI streaming error');
         }
     }
 

@@ -819,6 +819,13 @@
     "infoTokens": "Tokens",
     "infoCost": "Kosten"
   },
+  "chatError": {
+    "title": "Die Antwort ist fehlgeschlagen",
+    "retry": "Mit einem anderen Modell erneut versuchen",
+    "retryWith": "Mit {model} erneut versuchen",
+    "chooseModel": "Anderes Modell wählen",
+    "showDetails": "Technische Details anzeigen"
+  },
   "commands": {
     "noResults": "Keine Befehle gefunden",
     "availableCommands": "Verfügbare Befehle",
@@ -1179,13 +1186,6 @@
   },
   "aiProvider": {
     "error": {
-      "prefix": "Fehler",
-      "noModelTitle": "Modell-Download erforderlich",
-      "quickModels": "Schnell & Leicht",
-      "mediumModels": "Mittel (Bessere Qualität)",
-      "largeModels": "Groß (Beste Qualität)",
-      "exampleCommand": "Installationsbefehl",
-      "restartNote": "Nach dem Herunterladen die Seite aktualisieren und erneut versuchen.",
       "visionModelHint": "Kein Vision-fähiges Modell konfiguriert",
       "visionModelHintDetail": "Deine Nachricht enthält Bilder, aber dein aktuelles Chat-Modell kann diese nicht analysieren. Gehe zu **Einstellungen → KI-Modelle** und aktiviere ein Modell mit Vision-Unterstützung (z.B. GPT-4o, Gemini, Llama 4), oder setze ein Standard-**Pic→Text**-Modell."
     }

@@ -546,6 +546,17 @@
             :docs="docs"
           />
 
+          <ChatErrorNotice
+            v-if="role === 'assistant' && errorReason"
+            class="m-3"
+            :can-retry-model="canRetryModel"
+            :error-debug="errorDebug"
+            :recommended-model-id="selectedModel?.id ?? null"
+            :failed-model-id="aiModels?.chat?.model_id ?? null"
+            :model-options="modelOptions"
+            @retry="handleErrorRetry"
+          />
+
           <!-- Continue Button (truncated response) -->
           <div
             v-if="role === 'assistant' && truncated && !isStreaming"
@@ -1143,6 +1154,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import ChatErrorNotice from './ChatErrorNotice.vue'
 import MessagePart from './MessagePart.vue'
 import MessageMemories from './MessageMemories.vue'
 import MessageFeedbacks from './MessageFeedbacks.vue'
@@ -1303,6 +1315,9 @@ interface Props {
   /** User text that produced this plan — used to save it as a scheduled task. */
   scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'
+  errorReason?: string | null
+  canRetryModel?: boolean
+  errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
   errorData?: {
     limitType?: string
@@ -1737,7 +1752,20 @@ const shortenModel = (name: string): string => {
 // that pre-date the structured metadata. Without this preference the round-robin
 // recommendation cannot identify the current model and always returns the
 // second-highest-rated model. See issue #922.
-const againDataComputed = computed(() => props.againData)
+const againDataComputed = computed(() => {
+  const existing = props.againData
+  const failedId = props.aiModels?.chat?.model_id
+  if (typeof failedId !== 'number' || failedId <= 0) {
+    return existing
+  }
+
+  return {
+    eligible: existing?.eligible ?? [],
+    predictedNext: existing?.predictedNext ?? null,
+    tag: existing?.tag ?? 'CHAT',
+    currentModelId: existing?.currentModelId ?? existing?.current_model_id ?? failedId,
+  }
+})
 const filesComputed = computed(() => props.files)
 const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
 const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
@@ -1843,6 +1871,12 @@ const isMultitaskTurn = computed(
 const handleSimpleAgain = () => {
   if (props.backendMessageId) {
     emit('again', props.backendMessageId)
+  }
+}
+
+const handleErrorRetry = (modelId?: number) => {
+  if (props.backendMessageId) {
+    emit('again', props.backendMessageId, modelId ?? selectedModel.value?.id)
   }
 }
 

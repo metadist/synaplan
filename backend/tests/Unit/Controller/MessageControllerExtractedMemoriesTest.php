@@ -27,6 +27,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -93,6 +94,7 @@ final class MessageControllerExtractedMemoriesTest extends TestCase
                     '/tmp',
                     new NullLogger(),
                 ),
+                $this->createMock(Security::class),
             ),
             new PremiumFeatureGate(new BillingService('', '')),
             new NullLogger(),

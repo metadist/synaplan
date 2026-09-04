@@ -212,6 +212,9 @@
               :topic="message.topic"
               :original-topic="message.originalTopic"
               :original-media-type="message.originalMediaType"
+              :error-reason="message.errorReason"
+              :can-retry-model="message.canRetryModel"
+              :error-debug="message.errorDebug"
               :again-data="message.againData"
               :backend-message-id="message.backendMessageId"
               :quoted-text="message.quotedText"
@@ -3753,6 +3756,11 @@ const streamAIResponse = async (
               if (data.originalMediaType !== undefined) {
                 message.originalMediaType = data.originalMediaType
               }
+              if (typeof data.errorReason === 'string' && data.errorReason !== '') {
+                message.errorReason = data.errorReason
+                message.canRetryModel = data.canRetryModel === true
+                message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+              }
 
               if (data.error_hint === 'vision_model_required') {
                 const hint =
@@ -4007,54 +4015,24 @@ const streamAIResponse = async (
               return
             }
 
-            // Format user-friendly error message with installation instructions
-            let displayError = '## ⚠️ ' + errorMsg + '\n\n'
-
-            if (data.install_command && data.suggested_models) {
-              displayError += '### 📦 ' + t('aiProvider.error.noModelTitle') + '\n\n'
-
-              if (data.suggested_models.quick) {
-                displayError += '**' + t('aiProvider.error.quickModels') + ':**\n'
-                data.suggested_models.quick.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              if (data.suggested_models.medium) {
-                displayError += '**' + t('aiProvider.error.mediumModels') + ':**\n'
-                data.suggested_models.medium.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              if (data.suggested_models.large) {
-                displayError += '**' + t('aiProvider.error.largeModels') + ':**\n'
-                data.suggested_models.large.forEach((model: string) => {
-                  displayError += `- \`${model}\`\n`
-                })
-                displayError += '\n'
-              }
-
-              displayError += '### 💡 ' + t('aiProvider.error.exampleCommand') + '\n\n'
-              displayError += '```bash\n' + data.install_command + '\n```\n\n'
-              displayError += '*' + t('aiProvider.error.restartNote') + '*'
-            }
-
-            // Show error in the streaming message bubble
             const message = historyStore.messages.find((m) => m.id === messageId)
             const hasContent = message?.parts.some(
               (p) => p.type === 'text' && p.content && p.content.trim() !== ''
             )
-            if (message && hasContent) {
-              // Already has meaningful content (partial response streamed before error)
-              historyStore.finishStreamingMessage(messageId)
-            } else {
-              // No visible content yet — display the error message
-              historyStore.updateStreamingMessage(messageId, displayError)
-              historyStore.finishStreamingMessage(messageId)
+            if (message) {
+              message.errorReason =
+                typeof data.errorReason === 'string' && data.errorReason !== ''
+                  ? data.errorReason
+                  : 'unknown'
+              message.canRetryModel = data.canRetryModel === true
+              message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
             }
+            if (!hasContent) {
+              // `errorMsg` is the localized text the backend also persists as the
+              // message body, so the live bubble and the reloaded row match.
+              historyStore.updateStreamingMessage(messageId, errorMsg)
+            }
+            historyStore.finishStreamingMessage(messageId)
 
             // Clean up streaming resources after error
             streamingAbortController = null

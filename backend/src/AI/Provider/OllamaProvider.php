@@ -3,6 +3,7 @@
 namespace App\AI\Provider;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
@@ -143,7 +144,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
             }
 
-            throw new ProviderException('Ollama chat error: '.$e->getMessage(), 'ollama');
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'ollama', 'chat');
         }
     }
 
@@ -345,7 +346,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                 throw ProviderException::noModelAvailable('chat', 'ollama', $model, $e);
             }
 
-            throw new ProviderException('Ollama streaming error: '.$e->getMessage(), 'ollama', null, 0, $e);
+            throw (new ProviderFailureFactory())->fromThrowable($e, 'ollama', 'chat_stream', 'Ollama streaming error');
         }
     }
 

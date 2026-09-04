@@ -10,6 +10,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\File\DataUrlFixer;
 use App\Service\Message\MessageApiFormatter;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Covers the taximeter `usage` serialization added to the history/message API
@@ -27,6 +28,7 @@ final class MessageApiFormatterUsageTest extends TestCase
             $this->createMock(MessageRepository::class),
             $this->createMock(SearchResultRepository::class),
             $this->createMock(DataUrlFixer::class),
+            $this->createMock(Security::class),
         );
     }
 

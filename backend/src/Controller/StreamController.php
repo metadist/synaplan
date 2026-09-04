@@ -32,6 +32,9 @@ use App\Service\Media\MediaCancellationStore;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\MemoryExtractionDispatcher;
+use App\Service\Message\ChatErrorNotifier;
+use App\Service\Message\ChatErrorPresenter;
+use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
@@ -119,6 +122,8 @@ class StreamController extends AbstractController
         private UsageTaximeterConfig $usageTaximeterConfig,
         private PremiumFeatureGate $premiumFeatureGate,
         private ChatRunService $chatRunService,
+        private ChatErrorPresenter $chatErrorPresenter,
+        private ChatErrorNotifier $chatErrorNotifier,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
     ) {
@@ -753,7 +758,7 @@ class StreamController extends AbstractController
             );
 
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, string $errorMessage, string $provider = 'system', string $errorType = 'unknown') use ($user, $trackId, $intendedChat, $incognito) {
+            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage) {
                 if (!$incomingMessage) {
                     return null;
                 }
@@ -783,8 +788,8 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMessageType('WEB');
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setTopic('ERROR');
-                    $outgoingMessage->setLanguage('en');
-                    $outgoingMessage->setText($errorMessage);
+                    $outgoingMessage->setLanguage($uiLanguage);
+                    $outgoingMessage->setText($view->userText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
 
@@ -798,7 +803,7 @@ class StreamController extends AbstractController
                     if (null !== ($intendedChat['id'] ?? null)) {
                         $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
                     }
-                    $outgoingMessage->setMeta('error_type', $errorType);
+                    $this->persistChatErrorMeta($outgoingMessage, $view);
 
                     $incomingMessage->setTopic('ERROR');
                     $incomingMessage->setStatus('error');
@@ -1402,57 +1407,17 @@ class StreamController extends AbstractController
                 }
 
                 if (!$result['success']) {
-                    // Build user-friendly error message as AI response
-                    $isDev = 'dev' === $this->getParameter('kernel.environment');
+                    $isAdmin = $this->isGranted('ROLE_ADMIN');
+                    $errorLang = $this->resolveErrorLanguage($result, $uiLanguage);
+                    $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
+                    $errorMessage = $errorView->userText;
 
-                    $errorMessage = '## ⚠️ '.$result['error']."\n\n";
+                    $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? ($result['provider'] ?? null), $user->getId(), [
+                        'model' => $intendedChat['name'] ?? null,
+                        'chat_id' => $chat?->getId(),
+                    ]);
 
-                    // Add installation instructions ONLY in dev mode
-                    if ($isDev && isset($result['context'])) {
-                        $context = $result['context'];
-
-                        // If a specific model was requested, show it prominently
-                        if (isset($context['requested_model']) && isset($context['install_command'])) {
-                            $errorMessage .= "### 💡 Install the Model You Selected\n\n";
-                            $errorMessage .= "```bash\n".$context['install_command']."\n```\n\n";
-                        }
-
-                        // Show alternative models if available
-                        if (isset($context['suggested_models'])) {
-                            $errorMessage .= "### 📦 Or Try These Alternatives\n\n";
-
-                            if (isset($context['suggested_models']['quick'])) {
-                                $errorMessage .= "**Quick & Light:**\n";
-                                foreach ($context['suggested_models']['quick'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-
-                            if (isset($context['suggested_models']['medium'])) {
-                                $errorMessage .= "**Medium (Better Quality):**\n";
-                                foreach ($context['suggested_models']['medium'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-
-                            if (isset($context['suggested_models']['large'])) {
-                                $errorMessage .= "**Large (Best Quality):**\n";
-                                foreach ($context['suggested_models']['large'] as $model) {
-                                    $errorMessage .= "- `{$model}`\n";
-                                }
-                                $errorMessage .= "\n";
-                            }
-                        }
-
-                        $errorMessage .= '*After downloading, refresh the page and try again.*';
-                    } elseif (!$isDev) {
-                        // Production: Generic message without technical details
-                        $errorMessage .= '*Please contact your system administrator or try selecting a different AI model.*';
-                    }
-
-                    // Stream the error message as data chunks (like normal AI response)
+                    // Stream the localized error as data chunks (like a normal AI response)
                     $this->sendSSE('data', ['chunk' => $errorMessage]);
 
                     // Recover original classification topic for correct frontend model selection
@@ -1480,7 +1445,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setMessageType('WEB');
                     $outgoingMessage->setFile(0);
                     $outgoingMessage->setTopic('ERROR');
-                    $outgoingMessage->setLanguage('en');
+                    $outgoingMessage->setLanguage($errorLang);
                     $outgoingMessage->setText($errorMessage);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
@@ -1499,7 +1464,7 @@ class StreamController extends AbstractController
                     if (null !== ($intendedChat['id'] ?? null)) {
                         $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedChat['id']);
                     }
-                    $outgoingMessage->setMeta('error_type', $result['error'] ?? 'unknown');
+                    $this->persistChatErrorMeta($outgoingMessage, $errorView);
                     if ($originalTopic) {
                         $outgoingMessage->setMeta('original_topic', $originalTopic);
                     }
@@ -1536,8 +1501,9 @@ class StreamController extends AbstractController
                         'topic' => 'ERROR',
                         'originalTopic' => $originalTopic,
                         'originalMediaType' => $originalMediaType,
-                        'language' => 'en',
+                        'language' => $errorLang,
                         'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
+                        ...$errorView->toSseFields(),
                     ];
 
                     if (isset($result['error_hint'])) {
@@ -2409,25 +2375,27 @@ class StreamController extends AbstractController
                     'context' => $e->getContext(),
                 ]);
 
-                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), $e->getProviderName(), 'provider_error');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage(), 'provider' => $e->getProviderName(), 'context' => $e->getContext()], $uiLanguage, $isAdmin);
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? $e->getProviderName(), $user->getId(), [
+                    'model' => $intendedChat['name'] ?? null,
+                    'chat_id' => $chat?->getId(),
+                ]);
+
+                $messageId = $saveError($chat, $incomingMessage, $errorView, $e->getProviderName());
 
                 $errorData = [
-                    'error' => $e->getMessage(),
+                    'error' => $errorView->userText,
                     'provider' => $intendedChat['provider'] ?? $e->getProviderName(),
                     'model' => $intendedChat['name'] ?? 'unknown',
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
                     $errorData['messageId'] = $messageId;
-                }
-
-                // Add installation instructions if available
-                if ($context = $e->getContext()) {
-                    $errorData['install_command'] = $context['install_command'] ?? null;
-                    $errorData['suggested_models'] = $context['suggested_models'] ?? null;
                 }
 
                 $this->sendSSE('error', $errorData);
@@ -2447,15 +2415,23 @@ class StreamController extends AbstractController
                     'error' => $e->getMessage(),
                 ]);
 
-                $messageId = $saveError($chat, $incomingMessage, $e->getMessage(), 'system', 'exception');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorView = $this->presentChatFailure(['exception' => $e, 'error' => $e->getMessage()], $uiLanguage, $isAdmin);
+                $this->chatErrorNotifier->notify($errorView, $intendedChat['provider'] ?? 'system', $user->getId(), [
+                    'model' => $intendedChat['name'] ?? null,
+                    'chat_id' => $chat?->getId(),
+                ]);
+
+                $messageId = $saveError($chat, $incomingMessage, $errorView, 'system');
 
                 $errorData = [
-                    'error' => 'Failed to process message: '.$e->getMessage(),
+                    'error' => $errorView->userText,
                     'provider' => $intendedChat['provider'] ?? 'system',
                     'model' => $intendedChat['name'] ?? 'unknown',
                     'model_id' => $intendedChat['id'],
                     'topic' => 'ERROR',
                     'trackId' => $trackId,
+                    ...$errorView->toSseFields(),
                 ];
 
                 if ($messageId) {
@@ -2604,7 +2580,14 @@ class StreamController extends AbstractController
             );
 
             if (!$result['success']) {
-                $errorMessage = (string) ($result['error'] ?? 'Failed to process message');
+                $isAdmin = $this->isGranted('ROLE_ADMIN');
+                $errorLang = $this->resolveErrorLanguage($result, $message->getLanguage() ?: 'en');
+                $errorView = $this->presentChatFailure($result, $errorLang, $isAdmin);
+                $errorMessage = $errorView->userText;
+                $this->chatErrorNotifier->notify($errorView, $result['provider'] ?? null, $user->getId(), [
+                    'model' => $intendedModelId ? $this->modelConfigService->getModelName($intendedModelId) : null,
+                    'chat_id' => $chat?->getId(),
+                ]);
                 $failedClassification = $result['classification'] ?? null;
                 $originalTopic = null;
                 $originalMediaType = null;
@@ -2628,7 +2611,7 @@ class StreamController extends AbstractController
                 $outgoingMessage->setMessageType('WEB');
                 $outgoingMessage->setFile(0);
                 $outgoingMessage->setTopic('ERROR');
-                $outgoingMessage->setLanguage('en');
+                $outgoingMessage->setLanguage($errorLang);
                 $outgoingMessage->setText($errorMessage);
                 $outgoingMessage->setDirection('OUT');
                 $outgoingMessage->setStatus('complete');
@@ -2650,7 +2633,7 @@ class StreamController extends AbstractController
                 if (null !== $intendedModelId) {
                     $outgoingMessage->setMeta('ai_chat_model_id', (string) $intendedModelId);
                 }
-                $outgoingMessage->setMeta('error_type', $errorMessage);
+                $this->persistChatErrorMeta($outgoingMessage, $errorView);
                 if (null !== $originalTopic) {
                     $outgoingMessage->setMeta('original_topic', $originalTopic);
                 }
@@ -2681,8 +2664,9 @@ class StreamController extends AbstractController
                     'topic' => 'ERROR',
                     'originalTopic' => $originalTopic,
                     'originalMediaType' => $originalMediaType,
-                    'language' => 'en',
+                    'language' => $errorLang,
                     'aiModels' => $this->buildAiModelsPayload($outgoingMessage),
+                    ...$errorView->toSseFields(),
                 ]);
 
                 return;
@@ -3968,5 +3952,34 @@ class StreamController extends AbstractController
         ]);
 
         return true;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function presentChatFailure(array $result, string $lang, bool $includeDiagnostics): ChatErrorView
+    {
+        return $this->chatErrorPresenter->presentFromResult($result, $lang, $includeDiagnostics);
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     */
+    private function resolveErrorLanguage(array $result, string $fallback): string
+    {
+        $classification = $result['classification'] ?? null;
+        if (is_array($classification) && isset($classification['language']) && is_string($classification['language']) && '' !== trim($classification['language'])) {
+            return $classification['language'];
+        }
+
+        return '' !== trim($fallback) ? $fallback : 'en';
+    }
+
+    private function persistChatErrorMeta(Message $outgoing, ChatErrorView $view): void
+    {
+        // `canRetryWithOtherModel` is derived from the reason, so persisting it
+        // separately would only create a second source of truth to keep in sync.
+        $outgoing->setMeta('error_reason', $view->reason->value);
+        $outgoing->setMeta('error_debug', $view->rawMessage);
     }
 }

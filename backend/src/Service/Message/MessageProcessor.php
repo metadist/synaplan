@@ -600,6 +600,7 @@ final readonly class MessageProcessor
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
                 'classification' => $classification ?? null,
+                'exception' => $e,
             ];
 
             // Include context data (install_command, suggested_models) if available
@@ -622,6 +623,7 @@ final readonly class MessageProcessor
                 'success' => false,
                 'error' => $e->getMessage(),
                 'classification' => $classification ?? null,
+                'exception' => $e,
             ];
         }
     }
@@ -1042,13 +1044,14 @@ final readonly class MessageProcessor
                 'error' => $e->getMessage(),
             ]);
 
-            $this->notify($statusCallback, 'error', $e->getMessage());
+            $this->notify($statusCallback, 'error', 'Processing failed');
 
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
                 'error_hint' => VisionModelRequiredException::HINT_CODE,
                 'classification' => $classification ?? null,
+                'exception' => $e,
             ];
         } catch (\App\AI\Exception\ProviderException $e) {
             // Handle ProviderException specially to preserve context (install instructions, etc.)
@@ -1059,13 +1062,14 @@ final readonly class MessageProcessor
                 'context' => $e->getContext(),
             ]);
 
-            $this->notify($statusCallback, 'error', $e->getMessage());
+            $this->notify($statusCallback, 'error', 'Processing failed');
 
             $errorResult = [
                 'success' => false,
                 'error' => $e->getMessage(),
                 'provider' => $e->getProviderName(),
                 'classification' => $classification ?? null,
+                'exception' => $e,
             ];
 
             // Include context data (install_command, suggested_models) if available
@@ -1085,13 +1089,14 @@ final readonly class MessageProcessor
 
             $this->logger->error('Message processing failed', $errorDetails);
 
-            $this->notify($statusCallback, 'error', $e->getMessage());
+            $this->notify($statusCallback, 'error', 'Processing failed');
 
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
                 'details' => $errorDetails,
                 'classification' => $classification ?? null,
+                'exception' => $e,
             ];
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\AI\Exception\ChatFailureClassifier;
 use App\AI\Service\AiFacade;
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\Chat;
@@ -14,6 +15,7 @@ use App\Service\DiscordNotificationService;
 use App\Service\EmailChatService;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
@@ -27,6 +29,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\SharedLockInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -74,6 +77,7 @@ class WhatsAppServiceTest extends TestCase
     private $messageReferenceResolver;
     /** @var ConversationSummaryRefreshDispatcher&\PHPUnit\Framework\MockObject\MockObject */
     private $summaryRefreshDispatcher;
+    private ChatErrorPresenter $chatErrorPresenter;
     private string $testPhoneNumberId = '123456789'; // Test phone number ID
 
     protected function setUp(): void
@@ -114,6 +118,12 @@ class WhatsAppServiceTest extends TestCase
         $this->messageReferenceResolver = $this->createMock(\App\Service\Digest\MessageReferenceResolver::class);
         $this->messageReferenceResolver->method('resolveMessageTags')->willReturnArgument(0);
         $this->summaryRefreshDispatcher = $this->createMock(ConversationSummaryRefreshDispatcher::class);
+        // Real presenter over an identity translator: classification stays under
+        // test while the catalog lookup collapses to the translation key.
+        $this->chatErrorPresenter = new ChatErrorPresenter(
+            new IdentityTranslator(),
+            new ChatFailureClassifier(),
+        );
 
         // Create service with test configuration (dynamic multi-number support)
         $this->service = new WhatsAppService(
@@ -132,6 +142,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -163,6 +174,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false, // disabled
             '/tmp/test_uploads',
@@ -190,6 +202,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -408,6 +421,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             false,
             '/tmp/test_uploads',
@@ -1236,6 +1250,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',
@@ -1580,6 +1595,7 @@ class WhatsAppServiceTest extends TestCase
             $this->memoryService,
             $this->messageReferenceResolver,
             $this->summaryRefreshDispatcher,
+            $this->chatErrorPresenter,
             'test_token',
             true,
             '/tmp/test_uploads',

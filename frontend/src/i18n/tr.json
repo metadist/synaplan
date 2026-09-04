@@ -855,6 +855,13 @@
     "infoTokens": "Token",
     "infoCost": "Maliyet"
   },
+  "chatError": {
+    "title": "Yanıt alınamadı",
+    "retry": "Başka bir modelle tekrar dene",
+    "retryWith": "{model} ile tekrar dene",
+    "chooseModel": "Başka bir model seç",
+    "showDetails": "Teknik ayrıntıları göster"
+  },
   "commands": {
     "noResults": "Komut bulunamadı",
     "availableCommands": "Mevcut Komutlar",
@@ -1075,13 +1082,6 @@
   },
   "aiProvider": {
     "error": {
-      "prefix": "Hata",
-      "noModelTitle": "Model İndirmesi Gerekli",
-      "quickModels": "Hızlı ve Hafif",
-      "mediumModels": "Orta (Daha İyi Kalite)",
-      "largeModels": "Büyük (En İyi Kalite)",
-      "exampleCommand": "Kurulum Komutu",
-      "restartNote": "İndirdikten sonra sayfayı yenileyin ve tekrar deneyin.",
       "visionModelHint": "Görüntü destekli model yapılandırılmamış",
       "visionModelHintDetail": "Mesajınız görüntüler içeriyor, ancak mevcut sohbet modeliniz bunları analiz edemiyor. **Ayarlar → AI Modelleri**'ne gidin ve görüntü destekli bir model etkinleştirin (ör. GPT-4o, Gemini, Llama 4) veya varsayılan bir **Pic→Text** modeli ayarlayın."
     }
