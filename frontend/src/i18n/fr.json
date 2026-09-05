@@ -776,6 +776,8 @@
       "notSupported": "La saisie vocale n’est pas disponible ici.",
       "unknown": "Le microphone n’a pas pu être démarré. Veuillez réessayer."
     },
+    "dictationUnavailable": "La dictée vocale n’est pas disponible sur ce serveur.",
+    "cameraUnavailable": "L’appareil photo n’a pas pu être ouvert. Vous pouvez toujours joindre une photo depuis le menu +.",
     "dropFiles": "Déposez les fichiers ici",
     "dropFilesHint": "Images, documents, fichiers audio…",
     "filesPasted": "{count} fichier collé | {count} fichiers collés",
@@ -809,7 +811,17 @@
     "modelDropdown": {
       "default": "Par défaut"
     },
-    "removeTool": "Retirer l’outil"
+    "removeTool": "Retirer l’outil",
+    "pastedText": {
+      "label": "Collé",
+      "title": "Texte collé",
+      "remove": "Retirer le texte collé",
+      "open": "Ouvrir le texte collé",
+      "meta": "{lines} lignes · {chars} caractères",
+      "modalTitle": "Contenu collé",
+      "save": "Enregistrer",
+      "cancel": "Annuler"
+    }
   },
   "chatMessage": {
     "again": "Encore",
@@ -4233,6 +4245,7 @@
       "text2sound": "Audio",
       "document_generation": "Document",
       "document_export": "Export PDF",
+      "document_combine": "PDF fusionné",
       "calendar_event": "Invitation d’agenda",
       "email_me": "Résultat par e-mail",
       "save_to_folder": "Enregistrer dans le dossier"

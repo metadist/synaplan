@@ -777,6 +777,8 @@
       "notSupported": "Spracheingabe ist hier nicht verfügbar.",
       "unknown": "Das Mikrofon konnte nicht gestartet werden. Bitte versuche es erneut."
     },
+    "dictationUnavailable": "Sprachdiktat ist auf diesem Server nicht verfügbar.",
+    "cameraUnavailable": "Die Kamera konnte nicht geöffnet werden. Du kannst ein Foto weiterhin über das +-Menü anhängen.",
     "dropFiles": "Dateien hier ablegen",
     "dropFilesHint": "Bilder, Dokumente, Audiodateien...",
     "filesPasted": "{count} Datei eingefügt | {count} Dateien eingefügt",
@@ -805,7 +807,17 @@
     "modelDropdown": {
       "default": "Standard"
     },
-    "removeTool": "Werkzeug entfernen"
+    "removeTool": "Werkzeug entfernen",
+    "pastedText": {
+      "label": "Eingefügt",
+      "title": "Eingefügter Text",
+      "remove": "Eingefügten Text entfernen",
+      "open": "Eingefügten Text öffnen",
+      "meta": "{lines} Zeilen · {chars} Zeichen",
+      "modalTitle": "Eingefügter Inhalt",
+      "save": "Speichern",
+      "cancel": "Abbrechen"
+    }
   },
   "chatMessage": {
     "again": "Nochmal",
@@ -1383,6 +1395,7 @@
       "text2sound": "Audio",
       "document_generation": "Dokument",
       "document_export": "PDF-Export",
+      "document_combine": "Zusammengeführtes PDF",
       "calendar_event": "Kalendereinladung",
       "email_me": "E-Mail-Versand",
       "save_to_folder": "Im Ordner speichern"

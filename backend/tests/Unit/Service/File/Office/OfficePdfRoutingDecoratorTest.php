@@ -68,7 +68,8 @@ PROMPT;
         self::assertStringContainsString('Creating a real PDF is supported', $out);
         // #1691: an existing file becomes a PDF through document_export, never by re-authoring it.
         self::assertStringContainsString('single `document_export` node — NOT extract_text + document_generation', $out);
-        self::assertStringContainsString('document_generation, document_export, calendar_event), surfaced through `compose_reply`.', $out);
+        self::assertStringContainsString('document_generation, document_export, document_combine, calendar_event), surfaced through `compose_reply`.', $out);
+        self::assertStringContainsString('single `document_combine` node', $out);
         self::assertStringContainsString('Office document (XLSX, DOCX, PPTX, CSV, PDF)', $out);
         self::assertStringNotContainsString('e.g. a real', $out);
         self::assertStringContainsString('OFFICE_PDF_ROUTING', $out);

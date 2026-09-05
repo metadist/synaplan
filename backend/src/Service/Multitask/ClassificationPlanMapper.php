@@ -87,6 +87,8 @@ final class ClassificationPlanMapper
         return match ($intent) {
             'file_analysis' => Capability::FileAnalysis,
             'document_generation' => Capability::DocumentGeneration,
+            'document_export' => Capability::DocumentExport,
+            'document_combine' => Capability::DocumentCombine,
             default => Capability::Chat,
         };
     }

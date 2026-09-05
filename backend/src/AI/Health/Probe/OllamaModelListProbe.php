@@ -19,8 +19,10 @@ use App\AI\Service\ProviderRegistry;
  */
 final readonly class OllamaModelListProbe implements ModelListProbeInterface
 {
-    public function __construct(private ProviderRegistry $registry)
-    {
+    public function __construct(
+        private ProviderRegistry $registry,
+        private string $baseUrl = '',
+    ) {
     }
 
     public function supports(string $service): bool
@@ -33,6 +35,13 @@ final readonly class OllamaModelListProbe implements ModelListProbeInterface
         $provider = $this->ollamaProvider();
         if (null === $provider) {
             return ProbeResult::skipped('Ollama is not registered in this installation.');
+        }
+
+        // Ollama is always registered as a provider, so an empty URL is the only
+        // signal that this install never enabled local AI (#1704). Name the
+        // variable — the operator reads this string in the model status list.
+        if ('' === trim($this->baseUrl)) {
+            return ProbeResult::skipped('OLLAMA_BASE_URL is not configured.');
         }
 
         try {

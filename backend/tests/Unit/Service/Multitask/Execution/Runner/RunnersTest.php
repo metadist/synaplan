@@ -429,6 +429,36 @@ final class RunnersTest extends TestCase
         self::assertFalse($result->isSuccessful());
     }
 
+    public function testText2SoundTruncatesLongTextBeforeSynthesize(): void
+    {
+        $longText = str_repeat('Word ', 1500);
+
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade
+            ->expects(self::once())
+            ->method('synthesize')
+            ->with(
+                self::callback(static function (string $text): bool {
+                    return mb_strlen($text) <= \App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS;
+                }),
+                self::anything(),
+                self::anything(),
+            )
+            ->willReturn([
+                'relativePath' => '1/000/2026/06/tts_x.mp3',
+                'provider' => 'openai',
+                'model' => 'tts-1',
+            ]);
+
+        $runner = new Text2SoundRunner($aiFacade, $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n3', Capability::Text2Sound, ['n2'], ['text' => $longText], ['format' => 'mp3']);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertLessThanOrEqual(\App\Service\TtsTextSanitizer::MAX_SYNTHESIS_CHARS, mb_strlen((string) $result->files[0]['source_text']));
+    }
+
     public function testMediaGenerationRunnerProducesImageFile(): void
     {
         $handler = $this->createMock(MediaGenerationHandler::class);

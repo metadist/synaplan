@@ -53,6 +53,22 @@ final class DocumentCombineServiceTest extends TestCase
         }
     }
 
+    public function testResolvedDisplayNameUsesFirstSourceStemWhenFilenameMissing(): void
+    {
+        $xlsx = $this->file(1, 'Finanzmodell_Pro_Forma_Forecast.xlsx', 'xlsx');
+        $pdf = $this->file(2, 'Finanzmodell_Pro_Forma_Forecast.pdf', 'pdf');
+
+        self::assertSame(
+            'Finanzmodell_Pro_Forma_Forecast_combined.pdf',
+            DocumentCombineService::resolvedDisplayName(null, [$xlsx, $pdf]),
+        );
+        self::assertSame(
+            'Quarterly_Report.pdf',
+            DocumentCombineService::resolvedDisplayName('Quarterly_Report.pdf', [$xlsx, $pdf]),
+        );
+        self::assertSame('combined.pdf', DocumentCombineService::resolvedDisplayName(null, []));
+    }
+
     public function testRejectsUnsupportedTypes(): void
     {
         $png = $this->file(1, 'pic.png', 'png');

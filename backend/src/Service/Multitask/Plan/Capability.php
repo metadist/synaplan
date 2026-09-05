@@ -71,6 +71,13 @@ enum Capability: string
      */
     case DocumentExport = 'document_export';
 
+    /**
+     * Merge two or more office/PDF files that already exist in the conversation
+     * into one PDF (DocumentCombineService, no model) — the same merge as the
+     * file chip's Combine action (#1694).
+     */
+    case DocumentCombine = 'document_combine';
+
     /** Calendar event / meeting invite as a downloadable .ics file (CalendarEventService, no model). */
     case CalendarEvent = 'calendar_event';
 
@@ -104,7 +111,7 @@ enum Capability: string
             self::ImageGeneration => 'image',
             self::VideoGeneration => 'video',
             self::Text2Sound => 'audio',
-            self::DocumentGeneration, self::DocumentExport => 'document',
+            self::DocumentGeneration, self::DocumentExport, self::DocumentCombine => 'document',
             self::CalendarEvent => 'document',
             self::EmailMe => 'email',
             self::SaveToFolder => 'folder',

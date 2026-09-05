@@ -812,6 +812,8 @@
       "notSupported": "Sesli giriş burada kullanılamıyor.",
       "unknown": "Mikrofon başlatılamadı. Lütfen tekrar dene."
     },
+    "dictationUnavailable": "Sesli dikte bu sunucuda kullanılamıyor.",
+    "cameraUnavailable": "Kamera açılamadı. Fotoğrafı yine + menüsünden ekleyebilirsin.",
     "dropFiles": "Dosyaları buraya bırakın",
     "dropFilesHint": "Resimler, belgeler, ses dosyaları...",
     "filesPasted": "{count} dosya yapıştırıldı",
@@ -845,7 +847,17 @@
     "modelDropdown": {
       "default": "Standart"
     },
-    "removeTool": "Aracı kaldır"
+    "removeTool": "Aracı kaldır",
+    "pastedText": {
+      "label": "Yapıştırıldı",
+      "title": "Yapıştırılan metin",
+      "remove": "Yapıştırılan metni kaldır",
+      "open": "Yapıştırılan metni aç",
+      "meta": "{lines} satır · {chars} karakter",
+      "modalTitle": "Yapıştırılan içerik",
+      "save": "Kaydet",
+      "cancel": "İptal"
+    }
   },
   "chatMessage": {
     "again": "Tekrar",
@@ -1865,6 +1877,7 @@
       "text2sound": "Ses",
       "document_generation": "Belge",
       "document_export": "PDF dışa aktarma",
+      "document_combine": "Birleştirilmiş PDF",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi",
       "save_to_folder": "Klasöre kaydet"

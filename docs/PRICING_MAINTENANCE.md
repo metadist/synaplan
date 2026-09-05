@@ -208,7 +208,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 **Known deviations and limits — read before "fixing" a number:**
 
 - **LiteLLM reports a $0.50/1M cache-read price for `xai/grok-4.5`; the official xAI docs say $0.30.** We follow the official value. The sync only rewrites `cache_read_price_per_1M` when the input/output price itself drifts, so our value stays put — do not "correct" it toward LiteLLM. (`grok-4.6` is different: there the official cache-read price really is $0.50, so catalog and LiteLLM agree.)
-- **Cached tokens are not doubled in the long-context tier.** `CONTEXT_PRICING` overrides only `price_in`/`price_out`, so above 200k prompt tokens cache reads are billed at the base rate ($0.30 on `grok-4.5` instead of xAI's $0.60, $0.50 on `grok-4.6` instead of $1.00) — a small undercharge. Extending `CONTEXT_PRICING` with a `cache_price_above` key would be a small follow-up.
+- **Cached tokens ARE doubled in the long-context tier** (fixed 2026-09-04). `CONTEXT_PRICING` used to override only `price_in`/`price_out`, so above 200k prompt tokens cache reads stayed at the base rate ($0.30 on `grok-4.5` instead of xAI's $0.60) — a small undercharge. The `cache_price_in_above` key now carries the tiered rate.
 - **No pic2pic / image editing and no video editing or extension.** xAI bills input media separately ($0.002 per input image, $0.01 per input video second) and the `per_image` cost path pins `inputQuantity` to 0, so those inputs could not be attributed. `XaiProvider::editImage()` and `createVariations()` therefore throw. As long as only `text2pic` and `text2vid` are offered, billing is exact.
 - **Read the Imagine table in the rendered page, never the "View as Markdown" export.** The markdown/plain-text view flattens the multi-row Imagine table and keeps only the FIRST resolution row, so `grok-imagine-video` looks like a flat `$0.050 / sec` and the 720p rate silently disappears. The `.../models/grok-imagine-video` page shows the same collapsed number. Trusting that export once already produced a 40% undercharge on the default 720p render. The rendered [pricing page](https://docs.x.ai/developers/pricing) is the only reliable source for media rows.
 - **1080p is not a `grok-imagine-video` resolution.** Only `grok-imagine-video-1.5` (BID 319) offers it, which is why BID 317 caps `allowed_resolutions` at 480p/720p. `XaiProvider::resolutionFromOptions()` additionally intersects the request with the keys of `resolution_prices`, so a row that prices only 480p/720p can never render an unpriced tier even if its `allowed_resolutions` are missing. A row without `resolution_prices` bills every tier at `priceOut`, so there the requested resolution is honoured as-is.
@@ -462,17 +462,33 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 ## Long-context tiers — #1319
 
-Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro above 200k, GPT-5.x above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches both input and output to the above rate when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
+Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 2.5/3.1 Pro and Grok above 200k, GPT-5.x / GPT-6 above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches input, output **and the cached-input rate** to the above values when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
-| Model | Threshold | Base in/out (per 1M) | Above in/out (per 1M) |
-| ----- | --------- | -------------------- | --------------------- |
-| gpt-5.4 | 272k | 2.50 / 15 | 5.00 / 22.50 |
-| gpt-5.6-terra | 272k | 2.00 / 12 | 4.00 / 18 |
-| gpt-5.5 / gpt-5.6-sol | 272k | 5.00 / 30 | 10.00 / 45 |
-| gpt-5.5-pro | 272k | 30 / 180 | 60 / 270 |
-| gpt-5.6-luna | 272k | 0.20 / 1.20 | 0.40 / 1.80 |
-| gemini-2.5-pro | 200k | 1.25 / 10 | 2.50 / 15 |
-| gemini-3.1-pro-preview | 200k | 2.00 / 12 | 4.00 / 18 |
+The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that, and also that no tiered model omits its cache rate. `gpt-5.5-pro` is the one model OpenAI sells **without** a cached-input discount; it still states a cache rate, equal to its plain input rate (30 / 60), because an omitted rate would fall through to the 50% default discount and halve the bill.
+
+| Model | Threshold | Base in/out (cache) | Above in/out (cache) |
+| ----- | --------- | ------------------- | -------------------- |
+| gpt-5.4 | 272k | 2.50 / 15 (0.25) | 5.00 / 22.50 (0.50) |
+| gpt-5.6-terra | 272k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
+| gpt-5.5 | 272k | 5.00 / 30 (0.50) | 10.00 / 45 (1.00) |
+| gpt-5.6-sol | 272k | 4.00 / 20 (0.40) | 8.00 / 30 (0.80) |
+| gpt-5.5-pro | 272k | 30 / 180 (30 — no discount) | 60 / 270 (60) |
+| gpt-5.6-luna | 272k | 0.20 / 1.20 (0.02) | 0.40 / 1.80 (0.04) |
+| gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
+| gemini-2.5-pro | 200k | 1.25 / 10 (0.125) | 2.50 / 15 (0.25) |
+| gemini-3.1-pro-preview | 200k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
+| grok-4.5 | 200k | 2.00 / 6.00 (0.30) | 4.00 / 12.00 (0.60) |
+| grok-4.6 | 200k | 2.00 / 6.00 (0.50) | 4.00 / 12.00 (1.00) |
+
+## Prompt-cache mechanics — read before touching a cache rate
+
+Cache billing has three independent knobs, and getting any of them wrong is invisible in normal testing because a cache hit needs a repeated prefix:
+
+1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount (`gpt-5.5-pro`) gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
+2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6. Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
+3. **Long-context cache rate** — `cache_price_in_above` in `CONTEXT_PRICING`, see the table above.
+
+The provider must also report the token counts, and the field names differ: OpenAI's Responses API returns `usage.input_tokens_details.cached_tokens` and `…cache_write_tokens`, Chat Completions uses `prompt_tokens_details`, Anthropic uses `cache_read_input_tokens` / `cache_creation_input_tokens`. The internal pipeline normalises all of them to `cached_tokens` / `cache_creation_tokens` — so an internal key that *looks* right can still be reading a provider key that never exists. `OpenAIProvider` did exactly that (`cache_creation_tokens` instead of `cache_write_tokens`), which kept written tokens at 0 and billed them as ordinary input. When adding a provider, verify the key against the provider's own cost-calculation example, not against our internal name.
 
 > The `claude-sonnet-4-5` tier was dropped together with that model's catalog rows (retired 2026-07-27, see `Version20260727120000`). No current Claude model has a long-context tier — the 5-series bills one flat rate across its 1M window.
 
@@ -484,6 +500,8 @@ Some providers charge a higher per-token rate for the **whole request** once the
 - Idempotent: fixed value UPDATEs / `JSON_SET` re-run to the same result; a `providerId` change guards on the old `BPROVID` so a re-run is a no-op.
 - Never touch operator-owned columns (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`, `BSHOWWHENFREE`).
 - Migrations do **not** write `BMODEL_PRICE_HISTORY`; `BMODELS` is the effective price source (history is time-bounded and typically absent), matching every prior price migration.
+- **A migration that force-updates a catalog-owned column MUST refresh `BJSON.__catalog_fingerprint` too.** This is the trap that cost us Sol: `Version20260830190000` rolled out the 2026-08-21 price cut with a bare `UPDATE BMODELS SET BPRICEIN/BPRICEOUT`, leaving the stored fingerprint describing the old 5/30 row. `ModelSeeder` recomputes the fingerprint from the row it reads, sees `stored !== recomputed`, and classifies the row as an operator edit — so BIDs 251/252 were **preserved out of every catalog update for the next two weeks**, and this release's cache rates would have skipped them as well (`Version20260904120000` repairs it). A force-update that "wins" once but freezes the row forever is worse than no migration at all. Write the full row with a matching fingerprint instead, following `Version20260819080000` / `Version20260904120000`: a frozen local copy of `ModelCatalog::fingerprint()` plus the exact catalog snapshot, json key order included, since the hash covers the encoded payload.
+- After writing one, verify the row is genuinely back under catalog management: `make -C backend migrate && make -C backend seed` must report `preserved=0` for `models`. A non-zero count names rows that will silently ignore every future price change.
 
 This PR's corrections are rolled out by `Version20260713190000` (per-token reprices, Kimi DeepInfra pin, TheHive rates, Veo 3.1 Fast, gpt-image quality tiers, Whisper/Voxtral per-second).
 

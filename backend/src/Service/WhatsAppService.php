@@ -1324,23 +1324,22 @@ final class WhatsAppService
      */
     private function generateTtsResponse(string $text, int $userId, string $language = 'en'): ?array
     {
-        // Sanitize: strip [Memory:ID], markdown, code blocks, <think> tags
-        $text = TtsTextSanitizer::sanitize($text);
-
-        // Limit text length for TTS (max ~4000 chars for most providers)
-        $maxLength = 4000;
-        if (strlen($text) > $maxLength) {
-            $text = substr($text, 0, $maxLength - 3).'...';
+        // Compare against the SANITIZED length: stripping markdown shortens
+        // almost every answer, so measuring against the raw text would log a
+        // truncation on each one.
+        $speakable = TtsTextSanitizer::sanitize($text);
+        $text = TtsTextSanitizer::truncateForSynthesis($speakable);
+        if (mb_strlen($text) < mb_strlen($speakable)) {
             $this->logger->info('WhatsApp: TTS text truncated', [
-                'original_length' => strlen($text),
-                'max_length' => $maxLength,
+                'original_length' => mb_strlen($speakable),
+                'max_length' => TtsTextSanitizer::MAX_SYNTHESIS_CHARS,
             ]);
         }
 
         try {
             $this->logger->info('WhatsApp: Generating TTS response', [
                 'user_id' => $userId,
-                'text_length' => strlen($text),
+                'text_length' => mb_strlen($text),
                 'language' => $language,
             ]);
 

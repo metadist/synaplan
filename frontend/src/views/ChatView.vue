@@ -525,6 +525,7 @@ import { generatePartId, pushMediaPart, extractMediaParts } from '@/utils/mediaP
 import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
+import { stripPastedBlocks } from '@/utils/pastedContent'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
@@ -535,6 +536,7 @@ import {
   parseMediaJobPayload,
   applyMediaJobUpdateToMessage,
   mapApiMessageRow,
+  parseContentWithThinking,
   IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -564,6 +566,13 @@ import GuestHintPopover from '@/components/guest/GuestHintPopover.vue'
 import SubscriptionPaywallModal from '@/components/subscription/SubscriptionPaywallModal.vue'
 import { paywallReasonForLimit, usePaywallPrompt } from '@/composables/usePaywallPrompt'
 import { hasPendingIapRedemption } from '@/services/nativeIap'
+import { isNativeApp } from '@/services/api/nativeRuntime'
+import {
+  consumePendingShortcut,
+  onShortcutAction,
+  type ShortcutActionName,
+} from '@/services/api/nativeShortcuts'
+import { captureNativePhoto, isNativeCameraAvailable } from '@/services/api/nativeCamera'
 import { usePromoTips } from '@/composables/usePromoTips'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -775,6 +784,78 @@ function handleGuestFeatureGate(key: string) {
   featureGateOpen.value = true
 }
 
+// MOBILE-APP SEAM: iOS App Shortcuts land here after the native bootstrap
+// pulls (cold start) or pushes (warm start) the pending action. `open` is a
+// no-op — the app is already visible. Photos are attached, never auto-sent.
+let stopShortcutListen: (() => void) | null = null
+const handledShortcutTokens = new Set<string>()
+// The composer is `v-if`-gated behind provider setup, so a shortcut can arrive
+// before it exists. The action is parked here and run by the watcher below
+// once the composer is mounted, instead of polling for the ref: dictation and
+// the camera are useless without an input to hand their result to, and a
+// captured photo with nowhere to go would be silently discarded.
+const queuedShortcut = ref<Exclude<ShortcutActionName, 'open'> | null>(null)
+
+async function runNativeShortcut(
+  input: InstanceType<typeof ChatInput>,
+  action: Exclude<ShortcutActionName, 'open'>
+): Promise<void> {
+  if ('dictate' === action) {
+    await input.startDictation()
+    return
+  }
+  if (isGuestMode.value) {
+    handleGuestFeatureGate('attach')
+    return
+  }
+  if (!isNativeCameraAvailable()) {
+    showErrorToast(t('chatInput.cameraUnavailable'))
+    return
+  }
+  const file = await captureNativePhoto()
+  if (file) {
+    await chatInputRef.value?.uploadFiles([file])
+  }
+}
+
+function handleNativeShortcut(action: ShortcutActionName, token: string): void {
+  if (token && handledShortcutTokens.has(token)) {
+    return
+  }
+  if (token) {
+    handledShortcutTokens.add(token)
+  }
+  if ('open' !== action) {
+    queuedShortcut.value = action
+  }
+}
+
+watch(
+  [chatInputRef, queuedShortcut],
+  ([input, action]) => {
+    if (!input || !action) {
+      return
+    }
+    queuedShortcut.value = null
+    void runNativeShortcut(input, action)
+  },
+  { flush: 'post' }
+)
+
+function initChatShortcuts(): void {
+  if (!isNativeApp()) {
+    return
+  }
+  stopShortcutListen = onShortcutAction((payload) => {
+    handleNativeShortcut(payload.action, payload.token)
+  })
+  void consumePendingShortcut().then((pending) => {
+    if (pending) {
+      handleNativeShortcut(pending.action, pending.token)
+    }
+  })
+}
+
 function handleExamplePick(prompt: string) {
   chatInputRef.value?.submitText(prompt)
 }
@@ -901,6 +982,7 @@ const isStreaming = computed(() => {
 
 // Init on mount
 onMounted(async () => {
+  initChatShortcuts()
   // Subscribe to the per-user realtime channel so finished renders resolve
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
@@ -1232,6 +1314,10 @@ onBeforeUnmount(() => {
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
   window.removeEventListener('open-message-reference', handleOpenMessageReferenceEvent)
+  if (stopShortcutListen) {
+    stopShortcutListen()
+    stopShortcutListen = null
+  }
   window.removeEventListener('focus', prefetchSseToken)
   document.removeEventListener('visibilitychange', handleVisibilityChangeForToken)
   clearDeleteDialogTimer()
@@ -2153,7 +2239,7 @@ const handleSendMessage = async (
   let backendContent = backendMessage
 
   if (messageToSend.startsWith('/')) {
-    const commandMatch = messageToSend.match(/^\/(\w+)\s+(.*)$/)
+    const commandMatch = messageToSend.match(/^\/(\w+)\s+([\s\S]*)$/)
     if (commandMatch) {
       const cmd = commandMatch[1]
       const args = commandMatch[2] || ''
@@ -2186,9 +2272,10 @@ const handleSendMessage = async (
   // badge). Without this the only visible artifact of a voice upload was
   // the transcribed text — there was no way to replay the original
   // recording from the web chat.
-  const optimisticParts: import('@/stores/history').Part[] = [
-    { type: 'text', content: displayContent },
-  ]
+  const optimisticParts: import('@/stores/history').Part[] = parseContentWithThinking(
+    displayContent,
+    'user'
+  )
   if (files && files.length > 0) {
     for (const file of files) {
       if (!isAudioFileType(file.fileType, file.fileMime)) continue
@@ -2223,7 +2310,7 @@ const handleSendMessage = async (
   // Mirrors the backend preview format (30 chars + ellipsis).
   // Incognito: the turn belongs to no chat — never touch the sidebar.
   if (chatsStore.activeChatId && !incognitoStore.active) {
-    const previewSource = displayContent.trim()
+    const previewSource = stripPastedBlocks(displayContent).trim()
     const preview =
       previewSource.length > 30 ? previewSource.slice(0, 30) + '…' : previewSource || undefined
     chatsStore.bumpChatActivity(chatsStore.activeChatId, {

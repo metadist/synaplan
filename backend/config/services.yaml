@@ -470,6 +470,13 @@ services:
             $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
             $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
 
+    # Ollama is always registered as a provider; an empty URL means the
+    # Cloud-AI profile never enabled local AI — that is Unconfigured, not
+    # an outage (#1704).
+    App\AI\Health\Probe\OllamaModelListProbe:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
     App\AI\Health\Probe\ModelListProbeRegistry:
         arguments:
             $probes: !tagged_iterator app.model_list_probe

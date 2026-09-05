@@ -56,6 +56,7 @@ final readonly class TaskPlanExecutor
     private const DAG_ONLY_CAPABILITIES = [
         Capability::CalendarEvent,
         Capability::DocumentExport,
+        Capability::DocumentCombine,
         Capability::UrlFetch,
         Capability::McpFetch,
         Capability::EmailSearch,
@@ -140,11 +141,13 @@ final readonly class TaskPlanExecutor
             // "step failed" box sitting above a correct reply.
             $this->discardPlan($progressCallback);
 
+            $fallbackClassification = $this->legacyFallbackClassification($classification);
+
             return $this->withPlanningUsage(
                 $this->runSingleNode(
-                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
+                    fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($fallbackClassification), $streamCallback, $progressCallback, $options),
                     $message,
-                    $classification,
+                    $fallbackClassification,
                 ),
                 $plan,
             );
@@ -198,11 +201,13 @@ final readonly class TaskPlanExecutor
         if ($assembled['all_failed']) {
             $this->discardPlan($progressCallback);
 
+            $fallbackClassification = $this->legacyFallbackClassification($classification);
+
             return $this->withPlanningUsage(
                 $this->runSingleNode(
-                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
+                    fn () => $this->router->route($message, $thread, $this->effectiveClassification($fallbackClassification), $progressCallback, $options),
                     $message,
-                    $classification,
+                    $fallbackClassification,
                 ),
                 $plan,
             );
@@ -230,6 +235,48 @@ final readonly class TaskPlanExecutor
         }
 
         return !in_array($plan->nodes[0]->capability, self::DAG_ONLY_CAPABILITIES, true);
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function isDeterministicDocumentFileIntent(array $classification): bool
+    {
+        $intent = $classification['intent'] ?? null;
+        $source = $classification['source'] ?? null;
+
+        return in_array($intent, ['document_combine', 'document_export'], true)
+            && is_string($source)
+            && str_starts_with($source, 'attachment_');
+    }
+
+    /**
+     * Classification the legacy router should run on after a DAG produced
+     * nothing.
+     *
+     * The deterministic merge/export intents (#1694 / #1691) have no legacy
+     * handler — `InferenceRouter::getHandler()` falls through to `chat`, which
+     * would answer a failed merge (no office engine, missing `pdfunite`, a file
+     * that vanished) with a chat turn that happily CLAIMS the PDF exists: the
+     * exact symptom #1694 was about. Hand the router the attachment
+     * classification these turns had before the merge route existed, so the
+     * user gets a real answer about the attached files instead.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function legacyFallbackClassification(array $classification): array
+    {
+        if (!$this->isDeterministicDocumentFileIntent($classification)) {
+            return $classification;
+        }
+
+        return array_merge($classification, [
+            'topic' => 'analyzefile',
+            'intent' => 'file_analysis',
+            'source' => 'attachment_document_or_audio',
+        ]);
     }
 
     /**
@@ -262,7 +309,9 @@ final readonly class TaskPlanExecutor
         //     about the steps. A single-intent instruction still collapses to a
         //     one-node plan → legacy path, identical to a normal chat turn.
         $source = $classification['source'] ?? null;
-        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)) {
+        $deterministicFileIntent = $this->isDeterministicDocumentFileIntent($classification);
+        if (!in_array($source, ['ai_sorting', 'attachment_document_or_audio', 'saved_task'], true)
+            && !$deterministicFileIntent) {
             return null;
         }
 
@@ -273,6 +322,13 @@ final readonly class TaskPlanExecutor
         // (planning-doc §3.4 invariant).
         if (!empty($classification['is_widget_mode'])) {
             return null;
+        }
+
+        // Attachment merge/export (#1694 / #1691): the classifier already
+        // decided. Do not send these to the planner or the analyzefile legacy
+        // router — neither produces a real PDF.
+        if ($deterministicFileIntent) {
+            return new TaskPlanResult($this->mapper->toSingleNodePlan($classification), fallback: false);
         }
 
         $authored = $this->authoredSavedTaskPlan($message, $classification);

@@ -776,6 +776,8 @@
       "notSupported": "Voice input is not available here.",
       "unknown": "The microphone could not be started. Please try again."
     },
+    "dictationUnavailable": "Voice dictation is not available on this server.",
+    "cameraUnavailable": "The camera could not be opened. You can still attach a photo from the + menu.",
     "dropFiles": "Drop files here",
     "dropFilesHint": "Images, documents, audio files...",
     "filesPasted": "{count} file pasted | {count} files pasted",
@@ -809,7 +811,17 @@
     "modelDropdown": {
       "default": "Default"
     },
-    "removeTool": "Remove tool"
+    "removeTool": "Remove tool",
+    "pastedText": {
+      "label": "Pasted",
+      "title": "Pasted text",
+      "remove": "Remove pasted text",
+      "open": "Open pasted text",
+      "meta": "{lines} lines · {chars} characters",
+      "modalTitle": "Pasted content",
+      "save": "Save",
+      "cancel": "Cancel"
+    }
   },
   "chatMessage": {
     "again": "Again",
@@ -4233,6 +4245,7 @@
       "text2sound": "Audio",
       "document_generation": "Document",
       "document_export": "PDF export",
+      "document_combine": "Combined PDF",
       "calendar_event": "Calendar invite",
       "email_me": "Email result",
       "save_to_folder": "Save to folder"

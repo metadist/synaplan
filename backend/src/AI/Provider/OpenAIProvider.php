@@ -26,6 +26,35 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 {
     private const DEFAULT_MAX_TOKENS = 4096;
 
+    /**
+     * Accepted `reasoning.effort` tiers per model family, cheapest tier first.
+     *
+     * OpenAI renames and extends this vocabulary with almost every family and
+     * answers an unknown tier with HTTP 400 ("Unsupported value: 'X' is not
+     * supported with the 'Y' model"), so it has to be looked up per model
+     * rather than guessed. Verified against the model reference on 2026-09-04
+     * (https://developers.openai.com/api/docs/models).
+     *
+     * The first match wins, so more specific prefixes must come first —
+     * `gpt-5.5-pro` accepts a narrower set than `gpt-5.5`, and every `gpt-5.x`
+     * entry must precede the bare `gpt-5` fallback.
+     *
+     * @var array<string, list<string>>
+     */
+    private const REASONING_EFFORT_TIERS = [
+        'gpt-6' => ['low', 'medium', 'high', 'xhigh', 'max'],
+        'gpt-5.6' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+        // Pro reasons hard by design: no skip tier, default 'high'.
+        'gpt-5.5-pro' => ['medium', 'high', 'xhigh'],
+        'gpt-5.5' => ['none', 'low', 'medium', 'high', 'xhigh'],
+        'gpt-5.4' => ['none', 'low', 'medium', 'high', 'xhigh'],
+        // gpt-5 … gpt-5.3 still use the original 'minimal' skip tier.
+        'gpt-5' => ['minimal', 'low', 'medium', 'high'],
+    ];
+
+    /** o-series (o1/o3/o4) and anything unknown: no skip tier, no xhigh. */
+    private const REASONING_EFFORT_TIERS_FALLBACK = ['low', 'medium', 'high'];
+
     private ?OpenAI\Client $client = null;
 
     /** Key the cached client was built with (rebuild on key change). */
@@ -182,12 +211,12 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $modelData = $modelInfo->toArray();
             $capabilities = is_array($modelData['capabilities'] ?? null) ? $modelData['capabilities'] : [];
 
-            // Check if model has reasoning capabilities or is o-series/gpt-5
-            // Reasoning models (o1, o3, gpt-5) use max_completion_tokens
+            // Check if model has reasoning capabilities or is o-series/gpt-5+
+            // Reasoning models (o1, o3, gpt-5, gpt-6) use max_completion_tokens
             $isReasoningModel = isset($capabilities['reasoning'])
                                || str_starts_with($model, 'o1')
                                || str_starts_with($model, 'o3')
-                               || str_starts_with($model, 'gpt-5');
+                               || $this->isGptReasoningFamily($model);
 
             $this->modelCapabilities[$model] = $isReasoningModel;
 
@@ -199,10 +228,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'error' => $e->getMessage(),
             ]);
 
-            // Heuristic: o-series and gpt-5 models use max_completion_tokens
+            // Heuristic: o-series and gpt-5+ models use max_completion_tokens
             $usesCompletionTokens = str_starts_with($model, 'o1')
                                    || str_starts_with($model, 'o3')
-                                   || str_starts_with($model, 'gpt-5');
+                                   || $this->isGptReasoningFamily($model);
 
             $this->modelCapabilities[$model] = $usesCompletionTokens;
 
@@ -448,12 +477,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * "default chat = no thinking, near-instant TTFT" behaviour is identical
      * across providers. The headline Phase 1e win on Gemini Pro
      * (`thinkingBudget=0` for default chat) translates to OpenAI as the
-     * model family's lowest reasoning tier — `'none'` on gpt-5.5+, `'minimal'`
-     * on the original gpt-5, `'low'` on the o-series. Without this, the model
-     * falls back to OpenAI's server-side default of `medium` and burns 1-3 s
-     * of chain-of-thought before emitting the first visible token, even on a
-     * "Hi, how are you?" style chat where the user did not enable the
-     * Thinking toggle.
+     * model family's lowest reasoning tier (see self::REASONING_EFFORT_TIERS).
+     * Without this, the model falls back to OpenAI's server-side default of `medium` and
+     * burns 1-3 s of chain-of-thought before emitting the first visible token,
+     * even on a "Hi, how are you?" style chat where the user did not enable
+     * the Thinking toggle.
      *
      * Resolution order:
      *
@@ -470,8 +498,8 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      *    callers that pass empty options, e.g. unit tests).
      *
      * `summary => 'auto'` is included only when the resolved effort is
-     * `medium`, `high` or `xhigh` — that's where chain-of-thought is long
-     * enough for the SSE reasoning-summary stream to be useful.
+     * `medium`, `high`, `xhigh` or `max` — that's where chain-of-thought is
+     * long enough for the SSE reasoning-summary stream to be useful.
      *
      * @param array<string, mixed> $options
      *
@@ -500,20 +528,20 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return null;
         }
 
-        $lowestTier = $this->lowestEffortTier($model);
-        $supportsXHigh = $this->modelSupportsXHighEffort($model);
-
         $resolvedEffort = match ($effort) {
             // 'lowest' is our internal sentinel for "lowest tier this model
             // accepts" (= the Phase 1e fast-default path). 'minimal' / 'none'
             // / 'off' / 'disabled' all map to the same intent: skip reasoning.
-            'lowest', 'off', 'none', 'disabled', 'minimal' => $lowestTier,
-            'low' => 'low',
+            'lowest', 'off', 'none', 'disabled', 'minimal' => $this->lowestEffortTier($model),
+            // 'low' is absent on gpt-5.5-pro, so even this needs clamping.
+            'low' => $this->clampEffort($model, ['low', 'medium']),
             'medium' => 'medium',
             'high' => 'high',
-            // gpt-5.5+ exposes an 'xhigh' tier above 'high'. On older models
-            // it isn't accepted — clamp down to 'high' to avoid an HTTP 400.
-            'xhigh', 'extra-high', 'extreme' => $supportsXHigh ? 'xhigh' : 'high',
+            // Most of the gpt-5.x line and gpt-6 expose 'xhigh' above 'high';
+            // the original gpt-5 and the o-series cap at 'high'.
+            'xhigh', 'extra-high', 'extreme' => $this->clampEffort($model, ['xhigh', 'high']),
+            // gpt-5.6 and gpt-6 add 'max' above 'xhigh'.
+            'max', 'maximum' => $this->clampEffort($model, ['max', 'xhigh', 'high']),
             default => null,
         };
 
@@ -523,7 +551,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
         $config = ['effort' => $resolvedEffort];
 
-        if (in_array($resolvedEffort, ['medium', 'high', 'xhigh'], true)) {
+        if (in_array($resolvedEffort, ['medium', 'high', 'xhigh', 'max'], true)) {
             $config['summary'] = 'auto';
         }
 
@@ -531,40 +559,61 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     }
 
     /**
-     * Lowest `reasoning.effort` tier the given model accepts.
+     * Tiers the given model accepts, cheapest first.
      *
-     * The Responses-API vocabulary is per family:
-     *
-     * - `gpt-5.5*` (gpt-5.5, gpt-5.5-pro, …): `none`, `low`, `medium`, `high`,
-     *   `xhigh`. Skip-reasoning tier is `none`. (Sending `minimal` here
-     *   returns HTTP 400 with "Unsupported value: 'minimal' is not supported
-     *   with the 'gpt-5.5' model".)
-     * - `gpt-5` (original): `minimal`, `low`, `medium`, `high`. Skip tier is
-     *   `minimal`.
-     * - o-series (`o1`, `o3`, `o4`): `low`, `medium`, `high`. Skip tier is
-     *   `low` — these models don't accept `minimal`/`none`.
+     * @return list<string>
      */
-    private function lowestEffortTier(string $model): string
+    private function reasoningEffortTiers(string $model): array
     {
-        if (str_starts_with($model, 'gpt-5.5')) {
-            return 'none';
-        }
-        if (str_starts_with($model, 'gpt-5')) {
-            return 'minimal';
+        foreach (self::REASONING_EFFORT_TIERS as $prefix => $tiers) {
+            if (str_starts_with($model, $prefix)) {
+                return $tiers;
+            }
         }
 
-        return 'low';
+        return self::REASONING_EFFORT_TIERS_FALLBACK;
     }
 
     /**
-     * Whether the model accepts `reasoning.effort = 'xhigh'`.
-     *
-     * Currently only the `gpt-5.5` family. Original gpt-5 + o-series cap at
-     * `'high'` and reject `xhigh` with HTTP 400.
+     * Cheapest `reasoning.effort` tier the given model accepts — `'none'` on
+     * most of the gpt-5.x line, `'minimal'` on the original gpt-5, `'low'` on
+     * gpt-6 and the o-series, `'medium'` on gpt-5.5-pro.
      */
-    private function modelSupportsXHighEffort(string $model): bool
+    private function lowestEffortTier(string $model): string
     {
-        return str_starts_with($model, 'gpt-5.5');
+        return $this->reasoningEffortTiers($model)[0];
+    }
+
+    /**
+     * First tier from $preferences that the model accepts.
+     *
+     * Callers pass the requested tier followed by its cheaper fallbacks, so a
+     * cross-provider `'max'` clamps down on a family that caps lower instead of
+     * returning HTTP 400.
+     *
+     * @param list<string> $preferences requested tier first, then fallbacks
+     */
+    private function clampEffort(string $model, array $preferences): string
+    {
+        $supported = $this->reasoningEffortTiers($model);
+
+        foreach ($preferences as $tier) {
+            if (in_array($tier, $supported, true)) {
+                return $tier;
+            }
+        }
+
+        // Every family accepts 'high'.
+        return 'high';
+    }
+
+    /**
+     * GPT reasoning families that use the Responses API and
+     * `max_completion_tokens` (gpt-5, gpt-6, and later dated snapshots).
+     */
+    private function isGptReasoningFamily(string $model): bool
+    {
+        return str_starts_with($model, 'gpt-5') || str_starts_with($model, 'gpt-6');
     }
 
     /**
@@ -717,7 +766,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return false;
         }
 
-        foreach (['minimal', 'none', 'low', 'medium', 'high', 'xhigh'] as $tier) {
+        foreach (['minimal', 'none', 'low', 'medium', 'high', 'xhigh', 'max'] as $tier) {
             if (str_contains($message, "'".$tier."'")) {
                 return true;
             }
@@ -958,7 +1007,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             'completion_tokens' => $usage['output_tokens'] ?? 0,
             'total_tokens' => $usage['total_tokens'] ?? 0,
             'cached_tokens' => $usage['input_tokens_details']['cached_tokens'] ?? 0,
-            'cache_creation_tokens' => $usage['input_tokens_details']['cache_creation_tokens'] ?? 0,
+            // OpenAI reports cache writes as `cache_write_tokens`; the internal
+            // key keeps Anthropic's name. Reading the wrong key silently billed
+            // written tokens as ordinary input (1.0x instead of 1.25x).
+            'cache_creation_tokens' => $usage['input_tokens_details']['cache_write_tokens'] ?? 0,
         ];
     }
 

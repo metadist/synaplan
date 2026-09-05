@@ -11,6 +11,7 @@ use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
 use App\Service\File\FileTypeResolver;
+use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Routing\EmbeddingRouterConfig;
@@ -19,6 +20,7 @@ use App\Service\Message\Routing\NativeToolRoutingConfig;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\SelfAware\SelfAwareConfig;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -81,6 +83,7 @@ final readonly class MessageClassifier
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficeConverterClient $officeConverter = null,
         private ?DocumentToolsConfig $documentToolsConfig = null,
+        private ?MultitaskRoutingConfig $multitaskConfig = null,
     ) {
     }
 
@@ -259,6 +262,26 @@ final readonly class MessageClassifier
                     'language' => $message->getLanguage() ?: 'en',
                     'intent' => 'document_generation',
                     'source' => 'attachment_office_edit',
+                    'skip_sorting' => true,
+                ];
+            }
+            $combineRoute = $this->attachmentDocumentFileIntent($message);
+            if (null !== $combineRoute) {
+                $this->logger->info('MessageClassifier: Routing attachment merge/export to '.$combineRoute, [
+                    'message_id' => $messageId,
+                ]);
+
+                // BTOPIC stays inside the prompt-topic namespace: `officemaker`
+                // is the topic OFFICE_PDF_ROUTING already assigns to produce-a-PDF
+                // turns, it has a seeded BPROMPTS row, and the chat info popover
+                // links it to a real /ai/instructions entry. The capability is
+                // selected from `intent` + `source`, not from the topic
+                // ({@see TaskPlanExecutor::isDeterministicDocumentFileIntent()}).
+                return [
+                    'topic' => 'officemaker',
+                    'language' => $message->getLanguage() ?: 'en',
+                    'intent' => $combineRoute,
+                    'source' => 'attachment_'.$combineRoute,
                     'skip_sorting' => true,
                 ];
             }
@@ -731,14 +754,148 @@ final readonly class MessageClassifier
     }
 
     /**
-     * True if the message has at least one attached document, audio, or video
-     * file (i.e. an analyzable non-image attachment). Routes to
-     * FileAnalysisHandler so the ANALYZE default model is used (#595, video
-     * added in #983). Video is included because its audio track is transcribed
-     * to text the chat model can reason about (#722); without this gate a
-     * video-only message fell through to the AI sorter and was answered as a
-     * plain (text-less) chat.
+     * Explicit merge lexicon. Only verbs that mean "make ONE file out of
+     * several" — a bare "speichern"/"save" is NOT one of them (see
+     * {@see EXPORT_INTENT_PATTERN}).
      */
+    private const MERGE_INTENT_PATTERN = '/(?:'
+        .'\b(?:merge|combine|concatenate|zusammenführen|zusammenfügen|zusammenlegen|fusionner|combiner|combinar|fusionar|birleştir\w*)\b'
+        .'|'
+        .'\b(?:führe?|füge?|fügen)\b.{0,80}\bzusammen\b'
+        .')/iu';
+
+    /**
+     * Explicit "turn this INTO a PDF" lexicon. Every alternative pairs a
+     * conversion verb with the target format, so "speichere die PDFs im Ordner
+     * X" (a save_to_folder request) no longer reads as an export.
+     */
+    private const EXPORT_INTENT_PATTERN = '/(?:'
+        .'\b(?:export\w*|exportier\w*|convert\w*|konvertier\w*|umwandel\w*|wandle|exportar|convertir|convierte|enregistrer|dönüştür\w*)\b[^.!?]{0,40}\bpdfs?\b'
+        .'|'
+        .'\b(?:speicher\w*|save|guardar|guarda)\b\s*(?:\w+\s+){0,3}?\b(?:als|as|como|en|comme|olarak)\s+(?:eine[nmr]?\s+)?pdfs?\b'
+        .'|'
+        .'\b(?:als|as|hieraus|daraus)\s+(?:eine[nmr]?\s+)?pdfs?\b'
+        .')/iu';
+
+    /**
+     * "…into ONE pdf". Turns an otherwise ambiguous export phrasing ("mach aus
+     * beiden eine PDF") into a merge when several files are attached, while
+     * "convert both files to PDF" (two separate PDFs) stays with the planner.
+     */
+    private const SINGLE_PDF_TARGET_PATTERN = '/\b(?:one|single|a\s+single|eine[nmr]?|un|una|seule|tek|einzige[nsr]?)\s+(?:\w+\s+){0,2}?pdfs?\b/iu';
+
+    /**
+     * Capabilities that only the planner can deliver alongside a merge. When a
+     * message asks for one of them too ("merge both AND read it aloud"), the
+     * deterministic single-node route would silently drop it (#1192), so we let
+     * the planner see the whole turn instead.
+     */
+    private const COMPETING_INTENT_PATTERN = '/(?:'
+        .'\b(?:aloud|audio|mp3|podcast|voice|vorlesen|vorlies\w*|sprich|audiodatei|sprachnachricht|voz|voix|sesli)\b'
+        .'|\b(?:lies|liest)\b.{0,20}\bvor\b'
+        .'|\bread\b.{0,20}\b(?:aloud|out\s+loud)\b'
+        .'|\b(?:image|picture|photo|illustration|bild|grafik|imagen|foto|resim|görsel)\b'
+        .'|\b(?:e-?mail|mail\s+it|maile?|verschick\w*|correo|courriel|posta)\b'
+        .'|\b(?:folder|ordner|nextcloud|dropbox|carpeta|dossier|klasör)\b'
+        .'|\b(?:translate|translation|übersetz\w*|traduc\w*|traduir\w*|çevir\w*)\b'
+        .'|\b(?:summarize|summary|summarise|zusammenfassung|resum\w*|résum\w*|özetle\w*)\b'
+        .'|\bfasse?\b.{0,40}\bzusammen\b'
+        .')/iu';
+
+    /**
+     * Merge/export-as-PDF of attached office/PDF files must not be forced onto
+     * analyzefile (#1694). Two or more combine-eligible files plus an explicit
+     * merge prompt maps to `document_combine`. A single office file plus an
+     * export-as-PDF prompt maps to `document_export` (the #1691 conversion).
+     * Read or summarize prompts still return null and take analyzefile.
+     *
+     * Deliberately narrow: this route SKIPS the planner, so anything it claims
+     * is delivered by exactly one server-side node and every other intent in
+     * the same turn would be lost. Whenever the request is ambiguous or
+     * compound we return null and let the planner decide — it knows
+     * `document_combine` too (see {@see OfficePdfRoutingDecorator}).
+     */
+    private function attachmentDocumentFileIntent(Message $message): ?string
+    {
+        $text = trim((string) $message->getText());
+        if ('' === $text) {
+            return null;
+        }
+
+        $eligible = $this->combineEligibleAttachments($message);
+        if ([] === $eligible) {
+            return null;
+        }
+
+        // Neither capability exists without the multi-task engine: the legacy
+        // InferenceRouter has no handler for these intents and would answer
+        // with a plain chat turn that merely CLAIMS a PDF was produced.
+        if (null === $this->multitaskConfig || !$this->multitaskConfig->isRoutingEnabled($message->getUserId())) {
+            return null;
+        }
+
+        if (1 === preg_match(self::COMPETING_INTENT_PATTERN, $text)) {
+            return null;
+        }
+
+        $wantsMerge = 1 === preg_match(self::MERGE_INTENT_PATTERN, $text);
+        $wantsExport = 1 === preg_match(self::EXPORT_INTENT_PATTERN, $text);
+
+        if (count($eligible) >= 2) {
+            $wantsOnePdf = 1 === preg_match(self::SINGLE_PDF_TARGET_PATTERN, $text);
+
+            return ($wantsMerge || ($wantsExport && $wantsOnePdf)) && $this->officeEngineReadyFor($eligible)
+                ? 'document_combine'
+                : null;
+        }
+
+        if ($wantsExport && !$wantsMerge && DocumentThumbnailGenerator::isOffice(DocumentThumbnailGenerator::extensionOf($eligible[0]))) {
+            // Every single-file export runs through the converter, so without
+            // an office engine the node can only fail.
+            return $this->officeEngineReadyFor($eligible) ? 'document_export' : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether the office engine is available for the conversions these sources
+     * need. PDF-only merges never touch the converter; a single office source
+     * makes it mandatory ({@see DocumentCombineService} throws
+     * `engine_required` otherwise, and {@see DocumentExportRunner} hides its
+     * capability from the planner for the same reason).
+     *
+     * @param list<File> $sources
+     */
+    private function officeEngineReadyFor(array $sources): bool
+    {
+        $needsEngine = false;
+        foreach ($sources as $source) {
+            if (DocumentThumbnailGenerator::isOffice(DocumentThumbnailGenerator::extensionOf($source))) {
+                $needsEngine = true;
+                break;
+            }
+        }
+
+        return !$needsEngine || true === $this->officeConverter?->isEnabled();
+    }
+
+    /**
+     * @return list<File>
+     */
+    private function combineEligibleAttachments(Message $message): array
+    {
+        $eligible = [];
+        foreach ($message->getFiles() as $file) {
+            $ext = DocumentThumbnailGenerator::extensionOf($file);
+            if (DocumentThumbnailGenerator::isOffice($ext) || DocumentThumbnailGenerator::isPdf($ext)) {
+                $eligible[] = $file;
+            }
+        }
+
+        return $eligible;
+    }
+
     /**
      * When DOCUMENT_TOOLS.ALLOW_UPLOAD_EDIT is on, an office attachment plus
      * an edit-intent prompt goes to officemaker instead of analyzefile.

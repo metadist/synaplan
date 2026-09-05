@@ -25,9 +25,20 @@
          uses the full width; md+ keeps the roomier px-4. -->
     <div class="max-w-4xl mx-auto px-3 py-2 md:px-4 md:py-4">
       <!-- File and Quote Display (above input) -->
-      <div v-if="uploadedFiles.length > 0 || quote" class="mb-3 flex flex-wrap gap-2">
+      <div
+        v-if="uploadedFiles.length > 0 || quote || pastedBlocks.length > 0"
+        class="mb-3 flex flex-wrap gap-2 max-h-28 overflow-y-auto"
+      >
         <!-- Quoted reference chip -->
         <QuoteChip v-if="quote" :quote="quote" @remove="emit('clearQuote')" />
+
+        <PastedTextCard
+          v-for="block in pastedBlocks"
+          :key="block.id"
+          :content="block.content"
+          @open="openPastedBlock(block.id)"
+          @remove="removePastedBlock(block.id)"
+        />
 
         <!-- Uploaded Files -->
         <div
@@ -394,6 +405,13 @@
       @close="fileSelectionModalVisible = false"
       @select="handleFilesSelected"
     />
+
+    <PastedTextModal
+      :visible="editingPastedBlock !== null"
+      :content="editingPastedBlock?.content ?? ''"
+      @close="closePastedBlock"
+      @save="savePastedBlock"
+    />
   </div>
 </template>
 
@@ -416,6 +434,8 @@ import DesktopJobCard from './DesktopJobCard.vue'
 import ModelDropdown from './ModelDropdown.vue'
 import KnowledgeFolderPicker from './KnowledgeFolderPicker.vue'
 import FileSelectionModal from './FileSelectionModal.vue'
+import PastedTextCard from './chat/PastedTextCard.vue'
+import PastedTextModal from './chat/PastedTextModal.vue'
 import { parseCommand } from '../commands/parse'
 import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -431,7 +451,11 @@ import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechServ
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { useAutoPersist, useAttachmentPersist } from '@/composables/useInputPersistence'
+import {
+  useAutoPersist,
+  useAttachmentPersist,
+  usePastedBlocksPersist,
+} from '@/composables/useInputPersistence'
 import { useChatsStore } from '@/stores/chats'
 import { useAuthStore } from '@/stores/auth'
 import { useIncognitoStore } from '@/stores/incognito'
@@ -439,6 +463,12 @@ import { useDialog } from '@/composables/useDialog'
 import { desktopApi } from '@/services/api/desktopApi'
 import QuoteChip from './QuoteChip.vue'
 import type { QuotedReference } from '@/composables/useMessageQuoting'
+import {
+  createPastedBlockId,
+  shouldBecomeBlock,
+  wrapPastedBlocks,
+  type PastedTextBlock,
+} from '@/utils/pastedContent'
 
 interface UploadedFile {
   file_id: number
@@ -515,6 +545,8 @@ const message = ref('')
 const originalMessage = ref('')
 const enhancedMessage = ref('')
 const uploadedFiles = ref<UploadedFile[]>([])
+const pastedBlocks = ref<PastedTextBlock[]>([])
+const editingPastedBlockId = ref<string | null>(null)
 const uploading = ref(false)
 const uploadAbortController = ref<AbortController | null>(null)
 const enhanceEnabled = ref(false)
@@ -737,6 +769,17 @@ const { clearAttachments: clearPersistedAttachments } = useAttachmentPersist(
   computed(() => incognitoStore.active)
 )
 
+const { clearPastedBlocks: clearPersistedBlocks } = usePastedBlocksPersist(
+  pastedBlocks,
+  'chat',
+  computed(() => chatsStore.activeChatId),
+  computed(() => incognitoStore.active)
+)
+
+const editingPastedBlock = computed(
+  () => pastedBlocks.value.find((block) => block.id === editingPastedBlockId.value) ?? null
+)
+
 const emit = defineEmits<{
   send: [
     message: string,
@@ -760,25 +803,26 @@ const canSend = computed(() => {
   const trimmedMessage = message.value.trim()
   const hasMessage = trimmedMessage.length > 0
   const hasFiles = uploadedFiles.value.length > 0
+  const hasPastedBlocks = pastedBlocks.value.length > 0
   const filesReady = uploadedFiles.value.every((f) => !f.processing)
 
   // A tool badge (search/image/video) needs a query or description to act on,
   // so an active tool with an empty textarea (and no files) can't be sent.
-  if (activeTool.value && !hasMessage && !hasFiles) {
+  if (activeTool.value && !hasMessage && !hasFiles && !hasPastedBlocks) {
     return false
   }
 
   // Prevent sending if only a raw command is typed (e.g., just "/pic" without arguments).
   // Commands that take no arguments (e.g. /help) are sendable as-is.
   const isOnlyCommand = trimmedMessage.startsWith('/') && !trimmedMessage.includes(' ')
-  if (isOnlyCommand && !hasFiles) {
+  if (isOnlyCommand && !hasFiles && !hasPastedBlocks) {
     const cmd = commandsStore.getCommand(trimmedMessage.slice(1))
     if (!cmd || cmd.requiresArgs) {
       return false
     }
   }
 
-  return (hasMessage || hasFiles) && filesReady && !uploading.value
+  return (hasMessage || hasFiles || hasPastedBlocks) && filesReady && !uploading.value
 })
 
 const currentChatModel = computed(() => {
@@ -931,7 +975,7 @@ const sendMessage = () => {
   // ChatView/backend contract stays identical to the old slash-command flow.
   // The textarea only holds the query; ChatView strips the prefix for display
   // and uses the webSearch flag for /search (see handleSendMessage).
-  const query = message.value
+  const query = wrapPastedBlocks(message.value, pastedBlocks.value)
   let messageToSend = query
   if (activeTool.value === 'pic' || activeTool.value === 'vid') {
     messageToSend = `/${activeTool.value} ${query}`.trim()
@@ -952,6 +996,8 @@ const sendMessage = () => {
   emit('send', messageToSend, options)
   message.value = ''
   uploadedFiles.value = []
+  pastedBlocks.value = []
+  editingPastedBlockId.value = null
   plusMenuOpen.value = false
   paletteVisible.value = false
   mentionPaletteVisible.value = false
@@ -966,6 +1012,7 @@ const sendMessage = () => {
   // Clear persisted input after successful send
   clearPersistedInput()
   clearPersistedAttachments()
+  clearPersistedBlocks()
 }
 
 const toggleThinking = () => {
@@ -1134,61 +1181,114 @@ const handleDragLeave = () => {
   isDragging.value = false
 }
 
-// Clipboard paste handler for images and files
+const isComposerTextarea = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+  if (target instanceof HTMLTextAreaElement && target.closest('[data-testid="comp-chat-input"]')) {
+    return true
+  }
+  return Boolean(
+    target.closest('[data-testid="input-chat-message"], [data-testid="input-textarea"]')
+  )
+}
+
+const addPastedBlock = (content: string) => {
+  pastedBlocks.value.push({
+    id: createPastedBlockId(),
+    content,
+  })
+  triggerHapticImpact('light')
+}
+
+const removePastedBlock = (id: string) => {
+  pastedBlocks.value = pastedBlocks.value.filter((block) => block.id !== id)
+  if (editingPastedBlockId.value === id) {
+    editingPastedBlockId.value = null
+  }
+  triggerHapticImpact('light')
+}
+
+const openPastedBlock = (id: string) => {
+  editingPastedBlockId.value = id
+}
+
+const closePastedBlock = () => {
+  editingPastedBlockId.value = null
+  if (typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches) {
+    textareaRef.value?.focus()
+  }
+}
+
+const savePastedBlock = (content: string) => {
+  const id = editingPastedBlockId.value
+  if (!id) {
+    return
+  }
+  if (!content.trim()) {
+    removePastedBlock(id)
+    closePastedBlock()
+    return
+  }
+  pastedBlocks.value = pastedBlocks.value.map((block) =>
+    block.id === id ? { ...block, content } : block
+  )
+  closePastedBlock()
+}
+
+// Clipboard paste handler for images, files, and large text
 const handlePaste = async (event: ClipboardEvent) => {
-  if (props.isGuestMode) {
-    const items = event.clipboardData?.items
-    if (items) {
-      for (const item of items) {
-        if (item.type.startsWith('image/') || item.kind === 'file') {
-          event.preventDefault()
-          emit('guestFeatureGate', 'files')
-          return
+  const items = event.clipboardData?.items
+
+  if (items) {
+    const filesToUpload: File[] = []
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile()
+        if (file) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+          const extension = item.type.split('/')[1] || 'png'
+          const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
+            type: file.type,
+          })
+          filesToUpload.push(namedFile)
+        }
+      } else if (item.kind === 'file') {
+        const file = item.getAsFile()
+        if (file) {
+          filesToUpload.push(file)
         }
       }
     }
+
+    if (filesToUpload.length > 0) {
+      event.preventDefault()
+      if (props.isGuestMode) {
+        emit('guestFeatureGate', 'files')
+        return
+      }
+      try {
+        await uploadFiles(filesToUpload)
+        success(t('chatInput.filesPasted', { count: filesToUpload.length }))
+      } catch {
+        showError(t('chatInput.uploadError'))
+      }
+      return
+    }
+  }
+
+  const pastedText = event.clipboardData?.getData('text/plain') ?? ''
+  if (!pastedText || !shouldBecomeBlock(pastedText)) {
     return
   }
 
-  const items = event.clipboardData?.items
-  if (!items) return
-
-  const filesToUpload: File[] = []
-
-  for (const item of items) {
-    // Handle pasted images (screenshots, copied images)
-    if (item.type.startsWith('image/')) {
-      const file = item.getAsFile()
-      if (file) {
-        // Generate a meaningful filename for pasted images
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        const extension = item.type.split('/')[1] || 'png'
-        const namedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
-          type: file.type,
-        })
-        filesToUpload.push(namedFile)
-      }
-    }
-    // Handle pasted files (from file manager)
-    else if (item.kind === 'file') {
-      const file = item.getAsFile()
-      if (file) {
-        filesToUpload.push(file)
-      }
-    }
+  if (!isComposerTextarea(event.target) && !isComposerTextarea(document.activeElement)) {
+    return
   }
 
-  if (filesToUpload.length > 0) {
-    // Prevent default paste behavior for files/images
-    event.preventDefault()
-    try {
-      await uploadFiles(filesToUpload)
-      success(t('chatInput.filesPasted', { count: filesToUpload.length }))
-    } catch {
-      showError(t('chatInput.uploadError'))
-    }
-  }
-  // If no files, let the default paste behavior handle text
+  event.preventDefault()
+  addPastedBlock(pastedText)
 }
 
 const uploadFiles = async (files: File[]) => {
@@ -1660,6 +1760,23 @@ const submitText = (text: string) => {
   nextTick(() => sendMessage())
 }
 
+/**
+ * MOBILE-APP SEAM: start voice dictation for the iOS Shortcuts "Start
+ * dictation" action. No-op when already recording. Returns false (and a
+ * toast) when this server has no speech-to-text path.
+ */
+const startDictation = async (): Promise<boolean> => {
+  if (isRecording.value) {
+    return true
+  }
+  if (!showMicrophoneButton.value) {
+    showError(t('chatInput.dictationUnavailable'))
+    return false
+  }
+  await toggleRecording()
+  return isRecording.value
+}
+
 // Expose textarea ref, uploadFiles, setInputText, submitText for parent component
 // ATTENTION: needs to be typed when using vue-tsc -b
 defineExpose<{
@@ -1667,11 +1784,13 @@ defineExpose<{
   uploadFiles: (files: File[]) => Promise<void>
   setInputText: (text: string) => void
   submitText: (text: string) => void
+  startDictation: () => Promise<boolean>
 }>({
   textareaRef,
   uploadFiles,
   setInputText,
   submitText,
+  startDictation,
 })
 </script>
 
