@@ -386,8 +386,34 @@ When the flag is on:
 - An admin can create a manual group, add people by email, and set the role
   to member or manager.
 - Groups that come from company login (`kind=directory`) are read-only here.
-- Sharing a folder or conversation with a group is a later step and stays off
-  (`IAM.SHARING_ENABLED`).
+- Sharing a folder or conversation with a group is gated separately by
+  `IAM.SHARING_ENABLED` (effective only when groups are also on).
+
+## Sharing
+
+Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
+`1`. When they are on:
+
+- An owner can share a knowledge folder or a conversation with a person, a
+  group, or everyone on the instance.
+- Conversation permissions are **Can view** and **Can use**. **Can use** lets
+  a member continue the chat as their own copy (file binaries stay with the
+  owner).
+- RAG only includes another person's files when a share grants **Can use**
+  or higher. A query never runs without an owner scope.
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is in Operate → System
+  config → Sharing.
+
+Enable:
+
+```sql
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
+ON DUPLICATE KEY UPDATE BVALUE = '1';
+```
+
+Public token links are unchanged. Admins do not see other people's chats or
+files unless those items are shared with them.
 
 Enable on a running instance:
 

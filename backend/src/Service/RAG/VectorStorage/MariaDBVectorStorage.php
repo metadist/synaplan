@@ -98,8 +98,10 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
     {
         $vectorStr = '['.implode(',', $query->vector).']';
         $maxDistance = 1.0 - $query->minScore;
+        $legacy = $query->isLegacyOwnFilter();
+        $ownerSelect = $legacy ? '' : ",\n                r.BUID as owner_id";
 
-        $sql = <<<'SQL'
+        $sql = <<<SQL
             SELECT
                 r.BID as chunk_id,
                 r.BMID as file_id,
@@ -109,14 +111,20 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
                 r.BEND as end_line,
                 VEC_DISTANCE_COSINE(r.BEMBED, VEC_FromText(:vector)) as distance,
                 f.BFILENAME as file_name,
-                f.BFILEMIME as mime_type
+                f.BFILEMIME as mime_type{$ownerSelect}
             FROM BRAG r
             LEFT JOIN BFILES f ON r.BMID = f.BID
-            WHERE r.BUID = :userId
+            WHERE 
         SQL;
 
-        if (null !== $query->groupKey) {
-            $sql .= ' AND r.BGROUPKEY = :groupKey';
+        if ($legacy) {
+            $sql .= 'r.BUID = :userId';
+            if (null !== $query->groupKey) {
+                $sql .= ' AND r.BGROUPKEY = :groupKey';
+            }
+        } else {
+            $filter = RagScopeFilter::mariaDbWhere($query);
+            $sql .= $filter['sql'];
         }
 
         $sql .= <<<'SQL'
@@ -127,28 +135,40 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
 
         $stmt = $this->connection->prepare($sql);
         $stmt->bindValue('vector', $vectorStr);
-        $stmt->bindValue('userId', $query->userId);
         $stmt->bindValue('maxDistance', $maxDistance);
         $stmt->bindValue('limit', $query->limit, \Doctrine\DBAL\ParameterType::INTEGER);
 
-        if (null !== $query->groupKey) {
-            $stmt->bindValue('groupKey', $query->groupKey);
+        if ($legacy) {
+            $stmt->bindValue('userId', $query->userId);
+            if (null !== $query->groupKey) {
+                $stmt->bindValue('groupKey', $query->groupKey);
+            }
+        } else {
+            foreach (RagScopeFilter::mariaDbWhere($query)['params'] as $name => $value) {
+                $stmt->bindValue($name, $value);
+            }
         }
 
         $results = $stmt->executeQuery()->fetchAllAssociative();
 
         return array_map(
-            fn (array $row) => new SearchResult(
-                chunkId: (int) $row['chunk_id'],
-                fileId: (int) $row['file_id'],
-                groupKey: $row['group_key'],
-                text: $row['text'],
-                score: 1.0 - (float) $row['distance'],
-                startLine: (int) $row['start_line'],
-                endLine: (int) $row['end_line'],
-                fileName: $row['file_name'],
-                mimeType: $row['mime_type'],
-            ),
+            function (array $row) use ($query, $legacy): SearchResult {
+                $ownerId = $legacy ? $query->userId : (int) ($row['owner_id'] ?? $query->userId);
+
+                return new SearchResult(
+                    chunkId: (int) $row['chunk_id'],
+                    fileId: (int) $row['file_id'],
+                    groupKey: $row['group_key'],
+                    text: $row['text'],
+                    score: 1.0 - (float) $row['distance'],
+                    startLine: (int) $row['start_line'],
+                    endLine: (int) $row['end_line'],
+                    fileName: $row['file_name'],
+                    mimeType: $row['mime_type'],
+                    ownerId: $ownerId,
+                    shared: $ownerId !== $query->userId,
+                );
+            },
             $results
         );
     }

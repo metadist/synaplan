@@ -178,6 +178,9 @@ final class ApiKeyScope
      *   /api/v1/chats            → chats:*
      *   /api/v1/rag              → rag:*
      *   /api/v1/groups           → iam:read
+     *   /api/v1/iam              → iam:read
+     *   /api/v1/me/shared        → iam:read
+     *   /api/v1/shares           → iam:manage (implies iam:read)
      *   /api/v1/admin/groups     → iam:manage (implies iam:read)
      *   /api/v1/auth/me          → any key (self-service identity, see
      *                              SELF_SERVICE_PATHS)
@@ -258,11 +261,16 @@ final class ApiKeyScope
             return [self::ADDIN_RAG];
         }
 
-        if (self::matchesPrefix($path, '/api/v1/groups')) {
+        if (self::matchesPrefix($path, '/api/v1/groups')
+            || self::matchesPrefix($path, '/api/v1/iam')
+            || self::matchesPrefix($path, '/api/v1/me/shared')
+        ) {
             return [self::IAM_READ];
         }
 
-        if (self::matchesPrefix($path, '/api/v1/admin/groups')) {
+        if (self::matchesPrefix($path, '/api/v1/shares')
+            || self::matchesPrefix($path, '/api/v1/admin/groups')
+        ) {
             return [self::IAM_MANAGE];
         }
 

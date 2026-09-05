@@ -7,9 +7,16 @@ use App\Entity\User;
 use App\Repository\ChatRepository;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
+use App\Repository\ShareRepository;
+use App\Repository\UserRepository;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\ConversationCopyService;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\PastedContentText;
@@ -39,6 +46,11 @@ class ChatController extends AbstractController
         private InProgressTurnResolver $inProgressTurnResolver,
         private ChatRunService $chatRunService,
         private LoggerInterface $logger,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private ConversationCopyService $conversationCopyService,
+        private ShareRepository $shareRepository,
+        private UserRepository $userRepository,
     ) {
     }
 
@@ -309,10 +321,13 @@ class ChatController extends AbstractController
         }
 
         $chat = $this->chatRepository->find($id);
-
-        if (!$chat || $chat->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
         }
+        \assert($chat instanceof Chat);
+        $access = $this->conversationAccess($user, $chat);
+        \assert(null !== $access);
 
         $sessionInfo = $this->widgetSessionService->getSessionMapForChats([$chat->getId()]);
 
@@ -326,6 +341,8 @@ class ChatController extends AbstractController
                 'isShared' => $chat->isPublic(),
                 'shareToken' => $chat->getShareToken(),
                 'widgetSession' => $sessionInfo[$chat->getId()] ?? null,
+                'access' => $access,
+                'owner' => $this->conversationOwner($chat),
             ],
         ]);
     }
@@ -420,6 +437,7 @@ class ChatController extends AbstractController
         // vectors leave the search index.
         $this->digestMaintenance->deactivateForChat($user->getId(), $id);
 
+        $this->shareRepository->deleteByResource(ConversationKind::KEY, (string) $id);
         $this->em->remove($chat);
         $this->em->flush();
 
@@ -605,10 +623,11 @@ class ChatController extends AbstractController
         }
 
         $chat = $this->chatRepository->find($id);
-
-        if (!$chat || $chat->getUserId() !== $user->getId()) {
-            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        $denied = $this->denyConversation($user, $chat);
+        if (null !== $denied) {
+            return $denied;
         }
+        \assert($chat instanceof Chat);
 
         $limit = (int) $request->query->get('limit', 50);
         $offset = (int) $request->query->get('offset', 0);
@@ -751,5 +770,121 @@ class ChatController extends AbstractController
             ],
             'messages' => $messageData,
         ]);
+    }
+
+    #[Route('/{id}/continue', name: 'continue', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/chats/{id}/continue',
+        operationId: 'continueSharedChat',
+        summary: 'Continue a shared conversation as my copy',
+        tags: ['Chats', 'IAM Sharing'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Copy created',
+                content: new OA\JsonContent(
+                    required: ['success', 'chat'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(
+                            property: 'chat',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'title', type: 'string'),
+                                new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
+                                new OA\Property(property: 'access', type: 'string', example: 'owner'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 403, description: 'Need Can use'),
+            new OA\Response(response: 404, description: 'Chat not found'),
+        ]
+    )]
+    public function continueAsCopy(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $chat = $this->chatRepository->find($id);
+        $denied = $this->denyConversation($user, $chat, Permission::Use);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($chat instanceof Chat);
+
+        $copy = $this->conversationCopyService->copyForUser($chat, $user);
+
+        return $this->json([
+            'success' => true,
+            'chat' => [
+                'id' => $copy->getId(),
+                'title' => $copy->getTitle() ?? 'New Chat',
+                'createdAt' => $copy->getCreatedAt()->format('c'),
+                'updatedAt' => $copy->getUpdatedAt()->format('c'),
+                'access' => 'owner',
+                'owner' => $this->conversationOwner($copy),
+            ],
+        ], Response::HTTP_CREATED);
+    }
+
+    private function denyConversation(?User $user, ?Chat $chat, Permission $needed = Permission::Read): ?JsonResponse
+    {
+        if (!$user instanceof User) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        if (!$chat instanceof Chat) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($chat->getUserId() === (int) $user->getId()) {
+            return null;
+        }
+        if (!$this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->accessGate->decide($user, ConversationKind::KEY, (string) $chat->getId(), $needed)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function conversationAccess(User $user, Chat $chat): ?string
+    {
+        if ($chat->getUserId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, ConversationKind::KEY, (string) $chat->getId());
+        if (null === $granted || !$granted->implies(Permission::Read)) {
+            return null;
+        }
+
+        return $granted->implies(Permission::Use) ? 'use' : 'read';
+    }
+
+    /**
+     * @return array{id: int, name: string}
+     */
+    private function conversationOwner(Chat $chat): array
+    {
+        $owner = $this->userRepository->find($chat->getUserId());
+        $name = $owner instanceof User ? (string) $owner->getMail() : '';
+        if ($owner instanceof User) {
+            $details = $owner->getUserDetails();
+            foreach (['full_name', 'first_name'] as $key) {
+                $value = $details[$key] ?? null;
+                if (is_string($value) && '' !== trim($value)) {
+                    $name = trim($value);
+                    break;
+                }
+            }
+        }
+
+        return ['id' => $chat->getUserId(), 'name' => $name];
     }
 }

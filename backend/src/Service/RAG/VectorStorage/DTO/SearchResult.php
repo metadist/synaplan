@@ -16,6 +16,9 @@ final readonly class SearchResult
         public int $endLine,
         public ?string $fileName = null,
         public ?string $mimeType = null,
+        public ?int $ownerId = null,
+        public ?string $ownerName = null,
+        public bool $shared = false,
     ) {
     }
 }

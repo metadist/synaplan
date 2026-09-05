@@ -29,6 +29,35 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
+     * True when a message this user owns lists this file in shared_file_ref.
+     */
+    public function userHasSharedFileRef(int $userId, int $fileId): bool
+    {
+        $needle = (string) $fileId;
+        $qb = $this->createQueryBuilder('meta');
+        $count = $qb->select('COUNT(meta.id)')
+            ->innerJoin('meta.message', 'm')
+            ->where('m.userId = :userId')
+            ->andWhere('meta.metaKey = :key')
+            ->andWhere($qb->expr()->orX(
+                'meta.metaValue = :exact',
+                'meta.metaValue LIKE :prefix',
+                'meta.metaValue LIKE :infix',
+                'meta.metaValue LIKE :suffix',
+            ))
+            ->setParameter('userId', $userId)
+            ->setParameter('key', 'shared_file_ref')
+            ->setParameter('exact', $needle)
+            ->setParameter('prefix', $needle.',%')
+            ->setParameter('infix', '%,'.$needle.',%')
+            ->setParameter('suffix', '%,'.$needle)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    /**
      * Findet Meta-Daten nach Key.
      */
     public function findByMessageAndKey(int $messageId, string $key): ?MessageMeta

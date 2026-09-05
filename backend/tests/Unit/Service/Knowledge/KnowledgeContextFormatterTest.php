@@ -22,6 +22,17 @@ final class KnowledgeContextFormatterTest extends TestCase
         $this->assertStringContainsString('[Source 1] first', $rag);
         $this->assertStringContainsString('[Source 2] second', $rag);
 
+        $shared = $fmt->formatRagContext([
+            [
+                'chunk_id' => 1,
+                'chunk_text' => 'playbook',
+                'file_name' => 'q3.pdf',
+                'shared' => true,
+                'owner_name' => 'Ada',
+            ],
+        ]);
+        $this->assertStringContainsString('q3.pdf (Ada)', $shared);
+
         $mem = $fmt->formatMemoriesContext([
             ['id' => 9, 'key' => 'k', 'value' => 'v'],
         ]);

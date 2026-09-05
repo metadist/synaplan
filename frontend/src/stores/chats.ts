@@ -39,6 +39,7 @@ export interface Chat {
   source?: 'web' | 'whatsapp' | 'email' | 'widget' | 'api'
   widgetSession?: WidgetSessionInfo | null
   firstMessagePreview?: string | null
+  access?: 'owner' | 'read' | 'use'
 }
 
 export interface WidgetSessionInfo {
@@ -63,6 +64,7 @@ export function isDefaultChatTitle(title: string, localizedNewChat?: string): bo
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
   const activeChatId = ref<number | null>(readActiveChatId())
+  const conversationAccess = ref<'owner' | 'read' | 'use'>('owner')
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -428,6 +430,19 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  async function loadConversationAccess(chatId: number) {
+    conversationAccess.value = 'owner'
+    try {
+      const data = await httpClient<{ chat: { access?: string } }>(`/api/v1/chats/${chatId}`)
+      const access = data.chat.access
+      if (access === 'read' || access === 'use' || access === 'owner') {
+        conversationAccess.value = access
+      }
+    } catch {
+      conversationAccess.value = 'owner'
+    }
+  }
+
   async function getShareInfo(chatId: number) {
     if (!checkAuthOrRedirect()) return null
 
@@ -518,6 +533,7 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
+    conversationAccess.value = 'owner'
     activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0
@@ -531,6 +547,8 @@ export const useChatsStore = defineStore('chats', () => {
   return {
     chats,
     activeChatId,
+    conversationAccess,
+    loadConversationAccess,
     activeChat,
     loading,
     error,

@@ -4573,6 +4573,24 @@
     "share": "Paylaş",
     "sharedWithMe": "Benimle paylaşılan",
     "everyone": "Bu kuruluştaki herkes",
-    "owner": "Sahip"
+    "owner": "Sahip",
+    "fileUnavailable": "Bu dosya artık kullanılamıyor.",
+    "continueAsCopy": "Kendi kopyam olarak devam et",
+    "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
+    "sharedFolder": "Paylaşılan · {name}",
+    "dialog": {
+      "title": "\"{name}\" paylaş",
+      "who": "Kim",
+      "searchPlaceholder": "Kişi veya grup ara…",
+      "permission": "İzin",
+      "sharedWith": "Paylaşılan",
+      "empty": "Henüz kimseyle paylaşılmadı.",
+      "cancel": "İptal",
+      "remove": "Kaldır",
+      "removeTitle": "Paylaşımı durdur",
+      "removeConfirm": "{name} kaldırılsın mı?",
+      "publicLink": "Herkese açık bağlantı",
+      "openPublicLink": "Herkese açık bağlantıyı aç"
+    }
   }
 }
