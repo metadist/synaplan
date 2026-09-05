@@ -5,7 +5,7 @@ Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 
 S1 Groups core is **merged to `main`** (`feat/iam-groups-core`, PR #1708).
 S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20; PR #1713 green).
-S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; [draft PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on S2).
+S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; [draft PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on S2, targeting `main` so CI runs).
 
 ## Steps
 
@@ -14,7 +14,7 @@ S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; [draft PR #1714](https
 | S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes in S1/S2 |
 | S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 (`8e8ad71ef`) |
 | S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | in review | IAM11–IAM20; PR #1713 All Checks Passed |
-| S3 More kinds | `synaplan/` `feat/iam-more-kinds` | draft PR | IAM21–IAM28; [PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on #1713. Public docs: [synaplan-docs#14](https://github.com/metadist/synaplan-docs/pull/14) |
+| S3 More kinds | `synaplan/` `feat/iam-more-kinds` | draft PR | IAM21–IAM28; [PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on #1713, opened against `main` for CI. Public docs: [synaplan-docs#14](https://github.com/metadist/synaplan-docs/pull/14) |
 | S4 Directory & privacy | — | planned | |
 | S5 Group policies | — | planned | |
 
