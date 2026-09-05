@@ -5494,6 +5494,15 @@
     "everyone": "Alle in dieser Organisation",
     "owner": "Eigentümer",
     "fileUnavailable": "Diese Datei ist nicht mehr verfügbar.",
+    "kind": {
+      "assistant": "KI-Assistent",
+      "saved_task": "Gespeicherte Aufgabe",
+      "widget": "Chat-Widget"
+    },
+    "runCopy": "Als meine Kopie ausführen",
+    "runCopyConfirm": "Eine eigene Kopie dieser gespeicherten Aufgabe anlegen? Sie läuft nur, wenn Sie sie starten.",
+    "assistantNotShared": "Der KI-Assistent dieser Aufgabe ist nicht mit Ihnen geteilt.",
+    "sharedBy": "Von {name}",
     "continueAsCopy": "Als meine Kopie fortsetzen",
     "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
     "sharedFolder": "Geteilt · {name}",

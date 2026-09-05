@@ -30,6 +30,16 @@
               <span class="hidden sm:inline">{{ $t('widgets.setupChat.title') }}</span>
             </button>
             <button
+              v-if="canShareWidget"
+              type="button"
+              class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary text-sm transition-colors inline-flex items-center gap-2"
+              data-testid="btn-share-widget"
+              @click="openWidgetShare"
+            >
+              <Icon icon="heroicons:share" class="w-4 h-4" />
+              <span class="hidden sm:inline">{{ $t('iam.share') }}</span>
+            </button>
+            <button
               v-if="widget"
               class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium transition-colors inline-flex items-center gap-2"
               data-testid="btn-widget-settings"
@@ -1209,6 +1219,13 @@
       @close="showKnowledgeFilePicker = false"
       @select="handleKnowledgePickerSelect"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="widget"
+      :resource-id="iamShareResourceId"
+      :resource-name="widget?.name || ''"
+      @close="iamShareOpen = false"
+    />
   </MainLayout>
 </template>
 
@@ -1235,6 +1252,8 @@ import { promptsApi, type PromptMetadata } from '@/services/api/promptsApi'
 import { chatApi } from '@/services/api/chatApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import {
   WIDGET_RULES_BLOCK_START,
   WIDGET_RULES_BLOCK_END,
@@ -1281,6 +1300,16 @@ const saving = ref(false)
 const autoSaveStatus = ref<'idle' | 'unsaved' | 'saving' | 'saved'>('idle')
 const dataReady = ref(false)
 const widget = ref<widgetsApi.Widget | null>(null)
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const canShareWidget = computed(
+  () => isIamSharingEnabled() && widget.value !== null && widget.value.shared !== true
+)
+const openWidgetShare = () => {
+  if (!widget.value) return
+  iamShareResourceId.value = String(widget.value.id)
+  iamShareOpen.value = true
+}
 const setupModalWidget = ref<widgetsApi.Widget | null>(null)
 const advancedWidget = ref<widgetsApi.Widget | null>(null)
 const promptId = ref(0)

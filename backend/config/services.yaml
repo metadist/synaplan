@@ -230,6 +230,8 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+            # Factory product of PluginResourceKindCatalog — never a singleton.
+            - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.

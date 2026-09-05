@@ -3,19 +3,30 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
 import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
+import { ApiError } from '@/services/api/httpClient'
 
 const props = defineProps<{
   task: SavedTask
+  sharedView?: boolean
+  ownerName?: string
 }>()
 
 const emit = defineEmits<{
   updated: [task: SavedTask]
+  copied: [task: SavedTask]
 }>()
 
 const { t, te, locale } = useI18n()
 const router = useRouter()
 const { success, error: showError } = useNotification()
+const dialog = useDialog()
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const copying = ref(false)
 
 const running = ref(false)
 const showRuns = ref(false)
@@ -191,13 +202,40 @@ const openResults = () => {
   if (!props.task.chatId) return
   void router.push({ path: '/', query: { chat: String(props.task.chatId) } })
 }
+
+const onRunCopy = async () => {
+  const ok = await dialog.confirm({
+    title: t('iam.runCopy'),
+    message: t('iam.runCopyConfirm'),
+  })
+  if (!ok) return
+  copying.value = true
+  try {
+    emit('copied', await savedTasksApi.copy(props.task.id))
+    success(t('iam.runCopy'))
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : ''
+    showError(
+      message === 'iam.assistantNotShared'
+        ? t('iam.assistantNotShared')
+        : t('config.savedTasks.runFailed')
+    )
+  } finally {
+    copying.value = false
+  }
+}
 </script>
 
 <template>
   <section class="surface-card p-4 space-y-3" data-testid="saved-task-card">
     <div class="flex items-center justify-between gap-3">
-      <h3 class="font-semibold txt-primary">{{ task.name }}</h3>
-      <label class="flex items-center gap-2 text-sm txt-secondary">
+      <div class="min-w-0">
+        <h3 class="font-semibold txt-primary">{{ task.name }}</h3>
+        <p v-if="sharedView && ownerName" class="text-xs txt-secondary">
+          {{ $t('iam.sharedBy', { name: ownerName }) }}
+        </p>
+      </div>
+      <label v-if="!sharedView" class="flex items-center gap-2 text-sm txt-secondary">
         <input
           type="checkbox"
           class="accent-[var(--brand)]"
@@ -242,6 +280,17 @@ const openResults = () => {
 
     <div class="flex flex-wrap items-center gap-2">
       <button
+        v-if="sharedView"
+        type="button"
+        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        :disabled="copying"
+        data-testid="btn-run-copy"
+        @click="onRunCopy"
+      >
+        {{ $t('iam.runCopy') }}
+      </button>
+      <button
+        v-else
         type="button"
         class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
         :disabled="running"
@@ -250,7 +299,17 @@ const openResults = () => {
       >
         {{ $t('config.savedTasks.runNow') }}
       </button>
+      <button
+        v-if="iamSharingEnabled && !sharedView"
+        type="button"
+        class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        data-testid="btn-share-saved-task"
+        @click="iamShareOpen = true"
+      >
+        {{ $t('iam.share') }}
+      </button>
       <select
+        v-if="!sharedView"
         v-model="scheduleKind"
         class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
         data-testid="saved-task-schedule"
@@ -263,7 +322,7 @@ const openResults = () => {
         <option value="weekly">{{ $t('config.savedTasks.schedule.weekdays') }}</option>
       </select>
       <input
-        v-if="scheduleKind === 'daily' || scheduleKind === 'weekly'"
+        v-if="!sharedView && (scheduleKind === 'daily' || scheduleKind === 'weekly')"
         v-model="scheduleAt"
         type="time"
         class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
@@ -273,6 +332,7 @@ const openResults = () => {
     </div>
 
     <div
+      v-if="!sharedView"
       class="flex flex-wrap items-center gap-3 pt-3 border-t border-light-border/20 dark:border-dark-border/20"
     >
       <button
@@ -326,5 +386,12 @@ const openResults = () => {
     <p v-if="showAdvanced" class="text-xs txt-secondary">
       {{ $t('config.savedTasks.advancedHint') }}
     </p>
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="saved_task"
+      :resource-id="String(task.id)"
+      :resource-name="task.name"
+      @close="iamShareOpen = false"
+    />
   </section>
 </template>

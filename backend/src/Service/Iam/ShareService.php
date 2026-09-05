@@ -57,8 +57,12 @@ final readonly class ShareService
             throw new \InvalidArgumentException($e->getMessage(), 0, $e);
         }
 
-        if (null === $kindImpl->ownerId($resourceId)) {
+        $ownerId = $kindImpl->ownerId($resourceId);
+        if (null === $ownerId) {
             throw new \InvalidArgumentException('This item was not found.');
+        }
+        if (0 === $ownerId) {
+            throw new ShareNotAllowedException('This item cannot be shared.');
         }
 
         if (!in_array($level, $kindImpl->supportedPermissions(), true)) {

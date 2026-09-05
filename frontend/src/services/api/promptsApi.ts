@@ -28,6 +28,9 @@ export interface TaskPrompt {
   isUserOverride?: boolean
   selectionRules?: string | null
   metadata?: PromptMetadata
+  owner?: { id: number; name: string }
+  shared?: boolean
+  access?: string
 }
 
 export interface CreatePromptRequest {

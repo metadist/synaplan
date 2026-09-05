@@ -4574,6 +4574,15 @@
     "everyone": "Todos en esta organización",
     "owner": "Propietario",
     "fileUnavailable": "Este archivo ya no está disponible.",
+    "kind": {
+      "assistant": "Asistente de IA",
+      "saved_task": "Tarea guardada",
+      "widget": "Widget de chat"
+    },
+    "runCopy": "Ejecutar como mi copia",
+    "runCopyConfirm": "¿Crear tu propia copia de esta tarea guardada? Se ejecutará solo cuando tú la inicies.",
+    "assistantNotShared": "El asistente de IA de esta tarea no está compartido contigo.",
+    "sharedBy": "De {name}",
     "continueAsCopy": "Continuar como mi copia",
     "readOnly": "Puede ver esta conversación. Para añadir un mensaje, continúela como su propia copia.",
     "sharedFolder": "Compartido · {name}",

@@ -5560,6 +5560,15 @@
     "everyone": "Everyone in this organization",
     "owner": "Owner",
     "fileUnavailable": "This file is no longer available.",
+    "kind": {
+      "assistant": "AI assistant",
+      "saved_task": "Saved task",
+      "widget": "Chat widget"
+    },
+    "runCopy": "Run as my copy",
+    "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
+    "assistantNotShared": "This task's AI assistant is not shared with you.",
+    "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
     "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
     "sharedFolder": "Shared · {name}",

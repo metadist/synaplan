@@ -10,8 +10,14 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
+use App\Repository\UserRepository;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\File\FileUploadService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Model\Exception\InvalidPromptModelException;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
@@ -58,6 +64,10 @@ class PromptController extends AbstractController
         private PromptModelEligibilityValidator $modelEligibilityValidator,
         private TaskPlanner $taskPlanner,
         private FileUploadService $fileUploadService,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private UserRepository $userRepository,
+        private ShareRepository $shareRepository,
     ) {
     }
 
@@ -152,7 +162,7 @@ class PromptController extends AbstractController
         foreach ($systemPrompts as $prompt) {
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
 
-            $promptsMap[$prompt->getTopic()] = $this->serializePrompt($prompt, isDefault: true, isUserOverride: false, metadata: $metadata);
+            $promptsMap[$prompt->getTopic()] = $this->serializePrompt($prompt, isDefault: true, isUserOverride: false, metadata: $metadata, viewer: $user);
         }
 
         // Then override with user prompts
@@ -161,7 +171,27 @@ class PromptController extends AbstractController
             $hasSystemVersion = isset($promptsMap[$topic]);
             $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
 
-            $promptsMap[$topic] = $this->serializePrompt($prompt, isDefault: false, isUserOverride: $hasSystemVersion, metadata: $metadata);
+            $promptsMap[$topic] = $this->serializePrompt($prompt, isDefault: false, isUserOverride: $hasSystemVersion, metadata: $metadata, viewer: $user);
+        }
+
+        if ($this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            foreach ($this->promptRepository->findAllForUser((int) $user->getId()) as $prompt) {
+                if ($prompt->getOwnerId() === (int) $user->getId() || 0 === $prompt->getOwnerId()) {
+                    continue;
+                }
+                $topic = $prompt->getTopic();
+                if (isset($promptsMap[$topic])) {
+                    continue;
+                }
+                $metadata = $this->promptService->loadMetadataForPrompt($prompt->getId());
+                $promptsMap[$topic] = $this->serializePrompt(
+                    $prompt,
+                    isDefault: false,
+                    isUserOverride: false,
+                    metadata: $metadata,
+                    viewer: $user,
+                );
+            }
         }
 
         return $this->json([
@@ -184,8 +214,9 @@ class PromptController extends AbstractController
         bool $isDefault,
         bool $isUserOverride,
         array $metadata = [],
+        ?User $viewer = null,
     ): array {
-        return [
+        $row = [
             'id' => $prompt->getId(),
             'topic' => $prompt->getTopic(),
             'name' => $this->formatPromptName($prompt->getTopic(), $prompt->getShortDescription(), $isDefault),
@@ -197,6 +228,13 @@ class PromptController extends AbstractController
             'isUserOverride' => $isUserOverride,
             'metadata' => $metadata,
         ];
+        if (null !== $viewer && $this->iamConfig->isSharingEnabled((int) $viewer->getId())) {
+            $row['owner'] = $this->assistantOwner($prompt);
+            $row['shared'] = $prompt->getOwnerId() > 0 && $prompt->getOwnerId() !== (int) $viewer->getId();
+            $row['access'] = $this->assistantAccess($viewer, $prompt);
+        }
+
+        return $row;
     }
 
     /**
@@ -723,8 +761,9 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check access: user can only access system prompts (ownerId=0) or their own prompts
-        if (0 !== $prompt->getOwnerId() && $prompt->getOwnerId() !== $user->getId()) {
+        if (0 !== $prompt->getOwnerId()
+            && !$this->accessGate->decide($user, AssistantKind::KEY, (string) $prompt->getId(), Permission::Read)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -735,6 +774,7 @@ class PromptController extends AbstractController
                 isDefault: 0 === $prompt->getOwnerId(),
                 isUserOverride: false,
                 metadata: $this->promptService->loadMetadataForPrompt($prompt->getId()),
+                viewer: $user,
             ),
         ]);
     }
@@ -983,8 +1023,13 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be updated (admins can also update system prompts)
-        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
+        if (0 === $prompt->getOwnerId()) {
+            if (!$user->isAdmin()) {
+                return $this->json([
+                    'error' => 'Cannot modify this prompt. You can only modify your own custom prompts.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        } elseif (!$this->accessGate->decide($user, AssistantKind::KEY, (string) $prompt->getId(), Permission::Edit)) {
             $this->logger->warning('User tried to update prompt they don\'t own', [
                 'user_id' => $user->getId(),
                 'prompt_owner' => $prompt->getOwnerId(),
@@ -1088,6 +1133,7 @@ class PromptController extends AbstractController
                 isDefault: $isSystemPrompt,
                 isUserOverride: false,
                 metadata: $this->promptService->loadMetadataForPrompt($prompt->getId()),
+                viewer: $user,
             ),
         ]);
     }
@@ -1133,8 +1179,13 @@ class PromptController extends AbstractController
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // Check ownership: only user's own prompts can be deleted (admins can also delete system prompts)
-        if ($prompt->getOwnerId() !== $user->getId() && !($user->isAdmin() && 0 === $prompt->getOwnerId())) {
+        if (0 === $prompt->getOwnerId()) {
+            if (!$user->isAdmin()) {
+                return $this->json([
+                    'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        } elseif (!$this->accessGate->decide($user, AssistantKind::KEY, (string) $prompt->getId(), Permission::Manage)) {
             return $this->json([
                 'error' => 'Cannot delete this prompt. You can only delete your own custom prompts.',
             ], Response::HTTP_FORBIDDEN);
@@ -1154,7 +1205,7 @@ class PromptController extends AbstractController
         }
 
         // Now delete the prompt itself
-        $ownerId = $prompt->getOwnerId();
+        $this->shareRepository->deleteByResource(AssistantKind::KEY, (string) $id);
         $this->em->remove($prompt);
         $this->em->flush();
 
@@ -1328,13 +1379,14 @@ class PromptController extends AbstractController
 
         // Build groupKey for this task prompt
         $groupKey = "TASKPROMPT:{$topic}";
+        $folderOwnerId = 0 === $prompt->getOwnerId() ? (int) $user->getId() : $prompt->getOwnerId();
 
         // Get files with chunks for this specific group key directly.
         // This uses a targeted query (by groupKey) instead of fetching ALL files
         // and filtering, which avoids stale groupKey issues with Qdrant.
         try {
             $filesWithChunks = $this->vectorStorageFacade->getFilesWithChunksByGroupKey(
-                $user->getId(),
+                $folderOwnerId,
                 $groupKey
             );
         } catch (\Throwable $e) {
@@ -1349,7 +1401,7 @@ class PromptController extends AbstractController
         $filesByFileId = [];
         foreach ($filesWithChunks as $fileId => $info) {
             $file = $this->fileRepository->find($fileId);
-            if (!$file || $file->getUserId() !== $user->getId()) {
+            if (!$file || $file->getUserId() !== $folderOwnerId) {
                 continue;
             }
 
@@ -1772,5 +1824,46 @@ PROMPT;
                 'currentLevel' => $e->currentLevel,
             ], Response::HTTP_FORBIDDEN);
         }
+    }
+
+    /**
+     * @return array{id: int, name: string}
+     */
+    private function assistantOwner(Prompt $prompt): array
+    {
+        $ownerId = $prompt->getOwnerId();
+        if ($ownerId <= 0) {
+            return ['id' => 0, 'name' => ''];
+        }
+        $owner = $this->userRepository->find($ownerId);
+        $name = '';
+        if ($owner instanceof User) {
+            $details = $owner->getUserDetails();
+            foreach (['full_name', 'first_name'] as $key) {
+                $value = $details[$key] ?? null;
+                if (is_string($value) && '' !== trim($value)) {
+                    $name = trim($value);
+                    break;
+                }
+            }
+            if ('' === $name) {
+                $name = (string) $owner->getMail();
+            }
+        }
+
+        return ['id' => $ownerId, 'name' => $name];
+    }
+
+    private function assistantAccess(User $user, Prompt $prompt): string
+    {
+        if (0 === $prompt->getOwnerId() || $prompt->getOwnerId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, AssistantKind::KEY, (string) $prompt->getId());
+        if (null === $granted) {
+            return 'read';
+        }
+
+        return $granted->value;
     }
 }

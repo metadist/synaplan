@@ -6,9 +6,15 @@ namespace App\Service\SavedTask;
 
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
+use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\Exception\AssistantNotSharedException;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AssistantKind;
+use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\Schedule\ScheduleParser;
 
@@ -20,6 +26,7 @@ final readonly class SavedTaskService
         private PromptRepository $prompts,
         private SavedTaskGraphValidator $graphValidator,
         private ScheduleParser $scheduleParser,
+        private AccessGate $accessGate,
     ) {
     }
 
@@ -34,6 +41,55 @@ final readonly class SavedTaskService
     public function getOwned(int $id, int $ownerId): ?SavedTask
     {
         return $this->tasks->findByIdAndOwner($id, $ownerId);
+    }
+
+    public function getForRead(int $id, User $user): ?SavedTask
+    {
+        $task = $this->tasks->find($id);
+        if (!$task instanceof SavedTask) {
+            return null;
+        }
+        if ($task->getOwnerId() === (int) $user->getId()) {
+            return $task;
+        }
+        if ($this->accessGate->decide($user, SavedTaskKind::KEY, (string) $id, Permission::Read)) {
+            return $task;
+        }
+
+        return null;
+    }
+
+    public function copyForOwner(SavedTask $source, User $user): SavedTask
+    {
+        if (!$this->accessGate->decide($user, SavedTaskKind::KEY, (string) $source->getId(), Permission::Use)) {
+            throw new SavedTaskNotFoundException();
+        }
+
+        $prompt = $this->prompts->find($source->getPromptId());
+        $userId = (int) $user->getId();
+        $assistantOk = $prompt instanceof Prompt
+            && $prompt->isEnabled()
+            && (
+                0 === $prompt->getOwnerId()
+                || $prompt->getOwnerId() === $userId
+                || $this->accessGate->decide(
+                    $user,
+                    AssistantKind::KEY,
+                    (string) $prompt->getId(),
+                    Permission::Use,
+                )
+            );
+        if (!$assistantOk) {
+            throw new AssistantNotSharedException();
+        }
+
+        $copy = new SavedTask($userId, $source->getPromptId(), $source->getName());
+        $copy->setGraph($source->getGraph());
+        $copy->setTrigger(SavedTask::TRIGGER_MANUAL, null);
+        $copy->setAllowUnattended(false);
+        $this->tasks->save($copy);
+
+        return $copy;
     }
 
     public function findForPrompt(int $promptId, int $ownerId): ?SavedTask

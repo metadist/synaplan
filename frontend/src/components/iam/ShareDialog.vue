@@ -104,7 +104,7 @@ import SubjectPicker from './SubjectPicker.vue'
 
 const props = defineProps<{
   isOpen: boolean
-  kind: 'conversation' | 'knowledge_folder'
+  kind: 'conversation' | 'knowledge_folder' | 'assistant' | 'saved_task' | 'widget'
   resourceId: string
   resourceName: string
 }>()
@@ -121,9 +121,18 @@ const permission = ref('use')
 const shares = ref<IamShare[]>([])
 const saving = ref(false)
 
-const allowedPermissions = computed(() =>
-  props.kind === 'conversation' ? ['read', 'use'] : ['read', 'use', 'edit', 'manage']
-)
+const allowedPermissions = computed(() => {
+  if (props.kind === 'conversation' || props.kind === 'saved_task') {
+    return ['read', 'use']
+  }
+  if (props.kind === 'assistant') {
+    return ['read', 'use', 'edit']
+  }
+  if (props.kind === 'widget') {
+    return ['read', 'edit', 'manage']
+  }
+  return ['read', 'use', 'edit', 'manage']
+})
 
 const load = async () => {
   if (!props.isOpen || !props.resourceId) return

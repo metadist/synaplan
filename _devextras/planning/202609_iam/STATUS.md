@@ -4,7 +4,8 @@ Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
 
 S1 Groups core is **merged to `main`** (`feat/iam-groups-core`, PR #1708).
-S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20 implemented; gate in progress).
+S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20; PR #1713 green).
+S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; draft stacked on S2).
 
 ## Steps
 
@@ -12,8 +13,8 @@ S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20 implemented; gate in 
 | ------------- | ------------- | ----- | ----- |
 | S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes in S1/S2 |
 | S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 (`8e8ad71ef`) |
-| S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | in review | IAM11–IAM20 implemented; public docs on `synaplan-docs` `feat/docs-people-and-groups` |
-| S3 More kinds | — | planned | |
+| S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | in review | IAM11–IAM20; PR #1713 All Checks Passed |
+| S3 More kinds | `synaplan/` `feat/iam-more-kinds` | in progress | IAM21–IAM28: assistant, saved_task, widget + plugin kinds; stacked on S2 |
 | S4 Directory & privacy | — | planned | |
 | S5 Group policies | — | planned | |
 
@@ -42,3 +43,9 @@ sprint files written.
 **2026-09-05 (S2):** BSHARES, share API, AccessGate, RagScope, continue-as-copy,
 ShareDialog, Shared with me. Public docs cover groups + sharing (flag-off by
 default). Apply `Version20260905140000` to both the app DB and `synaplan_test`.
+
+**2026-09-05 (S3):** Assistant, saved task, and widget kinds on the S2 rails.
+Shared assistants enter lists via `PromptRepository` (classifier untouched).
+Saved tasks copy as the member's own run. Widgets support read and co-edit;
+embed and sessions stay owner-only. Plugin manifests may declare
+`provides.resourceKinds`.

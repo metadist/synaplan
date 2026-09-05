@@ -32,6 +32,10 @@ export interface Widget {
     internal_sessions: number
   }
   allowedDomains?: string[]
+  access?: string
+  shared?: boolean
+  ownerId?: number
+  ownerName?: string
 }
 
 export const CustomFieldDefSchema = z.discriminatedUnion('type', [

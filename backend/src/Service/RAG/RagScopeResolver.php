@@ -6,14 +6,17 @@ namespace App\Service\RAG;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\Prompt;
 use App\Entity\Share;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\MessageRepository;
+use App\Repository\PromptRepository;
 use App\Repository\ShareRepository;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\RAG\VectorStorage\DTO\RagScope;
@@ -33,6 +36,7 @@ final readonly class RagScopeResolver
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
+        private PromptRepository $promptRepository,
     ) {
     }
 
@@ -59,6 +63,9 @@ final readonly class RagScopeResolver
 
         $scopes = [$own];
         foreach ($this->sharedFolderScopes($userId, $groupKey) as $scope) {
+            $scopes[] = $scope;
+        }
+        foreach ($this->sharedAssistantFolderScopes($userId, $groupKey) as $scope) {
             $scopes[] = $scope;
         }
         foreach ($this->sharedConversationFileScopes($userId, $groupKey) as $scope) {
@@ -110,6 +117,36 @@ final readonly class RagScopeResolver
                 continue;
             }
             $out[] = new RagScope($ownerId, $folderKey);
+        }
+
+        return $out;
+    }
+
+    /**
+     * TASKPROMPT:{topic} of an assistant shared with "Can use".
+     *
+     * @return list<RagScope>
+     */
+    private function sharedAssistantFolderScopes(int $userId, ?string $groupKey): array
+    {
+        $out = [];
+        foreach ($this->sharesReaching($userId, AssistantKind::KEY) as $share) {
+            $permission = Permission::tryFrom($share->getPermission());
+            if (null === $permission || !$permission->implies(Permission::Use)) {
+                continue;
+            }
+            if (!ctype_digit($share->getResourceId())) {
+                continue;
+            }
+            $prompt = $this->promptRepository->find((int) $share->getResourceId());
+            if (!$prompt instanceof Prompt) {
+                continue;
+            }
+            $folder = AssistantKind::knowledgeFolder($prompt->getTopic());
+            if (null !== $groupKey && $groupKey !== $folder) {
+                continue;
+            }
+            $out[] = new RagScope($prompt->getOwnerId(), $folder);
         }
 
         return $out;

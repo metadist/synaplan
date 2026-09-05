@@ -8,9 +8,14 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
 use App\Repository\WidgetRepository;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\WidgetKind;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
@@ -57,6 +62,9 @@ class WidgetController extends AbstractController
         private LoggerInterface $logger,
         private SlackNotificationService $slack,
         private string $uploadDir,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private ShareRepository $shareRepository,
     ) {
     }
 
@@ -260,28 +268,36 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Read)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         // Get statistics
         $stats = $this->sessionService->getWidgetStats($widgetId);
+        $widgetPayload = [
+            'id' => $widget->getId(),
+            'widgetId' => $widget->getWidgetId(),
+            'name' => $widget->getName(),
+            'taskPromptTopic' => $widget->getTaskPromptTopic(),
+            'status' => $widget->getStatus(),
+            'config' => $widget->getConfig(),
+            'allowedDomains' => $widget->getAllowedDomains(),
+            'isActive' => $this->widgetService->isWidgetActive($widget),
+            'created' => $widget->getCreated(),
+            'updated' => $widget->getUpdated(),
+            'stats' => $stats,
+        ];
+        if ($this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            $widgetPayload['access'] = $this->widgetAccess($user, $widget);
+            $widgetPayload['shared'] = $widget->getOwnerId() !== (int) $user->getId();
+            $widgetPayload['ownerId'] = $widget->getOwnerId();
+        }
 
         return $this->json([
             'success' => true,
-            'widget' => [
-                'id' => $widget->getId(),
-                'widgetId' => $widget->getWidgetId(),
-                'name' => $widget->getName(),
-                'taskPromptTopic' => $widget->getTaskPromptTopic(),
-                'status' => $widget->getStatus(),
-                'config' => $widget->getConfig(),
-                'allowedDomains' => $widget->getAllowedDomains(),
-                'isActive' => $this->widgetService->isWidgetActive($widget),
-                'created' => $widget->getCreated(),
-                'updated' => $widget->getUpdated(),
-                'stats' => $stats,
-            ],
+            'widget' => $widgetPayload,
         ]);
     }
 
@@ -307,7 +323,9 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Edit)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -367,11 +385,14 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Manage)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         try {
+            $this->shareRepository->deleteByResource(WidgetKind::KEY, (string) $widget->getId());
             $this->widgetService->deleteWidget($widget);
 
             return $this->json([
@@ -1410,5 +1431,18 @@ class WidgetController extends AbstractController
         }
 
         return ['urls' => $urls, 'promptId' => $prompt->getId()];
+    }
+
+    private function widgetAccess(User $user, Widget $widget): string
+    {
+        if ($widget->getOwnerId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, WidgetKind::KEY, (string) $widget->getId());
+        if (null === $granted) {
+            return 'read';
+        }
+
+        return $granted->value;
     }
 }

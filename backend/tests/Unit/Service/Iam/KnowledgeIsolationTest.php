@@ -7,13 +7,16 @@ namespace App\Tests\Unit\Service\Iam;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\Prompt;
 use App\Entity\Share;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\MessageRepository;
+use App\Repository\PromptRepository;
 use App\Repository\ShareRepository;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\RAG\RagScopeResolver;
@@ -43,6 +46,7 @@ final class KnowledgeIsolationTest extends TestCase
             $this->createMock(ChatRepository::class),
             $this->createMock(MessageRepository::class),
             $this->createMock(FileRepository::class),
+            $this->createMock(PromptRepository::class),
         );
     }
 
@@ -142,6 +146,7 @@ final class KnowledgeIsolationTest extends TestCase
             $chatRepo,
             $messages,
             $files,
+            $this->createMock(PromptRepository::class),
         );
 
         $scopes = $resolver->resolve(3, null);
@@ -151,6 +156,61 @@ final class KnowledgeIsolationTest extends TestCase
         self::assertSame(9, $scopes[1]->ownerId);
         self::assertSame('sales', $scopes[1]->groupKey);
         self::assertSame([42], $scopes[1]->fileIds);
+    }
+
+    public function testAssistantFolderFollowsAssistantShare(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(9);
+        $prompt->setTopic('sales-helper');
+        $prompt->setPrompt('Help sales.');
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->expects(self::atLeastOnce())
+            ->method('find')
+            ->with(8)
+            ->willReturn($prompt);
+
+        $share = new Share();
+        $share->setResourceKind(AssistantKind::KEY);
+        $share->setResourceId('8');
+        $share->setSubjectType(Share::SUBJECT_USER);
+        $share->setSubjectId(3);
+        $share->setPermission('use');
+
+        $shareRows = [$share];
+        $this->shares->method('findForSubjects')->willReturnCallback(
+            static function (int $_userId, array $_groups, ?string $kind) use (&$shareRows): array {
+                return AssistantKind::KEY === $kind ? $shareRows : [];
+            }
+        );
+
+        $members = $this->createMock(GroupMemberRepository::class);
+        $members->method('findByUserId')->willReturn([]);
+
+        $resolver = new RagScopeResolver(
+            $this->iamConfig,
+            $this->shares,
+            $members,
+            $this->createMock(ChatRepository::class),
+            $this->createMock(MessageRepository::class),
+            $this->createMock(FileRepository::class),
+            $prompts,
+        );
+
+        $scopes = $resolver->resolve(3, null);
+
+        self::assertCount(2, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+        self::assertSame(9, $scopes[1]->ownerId);
+        self::assertSame('TASKPROMPT:sales-helper', $scopes[1]->groupKey);
+
+        $shareRows = [];
+        $revoked = $resolver->resolve(3, null);
+        self::assertCount(1, $revoked);
+        self::assertSame(3, $revoked[0]->ownerId);
     }
 
     private function folderShare(string $resourceId, string $permission): Share

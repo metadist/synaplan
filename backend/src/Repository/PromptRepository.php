@@ -3,6 +3,9 @@
 namespace App\Repository;
 
 use App\Entity\Prompt;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AssistantKind;
+use App\Service\Iam\SharedResourceIds;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -11,8 +14,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class PromptRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private SharedResourceIds $sharedResourceIds,
+    ) {
         parent::__construct($registry, Prompt::class);
     }
 
@@ -66,8 +71,21 @@ class PromptRepository extends ServiceEntityRepository
         }
 
         $results = $qb->getQuery()->getScalarResult();
+        $topics = array_map(fn ($r) => $r['topic'], $results);
 
-        return array_map(fn ($r) => $r['topic'], $results);
+        if (null !== $userId && $userId > 0) {
+            foreach ($this->findSharedPrompts($userId) as $prompt) {
+                $topic = $prompt->getTopic();
+                if ($excludeTools && str_starts_with($topic, 'tools:')) {
+                    continue;
+                }
+                if (!in_array($topic, $topics, true)) {
+                    $topics[] = $topic;
+                }
+            }
+        }
+
+        return $topics;
     }
 
     /**
@@ -137,6 +155,24 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
+        if (null !== $userId && $userId > 0) {
+            foreach ($this->findSharedPrompts($userId) as $prompt) {
+                $topic = $prompt->getTopic();
+                if ($excludeTools && str_starts_with($topic, 'tools:')) {
+                    continue;
+                }
+                if (isset($seen[$topic])) {
+                    continue;
+                }
+                $result[] = [
+                    'topic' => $topic,
+                    'description' => $prompt->getShortDescription(),
+                    'ownerId' => $prompt->getOwnerId(),
+                ];
+                $seen[$topic] = true;
+            }
+        }
+
         return $result;
     }
 
@@ -155,6 +191,11 @@ class PromptRepository extends ServiceEntityRepository
             $userPrompt = $this->findByTopic($topic, $userId);
             if ($userPrompt) {
                 return $userPrompt;
+            }
+            foreach ($this->findSharedPrompts($userId) as $shared) {
+                if ($shared->getTopic() === $topic) {
+                    return $shared;
+                }
             }
         }
 
@@ -199,6 +240,11 @@ class PromptRepository extends ServiceEntityRepository
         }
         foreach ($userPrompts as $p) {
             $map[$p->getTopic()] = $p;
+        }
+        foreach ($this->findSharedPrompts($userId) as $prompt) {
+            if (!isset($map[$prompt->getTopic()])) {
+                $map[$prompt->getTopic()] = $prompt;
+            }
         }
 
         return array_values($map);
@@ -245,7 +291,35 @@ class PromptRepository extends ServiceEntityRepository
         foreach ($userPrompts as $p) {
             $map[$p->getTopic()] = $p;
         }
+        foreach ($this->findSharedPrompts($userId) as $prompt) {
+            if (null === $prompt->getSelectionRules() || '' === $prompt->getSelectionRules()) {
+                continue;
+            }
+            if (!isset($map[$prompt->getTopic()])) {
+                $map[$prompt->getTopic()] = $prompt;
+            }
+        }
 
         return array_values($map);
+    }
+
+    /**
+     * @return list<Prompt>
+     */
+    private function findSharedPrompts(int $userId): array
+    {
+        $ids = $this->sharedResourceIds->forUser($userId, AssistantKind::KEY, Permission::Use);
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var list<Prompt> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 }
