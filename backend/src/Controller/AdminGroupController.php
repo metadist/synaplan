@@ -383,6 +383,7 @@ final class AdminGroupController extends AbstractController
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
+            new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]
     )]
     public function setMember(int $id, int $userId, Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -408,6 +409,8 @@ final class AdminGroupController extends AbstractController
                 $user,
                 (string) ($request->getClientIp() ?? ''),
             );
+        } catch (DirectoryGroupReadOnlyException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -442,6 +445,7 @@ final class AdminGroupController extends AbstractController
                 )
             ),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
+            new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]
     )]
     public function removeMember(int $id, int $userId, Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -456,7 +460,11 @@ final class AdminGroupController extends AbstractController
             return $this->json(['error' => 'Group not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $this->groupService->removeMember($group, $userId, $user, (string) ($request->getClientIp() ?? ''));
+        try {
+            $this->groupService->removeMember($group, $userId, $user, (string) ($request->getClientIp() ?? ''));
+        } catch (DirectoryGroupReadOnlyException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
+        }
 
         return $this->json(['success' => true]);
     }

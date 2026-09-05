@@ -98,6 +98,28 @@ final class GroupServiceTest extends TestCase
         self::assertSame('manager', $member->getRole());
     }
 
+    public function testSetMemberOnDirectoryGroupIsRejected(): void
+    {
+        $group = $this->directoryGroup(9);
+        $this->expectException(DirectoryGroupReadOnlyException::class);
+        $this->users->expects(self::never())->method('find');
+        $this->members->expects(self::never())->method('save');
+        $this->audit->expects(self::never())->method('save');
+
+        $this->service->setMember($group, 8, 'member', $this->actor);
+    }
+
+    public function testRemoveMemberOnDirectoryGroupIsRejected(): void
+    {
+        $group = $this->directoryGroup(9);
+        $this->expectException(DirectoryGroupReadOnlyException::class);
+        $this->members->expects(self::never())->method('findMembership');
+        $this->members->expects(self::never())->method('remove');
+        $this->audit->expects(self::never())->method('save');
+
+        $this->service->removeMember($group, 8, $this->actor);
+    }
+
     private function userWithId(int $id): User
     {
         $user = new User();
@@ -105,5 +127,15 @@ final class GroupServiceTest extends TestCase
         $ref->setValue($user, $id);
 
         return $user;
+    }
+
+    private function directoryGroup(int $id): Group
+    {
+        $group = new Group();
+        $group->setKind(Group::KIND_DIRECTORY);
+        $ref = new \ReflectionProperty(Group::class, 'id');
+        $ref->setValue($group, $id);
+
+        return $group;
     }
 }

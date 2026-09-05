@@ -71,16 +71,28 @@ final class AdminGroupControllerTest extends WebTestCase
     {
         $this->enableFlag();
         $admin = $this->createAdmin('iam-admin-dir@synaplan.internal');
-        $group = new Group();
-        $group->setName('From login');
-        $group->setSlug('from-login-'.uniqid());
-        $group->setKind(Group::KIND_DIRECTORY);
-        $this->em->persist($group);
-        $this->em->flush();
+        $group = $this->createDirectoryGroup();
 
         $this->authenticateClient($this->client, $admin);
         $this->client->request('DELETE', '/api/v1/admin/groups/'.$group->getId());
 
+        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testDirectoryGroupMemberMutationsAre409(): void
+    {
+        $this->enableFlag();
+        $admin = $this->createAdmin('iam-admin-dir-members@synaplan.internal');
+        $alice = $this->createUser('iam-dir-alice@synaplan.internal');
+        $group = $this->createDirectoryGroup();
+        $this->authenticateClient($this->client, $admin);
+
+        $this->putJson('/api/v1/admin/groups/'.$group->getId().'/members/'.$alice->getId(), [
+            'role' => 'member',
+        ]);
+        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('DELETE', '/api/v1/admin/groups/'.$group->getId().'/members/'.$alice->getId());
         self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
     }
 
@@ -148,6 +160,18 @@ final class AdminGroupControllerTest extends WebTestCase
         static::getContainer()->get(ConfigRepository::class)
             ->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '0');
         $this->em->flush();
+    }
+
+    private function createDirectoryGroup(): Group
+    {
+        $group = new Group();
+        $group->setName('From login');
+        $group->setSlug('from-login-'.uniqid());
+        $group->setKind(Group::KIND_DIRECTORY);
+        $this->em->persist($group);
+        $this->em->flush();
+
+        return $group;
     }
 
     private function createAdmin(string $email): User

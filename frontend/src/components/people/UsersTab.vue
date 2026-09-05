@@ -242,7 +242,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -305,16 +305,17 @@ async function loadUsers() {
   }
 }
 
-const debouncedSearchUsers = (() => {
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  return () => {
-    if (timeout) clearTimeout(timeout)
-    timeout = setTimeout(() => {
-      currentPage.value = 1
-      loadUsers()
-    }, 300)
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+function debouncedSearchUsers() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
   }
-})()
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    loadUsers()
+  }, 300)
+}
 
 async function updateUserLevel(userId: number, newLevel: string) {
   try {
@@ -398,5 +399,12 @@ function formatDate(dateStr: string): string {
 
 onMounted(() => {
   loadUsers()
+})
+
+onUnmounted(() => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+    searchTimeout = null
+  }
 })
 </script>

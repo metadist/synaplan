@@ -54,7 +54,7 @@ class OidcUserService
             throw new \RuntimeException('OIDC claims missing subject (sub)');
         }
 
-        $user = $this->findBySub($sub) ?? $this->findByEmail($email);
+        $user = $this->findBySub($claims) ?? $this->findByEmail($email);
         $isNewUser = false;
 
         if ($user) {
@@ -176,9 +176,25 @@ class OidcUserService
         return $paths;
     }
 
-    private function findBySub(string $sub): ?User
+    /**
+     * Resolve by the configured issuer first so a colliding `sub` from another
+     * IdP cannot log into the wrong local account. Legacy JSON `oidc_sub` is
+     * the fallback for rows written before BEXTERNALIDENTITIES existed.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function findBySub(array $claims): ?User
     {
-        $identity = $this->externalIdentityRepository->findOneOidcBySub($sub);
+        $sub = $claims['sub'] ?? null;
+        if (!is_string($sub) || '' === $sub) {
+            return null;
+        }
+
+        $identity = $this->externalIdentityRepository->findOneByTriple(
+            $this->oidcSource($claims),
+            '',
+            $sub,
+        );
         if (null !== $identity) {
             $user = $this->userRepository->find($identity->getUserId());
             if ($user instanceof User) {

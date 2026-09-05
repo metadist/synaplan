@@ -76,9 +76,7 @@ final readonly class GroupService
 
     public function rename(Group $group, string $name, string $description, User $actor, string $ip = ''): Group
     {
-        if ($group->isDirectory()) {
-            throw new DirectoryGroupReadOnlyException((int) $group->getId());
-        }
+        $this->assertManualGroup($group);
 
         $name = trim($name);
         if ('' === $name) {
@@ -111,9 +109,7 @@ final readonly class GroupService
 
     public function delete(Group $group, User $actor, string $ip = ''): void
     {
-        if ($group->isDirectory()) {
-            throw new DirectoryGroupReadOnlyException((int) $group->getId());
-        }
+        $this->assertManualGroup($group);
 
         $groupId = (int) $group->getId();
         $name = $group->getName();
@@ -132,6 +128,8 @@ final readonly class GroupService
 
     public function setMember(Group $group, int $userId, string $role, User $actor, string $ip = ''): GroupMember
     {
+        $this->assertManualGroup($group);
+
         if (!in_array($role, GroupMember::ROLES, true)) {
             throw new \InvalidArgumentException('Role must be member or manager.');
         }
@@ -164,6 +162,8 @@ final readonly class GroupService
 
     public function removeMember(Group $group, int $userId, User $actor, string $ip = ''): void
     {
+        $this->assertManualGroup($group);
+
         $groupId = (int) $group->getId();
         $member = $this->groupMemberRepository->findMembership($groupId, $userId);
         if (null === $member) {
@@ -304,6 +304,13 @@ final readonly class GroupService
             'source' => $member->getSource(),
             'created' => $member->getCreated(),
         ];
+    }
+
+    private function assertManualGroup(Group $group): void
+    {
+        if ($group->isDirectory()) {
+            throw new DirectoryGroupReadOnlyException((int) $group->getId());
+        }
     }
 
     private function uniqueSlug(string $name): string

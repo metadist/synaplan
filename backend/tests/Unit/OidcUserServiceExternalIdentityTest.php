@@ -46,7 +46,7 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         $this->em->expects(self::once())->method('persist');
         $this->em->expects(self::once())->method('flush');
 
-        $this->externalIdentities->method('findOneOidcBySub')->willReturn(null);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
         $this->externalIdentities->expects(self::once())
             ->method('upsert')
             ->with(11, 'oidc:https://idp.example/realms/synaplan', 'sub-abc')
@@ -71,8 +71,8 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         $identity->setExternalId('sub-table');
 
         $this->externalIdentities->expects(self::once())
-            ->method('findOneOidcBySub')
-            ->with('sub-table')
+            ->method('findOneByTriple')
+            ->with('oidc:https://idp.example', '', 'sub-table')
             ->willReturn($identity);
         $this->userRepository->expects(self::once())->method('find')->with(22)->willReturn($user);
         $this->userRepository->expects(self::never())->method('findOneBy');
@@ -93,13 +93,43 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         self::assertSame('NEW', $result->getUserLevel());
     }
 
+    public function testDoesNotResolveSubBelongingToADifferentIssuer(): void
+    {
+        $this->externalIdentities->expects(self::once())
+            ->method('findOneByTriple')
+            ->with('oidc:https://idp.example', '', 'shared-sub')
+            ->willReturn(null);
+        $this->userRepository->expects(self::never())->method('find');
+        $this->userRepository->method('findOneBy')->willReturn(null);
+        $this->em->expects(self::once())
+            ->method('persist')
+            ->willReturnCallback(static function (User $user): void {
+                $ref = new \ReflectionProperty(User::class, 'id');
+                $ref->setValue($user, 99);
+            });
+        $this->em->expects(self::once())->method('flush');
+        $this->externalIdentities->expects(self::once())
+            ->method('upsert')
+            ->with(99, 'oidc:https://idp.example', 'shared-sub')
+            ->willReturn($this->createStub(ExternalIdentity::class));
+
+        $result = $this->service()->findOrCreateFromClaims([
+            'sub' => 'shared-sub',
+            'email' => 'new-issuer@synaplan.internal',
+            'iss' => 'https://idp.example',
+        ]);
+
+        self::assertSame('new-issuer@synaplan.internal', $result->getMail());
+        self::assertSame('keycloak', $result->getProviderId());
+    }
+
     public function testFallsBackToDiscoveryIssuerWhenIssMissing(): void
     {
         $user = $this->keycloakUser(33, 'no-iss@synaplan.internal');
         $this->userRepository->method('findOneBy')->willReturn($user);
         $this->em->method('persist');
         $this->em->method('flush');
-        $this->externalIdentities->method('findOneOidcBySub')->willReturn(null);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
         $this->externalIdentities->expects(self::once())
             ->method('upsert')
             ->with(33, 'oidc:https://idp.example/realms/synaplan', 'sub-no-iss')

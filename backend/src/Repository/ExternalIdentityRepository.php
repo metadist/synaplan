@@ -36,24 +36,6 @@ class ExternalIdentityRepository extends ServiceEntityRepository
     }
 
     /**
-     * Any OIDC row for this subject, regardless of issuer.
-     */
-    public function findOneOidcBySub(string $sub): ?ExternalIdentity
-    {
-        /** @var ExternalIdentity|null $identity */
-        $identity = $this->createQueryBuilder('e')
-            ->where('e.source LIKE :prefix')
-            ->andWhere('e.externalId = :sub')
-            ->setParameter('prefix', 'oidc:%')
-            ->setParameter('sub', $sub)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-
-        return $identity;
-    }
-
-    /**
      * @return list<ExternalIdentity>
      */
     public function findByUserId(int $userId): array

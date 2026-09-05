@@ -30,7 +30,7 @@ class OidcUserServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
         $this->externalIdentities = $this->createMock(ExternalIdentityRepository::class);
-        $this->externalIdentities->method('findOneOidcBySub')->willReturn(null);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
         $this->externalIdentities->method('upsert')->willReturn(
             $this->createStub(\App\Entity\ExternalIdentity::class),
         );
