@@ -802,19 +802,25 @@ final class QdrantClientDirect implements QdrantClientInterface
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
     ): array {
         try {
-            $must = [
-                ['key' => 'user_id', 'match' => ['value' => $userId]],
-            ];
+            if (null !== $query && !$query->isLegacyOwnFilter()) {
+                $filter = \App\Service\RAG\VectorStorage\RagScopeFilter::qdrant($query);
+            } else {
+                $must = [
+                    ['key' => 'user_id', 'match' => ['value' => $userId]],
+                ];
 
-            if (null !== $groupKey) {
-                $must[] = ['key' => 'group_key', 'match' => ['value' => $groupKey]];
+                if (null !== $groupKey) {
+                    $must[] = ['key' => 'group_key', 'match' => ['value' => $groupKey]];
+                }
+                $filter = ['must' => $must];
             }
 
             $response = $this->qdrantRequest('POST', "/collections/{$this->documentsCollection}/points/query", [
                 'query' => $vector,
-                'filter' => ['must' => $must],
+                'filter' => $filter,
                 'limit' => $limit,
                 'score_threshold' => $minScore,
                 'with_payload' => true,

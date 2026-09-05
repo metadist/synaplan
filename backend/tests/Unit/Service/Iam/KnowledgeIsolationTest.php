@@ -1,0 +1,98 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Service\Iam;
+
+use App\Entity\Share;
+use App\Repository\ChatRepository;
+use App\Repository\FileRepository;
+use App\Repository\GroupMemberRepository;
+use App\Repository\MessageRepository;
+use App\Repository\ShareRepository;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
+use App\Service\RAG\RagScopeResolver;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * C2: no share ⇒ own scope only; read-only share ⇒ no extra RAG scope;
+ * use share ⇒ a foreign owner scope; sharing off ⇒ own scope only.
+ */
+final class KnowledgeIsolationTest extends TestCase
+{
+    private IamConfig&MockObject $iamConfig;
+    private ShareRepository&MockObject $shares;
+    private RagScopeResolver $resolver;
+
+    protected function setUp(): void
+    {
+        $this->iamConfig = $this->createMock(IamConfig::class);
+        $this->shares = $this->createMock(ShareRepository::class);
+        $members = $this->createMock(GroupMemberRepository::class);
+        $members->method('findByUserId')->willReturn([]);
+        $this->resolver = new RagScopeResolver(
+            $this->iamConfig,
+            $this->shares,
+            $members,
+            $this->createMock(ChatRepository::class),
+            $this->createMock(MessageRepository::class),
+            $this->createMock(FileRepository::class),
+        );
+    }
+
+    public function testSharingOffReturnsOwnScopeOnly(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(false);
+        $this->shares->expects(self::never())->method('findForSubjects');
+
+        $scopes = $this->resolver->resolve(3, null);
+
+        self::assertCount(1, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+        self::assertNull($scopes[0]->groupKey);
+    }
+
+    public function testReadOnlyFolderShareDoesNotAddScope(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $share = $this->folderShare('9:sales', 'read');
+        $this->shares->method('findForSubjects')->willReturn([$share]);
+
+        $scopes = $this->resolver->resolve(3, null);
+
+        self::assertCount(1, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+    }
+
+    public function testUseFolderShareAddsOwnerScope(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $share = $this->folderShare('9:sales', 'use');
+        $this->shares->method('findForSubjects')->willReturnCallback(
+            static function (int $_userId, array $_groups, ?string $kind) use ($share): array {
+                return KnowledgeFolderKind::KEY === $kind ? [$share] : [];
+            }
+        );
+
+        $scopes = $this->resolver->resolve(3, null);
+
+        self::assertCount(2, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+        self::assertSame(9, $scopes[1]->ownerId);
+        self::assertSame('sales', $scopes[1]->groupKey);
+    }
+
+    private function folderShare(string $resourceId, string $permission): Share
+    {
+        $share = new Share();
+        $share->setResourceKind(KnowledgeFolderKind::KEY);
+        $share->setResourceId($resourceId);
+        $share->setSubjectType(Share::SUBJECT_USER);
+        $share->setSubjectId(3);
+        $share->setPermission($permission);
+
+        return $share;
+    }
+}

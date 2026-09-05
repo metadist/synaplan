@@ -47,6 +47,24 @@
         <CheckIcon v-if="modelValue === g.name" class="w-5 h-5 flex-shrink-0 text-[var(--brand)]" />
       </button>
 
+      <button
+        v-for="folder in sharedFolders"
+        :key="folder.value"
+        type="button"
+        :class="['dropdown-item', modelValue === folder.value && 'dropdown-item--active']"
+        data-testid="opt-knowledge-folder-shared"
+        @click="select(folder.value)"
+      >
+        <FolderIcon class="w-5 h-5 flex-shrink-0" />
+        <span class="flex-1 text-sm truncate">{{
+          $t('iam.sharedFolder', { name: folder.name })
+        }}</span>
+        <CheckIcon
+          v-if="modelValue === folder.value"
+          class="w-5 h-5 flex-shrink-0 text-[var(--brand)]"
+        />
+      </button>
+
       <!-- §4.7 #1: the only way from the action row to the Files page lives
            INSIDE the picker, clearly marked as a link row — never as a
            sibling pill. -->
@@ -77,6 +95,8 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi } from '@/services/api/iamApi'
 
 interface Props {
   /** Selected knowledge-folder (RAG group) key; '' = none. */
@@ -96,9 +116,34 @@ const router = useRouter()
 const rootRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
 
-const selectedLabel = computed(() =>
-  props.modelValue !== '' ? props.modelValue : t('chatInput.knowledgeGroup')
-)
+const sharedFolders = ref<Array<{ name: string; value: string }>>([])
+
+const selectedLabel = computed(() => {
+  if (props.modelValue === '') return t('chatInput.knowledgeGroup')
+  const shared = sharedFolders.value.find((folder) => folder.value === props.modelValue)
+  return shared ? t('iam.sharedFolder', { name: shared.name }) : props.modelValue
+})
+
+const loadSharedFolders = async () => {
+  if (!isIamSharingEnabled()) {
+    sharedFolders.value = []
+    return
+  }
+  try {
+    const items = await iamApi.listSharedWithMe('knowledge_folder')
+    sharedFolders.value = items.map((item) => {
+      const ownerId = item.ownerId ?? 0
+      return { name: item.name, value: `shared:${ownerId}:${item.name}` }
+    })
+  } catch {
+    sharedFolders.value = []
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  void loadSharedFolders()
+})
 
 const toggleOpen = () => {
   triggerHapticImpact('light')
@@ -125,6 +170,5 @@ const handleClickOutside = (e: MouseEvent) => {
   close()
 }
 
-onMounted(() => document.addEventListener('click', handleClickOutside))
 onBeforeUnmount(() => document.removeEventListener('click', handleClickOutside))
 </script>

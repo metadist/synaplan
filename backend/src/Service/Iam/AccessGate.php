@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\Iam;
 
+use App\Entity\GroupMember;
 use App\Entity\User;
+use App\Repository\GroupMemberRepository;
+use App\Repository\ShareRepository;
 use App\Service\Iam\Exception\UnknownResourceKindException;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -12,9 +15,10 @@ use Symfony\Component\HttpFoundation\RequestStack;
 /**
  * Single decision point for IAM permissions.
  *
- * S1 body is owner-only: {@see ResourceKindRegistry} → ownerId === userId.
- * When groups are disabled the method returns before any IAM table is touched
- * (there is no share/membership lookup yet; this early return is the S2 seam).
+ * Owner always wins. When sharing is off, that is the whole decision and
+ * BSHARES is never read. When sharing is on, the highest share that reaches
+ * this user (themselves, any of their groups, or everyone) is compared with
+ * {@see Permission::implies()}.
  *
  * Owner id is memoized per request, keyed (kind, resourceId).
  */
@@ -26,22 +30,44 @@ final readonly class AccessGate
         private IamConfig $iamConfig,
         private ResourceKindRegistry $registry,
         private RequestStack $requestStack,
+        private ShareRepository $shareRepository,
+        private GroupMemberRepository $groupMemberRepository,
     ) {
     }
 
     public function decide(User $user, string $kind, string $resourceId, Permission $level): bool
     {
-        unset($level); // S1: owner has every level; unused until shares exist.
+        $granted = $this->highestGranted($user, $kind, $resourceId);
 
+        return null !== $granted && $granted->implies($level);
+    }
+
+    /**
+     * Highest permission this user holds, or null if they have none.
+     * The owner is treated as {@see Permission::Manage}.
+     */
+    public function highestGranted(User $user, string $kind, string $resourceId): ?Permission
+    {
         $userId = (int) $user->getId();
-
-        // Flag-off path: owner check only, no IAM table I/O.
-        if (!$this->iamConfig->isGroupsEnabled($userId)) {
-            return $this->isOwner($kind, $resourceId, $userId);
+        if ($this->isOwner($kind, $resourceId, $userId)) {
+            return Permission::Manage;
         }
 
-        // S1: sharing is not wired yet — still owner-only. S2 adds BSHARES here.
-        return $this->isOwner($kind, $resourceId, $userId);
+        if (!$this->iamConfig->isSharingEnabled($userId)) {
+            return null;
+        }
+
+        $groupIds = array_map(
+            static fn (GroupMember $member): int => $member->getGroupId(),
+            $this->groupMemberRepository->findByUserId($userId),
+        );
+
+        return $this->shareRepository->highestPermission($userId, $groupIds, $kind, $resourceId);
+    }
+
+    public function isOwnerOf(User $user, string $kind, string $resourceId): bool
+    {
+        return $this->isOwner($kind, $resourceId, (int) $user->getId());
     }
 
     private function isOwner(string $kind, string $resourceId, int $userId): bool

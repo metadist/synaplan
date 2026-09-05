@@ -1425,7 +1425,8 @@ async function loadKnowledgeGroups(): Promise<void> {
 function applyFolderFromQuery(): void {
   const folder = route.query.folder
   if (typeof folder !== 'string' || folder === '') return
-  if (knowledgeGroups.value.some((g) => g.name === folder)) {
+  const isSharedPicker = folder.startsWith('shared:')
+  if (isSharedPicker || knowledgeGroups.value.some((g) => g.name === folder)) {
     selectedGroupKey.value = folder
   }
   const rest = { ...route.query }
@@ -1448,7 +1449,7 @@ watch(
 watch(
   () => route.query.folder,
   (folder) => {
-    if (typeof folder === 'string' && folder !== '' && knowledgeGroups.value.length > 0) {
+    if (typeof folder === 'string' && folder !== '') {
       applyFolderFromQuery()
     }
   }

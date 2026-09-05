@@ -290,8 +290,24 @@
            centered hero composer) means the "+" menu and its dropdowns always
            open upward with room and are never clipped by the chat container's
            overflow (issue #1285). -->
+      <div
+        v-if="sharedConversationLocked"
+        class="mx-4 mb-3 p-4 surface-card rounded-xl"
+        data-testid="banner-shared-conversation"
+      >
+        <p class="text-sm txt-secondary mb-3">{{ $t('iam.readOnly') }}</p>
+        <button
+          v-if="chatsStore.conversationAccess === 'use'"
+          type="button"
+          class="btn-primary"
+          data-testid="btn-continue-as-copy"
+          @click="continueSharedConversation"
+        >
+          {{ $t('iam.continueAsCopy') }}
+        </button>
+      </div>
       <ChatInput
-        v-if="!needsProviderSetup"
+        v-if="!needsProviderSetup && !sharedConversationLocked"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -497,6 +513,7 @@ import {
   type Part,
 } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
+import { iamApi } from '@/services/api/iamApi'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -612,6 +629,18 @@ const isDragging = ref(false)
 const dragCounter = ref(0)
 const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
+const sharedConversationLocked = computed(
+  () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+)
+
+const continueSharedConversation = async () => {
+  const id = chatsStore.activeChatId
+  if (!id) return
+  const copy = await iamApi.continueChat(id)
+  chatsStore.setActiveChat(copy.id)
+  await chatsStore.loadChats()
+  await chatsStore.loadConversationAccess(copy.id)
+}
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
@@ -748,9 +777,13 @@ const dismissInlineMixPanel = () => {
 // A fresh chat gets the card back.
 watch(
   () => chatsStore.activeChatId,
-  () => {
+  (chatId) => {
     mixPanelDismissed.value = false
-  }
+    if (chatId) {
+      void chatsStore.loadConversationAccess(chatId)
+    }
+  },
+  { immediate: true }
 )
 
 // "Once tapped, clicked or text is entered, the popup closes": any pointer

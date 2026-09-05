@@ -5558,6 +5558,24 @@
     "share": "Partager",
     "sharedWithMe": "Partagé avec moi",
     "everyone": "Tout le monde dans cette organisation",
-    "owner": "Propriétaire"
+    "owner": "Propriétaire",
+    "fileUnavailable": "Ce fichier n'est plus disponible.",
+    "continueAsCopy": "Continuer comme ma copie",
+    "readOnly": "Vous pouvez voir cette conversation. Pour ajouter un message, continuez-la comme votre propre copie.",
+    "sharedFolder": "Partagé · {name}",
+    "dialog": {
+      "title": "Partager « {name} »",
+      "who": "Qui",
+      "searchPlaceholder": "Rechercher une personne ou un groupe…",
+      "permission": "Autorisation",
+      "sharedWith": "Partagé avec",
+      "empty": "Pas encore partagé.",
+      "cancel": "Annuler",
+      "remove": "Retirer",
+      "removeTitle": "Arrêter le partage",
+      "removeConfirm": "Retirer {name} ?",
+      "publicLink": "Lien public",
+      "openPublicLink": "Ouvrir le lien public"
+    }
   }
 }
