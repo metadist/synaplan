@@ -20,6 +20,7 @@
               type="button"
               class="icon-ghost"
               data-testid="btn-iam-share-close"
+              :aria-label="$t('common.close')"
               @click="close"
             >
               ×

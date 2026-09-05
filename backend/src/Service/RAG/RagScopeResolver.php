@@ -148,7 +148,7 @@ final readonly class RagScopeResolver
             if (null !== $groupKey && $groupKey !== $folder) {
                 continue;
             }
-            $scopes[] = new RagScope((int) $ownerId, $folder);
+            $scopes[] = new RagScope((int) $ownerId, $folder, array_values(array_unique($fileIds)));
         }
         foreach ($loose as $ownerId => $fileIds) {
             if (null !== $groupKey) {

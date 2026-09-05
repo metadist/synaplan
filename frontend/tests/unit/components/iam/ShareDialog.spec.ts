@@ -23,6 +23,7 @@ const i18n = createI18n({
   locale: 'en',
   messages: {
     en: {
+      common: { close: 'Close' },
       iam: {
         share: 'Share',
         everyone: 'Everyone in this organization',

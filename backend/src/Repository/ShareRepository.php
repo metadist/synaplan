@@ -70,8 +70,12 @@ class ShareRepository extends ServiceEntityRepository
      *
      * @return list<Share>
      */
-    public function findForSubjects(int $userId, array $groupIds, ?string $kind = null): array
-    {
+    public function findForSubjects(
+        int $userId,
+        array $groupIds,
+        ?string $kind = null,
+        ?string $resourceId = null,
+    ): array {
         $qb = $this->createQueryBuilder('s');
         $or = $qb->expr()->orX(
             $qb->expr()->andX(
@@ -97,6 +101,9 @@ class ShareRepository extends ServiceEntityRepository
         if (null !== $kind && '' !== $kind) {
             $qb->andWhere('s.resourceKind = :kind')->setParameter('kind', $kind);
         }
+        if (null !== $resourceId && '' !== $resourceId) {
+            $qb->andWhere('s.resourceId = :resourceId')->setParameter('resourceId', $resourceId);
+        }
 
         /** @var list<Share> $rows */
         $rows = $qb->orderBy('s.created', 'ASC')->getQuery()->getResult();
@@ -116,10 +123,7 @@ class ShareRepository extends ServiceEntityRepository
         string $resourceId,
     ): ?Permission {
         $highest = null;
-        foreach ($this->findForSubjects($userId, $groupIds, $kind) as $share) {
-            if ($share->getResourceId() !== $resourceId) {
-                continue;
-            }
+        foreach ($this->findForSubjects($userId, $groupIds, $kind, $resourceId) as $share) {
             $permission = Permission::tryFrom($share->getPermission());
             if (null === $permission) {
                 continue;

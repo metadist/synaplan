@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Iam;
 
+use App\Entity\Chat;
+use App\Entity\File;
+use App\Entity\Message;
 use App\Entity\Share;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
@@ -11,6 +14,7 @@ use App\Repository\GroupMemberRepository;
 use App\Repository\MessageRepository;
 use App\Repository\ShareRepository;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 use App\Service\RAG\RagScopeResolver;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -82,6 +86,71 @@ final class KnowledgeIsolationTest extends TestCase
         self::assertSame(3, $scopes[0]->ownerId);
         self::assertSame(9, $scopes[1]->ownerId);
         self::assertSame('sales', $scopes[1]->groupKey);
+        self::assertSame([], $scopes[1]->fileIds);
+    }
+
+    public function testUseConversationShareLimitsToReferencedFiles(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+
+        $chat = new Chat();
+        $chat->setUserId(9);
+        (new \ReflectionProperty(Chat::class, 'id'))->setValue($chat, 5);
+
+        $file = (new File())
+            ->setUserId(9)
+            ->setGroupKey('sales')
+            ->setFileName('one.pdf');
+        (new \ReflectionProperty(File::class, 'id'))->setValue($file, 42);
+
+        $message = new Message();
+        $message->addFile($file);
+
+        $chatRepo = $this->createMock(ChatRepository::class);
+        $chatRepo->expects(self::once())->method('find')->with(5)->willReturn($chat);
+
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findBy')->willReturnCallback(
+            static function (array $criteria) use ($message): array {
+                return isset($criteria['chatId']) ? [$message] : [];
+            }
+        );
+
+        $files = $this->createMock(FileRepository::class);
+        $files->method('findBy')->willReturn([]);
+
+        $members = $this->createMock(GroupMemberRepository::class);
+        $members->method('findByUserId')->willReturn([]);
+
+        $share = new Share();
+        $share->setResourceKind(ConversationKind::KEY);
+        $share->setResourceId('5');
+        $share->setSubjectType(Share::SUBJECT_USER);
+        $share->setSubjectId(3);
+        $share->setPermission('use');
+
+        $this->shares->method('findForSubjects')->willReturnCallback(
+            static function (int $_userId, array $_groups, ?string $kind) use ($share): array {
+                return ConversationKind::KEY === $kind ? [$share] : [];
+            }
+        );
+
+        $resolver = new RagScopeResolver(
+            $this->iamConfig,
+            $this->shares,
+            $members,
+            $chatRepo,
+            $messages,
+            $files,
+        );
+
+        $scopes = $resolver->resolve(3, null);
+
+        self::assertCount(2, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+        self::assertSame(9, $scopes[1]->ownerId);
+        self::assertSame('sales', $scopes[1]->groupKey);
+        self::assertSame([42], $scopes[1]->fileIds);
     }
 
     private function folderShare(string $resourceId, string $permission): Share

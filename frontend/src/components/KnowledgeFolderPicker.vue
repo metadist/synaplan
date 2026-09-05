@@ -131,10 +131,9 @@ const loadSharedFolders = async () => {
   }
   try {
     const items = await iamApi.listSharedWithMe('knowledge_folder')
-    sharedFolders.value = items.map((item) => {
-      const ownerId = item.ownerId ?? 0
-      return { name: item.name, value: `shared:${ownerId}:${item.name}` }
-    })
+    sharedFolders.value = items
+      .filter((item) => item.id !== '')
+      .map((item) => ({ name: item.name, value: `shared:${item.id}` }))
   } catch {
     sharedFolders.value = []
   }

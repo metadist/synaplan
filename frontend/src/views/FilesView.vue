@@ -691,7 +691,11 @@
                             ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                             : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                       "
-                      :data-testid="`folder-card-${folder.name}`"
+                      :data-testid="
+                        folder.shared && folder.resourceId
+                          ? `folder-card-shared-${folder.resourceId}`
+                          : `folder-card-${folder.name}`
+                      "
                       @click="onFolderCardClick(folder)"
                       @dragenter.prevent="onFolderDragEnter(folder.name)"
                       @dragover.prevent

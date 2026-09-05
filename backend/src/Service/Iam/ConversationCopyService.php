@@ -42,16 +42,30 @@ final readonly class ConversationCopyService
             ['unixTimestamp' => 'ASC', 'id' => 'ASC'],
         );
 
+        /** @var list<array{0: Message, 1: list<int>}> $pendingRefs */
+        $pendingRefs = [];
         foreach ($messages as $original) {
-            $this->copyMessage($original, $copy, (int) $user->getId());
+            $copied = $this->copyMessage($original, $copy, (int) $user->getId());
+            $fileIds = $this->sourceFileIds($original);
+            if ([] !== $fileIds) {
+                $pendingRefs[] = [$copied, $fileIds];
+            }
         }
 
         $this->em->flush();
 
+        foreach ($pendingRefs as [$message, $fileIds]) {
+            $message->setFile(1);
+            $message->setMeta(RagScopeResolver::SHARED_FILE_REF, implode(',', $fileIds));
+        }
+        if ([] !== $pendingRefs) {
+            $this->em->flush();
+        }
+
         return $copy;
     }
 
-    private function copyMessage(Message $original, Chat $copy, int $userId): void
+    private function copyMessage(Message $original, Chat $copy, int $userId): Message
     {
         $message = new Message();
         $message->setUserId($userId);
@@ -72,14 +86,8 @@ final readonly class ConversationCopyService
         $message->setFileText($original->getFileText());
 
         $this->em->persist($message);
-        $this->em->flush();
 
-        $fileIds = $this->sourceFileIds($original);
-        if ([] !== $fileIds) {
-            $message->setFile(1);
-            $message->setMeta(RagScopeResolver::SHARED_FILE_REF, implode(',', $fileIds));
-            $this->em->flush();
-        }
+        return $message;
     }
 
     /**

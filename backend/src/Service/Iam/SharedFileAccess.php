@@ -7,10 +7,10 @@ namespace App\Service\Iam;
 use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
+use App\Repository\MessageMetaRepository;
 use App\Repository\MessageRepository;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
-use App\Service\RAG\RagScopeResolver;
 
 /**
  * Read access to a file I own, or one that reaches me through a share.
@@ -21,6 +21,7 @@ final readonly class SharedFileAccess
         private AccessGate $accessGate,
         private IamConfig $iamConfig,
         private MessageRepository $messageRepository,
+        private MessageMetaRepository $messageMetaRepository,
         private FileRepository $fileRepository,
     ) {
     }
@@ -70,19 +71,6 @@ final readonly class SharedFileAccess
 
     private function hasSharedFileRef(int $userId, int $fileId): bool
     {
-        $needle = (string) $fileId;
-        foreach ($this->messageRepository->findBy(['userId' => $userId]) as $message) {
-            $raw = $message->getMeta(RagScopeResolver::SHARED_FILE_REF);
-            if (null === $raw || '' === $raw) {
-                continue;
-            }
-            foreach (explode(',', $raw) as $part) {
-                if (trim($part) === $needle) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return $this->messageMetaRepository->userHasSharedFileRef($userId, $fileId);
     }
 }
