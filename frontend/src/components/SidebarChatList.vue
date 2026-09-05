@@ -77,6 +77,14 @@
       @shared="chatsStore.loadChats()"
       @unshared="chatsStore.loadChats()"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="conversation"
+      :resource-id="iamShareResourceId"
+      :resource-name="shareModalChatTitle"
+      @close="iamShareOpen = false"
+      @public-link="shareModalOpen = true"
+    />
   </div>
 </template>
 
@@ -88,6 +96,8 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import { ChevronRightIcon, PuzzlePieceIcon } from '@heroicons/vue/24/outline'
 import SidebarChatListItem from './SidebarChatListItem.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -200,11 +210,18 @@ const openChat = async (id: string) => {
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 
 const handleShare = (id: string) => {
   const chat = chatsStore.chats.find((c) => c.id === Number(id))
   shareModalChatId.value = Number(id)
   shareModalChatTitle.value = chat?.title || 'Chat'
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(Number(id))
+    iamShareOpen.value = true
+    return
+  }
   shareModalOpen.value = true
 }
 

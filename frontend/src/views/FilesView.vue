@@ -416,6 +416,26 @@
                 <!-- §4.5: Incoming inbox quick-toggle with a count badge so the
                      user notices when integrations have pushed new files. -->
                 <button
+                  v-if="iamSharingEnabled && (sharedFolders.length > 0 || filterSharedWithMe)"
+                  class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
+                  :class="
+                    filterSharedWithMe
+                      ? 'border-[var(--brand)] bg-[var(--brand)]/10 text-[var(--brand)]'
+                      : 'border-black/[0.06] dark:border-white/[0.06] txt-secondary hover:border-[var(--brand)]/50 hover:text-[var(--brand)]'
+                  "
+                  data-testid="btn-shared-with-me"
+                  @click="filterSharedWithMe = !filterSharedWithMe"
+                >
+                  <Icon icon="heroicons:user-group" class="w-4 h-4" />
+                  <span class="hidden sm:inline">{{ $t('iam.sharedWithMe') }}</span>
+                  <span
+                    v-if="sharedFolders.length > 0"
+                    class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-full text-[10px] font-bold bg-[var(--brand)] text-white"
+                  >
+                    {{ sharedFolders.length }}
+                  </span>
+                </button>
+                <button
                   v-if="incomingCount > 0 || filterIncoming"
                   class="flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-all shrink-0"
                   :class="
@@ -657,8 +677,8 @@
                   class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
                 >
                   <div
-                    v-for="folder in displayedFolders"
-                    :key="folder.name"
+                    v-for="folder in visibleFolders"
+                    :key="folder.shared ? `shared-${folder.resourceId}` : folder.name"
                     class="group/f relative"
                   >
                     <button
@@ -671,8 +691,12 @@
                             ? 'border-dashed border-[var(--brand)]/40 hover:border-[var(--brand)]/60 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                             : 'border-light-border/20 dark:border-dark-border/7 hover:border-[var(--brand)]/30 hover:shadow-lg hover:shadow-[var(--brand)]/5 hover:bg-[var(--brand)]/[0.03]'
                       "
-                      :data-testid="`folder-card-${folder.name}`"
-                      @click="enterFolder(folder.name)"
+                      :data-testid="
+                        folder.shared && folder.resourceId
+                          ? `folder-card-shared-${folder.resourceId}`
+                          : `folder-card-${folder.name}`
+                      "
+                      @click="onFolderCardClick(folder)"
                       @dragenter.prevent="onFolderDragEnter(folder.name)"
                       @dragover.prevent
                       @dragleave="onFolderDragLeave(folder.name)"
@@ -726,6 +750,7 @@
                       </span>
                     </button>
                     <button
+                      v-if="!folder.shared"
                       type="button"
                       class="absolute top-1 right-1 p-1.5 rounded-lg text-red-500 bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-red-500/15 transition-all"
                       :title="$t('files.deleteFolder')"
@@ -744,10 +769,27 @@
                       :title="$t('files.useInChat')"
                       :aria-label="$t('files.useInChat')"
                       :data-testid="`btn-use-in-chat-${folder.name}`"
-                      @click.stop="useFolderInChat(folder.name)"
+                      @click.stop="useFolderInChat(folder)"
                     >
                       <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
                     </button>
+                    <button
+                      v-if="iamSharingEnabled && !folder.pending && !folder.shared"
+                      type="button"
+                      class="absolute bottom-1 left-1 p-1.5 rounded-lg txt-primary bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      :title="$t('iam.share')"
+                      :aria-label="$t('iam.share')"
+                      :data-testid="`btn-share-folder-${folder.name}`"
+                      @click.stop="openFolderShare(folder.name)"
+                    >
+                      <ShareIcon class="w-3.5 h-3.5" />
+                    </button>
+                    <span
+                      v-if="folder.shared"
+                      class="absolute bottom-1 right-1 text-[10px] font-medium txt-secondary"
+                    >
+                      {{ $t('iam.owner') }}: {{ folder.ownerName }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1432,6 +1474,13 @@
       @shared="handleShared"
       @unshared="handleUnshared"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="knowledge_folder"
+      :resource-id="iamShareResourceId"
+      :resource-name="iamShareName"
+      @close="iamShareOpen = false"
+    />
 
     <!-- Confirm Delete Dialog (Single File) -->
     <ConfirmDialog
@@ -1542,6 +1591,7 @@ import { Icon } from '@iconify/vue'
 import {
   ChatBubbleLeftRightIcon,
   CloudArrowUpIcon,
+  ShareIcon,
   TrashIcon,
   ArrowDownTrayIcon,
   XMarkIcon,
@@ -1564,14 +1614,41 @@ import { useDialog } from '@/composables/useDialog'
 import { ApiError } from '@/services/api/httpClient'
 import { useFilePersistence } from '@/composables/useInputPersistence'
 import { useRouter, useRoute } from 'vue-router'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useAuthStore } from '@/stores/auth'
+import { iamApi } from '@/services/api/iamApi'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 
+type DisplayedFolder = {
+  name: string
+  count: number
+  pending: boolean
+  shared?: boolean
+  ownerName?: string
+  resourceId?: string
+}
+
 /** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
-function useFolderInChat(folderName: string): void {
-  router.push({ path: '/', query: { folder: folderName } })
+function useFolderInChat(folder: DisplayedFolder | string): void {
+  const key =
+    typeof folder === 'string'
+      ? folder
+      : folder.shared && folder.resourceId
+        ? `shared:${folder.resourceId}`
+        : folder.name
+  router.push({ path: '/', query: { folder: key } })
+}
+
+function onFolderCardClick(folder: DisplayedFolder): void {
+  if (folder.shared) {
+    useFolderInChat(folder)
+    return
+  }
+  enterFolder(folder.name)
 }
 const { success: showSuccess, error: showError, info: showInfo } = useNotification()
 const { confirm } = useDialog()
@@ -1593,6 +1670,41 @@ const openFolder = ref<string | null>(null)
 const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
+const sharedFolders = ref<
+  Array<{ name: string; count: number; shared: true; ownerName: string; resourceId: string }>
+>([])
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const iamShareName = ref('')
+const authStore = useAuthStore()
+
+const openFolderShare = (folderName: string) => {
+  const ownerId = authStore.user?.id
+  if (!ownerId) return
+  iamShareResourceId.value = `${ownerId}:${folderName}`
+  iamShareName.value = folderName
+  iamShareOpen.value = true
+}
+
+const loadSharedFolders = async () => {
+  if (!isIamSharingEnabled()) {
+    sharedFolders.value = []
+    return
+  }
+  try {
+    const items = await iamApi.listSharedWithMe('knowledge_folder')
+    sharedFolders.value = items.map((item) => ({
+      name: item.name,
+      count: Number(item.meta?.fileCount ?? 0),
+      shared: true as const,
+      ownerName: item.ownerName ?? '',
+      resourceId: item.id,
+    }))
+  } catch {
+    sharedFolders.value = []
+  }
+}
 const selectedFileIds = ref<number[]>([])
 const currentPage = ref(1)
 const itemsPerPage = 10
@@ -1610,6 +1722,7 @@ const filterDateTo = ref('')
 const filterSource = ref('')
 const filterVectorized = ref('')
 const filterIncoming = ref(false)
+const filterSharedWithMe = ref(false)
 const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -1687,16 +1800,28 @@ const savePendingFolders = (folders: string[]): void => {
 
 const pendingFolders = ref<string[]>(loadPendingFolders())
 
-type DisplayedFolder = { name: string; count: number; pending: boolean }
-
 const displayedFolders = computed<DisplayedFolder[]>(() => {
   const realNames = new Set(fileGroups.value.map((f) => f.name))
   const real: DisplayedFolder[] = fileGroups.value.map((f) => ({ ...f, pending: false }))
   const pending: DisplayedFolder[] = pendingFolders.value
     .filter((name) => !realNames.has(name))
     .map((name) => ({ name, count: 0, pending: true }))
-  return [...real, ...pending]
+  const shared: DisplayedFolder[] = sharedFolders.value.map((folder) => ({
+    name: folder.name,
+    count: folder.count,
+    pending: false,
+    shared: true,
+    ownerName: folder.ownerName,
+    resourceId: folder.resourceId,
+  }))
+  return [...real, ...pending, ...shared]
 })
+
+const visibleFolders = computed(() =>
+  filterSharedWithMe.value
+    ? displayedFolders.value.filter((folder) => folder.shared)
+    : displayedFolders.value
+)
 
 watch(
   () => fileGroups.value.map((f) => f.name),
@@ -2203,6 +2328,7 @@ const resetFilters = () => {
   filterSource.value = ''
   filterVectorized.value = ''
   filterIncoming.value = false
+  filterSharedWithMe.value = false
   currentPage.value = 1
   loadFiles(1)
 }
@@ -2619,7 +2745,7 @@ const displayName = (file: FileItem): string =>
 // Load initial data
 onMounted(async () => {
   document.addEventListener('click', closeFolderMenu)
-  await Promise.all([loadFileGroups(), loadFiles(), loadFacets()])
+  await Promise.all([loadFileGroups(), loadFiles(), loadFacets(), loadSharedFolders()])
 
   // #1268: deep-link from /files/search "View file" (?file=<id>).
   const fileQuery = route.query.file

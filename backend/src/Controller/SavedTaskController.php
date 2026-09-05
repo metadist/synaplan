@@ -6,6 +6,9 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\SavedTaskRunRepository;
+use App\Repository\ShareRepository;
+use App\Service\Iam\Exception\AssistantNotSharedException;
+use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\SavedTaskDisabledException;
 use App\Service\SavedTask\SavedTaskNotFoundException;
@@ -30,6 +33,7 @@ final class SavedTaskController extends AbstractController
         private SavedTaskRunner $runner,
         private SavedTaskRunRepository $runs,
         private SavedTaskSerializer $serializer,
+        private ShareRepository $shareRepository,
     ) {
     }
 
@@ -256,9 +260,77 @@ final class SavedTaskController extends AbstractController
         if (null === $task) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
+        $this->shareRepository->deleteByResource(SavedTaskKind::KEY, (string) $id);
         $this->service->delete($task);
 
         return $this->json(['success' => true]);
+    }
+
+    #[Route('/{id}/copy', name: 'copy', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/saved-tasks/{id}/copy',
+        summary: 'Run a shared Saved Task as my copy',
+        tags: ['Saved Tasks'],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Copied task',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'task',
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'promptId', type: 'integer', example: 12),
+                                new OA\Property(property: 'name', type: 'string'),
+                                new OA\Property(property: 'enabled', type: 'boolean'),
+                                new OA\Property(property: 'triggerType', type: 'string'),
+                                new OA\Property(property: 'triggerConfig', type: 'object', nullable: true),
+                                new OA\Property(property: 'graph', type: 'object', nullable: true),
+                                new OA\Property(property: 'allowUnattended', type: 'boolean'),
+                                new OA\Property(property: 'chatId', type: 'integer', nullable: true),
+                                new OA\Property(property: 'nextRunAt', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastRunAt', type: 'string', nullable: true),
+                                new OA\Property(property: 'consecutiveFailures', type: 'integer'),
+                                new OA\Property(property: 'autoPaused', type: 'boolean'),
+                                new OA\Property(property: 'summary', type: 'object', properties: [
+                                    new OA\Property(property: 'key', type: 'string'),
+                                    new OA\Property(property: 'params', type: 'object'),
+                                ]),
+                                new OA\Property(property: 'instructionPreview', type: 'string', nullable: true),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 409, description: 'Assistant is not shared'),
+        ]
+    )]
+    public function copy(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        $task = $this->service->getForRead($id, $user);
+        if (null === $task) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $copy = $this->service->copyForOwner($task, $user);
+        } catch (SavedTaskNotFoundException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AssistantNotSharedException) {
+            return $this->json(['error' => 'iam.assistantNotShared'], Response::HTTP_CONFLICT);
+        }
+
+        return $this->json(['success' => true, 'task' => $this->serializer->task($copy)], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}/run', name: 'run', methods: ['POST'], requirements: ['id' => '\d+'])]

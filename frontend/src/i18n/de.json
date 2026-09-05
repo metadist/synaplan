@@ -5492,6 +5492,33 @@
     "share": "Teilen",
     "sharedWithMe": "Mit mir geteilt",
     "everyone": "Alle in dieser Organisation",
-    "owner": "Eigentümer"
+    "owner": "Eigentümer",
+    "fileUnavailable": "Diese Datei ist nicht mehr verfügbar.",
+    "kind": {
+      "assistant": "KI-Assistent",
+      "saved_task": "Gespeicherte Aufgabe",
+      "widget": "Chat-Widget"
+    },
+    "runCopy": "Als meine Kopie ausführen",
+    "runCopyConfirm": "Eine eigene Kopie dieser gespeicherten Aufgabe anlegen? Sie läuft nur, wenn Sie sie starten.",
+    "assistantNotShared": "Der KI-Assistent dieser Aufgabe ist nicht mit Ihnen geteilt.",
+    "sharedBy": "Von {name}",
+    "continueAsCopy": "Als meine Kopie fortsetzen",
+    "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
+    "sharedFolder": "Geteilt · {name}",
+    "dialog": {
+      "title": "„{name}“ teilen",
+      "who": "Wer",
+      "searchPlaceholder": "Person oder Gruppe suchen…",
+      "permission": "Berechtigung",
+      "sharedWith": "Geteilt mit",
+      "empty": "Noch mit niemandem geteilt.",
+      "cancel": "Abbrechen",
+      "remove": "Entfernen",
+      "removeTitle": "Teilen beenden",
+      "removeConfirm": "{name} entfernen?",
+      "publicLink": "Öffentlicher Link",
+      "openPublicLink": "Öffentlichen Link öffnen"
+    }
   }
 }

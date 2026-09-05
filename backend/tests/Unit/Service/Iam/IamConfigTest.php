@@ -44,4 +44,23 @@ final class IamConfigTest extends TestCase
         self::assertTrue($this->iam->isGroupsEnabled(4));
         self::assertFalse($this->iam->isGroupsEnabled(9));
     }
+
+    public function testSharingRequiresGroups(): void
+    {
+        $this->config->method('getValue')->willReturnCallback(
+            static function (int $ownerId, string $group, string $setting): ?string {
+                if (IamConfig::CONFIG_GROUP !== $group || 0 !== $ownerId) {
+                    return null;
+                }
+
+                return match ($setting) {
+                    IamConfig::KEY_GROUPS_ENABLED => '0',
+                    IamConfig::KEY_SHARING_ENABLED => '1',
+                    default => null,
+                };
+            }
+        );
+
+        self::assertFalse($this->iam->isSharingEnabled(1));
+    }
 }

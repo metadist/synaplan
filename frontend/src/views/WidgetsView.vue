@@ -10,6 +10,21 @@
         >
           <template #actions>
             <button
+              v-if="iamSharingEnabled && (sharedWidgets.length > 0 || filterShared)"
+              type="button"
+              class="px-3 py-2 rounded-full text-sm font-medium"
+              :class="
+                filterShared
+                  ? 'bg-[var(--brand)] text-white'
+                  : 'surface-chip txt-secondary hover:txt-primary'
+              "
+              data-testid="btn-shared-with-me"
+              @click="filterShared = !filterShared"
+            >
+              {{ $t('iam.sharedWithMe') }}
+              <span class="ml-1 text-xs">{{ sharedWidgets.length }}</span>
+            </button>
+            <button
               class="btn-primary px-4 lg:px-5 py-2 lg:py-2.5 rounded-lg transition-colors font-medium flex items-center gap-2 w-full sm:w-auto justify-center text-sm lg:text-base"
               data-testid="btn-create-widget"
               @click="startCreation"
@@ -36,7 +51,7 @@
 
           <!-- Empty State -->
           <div
-            v-else-if="widgets.length === 0"
+            v-else-if="visibleWidgets.length === 0"
             class="surface-card p-8 lg:p-12 text-center"
             data-testid="state-widgets-empty"
           >
@@ -65,8 +80,8 @@
             data-testid="section-widget-cards"
           >
             <div
-              v-for="widget in widgets"
-              :key="widget.id"
+              v-for="widget in visibleWidgets"
+              :key="widget.widgetId || widget.id"
               class="surface-card widget-card p-4 lg:p-5 cursor-pointer group"
               data-testid="item-widget"
               role="button"
@@ -85,6 +100,16 @@
                   <p class="text-xs txt-secondary truncate">{{ widget.taskPromptTopic }}</p>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    v-if="widget.shared"
+                    class="px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-[var(--brand)]/10 text-[var(--brand)]"
+                  >
+                    {{
+                      widget.ownerName
+                        ? $t('iam.sharedBy', { name: widget.ownerName })
+                        : $t('iam.sharedWithMe')
+                    }}
+                  </span>
                   <span
                     :class="[
                       'px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap',
@@ -164,6 +189,17 @@
                 </button>
                 <!-- Secondary: Chats -->
                 <button
+                  v-if="iamSharingEnabled && !widget.shared"
+                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  :title="$t('iam.share')"
+                  :aria-label="$t('iam.share')"
+                  data-testid="btn-share-widget"
+                  @click="openWidgetShare(widget)"
+                >
+                  <Icon icon="heroicons:share" class="w-4 h-4 txt-secondary" />
+                </button>
+                <button
+                  v-if="!widget.shared"
                   class="flex-1 min-w-[70px] px-3 py-2 rounded-lg bg-[var(--brand-alpha-light)] txt-brand hover:bg-[var(--brand)]/20 transition-colors text-xs font-medium flex items-center justify-center gap-1.5"
                   data-testid="btn-widget-sessions"
                   @click="viewSessions(widget)"
@@ -173,6 +209,7 @@
                 </button>
                 <!-- Get Code -->
                 <button
+                  v-if="!widget.shared"
                   class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
                   :title="$t('widgets.code')"
                   :aria-label="$t('widgets.code')"
@@ -193,6 +230,7 @@
                 </button>
                 <!-- Delete -->
                 <button
+                  v-if="!widget.shared"
                   class="p-2 rounded-lg hover:bg-red-500/10 transition-colors flex-shrink-0"
                   :title="$t('widgets.delete')"
                   :aria-label="$t('widgets.delete')"
@@ -381,6 +419,13 @@
         </div>
       </div>
     </Teleport>
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="widget"
+      :resource-id="iamShareResourceId"
+      :resource-name="iamShareName"
+      @close="iamShareOpen = false"
+    />
   </MainLayout>
 </template>
 
@@ -403,6 +448,9 @@ import WidgetCustomFieldsPanel from '@/components/widgets/WidgetCustomFieldsPane
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { getErrorMessage } from '@/utils/errorMessage'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi } from '@/services/api/iamApi'
 
 const router = useRouter()
 const route = useRoute()
@@ -413,6 +461,13 @@ const configStore = useConfigStore()
 
 const loading = ref(false)
 const widgets = ref<widgetsApi.Widget[]>([])
+const sharedWidgets = ref<widgetsApi.Widget[]>([])
+const filterShared = ref(false)
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const iamShareName = ref('')
+const visibleWidgets = computed(() => (filterShared.value ? sharedWidgets.value : widgets.value))
 const showWizard = ref(false)
 const successWidget = ref<widgetsApi.Widget | null>(null)
 const setupWidget = ref<widgetsApi.Widget | null>(null)
@@ -443,11 +498,36 @@ const loadWidgets = async () => {
   loading.value = true
   try {
     widgets.value = await widgetsApi.listWidgets()
+    if (isIamSharingEnabled()) {
+      const items = await iamApi.listSharedWithMe('widget')
+      sharedWidgets.value = items.map((item) => ({
+        id: Number(item.id),
+        widgetId: String(item.meta?.widgetId ?? ''),
+        name: item.name,
+        taskPromptTopic: '',
+        status: 'active' as const,
+        config: {},
+        isActive: true,
+        created: 0,
+        updated: 0,
+        shared: true,
+        access: item.permission,
+        ownerName: item.ownerName ?? undefined,
+      }))
+    } else {
+      sharedWidgets.value = []
+    }
   } catch (err: unknown) {
     error(getErrorMessage(err) || 'Failed to load widgets')
   } finally {
     loading.value = false
   }
+}
+
+const openWidgetShare = (widget: widgetsApi.Widget) => {
+  iamShareResourceId.value = String(widget.id)
+  iamShareName.value = widget.name
+  iamShareOpen.value = true
 }
 
 /**

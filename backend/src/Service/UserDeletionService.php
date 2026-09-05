@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\SavedTask;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ChatRepository;
@@ -21,6 +22,7 @@ use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\RevectorizeRunRepository;
 use App\Repository\SessionRepository;
+use App\Repository\ShareRepository;
 use App\Repository\TokenRepository;
 use App\Repository\TopupRepository;
 use App\Repository\UseLogRepository;
@@ -63,6 +65,7 @@ final readonly class UserDeletionService
         private QdrantClientInterface $qdrantClient,
         private GroupMemberRepository $groupMemberRepository,
         private ExternalIdentityRepository $externalIdentityRepository,
+        private ShareRepository $shareRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -94,6 +97,7 @@ final readonly class UserDeletionService
             $this->deleteRagDocuments($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
+            $this->deleteShares($userId);
             $this->deleteChats($userId);
             $this->deleteMessages($userId);
             $this->deleteEmailVerificationAttempts($email);
@@ -168,6 +172,7 @@ final readonly class UserDeletionService
             $this->deleteRagDocuments($userId);
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
+            $this->deleteShares($userId);
             $this->deleteChats($userId);
             $this->deleteMessages($userId);
             $this->deleteEmailVerificationAttempts($email);
@@ -429,6 +434,25 @@ final readonly class UserDeletionService
     private function deleteExternalIdentities(int $userId): void
     {
         $this->externalIdentityRepository->deleteByUserId($userId);
+    }
+
+    private function deleteShares(int $userId): void
+    {
+        $this->shareRepository->deleteBySubjectUser($userId);
+        $this->shareRepository->deleteByGrantedBy($userId);
+        foreach ($this->chatRepository->findByUser($userId) as $chat) {
+            $this->shareRepository->deleteByResource('conversation', (string) $chat->getId());
+        }
+        foreach ($this->promptRepository->findBy(['ownerId' => $userId]) as $prompt) {
+            $this->shareRepository->deleteByResource('assistant', (string) $prompt->getId());
+        }
+        foreach ($this->widgetRepository->findByOwnerId($userId) as $widget) {
+            $this->shareRepository->deleteByResource('widget', (string) $widget->getId());
+        }
+        foreach ($this->em->getRepository(SavedTask::class)->findBy(['ownerId' => $userId]) as $task) {
+            $this->shareRepository->deleteByResource('saved_task', (string) $task->getId());
+        }
+        $this->shareRepository->deleteByOwnerKnowledgeFolders($userId);
     }
 
     private function deleteRevectorizeRuns(int $userId): void

@@ -5558,6 +5558,33 @@
     "share": "Share",
     "sharedWithMe": "Shared with me",
     "everyone": "Everyone in this organization",
-    "owner": "Owner"
+    "owner": "Owner",
+    "fileUnavailable": "This file is no longer available.",
+    "kind": {
+      "assistant": "AI assistant",
+      "saved_task": "Saved task",
+      "widget": "Chat widget"
+    },
+    "runCopy": "Run as my copy",
+    "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
+    "assistantNotShared": "This task's AI assistant is not shared with you.",
+    "sharedBy": "From {name}",
+    "continueAsCopy": "Continue as my copy",
+    "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
+    "sharedFolder": "Shared · {name}",
+    "dialog": {
+      "title": "Share \"{name}\"",
+      "who": "Who",
+      "searchPlaceholder": "Search a person or group…",
+      "permission": "Permission",
+      "sharedWith": "Shared with",
+      "empty": "Not shared with anyone yet.",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "removeTitle": "Stop sharing",
+      "removeConfirm": "Remove {name}?",
+      "publicLink": "Public link",
+      "openPublicLink": "Open public link"
+    }
   }
 }

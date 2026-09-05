@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\PluginData;
+use App\Service\Iam\Permission;
+use App\Service\Iam\SharedResourceIds;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -13,8 +15,10 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class PluginDataRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private SharedResourceIds $sharedResourceIds,
+    ) {
         parent::__construct($registry, PluginData::class);
     }
 
@@ -103,5 +107,32 @@ class PluginDataRepository extends ServiceEntityRepository
             ->setParameter('dataType', $dataType)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * plugin_data rows of this type that are shared with the user.
+     *
+     * @return PluginData[]
+     */
+    public function findSharedWith(int $userId, string $pluginId, string $dataType): array
+    {
+        $ids = $this->sharedResourceIds->forUserKindPrefix($userId, $pluginId.':', Permission::Read);
+        if ([] === $ids) {
+            return [];
+        }
+
+        /** @var PluginData[] $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.id IN (:ids)')
+            ->andWhere('p.pluginName = :pluginName')
+            ->andWhere('p.dataType = :dataType')
+            ->setParameter('ids', $ids)
+            ->setParameter('pluginName', $pluginId)
+            ->setParameter('dataType', $dataType)
+            ->orderBy('p.dataKey', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 }

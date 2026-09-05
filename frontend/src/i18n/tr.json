@@ -4573,6 +4573,33 @@
     "share": "Paylaş",
     "sharedWithMe": "Benimle paylaşılan",
     "everyone": "Bu kuruluştaki herkes",
-    "owner": "Sahip"
+    "owner": "Sahip",
+    "fileUnavailable": "Bu dosya artık kullanılamıyor.",
+    "kind": {
+      "assistant": "AI asistanı",
+      "saved_task": "Kayıtlı görev",
+      "widget": "Sohbet widget'ı"
+    },
+    "runCopy": "Kendi kopyam olarak çalıştır",
+    "runCopyConfirm": "Bu kayıtlı görevin kendi kopyanızı oluşturulsun mu? Yalnızca siz başlattığınızda çalışır.",
+    "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
+    "sharedBy": "{name} tarafından",
+    "continueAsCopy": "Kendi kopyam olarak devam et",
+    "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
+    "sharedFolder": "Paylaşılan · {name}",
+    "dialog": {
+      "title": "\"{name}\" paylaş",
+      "who": "Kim",
+      "searchPlaceholder": "Kişi veya grup ara…",
+      "permission": "İzin",
+      "sharedWith": "Paylaşılan",
+      "empty": "Henüz kimseyle paylaşılmadı.",
+      "cancel": "İptal",
+      "remove": "Kaldır",
+      "removeTitle": "Paylaşımı durdur",
+      "removeConfirm": "{name} kaldırılsın mı?",
+      "publicLink": "Herkese açık bağlantı",
+      "openPublicLink": "Herkese açık bağlantıyı aç"
+    }
   }
 }

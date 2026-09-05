@@ -18,6 +18,33 @@ class UserRepository extends ServiceEntityRepository
         return $this->findOneBy(['mail' => $email]);
     }
 
+    /**
+     * People picker: match email or the JSON name fields in BUSERDETAILS.
+     *
+     * @return list<User>
+     */
+    public function searchByEmailOrName(string $query, int $limit = 20): array
+    {
+        $query = trim($query);
+        if ('' === $query) {
+            return [];
+        }
+
+        $escaped = $this->escapeLike($query);
+
+        /** @var list<User> $users */
+        $users = $this->createQueryBuilder('u')
+            ->where("u.mail LIKE :q ESCAPE '!'")
+            ->orWhere("u.userDetails LIKE :q ESCAPE '!'")
+            ->setParameter('q', '%'.$escaped.'%')
+            ->orderBy('u.mail', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $users;
+    }
+
     public function findByProviderId(string $providerId): ?User
     {
         return $this->findOneBy(['providerId' => $providerId]);

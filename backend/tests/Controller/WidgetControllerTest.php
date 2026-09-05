@@ -7,6 +7,8 @@ namespace App\Tests\Controller;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\Widget;
+use App\Repository\ConfigRepository;
+use App\Service\Iam\IamConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -353,5 +355,149 @@ class WidgetControllerTest extends WebTestCase
         $responseData = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('error', $responseData);
         $this->assertStringContainsString('generatedPrompt', $responseData['error']);
+    }
+
+    public function testReadShareLetsMemberGetWidgetButNotEmbedOrSessions(): void
+    {
+        $this->enableSharing();
+        $member = $this->createNamedUser('widget-share-member@synaplan.internal');
+        $this->authenticate();
+        $created = $this->createWidgetNamed('Share Read Widget');
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'widget',
+            'resource' => (string) $created['id'],
+            'subjectType' => 'user',
+            'subjectId' => (int) $member->getId(),
+            'permission' => 'read',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId']);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertTrue($body['widget']['shared']);
+        self::assertSame('read', $body['widget']['access']);
+
+        $this->client->request(
+            'PUT',
+            '/api/v1/widgets/'.$created['widgetId'],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['name' => 'Hijacked'], JSON_THROW_ON_ERROR)
+        );
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/embed');
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/sessions');
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testEditShareLetsMemberUpdateWidget(): void
+    {
+        $this->enableSharing();
+        $member = $this->createNamedUser('widget-edit-member@synaplan.internal');
+        $this->authenticate();
+        $created = $this->createWidgetNamed('Share Edit Widget');
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'widget',
+            'resource' => (string) $created['id'],
+            'subjectType' => 'user',
+            'subjectId' => (int) $member->getId(),
+            'permission' => 'edit',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request(
+            'PUT',
+            '/api/v1/widgets/'.$created['widgetId'],
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['name' => 'Co-edited'], JSON_THROW_ON_ERROR)
+        );
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testAdminCannotReadForeignWidgetSessions(): void
+    {
+        $this->enableSharing();
+        $admin = $this->createNamedUser('widget-c8-admin@synaplan.internal');
+        $admin->setUserLevel('ADMIN');
+        $this->em->flush();
+        $this->authenticate();
+        $created = $this->createWidgetNamed('C8 Widget');
+
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('GET', '/api/v1/widgets/'.$created['widgetId'].'/sessions');
+
+        self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+    }
+
+    private function enableSharing(): void
+    {
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED, '1');
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_SHARING_ENABLED, '1');
+        $this->em->flush();
+    }
+
+    private function createNamedUser(string $email): User
+    {
+        $existing = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
+        if ($existing instanceof User) {
+            return $existing;
+        }
+
+        $user = (new User())
+            ->setMail($email)
+            ->setType('WEB')
+            ->setProviderId('widget-share-'.uniqid())
+            ->setUserLevel('NEW');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
+        $this->em->persist($user);
+        $this->em->flush();
+
+        return $user;
+    }
+
+    /**
+     * @return array{id: int, widgetId: string}
+     */
+    private function createWidgetNamed(string $name): array
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/widgets',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode(['name' => $name], JSON_THROW_ON_ERROR)
+        );
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertIsArray($body);
+        self::assertIsInt($body['widget']['id']);
+        self::assertIsString($body['widget']['widgetId']);
+
+        return ['id' => $body['widget']['id'], 'widgetId' => $body['widget']['widgetId']];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function postJson(string $uri, array $payload): void
+    {
+        $this->client->request(
+            'POST',
+            $uri,
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode($payload, JSON_THROW_ON_ERROR),
+        );
     }
 }

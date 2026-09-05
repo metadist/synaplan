@@ -154,6 +154,7 @@ final class QdrantClientMock implements QdrantClientInterface
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?\App\Service\RAG\VectorStorage\DTO\SearchQuery $query = null,
     ): array {
         $this->logger->info('QdrantClientMock: searchDocuments', ['user_id' => $userId]);
 

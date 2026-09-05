@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Iam;
 
 use App\Entity\User;
+use App\Repository\GroupMemberRepository;
+use App\Repository\ShareRepository;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
@@ -19,6 +21,8 @@ final class AccessGateTest extends TestCase
 {
     private IamConfig&MockObject $iamConfig;
     private ShareableResourceKindInterface&MockObject $kind;
+    private ShareRepository&MockObject $shares;
+    private GroupMemberRepository&MockObject $members;
     private AccessGate $gate;
 
     protected function setUp(): void
@@ -26,13 +30,22 @@ final class AccessGateTest extends TestCase
         $this->iamConfig = $this->createMock(IamConfig::class);
         $this->kind = $this->createMock(ShareableResourceKindInterface::class);
         $this->kind->method('key')->willReturn('conversation');
+        $this->shares = $this->createMock(ShareRepository::class);
+        $this->members = $this->createMock(GroupMemberRepository::class);
         $registry = new ResourceKindRegistry([$this->kind]);
-        $this->gate = new AccessGate($this->iamConfig, $registry, new RequestStack());
+        $this->gate = new AccessGate(
+            $this->iamConfig,
+            $registry,
+            new RequestStack(),
+            $this->shares,
+            $this->members,
+        );
     }
 
     public function testFlagOffNeverQueriesIamTables(): void
     {
-        $this->iamConfig->expects(self::once())->method('isGroupsEnabled')->willReturn(false);
+        $this->iamConfig->expects(self::never())->method('isSharingEnabled');
+        $this->shares->expects(self::never())->method('highestPermission');
         $this->kind->expects(self::once())->method('ownerId')->with('42')->willReturn(7);
 
         $user = $this->userWithId(7);
@@ -41,8 +54,9 @@ final class AccessGateTest extends TestCase
 
     public function testAdminIsNotOwner(): void
     {
-        $this->iamConfig->method('isGroupsEnabled')->willReturn(true);
+        $this->iamConfig->method('isSharingEnabled')->willReturn(false);
         $this->kind->method('ownerId')->willReturn(2);
+        $this->shares->expects(self::never())->method('highestPermission');
 
         $admin = $this->userWithId(1);
         $admin->setUserLevel('ADMIN');
@@ -53,8 +67,9 @@ final class AccessGateTest extends TestCase
 
     public function testOwnerIsGrantedEveryLevel(): void
     {
-        $this->iamConfig->method('isGroupsEnabled')->willReturn(true);
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
         $this->kind->method('ownerId')->willReturn(5);
+        $this->shares->expects(self::never())->method('highestPermission');
 
         $owner = $this->userWithId(5);
         self::assertTrue($this->gate->decide($owner, 'conversation', '1', Permission::Read));
@@ -63,7 +78,7 @@ final class AccessGateTest extends TestCase
 
     public function testUnknownKindIsDenied(): void
     {
-        $this->iamConfig->method('isGroupsEnabled')->willReturn(false);
+        $this->iamConfig->method('isSharingEnabled')->willReturn(false);
 
         self::assertFalse($this->gate->decide($this->userWithId(1), 'widget', '1', Permission::Read));
     }
@@ -74,9 +89,9 @@ final class AccessGateTest extends TestCase
         $stack->push(new Request());
         $this->kind->expects(self::once())->method('ownerId')->willReturn(3);
         $registry = new ResourceKindRegistry([$this->kind]);
-        $this->iamConfig->method('isGroupsEnabled')->willReturn(true);
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
 
-        $gate = new AccessGate($this->iamConfig, $registry, $stack);
+        $gate = new AccessGate($this->iamConfig, $registry, $stack, $this->shares, $this->members);
         $user = $this->userWithId(3);
 
         self::assertTrue($gate->decide($user, 'conversation', '8', Permission::Read));

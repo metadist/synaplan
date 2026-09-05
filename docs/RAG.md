@@ -132,6 +132,18 @@ GET /api/v1/files/{id}
 
 ---
 
+## Sharing and search scopes
+
+A RAG query is always a non-empty list of **owner scopes**. Your own files
+are one scope. When `IAM.SHARING_ENABLED` is on, each knowledge folder (or
+referenced chat file) shared with you at **Can use** or higher becomes
+another scope. There is never an unfiltered search.
+
+Hits from someone else's files are marked `shared: true` and include the
+owner's name. **Can view** alone never adds chunks to a search.
+
+---
+
 ## Technical Details
 
 - **Embedding Model**: bge-m3 (1024 dimensions)
