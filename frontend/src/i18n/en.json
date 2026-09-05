@@ -135,6 +135,7 @@
     "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
     "adminSetup": "AI Provider Setup",
+    "adminPeople": "People",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -709,6 +710,7 @@
     "adminModelStatus": "Model Status",
     "adminSystemConfig": "System configuration",
     "adminProviderSetup": "AI providers",
+    "adminPeople": "People",
     "more": "More",
     "moreDescription": "More sections and account",
     "menu": "Menu",
@@ -2308,7 +2310,12 @@
       "errorActivating": "Failed to activate API key",
       "errorDeleting": "Failed to delete API key",
       "noKeys": "No API keys yet. Create your first key to get started.",
-      "usageCount": "requests"
+      "usageCount": "requests",
+      "scopes": {
+        "hint": "Leave unchecked for full access. Checking a box limits this key to People.",
+        "iamRead": "People — view groups",
+        "iamManage": "People — manage groups"
+      }
     },
     "desktop": {
       "title": "Desktop",
@@ -5493,5 +5500,64 @@
       "operator": "Operator key",
       "none": "None configured"
     }
+  },
+  "people": {
+    "title": "People",
+    "subtitle": "Users and groups on this instance.",
+    "tabs": {
+      "users": "Users",
+      "groups": "Groups"
+    },
+    "usersMoved": "Users now live on the People page.",
+    "openPeople": "Open People",
+    "users": {
+      "groups": "Groups",
+      "identities": "Sign-in"
+    },
+    "groups": {
+      "name": "Name",
+      "kind": "Kind",
+      "members": "Members",
+      "memberCount": "{count} members",
+      "fromLogin": "From your login",
+      "manual": "Manual",
+      "create": "Create group",
+      "createTitle": "Create a group",
+      "createPrompt": "Group name",
+      "rename": "Rename",
+      "renameTitle": "Rename group",
+      "delete": "Delete",
+      "deleteConfirm": "Delete the group \"{name}\"? People stay in the instance; only the group is removed.",
+      "empty": "No groups yet. Create one to start sharing later.",
+      "loadError": "Groups could not be loaded.",
+      "saveError": "The group could not be saved.",
+      "created": "Group created.",
+      "renamed": "Group renamed.",
+      "deleted": "Group deleted.",
+      "directoryReadOnly": "This group comes from your login and cannot be changed here.",
+      "addMember": "Add a person",
+      "addMemberPlaceholder": "Search by email",
+      "addMemberNotFound": "No user matches that email.",
+      "removeMember": "Remove",
+      "removeConfirm": "Remove {email} from this group?",
+      "roleMember": "Member",
+      "roleManager": "Manager",
+      "memberAdded": "Person added to the group.",
+      "memberRemoved": "Person removed from the group.",
+      "sharedWith": "Shared with this group",
+      "sharedEmpty": "Nothing is shared with this group yet."
+    }
+  },
+  "iam": {
+    "permission": {
+      "read": "Can view",
+      "use": "Can use",
+      "edit": "Can edit",
+      "manage": "Can manage"
+    },
+    "share": "Share",
+    "sharedWithMe": "Shared with me",
+    "everyone": "Everyone in this organization",
+    "owner": "Owner"
   }
 }

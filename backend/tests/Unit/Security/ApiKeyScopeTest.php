@@ -220,6 +220,34 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/filesX'));
     }
 
+    public function testIamReadReachesGroupsButNotAdminGroups(): void
+    {
+        $scopes = [ApiKeyScope::IAM_READ];
+
+        self::assertTrue(ApiKeyScope::isRestricted($scopes));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/groups/mine'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/groups'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/groups'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/groups/1/members'));
+    }
+
+    public function testIamManageImpliesIamReadAndReachesAdminGroups(): void
+    {
+        $scopes = [ApiKeyScope::IAM_MANAGE];
+
+        self::assertTrue(ApiKeyScope::isRestricted($scopes));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/admin/groups'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/admin/groups/1/members/4'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/groups/mine'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users'));
+    }
+
+    public function testLegacyWebhookKeyIsNotRestricted(): void
+    {
+        self::assertFalse(ApiKeyScope::isRestricted(['webhooks:*']));
+        self::assertFalse(ApiKeyScope::isRestricted([]));
+    }
+
     public function testSelfRevokeMatchesOnlyOwnKeyViaDelete(): void
     {
         self::assertTrue(ApiKeyScope::isSelfRevoke('DELETE', '/api/v1/apikeys/12', 12));

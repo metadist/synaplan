@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\User;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -27,9 +28,11 @@ class OidcUserService
         private EntityManagerInterface $em,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
+        private ExternalIdentityRepository $externalIdentityRepository,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
         string $oidcClientId,
+        private string $oidcDiscoveryUrl = '',
     ) {
         $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
         $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims, $oidcClientId);
@@ -51,7 +54,7 @@ class OidcUserService
             throw new \RuntimeException('OIDC claims missing subject (sub)');
         }
 
-        $user = $this->findBySub($sub) ?? $this->findByEmail($email);
+        $user = $this->findBySub($claims) ?? $this->findByEmail($email);
         $isNewUser = false;
 
         if ($user) {
@@ -92,6 +95,7 @@ class OidcUserService
 
         $this->em->persist($user);
         $this->em->flush();
+        $this->upsertExternalIdentity($user, $claims);
 
         if ($isNewUser) {
             $this->modelConfigService->initializeNewUserDefaults($user->getId());
@@ -172,14 +176,72 @@ class OidcUserService
         return $paths;
     }
 
-    private function findBySub(string $sub): ?User
+    /**
+     * Resolve by the configured issuer first so a colliding `sub` from another
+     * IdP cannot log into the wrong local account. Legacy JSON `oidc_sub` is
+     * the fallback for rows written before BEXTERNALIDENTITIES existed.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function findBySub(array $claims): ?User
     {
+        $sub = $claims['sub'] ?? null;
+        if (!is_string($sub) || '' === $sub) {
+            return null;
+        }
+
+        $identity = $this->externalIdentityRepository->findOneByTriple(
+            $this->oidcSource($claims),
+            '',
+            $sub,
+        );
+        if (null !== $identity) {
+            $user = $this->userRepository->find($identity->getUserId());
+            if ($user instanceof User) {
+                return $user;
+            }
+        }
+
         $qb = $this->userRepository->createQueryBuilder('u');
         $qb->where('u.userDetails LIKE :pattern')
             ->setParameter('pattern', '%"oidc_sub":"'.addcslashes($sub, '"\\').'"%')
             ->setMaxResults(1);
 
         return $qb->getQuery()->getOneOrNullResult();
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     */
+    private function upsertExternalIdentity(User $user, array $claims): void
+    {
+        $userId = $user->getId();
+        $sub = $claims['sub'] ?? null;
+        if (null === $userId || !is_string($sub) || '' === $sub) {
+            return;
+        }
+
+        $this->externalIdentityRepository->upsert(
+            (int) $userId,
+            $this->oidcSource($claims),
+            $sub,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     */
+    private function oidcSource(array $claims): string
+    {
+        $iss = $claims['iss'] ?? null;
+        if (is_string($iss) && '' !== $iss) {
+            return 'oidc:'.$iss;
+        }
+
+        $discovery = rtrim($this->oidcDiscoveryUrl, '/');
+        $issuer = preg_replace('#/\.well-known/openid-configuration$#', '', $discovery) ?? $discovery;
+
+        return 'oidc:'.('' !== $issuer ? $issuer : 'unknown');
     }
 
     private function findByEmail(?string $email): ?User

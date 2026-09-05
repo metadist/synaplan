@@ -62,6 +62,27 @@
           data-testid="input-key-name"
           @keypress.enter="createAPIKey"
         />
+        <div class="flex flex-col gap-2 sm:w-auto">
+          <p class="text-xs txt-secondary">{{ $t('config.apiKeys.scopes.hint') }}</p>
+          <label class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeIamRead"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-iam-read"
+            />
+            {{ $t('config.apiKeys.scopes.iamRead') }}
+          </label>
+          <label class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeIamManage"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-iam-manage"
+            />
+            {{ $t('config.apiKeys.scopes.iamManage') }}
+          </label>
+        </div>
         <button
           :disabled="!newKeyName.trim() || loading"
           class="w-full sm:w-auto btn-primary px-5 py-3 rounded-lg font-medium text-sm flex items-center justify-center gap-2 whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -419,6 +440,8 @@ interface UIApiKey {
 
 const apiKeys = ref<UIApiKey[]>([])
 const newKeyName = ref('')
+const includeIamRead = ref(false)
+const includeIamManage = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
@@ -460,9 +483,20 @@ const createAPIKey = async () => {
     loading.value = true
     error.value = null
 
+    const scopes: string[] = []
+    if (includeIamRead.value) {
+      scopes.push('iam:read')
+    }
+    if (includeIamManage.value) {
+      scopes.push('iam:manage')
+    }
+    if (scopes.length === 0) {
+      scopes.push('webhooks:*')
+    }
+
     const response = await createApiKey({
       name: newKeyName.value,
-      scopes: ['webhooks:*'], // Default scopes
+      scopes,
     })
 
     // Add to list with full key
@@ -482,6 +516,8 @@ const createAPIKey = async () => {
 
     apiKeys.value.unshift(newKey)
     newKeyName.value = ''
+    includeIamRead.value = false
+    includeIamManage.value = false
 
     // Show modal with the full key
     newlyCreatedKey.value = response.api_key.key

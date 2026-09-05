@@ -34,6 +34,18 @@ test('classifies allow-listed internal backend files as backend-only', () => {
   )
 })
 
+test('classifies IAM AccessGate as backend-only', () => {
+  const result = classifyFiles([entry('backend/src/Service/Iam/AccessGate.php', 'A')], policy)
+
+  assert.equal(result.classification, 'backend-only')
+})
+
+test('classifies People page as ota-candidate', () => {
+  const result = classifyFiles([entry('frontend/src/views/PeopleView.vue', 'A')], policy)
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies web-layer application code and assets as ota-candidate', () => {
   const paths = [
     'frontend/src/views/ChatView.styles.css',

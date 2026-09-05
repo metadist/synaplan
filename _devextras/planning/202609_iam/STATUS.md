@@ -1,15 +1,15 @@
 # Status — IAM — groups, sharing, directory
 
 Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
-[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03; awaiting technical plan review
-before the first sprint starts.**
+[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.** S1 Groups core is
+in progress on `feat/iam-groups-core`.
 
 ## Steps
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
 | S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes move to S1 |
-| S1 Groups core | — | planned | |
+| S1 Groups core | `synaplan/` `feat/iam-groups-core` | in progress | IAM1–IAM10 implemented; gate running |
 | S2 Sharing MVP | — | planned | |
 | S3 More kinds | — | planned | |
 | S4 Directory & privacy | — | planned | |

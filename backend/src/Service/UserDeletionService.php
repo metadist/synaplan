@@ -9,7 +9,9 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
 use App\Repository\EmailVerificationAttemptRepository;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\FileRepository;
+use App\Repository\GroupMemberRepository;
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\MessageDigestRepository;
@@ -59,6 +61,8 @@ final readonly class UserDeletionService
         private UserMemoryService $userMemoryService,
         private MessageDigestRepository $messageDigestRepository,
         private QdrantClientInterface $qdrantClient,
+        private GroupMemberRepository $groupMemberRepository,
+        private ExternalIdentityRepository $externalIdentityRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -103,6 +107,8 @@ final readonly class UserDeletionService
             $this->deleteRevectorizeRuns($userId);
             $this->deleteMemoriesFromSql($userId);
             $this->deleteMessageDigests($userId);
+            $this->deleteGroupMemberships($userId);
+            $this->deleteExternalIdentities($userId);
 
             // Finally, delete the user account
             $this->em->remove($user);
@@ -175,6 +181,8 @@ final readonly class UserDeletionService
             $this->deleteRevectorizeRuns($userId);
             $this->deleteMemoriesFromSql($userId);
             $this->deleteMessageDigests($userId);
+            $this->deleteGroupMemberships($userId);
+            $this->deleteExternalIdentities($userId);
 
             $this->em->flush();
             $this->em->getConnection()->commit();
@@ -411,6 +419,16 @@ final readonly class UserDeletionService
         foreach ($configs as $config) {
             $this->em->remove($config);
         }
+    }
+
+    private function deleteGroupMemberships(int $userId): void
+    {
+        $this->groupMemberRepository->deleteByUserId($userId);
+    }
+
+    private function deleteExternalIdentities(int $userId): void
+    {
+        $this->externalIdentityRepository->deleteByUserId($userId);
     }
 
     private function deleteRevectorizeRuns(int $userId): void

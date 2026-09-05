@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit;
 
 use App\Entity\User;
+use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\OidcUserService;
@@ -21,12 +22,27 @@ class OidcUserServiceTest extends TestCase
     private UserRepository&MockObject $userRepository;
     private EntityManagerInterface&MockObject $em;
     private ModelConfigService&MockObject $modelConfigService;
+    private ExternalIdentityRepository&MockObject $externalIdentities;
 
     protected function setUp(): void
     {
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->modelConfigService = $this->createMock(ModelConfigService::class);
+        $this->externalIdentities = $this->createMock(ExternalIdentityRepository::class);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
+        $this->externalIdentities->method('upsert')->willReturn(
+            $this->createStub(\App\Entity\ExternalIdentity::class),
+        );
+
+        $qb = $this->createMock(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $query = $this->createMock(Query::class);
+        $query->method('getOneOrNullResult')->willReturn(null);
+        $qb->method('getQuery')->willReturn($query);
+        $this->userRepository->method('createQueryBuilder')->willReturn($qb);
     }
 
     private function createService(
@@ -39,9 +55,11 @@ class OidcUserServiceTest extends TestCase
             $this->em,
             $this->modelConfigService,
             new NullLogger(),
+            $this->externalIdentities,
             $oidcAdminRoles,
             $oidcRoleClaims,
             $oidcClientId,
+            'https://idp.example/realms/synaplan/.well-known/openid-configuration',
         );
     }
 
