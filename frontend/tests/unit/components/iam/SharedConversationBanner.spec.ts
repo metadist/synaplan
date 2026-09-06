@@ -79,7 +79,11 @@ describe('SharedConversationBanner', () => {
       mountBanner({ canContinue: false }).find('[data-testid="btn-continue-as-copy"]').exists()
     ).toBe(false)
     const wrapper = mountBanner({ canContinue: true, access: 'use' })
-    await wrapper.get('[data-testid="btn-continue-as-copy"]').trigger('click')
+    const button = wrapper.get('[data-testid="btn-continue-as-copy"]')
+    expect(button.classes()).toEqual(
+      expect.arrayContaining(['btn-primary', 'px-4', 'py-2.5', 'rounded-lg'])
+    )
+    await button.trigger('click')
     expect(wrapper.emitted('continue')).toHaveLength(1)
   })
 })
