@@ -4636,6 +4636,7 @@
         "privateTitle": "Tu propio chat: solo tú puedes verlo",
         "group": "Grupo",
         "groupTitle": "Compartido con el grupo «{name}»",
+        "groupTitleGeneric": "Compartido con un grupo",
         "everyone": "Todos",
         "everyoneTitle": "Compartido con todos en esta organización",
         "direct": "Compartido contigo",

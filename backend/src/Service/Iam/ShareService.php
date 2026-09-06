@@ -165,25 +165,9 @@ final readonly class ShareService
             static fn ($m): int => $m->getGroupId(),
             $this->groupMemberRepository->findByUserId($userId),
         );
-        /** @var array<string, array{permission: Permission, share: Share, sharedAt: int}> $byResource */
-        $byResource = [];
-        foreach ($this->shareRepository->findForSubjects($userId, $groupIds, $kind) as $share) {
-            $id = $share->getResourceId();
-            $permission = Permission::tryFrom($share->getPermission());
-            if (null === $permission) {
-                continue;
-            }
-            $existing = $byResource[$id] ?? null;
-            if (null === $existing) {
-                $byResource[$id] = ['permission' => $permission, 'share' => $share, 'sharedAt' => $share->getCreated()];
-                continue;
-            }
-            $byResource[$id]['sharedAt'] = min($existing['sharedAt'], $share->getCreated());
-            if ($this->outranks($share, $permission, $existing['share'], $existing['permission'])) {
-                $byResource[$id]['permission'] = $permission;
-                $byResource[$id]['share'] = $share;
-            }
-        }
+        $byResource = $this->winnersByResource(
+            $this->shareRepository->findForSubjects($userId, $groupIds, $kind)
+        );
 
         $kindImpl = $this->registry->get($kind);
         $out = [];
@@ -214,7 +198,7 @@ final readonly class ShareService
 
         return [
             'type' => $row['share']->getSubjectType(),
-            'name' => $this->subjectNameAndEmail($row['share'])['name'],
+            'name' => $this->sharedViaName($row['share']),
         ];
     }
 
@@ -223,13 +207,27 @@ final readonly class ShareService
      */
     public function winningShareFor(int $userId, string $kind, string $resourceId): ?array
     {
-        foreach ($this->listSharedWith($userId, $kind) as $row) {
-            if ($row['share']->getResourceId() === $resourceId) {
-                return $row;
-            }
+        $groupIds = array_map(
+            static fn ($m): int => $m->getGroupId(),
+            $this->groupMemberRepository->findByUserId($userId),
+        );
+        $winners = $this->winnersByResource(
+            $this->shareRepository->findForSubjects($userId, $groupIds, $kind, $resourceId)
+        );
+        $winner = $winners[$resourceId] ?? null;
+        if (null === $winner) {
+            return null;
         }
 
-        return null;
+        $kindImpl = $this->registry->get($kind);
+
+        return [
+            'card' => $kindImpl->describe($resourceId),
+            'permission' => $winner['permission']->value,
+            'ownerId' => $kindImpl->ownerId($resourceId),
+            'share' => $winner['share'],
+            'sharedAt' => $winner['sharedAt'],
+        ];
     }
 
     /**
@@ -329,7 +327,7 @@ final readonly class ShareService
         $item = $this->serializeSharedCard($row['card'], $row['permission'], $row['ownerId']);
         $item['sharedVia'] = [
             'type' => $share->getSubjectType(),
-            'name' => $this->subjectNameAndEmail($share)['name'],
+            'name' => $this->sharedViaName($share),
         ];
         $item['sharedAt'] = $row['sharedAt'];
         $item['isNew'] = $share->getGrantedBy() !== $viewerId && $row['sharedAt'] > $lastSeenAt;
@@ -385,6 +383,49 @@ final readonly class ShareService
         if (!$group instanceof Group) {
             throw new \InvalidArgumentException('That group was not found.');
         }
+    }
+
+    /**
+     * How the share reached the viewer. Only a group name is useful here —
+     * a user subject is the viewer themselves, and everyone has no name.
+     */
+    private function sharedViaName(Share $share): string
+    {
+        if (Share::SUBJECT_GROUP !== $share->getSubjectType()) {
+            return '';
+        }
+
+        return $this->subjectNameAndEmail($share)['name'];
+    }
+
+    /**
+     * @param list<Share> $shares
+     *
+     * @return array<string, array{permission: Permission, share: Share, sharedAt: int}>
+     */
+    private function winnersByResource(array $shares): array
+    {
+        /** @var array<string, array{permission: Permission, share: Share, sharedAt: int}> $byResource */
+        $byResource = [];
+        foreach ($shares as $share) {
+            $id = $share->getResourceId();
+            $permission = Permission::tryFrom($share->getPermission());
+            if (null === $permission) {
+                continue;
+            }
+            $existing = $byResource[$id] ?? null;
+            if (null === $existing) {
+                $byResource[$id] = ['permission' => $permission, 'share' => $share, 'sharedAt' => $share->getCreated()];
+                continue;
+            }
+            $byResource[$id]['sharedAt'] = min($existing['sharedAt'], $share->getCreated());
+            if ($this->outranks($share, $permission, $existing['share'], $existing['permission'])) {
+                $byResource[$id]['permission'] = $permission;
+                $byResource[$id]['share'] = $share;
+            }
+        }
+
+        return $byResource;
     }
 
     /**

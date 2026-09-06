@@ -17,7 +17,10 @@ export function kindOfSharedVia(
     case 'everyone':
       return { kind: 'everyone', label: null }
     default:
-      return { kind: 'direct', label: ownerName ?? sharedVia?.name ?? null }
+      return {
+        kind: 'direct',
+        label: ownerName?.trim() || sharedVia?.name?.trim() || null,
+      }
   }
 }
 

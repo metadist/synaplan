@@ -324,7 +324,7 @@ class ChatController extends AbstractController
                                     required: ['type', 'name'],
                                     properties: [
                                         new OA\Property(property: 'type', type: 'string', enum: ['user', 'group', 'everyone'], example: 'group'),
-                                        new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group or person name; empty for everyone'),
+                                        new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group name, or empty for "everyone" / a direct share'),
                                     ]
                                 ),
                             ]

@@ -5556,6 +5556,7 @@
         "privateTitle": "Dein eigener Chat – nur du kannst ihn sehen",
         "group": "Gruppe",
         "groupTitle": "Mit der Gruppe „{name}“ geteilt",
+        "groupTitleGeneric": "Mit einer Gruppe geteilt",
         "everyone": "Alle",
         "everyoneTitle": "Mit allen in dieser Organisation geteilt",
         "direct": "Mit dir geteilt",
