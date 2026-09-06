@@ -5,23 +5,34 @@
         <Cog6ToothIcon class="w-5 h-5" />
         {{ $t('widget.configuration') }}
       </h2>
-      <button
-        class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
-        :aria-label="$t('widget.closeEditor')"
-        data-testid="btn-close"
-        @click="$emit('cancel')"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="2"
-          stroke="currentColor"
-          class="w-5 h-5"
+      <div class="flex items-center gap-2">
+        <button
+          v-if="iamSharingEnabled && resourceId"
+          type="button"
+          class="btn-secondary px-3 py-2 rounded-lg text-sm"
+          data-testid="btn-share-widget"
+          @click="iamShareOpen = true"
         >
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+          {{ $t('iam.share') }}
+        </button>
+        <button
+          class="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors txt-secondary hover:txt-primary"
+          :aria-label="$t('widget.closeEditor')"
+          data-testid="btn-close"
+          @click="$emit('cancel')"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            class="w-5 h-5"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -228,6 +239,13 @@
 
     <!-- Buttons are now in UnsavedChangesBar -->
     <div class="h-20"></div>
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="widget"
+      :resource-id="resourceId ? String(resourceId) : ''"
+      :resource-name="$t('iam.kind.widget')"
+      @close="iamShareOpen = false"
+    />
   </div>
 </template>
 
@@ -236,12 +254,15 @@ import { ref, computed } from 'vue'
 import { Cog6ToothIcon, CodeBracketIcon } from '@heroicons/vue/24/outline'
 import type { WidgetConfig } from '@/mocks/widgets'
 import { integrationTypes, positions, aiPrompts, generateEmbedCode } from '@/mocks/widgets'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 
 interface Props {
   modelValue: WidgetConfig
   widgetId?: string
   userId?: string
   showCode?: boolean
+  resourceId?: number
 }
 
 const props = defineProps<Props>()
@@ -261,6 +282,8 @@ const config = computed({
 const tabs = ['appearance', 'behavior', 'advanced']
 const activeTab = ref('appearance')
 const copied = ref(false)
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
 
 const embedCode = computed(() => {
   if (props.widgetId && props.userId) {

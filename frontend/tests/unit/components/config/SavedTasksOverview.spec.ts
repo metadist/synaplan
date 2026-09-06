@@ -15,6 +15,14 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
 }))
 
+vi.mock('@/composables/useIamFeature', () => ({
+  isIamSharingEnabled: () => false,
+}))
+
+vi.mock('@/services/api/iamApi', () => ({
+  iamApi: { listSharedWithMe: vi.fn().mockResolvedValue([]) },
+}))
+
 const task: SavedTask = {
   id: 7,
   promptId: 12,
@@ -66,5 +74,11 @@ describe('SavedTasksOverview', () => {
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="saved-tasks-empty"]').exists()).toBe(false)
     expect(wrapper.findAll('[data-testid="saved-task-card"]')).toHaveLength(1)
+  })
+
+  it('hides Shared with me when sharing is off', async () => {
+    mockList.mockResolvedValue([task])
+    const wrapper = await mountPage()
+    expect(wrapper.find('[data-testid="btn-shared-with-me"]').exists()).toBe(false)
   })
 })

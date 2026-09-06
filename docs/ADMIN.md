@@ -372,7 +372,9 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 Groups, the People page under Operate, and the group API are gated by
 `IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The seeder inserts the
-flag as `0`. Existing installs stay unchanged until an operator turns it on.
+flag as `0`. Existing installs stay unchanged until an operator turns it on
+in **Operate → System configuration → Access → Sharing**
+(`/admin/config?tab=sharing`).
 
 When the flag is off:
 
@@ -394,15 +396,16 @@ When the flag is on:
 Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
 `1`. When they are on:
 
-- An owner can share a knowledge folder or a conversation with a person, a
-  group, or everyone on the instance.
+- An owner can share a knowledge folder, a conversation, an **AI assistant**,
+  a **saved task**, or a **chat widget** with a person, a group, or everyone
+  on the instance.
 - Conversation permissions are **Can view** and **Can use**. **Can use** lets
   a member continue the chat as their own copy (file binaries stay with the
   owner).
 - RAG only includes another person's files when a share grants **Can use**
   or higher. A query never runs without an owner scope.
-- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is in Operate → System
-  config → Sharing. With `admins_only`, the share dialog does not offer
+- `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is on the same Sharing
+  page. With `admins_only`, the share dialog does not offer
   "Everyone on this instance" to non-admins.
 - **Can manage** on a folder lets that person re-share it; only the owner can
   delete it. Sharing an item with yourself is rejected.
@@ -414,7 +417,10 @@ Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
 - `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) is reserved for OIDC group sync
   (S4) and has no effect yet.
 
-Enable:
+Enable both switches under **Operate → System configuration → Access →
+Sharing** (`IAM_GROUPS_ENABLED`, then `IAM_SHARING_ENABLED`). The page
+reloads the runtime config so People and Share appear without a restart.
+SQL remains available for automation:
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
@@ -422,19 +428,55 @@ VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
 ON DUPLICATE KEY UPDATE BVALUE = '1';
 ```
 
-Public token links are unchanged. Admins do not see other people's chats or
-files unless those items are shared with them.
+### Publishing an assistant to a group
 
-Enable on a running instance:
+1. Turn groups and sharing on (both flags above).
+2. Create a custom assistant under **AI → Instructions** (system assistants
+   with owner `0` cannot be shared — everyone can already use them).
+3. Open **Share** and grant **Can use** to the group (for example Sales).
+4. Members of that group see the assistant in their list and the classifier
+   may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the
+   share. People outside the group get **403** on `GET /api/v1/prompts/{id}`.
+5. A shared **saved task** is run as the member's own copy
+   (`POST /api/v1/saved-tasks/{id}/copy`) — trigger resets to manual. The
+   assistant on that task must also be usable (owned, system, or shared
+   `use`), otherwise the copy returns **409** `iam.assistantNotShared`.
+6. A shared **widget** can be opened read-only (`read`) or co-edited (`edit`).
+   Embed code, visitor sessions, and transcripts stay with the owner.
 
-```sql
-INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-VALUES (0, 'IAM', 'GROUPS_ENABLED', '1')
-ON DUPLICATE KEY UPDATE BVALUE = '1';
+Acceptance script (HTTP only): `_devextras/testing/iam/publish-demo.sh`.
+
+### Plugin-declared kinds
+
+A plugin `manifest.json` may declare shareable rows in `plugin_data`:
+
+```json
+{
+  "provides": {
+    "resourceKinds": [
+      {
+        "key": "synaform:form",
+        "dataType": "form",
+        "labelKey": "synaform.kind.form",
+        "permissions": ["read", "use", "edit"]
+      }
+    ]
+  }
+}
 ```
 
-Then reload the app (or wait for the next runtime-config fetch). Rollback is
-the same statement with `'0'`. Group rows stay in the database.
+`key` must be `{pluginId}:{name}`. Permissions are a subset of
+`read`, `use`, `edit`, `manage`. An invalid field fails plugin load and names
+the field. Shared rows are loaded with
+`PluginDataRepository::findSharedWith($userId, $pluginId, $dataType)`.
+
+Public token links are unchanged. Admins do not see other people's chats,
+files, assistants, tasks, or widget transcripts unless those items are shared
+with them.
+
+Turn **People & groups** on from the same Sharing page (`IAM_GROUPS_ENABLED`).
+Members then see **Account → My groups**. Rollback is the same toggle (or
+SQL with `'0'`). Group rows stay in the database.
 
 API keys: empty or legacy webhook-only scopes keep full access. A key that
 opts into `iam:read` or `iam:manage` is limited to those People routes.

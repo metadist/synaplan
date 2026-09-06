@@ -230,6 +230,8 @@ export const selectors = {
   share: {
     shareButton: '[data-testid="btn-chat-share"]',
     shareModal: '[data-testid="modal-chat-share"]',
+    iamShareModal: '[data-testid="modal-iam-share"]',
+    iamPublicLink: '[data-testid="btn-iam-public-link"]',
     modalRoot: '[data-testid="modal-chat-share-root"]',
     shareCreate: '[data-testid="btn-chat-share-make-public"]',
     shareLinkInput: '[data-testid="share-link-input"]',

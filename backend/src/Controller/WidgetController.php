@@ -8,9 +8,14 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
 use App\Repository\WidgetRepository;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\WidgetKind;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
 use App\Service\UserMemoryService;
@@ -57,6 +62,9 @@ class WidgetController extends AbstractController
         private LoggerInterface $logger,
         private SlackNotificationService $slack,
         private string $uploadDir,
+        private AccessGate $accessGate,
+        private IamConfig $iamConfig,
+        private ShareRepository $shareRepository,
     ) {
     }
 
@@ -240,7 +248,43 @@ class WidgetController extends AbstractController
         path: '/api/v1/widgets/{widgetId}',
         summary: 'Get widget details',
         security: [['Bearer' => []]],
-        tags: ['Widgets']
+        tags: ['Widgets'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Widget details; visitor stats only for the owner',
+                content: new OA\JsonContent(
+                    required: ['success', 'widget'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'widget',
+                            type: 'object',
+                            required: ['id', 'widgetId', 'name', 'taskPromptTopic', 'status', 'config', 'allowedDomains', 'isActive'],
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer'),
+                                new OA\Property(property: 'widgetId', type: 'string'),
+                                new OA\Property(property: 'name', type: 'string'),
+                                new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                                new OA\Property(property: 'status', type: 'string'),
+                                new OA\Property(property: 'config', type: 'object'),
+                                new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
+                                new OA\Property(property: 'isActive', type: 'boolean'),
+                                new OA\Property(property: 'created', type: 'integer', format: 'int64'),
+                                new OA\Property(property: 'updated', type: 'integer', format: 'int64'),
+                                new OA\Property(property: 'stats', type: 'object', nullable: true, description: 'Owner only'),
+                                new OA\Property(property: 'access', type: 'string', enum: ['owner', 'read', 'edit', 'manage'], description: 'Present when sharing is enabled'),
+                                new OA\Property(property: 'shared', type: 'boolean', description: 'True when this widget belongs to someone else'),
+                                new OA\Property(property: 'ownerId', type: 'integer'),
+                            ]
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Widget does not reach this user'),
+            new OA\Response(response: 404, description: 'Widget not found'),
+        ]
     )]
     #[OA\Parameter(
         name: 'widgetId',
@@ -260,28 +304,37 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Read)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        // Get statistics
-        $stats = $this->sessionService->getWidgetStats($widgetId);
+        // Visitor statistics belong to the owner (like the session list); a
+        // read share shows the configuration only.
+        $isOwner = $widget->getOwnerId() === (int) $user->getId();
+        $widgetPayload = [
+            'id' => $widget->getId(),
+            'widgetId' => $widget->getWidgetId(),
+            'name' => $widget->getName(),
+            'taskPromptTopic' => $widget->getTaskPromptTopic(),
+            'status' => $widget->getStatus(),
+            'config' => $widget->getConfig(),
+            'allowedDomains' => $widget->getAllowedDomains(),
+            'isActive' => $this->widgetService->isWidgetActive($widget),
+            'created' => $widget->getCreated(),
+            'updated' => $widget->getUpdated(),
+            'stats' => $isOwner ? $this->sessionService->getWidgetStats($widgetId) : null,
+        ];
+        if ($this->iamConfig->isSharingEnabled((int) $user->getId())) {
+            $widgetPayload['access'] = $this->widgetAccess($user, $widget);
+            $widgetPayload['shared'] = $widget->getOwnerId() !== (int) $user->getId();
+            $widgetPayload['ownerId'] = $widget->getOwnerId();
+        }
 
         return $this->json([
             'success' => true,
-            'widget' => [
-                'id' => $widget->getId(),
-                'widgetId' => $widget->getWidgetId(),
-                'name' => $widget->getName(),
-                'taskPromptTopic' => $widget->getTaskPromptTopic(),
-                'status' => $widget->getStatus(),
-                'config' => $widget->getConfig(),
-                'allowedDomains' => $widget->getAllowedDomains(),
-                'isActive' => $this->widgetService->isWidgetActive($widget),
-                'created' => $widget->getCreated(),
-                'updated' => $widget->getUpdated(),
-                'stats' => $stats,
-            ],
+            'widget' => $widgetPayload,
         ]);
     }
 
@@ -307,7 +360,9 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Edit)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
@@ -367,11 +422,14 @@ class WidgetController extends AbstractController
             return $this->json(['error' => 'Widget not found'], Response::HTTP_NOT_FOUND);
         }
 
-        if ($widget->getOwnerId() !== $user->getId()) {
+        if ($widget->getOwnerId() !== $user->getId()
+            && !$this->accessGate->decide($user, WidgetKind::KEY, (string) $widget->getId(), Permission::Manage)
+        ) {
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         try {
+            $this->shareRepository->deleteByResource(WidgetKind::KEY, (string) $widget->getId());
             $this->widgetService->deleteWidget($widget);
 
             return $this->json([
@@ -1410,5 +1468,18 @@ class WidgetController extends AbstractController
         }
 
         return ['urls' => $urls, 'promptId' => $prompt->getId()];
+    }
+
+    private function widgetAccess(User $user, Widget $widget): string
+    {
+        if ($widget->getOwnerId() === (int) $user->getId()) {
+            return 'owner';
+        }
+        $granted = $this->accessGate->highestGranted($user, WidgetKind::KEY, (string) $widget->getId());
+        if (null === $granted) {
+            return 'read';
+        }
+
+        return $granted->value;
     }
 }

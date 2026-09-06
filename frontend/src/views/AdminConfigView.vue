@@ -10,6 +10,7 @@ import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useConfigStore } from '@/stores/config'
 import { useUpdatesStore } from '@/stores/updates'
 import { useNotification } from '@/composables/useNotification'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
@@ -27,6 +28,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const configStore = useConfigStore()
 const updatesStore = useUpdatesStore()
 const { success, error: showError } = useNotification()
 const { isDark } = useTheme()
@@ -61,6 +63,12 @@ const tabIcons: Record<string, string> = {
   channels: 'mdi:message-text',
   processing: 'mdi:file-document-outline',
   vectordb: 'mdi:database-search',
+  sharing: 'mdi:account-group',
+  routing: 'mdi:routes',
+  branding: 'mdi:palette',
+  interface: 'mdi:monitor-dashboard',
+  guest_landing: 'mdi:newspaper-variant-outline',
+  mobile: 'mdi:cellphone',
 }
 
 // Computed
@@ -81,19 +89,19 @@ const groupDefs = [
     id: 'ai-data',
     icon: 'mdi:robot',
     labelKey: 'admin.config.tabGroups.aiData',
-    tabIds: ['ai', 'vectordb', 'processing'],
+    tabIds: ['ai', 'vectordb', 'processing', 'routing'],
   },
   {
     id: 'communication',
     icon: 'mdi:message-text',
     labelKey: 'admin.config.tabGroups.communication',
-    tabIds: ['email', 'channels'],
+    tabIds: ['email', 'channels', 'branding', 'guest_landing', 'interface', 'mobile'],
   },
   {
     id: 'security',
     icon: 'mdi:shield-key',
     labelKey: 'admin.config.tabGroups.security',
-    tabIds: ['auth'],
+    tabIds: ['auth', 'sharing'],
   },
 ]
 
@@ -265,6 +273,9 @@ async function handleUpdate(key: string, value: string) {
       // Show restart banner only for env-based fields
       if (result.requiresRestart) {
         showRestartBanner.value = true
+      }
+      if (key === 'IAM_GROUPS_ENABLED' || key === 'IAM_SHARING_ENABLED') {
+        await configStore.reload()
       }
     }
   } catch (err) {

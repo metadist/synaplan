@@ -9,8 +9,13 @@ vi.mock('@/services/authService', () => ({
 }))
 
 const httpClientMock = vi.hoisted(() => vi.fn())
+const isIamSharingEnabledMock = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: httpClientMock,
+}))
+vi.mock('@/composables/useIamFeature', () => ({
+  isIamSharingEnabled: () => isIamSharingEnabledMock(),
+  isIamGroupsEnabled: () => false,
 }))
 
 function chatPayload(id: number) {
@@ -342,6 +347,63 @@ describe('Chats Store', () => {
         (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
       )
       expect(sorted[0].id).toBe(2)
+    })
+  })
+
+  describe('loadConversationAccess', () => {
+    it('skips the request and treats the chat as owned when sharing is off', async () => {
+      isIamSharingEnabledMock.mockReturnValueOnce(false)
+      const store = useChatsStore()
+
+      await store.loadConversationAccess(3)
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('treats a missing access field as owner', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 3 } })
+
+      await store.loadConversationAccess(3)
+
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('records a shared read-only chat', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 4, access: 'read' } })
+
+      await store.loadConversationAccess(4)
+
+      expect(store.conversationAccess).toBe('read')
+    })
+
+    it('clears access while loading and does not fall back to owner on error', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+
+      await store.loadConversationAccess(5)
+
+      expect(store.conversationAccess).toBeNull()
+    })
+
+    it('ignores a stale response after a newer load started', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadConversationAccess(1)
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 2, access: 'use' } })
+      await store.loadConversationAccess(2)
+
+      resolveFirst({ chat: { id: 1, access: 'owner' } })
+      await first
+
+      expect(store.conversationAccess).toBe('use')
     })
   })
 

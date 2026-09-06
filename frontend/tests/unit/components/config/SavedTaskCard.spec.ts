@@ -24,6 +24,14 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
 }))
 
+vi.mock('@/composables/useIamFeature', () => ({
+  isIamSharingEnabled: () => false,
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ confirm: vi.fn().mockResolvedValue(false) }),
+}))
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
@@ -71,7 +79,7 @@ const mountCard = (value: SavedTask) =>
   mount(SavedTaskCard, {
     props: { task: value },
     global: {
-      stubs: { Icon: true },
+      stubs: { Icon: true, ShareDialog: true },
     },
   })
 
@@ -227,5 +235,12 @@ describe('SavedTaskCard', () => {
     // The English retention prose from the backend is never shown raw.
     expect(text).not.toContain('ignored backend prose')
     expect(text).toContain('Older runs are removed automatically.')
+  })
+
+  it('hides Share and run-as-copy when sharing is off', () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.find('[data-testid="btn-share-saved-task"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-run-copy"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-run-now"]').exists()).toBe(true)
   })
 })

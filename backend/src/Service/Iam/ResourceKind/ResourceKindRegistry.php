@@ -18,6 +18,7 @@ final readonly class ResourceKindRegistry
     public function __construct(
         #[AutowireIterator('app.iam.resource_kind')]
         iterable $kinds,
+        private ?PluginResourceKindCatalog $pluginKinds = null,
     ) {
         $indexed = [];
         foreach ($kinds as $kind) {
@@ -28,16 +29,20 @@ final readonly class ResourceKindRegistry
 
     public function get(string $key): ShareableResourceKindInterface
     {
-        if (!isset($this->kinds[$key])) {
-            throw new UnknownResourceKindException($key);
+        if (isset($this->kinds[$key])) {
+            return $this->kinds[$key];
+        }
+        $plugin = $this->pluginKinds?->get($key);
+        if (null !== $plugin) {
+            return $plugin;
         }
 
-        return $this->kinds[$key];
+        throw new UnknownResourceKindException($key);
     }
 
     public function has(string $key): bool
     {
-        return isset($this->kinds[$key]);
+        return isset($this->kinds[$key]) || (null !== $this->pluginKinds && $this->pluginKinds->has($key));
     }
 
     /**

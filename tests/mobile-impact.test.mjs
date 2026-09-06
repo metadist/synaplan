@@ -52,6 +52,32 @@ test('classifies Share dialog as ota-candidate', () => {
   assert.equal(result.classification, 'ota-candidate')
 })
 
+test('classifies assistant/saved-task/widget kinds as backend-only', () => {
+  const result = classifyFiles(
+    [
+      entry('backend/src/Service/Iam/ResourceKind/AssistantKind.php', 'A'),
+      entry('backend/src/Service/Iam/ResourceKind/SavedTaskKind.php', 'A'),
+      entry('backend/src/Service/Iam/ResourceKind/WidgetKind.php', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'backend-only')
+})
+
+test('classifies more-kinds share cards as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/components/config/TaskPromptsConfiguration.vue', 'M'),
+      entry('frontend/src/components/config/SavedTaskCard.vue', 'M'),
+      entry('frontend/src/views/WidgetsView.vue', 'M'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies web-layer application code and assets as ota-candidate', () => {
   const paths = [
     'frontend/src/views/ChatView.styles.css',

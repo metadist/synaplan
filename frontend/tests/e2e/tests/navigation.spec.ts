@@ -112,11 +112,11 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     await test.step('Act+Assert: first flyout lists groups only', async () => {
       const flyout = await openFlyout(page, NAV.sidebarV2Manage)
       await expect(flyout.locator(NAV.flyoutGroup('assistants'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('automations'))).toBeVisible()
       await expect(flyout.locator(NAV.flyoutGroup('channels'))).toBeVisible()
       await expect(flyout.locator(NAV.flyoutGroup('connections'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('api'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('automations'))).toBeVisible()
-      await expect(flyout.locator(NAV.flyoutGroup('tools'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('api'))).toHaveCount(0)
+      await expect(flyout.locator(NAV.flyoutGroup('tools'))).toHaveCount(0)
       await expect(flyout.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
       await expect(flyout.locator(NAV.flyoutLinkChatWidget)).toHaveCount(0)
     })
@@ -130,8 +130,8 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       await expect(sub.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
     })
 
-    await test.step('Act+Assert: API submenu shows API docs', async () => {
-      await page.locator(NAV.flyoutGroup('api')).click()
+    await test.step('Act+Assert: Connections submenu shows API docs', async () => {
+      await page.locator(NAV.flyoutGroup('connections')).click()
       const sub = page.locator(NAV.navSubDropdown)
       await expect(sub.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
     })

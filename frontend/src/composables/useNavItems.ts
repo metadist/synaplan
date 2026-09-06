@@ -192,9 +192,7 @@ export function useNavItems() {
       const assistants = t('nav.groupAssistants')
       const channels = t('nav.channels')
       const automations = t('nav.groupAutomations')
-      const tools = t('nav.groupTools')
       const connections = t('nav.connections')
-      const api = t('nav.groupApi')
 
       const grouped = (groupKey: string, group: string) => ({ groupKey, group })
 
@@ -216,6 +214,28 @@ export function useNavItems() {
           path: '/ai/routing',
           label: t('nav.configSortingPrompt'),
           ...grouped('assistants', assistants),
+        },
+        {
+          key: 'doc-summary',
+          path: '/ai/summarizer',
+          label: t('nav.toolsDocSummary'),
+          ...grouped('assistants', assistants),
+        },
+        ...(isSavedTasksEnabled()
+          ? [
+              {
+                key: 'saved-tasks',
+                path: '/channels/tasks',
+                label: t('nav.savedTasks'),
+                ...grouped('automations', automations),
+              },
+            ]
+          : []),
+        {
+          key: 'ai-agents',
+          path: '/channels/agents',
+          label: t('nav.aiAgents'),
+          ...grouped('automations', automations),
         },
         {
           key: 'inbound',
@@ -271,35 +291,13 @@ export function useNavItems() {
           key: 'api-keys',
           path: '/channels/api',
           label: t('nav.configApiKeys'),
-          ...grouped('api', api),
+          ...grouped('connections', connections),
         },
         {
           key: 'api-docs',
           path: '/channels/api/docs',
           label: t('pageTitles.configApiDocs'),
-          ...grouped('api', api),
-        },
-        ...(isSavedTasksEnabled()
-          ? [
-              {
-                key: 'saved-tasks',
-                path: '/channels/tasks',
-                label: t('nav.savedTasks'),
-                ...grouped('automations', automations),
-              },
-            ]
-          : []),
-        {
-          key: 'ai-agents',
-          path: '/channels/agents',
-          label: t('nav.aiAgents'),
-          ...grouped('automations', automations),
-        },
-        {
-          key: 'doc-summary',
-          path: '/ai/summarizer',
-          label: t('nav.toolsDocSummary'),
-          ...grouped('tools', tools),
+          ...grouped('connections', connections),
         },
       ]
 

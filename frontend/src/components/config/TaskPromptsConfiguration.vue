@@ -237,6 +237,13 @@
                         >
                           {{ $t('config.taskPrompts.badgeOverride') }}
                         </span>
+                        <span
+                          v-if="prompt.shared"
+                          class="px-1 py-0.5 rounded text-[9px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none flex-shrink-0"
+                          data-testid="badge-shared-assistant"
+                        >
+                          {{ $t('iam.sharedWithMe') }}
+                        </span>
                       </div>
                       <p
                         v-if="viewDensity === 'detailed' && prompt.shortDescription"
@@ -322,6 +329,16 @@
                   {{ $t('config.taskPrompts.badgeSystem') }}
                 </span>
                 <span
+                  v-else-if="currentPrompt.shared"
+                  class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-[var(--brand)]/10 text-[var(--brand)] leading-none"
+                >
+                  {{
+                    currentPrompt.owner?.name
+                      ? $t('iam.sharedBy', { name: currentPrompt.owner.name })
+                      : $t('iam.sharedWithMe')
+                  }}
+                </span>
+                <span
                   v-else-if="!currentPrompt.isDefault"
                   class="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase bg-purple-500/10 text-purple-600 dark:text-purple-400 leading-none"
                 >
@@ -330,6 +347,15 @@
               </div>
               <p class="text-xs txt-secondary font-mono truncate">{{ currentPrompt.topic }}</p>
             </div>
+            <button
+              v-if="canSharePrompt"
+              type="button"
+              class="btn-secondary inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap"
+              data-testid="btn-share-assistant"
+              @click="openAssistantShare"
+            >
+              {{ $t('iam.share') }}
+            </button>
             <button
               v-if="showSaveAsTask"
               type="button"
@@ -1173,6 +1199,13 @@
       @save="handleSave"
       @discard="handleDiscard"
     />
+    <ShareDialog
+      :is-open="iamShareOpen"
+      kind="assistant"
+      :resource-id="iamShareResourceId"
+      :resource-name="iamShareName"
+      @close="iamShareOpen = false"
+    />
   </div>
 </template>
 
@@ -1209,6 +1242,8 @@ import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { ApiError } from '@/services/api/httpClient'
+import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -1322,7 +1357,22 @@ const newPromptSelectedFiles = ref<number[]>([])
 const newPromptFilesSearch = ref('')
 const showCreateModal = ref(false)
 const promptListSearch = ref('')
-const promptListFilter = ref<'all' | 'system' | 'custom'>('all')
+const promptListFilter = ref<'all' | 'system' | 'custom' | 'shared'>('all')
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
+const iamShareName = ref('')
+const canSharePrompt = computed(() => {
+  const prompt = currentPrompt.value
+  if (!iamSharingEnabled.value || !prompt || prompt.shared) return false
+  return !prompt.isDefault || prompt.isUserOverride === true
+})
+const openAssistantShare = () => {
+  if (!currentPrompt.value) return
+  iamShareResourceId.value = String(currentPrompt.value.id)
+  iamShareName.value = currentPrompt.value.name
+  iamShareOpen.value = true
+}
 const activeTab = ref<EditorTabId>('routing')
 const viewDensity = ref<'compact' | 'detailed'>('compact')
 const collapsedGroups = ref<Set<string>>(new Set())
@@ -1335,24 +1385,36 @@ const systemPromptCount = computed(
   () => prompts.value.filter((p) => p.isDefault && !p.isUserOverride).length
 )
 const customPromptCount = computed(() => prompts.value.filter((p) => !p.isDefault).length)
+const sharedPromptCount = computed(() => prompts.value.filter((p) => p.shared === true).length)
 
-const promptListFilters = computed(() => [
-  {
-    value: 'all' as const,
-    label: t('config.taskPrompts.filterAll'),
-    count: prompts.value.length,
-  },
-  {
-    value: 'system' as const,
-    label: t('config.taskPrompts.filterSystem'),
-    count: systemPromptCount.value,
-  },
-  {
-    value: 'custom' as const,
-    label: t('config.taskPrompts.filterCustom'),
-    count: customPromptCount.value,
-  },
-])
+const promptListFilters = computed(() => {
+  const filters: { value: 'all' | 'system' | 'custom' | 'shared'; label: string; count: number }[] =
+    [
+      {
+        value: 'all',
+        label: t('config.taskPrompts.filterAll'),
+        count: prompts.value.length,
+      },
+      {
+        value: 'system',
+        label: t('config.taskPrompts.filterSystem'),
+        count: systemPromptCount.value,
+      },
+      {
+        value: 'custom',
+        label: t('config.taskPrompts.filterCustom'),
+        count: customPromptCount.value,
+      },
+    ]
+  if (iamSharingEnabled.value) {
+    filters.push({
+      value: 'shared',
+      label: t('iam.sharedWithMe'),
+      count: sharedPromptCount.value,
+    })
+  }
+  return filters
+})
 
 const contentLength = computed(() => (formData.value.content || '').length)
 const contentWordCount = computed(() => {
@@ -1368,6 +1430,9 @@ const filteredPrompts = computed(() => {
       return false
     }
     if (promptListFilter.value === 'custom' && p.isDefault && !p.isUserOverride) {
+      return false
+    }
+    if (promptListFilter.value === 'shared' && p.shared !== true) {
       return false
     }
     if (search === '') return true

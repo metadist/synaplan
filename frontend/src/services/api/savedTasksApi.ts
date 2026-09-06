@@ -4,6 +4,7 @@ import {
   GetApiSavedTasksListResponseSchema,
   GetApiSavedTasksRunsResponseSchema,
   PatchApiSavedTasksUpdateResponseSchema,
+  PostApiSavedTasksCopyResponseSchema,
   PostApiSavedTasksCreateResponseSchema,
   PostApiSavedTasksResumeResponseSchema,
   PostApiSavedTasksRunResponseSchema,
@@ -154,6 +155,14 @@ export const savedTasksApi = {
       runs: (data.runs ?? []).map((run) => asRun(run)),
       retention: data.retention ?? '',
     }
+  },
+
+  async copy(id: number): Promise<SavedTask> {
+    const data = await httpClient(`/api/v1/saved-tasks/${id}/copy`, {
+      method: 'POST',
+      schema: PostApiSavedTasksCopyResponseSchema,
+    })
+    return asTask(data.task)
   },
 
   async resume(id: number): Promise<SavedTask> {

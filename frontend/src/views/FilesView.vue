@@ -776,7 +776,7 @@
                     <button
                       v-if="iamSharingEnabled && !folder.pending && !folder.shared"
                       type="button"
-                      class="absolute bottom-1 left-1 p-1.5 rounded-lg txt-primary bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      class="absolute bottom-1 left-1 icon-ghost opacity-0 group-hover/f:opacity-100 focus:opacity-100"
                       :title="$t('iam.share')"
                       :aria-label="$t('iam.share')"
                       :data-testid="`btn-share-folder-${folder.name}`"

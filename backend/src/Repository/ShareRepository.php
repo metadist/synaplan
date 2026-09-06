@@ -182,6 +182,30 @@ class ShareRepository extends ServiceEntityRepository
             ->execute();
     }
 
+    /**
+     * Remove shares on plugin-declared kinds for the given plugin_data ids.
+     *
+     * Plugin kind keys are always `{pluginId}:{name}`; no built-in kind carries
+     * a colon. Matching on the key shape (not on loaded manifests) also cleans
+     * rows left behind by a plugin that has since been uninstalled.
+     *
+     * @param list<int> $pluginDataIds
+     */
+    public function deleteByPluginDataIds(array $pluginDataIds): void
+    {
+        if ([] === $pluginDataIds) {
+            return;
+        }
+
+        $this->createQueryBuilder('s')
+            ->delete()
+            ->where("s.resourceKind LIKE '%:%'")
+            ->andWhere('s.resourceId IN (:ids)')
+            ->setParameter('ids', array_map(static fn (int $id): string => (string) $id, $pluginDataIds))
+            ->getQuery()
+            ->execute();
+    }
+
     public function deleteByOwnerKnowledgeFolders(int $ownerId): void
     {
         $prefix = $ownerId.':';

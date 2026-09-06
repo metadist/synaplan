@@ -15,8 +15,8 @@
       <li v-for="subject in subjects" :key="`${subject.type}-${subject.id}`">
         <button
           type="button"
-          class="w-full text-left px-3 py-2 rounded-lg text-sm txt-primary hover:bg-black/5 dark:hover:bg-white/5"
-          :class="isSelected(subject) ? 'bg-[var(--brand)]/10 text-[var(--brand)]' : ''"
+          class="w-full text-left px-3 py-2 rounded-lg text-sm txt-primary hover-surface"
+          :class="isSelected(subject) ? 'txt-brand bg-[var(--brand-alpha-light)]' : ''"
           :data-testid="`btn-iam-subject-${subject.type}-${subject.id}`"
           @click="select(subject)"
         >
@@ -47,7 +47,11 @@ const subjects = ref<IamSubject[]>([])
 let timer: ReturnType<typeof setTimeout> | null = null
 
 const load = async () => {
-  subjects.value = await iamApi.searchSubjects(query.value)
+  try {
+    subjects.value = await iamApi.searchSubjects(query.value)
+  } catch {
+    subjects.value = []
+  }
 }
 
 watch(

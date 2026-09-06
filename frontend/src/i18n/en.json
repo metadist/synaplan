@@ -136,6 +136,7 @@
     "adminConfig": "System Configuration",
     "adminSetup": "AI Provider Setup",
     "adminPeople": "People",
+    "myGroups": "My groups",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -619,7 +620,7 @@
       "tabGroups": {
         "aiData": "AI & Data",
         "communication": "Communication",
-        "security": "Security & Login"
+        "security": "Access"
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
@@ -719,7 +720,8 @@
     "aiAgents": "AI Agents",
     "desktop": "Desktop",
     "manage": "Manage",
-    "manageDescription": "Assistants, channels and automations",
+    "manageDescription": "Assistants, automations, channels and connections",
+    "myGroups": "My groups",
     "groupAssistants": "Assistants",
     "groupAutomations": "Automations",
     "groupTools": "Tools",
@@ -5512,6 +5514,11 @@
     },
     "usersMoved": "Users now live on the People page.",
     "openPeople": "Open People",
+    "myGroups": {
+      "subtitle": "Groups you belong to on this instance.",
+      "emptyMember": "You are not in a group yet. An administrator can add you on the People page.",
+      "emptyAdmin": "No groups yet. Create one on the People page."
+    },
     "users": {
       "groups": "Groups",
       "identities": "Sign-in"
@@ -5562,7 +5569,17 @@
     "everyone": "Everyone in this organization",
     "owner": "Owner",
     "fileUnavailable": "This file is no longer available.",
+    "kind": {
+      "assistant": "AI assistant",
+      "saved_task": "Saved task",
+      "widget": "Chat widget"
+    },
+    "runCopy": "Run as my copy",
+    "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
+    "assistantNotShared": "This task's AI assistant is not shared with you.",
+    "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
+    "continueFailed": "Couldn't create your copy. Please try again.",
     "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
     "sharedFolder": "Shared · {name}",
     "dialog": {
@@ -5576,6 +5593,11 @@
       "remove": "Remove",
       "removeTitle": "Stop sharing",
       "removeConfirm": "Remove {name}?",
+      "loadFailed": "Couldn't load who this is shared with.",
+      "saveFailed": "Couldn't share this. Please try again.",
+      "shared": "Shared with {name}.",
+      "removed": "Stopped sharing with {name}.",
+      "removeFailed": "Couldn't stop sharing. Please try again.",
       "publicLink": "Public link",
       "openPublicLink": "Open public link"
     }

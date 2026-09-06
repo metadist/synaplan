@@ -137,6 +137,7 @@ final readonly class SystemConfigService
             'sharing' => [
                 'label' => 'Sharing',
                 'sections' => [
+                    'features' => ['label' => 'People & sharing', 'fields' => ['IAM_GROUPS_ENABLED', 'IAM_SHARING_ENABLED']],
                     'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
                 ],
             ],
@@ -252,7 +253,7 @@ final readonly class SystemConfigService
                 }
 
                 $values[$key] = [
-                    'value' => $rawValue ?? $field['default'],
+                    'value' => $this->normalizeStoredValue($field, $rawValue) ?? $field['default'],
                     'isSet' => $isSet,
                     'isMasked' => false,
                 ];
@@ -973,6 +974,24 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => GuestChatConfig::CONFIG_GROUP,
                 'dbKey' => GuestChatConfig::KEY_ENABLED,
+            ],
+            'IAM_GROUPS_ENABLED' => [
+                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show People under Operate and let administrators create groups. Members see their groups under Account. Off by default — existing installs stay unchanged until you turn this on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_GROUPS_ENABLED,
+            ],
+            'IAM_SHARING_ENABLED' => [
+                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires People & groups to be on. Share buttons and "Shared with me" stay hidden until both flags are on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_SHARING_ENABLED,
             ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
@@ -1913,5 +1932,25 @@ final readonly class SystemConfigService
                 'source' => 'database',
             ],
         ];
+    }
+
+    /**
+     * The admin toggle only treats the strings "true" / "false" as on/off.
+     * Seeders and SQL often store "1" / "0"; map those so the switch matches
+     * what IamConfig (and the rest of the app) actually do.
+     *
+     * @param array{type?: string} $field
+     */
+    private function normalizeStoredValue(array $field, ?string $rawValue): ?string
+    {
+        if (null === $rawValue || '' === $rawValue) {
+            return $rawValue;
+        }
+        if ('boolean' !== ($field['type'] ?? '')) {
+            return $rawValue;
+        }
+        $asBool = filter_var($rawValue, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+
+        return null === $asBool ? $rawValue : ($asBool ? 'true' : 'false');
     }
 }

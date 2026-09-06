@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { iamApi } from '@/services/api/iamApi'
+
+const { showSuccess } = vi.hoisted(() => ({ showSuccess: vi.fn() }))
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
@@ -15,6 +18,13 @@ vi.mock('@/services/api/iamApi', () => ({
 vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({
     confirm: vi.fn().mockResolvedValue(false),
+  }),
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({
+    error: vi.fn(),
+    success: showSuccess,
   }),
 }))
 
@@ -39,6 +49,11 @@ const i18n = createI18n({
           remove: 'Remove',
           removeTitle: 'Stop',
           removeConfirm: 'Remove {name}?',
+          loadFailed: 'Load failed',
+          saveFailed: 'Save failed',
+          shared: 'Shared with {name}.',
+          removed: 'Stopped sharing with {name}.',
+          removeFailed: 'Remove failed',
           publicLink: 'Public link',
           openPublicLink: 'Open public link',
         },
@@ -67,6 +82,12 @@ const mountDialog = (isOpen: boolean) =>
   })
 
 describe('ShareDialog', () => {
+  beforeEach(() => {
+    showSuccess.mockReset()
+    vi.mocked(iamApi.listShares).mockResolvedValue([])
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue([])
+  })
+
   it('does not render when closed', () => {
     const wrapper = mountDialog(false)
 
@@ -77,5 +98,79 @@ describe('ShareDialog', () => {
     const wrapper = mountDialog(true)
 
     expect(wrapper.find('[data-testid="modal-iam-share"]').exists()).toBe(true)
+  })
+
+  it('offers the public-link action for conversations', () => {
+    const wrapper = mountDialog(true)
+
+    expect(wrapper.find('[data-testid="btn-iam-public-link"]').exists()).toBe(true)
+  })
+
+  it('stays open when listing shares fails', async () => {
+    vi.mocked(iamApi.listShares).mockRejectedValueOnce(new Error('network'))
+
+    const wrapper = mountDialog(true)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="modal-iam-share"]').exists()).toBe(true)
+  })
+
+  it('shows a success toast after sharing', async () => {
+    vi.mocked(iamApi.searchSubjects).mockResolvedValue([
+      { type: 'group', id: 1, name: 'First Test', pinned: false },
+    ])
+    vi.mocked(iamApi.grantShare).mockResolvedValue({
+      id: 9,
+      kind: 'conversation',
+      resourceId: '1',
+      subjectType: 'group',
+      subjectId: 1,
+      permission: 'use',
+      name: 'First Test',
+    })
+    vi.mocked(iamApi.listShares)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 9,
+          kind: 'conversation',
+          resourceId: '1',
+          subjectType: 'group',
+          subjectId: 1,
+          permission: 'use',
+          name: 'First Test',
+        },
+      ])
+
+    vi.useFakeTimers()
+    try {
+      const wrapper = mount(ShareDialog, {
+        props: {
+          isOpen: true,
+          kind: 'conversation',
+          resourceId: '1',
+          resourceName: 'Chat',
+        },
+        global: {
+          plugins: [i18n],
+          stubs: {
+            Teleport: true,
+            Transition: false,
+            PermissionSelect: true,
+          },
+        },
+      })
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+
+      await wrapper.find('[data-testid="btn-iam-subject-group-1"]').trigger('click')
+      await wrapper.find('[data-testid="btn-iam-share-confirm"]').trigger('click')
+      await flushPromises()
+
+      expect(showSuccess).toHaveBeenCalledWith('Shared with First Test.')
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

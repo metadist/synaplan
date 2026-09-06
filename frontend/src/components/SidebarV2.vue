@@ -225,6 +225,16 @@
               <span>{{ $t('nav.profile') }}</span>
             </button>
             <button
+              v-if="iamGroupsEnabled"
+              role="menuitem"
+              class="dropdown-item"
+              data-testid="btn-sidebar-v2-my-groups"
+              @click="handleNavigate('/groups')"
+            >
+              <UserGroupIcon class="w-4 h-4" />
+              <span>{{ $t('nav.myGroups') }}</span>
+            </button>
+            <button
               v-if="isMemoryServiceAvailable"
               role="menuitem"
               class="dropdown-item"
@@ -613,6 +623,14 @@
     @shared="chatsStore.loadChats()"
     @unshared="chatsStore.loadChats()"
   />
+  <ShareDialog
+    :is-open="iamShareOpen"
+    kind="conversation"
+    :resource-id="iamShareResourceId"
+    :resource-name="shareModalChatTitle"
+    @close="iamShareOpen = false"
+    @public-link="openPublicLinkFromIam"
+  />
 
   <!-- Memories Dialog -->
   <MemoriesDialog :is-open="isMemoriesDialogOpen" @close="isMemoriesDialogOpen = false" />
@@ -637,6 +655,7 @@ import {
   Cog6ToothIcon,
   ChartBarIcon,
   UserCircleIcon,
+  UserGroupIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -661,8 +680,10 @@ import { formatRunningVersion } from '@/utils/formatRunningVersion'
 import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 
 const { t } = useI18n()
@@ -707,11 +728,14 @@ const chatMenuStyle = ref<Record<string, string>>({})
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 const isCreatingChat = ref(false)
 const chatSearchQuery = ref('')
 
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
+const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 type FlyoutType = 'nav' | null
 const activeFlyout = ref<FlyoutType>(null)
@@ -1022,12 +1046,22 @@ const handleChatDelete = async (chatId: number) => {
   }
 }
 
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const handleChatShare = (chatId: number) => {
   const chat = chatsStore.chats.find((c) => c.id === chatId)
   shareModalChatId.value = chatId
   shareModalChatTitle.value = chat?.title || 'Chat'
-  shareModalOpen.value = true
   chatMenuOpenId.value = null
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(chatId)
+    iamShareOpen.value = true
+    return
+  }
+  shareModalOpen.value = true
 }
 
 const toggleChatMenu = (chatId: number, event: MouseEvent) => {

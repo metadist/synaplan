@@ -135,6 +135,7 @@
     "adminConfig": "Sistem Yapılandırması",
     "adminSetup": "AI Sağlayıcı Kurulumu",
     "adminPeople": "Kişiler",
+    "myGroups": "Gruplarım",
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
@@ -610,7 +611,7 @@
       "tabGroups": {
         "aiData": "AI ve Veri",
         "communication": "İletişim",
-        "security": "Güvenlik ve Giriş"
+        "security": "Erişim"
       },
       "brandingMode": {
         "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
@@ -708,7 +709,8 @@
     "menu": "Menü",
     "aiAgents": "Yapay zeka ajanları",
     "manage": "Yönet",
-    "manageDescription": "Asistanlar, kanallar ve otomasyonlar",
+    "manageDescription": "Asistanlar, otomasyonlar, kanallar ve bağlantılar",
+    "myGroups": "Gruplarım",
     "groupAssistants": "Asistanlar",
     "groupAutomations": "Otomasyonlar",
     "groupTools": "Araçlar",
@@ -4527,6 +4529,11 @@
     },
     "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
     "openPeople": "Kişiler’i aç",
+    "myGroups": {
+      "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
+      "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kişiler sayfasından ekleyebilir.",
+      "emptyAdmin": "Henüz grup yok. Kişiler sayfasından bir tane oluşturun."
+    },
     "users": {
       "groups": "Gruplar",
       "identities": "Giriş"
@@ -4577,7 +4584,17 @@
     "everyone": "Bu kuruluştaki herkes",
     "owner": "Sahip",
     "fileUnavailable": "Bu dosya artık kullanılamıyor.",
+    "kind": {
+      "assistant": "AI asistanı",
+      "saved_task": "Kayıtlı görev",
+      "widget": "Sohbet widget'ı"
+    },
+    "runCopy": "Kendi kopyam olarak çalıştır",
+    "runCopyConfirm": "Bu kayıtlı görevin kendi kopyanızı oluşturulsun mu? Yalnızca siz başlattığınızda çalışır.",
+    "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
+    "sharedBy": "{name} tarafından",
     "continueAsCopy": "Kendi kopyam olarak devam et",
+    "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
     "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
     "sharedFolder": "Paylaşılan · {name}",
     "dialog": {
@@ -4591,6 +4608,11 @@
       "remove": "Kaldır",
       "removeTitle": "Paylaşımı durdur",
       "removeConfirm": "{name} kaldırılsın mı?",
+      "loadFailed": "Paylaşımlar yüklenemedi.",
+      "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
+      "shared": "{name} ile paylaşıldı.",
+      "removed": "{name} ile paylaşım durduruldu.",
+      "removeFailed": "Paylaşım durdurulamadı. Lütfen tekrar deneyin.",
       "publicLink": "Herkese açık bağlantı",
       "openPublicLink": "Herkese açık bağlantıyı aç"
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\SavedTask;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ChatRepository;
@@ -442,7 +443,27 @@ final readonly class UserDeletionService
         foreach ($this->chatRepository->findByUser($userId) as $chat) {
             $this->shareRepository->deleteByResource('conversation', (string) $chat->getId());
         }
+        foreach ($this->promptRepository->findBy(['ownerId' => $userId]) as $prompt) {
+            $this->shareRepository->deleteByResource('assistant', (string) $prompt->getId());
+        }
+        foreach ($this->widgetRepository->findByOwnerId($userId) as $widget) {
+            $this->shareRepository->deleteByResource('widget', (string) $widget->getId());
+        }
+        foreach ($this->em->getRepository(SavedTask::class)->findBy(['ownerId' => $userId]) as $task) {
+            $this->shareRepository->deleteByResource('saved_task', (string) $task->getId());
+        }
         $this->shareRepository->deleteByOwnerKnowledgeFolders($userId);
+
+        // Plugin-declared kinds share by plugin_data.id; a stale row would
+        // otherwise attach to whoever gets that id next.
+        $pluginDataIds = [];
+        foreach ($this->pluginDataRepository->findBy(['userId' => $userId]) as $item) {
+            $id = $item->getId();
+            if (null !== $id) {
+                $pluginDataIds[] = (int) $id;
+            }
+        }
+        $this->shareRepository->deleteByPluginDataIds($pluginDataIds);
     }
 
     private function deleteRevectorizeRuns(int $userId): void

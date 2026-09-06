@@ -13,8 +13,11 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\File\FileUploadService;
+use App\Service\Iam\AccessGate;
+use App\Service\Iam\IamConfig;
 use App\Service\Model\PromptModelEligibilityValidator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlanValidator;
@@ -86,6 +89,10 @@ final class PromptControllerTestRoutingTest extends TestCase
                 $this->alwaysOnStructuredOutputConfig(),
             ),
             $this->createMock(FileUploadService::class),
+            $this->createMock(AccessGate::class),
+            $this->createMock(IamConfig::class),
+            $this->createMock(UserRepository::class),
+            $this->createMock(ShareRepository::class),
         );
 
         $container = new Container();
