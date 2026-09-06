@@ -5667,6 +5667,7 @@
         "privateTitle": "Your own chat — only you can see it",
         "group": "Group",
         "groupTitle": "Shared with the group \"{name}\"",
+        "groupTitleGeneric": "Shared with a group",
         "everyone": "Everyone",
         "everyoneTitle": "Shared with everyone in this organization",
         "direct": "Shared with you",

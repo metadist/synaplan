@@ -5667,6 +5667,7 @@
         "privateTitle": "Votre propre discussion — vous seul pouvez la voir",
         "group": "Groupe",
         "groupTitle": "Partagée avec le groupe « {name} »",
+        "groupTitleGeneric": "Partagée avec un groupe",
         "everyone": "Tout le monde",
         "everyoneTitle": "Partagée avec tout le monde dans cette organisation",
         "direct": "Partagée avec vous",

@@ -37,9 +37,15 @@ describe('kindOfSharedItem', () => {
   })
 
   it('pills a direct share with the owner name', () => {
-    expect(kindOfSharedItem(item({ sharedVia: { type: 'user', name: 'Me' } }))).toEqual({
+    expect(kindOfSharedItem(item({ sharedVia: { type: 'user', name: '' } }))).toEqual({
       kind: 'direct',
       label: 'Alice',
+    })
+    expect(
+      kindOfSharedItem(item({ sharedVia: { type: 'user', name: '' }, ownerName: null }))
+    ).toEqual({
+      kind: 'direct',
+      label: null,
     })
   })
 })

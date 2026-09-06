@@ -4682,6 +4682,7 @@
         "privateTitle": "Kendi sohbetiniz — yalnızca siz görebilirsiniz",
         "group": "Grup",
         "groupTitle": "\"{name}\" grubuyla paylaşıldı",
+        "groupTitleGeneric": "Bir grupla paylaşıldı",
         "everyone": "Herkes",
         "everyoneTitle": "Bu organizasyondaki herkesle paylaşıldı",
         "direct": "Sizinle paylaşıldı",
