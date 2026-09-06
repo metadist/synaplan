@@ -98,6 +98,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 import { iamApi, type IamShare, type IamSubject } from '@/services/api/iamApi'
 import PermissionSelect from './PermissionSelect.vue'
 import SubjectPicker from './SubjectPicker.vue'
@@ -116,6 +117,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { confirm } = useDialog()
+const { error: showError } = useNotification()
 const subject = ref<IamSubject | null>(null)
 const permission = ref('use')
 const shares = ref<IamShare[]>([])
@@ -136,7 +138,12 @@ const allowedPermissions = computed(() => {
 
 const load = async () => {
   if (!props.isOpen || !props.resourceId) return
-  shares.value = await iamApi.listShares(props.kind, props.resourceId)
+  try {
+    shares.value = await iamApi.listShares(props.kind, props.resourceId)
+  } catch {
+    shares.value = []
+    showError(t('iam.dialog.loadFailed'))
+  }
 }
 
 watch(
@@ -167,6 +174,8 @@ const grant = async () => {
     })
     subject.value = null
     await load()
+  } catch {
+    showError(t('iam.dialog.saveFailed'))
   } finally {
     saving.value = false
   }
@@ -179,7 +188,11 @@ const remove = async (row: IamShare) => {
     danger: true,
   })
   if (!ok) return
-  await iamApi.revokeShare(props.kind, props.resourceId, row.subjectType, row.subjectId)
-  await load()
+  try {
+    await iamApi.revokeShare(props.kind, props.resourceId, row.subjectType, row.subjectId)
+    await load()
+  } catch {
+    showError(t('iam.dialog.removeFailed'))
+  }
 }
 </script>

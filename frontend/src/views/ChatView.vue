@@ -307,7 +307,7 @@
         </button>
       </div>
       <ChatInput
-        v-if="!needsProviderSetup && !sharedConversationLocked"
+        v-if="!needsProviderSetup && chatsStore.conversationAccess === 'owner'"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -636,10 +636,14 @@ const sharedConversationLocked = computed(
 const continueSharedConversation = async () => {
   const id = chatsStore.activeChatId
   if (!id) return
-  const copy = await iamApi.continueChat(id)
-  chatsStore.setActiveChat(copy.id)
-  await chatsStore.loadChats()
-  await chatsStore.loadConversationAccess(copy.id)
+  try {
+    const copy = await iamApi.continueChat(id)
+    chatsStore.setActiveChat(copy.id)
+    await chatsStore.loadChats()
+    await chatsStore.loadConversationAccess(copy.id)
+  } catch {
+    showErrorToast(t('iam.continueFailed'))
+  }
 }
 const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()

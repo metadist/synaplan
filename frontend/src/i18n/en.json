@@ -5570,6 +5570,7 @@
     "assistantNotShared": "This task's AI assistant is not shared with you.",
     "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
+    "continueFailed": "Couldn't create your copy. Please try again.",
     "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
     "sharedFolder": "Shared · {name}",
     "dialog": {
@@ -5583,6 +5584,9 @@
       "remove": "Remove",
       "removeTitle": "Stop sharing",
       "removeConfirm": "Remove {name}?",
+      "loadFailed": "Couldn't load who this is shared with.",
+      "saveFailed": "Couldn't share this. Please try again.",
+      "removeFailed": "Couldn't stop sharing. Please try again.",
       "publicLink": "Public link",
       "openPublicLink": "Open public link"
     }

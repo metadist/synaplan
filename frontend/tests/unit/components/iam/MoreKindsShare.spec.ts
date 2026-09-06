@@ -18,6 +18,13 @@ vi.mock('@/composables/useDialog', () => ({
   }),
 }))
 
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({
+    error: vi.fn(),
+    success: vi.fn(),
+  }),
+}))
+
 const i18n = createI18n({
   legacy: false,
   locale: 'en',

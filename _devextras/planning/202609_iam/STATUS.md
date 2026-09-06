@@ -49,3 +49,7 @@ Shared assistants enter lists via `PromptRepository` (classifier untouched).
 Saved tasks copy as the member's own run. Widgets support read and co-edit;
 embed and sessions stay owner-only. Plugin manifests may declare
 `provides.resourceKinds`.
+
+**2026-09-06:** PR #1714 converted back to draft. Copilot lite review on S3:
+Share dialog / subject search catch API errors; conversation access no longer
+defaults to writable while the check is in flight.

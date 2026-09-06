@@ -345,6 +345,53 @@ describe('Chats Store', () => {
     })
   })
 
+  describe('loadConversationAccess', () => {
+    it('treats a missing access field as owner', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 3 } })
+
+      await store.loadConversationAccess(3)
+
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('records a shared read-only chat', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 4, access: 'read' } })
+
+      await store.loadConversationAccess(4)
+
+      expect(store.conversationAccess).toBe('read')
+    })
+
+    it('clears access while loading and does not fall back to owner on error', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockRejectedValueOnce(new Error('network'))
+
+      await store.loadConversationAccess(5)
+
+      expect(store.conversationAccess).toBeNull()
+    })
+
+    it('ignores a stale response after a newer load started', async () => {
+      const store = useChatsStore()
+      let resolveFirst: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      )
+      const first = store.loadConversationAccess(1)
+      httpClientMock.mockResolvedValueOnce({ chat: { id: 2, access: 'use' } })
+      await store.loadConversationAccess(2)
+
+      resolveFirst({ chat: { id: 1, access: 'owner' } })
+      await first
+
+      expect(store.conversationAccess).toBe('use')
+    })
+  })
+
   describe('noteExternalActivity', () => {
     it('bumps an already-loaded chat instead of reloading', async () => {
       const store = useChatsStore()

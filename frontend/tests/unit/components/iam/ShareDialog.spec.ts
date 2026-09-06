@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import { iamApi } from '@/services/api/iamApi'
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
@@ -15,6 +16,13 @@ vi.mock('@/services/api/iamApi', () => ({
 vi.mock('@/composables/useDialog', () => ({
   useDialog: () => ({
     confirm: vi.fn().mockResolvedValue(false),
+  }),
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({
+    error: vi.fn(),
+    success: vi.fn(),
   }),
 }))
 
@@ -39,6 +47,9 @@ const i18n = createI18n({
           remove: 'Remove',
           removeTitle: 'Stop',
           removeConfirm: 'Remove {name}?',
+          loadFailed: 'Load failed',
+          saveFailed: 'Save failed',
+          removeFailed: 'Remove failed',
           publicLink: 'Public link',
           openPublicLink: 'Open public link',
         },
@@ -75,6 +86,15 @@ describe('ShareDialog', () => {
 
   it('renders when open', () => {
     const wrapper = mountDialog(true)
+
+    expect(wrapper.find('[data-testid="modal-iam-share"]').exists()).toBe(true)
+  })
+
+  it('stays open when listing shares fails', async () => {
+    vi.mocked(iamApi.listShares).mockRejectedValueOnce(new Error('network'))
+
+    const wrapper = mountDialog(true)
+    await flushPromises()
 
     expect(wrapper.find('[data-testid="modal-iam-share"]').exists()).toBe(true)
   })

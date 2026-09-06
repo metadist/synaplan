@@ -5570,6 +5570,7 @@
     "assistantNotShared": "L'assistant IA de cette tâche n'est pas partagé avec vous.",
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuer comme ma copie",
+    "continueFailed": "Impossible de créer votre copie. Veuillez réessayer.",
     "readOnly": "Vous pouvez voir cette conversation. Pour ajouter un message, continuez-la comme votre propre copie.",
     "sharedFolder": "Partagé · {name}",
     "dialog": {
@@ -5583,6 +5584,9 @@
       "remove": "Retirer",
       "removeTitle": "Arrêter le partage",
       "removeConfirm": "Retirer {name} ?",
+      "loadFailed": "Impossible de charger les partages.",
+      "saveFailed": "Le partage a échoué. Veuillez réessayer.",
+      "removeFailed": "Impossible d'arrêter le partage. Veuillez réessayer.",
       "publicLink": "Lien public",
       "openPublicLink": "Ouvrir le lien public"
     }

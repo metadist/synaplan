@@ -64,7 +64,8 @@ export function isDefaultChatTitle(title: string, localizedNewChat?: string): bo
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
   const activeChatId = ref<number | null>(readActiveChatId())
-  const conversationAccess = ref<'owner' | 'read' | 'use'>('owner')
+  const conversationAccess = ref<'owner' | 'read' | 'use' | null>(null)
+  let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -431,15 +432,20 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function loadConversationAccess(chatId: number) {
-    conversationAccess.value = 'owner'
+    const seq = ++conversationAccessSeq
+    conversationAccess.value = null
     try {
       const data = await httpClient<{ chat: { access?: string } }>(`/api/v1/chats/${chatId}`)
-      const access = data.chat.access
-      if (access === 'read' || access === 'use' || access === 'owner') {
-        conversationAccess.value = access
+      if (seq !== conversationAccessSeq) {
+        return
       }
+      const access = data.chat.access
+      conversationAccess.value = access === 'read' || access === 'use' ? access : 'owner'
     } catch {
-      conversationAccess.value = 'owner'
+      if (seq !== conversationAccessSeq) {
+        return
+      }
+      conversationAccess.value = null
     }
   }
 
@@ -533,7 +539,8 @@ export const useChatsStore = defineStore('chats', () => {
 
   function $reset() {
     chats.value = []
-    conversationAccess.value = 'owner'
+    conversationAccess.value = null
+    conversationAccessSeq = 0
     activeRunChatIds.value = new Set()
     historyChats.value = []
     historyOffset.value = 0

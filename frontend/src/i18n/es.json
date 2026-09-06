@@ -4584,6 +4584,7 @@
     "assistantNotShared": "El asistente de IA de esta tarea no está compartido contigo.",
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuar como mi copia",
+    "continueFailed": "No se pudo crear su copia. Inténtelo de nuevo.",
     "readOnly": "Puede ver esta conversación. Para añadir un mensaje, continúela como su propia copia.",
     "sharedFolder": "Compartido · {name}",
     "dialog": {
@@ -4597,6 +4598,9 @@
       "remove": "Quitar",
       "removeTitle": "Dejar de compartir",
       "removeConfirm": "¿Quitar a {name}?",
+      "loadFailed": "No se pudo cargar con quién está compartido.",
+      "saveFailed": "No se pudo compartir. Inténtelo de nuevo.",
+      "removeFailed": "No se pudo dejar de compartir. Inténtelo de nuevo.",
       "publicLink": "Enlace público",
       "openPublicLink": "Abrir enlace público"
     }

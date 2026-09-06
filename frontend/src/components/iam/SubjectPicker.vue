@@ -47,7 +47,11 @@ const subjects = ref<IamSubject[]>([])
 let timer: ReturnType<typeof setTimeout> | null = null
 
 const load = async () => {
-  subjects.value = await iamApi.searchSubjects(query.value)
+  try {
+    subjects.value = await iamApi.searchSubjects(query.value)
+  } catch {
+    subjects.value = []
+  }
 }
 
 watch(

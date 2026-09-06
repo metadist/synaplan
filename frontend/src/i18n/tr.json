@@ -4585,6 +4585,7 @@
     "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
     "sharedBy": "{name} tarafından",
     "continueAsCopy": "Kendi kopyam olarak devam et",
+    "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
     "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
     "sharedFolder": "Paylaşılan · {name}",
     "dialog": {
@@ -4598,6 +4599,9 @@
       "remove": "Kaldır",
       "removeTitle": "Paylaşımı durdur",
       "removeConfirm": "{name} kaldırılsın mı?",
+      "loadFailed": "Paylaşımlar yüklenemedi.",
+      "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
+      "removeFailed": "Paylaşım durdurulamadı. Lütfen tekrar deneyin.",
       "publicLink": "Herkese açık bağlantı",
       "openPublicLink": "Herkese açık bağlantıyı aç"
     }
