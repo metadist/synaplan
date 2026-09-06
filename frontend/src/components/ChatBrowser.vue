@@ -357,8 +357,9 @@
             <!-- Share Button -->
             <button
               v-if="chat.type !== 'shared'"
-              class="p-1.5 md:p-2 rounded-lg txt-secondary hover:txt-brand hover:bg-brand/10 transition-all"
+              class="icon-ghost"
               :title="$t('chat.browser.share')"
+              :aria-label="$t('chat.browser.share')"
               data-testid="btn-chat-share"
               @click.stop="openShareModal(chat)"
             >
@@ -483,7 +484,7 @@
       :resource-id="iamShareResourceId"
       :resource-name="shareModalChatTitle"
       @close="iamShareOpen = false"
-      @public-link="shareModalOpen = true"
+      @public-link="openPublicLinkFromIam"
     />
   </div>
 </template>
@@ -591,6 +592,11 @@ const getShareStatus = (chatId: number): boolean => {
 }
 
 // Share modal
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const openShareModal = (chat: ChatItem) => {
   shareModalChatId.value = chat.id
   shareModalChatTitle.value = chat.title

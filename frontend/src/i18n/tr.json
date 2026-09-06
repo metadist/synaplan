@@ -4610,6 +4610,8 @@
       "removeConfirm": "{name} kaldırılsın mı?",
       "loadFailed": "Paylaşımlar yüklenemedi.",
       "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
+      "shared": "{name} ile paylaşıldı.",
+      "removed": "{name} ile paylaşım durduruldu.",
       "removeFailed": "Paylaşım durdurulamadı. Lütfen tekrar deneyin.",
       "publicLink": "Herkese açık bağlantı",
       "openPublicLink": "Herkese açık bağlantıyı aç"

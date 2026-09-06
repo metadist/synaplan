@@ -5595,6 +5595,8 @@
       "removeConfirm": "Remove {name}?",
       "loadFailed": "Couldn't load who this is shared with.",
       "saveFailed": "Couldn't share this. Please try again.",
+      "shared": "Shared with {name}.",
+      "removed": "Stopped sharing with {name}.",
       "removeFailed": "Couldn't stop sharing. Please try again.",
       "publicLink": "Public link",
       "openPublicLink": "Open public link"

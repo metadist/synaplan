@@ -527,6 +527,14 @@
     @shared="chatsStore.loadChatHistory(true)"
     @unshared="chatsStore.loadChatHistory(true)"
   />
+  <ShareDialog
+    :is-open="iamShareOpen"
+    kind="conversation"
+    :resource-id="iamShareResourceId"
+    :resource-name="shareModalChatTitle"
+    @close="iamShareOpen = false"
+    @public-link="openPublicLinkFromIam"
+  />
 
   <!-- Guest hint popover -->
   <GuestHintPopover
@@ -576,9 +584,10 @@ import {
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
-import { isIamGroupsEnabled } from '@/composables/useIamFeature'
+import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import ChatShareModal from './ChatShareModal.vue'
+import ShareDialog from './iam/ShareDialog.vue'
 
 const { t } = useI18n()
 const { formatRelativeTime } = useDateFormat()
@@ -605,6 +614,8 @@ const featureGateKey = ref('general')
 const shareModalOpen = ref(false)
 const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref('')
+const iamShareOpen = ref(false)
+const iamShareResourceId = ref('')
 const chatMenuOpenId = ref<number | null>(null)
 const chatMenuStyle = ref<Record<string, string>>({})
 
@@ -836,12 +847,22 @@ const handleChatDelete = async (chatId: number) => {
   }
 }
 
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
+
 const handleChatShare = (chatId: number) => {
   const chat = chatsStore.historyChats.find((c) => c.id === chatId)
   shareModalChatId.value = chatId
   shareModalChatTitle.value = chat?.title || 'Chat'
-  shareModalOpen.value = true
   chatMenuOpenId.value = null
+  if (isIamSharingEnabled()) {
+    iamShareResourceId.value = String(chatId)
+    iamShareOpen.value = true
+    return
+  }
+  shareModalOpen.value = true
 }
 
 const setupObserver = () => {

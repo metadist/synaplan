@@ -83,7 +83,7 @@
       :resource-id="iamShareResourceId"
       :resource-name="shareModalChatTitle"
       @close="iamShareOpen = false"
-      @public-link="shareModalOpen = true"
+      @public-link="openPublicLinkFromIam"
     />
   </div>
 </template>
@@ -212,6 +212,11 @@ const shareModalChatId = ref<number | null>(null)
 const shareModalChatTitle = ref<string>('')
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
+
+const openPublicLinkFromIam = () => {
+  iamShareOpen.value = false
+  shareModalOpen.value = true
+}
 
 const handleShare = (id: string) => {
   const chat = chatsStore.chats.find((c) => c.id === Number(id))

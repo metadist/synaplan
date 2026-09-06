@@ -33,12 +33,16 @@
           </div>
 
           <div class="mt-4 flex justify-end gap-2">
-            <button type="button" class="btn-secondary" @click="close">
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2 rounded-lg font-medium"
+              @click="close"
+            >
               {{ $t('iam.dialog.cancel') }}
             </button>
             <button
               type="button"
-              class="btn-primary"
+              class="btn-primary px-4 py-2 rounded-lg font-medium"
               :disabled="!subject || saving"
               data-testid="btn-iam-share-confirm"
               @click="grant"
@@ -56,7 +60,10 @@
               <li
                 v-for="row in shares"
                 :key="row.id"
-                class="flex items-center justify-between gap-2 text-sm"
+                class="flex items-center justify-between gap-2 text-sm rounded-lg px-2 py-1 -mx-2"
+                :class="
+                  shareKey(row) === highlightedShareKey ? 'bg-[var(--brand-alpha-light)]' : ''
+                "
               >
                 <span class="txt-primary truncate">{{ rowLabel(row) }}</span>
                 <span class="txt-secondary shrink-0">{{
@@ -64,7 +71,7 @@
                 }}</span>
                 <button
                   type="button"
-                  class="txt-secondary hover:text-danger"
+                  class="icon-ghost icon-ghost--danger text-sm"
                   :data-testid="`btn-iam-share-remove-${row.id}`"
                   @click="remove(row)"
                 >
@@ -81,7 +88,7 @@
             <h3 class="text-sm font-medium txt-primary mb-2">{{ $t('iam.dialog.publicLink') }}</h3>
             <button
               type="button"
-              class="btn-secondary"
+              class="btn-secondary px-4 py-2 rounded-lg font-medium"
               data-testid="btn-iam-public-link"
               @click="emit('publicLink')"
             >
@@ -95,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -117,11 +124,25 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { confirm } = useDialog()
-const { error: showError } = useNotification()
+const { error: showError, success: showSuccess } = useNotification()
 const subject = ref<IamSubject | null>(null)
 const permission = ref('use')
 const shares = ref<IamShare[]>([])
 const saving = ref(false)
+const highlightedShareKey = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+const shareKey = (row: Pick<IamShare, 'subjectType' | 'subjectId'>) =>
+  `${row.subjectType}:${row.subjectId}`
+
+const markHighlighted = (key: string) => {
+  highlightedShareKey.value = key
+  if (highlightTimer) clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => {
+    highlightedShareKey.value = ''
+    highlightTimer = null
+  }, 4000)
+}
 
 const allowedPermissions = computed(() => {
   if (props.kind === 'conversation' || props.kind === 'saved_task') {
@@ -156,6 +177,11 @@ watch(
 
 const close = () => emit('close')
 
+const subjectLabel = (item: IamSubject) => {
+  if (item.type === 'everyone') return t('iam.everyone')
+  return item.name || item.email || String(item.id)
+}
+
 const rowLabel = (row: IamShare) => {
   if (row.subjectType === 'everyone') return t('iam.everyone')
   return row.name || row.email || String(row.subjectId)
@@ -163,6 +189,8 @@ const rowLabel = (row: IamShare) => {
 
 const grant = async () => {
   if (!subject.value) return
+  const who = subjectLabel(subject.value)
+  const key = `${subject.value.type}:${subject.value.id}`
   saving.value = true
   try {
     await iamApi.grantShare({
@@ -174,6 +202,8 @@ const grant = async () => {
     })
     subject.value = null
     await load()
+    markHighlighted(key)
+    showSuccess(t('iam.dialog.shared', { name: who }))
   } catch {
     showError(t('iam.dialog.saveFailed'))
   } finally {
@@ -191,8 +221,13 @@ const remove = async (row: IamShare) => {
   try {
     await iamApi.revokeShare(props.kind, props.resourceId, row.subjectType, row.subjectId)
     await load()
+    showSuccess(t('iam.dialog.removed', { name: rowLabel(row) }))
   } catch {
     showError(t('iam.dialog.removeFailed'))
   }
 }
+
+onUnmounted(() => {
+  if (highlightTimer) clearTimeout(highlightTimer)
+})
 </script>

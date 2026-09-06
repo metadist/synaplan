@@ -5529,6 +5529,8 @@
       "removeConfirm": "{name} entfernen?",
       "loadFailed": "Die Freigaben konnten nicht geladen werden.",
       "saveFailed": "Teilen ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
+      "shared": "Mit {name} geteilt.",
+      "removed": "Freigabe für {name} beendet.",
       "removeFailed": "Die Freigabe konnte nicht beendet werden. Bitte versuchen Sie es erneut.",
       "publicLink": "Öffentlicher Link",
       "openPublicLink": "Öffentlichen Link öffnen"

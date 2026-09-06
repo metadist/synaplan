@@ -4609,6 +4609,8 @@
       "removeConfirm": "¿Quitar a {name}?",
       "loadFailed": "No se pudo cargar con quién está compartido.",
       "saveFailed": "No se pudo compartir. Inténtelo de nuevo.",
+      "shared": "Compartido con {name}.",
+      "removed": "Se dejó de compartir con {name}.",
       "removeFailed": "No se pudo dejar de compartir. Inténtelo de nuevo.",
       "publicLink": "Enlace público",
       "openPublicLink": "Abrir enlace público"

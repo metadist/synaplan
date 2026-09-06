@@ -5595,6 +5595,8 @@
       "removeConfirm": "Retirer {name} ?",
       "loadFailed": "Impossible de charger les partages.",
       "saveFailed": "Le partage a échoué. Veuillez réessayer.",
+      "shared": "Partagé avec {name}.",
+      "removed": "Partage avec {name} arrêté.",
       "removeFailed": "Impossible d'arrêter le partage. Veuillez réessayer.",
       "publicLink": "Lien public",
       "openPublicLink": "Ouvrir le lien public"

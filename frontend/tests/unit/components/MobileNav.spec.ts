@@ -76,6 +76,7 @@ const mountNav = async (path = '/') => {
       stubs: {
         Icon: true,
         ChatShareModal: true,
+        ShareDialog: true,
         GuestHintPopover: true,
         Teleport: true,
         Transition: { template: '<div><slot /></div>' },

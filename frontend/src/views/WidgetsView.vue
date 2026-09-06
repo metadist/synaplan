@@ -190,13 +190,13 @@
                 <!-- Secondary: Chats -->
                 <button
                   v-if="iamSharingEnabled && !widget.shared"
-                  class="p-2 rounded-lg hover-surface transition-colors flex-shrink-0"
+                  class="icon-ghost flex-shrink-0"
                   :title="$t('iam.share')"
                   :aria-label="$t('iam.share')"
                   data-testid="btn-share-widget"
                   @click="openWidgetShare(widget)"
                 >
-                  <Icon icon="heroicons:share" class="w-4 h-4 txt-secondary" />
+                  <Icon icon="heroicons:share" class="w-4 h-4" />
                 </button>
                 <button
                   v-if="!widget.shared"

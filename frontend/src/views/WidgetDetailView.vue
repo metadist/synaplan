@@ -32,7 +32,7 @@
             <button
               v-if="canShareWidget"
               type="button"
-              class="px-4 py-2.5 rounded-xl border border-light-border/30 dark:border-dark-border/20 txt-secondary hover:txt-primary text-sm transition-colors inline-flex items-center gap-2"
+              class="btn-secondary px-4 py-2.5 rounded-xl text-sm inline-flex items-center gap-2"
               data-testid="btn-share-widget"
               @click="openWidgetShare"
             >
