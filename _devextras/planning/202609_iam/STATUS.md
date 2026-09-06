@@ -53,3 +53,31 @@ embed and sessions stay owner-only. Plugin manifests may declare
 **2026-09-06:** PR #1714 converted back to draft. Copilot lite review on S3:
 Share dialog / subject search catch API errors; conversation access no longer
 defaults to writable while the check is in flight.
+
+**2026-09-06 (pre-merge security + house-rules review of S1–S3):** findings
+fixed on `feat/iam-sharing-mvp` (S2, merged into S3):
+
+- `shared_file_ref` no longer outlives the share — RAG scopes and file reads
+  follow the *live* conversation/folder share only (C2 acceptance "revoke ⇒
+  next search returns no shared source" now actually holds).
+- `GET /chats/{id}` returns the public `shareToken` only to the owner.
+- `AccessGate` denies stale `BSHARES` rows whose resource is gone (id reuse).
+- Sharing with yourself → 400; "Everyone" is only offered when
+  `IAM.EVERYONE_SHARES` allows the actor; error text without internal ids.
+- `BSHARES.BGRANTEDBY` index; RAG file ids bound as parameters; complete
+  401/403/400 OpenAPI responses; share client on generated Zod schemas.
+- People/Share UI: theme tokens instead of raw Tailwind colours; users-tab
+  load errors via i18n (all five locales).
+
+On `feat/iam-more-kinds` (S3): shares on plugin-declared kinds are removed
+when their owner is deleted (`ShareRepository::deleteByPluginDataIds`);
+widget visitor stats only for the owner; OpenAPI for prompt list IAM fields,
+widget get, saved-task copy; runtime-config `iamSharing` description.
+
+By design and left as is: `manage` grantees may re-share (master plan row 3);
+knowledge-folder `edit` is accepted by the API but no file mutation honours
+it yet (MVP scope, see docs/ADMIN.md); subject search lists any user by
+name/email (standard share-picker behaviour, instance = organization).
+Follow-ups (not blocking): `UsersTab.vue` is 410 lines (moved from
+`AdminView`, split later); `PromptController::list` still builds queries
+inline (pre-existing).

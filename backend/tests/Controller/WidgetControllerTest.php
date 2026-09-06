@@ -378,6 +378,7 @@ class WidgetControllerTest extends WebTestCase
         $body = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertTrue($body['widget']['shared']);
         self::assertSame('read', $body['widget']['access']);
+        self::assertNull($body['widget']['stats'], 'visitor statistics stay with the owner');
 
         $this->client->request(
             'PUT',

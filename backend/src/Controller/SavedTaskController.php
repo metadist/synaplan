@@ -276,11 +276,13 @@ final class SavedTaskController extends AbstractController
                 response: 201,
                 description: 'Copied task',
                 content: new OA\JsonContent(
+                    required: ['success', 'task'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'task',
                             type: 'object',
+                            required: ['id', 'promptId', 'name', 'enabled', 'triggerType', 'allowUnattended'],
                             properties: [
                                 new OA\Property(property: 'id', type: 'integer', example: 1),
                                 new OA\Property(property: 'promptId', type: 'integer', example: 12),
@@ -305,7 +307,8 @@ final class SavedTaskController extends AbstractController
                     ]
                 )
             ),
-            new OA\Response(response: 404, description: 'Not found'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
             new OA\Response(response: 409, description: 'Assistant is not shared'),
         ]
     )]

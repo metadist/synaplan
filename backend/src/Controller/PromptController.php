@@ -113,6 +113,19 @@ class PromptController extends AbstractController
                                     new OA\Property(property: 'language', type: 'string', example: 'en'),
                                     new OA\Property(property: 'isDefault', type: 'boolean', example: true, description: 'True if this is a system prompt'),
                                     new OA\Property(property: 'isUserOverride', type: 'boolean', example: false, description: 'True if user has customized this prompt'),
+                                    new OA\Property(property: 'metadata', type: 'object'),
+                                    new OA\Property(
+                                        property: 'owner',
+                                        type: 'object',
+                                        description: 'Present when sharing is enabled; id 0 for system prompts',
+                                        required: ['id', 'name'],
+                                        properties: [
+                                            new OA\Property(property: 'id', type: 'integer'),
+                                            new OA\Property(property: 'name', type: 'string'),
+                                        ]
+                                    ),
+                                    new OA\Property(property: 'shared', type: 'boolean', description: 'True when this AI assistant belongs to someone else (sharing enabled)'),
+                                    new OA\Property(property: 'access', type: 'string', enum: ['owner', 'read', 'use', 'edit'], description: 'Present when sharing is enabled'),
                                 ]
                             )
                         ),

@@ -453,6 +453,17 @@ final readonly class UserDeletionService
             $this->shareRepository->deleteByResource('saved_task', (string) $task->getId());
         }
         $this->shareRepository->deleteByOwnerKnowledgeFolders($userId);
+
+        // Plugin-declared kinds share by plugin_data.id; a stale row would
+        // otherwise attach to whoever gets that id next.
+        $pluginDataIds = [];
+        foreach ($this->pluginDataRepository->findBy(['userId' => $userId]) as $item) {
+            $id = $item->getId();
+            if (null !== $id) {
+                $pluginDataIds[] = (int) $id;
+            }
+        }
+        $this->shareRepository->deleteByPluginDataIds($pluginDataIds);
     }
 
     private function deleteRevectorizeRuns(int $userId): void
