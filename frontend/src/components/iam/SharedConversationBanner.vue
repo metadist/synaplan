@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="surface-card rounded-xl px-4 py-3"
-    :class="compact ? '' : 'p-4'"
-    data-testid="banner-shared-conversation"
-  >
+  <div class="surface-card rounded-xl p-4" data-testid="banner-shared-conversation">
     <div class="flex items-start gap-3">
       <div
         class="w-9 h-9 rounded-lg bg-[var(--brand-alpha-light)] flex items-center justify-center flex-shrink-0"
@@ -29,11 +25,11 @@
         <p class="text-sm txt-primary" data-testid="text-shared-conversation-source">
           {{ sourceText }}
         </p>
-        <p v-if="!compact" class="text-sm txt-secondary">{{ $t('iam.readOnly') }}</p>
+        <p class="text-sm txt-secondary">{{ $t('iam.readOnly') }}</p>
         <button
           v-if="canContinue"
           type="button"
-          class="btn-primary mt-1"
+          class="btn-primary mt-2 px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center"
           data-testid="btn-continue-as-copy"
           @click="$emit('continue')"
         >
@@ -58,9 +54,8 @@ const props = withDefaults(
     sharedVia: ConversationSharedVia | null
     access: 'read' | 'use'
     canContinue?: boolean
-    compact?: boolean
   }>(),
-  { canContinue: false, compact: false }
+  { canContinue: false }
 )
 
 defineEmits<{ continue: [] }>()
