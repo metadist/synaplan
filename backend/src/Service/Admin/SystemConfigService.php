@@ -137,7 +137,7 @@ final readonly class SystemConfigService
             'sharing' => [
                 'label' => 'Sharing',
                 'sections' => [
-                    'features' => ['label' => 'People & sharing', 'fields' => ['IAM_GROUPS_ENABLED', 'IAM_SHARING_ENABLED']],
+                    'features' => ['label' => 'People & sharing', 'fields' => ['IAM_GROUPS_ENABLED', 'IAM_SHARING_ENABLED', 'IAM_GROUP_POLICIES_ENABLED']],
                     'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
                     'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_SYNC_ENABLED', 'IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
                     'audit' => ['label' => 'People & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
@@ -235,12 +235,13 @@ final readonly class SystemConfigService
             }
 
             if ('database' === $source) {
-                $rawValue = $this->configRepository->getValue(
-                    self::DB_OWNER_ID,
-                    $field['dbGroup'] ?? self::DB_GROUP,
-                    $field['dbKey'] ?? $key,
-                );
+                $dbGroup = $field['dbGroup'] ?? self::DB_GROUP;
+                $dbKey = $field['dbKey'] ?? $key;
+                $rawValue = $this->configRepository->getValue(self::DB_OWNER_ID, $dbGroup, $dbKey);
                 $isSet = null !== $rawValue && '' !== $rawValue;
+                $locked = $this->configRepository
+                    ->findByOwnerGroupAndSetting(self::DB_OWNER_ID, $dbGroup, $dbKey)
+                    ?->isBlocked() ?? false;
 
                 // A database-backed secret (e.g. an OAuth client secret) is
                 // stored encrypted and must be masked here for the same reason
@@ -250,6 +251,7 @@ final readonly class SystemConfigService
                         'value' => $isSet ? self::MASK : $field['default'],
                         'isSet' => $isSet,
                         'isMasked' => $isSet,
+                        'locked' => $locked,
                     ];
                     continue;
                 }
@@ -258,6 +260,7 @@ final readonly class SystemConfigService
                     'value' => $this->normalizeStoredValue($field, $rawValue) ?? $field['default'],
                     'isSet' => $isSet,
                     'isMasked' => false,
+                    'locked' => $locked,
                 ];
             } else {
                 $rawValue = $this->getEnvValue($key);
@@ -994,6 +997,15 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_SHARING_ENABLED,
+            ],
+            'IAM_GROUP_POLICIES_ENABLED' => [
+                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let administrators set default models, allowed models, feature flags and a rate-limit tier per group. Locked global defaults cannot be overridden. Requires People & groups. Off by default.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_GROUP_POLICIES_ENABLED,
             ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',

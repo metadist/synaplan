@@ -2593,7 +2593,9 @@
         "this_week": "Diese Woche",
         "this_month": "Diesen Monat"
       }
-    }
+    },
+    "setByAdmin": "Von Ihrer Verwaltung festgelegt",
+    "fromGroup": "Vorgabe Ihrer Gruppe"
   },
   "channels": {
     "title": "Kanäle",
@@ -5448,6 +5450,7 @@
     "tabs": {
       "users": "Benutzer",
       "groups": "Gruppen",
+      "policies": "Richtlinien",
       "audit": "Protokoll"
     },
     "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
@@ -5517,7 +5520,49 @@
         "directory_sync": "Anmeldegruppe aktualisiert",
         "impersonation_start": "Ansicht als Benutzer gestartet",
         "impersonation_stop": "Ansicht als Benutzer beendet",
-        "admin_metadata_view": "Ressourcenliste angesehen"
+        "admin_metadata_view": "Ressourcenliste angesehen",
+        "policy_set": "Gruppenrichtlinien geändert",
+        "policy_lock": "Einstellung gesperrt"
+      }
+    },
+    "policies": {
+      "group": "Gruppe",
+      "chooseGroup": "Gruppe wählen",
+      "helper": "Diese Einstellungen gelten für alle in der Gruppe. Eine persönliche Einstellung gewinnt, solange die Vorgabe nicht gesperrt ist.",
+      "pickGroup": "Wählen Sie eine Gruppe, um ihre Richtlinien zu bearbeiten.",
+      "defaultModels": "Standardmodelle",
+      "allowedModels": "Erlaubte Modelle",
+      "allowedHelper": "Leer lassen, damit alle Modelle verfügbar bleiben. Eine Liste schränkt die Auswahl ein.",
+      "features": "Funktionen",
+      "rateLimit": "Nutzungskontingent",
+      "useGlobal": "Instanzvorgabe verwenden",
+      "useBillingTier": "Tarif der Person verwenden",
+      "conflict": "Eine andere Gruppe setzt eine andere Vorgabe. Die Gruppe mit der kleineren Nummer gewinnt.",
+      "locks": "Gesperrte Vorgaben",
+      "locksHelper": "Benutzer können das nicht ändern.",
+      "save": "Richtlinien speichern",
+      "saved": "Gruppenrichtlinien gespeichert.",
+      "lockSaved": "Sperre aktualisiert.",
+      "loadError": "Richtlinien konnten nicht geladen werden.",
+      "saveError": "Richtlinien konnten nicht gespeichert werden.",
+      "capability": {
+        "CHAT": "Chat",
+        "VECTORIZE": "Suche",
+        "PIC2TEXT": "Bild zu Text",
+        "SOUND2TEXT": "Sprache zu Text",
+        "MEM": "Gedächtnis",
+        "TOOLS": "Werkzeuge"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Gespeicherte Aufgaben",
+        "DESKTOP_AGENT_ENABLED": "Desktop-Agent",
+        "DOCUMENT_TOOLS_ENABLED": "Dokumentwerkzeuge",
+        "MULTITASK_ROUTING_ENABLED": "Mehrschritt-Routing",
+        "MULTITASK_PARALLEL_ENABLED": "Parallele Schritte",
+        "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",
+        "MULTITASK_MCP_FETCH_ENABLED": "Verbundene Werkzeuge lesen",
+        "MULTITASK_MCP_ACTION_ENABLED": "Über verbundene Werkzeuge handeln",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen"
       }
     }
   },

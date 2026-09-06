@@ -3366,7 +3366,9 @@
         "this_week": "Esta Semana",
         "this_month": "Este Mes"
       }
-    }
+    },
+    "setByAdmin": "Definido por su administrador",
+    "fromGroup": "Valor predeterminado de su grupo"
   },
   "channels": {
     "title": "Canales",
@@ -4528,6 +4530,7 @@
     "tabs": {
       "users": "Usuarios",
       "groups": "Grupos",
+      "policies": "Políticas",
       "audit": "Auditoría"
     },
     "usersMoved": "Los usuarios están ahora en la página Personas.",
@@ -4597,7 +4600,49 @@
         "directory_sync": "Grupo de inicio de sesión actualizado",
         "impersonation_start": "Empezó a ver como usuario",
         "impersonation_stop": "Dejó de ver como usuario",
-        "admin_metadata_view": "Consultó la lista de recursos"
+        "admin_metadata_view": "Consultó la lista de recursos",
+        "policy_set": "Políticas de grupo actualizadas",
+        "policy_lock": "Ajuste bloqueado"
+      }
+    },
+    "policies": {
+      "group": "Grupo",
+      "chooseGroup": "Seleccione un grupo",
+      "helper": "Estos ajustes se aplican a todos en el grupo. Un ajuste personal gana si el valor no está bloqueado.",
+      "pickGroup": "Seleccione un grupo para editar sus políticas.",
+      "defaultModels": "Modelos predeterminados",
+      "allowedModels": "Modelos permitidos",
+      "allowedHelper": "Déjelo vacío para que puedan usar todos los modelos. Una lista limita lo que pueden elegir.",
+      "features": "Funciones",
+      "rateLimit": "Nivel de límite de uso",
+      "useGlobal": "Usar el valor de la instancia",
+      "useBillingTier": "Usar el plan de la persona",
+      "conflict": "Otro grupo define un valor distinto. Gana el grupo con el número más bajo.",
+      "locks": "Valores bloqueados",
+      "locksHelper": "Los usuarios no pueden cambiar esto.",
+      "save": "Guardar políticas",
+      "saved": "Políticas del grupo guardadas.",
+      "lockSaved": "Bloqueo actualizado.",
+      "loadError": "No se pudieron cargar las políticas.",
+      "saveError": "No se pudieron guardar las políticas.",
+      "capability": {
+        "CHAT": "Chat",
+        "VECTORIZE": "Búsqueda",
+        "PIC2TEXT": "Imagen a texto",
+        "SOUND2TEXT": "Voz a texto",
+        "MEM": "Memoria",
+        "TOOLS": "Herramientas"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Tareas guardadas",
+        "DESKTOP_AGENT_ENABLED": "Agente de escritorio",
+        "DOCUMENT_TOOLS_ENABLED": "Herramientas de documentos",
+        "MULTITASK_ROUTING_ENABLED": "Enrutado de varios pasos",
+        "MULTITASK_PARALLEL_ENABLED": "Pasos en paralelo",
+        "MULTITASK_URL_FETCH_ENABLED": "Obtener páginas web",
+        "MULTITASK_MCP_FETCH_ENABLED": "Leer herramientas conectadas",
+        "MULTITASK_MCP_ACTION_ENABLED": "Actuar con herramientas conectadas",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Buscar correo"
       }
     }
   },

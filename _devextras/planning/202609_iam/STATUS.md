@@ -17,8 +17,8 @@ S4 Directory & privacy and S5 Group policies start from that branch.
 | S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | done | Merged to `main` as #1713 |
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | in review | [PR #1717](https://github.com/metadist/synaplan/pull/1717). History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
-| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in progress | IAM29–IAM38 on this branch (directory sync, audit tab, admin manage-without-read, impersonation audit). Stacked on #1717 |
-| S5 Group policies | — | planned | IAM39–IAM46; first cut line. New flag `IAM.GROUP_POLICIES_ENABLED` (seeded off) |
+| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in review | [PR #1718](https://github.com/metadist/synaplan/pull/1718). Stacked on #1717 |
+| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | IAM39–IAM46. Stacked on #1718 |
 
 ## Decisions
 
@@ -96,3 +96,9 @@ statistics browser. We kept the lean-nav contract and added:
 - `/chats/incoming` as the chat inbox (Files → Incoming stayed at `/files/incoming`).
 - Opening a shared chat now answers the five-question check: who owns it, which
   group (or everyone / person) it came through, what the viewer may do.
+
+**2026-09-06 (S4 / S5):** S4 is [PR #1718](https://github.com/metadist/synaplan/pull/1718).
+S5 Group policies starts from that branch (`feat/iam-group-policies`):
+`BGROUPCONFIG`, `BCONFIG.BLOCKED`, `LayeredConfigResolver`, People → **Policies**,
+and locked / group-set defaults on the user model settings page. Flag
+`IAM.GROUP_POLICIES_ENABLED` seeds off (C1).

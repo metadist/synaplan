@@ -638,6 +638,7 @@ seed **off** so an existing install stays unchanged until you turn them on.
 | ------- | ------- | ------- |
 | `IAM.GROUPS_ENABLED` | `0` | People page, groups, audit tab |
 | `IAM.SHARING_ENABLED` | `0` | Share dialog and “Shared with me” (requires groups) |
+| `IAM.GROUP_POLICIES_ENABLED` | `0` | People → Policies and group-layer defaults (requires groups) |
 | `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
 | `IAM.DIRECTORY_SYNC_ENABLED` | `0` | Put people into groups from the OIDC groups claim at sign-in |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
@@ -645,8 +646,21 @@ seed **off** so an existing install stays unchanged until you turn them on.
 | `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
 | `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep People audit rows; `0` keeps them forever |
 
-See [People, groups and sharing](ADMIN.md#people-groups-and-sharing) in the
-admin guide.
+Group policy rows live in `BGROUPCONFIG`. Only this allow-list is read from
+the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
+
+| Key | Type | Merge across a person's groups |
+| --- | ---- | ------------------------------ |
+| `DEFAULTMODEL.{CHAT,VECTORIZE,PIC2TEXT,SOUND2TEXT,MEM,TOOLS}` | catalog key | First group by `BGROUPS.BID` |
+| `MODELS.ALLOWED` | JSON list of catalog keys | Union; empty = no restriction |
+| `SAVEDTASKS.ENABLED`, `DESKTOP_AGENT.ENABLED`, `DOCUMENT_TOOLS.ENABLED`, `MULTITASK.*_ENABLED` | bool | OR |
+| `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
+
+A locked global row (`BCONFIG.BLOCKED = 1`) wins alone. Keys outside this list
+never consult `BGROUPCONFIG`. See
+[Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
+
+See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
 
 ---
 

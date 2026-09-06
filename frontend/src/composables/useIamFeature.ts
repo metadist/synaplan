@@ -21,3 +21,7 @@ export function isIamSharingEnabled(): boolean {
 export function isIamImpersonationDisabled(): boolean {
   return getConfigSync().features?.iamImpersonationDisabled === true
 }
+
+export function isIamPoliciesEnabled(): boolean {
+  return getConfigSync().features?.iamPolicies === true
+}

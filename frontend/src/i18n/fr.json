@@ -2506,7 +2506,9 @@
         "this_week": "Cette semaine",
         "this_month": "Ce mois-ci"
       }
-    }
+    },
+    "setByAdmin": "Défini par votre administrateur",
+    "fromGroup": "Valeur par défaut de votre groupe"
   },
   "channels": {
     "title": "Canaux",
@@ -5514,6 +5516,7 @@
     "tabs": {
       "users": "Utilisateurs",
       "groups": "Groupes",
+      "policies": "Règles",
       "audit": "Journal"
     },
     "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
@@ -5583,7 +5586,49 @@
         "directory_sync": "Groupe de connexion mis à jour",
         "impersonation_start": "A commencé à voir en tant qu’utilisateur",
         "impersonation_stop": "A cessé de voir en tant qu’utilisateur",
-        "admin_metadata_view": "A consulté la liste des ressources"
+        "admin_metadata_view": "A consulté la liste des ressources",
+        "policy_set": "Règles de groupe mises à jour",
+        "policy_lock": "Réglage verrouillé"
+      }
+    },
+    "policies": {
+      "group": "Groupe",
+      "chooseGroup": "Choisir un groupe",
+      "helper": "Ces réglages s’appliquent à tout le groupe. Un réglage personnel l’emporte tant que la valeur n’est pas verrouillée.",
+      "pickGroup": "Choisissez un groupe pour modifier ses règles.",
+      "defaultModels": "Modèles par défaut",
+      "allowedModels": "Modèles autorisés",
+      "allowedHelper": "Laissez vide pour que chacun puisse utiliser tous les modèles. Une liste limite le choix.",
+      "features": "Fonctions",
+      "rateLimit": "Niveau de limite d’usage",
+      "useGlobal": "Utiliser la valeur de l’instance",
+      "useBillingTier": "Utiliser l’offre de la personne",
+      "conflict": "Un autre groupe définit une autre valeur. Le groupe au plus petit numéro l’emporte.",
+      "locks": "Valeurs verrouillées",
+      "locksHelper": "Les utilisateurs ne peuvent pas modifier cela.",
+      "save": "Enregistrer les règles",
+      "saved": "Règles du groupe enregistrées.",
+      "lockSaved": "Verrou mis à jour.",
+      "loadError": "Les règles n’ont pas pu être chargées.",
+      "saveError": "Les règles n’ont pas pu être enregistrées.",
+      "capability": {
+        "CHAT": "Discussion",
+        "VECTORIZE": "Recherche",
+        "PIC2TEXT": "Image vers texte",
+        "SOUND2TEXT": "Parole vers texte",
+        "MEM": "Mémoire",
+        "TOOLS": "Outils"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Tâches enregistrées",
+        "DESKTOP_AGENT_ENABLED": "Agent bureau",
+        "DOCUMENT_TOOLS_ENABLED": "Outils document",
+        "MULTITASK_ROUTING_ENABLED": "Routage en plusieurs étapes",
+        "MULTITASK_PARALLEL_ENABLED": "Étapes en parallèle",
+        "MULTITASK_URL_FETCH_ENABLED": "Récupérer des pages web",
+        "MULTITASK_MCP_FETCH_ENABLED": "Lire les outils connectés",
+        "MULTITASK_MCP_ACTION_ENABLED": "Agir via les outils connectés",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails"
       }
     }
   },

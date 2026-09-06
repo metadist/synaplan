@@ -27,6 +27,7 @@ final class IamConfigTest extends TestCase
         self::assertFalse($this->iam->isGroupsEnabled(1));
         self::assertFalse($this->iam->isSharingEnabled(1));
         self::assertFalse($this->iam->isDirectorySyncEnabled(1));
+        self::assertFalse($this->iam->isGroupPoliciesEnabled(1));
         self::assertFalse($this->iam->isImpersonationDisabled(1));
         self::assertSame(IamConfig::DEFAULT_DIRECTORY_GROUPS_CLAIM, $this->iam->directoryGroupsClaim(1));
         self::assertSame(IamConfig::DEFAULT_AUDIT_RETENTION_DAYS, $this->iam->auditRetentionDays(1));

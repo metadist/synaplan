@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Repository\ConfigRepository;
+use App\Service\Config\LayeredConfigResolver;
 
 /**
  * Feature-flag resolver for the multi-task routing engine.
@@ -61,6 +62,7 @@ final readonly class MultitaskRoutingConfig
 
     public function __construct(
         private ConfigRepository $configRepository,
+        private ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
     }
 
@@ -151,6 +153,9 @@ final readonly class MultitaskRoutingConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        if (null !== $this->layeredConfigResolver) {
+            return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
+        }
         if (null !== $userId && $userId > 0) {
             $perUser = $this->configRepository->getValue($userId, self::CONFIG_GROUP, $setting);
             if (null !== $perUser) {

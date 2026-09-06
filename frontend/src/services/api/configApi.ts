@@ -12,6 +12,8 @@ export interface ModelsResponse {
 export interface DefaultsResponse {
   success: boolean
   defaults: Record<Capability, number | null>
+  locked?: Partial<Record<Capability, boolean>>
+  sources?: Partial<Record<Capability, 'admin' | 'group' | 'user'>>
 }
 
 export interface SaveDefaultsRequest {

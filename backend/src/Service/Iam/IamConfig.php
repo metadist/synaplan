@@ -28,6 +28,7 @@ final readonly class IamConfig
     public const KEY_GROUPS_ENABLED = 'GROUPS_ENABLED';
     public const KEY_SHARING_ENABLED = 'SHARING_ENABLED';
     public const KEY_DIRECTORY_SYNC_ENABLED = 'DIRECTORY_SYNC_ENABLED';
+    public const KEY_GROUP_POLICIES_ENABLED = 'GROUP_POLICIES_ENABLED';
     public const KEY_DIRECTORY_GROUPS_CLAIM = 'DIRECTORY_GROUPS_CLAIM';
     public const KEY_DIRECTORY_GROUP_NAMES = 'DIRECTORY_GROUP_NAMES';
     public const KEY_EVERYONE_SHARES = 'EVERYONE_SHARES';
@@ -92,6 +93,12 @@ final readonly class IamConfig
     public function isDirectorySyncEnabled(?int $userId): bool
     {
         return $this->resolveFlag(self::KEY_DIRECTORY_SYNC_ENABLED, $userId, self::DEFAULT_ENABLED);
+    }
+
+    public function isGroupPoliciesEnabled(?int $userId): bool
+    {
+        return $this->isGroupsEnabled($userId)
+            && $this->resolveFlag(self::KEY_GROUP_POLICIES_ENABLED, $userId, self::DEFAULT_ENABLED);
     }
 
     public function directoryGroupsClaim(?int $userId): string

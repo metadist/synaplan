@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Desktop;
 
 use App\Repository\ConfigRepository;
+use App\Service\Config\LayeredConfigResolver;
 
 /**
  * Feature-flag resolver for the Synaplan Desktop agent (the whole desktop
@@ -34,6 +35,7 @@ final readonly class DesktopAgentConfig
 
     public function __construct(
         private ConfigRepository $configRepository,
+        private ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
     }
 
@@ -48,6 +50,9 @@ final readonly class DesktopAgentConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        if (null !== $this->layeredConfigResolver) {
+            return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
+        }
         if (null !== $userId && $userId > 0) {
             $perUser = $this->configRepository->getValue($userId, self::CONFIG_GROUP, $setting);
             if (null !== $perUser) {
