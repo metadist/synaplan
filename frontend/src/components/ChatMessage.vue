@@ -116,7 +116,7 @@
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
-          <!-- Trennlinie für Memory-Processing (nach dem Haupt-Content) -->
+          <!-- Divider for memory processing (after the main content) -->
           <div
             v-if="
               processingStatus.startsWith('analyzing_memories') ||
@@ -686,6 +686,13 @@
 
                       <!-- Source Name -->
                       <span class="text-xs txt-muted truncate flex-1">{{ result.source }}</span>
+                      <span
+                        v-if="result.shared && result.ownerName"
+                        class="text-[10px] txt-secondary shrink-0"
+                        data-testid="chip-shared-owner"
+                      >
+                        {{ $t('iam.owner') }}: {{ result.ownerName }}
+                      </span>
 
                       <!-- Open Link Icon (visible when highlighted) -->
                       <span
@@ -1261,6 +1268,8 @@ interface Props {
     published?: string
     source?: string
     thumbnail?: string
+    shared?: boolean
+    ownerName?: string
   }> | null // Web search results
   aiModels?: {
     chat?: {

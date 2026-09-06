@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Iam;
 
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 
 /**
@@ -27,6 +28,10 @@ final readonly class IamConfig
     public const KEY_GROUPS_ENABLED = 'GROUPS_ENABLED';
     public const KEY_SHARING_ENABLED = 'SHARING_ENABLED';
     public const KEY_DIRECTORY_SYNC_ENABLED = 'DIRECTORY_SYNC_ENABLED';
+    public const KEY_EVERYONE_SHARES = 'EVERYONE_SHARES';
+
+    public const EVERYONE_SHARES_ANY_OWNER = 'any_owner';
+    public const EVERYONE_SHARES_ADMINS_ONLY = 'admins_only';
 
     private const DEFAULT_ENABLED = false;
 
@@ -42,7 +47,36 @@ final readonly class IamConfig
 
     public function isSharingEnabled(?int $userId): bool
     {
-        return $this->resolveFlag(self::KEY_SHARING_ENABLED, $userId, self::DEFAULT_ENABLED);
+        return $this->isGroupsEnabled($userId)
+            && $this->resolveFlag(self::KEY_SHARING_ENABLED, $userId, self::DEFAULT_ENABLED);
+    }
+
+    /**
+     * Who may share a resource with "everyone on this instance".
+     */
+    public function everyoneSharesPolicy(?int $userId): string
+    {
+        $value = null;
+        if (null !== $userId && $userId > 0) {
+            $value = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
+        }
+        if (null === $value) {
+            $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_EVERYONE_SHARES);
+        }
+        if (self::EVERYONE_SHARES_ADMINS_ONLY === $value) {
+            return self::EVERYONE_SHARES_ADMINS_ONLY;
+        }
+
+        return self::EVERYONE_SHARES_ANY_OWNER;
+    }
+
+    public function canShareWithEveryone(User $actor): bool
+    {
+        if (self::EVERYONE_SHARES_ANY_OWNER === $this->everyoneSharesPolicy((int) $actor->getId())) {
+            return true;
+        }
+
+        return $actor->isAdmin();
     }
 
     public function isDirectorySyncEnabled(?int $userId): bool

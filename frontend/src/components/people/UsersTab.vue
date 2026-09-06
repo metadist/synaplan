@@ -84,7 +84,7 @@
                     <Icon
                       v-if="user.emailVerified"
                       icon="mdi:check-decagram"
-                      class="w-4 h-4 text-green-500"
+                      class="w-4 h-4 text-success"
                       :title="$t('admin.users.verified')"
                     />
                   </div>
@@ -135,7 +135,7 @@
                 <td class="py-3 px-4 text-right">
                   <div v-if="user.id !== currentUserId" class="flex items-center justify-end gap-1">
                     <button
-                      class="p-2 rounded-lg text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      class="icon-ghost p-2 rounded-lg text-warning"
                       :title="$t('admin.impersonate.buttonTitle')"
                       :data-testid="`btn-impersonate-user-${user.id}`"
                       @click="confirmImpersonate(user)"
@@ -143,7 +143,7 @@
                       <Icon icon="mdi:incognito" class="w-5 h-5" />
                     </button>
                     <button
-                      class="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                      class="icon-ghost icon-ghost--danger p-2 rounded-lg"
                       :title="$t('admin.users.delete')"
                       :data-testid="`btn-delete-user-${user.id}`"
                       @click="confirmDeleteUser(user)"
@@ -195,7 +195,7 @@
             data-testid="modal-delete-user-content"
           >
             <div class="flex items-center justify-center mb-4">
-              <Icon icon="mdi:alert-circle-outline" class="w-12 h-12 text-red-500" />
+              <Icon icon="mdi:alert-circle-outline" class="w-12 h-12 text-danger" />
             </div>
             <h3 class="text-xl font-bold text-center txt-primary mb-2">
               {{ $t('admin.users.deleteConfirmTitle') }}
@@ -296,10 +296,10 @@ async function loadUsers() {
       users.value = response.users
       totalUsers.value = response.total
     } else {
-      showError('Invalid response from server')
+      showError(t('admin.users.invalidResponse'))
     }
   } catch (error) {
-    showError(error instanceof Error ? error.message : 'Failed to load users')
+    showError(error instanceof Error ? error.message : t('admin.users.loadFailed'))
   } finally {
     usersLoading.value = false
   }

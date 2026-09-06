@@ -4,6 +4,7 @@ namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -38,6 +39,8 @@ final readonly class VectorSearchService
         private ModelConfigService $modelConfigService,
         private VectorStorageFacade $vectorStorage,
         private RateLimitService $rateLimitService,
+        private RagScopeResolver $ragScopeResolver,
+        private UserRepository $userRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -69,17 +72,23 @@ final readonly class VectorSearchService
         }
 
         try {
+            $scopes = $this->ragScopeResolver->resolve($userId, $groupKey);
             $searchQuery = new SearchQuery(
                 userId: $userId,
                 vector: $this->normalizeQueryVector(array_map('floatval', $vector)),
                 groupKey: $groupKey,
                 limit: $limit,
                 minScore: $minScore,
+                scopes: $scopes,
             );
 
             $results = $this->vectorStorage->search($searchQuery);
+            $names = $this->ownerNames($results, $userId);
 
-            return array_map(static function ($result): array {
+            return array_map(static function ($result) use ($userId, $names): array {
+                $ownerId = $result->ownerId ?? $userId;
+                $shared = $result->shared || $ownerId !== $userId;
+
                 return [
                     'chunk_id' => $result->chunkId,
                     'file_id' => $result->fileId,
@@ -92,6 +101,9 @@ final readonly class VectorSearchService
                     'score' => $result->score,
                     'file_name' => $result->fileName,
                     'mime_type' => $result->mimeType,
+                    'owner_id' => $ownerId,
+                    'owner_name' => $shared ? ($names[$ownerId] ?? null) : null,
+                    'shared' => $shared,
                 ];
             }, $results);
         } catch (\Throwable $e) {
@@ -182,34 +194,13 @@ final readonly class VectorSearchService
             return [];
         }
 
-        // 3. Search via Facade
-        $searchQuery = new SearchQuery(
-            userId: $userId,
-            vector: $this->normalizeQueryVector(array_map('floatval', $queryEmbedding)),
-            groupKey: $groupKey,
-            limit: $limit,
-            minScore: $minScore,
+        return $this->semanticSearchByVector(
+            $userId,
+            $queryEmbedding,
+            $groupKey,
+            $limit,
+            $minScore,
         );
-
-        $results = $this->vectorStorage->search($searchQuery);
-
-        // 4. Map DTOs to arrays for backward compatibility
-        return array_map(function ($result) {
-            return [
-                'chunk_id' => $result->chunkId,
-                'file_id' => $result->fileId, // Mapped from BMID/file_id
-                'message_id' => $result->fileId, // Legacy key
-                'chunk_text' => $result->text,
-                'start_line' => $result->startLine,
-                'end_line' => $result->endLine,
-                'group_key' => $result->groupKey,
-                'distance' => $result->score, // Legacy: 'distance' key contained similarity score (1.0 = identical)
-                'score' => $result->score, // Add score explicitly
-                'file_name' => $result->fileName,
-                'mime_type' => $result->mimeType,
-                // Add other fields if needed by consumers
-            ];
-        }, $results);
     }
 
     /**
@@ -333,5 +324,40 @@ final readonly class VectorSearchService
         }
 
         return array_pad($vector, self::QUERY_VECTOR_DIMENSION, 0.0);
+    }
+
+    /**
+     * @param list<VectorStorage\DTO\SearchResult> $results
+     *
+     * @return array<int, string>
+     */
+    private function ownerNames(array $results, int $searcherId): array
+    {
+        $ids = [];
+        foreach ($results as $result) {
+            $ownerId = $result->ownerId ?? $searcherId;
+            if ($ownerId !== $searcherId) {
+                $ids[$ownerId] = $ownerId;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($this->userRepository->findBy(['id' => array_values($ids)]) as $user) {
+            $details = $user->getUserDetails();
+            $name = null;
+            foreach (['full_name', 'first_name'] as $key) {
+                $value = $details[$key] ?? null;
+                if (is_string($value) && '' !== trim($value)) {
+                    $name = trim($value);
+                    break;
+                }
+            }
+            $names[(int) $user->getId()] = $name ?? (string) $user->getMail();
+        }
+
+        return $names;
     }
 }

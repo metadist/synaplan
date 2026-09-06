@@ -15,6 +15,7 @@ use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
 use App\Service\FeedbackConstants;
 use App\Service\GuestChatConfig;
+use App\Service\Iam\IamConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Media\MediaJobConfig;
@@ -131,6 +132,12 @@ final readonly class SystemConfigService
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
+                ],
+            ],
+            'sharing' => [
+                'label' => 'Sharing',
+                'sections' => [
+                    'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
                 ],
             ],
             'routing' => [
@@ -966,6 +973,16 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => GuestChatConfig::CONFIG_GROUP,
                 'dbKey' => GuestChatConfig::KEY_ENABLED,
+            ],
+            'IAM_EVERYONE_SHARES' => [
+                'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Who may share a folder or chat with everyone on this instance. "any_owner" lets every owner do it; "admins_only" restricts it to administrators.',
+                'default' => IamConfig::EVERYONE_SHARES_ANY_OWNER,
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
+                'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
             ],
             // === Routing (database-backed, no restart required) ===
             // Stored in BCONFIG group MULTITASK / setting ROUTING_ENABLED (the row

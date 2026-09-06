@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\VectorSearch;
 
+use App\Service\RAG\VectorStorage\DTO\SearchQuery;
+
 /**
  * Interface for Qdrant Vector Database Client.
  *
@@ -114,11 +116,12 @@ interface QdrantClientInterface
     /**
      * Search for similar document chunks using vector similarity.
      *
-     * @param float[]     $vector   Query embedding vector
-     * @param int         $userId   User ID (for filtering)
-     * @param string|null $groupKey Optional group key filter
-     * @param int         $limit    Max results
-     * @param float       $minScore Minimum similarity score
+     * @param float[]          $vector   Query embedding vector
+     * @param int              $userId   User ID (for filtering)
+     * @param string|null      $groupKey Optional group key filter
+     * @param int              $limit    Max results
+     * @param float            $minScore Minimum similarity score
+     * @param SearchQuery|null $query    When set and not own-only, filter uses RagScope `should`
      *
      * @return array Array of results: [['id' => string, 'score' => float, 'payload' => array], ...]
      */
@@ -128,6 +131,7 @@ interface QdrantClientInterface
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?SearchQuery $query = null,
     ): array;
 
     /**

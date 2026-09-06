@@ -13,3 +13,7 @@ import { getConfigSync } from '@/services/api/httpClient'
 export function isIamGroupsEnabled(): boolean {
   return getConfigSync().features?.iamGroups === true
 }
+
+export function isIamSharingEnabled(): boolean {
+  return getConfigSync().features?.iamSharing === true
+}

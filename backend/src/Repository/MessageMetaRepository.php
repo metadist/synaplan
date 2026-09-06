@@ -17,7 +17,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet alle Meta-Daten für eine Message.
+     * Find all meta rows of a message.
      */
     public function findByMessage(int $messageId): array
     {
@@ -29,7 +29,36 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet Meta-Daten nach Key.
+     * True when a message this user owns lists this file in shared_file_ref.
+     */
+    public function userHasSharedFileRef(int $userId, int $fileId): bool
+    {
+        $needle = (string) $fileId;
+        $qb = $this->createQueryBuilder('meta');
+        $count = $qb->select('COUNT(meta.id)')
+            ->innerJoin('meta.message', 'm')
+            ->where('m.userId = :userId')
+            ->andWhere('meta.metaKey = :key')
+            ->andWhere($qb->expr()->orX(
+                'meta.metaValue = :exact',
+                'meta.metaValue LIKE :prefix',
+                'meta.metaValue LIKE :infix',
+                'meta.metaValue LIKE :suffix',
+            ))
+            ->setParameter('userId', $userId)
+            ->setParameter('key', 'shared_file_ref')
+            ->setParameter('exact', $needle)
+            ->setParameter('prefix', $needle.',%')
+            ->setParameter('infix', '%,'.$needle.',%')
+            ->setParameter('suffix', '%,'.$needle)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
+    /**
+     * Find one meta row of a message by key.
      */
     public function findByMessageAndKey(int $messageId, string $key): ?MessageMeta
     {
@@ -43,7 +72,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert MessageMeta.
+     * Persist a meta row.
      */
     public function save(MessageMeta $messageMeta, bool $flush = true): void
     {
@@ -55,7 +84,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht MessageMeta.
+     * Remove a meta row.
      */
     public function remove(MessageMeta $messageMeta, bool $flush = true): void
     {

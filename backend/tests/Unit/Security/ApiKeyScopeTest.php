@@ -229,6 +229,9 @@ final class ApiKeyScopeTest extends TestCase
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/groups'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/groups'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/groups/1/members'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/me/shared'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/iam/subjects'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/shares'));
     }
 
     public function testIamManageImpliesIamReadAndReachesAdminGroups(): void
@@ -239,6 +242,7 @@ final class ApiKeyScopeTest extends TestCase
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/admin/groups'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/admin/groups/1/members/4'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/groups/mine'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/shares'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users'));
     }
 

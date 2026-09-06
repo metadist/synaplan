@@ -43,9 +43,16 @@ final class KnowledgeContextFormatter
 
         $ragContext = "\n\n## Knowledge Base Context (relevant to your task):\n";
         foreach ($ragResults as $idx => $result) {
+            $label = trim((string) ($result['file_name'] ?? ''));
+            $owner = trim((string) ($result['owner_name'] ?? ''));
+            if (!empty($result['shared']) && '' !== $owner) {
+                $label = '' !== $label ? $label.' ('.$owner.')' : $owner;
+            }
+            $prefix = '' !== $label ? $label."\n" : '';
             $ragContext .= sprintf(
-                "[Source %d] %s\n",
+                "[Source %d] %s%s\n",
                 $idx + 1,
+                $prefix,
                 trim((string) ($result['chunk_text'] ?? '')),
             );
         }

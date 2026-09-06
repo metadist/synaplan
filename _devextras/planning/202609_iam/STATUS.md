@@ -1,16 +1,18 @@
 # Status — IAM — groups, sharing, directory
 
 Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
-[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.** S1 Groups core is
-in progress on `feat/iam-groups-core`.
+[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
+
+S1 Groups core is **merged to `main`** (`feat/iam-groups-core`, PR #1708).
+S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20 implemented; gate in progress).
 
 ## Steps
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes move to S1 |
-| S1 Groups core | `synaplan/` `feat/iam-groups-core` | in progress | IAM1–IAM10 implemented; gate running |
-| S2 Sharing MVP | — | planned | |
+| S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes in S1/S2 |
+| S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 (`8e8ad71ef`) |
+| S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | in review | IAM11–IAM20 implemented; public docs on `synaplan-docs` `feat/docs-people-and-groups` |
 | S3 More kinds | — | planned | |
 | S4 Directory & privacy | — | planned | |
 | S5 Group policies | — | planned | |
@@ -24,6 +26,7 @@ in progress on `feat/iam-groups-core`.
 | 2026-09-03 | Open questions resolved: any owner may share with `everyone` (`IAM.EVERYONE_SHARES` default `any_owner`); shared knowledge sources show the owner's name; conversation `use` copies file *references*; audit retention 365 days. |
 | 2026-09-03 | S4 gains a regression check for OpenCloud token-exchanged users (same `BUSER`, therefore same groups and shares) — consequence of track 6 excluding OpenCloud. |
 | 2026-09-03 | S0 closed except wireframes (People, ShareDialog), which are the first deliverable of S1. |
+| 2026-09-05 | S1 shipped on `main`. S2 started on `feat/iam-sharing-mvp`. Public docs: `synaplan-docs` `feat/docs-people-and-groups`. |
 
 ## Review log
 
@@ -32,4 +35,10 @@ codebase state (see roadmap §5).
 
 **2026-09-03 (second pass):** all §0 rows ticked via the product-owner
 questionnaire; open questions converted into the master plan's decisions table;
-sprint files written. Next: technical plan review (roadmap §7 step 3).
+sprint files written.
+
+**2026-09-05:** S1 merged. Sharing MVP implementation started.
+
+**2026-09-05 (S2):** BSHARES, share API, AccessGate, RagScope, continue-as-copy,
+ShareDialog, Shared with me. Public docs cover groups + sharing (flag-off by
+default). Apply `Version20260905140000` to both the app DB and `synaplan_test`.

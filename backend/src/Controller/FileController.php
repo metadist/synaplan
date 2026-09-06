@@ -24,6 +24,7 @@ use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\UploadOptions;
+use App\Service\Iam\SharedFileAccess;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
@@ -65,6 +66,7 @@ class FileController extends AbstractController
         private DocumentCombineService $documentCombineService,
         private DocumentRevisionService $documentRevisionService,
         private DocumentOfficeMergeService $documentOfficeMergeService,
+        private SharedFileAccess $sharedFileAccess,
     ) {
     }
 
@@ -580,6 +582,10 @@ class FileController extends AbstractController
 
         $file = $this->fileRepository->find($id);
         if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -772,6 +778,10 @@ class FileController extends AbstractController
 
         $file = $this->fileRepository->find($id);
         if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
         }
 
@@ -866,8 +876,15 @@ class FileController extends AbstractController
         }
 
         $file = $this->fileRepository->find($id);
-        if (!$file || $file->getUserId() !== $user->getId()) {
+        if (!$file) {
+            if ($this->sharedFileAccess->isMissingReferencedFile($user, $id)) {
+                return $this->json(['error' => 'iam.fileUnavailable'], Response::HTTP_GONE);
+            }
+
             return $this->json(['error' => 'File not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (!$this->isFileAccessibleByUser($file, $user)) {
+            return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
         return $this->json([
@@ -1715,6 +1732,6 @@ class FileController extends AbstractController
             }
         }
 
-        return false;
+        return $this->sharedFileAccess->canRead($user, $file);
     }
 }

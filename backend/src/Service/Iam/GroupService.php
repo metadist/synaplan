@@ -9,6 +9,7 @@ use App\Entity\GroupMember;
 use App\Entity\User;
 use App\Repository\GroupMemberRepository;
 use App\Repository\GroupRepository;
+use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
 
@@ -22,6 +23,7 @@ final readonly class GroupService
         private GroupMemberRepository $groupMemberRepository,
         private UserRepository $userRepository,
         private AuditLogWriter $auditLogWriter,
+        private ShareRepository $shareRepository,
     ) {
     }
 
@@ -114,6 +116,7 @@ final readonly class GroupService
         $groupId = (int) $group->getId();
         $name = $group->getName();
         $this->groupMemberRepository->deleteByGroupId($groupId);
+        $this->shareRepository->deleteBySubjectGroup($groupId);
         $this->groupRepository->remove($group);
 
         $this->auditLogWriter->record(

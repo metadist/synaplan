@@ -54,6 +54,30 @@ class GroupRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<Group>
+     */
+    public function searchByName(string $query, int $limit = 20): array
+    {
+        $query = trim($query);
+        if ('' === $query) {
+            return [];
+        }
+
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $query);
+
+        /** @var list<Group> $groups */
+        $groups = $this->createQueryBuilder('g')
+            ->where("g.name LIKE :q ESCAPE '!'")
+            ->setParameter('q', '%'.$escaped.'%')
+            ->orderBy('g.name', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $groups;
+    }
+
+    /**
      * @param list<int> $ids
      *
      * @return list<Group>

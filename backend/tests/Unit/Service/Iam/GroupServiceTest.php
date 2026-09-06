@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\AuditLogEntryRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\GroupRepository;
+use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
@@ -37,6 +38,7 @@ final class GroupServiceTest extends TestCase
             $this->members,
             $this->users,
             new AuditLogWriter($this->audit),
+            $this->createMock(ShareRepository::class),
         );
         $this->actor = $this->userWithId(1);
     }

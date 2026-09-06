@@ -9,11 +9,25 @@ import {
   PutAdminGroupMemberResponseSchema,
   DeleteAdminGroupMemberResponseSchema,
   ListMyGroupsResponseSchema,
+  ListSharesResponseSchema,
+  GrantShareResponseSchema,
+  RevokeShareResponseSchema,
+  SearchIamSubjectsResponseSchema,
+  ListSharedWithMeResponseSchema,
+  ContinueSharedChatResponseSchema,
 } from '@/generated/api-schemas'
 
 export type IamGroup = NonNullable<z.infer<typeof ListAdminGroupsResponseSchema>['groups']>[number]
 export type IamGroupMember = NonNullable<
   z.infer<typeof ListAdminGroupMembersResponseSchema>['members']
+>[number]
+
+export type IamShare = NonNullable<z.infer<typeof ListSharesResponseSchema>['shares']>[number]
+export type IamSubject = NonNullable<
+  z.infer<typeof SearchIamSubjectsResponseSchema>['subjects']
+>[number]
+export type IamSharedItem = NonNullable<
+  z.infer<typeof ListSharedWithMeResponseSchema>['items']
 >[number]
 
 export const iamApi = {
@@ -87,5 +101,72 @@ export const iamApi = {
       schema: ListMyGroupsResponseSchema,
     })
     return data.groups ?? []
+  },
+
+  async listShares(kind: string, resource: string): Promise<IamShare[]> {
+    const data = await httpClient('/api/v1/shares', {
+      method: 'GET',
+      params: { kind, resource },
+      schema: ListSharesResponseSchema,
+    })
+    return data.shares ?? []
+  },
+
+  async grantShare(payload: {
+    kind: string
+    resource: string
+    subjectType: string
+    subjectId: number
+    permission: string
+  }): Promise<IamShare> {
+    const data = await httpClient('/api/v1/shares', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      schema: GrantShareResponseSchema,
+    })
+    return data.share
+  },
+
+  async revokeShare(
+    kind: string,
+    resource: string,
+    subjectType: string,
+    subjectId: number
+  ): Promise<void> {
+    await httpClient('/api/v1/shares', {
+      method: 'DELETE',
+      params: { kind, resource, subjectType, subjectId: String(subjectId) },
+      schema: RevokeShareResponseSchema,
+    })
+  },
+
+  async searchSubjects(q: string): Promise<IamSubject[]> {
+    const data = await httpClient('/api/v1/iam/subjects', {
+      method: 'GET',
+      params: { q },
+      schema: SearchIamSubjectsResponseSchema,
+    })
+    return data.subjects ?? []
+  },
+
+  async listSharedWithMe(kind: string): Promise<IamSharedItem[]> {
+    const data = await httpClient('/api/v1/me/shared', {
+      method: 'GET',
+      params: { kind },
+      schema: ListSharedWithMeResponseSchema,
+    })
+    return data.items ?? []
+  },
+
+  async continueChat(chatId: number): Promise<{ id: number; title: string }> {
+    const data = await httpClient(`/api/v1/chats/${chatId}/continue`, {
+      method: 'POST',
+      schema: ContinueSharedChatResponseSchema,
+    })
+    const chat = data.chat ?? {}
+    if (typeof chat.id !== 'number') {
+      throw new Error('Continue response did not include the new chat id')
+    }
+    return { id: chat.id, title: chat.title ?? '' }
   },
 }
