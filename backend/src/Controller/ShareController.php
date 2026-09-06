@@ -68,6 +68,8 @@ final class ShareController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 400, description: 'kind and resource are required'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feature disabled or item not found'),
         ]
     )]
@@ -109,7 +111,7 @@ final class ShareController extends AbstractController
                     new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
                     new OA\Property(property: 'resource', type: 'string', example: '42'),
                     new OA\Property(property: 'subjectType', type: 'string', enum: ['user', 'group', 'everyone']),
-                    new OA\Property(property: 'subjectId', type: 'integer', example: 3),
+                    new OA\Property(property: 'subjectId', type: 'integer', example: 3, description: 'Required for user and group; ignored for everyone'),
                     new OA\Property(property: 'permission', type: 'string', enum: ['read', 'use', 'edit', 'manage'], example: 'use'),
                 ]
             )
@@ -128,9 +130,9 @@ final class ShareController extends AbstractController
                                 new OA\Property(property: 'id', type: 'integer'),
                                 new OA\Property(property: 'kind', type: 'string'),
                                 new OA\Property(property: 'resourceId', type: 'string'),
-                                new OA\Property(property: 'subjectType', type: 'string'),
+                                new OA\Property(property: 'subjectType', type: 'string', enum: ['user', 'group', 'everyone']),
                                 new OA\Property(property: 'subjectId', type: 'integer'),
-                                new OA\Property(property: 'permission', type: 'string'),
+                                new OA\Property(property: 'permission', type: 'string', enum: ['read', 'use', 'edit', 'manage']),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'email', type: 'string', nullable: true),
                                 new OA\Property(property: 'grantedBy', type: 'integer'),
@@ -141,6 +143,7 @@ final class ShareController extends AbstractController
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Not allowed'),
             new OA\Response(response: 404, description: 'Feature disabled'),
             new OA\Response(response: 422, description: 'Permission not supported for this item'),
@@ -203,6 +206,8 @@ final class ShareController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 400, description: 'kind, resource and subjectType are required'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Not allowed'),
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
@@ -273,6 +278,7 @@ final class ShareController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
     )]
@@ -282,9 +288,10 @@ final class ShareController extends AbstractController
         if (null !== $denied) {
             return $denied;
         }
+        \assert($user instanceof User);
 
         return $this->json([
-            'subjects' => $this->shareService->searchSubjects((string) $request->query->get('q', '')),
+            'subjects' => $this->shareService->searchSubjects($user, (string) $request->query->get('q', '')),
         ]);
     }
 
@@ -323,6 +330,8 @@ final class ShareController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 400, description: 'kind is required or unknown'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
     )]

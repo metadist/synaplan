@@ -421,6 +421,28 @@ class MessageRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /**
+     * Chats whose messages carry this file through the message↔file link.
+     *
+     * Used by IAM to decide whether a foreign file reaches a user through a
+     * conversation share; the file row alone may not point at a message.
+     *
+     * @return list<int>
+     */
+    public function findChatIdsByFileId(int $fileId): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('DISTINCT m.chatId AS cid')
+            ->innerJoin('m.files', 'f')
+            ->where('f.id = :fileId')
+            ->andWhere('m.chatId IS NOT NULL')
+            ->setParameter('fileId', $fileId)
+            ->getQuery()
+            ->getResult();
+
+        return array_values(array_map(static fn (array $row): int => (int) $row['cid'], $rows));
+    }
+
     public function flush(): void
     {
         $this->getEntityManager()->flush();

@@ -64,7 +64,7 @@
                 }}</span>
                 <button
                   type="button"
-                  class="txt-secondary hover:text-red-500"
+                  class="txt-secondary hover:text-danger"
                   :data-testid="`btn-iam-share-remove-${row.id}`"
                   @click="remove(row)"
                 >

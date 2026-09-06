@@ -69,7 +69,7 @@
                     {{ $t('people.groups.rename') }}
                   </button>
                   <button
-                    class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                    class="icon-ghost icon-ghost--danger p-2 rounded-lg"
                     :data-testid="`btn-delete-group-${group.id}`"
                     @click.stop="deleteGroup(group)"
                   >

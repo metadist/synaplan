@@ -49,11 +49,14 @@ final readonly class AccessGate
     public function highestGranted(User $user, string $kind, string $resourceId): ?Permission
     {
         $userId = (int) $user->getId();
-        if ($this->isOwner($kind, $resourceId, $userId)) {
+        $ownerId = $this->memoizedOwnerId($kind, $resourceId);
+        if (null !== $ownerId && $ownerId === $userId) {
             return Permission::Manage;
         }
 
-        if (!$this->iamConfig->isSharingEnabled($userId)) {
+        // No resource behind the id ⇒ nothing to grant, even if a stale
+        // BSHARES row still names it (ids may be reused after deletion).
+        if (null === $ownerId || !$this->iamConfig->isSharingEnabled($userId)) {
             return null;
         }
 

@@ -39,9 +39,12 @@ final class Version20260905140000 extends AbstractMigration
               BCREATED BIGINT NOT NULL,
               PRIMARY KEY (BID),
               UNIQUE KEY uniq_share_subject (BRESOURCEKIND, BRESOURCEID, BSUBJECTTYPE, BSUBJECTID),
-              KEY idx_share_lookup (BSUBJECTTYPE, BSUBJECTID, BRESOURCEKIND)
+              KEY idx_share_lookup (BSUBJECTTYPE, BSUBJECTID, BRESOURCEKIND),
+              KEY idx_share_grantedby (BGRANTEDBY)
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB
         SQL);
+        // Dev databases that ran an earlier draft of this migration lack the index.
+        $this->addSql('ALTER TABLE BSHARES ADD INDEX IF NOT EXISTS idx_share_grantedby (BGRANTEDBY)');
     }
 
     public function down(Schema $schema): void

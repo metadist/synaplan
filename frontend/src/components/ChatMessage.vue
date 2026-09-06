@@ -116,7 +116,7 @@
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-typing-indicator"
         >
-          <!-- Trennlinie für Memory-Processing (nach dem Haupt-Content) -->
+          <!-- Divider for memory processing (after the main content) -->
           <div
             v-if="
               processingStatus.startsWith('analyzing_memories') ||

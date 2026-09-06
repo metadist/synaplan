@@ -70,10 +70,13 @@ final class RagScopeFilterCharacterizationTest extends TestCase
 
         $maria = RagScopeFilter::mariaDbWhere($query);
         self::assertSame(
-            '((r.BUID = :u0) OR (r.BUID = :u1 AND r.BGROUPKEY = :g1) OR (r.BUID = :u2 AND r.BMID IN (11,12)))',
+            '((r.BUID = :u0) OR (r.BUID = :u1 AND r.BGROUPKEY = :g1) OR (r.BUID = :u2 AND r.BMID IN (:f2_0, :f2_1)))',
             $maria['sql'],
         );
-        self::assertSame(['u0' => 3, 'u1' => 9, 'g1' => 'sales', 'u2' => 9], $maria['params']);
+        self::assertSame(
+            ['u0' => 3, 'u1' => 9, 'g1' => 'sales', 'u2' => 9, 'f2_0' => 11, 'f2_1' => 12],
+            $maria['params'],
+        );
 
         $qdrant = RagScopeFilter::qdrant($query);
         self::assertArrayHasKey('should', $qdrant);

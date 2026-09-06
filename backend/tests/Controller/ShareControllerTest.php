@@ -52,6 +52,8 @@ final class ShareControllerTest extends WebTestCase
         $group = $this->createGroup('Sales');
         $this->addMember($group, (int) $member->getId());
         $chat = $this->createChat((int) $owner->getId(), 'Q3 playbook');
+        $chat->setShareToken('public-token-stays-private');
+        $this->em->flush();
 
         $this->authenticateClient($this->client, $owner);
         $this->postJson('/api/v1/shares', [
@@ -69,6 +71,7 @@ final class ShareControllerTest extends WebTestCase
         $body = $this->json();
         self::assertSame('use', $body['chat']['access']);
         self::assertSame((int) $owner->getId(), $body['chat']['owner']['id']);
+        self::assertNull($body['chat']['shareToken'], 'A group share must not leak the public link token');
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
@@ -192,6 +195,50 @@ final class ShareControllerTest extends WebTestCase
         );
 
         self::assertSame(Response::HTTP_FORBIDDEN, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testSharingWithYourselfIs400(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('share-self@synaplan.internal');
+        $chat = $this->createChat((int) $owner->getId(), 'Mine');
+        $this->authenticateClient($this->client, $owner);
+
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'user',
+            'subjectId' => (int) $owner->getId(),
+            'permission' => 'read',
+        ]);
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testEveryoneIsNotOfferedWhenPolicyIsAdminsOnly(): void
+    {
+        $this->enableSharing();
+        $config = static::getContainer()->get(ConfigRepository::class);
+        $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ADMINS_ONLY);
+        $this->em->flush();
+
+        try {
+            $member = $this->createUser('share-no-everyone@synaplan.internal');
+            $this->authenticateClient($this->client, $member);
+            $this->client->request('GET', '/api/v1/iam/subjects');
+            self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+            $types = array_column($this->json()['subjects'], 'type');
+            self::assertNotContains('everyone', $types);
+
+            $admin = $this->createAdmin('share-yes-everyone@synaplan.internal');
+            $this->authenticateClient($this->client, $admin);
+            $this->client->request('GET', '/api/v1/iam/subjects');
+            $types = array_column($this->json()['subjects'], 'type');
+            self::assertContains('everyone', $types);
+        } finally {
+            $config->setValue(0, IamConfig::CONFIG_GROUP, IamConfig::KEY_EVERYONE_SHARES, IamConfig::EVERYONE_SHARES_ANY_OWNER);
+            $this->em->flush();
+        }
     }
 
     private function enableSharing(): void

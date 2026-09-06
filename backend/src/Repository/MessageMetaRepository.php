@@ -17,7 +17,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet alle Meta-Daten für eine Message.
+     * Find all meta rows of a message.
      */
     public function findByMessage(int $messageId): array
     {
@@ -58,7 +58,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Findet Meta-Daten nach Key.
+     * Find one meta row of a message by key.
      */
     public function findByMessageAndKey(int $messageId, string $key): ?MessageMeta
     {
@@ -72,7 +72,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Speichert MessageMeta.
+     * Persist a meta row.
      */
     public function save(MessageMeta $messageMeta, bool $flush = true): void
     {
@@ -84,7 +84,7 @@ class MessageMetaRepository extends ServiceEntityRepository
     }
 
     /**
-     * Löscht MessageMeta.
+     * Remove a meta row.
      */
     public function remove(MessageMeta $messageMeta, bool $flush = true): void
     {

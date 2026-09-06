@@ -72,6 +72,9 @@ final readonly class ShareService
             }
         }
 
+        if (Share::SUBJECT_USER === $subjectType && $subjectId === (int) $actor->getId()) {
+            throw new \InvalidArgumentException('You already have full access to your own item.');
+        }
         $this->assertSubjectExists($subjectType, $subjectId);
 
         if (!$this->accessGate->decide($actor, $kind, $resourceId, Permission::Manage)) {
@@ -181,21 +184,31 @@ final readonly class ShareService
     }
 
     /**
+     * People and groups the actor may share with. "Everyone" is pinned first
+     * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
+     *
      * @return list<array<string, mixed>>
      */
-    public function searchSubjects(string $query, int $limit = 20): array
+    public function searchSubjects(User $actor, string $query, int $limit = 20): array
     {
         $query = trim($query);
-        $out = [[
-            'type' => Share::SUBJECT_EVERYONE,
-            'id' => 0,
-            'name' => '',
-            'email' => null,
-            'pinned' => true,
-        ]];
+        $out = [];
+        if ($this->iamConfig->canShareWithEveryone($actor)) {
+            $out[] = [
+                'type' => Share::SUBJECT_EVERYONE,
+                'id' => 0,
+                'name' => '',
+                'email' => null,
+                'pinned' => true,
+            ];
+        }
+        $actorId = (int) $actor->getId();
 
         if ('' !== $query) {
             foreach ($this->userRepository->searchByEmailOrName($query, $limit) as $user) {
+                if ((int) $user->getId() === $actorId) {
+                    continue;
+                }
                 $out[] = [
                     'type' => Share::SUBJECT_USER,
                     'id' => (int) $user->getId(),
@@ -214,6 +227,7 @@ final readonly class ShareService
                 ];
             }
         } else {
+            $listed = 0;
             foreach ($this->groupRepository->findAllOrderedByName() as $group) {
                 $out[] = [
                     'type' => Share::SUBJECT_GROUP,
@@ -222,7 +236,7 @@ final readonly class ShareService
                     'email' => null,
                     'pinned' => false,
                 ];
-                if (count($out) >= $limit + 1) {
+                if (++$listed >= $limit) {
                     break;
                 }
             }
@@ -304,14 +318,14 @@ final readonly class ShareService
         if (Share::SUBJECT_USER === $subjectType) {
             $user = $this->userRepository->find($subjectId);
             if (!$user instanceof User) {
-                throw new \InvalidArgumentException(sprintf('User %d was not found.', $subjectId));
+                throw new \InvalidArgumentException('That person was not found.');
             }
 
             return;
         }
         $group = $this->groupRepository->find($subjectId);
         if (!$group instanceof Group) {
-            throw new \InvalidArgumentException(sprintf('Group %d was not found.', $subjectId));
+            throw new \InvalidArgumentException('That group was not found.');
         }
     }
 

@@ -470,7 +470,9 @@
       "userDeleted": "Benutzer {email} wurde erfolgreich gelöscht",
       "userDeleteFailed": "Fehler beim Löschen des Benutzers",
       "levelUpdated": "Benutzer-Level auf {level} aktualisiert",
-      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels"
+      "levelUpdateFailed": "Fehler beim Aktualisieren des Benutzer-Levels",
+      "loadFailed": "Benutzer konnten nicht geladen werden",
+      "invalidResponse": "Der Server hat eine unerwartete Antwort gesendet"
     },
     "impersonate": {
       "button": "Als Benutzer ansehen",

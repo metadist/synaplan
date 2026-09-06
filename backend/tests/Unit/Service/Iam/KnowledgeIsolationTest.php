@@ -153,6 +153,48 @@ final class KnowledgeIsolationTest extends TestCase
         self::assertSame([42], $scopes[1]->fileIds);
     }
 
+    /**
+     * A copy's shared_file_ref must not keep the owner's files searchable
+     * after the conversation share is gone.
+     */
+    public function testRevokedConversationShareDropsReferencedFiles(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $this->shares->method('findForSubjects')->willReturn([]);
+
+        $copy = new Message();
+        $copy->setUserId(3);
+        (new \ReflectionProperty(Message::class, 'id'))->setValue($copy, 77);
+        $copy->setMeta(RagScopeResolver::SHARED_FILE_REF, '42,43');
+
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findBy')->willReturnCallback(
+            static function (array $criteria) use ($copy): array {
+                return isset($criteria['userId']) ? [$copy] : [];
+            }
+        );
+        $files = $this->createMock(FileRepository::class);
+        $files->expects(self::never())->method('find');
+
+        $members = $this->createMock(GroupMemberRepository::class);
+        $members->method('findByUserId')->willReturn([]);
+
+        $resolver = new RagScopeResolver(
+            $this->iamConfig,
+            $this->shares,
+            $members,
+            $this->createMock(ChatRepository::class),
+            $messages,
+            $files,
+        );
+
+        $scopes = $resolver->resolve(3, null);
+
+        self::assertCount(1, $scopes);
+        self::assertSame(3, $scopes[0]->ownerId);
+        self::assertSame([], $scopes[0]->fileIds);
+    }
+
     private function folderShare(string $resourceId, string $permission): Share
     {
         $share = new Share();

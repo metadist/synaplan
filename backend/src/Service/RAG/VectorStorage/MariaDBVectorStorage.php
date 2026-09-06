@@ -117,13 +117,13 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
             WHERE 
         SQL;
 
-        if ($legacy) {
+        $filter = $legacy ? null : RagScopeFilter::mariaDbWhere($query);
+        if (null === $filter) {
             $sql .= 'r.BUID = :userId';
             if (null !== $query->groupKey) {
                 $sql .= ' AND r.BGROUPKEY = :groupKey';
             }
         } else {
-            $filter = RagScopeFilter::mariaDbWhere($query);
             $sql .= $filter['sql'];
         }
 
@@ -138,13 +138,13 @@ final readonly class MariaDBVectorStorage implements VectorStorageInterface
         $stmt->bindValue('maxDistance', $maxDistance);
         $stmt->bindValue('limit', $query->limit, \Doctrine\DBAL\ParameterType::INTEGER);
 
-        if ($legacy) {
+        if (null === $filter) {
             $stmt->bindValue('userId', $query->userId);
             if (null !== $query->groupKey) {
                 $stmt->bindValue('groupKey', $query->groupKey);
             }
         } else {
-            foreach (RagScopeFilter::mariaDbWhere($query)['params'] as $name => $value) {
+            foreach ($filter['params'] as $name => $value) {
                 $stmt->bindValue($name, $value);
             }
         }
