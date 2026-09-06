@@ -464,9 +464,10 @@ const router = createRouter({
     },
     {
       // Conversations other people or groups shared with me ("incoming").
-      path: '/incoming',
-      name: 'incoming',
-      component: () => import('@/views/IncomingView.vue'),
+      // Sibling of /files/incoming, which is the file inbox.
+      path: '/chats/incoming',
+      name: 'chats-incoming',
+      component: () => import('@/views/IncomingChatsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.incoming' },
     },
     {

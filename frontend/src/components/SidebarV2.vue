@@ -238,7 +238,7 @@
               class="dropdown-item"
               :class="{ 'font-semibold': incomingStore.hasNew }"
               data-testid="btn-sidebar-v2-incoming"
-              @click="handleNavigate('/incoming')"
+              @click="handleNavigate('/chats/incoming')"
             >
               <span class="relative flex-shrink-0">
                 <InboxArrowDownIcon class="w-4 h-4" />

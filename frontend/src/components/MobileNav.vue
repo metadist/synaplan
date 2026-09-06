@@ -256,10 +256,12 @@
                   <button
                     v-if="iamSharingEnabled"
                     class="v2-drawer-account"
-                    :class="isPathActive('/incoming') ? 'v2-drawer-account--active' : 'txt-primary'"
-                    :data-nav-active="isPathActive('/incoming') ? 'true' : undefined"
+                    :class="
+                      isPathActive('/chats/incoming') ? 'v2-drawer-account--active' : 'txt-primary'
+                    "
+                    :data-nav-active="isPathActive('/chats/incoming') ? 'true' : undefined"
                     data-testid="btn-mobile-more-incoming"
-                    @click="handleNavigate('/incoming')"
+                    @click="handleNavigate('/chats/incoming')"
                   >
                     <span class="relative flex-shrink-0">
                       <InboxArrowDownIcon class="w-5 h-5" />
