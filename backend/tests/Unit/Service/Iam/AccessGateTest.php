@@ -84,6 +84,20 @@ final class AccessGateTest extends TestCase
         self::assertNull($this->gate->highestGranted($admin, 'conversation', '99'));
     }
 
+    public function testAdminGetsManageWhenGroupsOnEvenIfSharingOff(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(false);
+        $this->iamConfig->method('isGroupsEnabled')->willReturn(true);
+        $this->kind->method('ownerId')->willReturn(2);
+        $this->shares->expects(self::never())->method('highestPermission');
+
+        $admin = $this->userWithId(1);
+        $admin->setUserLevel('ADMIN');
+
+        self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Read));
+        self::assertTrue($this->gate->decide($admin, 'conversation', '99', Permission::Manage));
+    }
+
     public function testOwnerIsGrantedEveryLevel(): void
     {
         $this->iamConfig->method('isSharingEnabled')->willReturn(true);

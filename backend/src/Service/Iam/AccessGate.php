@@ -110,6 +110,12 @@ final readonly class AccessGate
         return $ownerId;
     }
 
+    /**
+     * S4 IAM32: admins may share / unshare / delete when People is on.
+     * This follows {@see IamConfig::isGroupsEnabled()}, not sharing — a
+     * sharing-off instance still lets an admin manage metadata. Content
+     * routes stay owner-or-share-only because they ask for Read / Use.
+     */
     private function adminMayManage(User $user, string $kind, string $resourceId): bool
     {
         if (!$user->isAdmin() || !$this->iamConfig->isGroupsEnabled((int) $user->getId())) {
