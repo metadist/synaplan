@@ -14,6 +14,8 @@ import {
   RevokeShareResponseSchema,
   SearchIamSubjectsResponseSchema,
   ListSharedWithMeResponseSchema,
+  CountUnseenSharedResponseSchema,
+  MarkSharedSeenResponseSchema,
   ContinueSharedChatResponseSchema,
 } from '@/generated/api-schemas'
 
@@ -156,6 +158,25 @@ export const iamApi = {
       schema: ListSharedWithMeResponseSchema,
     })
     return data.items ?? []
+  },
+
+  /** Items of `kind` that reached me since I last opened my incoming list. */
+  async countUnseenShared(kind: string): Promise<number> {
+    const data = await httpClient('/api/v1/me/shared/unseen', {
+      method: 'GET',
+      params: { kind },
+      schema: CountUnseenSharedResponseSchema,
+    })
+    return data.count ?? 0
+  },
+
+  /** Clears the "new" indicator for `kind` by moving my seen-watermark to now. */
+  async markSharedSeen(kind: string): Promise<void> {
+    await httpClient('/api/v1/me/shared/seen', {
+      method: 'POST',
+      body: JSON.stringify({ kind }),
+      schema: MarkSharedSeenResponseSchema,
+    })
   },
 
   async continueChat(chatId: number): Promise<{ id: number; title: string }> {

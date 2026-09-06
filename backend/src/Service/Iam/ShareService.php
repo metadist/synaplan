@@ -153,7 +153,11 @@ final readonly class ShareService
     }
 
     /**
-     * @return list<array{card: ResourceCard, permission: string, ownerId: int|null}>
+     * Resources shared with this user, one row per resource. `share` is the
+     * grant that wins (highest permission), `sharedAt` the moment the resource
+     * first reached the user through any of their subjects.
+     *
+     * @return list<array{card: ResourceCard, permission: string, ownerId: int|null, share: Share, sharedAt: int}>
      */
     public function listSharedWith(int $userId, string $kind): array
     {
@@ -161,6 +165,7 @@ final readonly class ShareService
             static fn ($m): int => $m->getGroupId(),
             $this->groupMemberRepository->findByUserId($userId),
         );
+        /** @var array<string, array{permission: Permission, share: Share, sharedAt: int}> $byResource */
         $byResource = [];
         foreach ($this->shareRepository->findForSubjects($userId, $groupIds, $kind) as $share) {
             $id = $share->getResourceId();
@@ -169,18 +174,26 @@ final readonly class ShareService
                 continue;
             }
             $existing = $byResource[$id] ?? null;
-            if (null === $existing || $permission->implies($existing)) {
-                $byResource[$id] = $permission;
+            if (null === $existing) {
+                $byResource[$id] = ['permission' => $permission, 'share' => $share, 'sharedAt' => $share->getCreated()];
+                continue;
+            }
+            $byResource[$id]['sharedAt'] = min($existing['sharedAt'], $share->getCreated());
+            if ($this->outranks($share, $permission, $existing['share'], $existing['permission'])) {
+                $byResource[$id]['permission'] = $permission;
+                $byResource[$id]['share'] = $share;
             }
         }
 
         $kindImpl = $this->registry->get($kind);
         $out = [];
-        foreach ($byResource as $resourceId => $permission) {
+        foreach ($byResource as $resourceId => $winner) {
             $out[] = [
                 'card' => $kindImpl->describe((string) $resourceId),
-                'permission' => $permission->value,
+                'permission' => $winner['permission']->value,
                 'ownerId' => $kindImpl->ownerId((string) $resourceId),
+                'share' => $winner['share'],
+                'sharedAt' => $winner['sharedAt'],
             ];
         }
 
@@ -254,20 +267,7 @@ final readonly class ShareService
      */
     public function serializeShare(Share $share): array
     {
-        $name = '';
-        $email = null;
-        if (Share::SUBJECT_USER === $share->getSubjectType()) {
-            $user = $this->userRepository->find($share->getSubjectId());
-            if ($user instanceof User) {
-                $name = $this->displayName($user);
-                $email = $user->getMail();
-            }
-        } elseif (Share::SUBJECT_GROUP === $share->getSubjectType()) {
-            $group = $this->groupRepository->find($share->getSubjectId());
-            if ($group instanceof Group) {
-                $name = $group->getName();
-            }
-        }
+        $subject = $this->subjectNameAndEmail($share);
 
         return [
             'id' => $share->getId(),
@@ -276,11 +276,33 @@ final readonly class ShareService
             'subjectType' => $share->getSubjectType(),
             'subjectId' => $share->getSubjectId(),
             'permission' => $share->getPermission(),
-            'name' => $name,
-            'email' => $email,
+            'name' => $subject['name'],
+            'email' => $subject['email'],
             'grantedBy' => $share->getGrantedBy(),
             'created' => $share->getCreated(),
         ];
+    }
+
+    /**
+     * One "shared with me" list entry: the resource card plus how and when it
+     * reached the user, and whether it arrived after they last looked.
+     *
+     * @param array{card: ResourceCard, permission: string, ownerId: int|null, share: Share, sharedAt: int} $row
+     *
+     * @return array<string, mixed>
+     */
+    public function serializeSharedItem(array $row, int $viewerId, int $lastSeenAt): array
+    {
+        $share = $row['share'];
+        $item = $this->serializeSharedCard($row['card'], $row['permission'], $row['ownerId']);
+        $item['sharedVia'] = [
+            'type' => $share->getSubjectType(),
+            'name' => $this->subjectNameAndEmail($share)['name'],
+        ];
+        $item['sharedAt'] = $row['sharedAt'];
+        $item['isNew'] = $share->getGrantedBy() !== $viewerId && $row['sharedAt'] > $lastSeenAt;
+
+        return $item;
     }
 
     /**
@@ -331,6 +353,49 @@ final readonly class ShareService
         if (!$group instanceof Group) {
             throw new \InvalidArgumentException('That group was not found.');
         }
+    }
+
+    /**
+     * A higher permission always wins. On equal permission the more specific
+     * subject wins (person over group over everyone), so the list can say
+     * "Group · Sales" instead of "Everyone" when both grants exist.
+     */
+    private function outranks(Share $candidate, Permission $candidateLevel, Share $current, Permission $currentLevel): bool
+    {
+        if ($candidateLevel === $currentLevel) {
+            return self::subjectSpecificity($candidate) > self::subjectSpecificity($current);
+        }
+
+        return $candidateLevel->implies($currentLevel);
+    }
+
+    private static function subjectSpecificity(Share $share): int
+    {
+        return match ($share->getSubjectType()) {
+            Share::SUBJECT_USER => 3,
+            Share::SUBJECT_GROUP => 2,
+            default => 1,
+        };
+    }
+
+    /**
+     * @return array{name: string, email: string|null}
+     */
+    private function subjectNameAndEmail(Share $share): array
+    {
+        if (Share::SUBJECT_USER === $share->getSubjectType()) {
+            $user = $this->userRepository->find($share->getSubjectId());
+            if ($user instanceof User) {
+                return ['name' => $this->displayName($user), 'email' => $user->getMail()];
+            }
+        } elseif (Share::SUBJECT_GROUP === $share->getSubjectType()) {
+            $group = $this->groupRepository->find($share->getSubjectId());
+            if ($group instanceof Group) {
+                return ['name' => $group->getName(), 'email' => null];
+            }
+        }
+
+        return ['name' => '', 'email' => null];
     }
 
     private function displayName(User $user): string

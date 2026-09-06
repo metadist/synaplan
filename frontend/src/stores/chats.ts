@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
+import { useIncomingStore } from '@/stores/incoming'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
@@ -144,9 +145,25 @@ export const useChatsStore = defineStore('chats', () => {
       return
     }
 
+    // An incoming (shared-with-me) chat is not in my own list but is a valid
+    // thing to have open. Keep it while the incoming list confirms it.
+    if (candidateId && !candidate && useIncomingStore().isOpenable(candidateId)) {
+      updateActiveChatSelection(candidateId)
+      return
+    }
+
     const firstRegularChat = chats.value.find((chat) => !chat.widgetSession)
     updateActiveChatSelection(firstRegularChat ? firstRegularChat.id : null)
   }
+
+  // Once the incoming list has arrived, an active chat that is neither mine nor
+  // shared with me (revoked share, stale storage) falls back like before.
+  watch(
+    () => useIncomingStore().loaded,
+    (incomingLoaded) => {
+      if (incomingLoaded && chats.value.length > 0) ensureValidActiveChat()
+    }
+  )
 
   async function loadChats() {
     if (!checkAuthOrRedirect()) return

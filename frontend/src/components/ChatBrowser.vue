@@ -70,7 +70,10 @@
       </div>
 
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div
+        class="grid grid-cols-1 gap-3"
+        :class="iamSharingEnabled ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'"
+      >
         <div class="surface-card p-4 flex items-center gap-3">
           <div class="p-2 rounded-lg bg-blue-500/10">
             <ChatBubbleLeftRightIcon class="w-5 h-5 text-blue-500" />
@@ -83,21 +86,38 @@
           </div>
         </div>
         <div class="surface-card p-4 flex items-center gap-3">
-          <div class="p-2 rounded-lg bg-purple-500/10">
-            <PuzzlePieceIcon class="w-5 h-5 text-purple-500" />
-          </div>
-          <div>
-            <div class="text-2xl font-bold txt-primary">{{ widgetChatsCount }}</div>
-            <div class="text-xs txt-secondary">Widget Chats</div>
-          </div>
-        </div>
-        <div class="surface-card p-4 flex items-center gap-3">
-          <div class="p-2 rounded-lg bg-green-500/10">
-            <UserIcon class="w-5 h-5 text-green-500" />
+          <div class="p-2 rounded-lg bg-[var(--status-success-muted)]">
+            <Icon icon="mdi:lock-outline" class="w-5 h-5 text-[var(--status-success-text)]" />
           </div>
           <div>
             <div class="text-2xl font-bold txt-primary">{{ myChatsCount }}</div>
-            <div class="text-xs txt-secondary">{{ $t('chat.browser.myChats') }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.private') }}</div>
+          </div>
+        </div>
+        <div
+          v-if="iamSharingEnabled"
+          class="surface-card p-4 flex items-center gap-3"
+          data-testid="card-incoming-count"
+        >
+          <div class="p-2 rounded-lg bg-[var(--brand-alpha-light)] relative">
+            <Icon icon="mdi:account-group-outline" class="w-5 h-5 text-[var(--brand)]" />
+            <span
+              v-if="incomingStore.hasNew"
+              class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-card)]"
+            />
+          </div>
+          <div>
+            <div class="text-2xl font-bold txt-primary">{{ incomingChatsCount }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.group') }}</div>
+          </div>
+        </div>
+        <div class="surface-card p-4 flex items-center gap-3">
+          <div class="p-2 rounded-lg bg-[var(--status-neutral-muted)]">
+            <PuzzlePieceIcon class="w-5 h-5 text-[var(--status-neutral-text)]" />
+          </div>
+          <div>
+            <div class="text-2xl font-bold txt-primary">{{ widgetChatsCount }}</div>
+            <div class="text-xs txt-secondary">{{ $t('iam.incoming.filter.widget') }}</div>
           </div>
         </div>
       </div>
@@ -126,26 +146,22 @@
         </button>
       </div>
 
+      <!-- Type filter buttons: Private (mine) / Group (incoming) / Widget -->
+      <div>
+        <span class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
+          <FunnelIcon class="w-3.5 h-3.5" />
+          {{ $t('chat.browser.filterByType') }}
+        </span>
+        <ChatKindFilter
+          v-model="selectedType"
+          show-widget
+          :counts="chatKindCounts"
+          :new-count="iamSharingEnabled ? incomingStore.unseenCount : 0"
+        />
+      </div>
+
       <!-- Filter Row -->
       <div class="flex flex-col sm:flex-row gap-3">
-        <!-- Type Filter -->
-        <div class="flex-1">
-          <label class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
-            <FunnelIcon class="w-3.5 h-3.5" />
-            {{ $t('chat.browser.filterByType') }}
-          </label>
-          <select
-            v-model="selectedType"
-            class="w-full px-3 py-2.5 bg-app border border-light-border dark:border-dark-border rounded-lg txt-primary focus:outline-none focus:ring-2 focus:ring-primary transition-all text-sm md:text-base"
-            data-testid="select-type-filter"
-          >
-            <option value="all">{{ $t('chat.browser.allTypes') }}</option>
-            <option value="widget">{{ $t('chat.browser.widgetChats') }}</option>
-            <option value="my">{{ $t('chat.browser.myChats') }}</option>
-            <option v-if="iamSharingEnabled" value="shared">{{ $t('iam.sharedWithMe') }}</option>
-          </select>
-        </div>
-
         <!-- Date Filter -->
         <div class="flex-1">
           <label class="flex items-center gap-2 text-xs font-medium txt-secondary mb-2">
@@ -193,17 +209,11 @@
         <button
           v-if="selectedType !== 'all'"
           class="pill txt-secondary text-xs flex items-center gap-1.5 hover:bg-red-500/10 hover:text-red-500 transition-colors"
+          data-testid="btn-clear-type-filter"
           @click="selectedType = 'all'"
         >
-          <PuzzlePieceIcon v-if="selectedType === 'widget'" class="w-3 h-3" />
-          <UserIcon v-else class="w-3 h-3" />
-          {{
-            selectedType === 'widget'
-              ? $t('chat.browser.widgetChats')
-              : selectedType === 'shared'
-                ? $t('iam.sharedWithMe')
-                : $t('chat.browser.myChats')
-          }}
+          <FunnelIcon class="w-3 h-3" />
+          {{ $t(`iam.incoming.filter.${selectedType}`) }}
           <XMarkIcon class="w-3 h-3" />
         </button>
         <button
@@ -280,32 +290,19 @@
           <!-- Main Content (clickable to open chat) -->
           <div class="flex-1 min-w-0 cursor-pointer" @click="openChat(chat.id)">
             <!-- Title and Type Badge -->
-            <div class="flex items-center gap-2 mb-2">
-              <div
-                v-if="chat.type === 'widget'"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400"
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+              <ChatKindPill
+                size="sm"
+                :kind="chat.kind"
+                :label="chat.kindLabel"
+                :is-new="chat.isNew"
+              />
+              <span
+                v-if="chat.type === 'shared' && chat.access"
+                class="text-xs txt-secondary"
+                data-testid="text-shared-chat-access"
+                >{{ $t(`iam.permission.${chat.access}`) }}</span
               >
-                <PuzzlePieceIcon class="w-3.5 h-3.5" />
-                <span class="text-xs font-medium">Widget</span>
-              </div>
-              <div
-                v-else-if="chat.type === 'shared'"
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[var(--brand)]/10 text-[var(--brand)]"
-                data-testid="badge-shared-chat"
-              >
-                <UserIcon class="w-3.5 h-3.5" />
-                <span class="text-xs font-medium">{{ $t('iam.sharedWithMe') }}</span>
-                <span v-if="chat.access" class="text-xs">{{
-                  $t(`iam.permission.${chat.access}`)
-                }}</span>
-              </div>
-              <div
-                v-else
-                class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 text-green-600 dark:text-green-400"
-              >
-                <UserIcon class="w-3.5 h-3.5" />
-                <span class="text-xs font-medium">{{ $t('chat.browser.myChats') }}</span>
-              </div>
               <!-- Share status badge -->
               <div
                 v-if="getShareStatus(chat.id)"
@@ -497,7 +494,6 @@ import {
   ChatBubbleLeftRightIcon,
   ChatBubbleLeftIcon,
   PuzzlePieceIcon,
-  UserIcon,
   ChevronRightIcon,
   ChevronLeftIcon,
   XMarkIcon,
@@ -511,10 +507,19 @@ import {
   Squares2X2Icon,
   GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
+import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatKindFilter from './iam/ChatKindFilter.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
-import { iamApi } from '@/services/api/iamApi'
+import { useIncomingStore } from '@/stores/incoming'
+import {
+  kindOfSharedItem,
+  matchesChatFilter,
+  type ChatKind,
+  type ChatListFilter,
+} from '@/utils/chatKind'
 import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -530,9 +535,9 @@ const { formatRelativeTime } = useDateFormat()
 
 // Filter states
 const searchQuery = ref('')
-const selectedType = ref<'all' | 'widget' | 'my' | 'shared'>('all')
+const selectedType = ref<ChatListFilter>('all')
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
-const sharedChats = ref<ChatItem[]>([])
+const incomingStore = useIncomingStore()
 const selectedDateRange = ref<'all' | 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'older'>(
   'all'
 )
@@ -692,6 +697,10 @@ interface ChatItem {
   messageCount: number
   lastMessage: number | string | undefined
   access?: string
+  /** Pill shown in the row: private (mine), group / everyone / direct (incoming), widget. */
+  kind: ChatKind
+  kindLabel: string | null
+  isNew: boolean
 }
 
 // Generate default widget title from session info
@@ -717,29 +726,28 @@ const isAutoGeneratedTitle = (
   return false
 }
 
-const loadSharedChats = async () => {
-  if (!isIamSharingEnabled()) {
-    sharedChats.value = []
-    return
-  }
-  try {
-    const items = await iamApi.listSharedWithMe('conversation')
-    sharedChats.value = items.map((item) => ({
+// Incoming (shared-with-me) conversations, pilled by the group / person they came through
+const sharedChats = computed((): ChatItem[] => {
+  if (!iamSharingEnabled.value) return []
+  return incomingStore.chats.map((item) => {
+    const { kind, label } = kindOfSharedItem(item)
+    return {
       id: Number(item.id),
       title: item.name,
       type: 'shared' as const,
       messageCount: Number(item.meta?.messageCount ?? 0),
-      lastMessage: undefined,
+      lastMessage: item.sharedAt || undefined,
       access: item.permission,
-    }))
-  } catch {
-    sharedChats.value = []
-  }
-}
+      kind,
+      kindLabel: label,
+      isNew: item.isNew === true,
+    }
+  })
+})
 
 // Compute all chats from store
 const allChats = computed((): ChatItem[] => {
-  const owned = chatsStore.chats.map((c) => {
+  const owned = chatsStore.chats.map((c): ChatItem => {
     if (c.widgetSession) {
       const session = c.widgetSession
       const defaultTitle = getDefaultWidgetTitle(session.widgetName, session.sessionId)
@@ -757,6 +765,9 @@ const allChats = computed((): ChatItem[] => {
         type: 'widget' as const,
         messageCount: session.messageCount,
         lastMessage: lastTimestamp,
+        kind: 'widget',
+        kindLabel: null,
+        isNew: false,
       }
     } else {
       return {
@@ -765,6 +776,9 @@ const allChats = computed((): ChatItem[] => {
         type: 'my' as const,
         messageCount: c.messageCount ?? 0,
         lastMessage: Math.floor(new Date(c.updatedAt).getTime() / 1000),
+        kind: 'private',
+        kindLabel: null,
+        isNew: false,
       }
     }
   })
@@ -776,9 +790,9 @@ const allChats = computed((): ChatItem[] => {
 const filteredChats = computed((): ChatItem[] => {
   let result = allChats.value
 
-  // Filter by type
+  // Filter by type (Private = mine, Group = incoming, Widget = visitor sessions)
   if (selectedType.value !== 'all') {
-    result = result.filter((c) => c.type === selectedType.value)
+    result = result.filter((c) => matchesChatFilter(c.kind, selectedType.value))
   }
 
   // Filter by search query
@@ -830,6 +844,14 @@ const totalChatsCount = computed(() => allChats.value.length)
 const widgetChatsCount = computed(() => allChats.value.filter((c) => c.type === 'widget').length)
 
 const myChatsCount = computed(() => allChats.value.filter((c) => c.type === 'my').length)
+
+const incomingChatsCount = computed(() => allChats.value.filter((c) => c.type === 'shared').length)
+
+const chatKindCounts = computed<Partial<Record<ChatListFilter, number>>>(() => ({
+  private: myChatsCount.value,
+  group: incomingChatsCount.value,
+  widget: widgetChatsCount.value,
+}))
 
 const hasActiveFilters = computed(() => {
   return (
@@ -892,7 +914,6 @@ const openChat = (id: number) => {
 }
 
 onMounted(async () => {
-  await chatsStore.loadChats()
-  await loadSharedChats()
+  await Promise.all([chatsStore.loadChats(), incomingStore.load()])
 })
 </script>

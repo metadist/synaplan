@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick, ref } from 'vue'
 import { useChatsStore } from '@/stores/chats'
 
 vi.mock('@/services/authService', () => ({
@@ -16,6 +17,19 @@ vi.mock('@/services/api/httpClient', () => ({
 vi.mock('@/composables/useIamFeature', () => ({
   isIamSharingEnabled: () => isIamSharingEnabledMock(),
   isIamGroupsEnabled: () => false,
+}))
+
+// The incoming (shared-with-me) store only matters for ensureValidActiveChat;
+// by default nothing is incoming, so the historical fallback behaviour holds.
+const incomingOpenableMock = vi.hoisted(() => vi.fn<(id: number) => boolean>(() => false))
+const incomingLoaded = ref(false)
+vi.mock('@/stores/incoming', () => ({
+  useIncomingStore: () => ({
+    get loaded() {
+      return incomingLoaded.value
+    },
+    isOpenable: (id: number) => incomingOpenableMock(id),
+  }),
 }))
 
 function chatPayload(id: number) {
@@ -36,6 +50,8 @@ describe('Chats Store', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.clearAllMocks()
+    incomingOpenableMock.mockReturnValue(false)
+    incomingLoaded.value = false
   })
 
   describe('createChat', () => {
@@ -159,6 +175,43 @@ describe('Chats Store', () => {
       httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9), widgetChat(5)] })
 
       await store.loadChats()
+
+      expect(store.activeChatId).toBe(9)
+    })
+
+    it('keeps an incoming (shared-with-me) chat that is not in my own list', async () => {
+      incomingOpenableMock.mockImplementation((id: number) => id === 13)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBe(13)
+    })
+
+    it('falls back to my first chat when the stored id is neither mine nor incoming', async () => {
+      incomingOpenableMock.mockReturnValue(false)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+
+      await store.loadChats()
+
+      expect(store.activeChatId).toBe(9)
+    })
+
+    it('re-validates a kept foreign id once the incoming list has loaded without it', async () => {
+      incomingOpenableMock.mockReturnValue(true)
+      localStorage.setItem('synaplan_active_chat_id', '13')
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({ chats: [regularChat(9)] })
+      await store.loadChats()
+      expect(store.activeChatId).toBe(13)
+
+      incomingOpenableMock.mockReturnValue(false)
+      incomingLoaded.value = true
+      await nextTick()
 
       expect(store.activeChatId).toBe(9)
     })

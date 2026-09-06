@@ -215,6 +215,110 @@ final class ShareControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testSharedItemTellsHowItArrivedAndIsNewUntilSeen(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('inbox-owner@synaplan.internal');
+        $member = $this->createUser('inbox-member@synaplan.internal');
+        $group = $this->createGroup('Support');
+        $this->addMember($group, (int) $member->getId());
+        $chat = $this->createChat((int) $owner->getId(), 'Escalation notes');
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame(0, $this->json()['count']);
+
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'group',
+            'subjectId' => (int) $group->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $items = array_values(array_filter(
+            $this->json()['items'],
+            static fn (array $item): bool => $item['id'] === (string) $chat->getId(),
+        ));
+        self::assertCount(1, $items);
+        self::assertSame(['type' => 'group', 'name' => 'Support'], $items[0]['sharedVia']);
+        self::assertTrue($items[0]['isNew']);
+        self::assertGreaterThan(0, $items[0]['sharedAt']);
+
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertGreaterThanOrEqual(1, $this->json()['count']);
+
+        $this->postJson('/api/v1/me/shared/seen', ['kind' => 'conversation']);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertTrue($this->json()['success']);
+
+        $this->client->request('GET', '/api/v1/me/shared/unseen?kind=conversation');
+        self::assertSame(0, $this->json()['count']);
+
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $items = array_values(array_filter(
+            $this->json()['items'],
+            static fn (array $item): bool => $item['id'] === (string) $chat->getId(),
+        ));
+        self::assertFalse($items[0]['isNew']);
+    }
+
+    public function testGroupGrantNamesTheGroupEvenWhenEveryoneHasTheSamePermission(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('tie-owner@synaplan.internal');
+        $member = $this->createUser('tie-member@synaplan.internal');
+        $group = $this->createGroup('Design');
+        $this->addMember($group, (int) $member->getId());
+        $chat = $this->createChat((int) $owner->getId(), 'Brand refresh');
+
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'group',
+            'subjectId' => (int) $group->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $chat->getId(),
+            'subjectType' => 'everyone',
+            'subjectId' => 0,
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $items = array_values(array_filter(
+            $this->json()['items'],
+            static fn (array $item): bool => $item['id'] === (string) $chat->getId(),
+        ));
+        self::assertCount(1, $items);
+        self::assertSame(['type' => 'group', 'name' => 'Design'], $items[0]['sharedVia']);
+        self::assertSame('use', $items[0]['permission']);
+    }
+
+    public function testUnseenRequiresKnownKind(): void
+    {
+        $this->enableSharing();
+        $member = $this->createUser('inbox-kind@synaplan.internal');
+        $this->authenticateClient($this->client, $member);
+
+        $this->client->request('GET', '/api/v1/me/shared/unseen');
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+
+        $this->postJson('/api/v1/me/shared/seen', ['kind' => 'no-such-kind']);
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testEveryoneIsNotOfferedWhenPolicyIsAdminsOnly(): void
     {
         $this->enableSharing();

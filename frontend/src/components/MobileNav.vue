@@ -254,6 +254,31 @@
                     <span>{{ $t('nav.profile') }}</span>
                   </button>
                   <button
+                    v-if="iamSharingEnabled"
+                    class="v2-drawer-account"
+                    :class="isPathActive('/incoming') ? 'v2-drawer-account--active' : 'txt-primary'"
+                    :data-nav-active="isPathActive('/incoming') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-incoming"
+                    @click="handleNavigate('/incoming')"
+                  >
+                    <span class="relative flex-shrink-0">
+                      <InboxArrowDownIcon class="w-5 h-5" />
+                      <span
+                        v-if="incomingStore.hasNew"
+                        class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
+                        data-testid="dot-mobile-more-incoming-new"
+                      />
+                    </span>
+                    <span class="flex-1 truncate">{{
+                      incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+                    }}</span>
+                    <span
+                      v-if="incomingStore.hasNew"
+                      class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+                      >{{ incomingStore.unseenCount }}</span
+                    >
+                  </button>
+                  <button
                     v-if="iamGroupsEnabled"
                     class="v2-drawer-account"
                     :class="isPathActive('/groups') ? 'v2-drawer-account--active' : 'txt-primary'"
@@ -561,6 +586,7 @@ import {
   ServerIcon,
   UserCircleIcon,
   UserGroupIcon,
+  InboxArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import {
@@ -585,6 +611,7 @@ import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useIncomingStore } from '@/stores/incoming'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
@@ -627,6 +654,8 @@ let observer: IntersectionObserver | null = null
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const incomingStore = useIncomingStore()
 
 /** Everything that is not a primary button lands in the "More" section. */
 const moreSections = computed(() =>

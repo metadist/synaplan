@@ -144,10 +144,18 @@
         data-testid="btn-sidebar-v2-user"
         @click="toggleUserMenu"
       >
-        <div
-          class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
-        >
-          {{ initials }}
+        <div class="relative">
+          <div
+            class="w-8 h-8 rounded-full surface-chip flex items-center justify-center text-xs font-semibold"
+          >
+            {{ initials }}
+          </div>
+          <span
+            v-if="incomingStore.hasNew"
+            class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[var(--status-error)] ring-2 ring-[var(--bg-sidebar)]"
+            data-testid="dot-sidebar-v2-incoming-new"
+            :aria-label="$t('iam.incoming.newCount', { count: incomingStore.unseenCount })"
+          />
         </div>
         <span class="v2-rail-label text-[10px] font-medium leading-tight">
           {{ $t('nav.account') }}
@@ -223,6 +231,32 @@
             >
               <UserCircleIcon class="w-4 h-4" />
               <span>{{ $t('nav.profile') }}</span>
+            </button>
+            <button
+              v-if="iamSharingEnabled"
+              role="menuitem"
+              class="dropdown-item"
+              :class="{ 'font-semibold': incomingStore.hasNew }"
+              data-testid="btn-sidebar-v2-incoming"
+              @click="handleNavigate('/incoming')"
+            >
+              <span class="relative flex-shrink-0">
+                <InboxArrowDownIcon class="w-4 h-4" />
+                <span
+                  v-if="incomingStore.hasNew"
+                  class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--status-error)]"
+                  data-testid="dot-sidebar-v2-menu-incoming-new"
+                />
+              </span>
+              <span class="flex-1 truncate">{{
+                incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
+              }}</span>
+              <span
+                v-if="incomingStore.hasNew"
+                class="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--status-error-muted)] text-[var(--status-error-text)] tabular-nums"
+                data-testid="text-sidebar-v2-incoming-count"
+                >{{ incomingStore.unseenCount }}</span
+              >
             </button>
             <button
               v-if="iamGroupsEnabled"
@@ -423,13 +457,22 @@
                 <span class="hidden sm:inline">{{ $t('chat.newChat') }}</span>
               </button>
             </div>
+
+            <!-- Private / Group filter (only with sharing on) -->
+            <div v-if="iamSharingEnabled" class="mt-3" data-testid="section-chat-manager-filter">
+              <ChatKindFilter
+                v-model="chatKindFilter"
+                :counts="chatKindCounts"
+                :new-count="incomingStore.unseenCount"
+              />
+            </div>
           </div>
 
           <!-- Chat List -->
           <div class="flex-1 overflow-y-auto scroll-thin px-3 pb-4 sm:px-4">
             <!-- Empty State -->
             <div
-              v-if="filteredChatList.length === 0 && chatSearchQuery"
+              v-if="filteredChatList.length === 0 && (chatSearchQuery || chatKindFilter !== 'all')"
               class="flex flex-col items-center justify-center py-10 gap-3"
             >
               <div
@@ -507,7 +550,13 @@
                   >
                     {{ getDisplayTitle(chat) }}
                   </p>
-                  <div class="flex items-center gap-2 mt-0.5">
+                  <div class="flex items-center gap-2 mt-0.5 min-w-0">
+                    <ChatKindPill
+                      v-if="iamSharingEnabled"
+                      :kind="chat.kind"
+                      :label="chat.kindLabel"
+                      :is-new="chat.isNew"
+                    />
                     <span class="text-[11px] txt-secondary">{{
                       formatTimestamp(chat.createdAt)
                     }}</span>
@@ -532,8 +581,8 @@
                   </div>
                 </div>
 
-                <!-- Actions -->
-                <div class="flex-shrink-0" @click.stop>
+                <!-- Actions (an incoming chat is someone else's: no rename/share/delete) -->
+                <div v-if="!chat.incoming" class="flex-shrink-0" @click.stop>
                   <button
                     class="w-9 h-9 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center sm:opacity-0 sm:group-hover/chat:opacity-100 focus:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
                     :class="chatMenuOpenId === chat.id && '!opacity-100 bg-black/5 dark:bg-white/5'"
@@ -656,6 +705,7 @@ import {
   ChartBarIcon,
   UserCircleIcon,
   UserGroupIcon,
+  InboxArrowDownIcon,
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
@@ -681,9 +731,18 @@ import { useDialog } from '../composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
+import { useIncomingStore } from '@/stores/incoming'
+import {
+  kindOfSharedItem,
+  matchesChatFilter,
+  type ChatKind,
+  type ChatListFilter,
+} from '@/utils/chatKind'
 import MemoriesDialog from './MemoriesDialog.vue'
 import ChatShareModal from './ChatShareModal.vue'
 import ShareDialog from './iam/ShareDialog.vue'
+import ChatKindPill from './iam/ChatKindPill.vue'
+import ChatKindFilter from './iam/ChatKindFilter.vue'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 
 const { t } = useI18n()
@@ -732,10 +791,13 @@ const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 const isCreatingChat = ref(false)
 const chatSearchQuery = ref('')
+const chatKindFilter = ref<ChatListFilter>('all')
+const incomingStore = useIncomingStore()
 
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
+const iamSharingEnabled = computed(() => isIamSharingEnabled())
 
 type FlyoutType = 'nav' | null
 const activeFlyout = ref<FlyoutType>(null)
@@ -747,8 +809,10 @@ watch(
   (open) => {
     if (open) {
       chatSearchQuery.value = ''
+      chatKindFilter.value = 'all'
       chatMenuOpenId.value = null
       chatsStore.loadChats()
+      incomingStore.load()
     }
   }
 )
@@ -788,6 +852,7 @@ const toggleUserMenu = () => {
     }
   }
   userMenuOpen.value = !userMenuOpen.value
+  if (userMenuOpen.value && authStore.isAuthenticated) incomingStore.refreshUnseen()
 }
 
 const handleEscape = (event: KeyboardEvent) => {
@@ -923,7 +988,19 @@ const chatActivityTimestamp = (chat: StoreChat): number => {
   return ts
 }
 
-const chatList = computed(() => {
+/**
+ * One row of the history sheet: my own chat (`private`) or a conversation
+ * someone shared with me (`incoming`, pilled by the group / person it came
+ * through). Incoming rows are read-only here — no rename, share or delete.
+ */
+type SheetChat = StoreChat & {
+  kind: ChatKind
+  kindLabel: string | null
+  isNew: boolean
+  incoming: boolean
+}
+
+const ownChatList = computed<SheetChat[]>(() => {
   return chatsStore.chats
     .filter((c) => {
       if (c.widgetSession) return false
@@ -937,15 +1014,55 @@ const chatList = computed(() => {
           c.title.startsWith('Chat '))
       return !isEmpty
     })
-    .slice()
-    .sort((a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a))
+    .map((c) => ({
+      ...c,
+      kind: 'private' as const,
+      kindLabel: null,
+      isNew: false,
+      incoming: false,
+    }))
 })
+
+const incomingChatList = computed<SheetChat[]>(() => {
+  if (!iamSharingEnabled.value) return []
+  const ownIds = new Set(chatsStore.chats.map((c) => c.id))
+  return incomingStore.chats
+    .filter((item) => !ownIds.has(Number(item.id)))
+    .map((item) => {
+      const { kind, label } = kindOfSharedItem(item)
+      const sharedAt = new Date((item.sharedAt ?? 0) * 1000).toISOString()
+      return {
+        id: Number(item.id),
+        title: item.name,
+        createdAt: sharedAt,
+        updatedAt: sharedAt,
+        messageCount: Number(item.meta?.messageCount ?? 0) || undefined,
+        source: 'web' as const,
+        access: item.permission as StoreChat['access'],
+        kind,
+        kindLabel: label,
+        isNew: item.isNew === true,
+        incoming: true,
+      }
+    })
+})
+
+const chatList = computed<SheetChat[]>(() => {
+  return [...ownChatList.value, ...incomingChatList.value].sort(
+    (a, b) => chatActivityTimestamp(b) - chatActivityTimestamp(a)
+  )
+})
+
+const chatKindCounts = computed<Partial<Record<ChatListFilter, number>>>(() => ({
+  private: ownChatList.value.length,
+  group: incomingChatList.value.length,
+}))
 
 const filteredChatList = computed(() => {
   const q = chatSearchQuery.value.toLowerCase().trim()
-  if (!q) return chatList.value
   return chatList.value.filter((c) => {
-    return getDisplayTitle(c).toLowerCase().includes(q)
+    if (!matchesChatFilter(c.kind, chatKindFilter.value)) return false
+    return !q || getDisplayTitle(c).toLowerCase().includes(q)
   })
 })
 
