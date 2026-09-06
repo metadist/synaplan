@@ -307,7 +307,7 @@
         </button>
       </div>
       <ChatInput
-        v-if="!needsProviderSetup && chatsStore.conversationAccess === 'owner'"
+        v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
@@ -514,6 +514,7 @@ import {
 } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -632,6 +633,18 @@ const chatsStore = useChatsStore()
 const sharedConversationLocked = computed(
   () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
 )
+const canComposeSharedChat = computed(() => {
+  if (isGuestMode.value) {
+    return true
+  }
+  if (sharedConversationLocked.value) {
+    return false
+  }
+  if (chatsStore.conversationAccess === 'owner') {
+    return true
+  }
+  return !isIamSharingEnabled()
+})
 
 const continueSharedConversation = async () => {
   const id = chatsStore.activeChatId

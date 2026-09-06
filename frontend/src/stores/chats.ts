@@ -4,6 +4,7 @@ import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
+import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -432,6 +433,10 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   async function loadConversationAccess(chatId: number) {
+    if (!isIamSharingEnabled()) {
+      conversationAccess.value = 'owner'
+      return
+    }
     const seq = ++conversationAccessSeq
     conversationAccess.value = null
     try {

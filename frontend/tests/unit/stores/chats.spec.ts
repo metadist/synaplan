@@ -9,8 +9,13 @@ vi.mock('@/services/authService', () => ({
 }))
 
 const httpClientMock = vi.hoisted(() => vi.fn())
+const isIamSharingEnabledMock = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: httpClientMock,
+}))
+vi.mock('@/composables/useIamFeature', () => ({
+  isIamSharingEnabled: () => isIamSharingEnabledMock(),
+  isIamGroupsEnabled: () => false,
 }))
 
 function chatPayload(id: number) {
@@ -346,6 +351,16 @@ describe('Chats Store', () => {
   })
 
   describe('loadConversationAccess', () => {
+    it('skips the request and treats the chat as owned when sharing is off', async () => {
+      isIamSharingEnabledMock.mockReturnValueOnce(false)
+      const store = useChatsStore()
+
+      await store.loadConversationAccess(3)
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(store.conversationAccess).toBe('owner')
+    })
+
     it('treats a missing access field as owner', async () => {
       const store = useChatsStore()
       httpClientMock.mockResolvedValueOnce({ chat: { id: 3 } })
