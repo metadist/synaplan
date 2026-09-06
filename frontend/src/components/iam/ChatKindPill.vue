@@ -101,8 +101,12 @@ const text = computed(() => {
 
 const title = computed(() => {
   switch (props.kind) {
-    case 'group':
-      return t('iam.incoming.pill.groupTitle', { name: text.value })
+    case 'group': {
+      const name = props.label?.trim() ?? ''
+      return name !== ''
+        ? t('iam.incoming.pill.groupTitle', { name })
+        : t('iam.incoming.pill.groupTitleGeneric')
+    }
     case 'everyone':
       return t('iam.incoming.pill.everyoneTitle')
     case 'direct':

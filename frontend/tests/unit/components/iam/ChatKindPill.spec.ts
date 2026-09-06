@@ -16,6 +16,7 @@ const i18n = createI18n({
             privateTitle: 'Your own chat',
             group: 'Group',
             groupTitle: 'Shared with the group "{name}"',
+            groupTitleGeneric: 'Shared with a group',
             everyone: 'Everyone',
             everyoneTitle: 'Shared with everyone',
             direct: 'Shared with you',
@@ -53,7 +54,9 @@ describe('ChatKindPill', () => {
   })
 
   it('falls back to a generic group label', () => {
-    expect(mountPill({ kind: 'group', label: '  ' }).text()).toBe('Group')
+    const wrapper = mountPill({ kind: 'group', label: '  ' })
+    expect(wrapper.text()).toBe('Group')
+    expect(wrapper.attributes('title')).toBe('Shared with a group')
   })
 
   it('names the sender for a direct share', () => {

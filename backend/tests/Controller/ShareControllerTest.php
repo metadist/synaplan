@@ -315,6 +315,44 @@ final class ShareControllerTest extends WebTestCase
         self::assertSame(['type' => 'group', 'name' => 'Design'], $this->json()['chat']['sharedVia']);
     }
 
+    public function testDirectAndEveryoneSharesLeaveSharedViaNameEmpty(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('via-owner@synaplan.internal');
+        $member = $this->createUser('via-member@synaplan.internal');
+        $direct = $this->createChat((int) $owner->getId(), 'Just you');
+        $everyone = $this->createChat((int) $owner->getId(), 'For all');
+
+        $this->authenticateClient($this->client, $owner);
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $direct->getId(),
+            'subjectType' => 'user',
+            'subjectId' => (int) $member->getId(),
+            'permission' => 'read',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'conversation',
+            'resource' => (string) $everyone->getId(),
+            'subjectType' => 'everyone',
+            'subjectId' => 0,
+            'permission' => 'read',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+
+        $this->authenticateClient($this->client, $member);
+        $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
+        $items = array_column($this->json()['items'], 'sharedVia', 'id');
+        self::assertSame(['type' => 'user', 'name' => ''], $items[(string) $direct->getId()]);
+        self::assertSame(['type' => 'everyone', 'name' => ''], $items[(string) $everyone->getId()]);
+
+        $this->client->request('GET', '/api/v1/chats/'.$direct->getId());
+        self::assertSame(['type' => 'user', 'name' => ''], $this->json()['chat']['sharedVia']);
+        $this->client->request('GET', '/api/v1/chats/'.$everyone->getId());
+        self::assertSame(['type' => 'everyone', 'name' => ''], $this->json()['chat']['sharedVia']);
+    }
+
     public function testUnseenRequiresKnownKind(): void
     {
         $this->enableSharing();
