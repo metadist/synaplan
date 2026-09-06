@@ -484,6 +484,8 @@
       "confirmAction": "Sitzung starten",
       "started": "Du siehst die Anwendung jetzt als {email}.",
       "startFailed": "Impersonation konnte nicht gestartet werden",
+      "disabled": "Die Ansicht als anderer Benutzer ist auf dieser Instanz ausgeschaltet.",
+      "disabledTitle": "Ansicht als anderer Benutzer ist ausgeschaltet",
       "cannotImpersonateSelf": "Du kannst dich nicht selbst impersonieren.",
       "banner": {
         "viewing": "Angemeldet als {email}",
@@ -5445,7 +5447,8 @@
     "subtitle": "Benutzer und Gruppen auf dieser Instanz.",
     "tabs": {
       "users": "Benutzer",
-      "groups": "Gruppen"
+      "groups": "Gruppen",
+      "audit": "Protokoll"
     },
     "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
     "openPeople": "Personen öffnen",
@@ -5478,7 +5481,8 @@
       "created": "Gruppe erstellt.",
       "renamed": "Gruppe umbenannt.",
       "deleted": "Gruppe gelöscht.",
-      "directoryReadOnly": "Diese Gruppe kommt aus Ihrer Anmeldung und kann hier nicht geändert werden.",
+      "directoryReadOnly": "Diese Gruppe kommt aus Ihrer Anmeldung und kann hier nicht umbenannt oder gelöscht werden.",
+      "directoryManagedHint": "Mitgliedschaften aus der Anmeldung werden beim nächsten Anmelden aktualisiert. Sie können weiterhin Personen von Hand hinzufügen.",
       "addMember": "Person hinzufügen",
       "addMemberPlaceholder": "Nach E-Mail suchen",
       "addMemberNotFound": "Kein Benutzer passt zu dieser E-Mail.",
@@ -5490,6 +5494,31 @@
       "memberRemoved": "Person aus der Gruppe entfernt.",
       "sharedWith": "Mit dieser Gruppe geteilt",
       "sharedEmpty": "Mit dieser Gruppe ist noch nichts geteilt."
+    },
+    "audit": {
+      "when": "Wann",
+      "who": "Wer",
+      "actionLabel": "Aktion",
+      "kind": "Art",
+      "resource": "Ressource",
+      "subject": "Details",
+      "empty": "Noch keine Protokolleinträge.",
+      "more": "Mehr laden",
+      "loadError": "Das Protokoll konnte nicht geladen werden.",
+      "filterAll": "Alle",
+      "action": {
+        "share_grant": "Geteilt",
+        "share_revoke": "Freigabe entfernt",
+        "group_create": "Gruppe erstellt",
+        "group_update": "Gruppe geändert",
+        "group_delete": "Gruppe gelöscht",
+        "group_member_set": "Mitglied hinzugefügt",
+        "group_member_remove": "Mitglied entfernt",
+        "directory_sync": "Anmeldegruppe aktualisiert",
+        "impersonation_start": "Ansicht als Benutzer gestartet",
+        "impersonation_stop": "Ansicht als Benutzer beendet",
+        "admin_metadata_view": "Ressourcenliste angesehen"
+      }
     }
   },
   "iam": {

@@ -17,7 +17,12 @@ import {
   CountUnseenSharedResponseSchema,
   MarkSharedSeenResponseSchema,
   ContinueSharedChatResponseSchema,
+  ListAdminAuditResponseSchema,
 } from '@/generated/api-schemas'
+
+export type IamAuditEntry = NonNullable<
+  z.infer<typeof ListAdminAuditResponseSchema>['entries']
+>[number]
 
 export type IamGroup = NonNullable<z.infer<typeof ListAdminGroupsResponseSchema>['groups']>[number]
 export type IamGroupMember = NonNullable<
@@ -176,6 +181,30 @@ export const iamApi = {
       method: 'POST',
       body: JSON.stringify({ kind }),
       schema: MarkSharedSeenResponseSchema,
+    })
+  },
+
+  async listAudit(params?: {
+    actor?: number
+    action?: string
+    kind?: string
+    from?: number
+    to?: number
+    cursor?: number
+    limit?: number
+  }): Promise<{ entries: IamAuditEntry[]; nextCursor: number | null }> {
+    const query: Record<string, string> = {}
+    if (params?.actor !== undefined) query.actor = String(params.actor)
+    if (params?.action) query.action = params.action
+    if (params?.kind) query.kind = params.kind
+    if (params?.from !== undefined) query.from = String(params.from)
+    if (params?.to !== undefined) query.to = String(params.to)
+    if (params?.cursor !== undefined) query.cursor = String(params.cursor)
+    if (params?.limit !== undefined) query.limit = String(params.limit)
+    return httpClient('/api/v1/admin/audit', {
+      method: 'GET',
+      params: query,
+      schema: ListAdminAuditResponseSchema,
     })
   },
 

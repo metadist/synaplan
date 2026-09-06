@@ -17,7 +17,7 @@ S4 Directory & privacy and S5 Group policies start from that branch.
 | S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | done | Merged to `main` as #1713 |
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | in review | [PR #1717](https://github.com/metadist/synaplan/pull/1717). History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
-| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in progress | IAM29–IAM38; stacked on #1717 |
+| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in progress | IAM29–IAM38 on this branch (directory sync, audit tab, admin manage-without-read, impersonation audit). Stacked on #1717 |
 | S5 Group policies | — | planned | IAM39–IAM46; first cut line. New flag `IAM.GROUP_POLICIES_ENABLED` (seeded off) |
 
 ## Decisions

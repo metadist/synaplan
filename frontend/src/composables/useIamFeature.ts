@@ -17,3 +17,7 @@ export function isIamGroupsEnabled(): boolean {
 export function isIamSharingEnabled(): boolean {
   return getConfigSync().features?.iamSharing === true
 }
+
+export function isIamImpersonationDisabled(): boolean {
+  return getConfigSync().features?.iamImpersonationDisabled === true
+}

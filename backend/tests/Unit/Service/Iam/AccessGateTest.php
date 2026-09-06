@@ -55,6 +55,7 @@ final class AccessGateTest extends TestCase
     public function testAdminIsNotOwner(): void
     {
         $this->iamConfig->method('isSharingEnabled')->willReturn(false);
+        $this->iamConfig->method('isGroupsEnabled')->willReturn(false);
         $this->kind->method('ownerId')->willReturn(2);
         $this->shares->expects(self::never())->method('highestPermission');
 
@@ -63,6 +64,24 @@ final class AccessGateTest extends TestCase
 
         self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Read));
         self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Use));
+    }
+
+    public function testAdminGetsManageNotRead(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $this->iamConfig->method('isGroupsEnabled')->willReturn(true);
+        $this->kind->method('ownerId')->willReturn(2);
+        $this->members->method('findByUserId')->willReturn([]);
+        $this->shares->method('highestPermission')->willReturn(null);
+
+        $admin = $this->userWithId(1);
+        $admin->setUserLevel('ADMIN');
+
+        self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Read));
+        self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Use));
+        self::assertFalse($this->gate->decide($admin, 'conversation', '99', Permission::Edit));
+        self::assertTrue($this->gate->decide($admin, 'conversation', '99', Permission::Manage));
+        self::assertNull($this->gate->highestGranted($admin, 'conversation', '99'));
     }
 
     public function testOwnerIsGrantedEveryLevel(): void

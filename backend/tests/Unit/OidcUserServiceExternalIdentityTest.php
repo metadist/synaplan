@@ -8,6 +8,8 @@ use App\Entity\ExternalIdentity;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcClaimResolver;
+use App\Service\Iam\DirectoryGroupSync;
 use App\Service\ModelConfigService;
 use App\Service\OidcUserService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -70,7 +72,7 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         $identity->setSource('oidc:https://idp.example');
         $identity->setExternalId('sub-table');
 
-        $this->externalIdentities->expects(self::once())
+        $this->externalIdentities->expects(self::exactly(2))
             ->method('findOneByTriple')
             ->with('oidc:https://idp.example', '', 'sub-table')
             ->willReturn($identity);
@@ -95,7 +97,7 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
 
     public function testDoesNotResolveSubBelongingToADifferentIssuer(): void
     {
-        $this->externalIdentities->expects(self::once())
+        $this->externalIdentities->expects(self::exactly(2))
             ->method('findOneByTriple')
             ->with('oidc:https://idp.example', '', 'shared-sub')
             ->willReturn(null);
@@ -143,12 +145,17 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
 
     private function service(): OidcUserService
     {
+        $sync = $this->createMock(DirectoryGroupSync::class);
+        $sync->method('shouldRun')->willReturn(false);
+
         return new OidcUserService(
             $this->userRepository,
             $this->em,
             $this->createStub(ModelConfigService::class),
             new NullLogger(),
             $this->externalIdentities,
+            new OidcClaimResolver(),
+            $sync,
             'admin',
             'realm_access.roles',
             'test-client-id',

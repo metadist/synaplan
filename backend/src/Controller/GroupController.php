@@ -48,6 +48,7 @@ final class GroupController extends AbstractController
                                     new OA\Property(property: 'slug', type: 'string', example: 'sales'),
                                     new OA\Property(property: 'description', type: 'string', example: ''),
                                     new OA\Property(property: 'kind', type: 'string', enum: ['manual', 'directory'], example: 'manual'),
+                                    new OA\Property(property: 'externalSource', type: 'string', nullable: true, example: 'oidc:https://idp.example/realms/synaplan'),
                                     new OA\Property(property: 'memberCount', type: 'integer', example: 3),
                                     new OA\Property(property: 'role', type: 'string', enum: ['member', 'manager'], nullable: true),
                                     new OA\Property(property: 'created', type: 'integer', format: 'int64'),

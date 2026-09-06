@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 
 const listAdminGroups = vi.fn()
 const mockGetUsers = vi.fn()
+const listAudit = vi.fn()
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
@@ -16,6 +17,7 @@ vi.mock('@/services/api/iamApi', () => ({
     setMember: vi.fn(),
     removeMember: vi.fn(),
     listMyGroups: vi.fn(),
+    listAudit: (...args: unknown[]) => listAudit(...args),
   },
 }))
 
@@ -64,6 +66,22 @@ describe('PeopleView', () => {
     listAdminGroups.mockReset()
     mockGetUsers.mockReset()
     mockGetUsers.mockResolvedValue({ users: [], total: 0, page: 1, limit: 50 })
+    listAudit.mockReset()
+    listAudit.mockResolvedValue({
+      entries: [
+        {
+          id: 1,
+          actorId: 2,
+          action: 'share.grant',
+          kind: 'conversation',
+          resourceId: '9',
+          subject: { permission: 'use' },
+          ip: '127.0.0.1',
+          created: 1_700_000_000,
+        },
+      ],
+      nextCursor: null,
+    })
     listAdminGroups.mockResolvedValue([
       {
         id: 1,
@@ -84,7 +102,21 @@ describe('PeopleView', () => {
 
     expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(false)
+  })
+
+  it('lists audit events on the Audit tab', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="tab-audit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(true)
+    expect(listAudit).toHaveBeenCalled()
+    expect(wrapper.text()).toContain('Shared')
   })
 
   it('lists groups on the Groups tab', async () => {

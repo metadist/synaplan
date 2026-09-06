@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Service;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
 use App\Service\ImpersonationService;
 use App\Service\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -37,24 +39,71 @@ final class ImpersonationServiceTest extends TestCase
 {
     private TokenService&MockObject $tokenService;
     private UserRepository&MockObject $userRepository;
+    private AuditLogWriter&MockObject $auditLogWriter;
+    private IamConfig&MockObject $iamConfig;
     private ImpersonationService $service;
 
     protected function setUp(): void
     {
         $this->tokenService = $this->createMock(TokenService::class);
         $this->userRepository = $this->createMock(UserRepository::class);
+        $this->auditLogWriter = $this->createMock(AuditLogWriter::class);
+        $this->iamConfig = $this->createMock(IamConfig::class);
+        $this->iamConfig->method('isImpersonationDisabled')->willReturn(false);
 
         $this->service = new ImpersonationService(
             $this->tokenService,
             $this->userRepository,
             new NullLogger(),
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            $this->auditLogWriter,
+            $this->iamConfig,
         );
     }
 
     // ---------------------------------------------------------------------
     // start() — security invariants
     // ---------------------------------------------------------------------
+
+    public function testStartWritesAuditRow(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO');
+        $request = $this->requestWithAppTokens([
+            TokenService::REFRESH_COOKIE => 'admin-refresh',
+        ]);
+        $this->tokenService->method('generateAccessToken')->willReturn('target-access');
+        $this->tokenService->method('createAccessCookie')
+            ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('target-access'));
+        $this->tokenService->method('createClearRefreshCookie')
+            ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue(''));
+        $this->auditLogWriter->expects(self::once())
+            ->method('record')
+            ->with(1, 'impersonation.start', 'user', '7', ['targetUserId' => 7], self::isString());
+
+        $this->service->startImpersonation($admin, $target, $request, new Response());
+    }
+
+    public function testDisabledReturns403Shape(): void
+    {
+        $this->iamConfig = $this->createMock(IamConfig::class);
+        $this->iamConfig->method('isImpersonationDisabled')->willReturn(true);
+        $this->service = new ImpersonationService(
+            $this->tokenService,
+            $this->userRepository,
+            new NullLogger(),
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            $this->auditLogWriter,
+            $this->iamConfig,
+        );
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO');
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage('iam.impersonationDisabled');
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        $this->service->startImpersonation($admin, $target, new Request(), new Response());
+    }
 
     public function testStartImpersonationRefusesNonAdmin(): void
     {

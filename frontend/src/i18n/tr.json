@@ -481,6 +481,8 @@
       "confirmAction": "Oturumu başlat",
       "started": "Uygulamayı şimdi {email} olarak görüntülüyorsun.",
       "startFailed": "Kimliğe bürünme başlatılamadı",
+      "disabled": "Bu kuruluşta başka bir kullanıcı olarak görüntüleme kapalı.",
+      "disabledTitle": "Başka bir kullanıcı olarak görüntüleme kapalı",
       "cannotImpersonateSelf": "Kendi kimliğine bürünemezsin.",
       "banner": {
         "viewing": "{email} olarak görüntüleniyor",
@@ -4526,7 +4528,8 @@
     "subtitle": "Bu kuruluştaki kullanıcılar ve gruplar.",
     "tabs": {
       "users": "Kullanıcılar",
-      "groups": "Gruplar"
+      "groups": "Gruplar",
+      "audit": "Kayıt"
     },
     "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
     "openPeople": "Kişiler’i aç",
@@ -4559,7 +4562,8 @@
       "created": "Grup oluşturuldu.",
       "renamed": "Grup yeniden adlandırıldı.",
       "deleted": "Grup silindi.",
-      "directoryReadOnly": "Bu grup girişinizden gelir ve burada değiştirilemez.",
+      "directoryReadOnly": "Bu grup girişinizden gelir; burada yeniden adlandırılamaz veya silinemez.",
+      "directoryManagedHint": "Girişten gelen üyelikler bir sonraki oturumda güncellenir. Yine de kişileri elle ekleyebilirsiniz.",
       "addMember": "Kişi ekle",
       "addMemberPlaceholder": "E-postayla ara",
       "addMemberNotFound": "Bu e-postayla eşleşen kullanıcı yok.",
@@ -4571,6 +4575,31 @@
       "memberRemoved": "Kişi gruptan kaldırıldı.",
       "sharedWith": "Bu grupla paylaşılanlar",
       "sharedEmpty": "Bu grupla henüz hiçbir şey paylaşılmadı."
+    },
+    "audit": {
+      "when": "Ne zaman",
+      "who": "Kim",
+      "actionLabel": "İşlem",
+      "kind": "Tür",
+      "resource": "Kaynak",
+      "subject": "Ayrıntılar",
+      "empty": "Henüz denetim kaydı yok.",
+      "more": "Daha fazla yükle",
+      "loadError": "Denetim kaydı yüklenemedi.",
+      "filterAll": "Tümü",
+      "action": {
+        "share_grant": "Paylaşıldı",
+        "share_revoke": "Paylaşım kaldırıldı",
+        "group_create": "Grup oluşturuldu",
+        "group_update": "Grup güncellendi",
+        "group_delete": "Grup silindi",
+        "group_member_set": "Üye eklendi",
+        "group_member_remove": "Üye kaldırıldı",
+        "directory_sync": "Giriş grubu güncellendi",
+        "impersonation_start": "Kullanıcı olarak görüntüleme başladı",
+        "impersonation_stop": "Kullanıcı olarak görüntüleme bitti",
+        "admin_metadata_view": "Kaynak listesine bakıldı"
+      }
     }
   },
   "iam": {

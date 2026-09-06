@@ -489,6 +489,8 @@
       "confirmAction": "Démarrer la session",
       "started": "Vous consultez maintenant l’application en tant que {email}.",
       "startFailed": "Impossible de démarrer l’usurpation d’identité",
+      "disabled": "Voir l’application en tant qu’un autre utilisateur est désactivé sur cette instance.",
+      "disabledTitle": "Voir en tant qu’un autre utilisateur est désactivé",
       "cannotImpersonateSelf": "Vous ne pouvez pas usurper votre propre identité.",
       "banner": {
         "viewing": "Consultation en tant que {email}",
@@ -5511,7 +5513,8 @@
     "subtitle": "Utilisateurs et groupes de cette instance.",
     "tabs": {
       "users": "Utilisateurs",
-      "groups": "Groupes"
+      "groups": "Groupes",
+      "audit": "Journal"
     },
     "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
     "openPeople": "Ouvrir Personnes",
@@ -5544,7 +5547,8 @@
       "created": "Groupe créé.",
       "renamed": "Groupe renommé.",
       "deleted": "Groupe supprimé.",
-      "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être modifié ici.",
+      "directoryReadOnly": "Ce groupe vient de votre connexion et ne peut pas être renommé ni supprimé ici.",
+      "directoryManagedHint": "Les appartenances issues de la connexion sont mises à jour à la prochaine connexion. Vous pouvez encore ajouter des personnes à la main.",
       "addMember": "Ajouter une personne",
       "addMemberPlaceholder": "Rechercher par e-mail",
       "addMemberNotFound": "Aucun utilisateur ne correspond à cet e-mail.",
@@ -5556,6 +5560,31 @@
       "memberRemoved": "Personne retirée du groupe.",
       "sharedWith": "Partagé avec ce groupe",
       "sharedEmpty": "Rien n’est encore partagé avec ce groupe."
+    },
+    "audit": {
+      "when": "Quand",
+      "who": "Qui",
+      "actionLabel": "Action",
+      "kind": "Type",
+      "resource": "Ressource",
+      "subject": "Détails",
+      "empty": "Aucun événement d’audit pour le moment.",
+      "more": "Charger plus",
+      "loadError": "Le journal d’audit n’a pas pu être chargé.",
+      "filterAll": "Tous",
+      "action": {
+        "share_grant": "Partagé",
+        "share_revoke": "Partage retiré",
+        "group_create": "Groupe créé",
+        "group_update": "Groupe modifié",
+        "group_delete": "Groupe supprimé",
+        "group_member_set": "Membre ajouté",
+        "group_member_remove": "Membre retiré",
+        "directory_sync": "Groupe de connexion mis à jour",
+        "impersonation_start": "A commencé à voir en tant qu’utilisateur",
+        "impersonation_stop": "A cessé de voir en tant qu’utilisateur",
+        "admin_metadata_view": "A consulté la liste des ressources"
+      }
     }
   },
   "iam": {

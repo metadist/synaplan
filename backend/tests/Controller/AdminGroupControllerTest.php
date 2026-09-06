@@ -79,7 +79,7 @@ final class AdminGroupControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
     }
 
-    public function testDirectoryGroupMemberMutationsAre409(): void
+    public function testDirectoryGroupAcceptsManualMembersButNotDirectoryRows(): void
     {
         $this->enableFlag();
         $admin = $this->createAdmin('iam-admin-dir-members@synaplan.internal');
@@ -90,9 +90,16 @@ final class AdminGroupControllerTest extends WebTestCase
         $this->putJson('/api/v1/admin/groups/'.$group->getId().'/members/'.$alice->getId(), [
             'role' => 'member',
         ]);
-        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame('manual', $this->json()['member']['source']);
 
-        $this->client->request('DELETE', '/api/v1/admin/groups/'.$group->getId().'/members/'.$alice->getId());
+        $bob = $this->createUser('iam-dir-bob@synaplan.internal');
+        $directoryMember = new \App\Entity\GroupMember((int) $group->getId(), (int) $bob->getId());
+        $directoryMember->setSource(\App\Entity\GroupMember::SOURCE_DIRECTORY);
+        $this->em->persist($directoryMember);
+        $this->em->flush();
+
+        $this->client->request('DELETE', '/api/v1/admin/groups/'.$group->getId().'/members/'.$bob->getId());
         self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
     }
 

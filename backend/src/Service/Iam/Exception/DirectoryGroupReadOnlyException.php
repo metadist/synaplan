@@ -6,8 +6,8 @@ namespace App\Service\Iam\Exception;
 
 final class DirectoryGroupReadOnlyException extends \RuntimeException
 {
-    public function __construct(int $groupId)
+    public function __construct(public readonly int $groupId)
     {
-        parent::__construct(sprintf('Directory group %d cannot be changed from the People page.', $groupId));
+        parent::__construct('This comes from the company login and cannot be changed here.');
     }
 }

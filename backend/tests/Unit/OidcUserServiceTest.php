@@ -7,6 +7,8 @@ namespace App\Tests\Unit;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcClaimResolver;
+use App\Service\Iam\DirectoryGroupSync;
 use App\Service\ModelConfigService;
 use App\Service\OidcUserService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,12 +52,17 @@ class OidcUserServiceTest extends TestCase
         string $oidcRoleClaims = 'realm_access.roles,resource_access.{client_id}.roles,groups',
         string $oidcClientId = 'test-client-id',
     ): OidcUserService {
+        $sync = $this->createMock(DirectoryGroupSync::class);
+        $sync->method('shouldRun')->willReturn(false);
+
         return new OidcUserService(
             $this->userRepository,
             $this->em,
             $this->modelConfigService,
             new NullLogger(),
             $this->externalIdentities,
+            new OidcClaimResolver(),
+            $sync,
             $oidcAdminRoles,
             $oidcRoleClaims,
             $oidcClientId,

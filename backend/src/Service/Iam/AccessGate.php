@@ -38,8 +38,14 @@ final readonly class AccessGate
     public function decide(User $user, string $kind, string $resourceId, Permission $level): bool
     {
         $granted = $this->highestGranted($user, $kind, $resourceId);
+        if (null !== $granted && $granted->implies($level)) {
+            return true;
+        }
 
-        return null !== $granted && $granted->implies($level);
+        // Admins may share / unshare / delete (manage) without being able to
+        // read the content. highestGranted stays share/owner-only so a GET
+        // never treats an admin as Can use.
+        return Permission::Manage === $level && $this->adminMayManage($user, $kind, $resourceId);
     }
 
     /**
@@ -102,6 +108,15 @@ final readonly class AccessGate
         }
 
         return $ownerId;
+    }
+
+    private function adminMayManage(User $user, string $kind, string $resourceId): bool
+    {
+        if (!$user->isAdmin() || !$this->iamConfig->isGroupsEnabled((int) $user->getId())) {
+            return false;
+        }
+
+        return null !== $this->memoizedOwnerId($kind, $resourceId);
     }
 
     private function resolveOwnerId(string $kind, string $resourceId): ?int

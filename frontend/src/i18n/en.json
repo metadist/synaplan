@@ -489,6 +489,8 @@
       "confirmAction": "Start session",
       "started": "You are now viewing the application as {email}.",
       "startFailed": "Could not start impersonation",
+      "disabled": "Viewing as another user is turned off on this instance.",
+      "disabledTitle": "Viewing as another user is turned off",
       "cannotImpersonateSelf": "You cannot impersonate yourself.",
       "banner": {
         "viewing": "Viewing as {email}",
@@ -5511,7 +5513,8 @@
     "subtitle": "Users and groups on this instance.",
     "tabs": {
       "users": "Users",
-      "groups": "Groups"
+      "groups": "Groups",
+      "audit": "Audit"
     },
     "usersMoved": "Users now live on the People page.",
     "openPeople": "Open People",
@@ -5544,7 +5547,8 @@
       "created": "Group created.",
       "renamed": "Group renamed.",
       "deleted": "Group deleted.",
-      "directoryReadOnly": "This group comes from your login and cannot be changed here.",
+      "directoryReadOnly": "This group comes from your login and cannot be renamed or deleted here.",
+      "directoryManagedHint": "Membership from your login is updated at the next sign-in. You can still add extra people by hand.",
       "addMember": "Add a person",
       "addMemberPlaceholder": "Search by email",
       "addMemberNotFound": "No user matches that email.",
@@ -5556,6 +5560,31 @@
       "memberRemoved": "Person removed from the group.",
       "sharedWith": "Shared with this group",
       "sharedEmpty": "Nothing is shared with this group yet."
+    },
+    "audit": {
+      "when": "When",
+      "who": "Who",
+      "actionLabel": "Action",
+      "kind": "Kind",
+      "resource": "Resource",
+      "subject": "Details",
+      "empty": "No audit events yet.",
+      "more": "Load more",
+      "loadError": "The audit log could not be loaded.",
+      "filterAll": "All",
+      "action": {
+        "share_grant": "Shared",
+        "share_revoke": "Share removed",
+        "group_create": "Group created",
+        "group_update": "Group updated",
+        "group_delete": "Group deleted",
+        "group_member_set": "Member added",
+        "group_member_remove": "Member removed",
+        "directory_sync": "Login group updated",
+        "impersonation_start": "Started viewing as user",
+        "impersonation_stop": "Stopped viewing as user",
+        "admin_metadata_view": "Looked at resource list"
+      }
     }
   },
   "iam": {

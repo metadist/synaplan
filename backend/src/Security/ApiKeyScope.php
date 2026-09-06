@@ -182,6 +182,8 @@ final class ApiKeyScope
      *   /api/v1/me/shared        → iam:read
      *   /api/v1/shares           → iam:manage (implies iam:read)
      *   /api/v1/admin/groups     → iam:manage (implies iam:read)
+     *   /api/v1/admin/audit      → iam:read
+     *   /api/v1/admin/users/{id}/resources → iam:read
      *   /api/v1/auth/me          → any key (self-service identity, see
      *                              SELF_SERVICE_PATHS)
      *   everything else          → denied for a restricted key (a scoped key
@@ -264,6 +266,8 @@ final class ApiKeyScope
         if (self::matchesPrefix($path, '/api/v1/groups')
             || self::matchesPrefix($path, '/api/v1/iam')
             || self::matchesPrefix($path, '/api/v1/me/shared')
+            || self::matchesPrefix($path, '/api/v1/admin/audit')
+            || 1 === preg_match('#^/api/v1/admin/users/\d+/resources$#', $path)
         ) {
             return [self::IAM_READ];
         }

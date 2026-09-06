@@ -5,6 +5,8 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Service\Auth\OidcClaimResolver;
+use App\Service\Iam\DirectoryGroupSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
@@ -29,13 +31,15 @@ class OidcUserService
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private ExternalIdentityRepository $externalIdentityRepository,
+        private OidcClaimResolver $claimResolver,
+        private DirectoryGroupSync $directoryGroupSync,
         string $oidcAdminRoles,
         string $oidcRoleClaims,
         string $oidcClientId,
         private string $oidcDiscoveryUrl = '',
     ) {
         $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
-        $this->roleClaimPaths = $this->parseRoleClaims($oidcRoleClaims, $oidcClientId);
+        $this->roleClaimPaths = $this->claimResolver->paths($oidcRoleClaims, $oidcClientId);
     }
 
     /**
@@ -95,7 +99,11 @@ class OidcUserService
 
         $this->em->persist($user);
         $this->em->flush();
+        $lastSeen = $this->lastSeenForClaims($user, $claims);
         $this->upsertExternalIdentity($user, $claims);
+        if ($this->directoryGroupSync->shouldRun($user, $refreshToken, $lastSeen)) {
+            $this->directoryGroupSync->sync($user, $claims);
+        }
 
         if ($isNewUser) {
             $this->modelConfigService->initializeNewUserDefaults($user->getId());
@@ -108,7 +116,7 @@ class OidcUserService
     {
         $oidcRoles = [];
         foreach ($this->roleClaimPaths as $segments) {
-            $value = $this->resolveClaimPath($claims, $segments);
+            $value = $this->claimResolver->resolve($claims, $segments);
             if (is_array($value)) {
                 $oidcRoles = array_values(array_unique(array_merge($oidcRoles, $value)));
             }
@@ -136,44 +144,6 @@ class OidcUserService
                 'oidc_roles' => $oidcRoles,
             ]);
         }
-    }
-
-    /**
-     * @param array<string, mixed> $data
-     * @param array<string>        $segments
-     */
-    private function resolveClaimPath(array $data, array $segments): mixed
-    {
-        $current = $data;
-        foreach ($segments as $segment) {
-            if (!is_array($current) || !array_key_exists($segment, $current)) {
-                return null;
-            }
-            $current = $current[$segment];
-        }
-
-        return $current;
-    }
-
-    /**
-     * @return array<array<string>>
-     */
-    private function parseRoleClaims(string $oidcRoleClaims, string $clientId): array
-    {
-        $raw = array_map('trim', explode(',', $oidcRoleClaims));
-
-        $paths = [];
-        foreach ($raw as $path) {
-            if ('' === $path) {
-                continue;
-            }
-            $path = str_replace('{client_id}', $clientId, $path);
-            $segments = preg_split('/(?<!\\\\)\./', $path);
-            $segments = array_map(static fn (string $s) => str_replace('\\.', '.', $s), $segments);
-            $paths[] = $segments;
-        }
-
-        return $paths;
     }
 
     /**
@@ -231,17 +201,25 @@ class OidcUserService
     /**
      * @param array<string, mixed> $claims
      */
+    private function lastSeenForClaims(User $user, array $claims): int
+    {
+        $sub = $claims['sub'] ?? null;
+        $userId = $user->getId();
+        if (null === $userId || !is_string($sub) || '' === $sub) {
+            return 0;
+        }
+        $identity = $this->externalIdentityRepository->findOneByTriple(
+            $this->oidcSource($claims),
+            '',
+            $sub,
+        );
+
+        return $identity?->getLastSeen() ?? 0;
+    }
+
     private function oidcSource(array $claims): string
     {
-        $iss = $claims['iss'] ?? null;
-        if (is_string($iss) && '' !== $iss) {
-            return 'oidc:'.$iss;
-        }
-
-        $discovery = rtrim($this->oidcDiscoveryUrl, '/');
-        $issuer = preg_replace('#/\.well-known/openid-configuration$#', '', $discovery) ?? $discovery;
-
-        return 'oidc:'.('' !== $issuer ? $issuer : 'unknown');
+        return 'oidc:'.$this->claimResolver->issuer($claims, $this->oidcDiscoveryUrl);
     }
 
     private function findByEmail(?string $email): ?User

@@ -135,8 +135,13 @@
                 <td class="py-3 px-4 text-right">
                   <div v-if="user.id !== currentUserId" class="flex items-center justify-end gap-1">
                     <button
-                      class="icon-ghost p-2 rounded-lg text-warning"
-                      :title="$t('admin.impersonate.buttonTitle')"
+                      class="icon-ghost p-2 rounded-lg text-warning disabled:opacity-50"
+                      :title="
+                        impersonationDisabled
+                          ? $t('admin.impersonate.disabledTitle')
+                          : $t('admin.impersonate.buttonTitle')
+                      "
+                      :disabled="impersonationDisabled"
                       :data-testid="`btn-impersonate-user-${user.id}`"
                       @click="confirmImpersonate(user)"
                     >
@@ -252,6 +257,7 @@ import { useDateFormat } from '@/composables/useDateFormat'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useEscapeKey } from '@/composables/useEscapeKey'
+import { isIamImpersonationDisabled } from '@/composables/useIamFeature'
 
 withDefaults(
   defineProps<{
@@ -275,6 +281,7 @@ const itemsPerPage = ref(50)
 const totalUsers = ref(0)
 const totalPages = computed(() => Math.ceil(totalUsers.value / itemsPerPage.value))
 const currentUserId = computed(() => authStore.user?.id)
+const impersonationDisabled = computed(() => isIamImpersonationDisabled())
 
 const showDeleteModal = ref(false)
 const userToDelete = ref<AdminUser | null>(null)
@@ -361,6 +368,10 @@ async function deleteUser() {
 }
 
 async function confirmImpersonate(targetUser: AdminUser) {
+  if (impersonationDisabled.value) {
+    showError(t('admin.impersonate.disabled'))
+    return
+  }
   const targetEmail = targetUser.email ?? `#${targetUser.id}`
 
   if (targetUser.id === currentUserId.value) {

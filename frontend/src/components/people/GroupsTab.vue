@@ -50,11 +50,15 @@
             >
               <td class="py-3 px-3 txt-primary font-medium">{{ group.name }}</td>
               <td class="py-3 px-3">
-                <span class="pill text-xs">{{
-                  group.kind === 'directory'
-                    ? $t('people.groups.fromLogin')
-                    : $t('people.groups.manual')
-                }}</span>
+                <span
+                  class="pill text-xs"
+                  :title="group.kind === 'directory' ? (group.externalSource ?? '') : undefined"
+                  >{{
+                    group.kind === 'directory'
+                      ? $t('people.groups.fromLogin')
+                      : $t('people.groups.manual')
+                  }}</span
+                >
               </td>
               <td class="py-3 px-3 txt-secondary text-sm">
                 {{ $t('people.groups.memberCount', { count: group.memberCount }) }}

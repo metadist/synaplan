@@ -6,7 +6,11 @@ vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => getConfigSync(),
 }))
 
-import { isIamGroupsEnabled, isIamSharingEnabled } from '@/composables/useIamFeature'
+import {
+  isIamGroupsEnabled,
+  isIamImpersonationDisabled,
+  isIamSharingEnabled,
+} from '@/composables/useIamFeature'
 
 describe('useIamFeature', () => {
   beforeEach(() => {
@@ -18,6 +22,13 @@ describe('useIamFeature', () => {
 
     expect(isIamGroupsEnabled()).toBe(false)
     expect(isIamSharingEnabled()).toBe(false)
+    expect(isIamImpersonationDisabled()).toBe(false)
+  })
+
+  it('reads iamImpersonationDisabled from runtime config', () => {
+    getConfigSync.mockReturnValue({ features: { iamImpersonationDisabled: true } })
+
+    expect(isIamImpersonationDisabled()).toBe(true)
   })
 
   it('reads iamSharing from runtime config', () => {

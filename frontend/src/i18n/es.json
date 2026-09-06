@@ -481,6 +481,8 @@
       "confirmAction": "Iniciar sesión",
       "started": "Ahora ves la aplicación como {email}.",
       "startFailed": "No se pudo iniciar la suplantación",
+      "disabled": "Ver la aplicación como otro usuario está desactivado en esta instancia.",
+      "disabledTitle": "Ver como otro usuario está desactivado",
       "cannotImpersonateSelf": "No puedes suplantarte a ti mismo.",
       "banner": {
         "viewing": "Viendo como {email}",
@@ -4525,7 +4527,8 @@
     "subtitle": "Usuarios y grupos de esta instancia.",
     "tabs": {
       "users": "Usuarios",
-      "groups": "Grupos"
+      "groups": "Grupos",
+      "audit": "Auditoría"
     },
     "usersMoved": "Los usuarios están ahora en la página Personas.",
     "openPeople": "Abrir Personas",
@@ -4558,7 +4561,8 @@
       "created": "Grupo creado.",
       "renamed": "Grupo renombrado.",
       "deleted": "Grupo eliminado.",
-      "directoryReadOnly": "Este grupo viene de su inicio de sesión y no se puede cambiar aquí.",
+      "directoryReadOnly": "Este grupo viene de su inicio de sesión y no se puede cambiar el nombre ni eliminar aquí.",
+      "directoryManagedHint": "Las pertenencias de su inicio de sesión se actualizan en el próximo acceso. Aún puede añadir personas a mano.",
       "addMember": "Añadir una persona",
       "addMemberPlaceholder": "Buscar por correo",
       "addMemberNotFound": "Ningún usuario coincide con ese correo.",
@@ -4570,6 +4574,31 @@
       "memberRemoved": "Persona quitada del grupo.",
       "sharedWith": "Compartido con este grupo",
       "sharedEmpty": "Todavía no hay nada compartido con este grupo."
+    },
+    "audit": {
+      "when": "Cuándo",
+      "who": "Quién",
+      "actionLabel": "Acción",
+      "kind": "Tipo",
+      "resource": "Recurso",
+      "subject": "Detalles",
+      "empty": "Aún no hay eventos de auditoría.",
+      "more": "Cargar más",
+      "loadError": "No se pudo cargar el registro de auditoría.",
+      "filterAll": "Todos",
+      "action": {
+        "share_grant": "Compartido",
+        "share_revoke": "Uso compartido eliminado",
+        "group_create": "Grupo creado",
+        "group_update": "Grupo actualizado",
+        "group_delete": "Grupo eliminado",
+        "group_member_set": "Miembro añadido",
+        "group_member_remove": "Miembro eliminado",
+        "directory_sync": "Grupo de inicio de sesión actualizado",
+        "impersonation_start": "Empezó a ver como usuario",
+        "impersonation_stop": "Dejó de ver como usuario",
+        "admin_metadata_view": "Consultó la lista de recursos"
+      }
     }
   },
   "iam": {

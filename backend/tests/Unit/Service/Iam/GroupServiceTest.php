@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Iam;
 
 use App\Entity\AuditLogEntry;
 use App\Entity\Group;
+use App\Entity\GroupMember;
 use App\Entity\User;
 use App\Repository\AuditLogEntryRepository;
 use App\Repository\GroupMemberRepository;
@@ -100,24 +101,41 @@ final class GroupServiceTest extends TestCase
         self::assertSame('manager', $member->getRole());
     }
 
-    public function testSetMemberOnDirectoryGroupIsRejected(): void
+    public function testSetMemberOnDirectoryGroupAddsManualMember(): void
     {
         $group = $this->directoryGroup(9);
-        $this->expectException(DirectoryGroupReadOnlyException::class);
-        $this->users->expects(self::never())->method('find');
-        $this->members->expects(self::never())->method('save');
-        $this->audit->expects(self::never())->method('save');
+        $target = $this->userWithId(8);
+        $this->users->expects(self::once())->method('find')->with(8)->willReturn($target);
+        $this->members->method('findMembership')->willReturn(null);
+        $this->members->expects(self::once())->method('save');
+        $this->audit->expects(self::once())->method('save');
 
-        $this->service->setMember($group, 8, 'member', $this->actor);
+        $member = $this->service->setMember($group, 8, 'member', $this->actor);
+
+        self::assertSame(GroupMember::SOURCE_MANUAL, $member->getSource());
     }
 
-    public function testRemoveMemberOnDirectoryGroupIsRejected(): void
+    public function testSetMemberCannotRewriteDirectoryRow(): void
     {
         $group = $this->directoryGroup(9);
+        $existing = new GroupMember(9, 8);
+        $existing->setSource(GroupMember::SOURCE_DIRECTORY);
+        $this->users->method('find')->willReturn($this->userWithId(8));
+        $this->members->method('findMembership')->willReturn($existing);
         $this->expectException(DirectoryGroupReadOnlyException::class);
-        $this->members->expects(self::never())->method('findMembership');
+        $this->members->expects(self::never())->method('save');
+
+        $this->service->setMember($group, 8, 'manager', $this->actor);
+    }
+
+    public function testRemoveDirectorySourcedMemberIsRejected(): void
+    {
+        $group = $this->directoryGroup(9);
+        $existing = new GroupMember(9, 8);
+        $existing->setSource(GroupMember::SOURCE_DIRECTORY);
+        $this->members->method('findMembership')->willReturn($existing);
+        $this->expectException(DirectoryGroupReadOnlyException::class);
         $this->members->expects(self::never())->method('remove');
-        $this->audit->expects(self::never())->method('save');
 
         $this->service->removeMember($group, 8, $this->actor);
     }

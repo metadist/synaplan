@@ -5,15 +5,25 @@
         <h3 class="text-lg font-semibold txt-primary">{{ group.name }}</h3>
         <p v-if="group.description" class="text-sm txt-secondary mt-1">{{ group.description }}</p>
       </div>
-      <span class="pill text-xs">{{
-        group.kind === 'directory' ? $t('people.groups.fromLogin') : $t('people.groups.manual')
-      }}</span>
+      <span
+        class="pill text-xs"
+        :title="group.kind === 'directory' ? (group.externalSource ?? '') : undefined"
+        >{{
+          group.kind === 'directory' ? $t('people.groups.fromLogin') : $t('people.groups.manual')
+        }}</span
+      >
     </div>
 
     <div class="mb-8">
       <h4 class="text-sm font-medium txt-primary mb-3">{{ $t('people.groups.members') }}</h4>
+      <p
+        v-if="group.kind === 'directory'"
+        class="text-sm txt-secondary mb-3"
+        data-testid="directory-members-hint"
+      >
+        {{ $t('people.groups.directoryManagedHint') }}
+      </p>
       <form
-        v-if="group.kind === 'manual'"
         class="flex flex-wrap gap-2 mb-4"
         data-testid="form-add-member"
         @submit.prevent="addMember"
@@ -60,10 +70,15 @@
                   ? $t('people.groups.roleManager')
                   : $t('people.groups.roleMember')
               }}
+              <span class="pill text-xs ml-2">{{
+                member.source === 'directory'
+                  ? $t('people.groups.fromLogin')
+                  : $t('people.groups.manual')
+              }}</span>
             </div>
           </div>
           <button
-            v-if="group.kind === 'manual'"
+            v-if="member.source !== 'directory'"
             class="icon-ghost icon-ghost--danger p-2 rounded-lg"
             :data-testid="`btn-remove-member-${member.userId}`"
             @click="removeMember(member)"
