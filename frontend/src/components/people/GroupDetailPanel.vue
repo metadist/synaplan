@@ -64,7 +64,7 @@
           </div>
           <button
             v-if="group.kind === 'manual'"
-            class="text-red-500 hover:text-red-600 p-2 rounded-lg"
+            class="icon-ghost icon-ghost--danger p-2 rounded-lg"
             :data-testid="`btn-remove-member-${member.userId}`"
             @click="removeMember(member)"
           >

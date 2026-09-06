@@ -301,14 +301,26 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'title', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
-                                new OA\Property(property: 'isShared', type: 'boolean'),
-                                new OA\Property(property: 'shareToken', type: 'string', nullable: true),
+                                new OA\Property(property: 'isShared', type: 'boolean', description: 'Public link enabled'),
+                                new OA\Property(property: 'shareToken', type: 'string', nullable: true, description: 'Public link token; only returned to the owner'),
+                                new OA\Property(property: 'widgetSession', type: 'object', nullable: true),
+                                new OA\Property(property: 'access', type: 'string', enum: ['owner', 'read', 'use'], example: 'owner'),
+                                new OA\Property(
+                                    property: 'owner',
+                                    type: 'object',
+                                    required: ['id', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'id', type: 'integer'),
+                                        new OA\Property(property: 'name', type: 'string'),
+                                    ]
+                                ),
                             ]
                         ),
                     ]
                 )
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Shared chat does not reach this user'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
@@ -330,6 +342,7 @@ class ChatController extends AbstractController
         \assert(null !== $access);
 
         $sessionInfo = $this->widgetSessionService->getSessionMapForChats([$chat->getId()]);
+        $isOwner = 'owner' === $access;
 
         return $this->json([
             'success' => true,
@@ -339,8 +352,10 @@ class ChatController extends AbstractController
                 'createdAt' => $chat->getCreatedAt()->format('c'),
                 'updatedAt' => $chat->getUpdatedAt()->format('c'),
                 'isShared' => $chat->isPublic(),
-                'shareToken' => $chat->getShareToken(),
-                'widgetSession' => $sessionInfo[$chat->getId()] ?? null,
+                // The public link is the owner's to hand out; a group share must
+                // not turn into a redistributable token.
+                'shareToken' => $isOwner ? $chat->getShareToken() : null,
+                'widgetSession' => $isOwner ? ($sessionInfo[$chat->getId()] ?? null) : null,
                 'access' => $access,
                 'owner' => $this->conversationOwner($chat),
             ],
@@ -797,11 +812,21 @@ class ChatController extends AbstractController
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'access', type: 'string', example: 'owner'),
+                                new OA\Property(
+                                    property: 'owner',
+                                    type: 'object',
+                                    required: ['id', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'id', type: 'integer'),
+                                        new OA\Property(property: 'name', type: 'string'),
+                                    ]
+                                ),
                             ]
                         ),
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Need Can use'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]

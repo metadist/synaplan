@@ -467,7 +467,9 @@
       "userDeleted": "{email} kullanıcısı başarıyla silindi",
       "userDeleteFailed": "Kullanıcı silinemedi",
       "levelUpdated": "Kullanıcı seviyesi {level} olarak güncellendi",
-      "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi"
+      "levelUpdateFailed": "Kullanıcı seviyesi güncellenemedi",
+      "loadFailed": "Kullanıcılar yüklenemedi",
+      "invalidResponse": "Sunucu beklenmedik bir yanıt gönderdi"
     },
     "impersonate": {
       "button": "Kullanıcı olarak görüntüle",

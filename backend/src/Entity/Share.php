@@ -14,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'BSHARES')]
 #[ORM\UniqueConstraint(name: 'uniq_share_subject', columns: ['BRESOURCEKIND', 'BRESOURCEID', 'BSUBJECTTYPE', 'BSUBJECTID'])]
 #[ORM\Index(columns: ['BSUBJECTTYPE', 'BSUBJECTID', 'BRESOURCEKIND'], name: 'idx_share_lookup')]
+#[ORM\Index(columns: ['BGRANTEDBY'], name: 'idx_share_grantedby')]
 class Share
 {
     public const SUBJECT_USER = 'user';

@@ -14,6 +14,11 @@ use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
 
 /**
  * Read access to a file I own, or one that reaches me through a share.
+ *
+ * Access follows the *live* share only. A copy made with "continue as copy"
+ * remembers the owner's file ids ({@see \App\Service\RAG\RagScopeResolver::SHARED_FILE_REF}),
+ * but that memory never grants access by itself — revoking the conversation
+ * or folder share closes the file again.
  */
 final readonly class SharedFileAccess
 {
@@ -43,22 +48,41 @@ final readonly class SharedFileAccess
             }
         }
 
-        $messageId = $file->getMessageId();
-        if (null !== $messageId) {
-            $message = $this->messageRepository->find($messageId);
-            $chatId = $message?->getChatId();
-            if (null !== $chatId
-                && $this->accessGate->decide($user, ConversationKind::KEY, (string) $chatId, Permission::Read)
-            ) {
+        foreach ($this->chatIdsCarrying($file) as $chatId) {
+            if ($this->accessGate->decide($user, ConversationKind::KEY, (string) $chatId, Permission::Read)) {
                 return true;
             }
         }
 
-        return $this->hasSharedFileRef((int) $user->getId(), (int) $file->getId());
+        return false;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function chatIdsCarrying(File $file): array
+    {
+        $chatIds = [];
+        $messageId = $file->getMessageId();
+        if (null !== $messageId) {
+            $chatId = $this->messageRepository->find($messageId)?->getChatId();
+            if (null !== $chatId) {
+                $chatIds[] = $chatId;
+            }
+        }
+        $fileId = $file->getId();
+        if (null !== $fileId) {
+            foreach ($this->messageRepository->findChatIdsByFileId((int) $fileId) as $chatId) {
+                $chatIds[] = $chatId;
+            }
+        }
+
+        return array_values(array_unique($chatIds));
     }
 
     /**
      * True when a copy I own still points at this (now missing) owner file.
+     * Only reveals that a file id I was once given no longer exists (410).
      */
     public function isMissingReferencedFile(User $user, int $fileId): bool
     {
@@ -66,11 +90,6 @@ final readonly class SharedFileAccess
             return false;
         }
 
-        return $this->hasSharedFileRef((int) $user->getId(), $fileId);
-    }
-
-    private function hasSharedFileRef(int $userId, int $fileId): bool
-    {
-        return $this->messageMetaRepository->userHasSharedFileRef($userId, $fileId);
+        return $this->messageMetaRepository->userHasSharedFileRef((int) $user->getId(), $fileId);
     }
 }

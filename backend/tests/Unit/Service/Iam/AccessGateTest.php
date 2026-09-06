@@ -83,6 +83,20 @@ final class AccessGateTest extends TestCase
         self::assertFalse($this->gate->decide($this->userWithId(1), 'widget', '1', Permission::Read));
     }
 
+    /**
+     * A stale BSHARES row for a deleted (or never existing) resource grants
+     * nothing — ids can be reused after deletion.
+     */
+    public function testMissingResourceIsDeniedEvenWithShareRow(): void
+    {
+        $this->iamConfig->method('isSharingEnabled')->willReturn(true);
+        $this->kind->method('ownerId')->willReturn(null);
+        $this->shares->expects(self::never())->method('highestPermission');
+
+        self::assertFalse($this->gate->decide($this->userWithId(4), 'conversation', '404', Permission::Read));
+        self::assertNull($this->gate->highestGranted($this->userWithId(4), 'conversation', '404'));
+    }
+
     public function testPerRequestMemoReusesOwnerLookup(): void
     {
         $stack = new RequestStack();

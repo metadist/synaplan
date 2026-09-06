@@ -403,7 +403,17 @@ Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
 - RAG only includes another person's files when a share grants **Can use**
   or higher. A query never runs without an owner scope.
 - `IAM.EVERYONE_SHARES` (`any_owner` | `admins_only`) is in Operate → System
-  config → Sharing.
+  config → Sharing. With `admins_only`, the share dialog does not offer
+  "Everyone on this instance" to non-admins.
+- **Can manage** on a folder lets that person re-share it; only the owner can
+  delete it. Sharing an item with yourself is rejected.
+- A copy made with "continue as copy" keeps the conversation text, but the
+  owner's files are readable and searchable only while the share exists.
+  Revoking the share closes them again on the next request.
+- The public link token of a conversation is only returned to its owner; a
+  group share never exposes it.
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) is reserved for OIDC group sync
+  (S4) and has no effect yet.
 
 Enable:
 

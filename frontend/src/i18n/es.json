@@ -467,7 +467,9 @@
       "userDeleted": "Usuario {email} eliminado correctamente",
       "userDeleteFailed": "Error al eliminar usuario",
       "levelUpdated": "Nivel de usuario actualizado a {level}",
-      "levelUpdateFailed": "Error al actualizar nivel de usuario"
+      "levelUpdateFailed": "Error al actualizar nivel de usuario",
+      "loadFailed": "No se pudieron cargar los usuarios",
+      "invalidResponse": "El servidor envió una respuesta inesperada"
     },
     "impersonate": {
       "button": "Ver como usuario",

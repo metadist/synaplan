@@ -475,7 +475,9 @@
       "userDeleted": "User {email} has been successfully deleted",
       "userDeleteFailed": "Failed to delete user",
       "levelUpdated": "User level updated to {level}",
-      "levelUpdateFailed": "Failed to update user level"
+      "levelUpdateFailed": "Failed to update user level",
+      "loadFailed": "Failed to load users",
+      "invalidResponse": "The server sent an unexpected response"
     },
     "impersonate": {
       "button": "View as user",

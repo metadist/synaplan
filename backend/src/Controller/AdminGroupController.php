@@ -130,6 +130,8 @@ final class AdminGroupController extends AbstractController
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
     )]
@@ -196,6 +198,8 @@ final class AdminGroupController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
             new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]
@@ -251,6 +255,8 @@ final class AdminGroupController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
             new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]
@@ -307,6 +313,8 @@ final class AdminGroupController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
         ]
     )]
@@ -382,6 +390,8 @@ final class AdminGroupController extends AbstractController
                 )
             ),
             new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
             new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]
@@ -444,6 +454,8 @@ final class AdminGroupController extends AbstractController
                     ]
                 )
             ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
             new OA\Response(response: 409, description: 'Directory group is read-only'),
         ]

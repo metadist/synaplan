@@ -475,7 +475,9 @@
       "userDeleted": "L’utilisateur {email} a été supprimé avec succès",
       "userDeleteFailed": "Échec de la suppression de l’utilisateur",
       "levelUpdated": "Niveau utilisateur mis à jour : {level}",
-      "levelUpdateFailed": "Échec de la mise à jour du niveau utilisateur"
+      "levelUpdateFailed": "Échec de la mise à jour du niveau utilisateur",
+      "loadFailed": "Impossible de charger les utilisateurs",
+      "invalidResponse": "Le serveur a renvoyé une réponse inattendue"
     },
     "impersonate": {
       "button": "Voir en tant qu’utilisateur",

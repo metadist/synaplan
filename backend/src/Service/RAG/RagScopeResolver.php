@@ -153,7 +153,12 @@ final readonly class RagScopeResolver
     }
 
     /**
-     * Files from conversations shared with "Can use", plus file refs on my copies.
+     * Files from conversations that currently reach this user with "Can use".
+     *
+     * A copy made with "continue as copy" stores {@see self::SHARED_FILE_REF}
+     * so the UI can show the owner's attachments, but the ref alone never
+     * widens a RAG scope: once the owner revokes the share, the files drop
+     * out of the next search.
      *
      * @return list<RagScope>
      */
@@ -176,8 +181,6 @@ final readonly class RagScopeResolver
             }
             $this->collectChatFiles((int) $chat->getId(), $byOwnerFolder, $loose);
         }
-
-        $this->collectReferencedFiles($userId, $byOwnerFolder, $loose);
 
         $scopes = [];
         foreach ($byOwnerFolder as $key => $fileIds) {
@@ -215,32 +218,6 @@ final readonly class RagScopeResolver
             }
             foreach ($this->fileRepository->findBy(['messageId' => $messageId]) as $file) {
                 $this->indexFile($file, $byOwnerFolder, $loose);
-            }
-        }
-    }
-
-    /**
-     * @param array<string, list<int>> $byOwnerFolder
-     * @param array<int, list<int>>    $loose
-     */
-    private function collectReferencedFiles(int $userId, array &$byOwnerFolder, array &$loose): void
-    {
-        /** @var list<Message> $messages */
-        $messages = $this->messageRepository->findBy(['userId' => $userId]);
-        foreach ($messages as $message) {
-            $raw = $message->getMeta(self::SHARED_FILE_REF);
-            if (null === $raw || '' === $raw) {
-                continue;
-            }
-            foreach (explode(',', $raw) as $part) {
-                $fileId = (int) trim($part);
-                if ($fileId <= 0) {
-                    continue;
-                }
-                $file = $this->fileRepository->find($fileId);
-                if ($file instanceof File) {
-                    $this->indexFile($file, $byOwnerFolder, $loose);
-                }
             }
         }
     }

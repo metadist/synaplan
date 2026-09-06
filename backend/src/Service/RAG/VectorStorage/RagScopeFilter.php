@@ -89,8 +89,13 @@ final class RagScopeFilter
             $params[$groupParam] = $scope->groupKey;
         }
         if ([] !== $scope->fileIds) {
-            $ids = implode(',', array_map(static fn (int $id): string => (string) $id, $scope->fileIds));
-            $sql .= ' AND r.BMID IN ('.$ids.')';
+            $placeholders = [];
+            foreach ($scope->fileIds as $j => $fileId) {
+                $name = 'f'.$i.'_'.$j;
+                $placeholders[] = ':'.$name;
+                $params[$name] = $fileId;
+            }
+            $sql .= ' AND r.BMID IN ('.implode(', ', $placeholders).')';
         }
 
         return '('.$sql.')';
