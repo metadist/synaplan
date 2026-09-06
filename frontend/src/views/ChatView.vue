@@ -61,16 +61,6 @@
       >
         <div class="max-w-4xl mx-auto py-6 px-4" :class="{ 'my-auto w-full': isEmptyLanding }">
           <!-- Loading indicator for infinite scroll -->
-          <SharedConversationBanner
-            v-if="sharedConversationLocked && sharedConversationAccess"
-            class="mb-4"
-            compact
-            :owner-name="sharedConversationOwnerName"
-            :shared-via="chatsStore.conversationSource?.sharedVia ?? null"
-            :access="sharedConversationAccess"
-            data-testid="banner-shared-conversation-source"
-          />
-
           <div
             v-if="historyStore.isLoadingMessages"
             class="flex items-center justify-center py-4"

@@ -189,6 +189,24 @@ const config = await httpClient('/api/v1/config/runtime', {
 - The V2 glass design (`frontend/src/style-v2.css`, active via the `.design-v2` class) overrides many tokens/utilities — a surface can look fine in V1 and be broken in V2.
 - See `docs/FRONTEND_CONVENTIONS.md` for the token/utility reference.
 
+### Buttons (MANDATORY)
+
+`.btn-primary` / `.btn-secondary` / `.btn-danger` only set the **color**. They do
+**not** add padding, radius, or type size. A bare `<button class="btn-primary">`
+renders as a rectangular browser button and is unfinished work.
+
+Every clickable button must use a house utility **and** the standard shape:
+
+```html
+<button type="button" class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium">
+```
+
+- Primary action: `btn-primary px-4 py-2.5 rounded-lg` (add `inline-flex items-center gap-2` when there is an icon).
+- Secondary / cancel: `btn-secondary` with the same padding and radius.
+- Destructive: `btn-danger` with the same padding and radius.
+- **Never** a raw `<button>` or `<input type="submit">` without those classes.
+- Match nearby buttons on the same surface — do not invent a one-off size.
+
 ### Color contrast & theme consistency (MANDATORY)
 
 Every UI surface must be readable in **both light and dark theme** (and in the V2 design variant). Poor contrast is a bug, not a style preference.
@@ -313,6 +331,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - Business logic or EntityManager work in a controller
 - Hardcoded user-facing strings (use `$t()`) or hardcoded AI model names (use `ModelRepository`)
 - Tailwind colors / custom CSS instead of `style.css` tokens
+- A raw or `btn-primary`-only button (missing `px-4 py-2.5 rounded-lg`)
 - `setTimeout()` to "fix" race conditions
 - German (or non-English) code comments
 - Committing to `main`, or committing with AI attribution

@@ -142,7 +142,11 @@ function handleOpen() {
   <div class="surface-card p-6">
     <h1 class="text-2xl font-semibold txt-primary mb-1">{{ $t('widget.title') }}</h1>
     <p class="txt-secondary text-sm">{{ $t('widget.description') }}</p>
-    <button class="btn-primary mt-4" @click="handleOpen">
+    <button
+      type="button"
+      class="btn-primary mt-4 px-4 py-2.5 rounded-lg text-sm font-medium"
+      @click="handleOpen"
+    >
       {{ $t('actions.open') }}
     </button>
   </div>
