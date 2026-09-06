@@ -18,7 +18,7 @@ S4 Directory & privacy and S5 Group policies start from that branch.
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | in review | [PR #1717](https://github.com/metadist/synaplan/pull/1717). History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
 | S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in review | [PR #1718](https://github.com/metadist/synaplan/pull/1718). Stacked on #1717 |
-| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | IAM39–IAM46. Stacked on #1718 |
+| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). Stacked on #1718 |
 
 ## Decisions
 
@@ -98,7 +98,7 @@ statistics browser. We kept the lean-nav contract and added:
   group (or everyone / person) it came through, what the viewer may do.
 
 **2026-09-06 (S4 / S5):** S4 is [PR #1718](https://github.com/metadist/synaplan/pull/1718).
-S5 Group policies starts from that branch (`feat/iam-group-policies`):
+S5 Group policies is [PR #1719](https://github.com/metadist/synaplan/pull/1719):
 `BGROUPCONFIG`, `BCONFIG.BLOCKED`, `LayeredConfigResolver`, People → **Policies**,
 and locked / group-set defaults on the user model settings page. Flag
-`IAM.GROUP_POLICIES_ENABLED` seeds off (C1).
+`IAM.GROUP_POLICIES_ENABLED` seeds off (C1). Merge order: #1717 → #1718 → #1719.
