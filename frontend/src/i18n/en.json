@@ -5576,6 +5576,9 @@
       "newCount": "{count} new incoming",
       "hint": "Open a chat to view it. To add your own messages, continue it as your copy.",
       "owner": "from {name}",
+      "sourceGroup": "This chat belongs to {owner}. It reached you through the group \"{name}\".",
+      "sourceEveryone": "This chat belongs to {owner}. It was shared with everyone in this organization.",
+      "sourceDirect": "This chat belongs to {owner}. It was shared with you personally.",
       "emptyTitle": "Nothing incoming yet",
       "emptyText": "When someone shares a chat with you or one of your groups, it shows up here.",
       "filter": {

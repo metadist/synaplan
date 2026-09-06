@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { kindOfSharedItem, matchesChatFilter } from '@/utils/chatKind'
+import { kindOfSharedItem, kindOfSharedVia, matchesChatFilter } from '@/utils/chatKind'
 import type { IamSharedItem } from '@/services/api/iamApi'
 
 function item(overrides: Partial<IamSharedItem>): IamSharedItem {
@@ -38,6 +38,23 @@ describe('kindOfSharedItem', () => {
 
   it('pills a direct share with the owner name', () => {
     expect(kindOfSharedItem(item({ sharedVia: { type: 'user', name: 'Me' } }))).toEqual({
+      kind: 'direct',
+      label: 'Alice',
+    })
+  })
+})
+
+describe('kindOfSharedVia', () => {
+  it('maps a GET /chats sharedVia payload the same way as a list item', () => {
+    expect(kindOfSharedVia({ type: 'group', name: 'Sales' }, 'Alice')).toEqual({
+      kind: 'group',
+      label: 'Sales',
+    })
+    expect(kindOfSharedVia({ type: 'everyone', name: '' }, 'Alice')).toEqual({
+      kind: 'everyone',
+      label: null,
+    })
+    expect(kindOfSharedVia({ type: 'user', name: '' }, 'Alice')).toEqual({
       kind: 'direct',
       label: 'Alice',
     })

@@ -5576,6 +5576,9 @@
       "newCount": "{count} nouveaux reçus",
       "hint": "Ouvrez une discussion pour la consulter. Pour ajouter vos propres messages, poursuivez-la comme votre copie.",
       "owner": "de {name}",
+      "sourceGroup": "Cette discussion appartient à {owner}. Elle vous est parvenue via le groupe \"{name}\".",
+      "sourceEveryone": "Cette discussion appartient à {owner}. Elle a été partagée avec tout le monde dans cette organisation.",
+      "sourceDirect": "Cette discussion appartient à {owner}. Elle a été partagée avec vous personnellement.",
       "emptyTitle": "Rien de reçu pour le moment",
       "emptyText": "Quand quelqu'un partage une discussion avec vous ou l'un de vos groupes, elle apparaît ici.",
       "filter": {

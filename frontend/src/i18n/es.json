@@ -4590,6 +4590,9 @@
       "newCount": "{count} entrantes nuevos",
       "hint": "Abre un chat para verlo. Para añadir tus propios mensajes, continúalo como tu copia.",
       "owner": "de {name}",
+      "sourceGroup": "Este chat pertenece a {owner}. Le llegó a través del grupo \"{name}\".",
+      "sourceEveryone": "Este chat pertenece a {owner}. Se compartió con todos en esta organización.",
+      "sourceDirect": "Este chat pertenece a {owner}. Se compartió con usted personalmente.",
       "emptyTitle": "Aún no hay entrantes",
       "emptyText": "Cuando alguien comparta un chat contigo o con uno de tus grupos, aparecerá aquí.",
       "filter": {

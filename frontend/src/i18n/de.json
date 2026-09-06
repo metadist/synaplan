@@ -5510,6 +5510,9 @@
       "newCount": "{count} neu im Eingang",
       "hint": "Öffne einen Chat, um ihn anzusehen. Um eigene Nachrichten hinzuzufügen, führe ihn als deine Kopie fort.",
       "owner": "von {name}",
+      "sourceGroup": "Dieser Chat gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+      "sourceEveryone": "Dieser Chat gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+      "sourceDirect": "Dieser Chat gehört {owner}. Er wurde persönlich mit Ihnen geteilt.",
       "emptyTitle": "Noch nichts im Eingang",
       "emptyText": "Wenn jemand einen Chat mit dir oder einer deiner Gruppen teilt, erscheint er hier.",
       "filter": {

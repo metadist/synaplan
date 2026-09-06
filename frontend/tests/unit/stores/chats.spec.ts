@@ -432,6 +432,35 @@ describe('Chats Store', () => {
       expect(store.conversationAccess).toBe('read')
     })
 
+    it('records who owns an incoming chat and how it reached the viewer', async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce({
+        chat: {
+          id: 13,
+          access: 'use',
+          owner: { id: 2, name: 'Alice' },
+          sharedVia: { type: 'group', name: 'Sales' },
+        },
+      })
+
+      await store.loadConversationAccess(13)
+
+      expect(store.conversationAccess).toBe('use')
+      expect(store.conversationSource).toEqual({
+        owner: { id: 2, name: 'Alice' },
+        sharedVia: { type: 'group', name: 'Sales' },
+      })
+    })
+
+    it('clears the source when sharing is off', async () => {
+      isIamSharingEnabledMock.mockReturnValueOnce(false)
+      const store = useChatsStore()
+
+      await store.loadConversationAccess(3)
+
+      expect(store.conversationSource).toBeNull()
+    })
+
     it('clears access while loading and does not fall back to owner on error', async () => {
       const store = useChatsStore()
       httpClientMock.mockRejectedValueOnce(new Error('network'))

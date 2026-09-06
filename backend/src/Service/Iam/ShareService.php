@@ -201,6 +201,38 @@ final readonly class ShareService
     }
 
     /**
+     * How one resource reached this user (winning grant), or null if it did not.
+     *
+     * @return array{type: string, name: string}|null
+     */
+    public function sharedViaFor(int $userId, string $kind, string $resourceId): ?array
+    {
+        $row = $this->winningShareFor($userId, $kind, $resourceId);
+        if (null === $row) {
+            return null;
+        }
+
+        return [
+            'type' => $row['share']->getSubjectType(),
+            'name' => $this->subjectNameAndEmail($row['share'])['name'],
+        ];
+    }
+
+    /**
+     * @return array{card: ResourceCard, permission: string, ownerId: int|null, share: Share, sharedAt: int}|null
+     */
+    public function winningShareFor(int $userId, string $kind, string $resourceId): ?array
+    {
+        foreach ($this->listSharedWith($userId, $kind) as $row) {
+            if ($row['share']->getResourceId() === $resourceId) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * People and groups the actor may share with. "Everyone" is pinned first
      * only when {@see IamConfig::canShareWithEveryone()} allows this actor.
      *

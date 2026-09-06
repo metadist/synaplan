@@ -4591,6 +4591,9 @@
       "newCount": "{count} yeni gelen",
       "hint": "Görüntülemek için bir sohbeti açın. Kendi mesajlarınızı eklemek için kopyanız olarak devam ettirin.",
       "owner": "{name} tarafından",
+      "sourceGroup": "Bu sohbet {owner} adlı kişiye ait. Size \"{name}\" grubu üzerinden ulaştı.",
+      "sourceEveryone": "Bu sohbet {owner} adlı kişiye ait. Bu kuruluştaki herkesle paylaşıldı.",
+      "sourceDirect": "Bu sohbet {owner} adlı kişiye ait. Sizinle kişisel olarak paylaşıldı.",
       "emptyTitle": "Henüz gelen yok",
       "emptyText": "Biri sizinle veya gruplarınızdan biriyle bir sohbet paylaştığında burada görünür.",
       "filter": {

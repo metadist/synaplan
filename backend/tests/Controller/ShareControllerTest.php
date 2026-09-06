@@ -71,6 +71,11 @@ final class ShareControllerTest extends WebTestCase
         $body = $this->json();
         self::assertSame('use', $body['chat']['access']);
         self::assertSame((int) $owner->getId(), $body['chat']['owner']['id']);
+        self::assertSame(
+            ['type' => 'group', 'name' => 'Sales'],
+            $body['chat']['sharedVia'],
+            'Opening a shared chat must name the group it came through',
+        );
         self::assertNull($body['chat']['shareToken'], 'A group share must not leak the public link token');
 
         $this->client->request('GET', '/api/v1/me/shared?kind=conversation');
@@ -304,6 +309,10 @@ final class ShareControllerTest extends WebTestCase
         self::assertCount(1, $items);
         self::assertSame(['type' => 'group', 'name' => 'Design'], $items[0]['sharedVia']);
         self::assertSame('use', $items[0]['permission']);
+
+        $this->client->request('GET', '/api/v1/chats/'.$chat->getId());
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame(['type' => 'group', 'name' => 'Design'], $this->json()['chat']['sharedVia']);
     }
 
     public function testUnseenRequiresKnownKind(): void
