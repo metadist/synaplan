@@ -51,7 +51,24 @@ describe('PoliciesTab', () => {
     ])
     getGroupConfig.mockResolvedValue({ settings: {}, conflicts: {} })
     listLocks.mockResolvedValue({})
-    getModels.mockResolvedValue({ success: true, models: { CHAT: [] }, providers: [] })
+    getModels.mockResolvedValue({
+      success: true,
+      models: {
+        CHAT: [
+          model({ id: 1, name: 'Chat Model', service: 'groq', providerId: 'groq', tag: 'chat' }),
+        ],
+        VECTORIZE: [
+          model({
+            id: 2,
+            name: 'Embed Model',
+            service: 'ollama',
+            providerId: 'ollama',
+            tag: 'vectorize',
+          }),
+        ],
+      },
+      providers: [],
+    })
   })
 
   it('renders group policies when a group is selected', async () => {
@@ -63,4 +80,36 @@ describe('PoliciesTab', () => {
     expect(wrapper.text()).toContain('Support')
     expect(getGroupConfig).toHaveBeenCalled()
   })
+
+  it('lists allow-list models from every capability, not only chat', async () => {
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="list-allowed-models"]').text()).toContain('Chat Model')
+    expect(wrapper.get('[data-testid="list-allowed-models"]').text()).toContain('Embed Model')
+    expect(wrapper.find('[data-testid="check-allowed-groq:groq:chat"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="check-allowed-ollama:ollama:vectorize"]').exists()).toBe(
+      true
+    )
+  })
 })
+
+function model(partial: {
+  id: number
+  name: string
+  service: string
+  providerId: string
+  tag: string
+}) {
+  return {
+    quality: 1,
+    rating: 1,
+    priceIn: 0,
+    priceOut: 0,
+    description: null,
+    isSystemModel: false,
+    features: [],
+    ...partial,
+  }
+}

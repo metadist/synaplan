@@ -72,20 +72,28 @@
               {{ $t('people.policies.allowedModels') }}
             </h3>
             <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.allowedHelper') }}</p>
-            <div class="max-h-64 overflow-y-auto space-y-2">
-              <label
-                v-for="model in allChatModels"
-                :key="model.id"
-                class="flex items-center gap-2 text-sm txt-primary"
-              >
-                <input
-                  type="checkbox"
-                  :checked="allowedKeys.includes(catalogKey(model))"
-                  :disabled="isLocked('MODELS.ALLOWED')"
-                  @change="toggleAllowed(catalogKey(model))"
-                />
-                <span>{{ model.name }}</span>
-              </label>
+            <div class="max-h-64 overflow-y-auto space-y-4" data-testid="list-allowed-models">
+              <template v-for="cap in defaultCapabilities" :key="cap">
+                <div v-if="modelsFor(cap).length > 0" class="space-y-2">
+                  <p class="text-xs font-medium txt-secondary">
+                    {{ $t(`people.policies.capability.${cap}`) }}
+                  </p>
+                  <label
+                    v-for="model in modelsFor(cap)"
+                    :key="`${cap}-${model.id}`"
+                    class="flex items-center gap-2 text-sm txt-primary"
+                  >
+                    <input
+                      type="checkbox"
+                      :checked="allowedKeys.includes(catalogKey(model))"
+                      :disabled="isLocked('MODELS.ALLOWED')"
+                      :data-testid="`check-allowed-${catalogKey(model)}`"
+                      @change="toggleAllowed(catalogKey(model))"
+                    />
+                    <span>{{ model.name }}</span>
+                  </label>
+                </div>
+              </template>
             </div>
           </section>
 
@@ -208,8 +216,6 @@ const draft = ref<Record<string, unknown>>({})
 const conflicts = ref<Record<string, string[]>>({})
 const locks = ref<Record<string, boolean>>({})
 const modelsByCap = ref<Partial<Record<Capability, AIModel[]>>>({})
-
-const allChatModels = computed(() => modelsByCap.value.CHAT ?? [])
 
 onMounted(async () => {
   try {

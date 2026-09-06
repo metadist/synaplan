@@ -33,7 +33,7 @@ final class Version20260906180000 extends AbstractMigration
               BGROUPID BIGINT NOT NULL,
               BGROUP VARCHAR(64) NOT NULL,
               BSETTING VARCHAR(96) NOT NULL,
-              BVALUE TEXT NOT NULL,
+              BVALUE LONGTEXT NOT NULL,
               BCREATED BIGINT NOT NULL,
               BUPDATED BIGINT NOT NULL,
               PRIMARY KEY (BID),

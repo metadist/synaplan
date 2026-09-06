@@ -185,17 +185,19 @@ final readonly class ImpersonationService
         $this->attachClearStashCookies($response);
 
         $ip = (string) $request->getClientIp();
+        $targetId = $this->impersonationTargetIdFromRequest($request, $admin);
         $this->auditLogWriter->record(
             (int) $admin->getId(),
             'impersonation.stop',
             'user',
-            (string) $admin->getId(),
-            ['targetUserId' => (int) $admin->getId()],
+            null !== $targetId ? (string) $targetId : '',
+            ['targetUserId' => $targetId],
             $ip,
         );
         $this->logger->warning('Admin stopped impersonation', [
             'admin_id' => $admin->getId(),
             'admin_email' => $admin->getMail(),
+            'target_user_id' => $targetId,
             'ip' => $ip,
         ]);
 
@@ -415,6 +417,33 @@ final readonly class ImpersonationService
         if ($this->isImpersonating($request)) {
             throw new AccessDeniedException('Already impersonating — exit the current session first.');
         }
+    }
+
+    /**
+     * Recover the impersonated user id from the (possibly expired) access
+     * cookie. Used by stop-audit so the row names the target, not the admin.
+     * Returns null when the token is missing, unreadable, or the impersonator
+     * claim does not match the admin resolved from the stash.
+     */
+    private function impersonationTargetIdFromRequest(Request $request, User $admin): ?int
+    {
+        $accessTokenString = $request->cookies->get(TokenService::ACCESS_COOKIE);
+        if (!is_string($accessTokenString) || '' === $accessTokenString) {
+            return null;
+        }
+
+        $payload = $this->tokenService->decodeAccessTokenIgnoringExpiry($accessTokenString);
+        if (!$payload || !isset($payload['user_id'], $payload['impersonator_id'])) {
+            return null;
+        }
+
+        if ((int) $payload['impersonator_id'] !== (int) $admin->getId()) {
+            return null;
+        }
+
+        $targetId = (int) $payload['user_id'];
+
+        return $targetId > 0 ? $targetId : null;
     }
 
     /**

@@ -320,6 +320,34 @@ final class ImpersonationServiceTest extends TestCase
         );
     }
 
+    public function testStopWritesAuditRowForImpersonatedUser(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-admin-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+        $this->tokenService->method('validateRefreshToken')->willReturn($refreshTokenEntity);
+        $this->tokenService->method('generateAccessToken')->willReturn('fresh-admin-access');
+        $this->tokenService->method('createAccessCookie')
+            ->willReturn(Cookie::create(TokenService::ACCESS_COOKIE)->withValue('fresh-admin-access'));
+        $this->tokenService->method('createRefreshCookie')
+            ->willReturn(Cookie::create(TokenService::REFRESH_COOKIE)->withValue('stashed-admin-refresh'));
+        $this->tokenService->method('decodeAccessTokenIgnoringExpiry')->willReturn([
+            'user_id' => 7,
+            'impersonator_id' => 1,
+            'type' => 'access',
+        ]);
+        $this->auditLogWriter->expects(self::once())
+            ->method('record')
+            ->with(1, 'impersonation.stop', 'user', '7', ['targetUserId' => 7], self::isString());
+
+        $this->service->stopImpersonation($request, new Response());
+    }
+
     public function testStopImpersonationFailsWhenNoStash(): void
     {
         $this->expectException(AccessDeniedException::class);
