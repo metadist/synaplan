@@ -254,6 +254,17 @@
                     <span>{{ $t('nav.profile') }}</span>
                   </button>
                   <button
+                    v-if="iamGroupsEnabled"
+                    class="v2-drawer-account"
+                    :class="isPathActive('/groups') ? 'v2-drawer-account--active' : 'txt-primary'"
+                    :data-nav-active="isPathActive('/groups') ? 'true' : undefined"
+                    data-testid="btn-mobile-more-my-groups"
+                    @click="handleNavigate('/groups')"
+                  >
+                    <UserGroupIcon class="w-5 h-5" />
+                    <span>{{ $t('nav.myGroups') }}</span>
+                  </button>
+                  <button
                     v-if="isMemoryServiceAvailable"
                     class="v2-drawer-account"
                     :class="[
@@ -541,6 +552,7 @@ import {
   RocketLaunchIcon,
   ServerIcon,
   UserCircleIcon,
+  UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import {
@@ -564,6 +576,7 @@ import {
 import { useDialog } from '../composables/useDialog'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { useI18n } from 'vue-i18n'
+import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import GuestHintPopover from './guest/GuestHintPopover.vue'
 import ChatShareModal from './ChatShareModal.vue'
 
@@ -602,6 +615,7 @@ let observer: IntersectionObserver | null = null
 
 const isMemoryServiceAvailable = computed(() => configStore.features?.memoryService ?? false)
 const memoriesEnabledForUser = computed(() => authStore.user?.memoriesEnabled !== false)
+const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 /** Everything that is not a primary button lands in the "More" section. */
 const moreSections = computed(() =>
@@ -617,9 +631,15 @@ const moreActive = computed(() => moreSections.value.some((item) => isItemActive
 // row the user is on (Profile, Memories, Statistics, Preferences, Subscription).
 const isPathActive = (path: string) => route.path.startsWith(path)
 const accountActive = computed(() =>
-  ['/profile', '/memories', '/statistics', '/feedbacks', '/settings', '/subscription'].some(
-    isPathActive
-  )
+  [
+    '/profile',
+    '/groups',
+    '/memories',
+    '/statistics',
+    '/feedbacks',
+    '/settings',
+    '/subscription',
+  ].some(isPathActive)
 )
 
 // Widget sessions live in their dedicated view — never in the main history.

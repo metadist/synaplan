@@ -137,6 +137,7 @@
     "adminConfig": "Configuration système",
     "adminSetup": "Configuration des fournisseurs IA",
     "adminPeople": "Personnes",
+    "myGroups": "Mes groupes",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement réussi",
     "subscriptionCancel": "Abonnement annulé",
@@ -619,7 +620,7 @@
       "tabGroups": {
         "aiData": "IA et données",
         "communication": "Communication",
-        "security": "Sécurité et connexion"
+        "security": "Accès"
       },
       "liveBadge": "En direct",
       "liveHint": "Les modifications prennent effet immédiatement, sans redémarrage.",
@@ -719,7 +720,8 @@
     "menu": "Menu",
     "aiAgents": "Agents IA",
     "manage": "Gérer",
-    "manageDescription": "Assistants, canaux et automatisations",
+    "manageDescription": "Assistants, automatisations, canaux et connexions",
+    "myGroups": "Mes groupes",
     "groupAssistants": "Assistants",
     "groupAutomations": "Automatisations",
     "groupTools": "Outils",
@@ -5512,6 +5514,11 @@
     },
     "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
     "openPeople": "Ouvrir Personnes",
+    "myGroups": {
+      "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
+      "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",
+      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes."
+    },
     "users": {
       "groups": "Groupes",
       "identities": "Connexion"

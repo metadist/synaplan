@@ -137,6 +137,7 @@
     "adminConfig": "Systemkonfiguration",
     "adminSetup": "KI-Anbieter einrichten",
     "adminPeople": "Personen",
+    "myGroups": "Meine Gruppen",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement erfolgreich",
     "subscriptionCancel": "Abonnement gekündigt",
@@ -614,7 +615,7 @@
       "tabGroups": {
         "aiData": "KI & Daten",
         "communication": "Kommunikation",
-        "security": "Sicherheit & Anmeldung"
+        "security": "Zugang"
       },
       "liveBadge": "Live",
       "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
@@ -715,7 +716,8 @@
     "menu": "Menü",
     "aiAgents": "KI-Agenten",
     "manage": "Verwalten",
-    "manageDescription": "Assistenten, Kanäle und Automatisierungen",
+    "manageDescription": "Assistenten, Automatisierungen, Kanäle und Verbindungen",
+    "myGroups": "Meine Gruppen",
     "groupAssistants": "Assistenten",
     "groupAutomations": "Automatisierungen",
     "groupTools": "Werkzeuge",
@@ -5446,6 +5448,11 @@
     },
     "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
     "openPeople": "Personen öffnen",
+    "myGroups": {
+      "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",
+      "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Personen hinzufügen.",
+      "emptyAdmin": "Noch keine Gruppen. Legen Sie eine auf der Seite Personen an."
+    },
     "users": {
       "groups": "Gruppen",
       "identities": "Anmeldung"

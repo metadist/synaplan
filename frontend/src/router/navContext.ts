@@ -28,7 +28,9 @@ export function inferNavContext(path: string, meta: Record<string, unknown> = {}
     path.startsWith('/memories') ||
     path.startsWith('/statistics') ||
     path.startsWith('/feedbacks') ||
-    path.startsWith('/subscription')
+    path.startsWith('/subscription') ||
+    path === '/groups' ||
+    path.startsWith('/groups/')
   ) {
     return 'personal'
   }

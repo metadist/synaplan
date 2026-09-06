@@ -25,6 +25,7 @@ describe('inferNavContext', () => {
     expect(inferNavContext('/settings')).toBe('personal')
     expect(inferNavContext('/profile')).toBe('personal')
     expect(inferNavContext('/statistics')).toBe('personal')
+    expect(inferNavContext('/groups')).toBe('personal')
   })
 
   it('marks chat and files as work', () => {

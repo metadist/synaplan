@@ -377,6 +377,49 @@ final class SystemConfigServiceTest extends TestCase
         );
     }
 
+    public function testIamFlagsWriteToTheIamGroupRow(): void
+    {
+        $calls = [];
+        $this->configRepository->expects($this->exactly(2))
+            ->method('setValue')
+            ->willReturnCallback(
+                static function (int $owner, string $group, string $setting, string $value) use (&$calls): Config {
+                    $calls[] = [$owner, $group, $setting, $value];
+
+                    return new Config();
+                }
+            );
+
+        $groups = $this->service->setValue('IAM_GROUPS_ENABLED', 'true', 1);
+        $sharing = $this->service->setValue('IAM_SHARING_ENABLED', 'true', 1);
+
+        $this->assertTrue($groups['success']);
+        $this->assertFalse($groups['requiresRestart']);
+        $this->assertTrue($sharing['success']);
+        $this->assertSame([
+            [0, 'IAM', 'GROUPS_ENABLED', 'true'],
+            [0, 'IAM', 'SHARING_ENABLED', 'true'],
+        ], $calls);
+    }
+
+    public function testIamFlagOneIsShownAsEnabled(): void
+    {
+        $this->configRepository->expects($this->atLeastOnce())
+            ->method('getValue')
+            ->willReturnCallback(
+                static fn (int $owner, string $group, string $setting): ?string => 0 === $owner
+                    && 'IAM' === $group
+                    && 'GROUPS_ENABLED' === $setting
+                        ? '1'
+                        : null
+            );
+
+        $values = $this->service->getValues();
+
+        $this->assertSame('true', $values['IAM_GROUPS_ENABLED']['value']);
+        $this->assertTrue($values['IAM_GROUPS_ENABLED']['isSet']);
+    }
+
     public function testConversationSummaryDefaultsMirrorTheConstants(): void
     {
         // No BCONFIG rows exist by default (there is no seeder), so what the

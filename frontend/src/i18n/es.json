@@ -135,6 +135,7 @@
     "adminConfig": "Configuración del Sistema",
     "adminSetup": "Configuración de Proveedores de IA",
     "adminPeople": "Personas",
+    "myGroups": "Mis grupos",
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
@@ -610,7 +611,7 @@
       "tabGroups": {
         "aiData": "IA y datos",
         "communication": "Comunicación",
-        "security": "Seguridad e inicio de sesión"
+        "security": "Acceso"
       },
       "brandingMode": {
         "light": "Está editando los ajustes del modo CLARO — los colores guardados aquí se aplican en el modo claro. Cambie la aplicación al modo oscuro para editar los colores del modo oscuro.",
@@ -708,7 +709,8 @@
     "menu": "Menú",
     "aiAgents": "Agentes de IA",
     "manage": "Gestionar",
-    "manageDescription": "Asistentes, canales y automatizaciones",
+    "manageDescription": "Asistentes, automatizaciones, canales y conexiones",
+    "myGroups": "Mis grupos",
     "groupAssistants": "Asistentes",
     "groupAutomations": "Automatizaciones",
     "groupTools": "Herramientas",
@@ -4526,6 +4528,11 @@
     },
     "usersMoved": "Los usuarios están ahora en la página Personas.",
     "openPeople": "Abrir Personas",
+    "myGroups": {
+      "subtitle": "Grupos a los que pertenece en esta instancia.",
+      "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Personas.",
+      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Personas."
+    },
     "users": {
       "groups": "Grupos",
       "identities": "Inicio de sesión"

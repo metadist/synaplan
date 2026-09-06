@@ -457,6 +457,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.profile' },
     },
     {
+      path: '/groups',
+      name: 'my-groups',
+      component: () => import('@/views/MyGroupsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups' },
+    },
+    {
       // Dead end for an account that still carries a deployment-generated
       // password. The beforeEach guard sends it here and lets nothing else
       // through until the change succeeds.

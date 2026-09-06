@@ -136,6 +136,7 @@
     "adminConfig": "System Configuration",
     "adminSetup": "AI Provider Setup",
     "adminPeople": "People",
+    "myGroups": "My groups",
     "subscription": "Subscription",
     "subscriptionSuccess": "Subscription Successful",
     "subscriptionCancel": "Subscription Cancelled",
@@ -619,7 +620,7 @@
       "tabGroups": {
         "aiData": "AI & Data",
         "communication": "Communication",
-        "security": "Security & Login"
+        "security": "Access"
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
@@ -719,7 +720,8 @@
     "aiAgents": "AI Agents",
     "desktop": "Desktop",
     "manage": "Manage",
-    "manageDescription": "Assistants, channels and automations",
+    "manageDescription": "Assistants, automations, channels and connections",
+    "myGroups": "My groups",
     "groupAssistants": "Assistants",
     "groupAutomations": "Automations",
     "groupTools": "Tools",
@@ -5512,6 +5514,11 @@
     },
     "usersMoved": "Users now live on the People page.",
     "openPeople": "Open People",
+    "myGroups": {
+      "subtitle": "Groups you belong to on this instance.",
+      "emptyMember": "You are not in a group yet. An administrator can add you on the People page.",
+      "emptyAdmin": "No groups yet. Create one on the People page."
+    },
     "users": {
       "groups": "Groups",
       "identities": "Sign-in"

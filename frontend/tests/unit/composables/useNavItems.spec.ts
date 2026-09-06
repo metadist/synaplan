@@ -48,6 +48,7 @@ const navMessages = {
     channels: 'Channels',
     connections: 'Connections',
     groupApi: 'API',
+    myGroups: 'My groups',
     configInbound: 'Inbound',
     toolsChatWidget: 'Chat widgets',
     toolsMailHandler: 'Email handler',
@@ -173,9 +174,12 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('saved-tasks')
     expect(childKeys).toContain('live-support')
     expect(childKeys).toContain('chat-widget')
+    expect(childKeys).toContain('doc-summary')
+    expect(childKeys).toContain('api-docs')
+    expect(childKeys).toContain('api-keys')
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
-    ).toEqual(new Set(['assistants', 'channels', 'connections', 'api', 'automations', 'tools']))
+    ).toEqual(new Set(['assistants', 'automations', 'channels', 'connections']))
   })
 
   it('admin also sees Operate', () => {
