@@ -101,7 +101,7 @@ final readonly class AgentRuntimeResolver
         ?int $agentVersionId,
     ): RuntimeProfile {
         $prompt = $this->prompts->find($agent->getPromptId());
-        $topic = $prompt instanceof Prompt ? $prompt->getTopic() : 'agent:'.$agent->getSlug();
+        $topic = $prompt instanceof Prompt ? $prompt->getTopic() : Agent::TOPIC_PREFIX.$agent->getSlug();
         if ('' === trim($systemPrompt) && $prompt instanceof Prompt) {
             $systemPrompt = $prompt->getPrompt();
         }
@@ -112,13 +112,7 @@ final readonly class AgentRuntimeResolver
         $notes = [];
         $modelIds = $this->resolveModels($definition, (int) $user->getId(), $notes);
 
-        $ragScopes = [];
-        if ($definition->ownFolderEnabled()) {
-            $ragScopes[] = [
-                'ownerId' => $agent->getOwnerId(),
-                'groupKey' => 'TASKPROMPT:agent:'.$agent->getSlug(),
-            ];
-        }
+        $ragScopes = AgentKnowledgeFolders::scopes($agent, $definition);
 
         $tools = $definition->tools();
         $toolFlags = [
@@ -153,6 +147,7 @@ final readonly class AgentRuntimeResolver
             notes: $notes,
             ragLimit: $definition->ragLimit(),
             ragMinScore: $definition->ragMinScore(),
+            viewerId: (int) $user->getId(),
         );
     }
 

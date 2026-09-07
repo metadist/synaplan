@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Runtime;
 
+use App\Service\RAG\RagScopeResolver;
+
 /**
  * The resolved chat runtime: prompt, models, RAG scopes, tools, skills.
  *
@@ -21,6 +23,7 @@ final readonly class RuntimeProfile
      * @param list<string>|null                           $skillDeny
      * @param array<string, mixed>                        $parameters
      * @param list<string>                                $notes      resolver diagnostics (model_fallback:chat, …)
+     * @param int|null                                    $viewerId   the user this profile was resolved for
      */
     public function __construct(
         public ?int $promptId,
@@ -37,15 +40,29 @@ final readonly class RuntimeProfile
         public array $notes = [],
         public ?int $ragLimit = null,
         public ?float $ragMinScore = null,
+        public ?int $viewerId = null,
     ) {
     }
 
+    /**
+     * The first RAG scope as the group-key string the search path consumes.
+     *
+     * A scope owned by someone other than the viewer (a shared assistant's
+     * knowledge) is emitted in the `shared:{ownerId}:{folder}` form, which
+     * {@see \App\Service\RAG\RagScopeResolver} checks against the viewer's
+     * grants before searching the owner's files.
+     */
     public function primaryRagGroupKey(): ?string
     {
         if ([] === $this->ragScopes) {
             return null;
         }
 
-        return $this->ragScopes[0]['groupKey'];
+        $scope = $this->ragScopes[0];
+        if (null !== $this->viewerId && $scope['ownerId'] !== $this->viewerId) {
+            return RagScopeResolver::sharedPickerKey($scope['ownerId'], $scope['groupKey']);
+        }
+
+        return $scope['groupKey'];
     }
 }

@@ -10,12 +10,12 @@ use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\PromptRepository;
-use App\Repository\ShareRepository;
 use App\Service\Agent\AgentPublisher;
 use App\Service\Agent\AgentSlugger;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ShareService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -32,7 +32,7 @@ final class SeedSystemAgentsCommand extends Command
         private readonly PromptRepository $prompts,
         private readonly AgentRepository $agents,
         private readonly AgentPublisher $publisher,
-        private readonly ShareRepository $shares,
+        private readonly ShareService $shares,
     ) {
         parent::__construct();
     }
@@ -87,7 +87,8 @@ final class SeedSystemAgentsCommand extends Command
 
             $agentId = $agent->getId();
             if (null !== $agentId) {
-                $this->shareEveryoneUse((string) $agentId);
+                // Same path as a user-made share: kind checks + audit row, actor 0.
+                $this->shares->grantAsSystem(AgentKind::KEY, (string) $agentId, Share::SUBJECT_EVERYONE, 0, Permission::Use);
             }
             ++$created;
         }
@@ -95,27 +96,5 @@ final class SeedSystemAgentsCommand extends Command
         $io->success(sprintf('System assistants: %d created, %d already present.', $created, $skipped));
 
         return Command::SUCCESS;
-    }
-
-    private function shareEveryoneUse(string $resourceId): void
-    {
-        $existing = $this->shares->findOneForSubject(
-            AgentKind::KEY,
-            $resourceId,
-            Share::SUBJECT_EVERYONE,
-            0,
-        );
-        if (null !== $existing) {
-            return;
-        }
-
-        $share = new Share();
-        $share->setResourceKind(AgentKind::KEY);
-        $share->setResourceId($resourceId);
-        $share->setSubjectType(Share::SUBJECT_EVERYONE);
-        $share->setSubjectId(0);
-        $share->setPermission(Permission::Use->value);
-        $share->setGrantedBy(0);
-        $this->shares->save($share);
     }
 }

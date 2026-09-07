@@ -60,16 +60,31 @@ export const useAgentsStore = defineStore('agents', () => {
       clearTimeout(debounceTimer)
     }
     debounceTimer = setTimeout(() => {
-      void saveDraft()
+      // A failed background save leaves `dirty` set and fieldErrors filled;
+      // the builder shows "unsaved" and the explicit Save button reports it.
+      saveDraft().catch(() => undefined)
     }, SAVE_DEBOUNCE_MS)
   }
 
+  /**
+   * Persist the current editable fields.
+   *
+   * Edits that arrive while a request is in flight are not lost: `dirty` is
+   * cleared when the request starts, so any later `markDirty()` flags them
+   * again; on success the server row is merged around the local editable
+   * fields and another save is scheduled; on failure the edits stay dirty.
+   */
   async function saveDraft(): Promise<void> {
     const agent = current.value
-    if (!agent || agent.id == null || !dirty.value || saving.value) {
+    if (!agent || agent.id == null || !dirty.value) {
+      return
+    }
+    if (saving.value) {
+      // The running request will re-schedule once it sees `dirty` again.
       return
     }
     saving.value = true
+    dirty.value = false
     fieldErrors.value = {}
     try {
       const saved = await agentsApi.update(agent.id, {
@@ -78,9 +93,22 @@ export const useAgentsStore = defineStore('agents', () => {
         icon: agent.icon,
         draft: (agent.draft ?? {}) as Record<string, unknown>,
       })
-      current.value = saved
-      dirty.value = false
+      const local = current.value
+      if (local && local.id === saved.id && dirty.value) {
+        // Newer keystrokes exist: take server metadata, keep what the user typed.
+        current.value = {
+          ...saved,
+          name: local.name,
+          description: local.description,
+          icon: local.icon,
+          draft: local.draft,
+        }
+        scheduleSave()
+      } else if (!local || local.id === saved.id) {
+        current.value = saved
+      }
     } catch (error) {
+      dirty.value = true
       const path = agentFieldPath(error)
       if (path) {
         fieldErrors.value = { [path]: error instanceof Error ? error.message : String(error) }

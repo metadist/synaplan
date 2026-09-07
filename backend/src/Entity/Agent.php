@@ -22,6 +22,13 @@ class Agent
     public const SOURCE_IMPORT = 'import';
     public const SOURCE_SYSTEM = 'system';
 
+    /**
+     * Topic prefix of the BPROMPTS row that carries an assistant's instructions.
+     * Such prompts belong to the assistant: the classifier only sees them
+     * when the assistant is published and marked routable.
+     */
+    public const TOPIC_PREFIX = 'agent:';
+
     public const STATUSES = [
         self::STATUS_DRAFT,
         self::STATUS_PUBLISHED,

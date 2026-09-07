@@ -78,6 +78,22 @@ final readonly class AgentDefinition
         return is_array($knowledge) && true === ($knowledge['ownFolder'] ?? true);
     }
 
+    /**
+     * Additional owner folders (BFILES group keys) this assistant searches.
+     *
+     * @return list<string>
+     */
+    public function knowledgeFolders(): array
+    {
+        $knowledge = $this->data['knowledge'] ?? [];
+        $folders = is_array($knowledge) ? ($knowledge['folders'] ?? []) : [];
+        if (!is_array($folders)) {
+            return [];
+        }
+
+        return array_values(array_filter($folders, static fn ($f): bool => is_string($f) && '' !== $f));
+    }
+
     public function ragLimit(): int
     {
         $knowledge = $this->data['knowledge'] ?? [];

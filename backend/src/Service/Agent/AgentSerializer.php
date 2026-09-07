@@ -31,12 +31,19 @@ final class AgentSerializer
     /**
      * Gallery card — never includes the draft JSON.
      *
+     * `$visibleDefinition` is the definition the viewer is allowed to see:
+     * the live draft for the owner, the published snapshot for everyone
+     * else. Starter prompts are read from it, so a recipient never sees
+     * text the owner is still editing.
+     *
+     * @param array<string, mixed>                   $visibleDefinition
      * @param array{type: string, name: string}|null $sharedVia
      *
      * @return array<string, mixed>
      */
     public function galleryCard(
         Agent $agent,
+        array $visibleDefinition,
         string $ownerName,
         string $origin = 'mine',
         ?int $version = null,
@@ -57,7 +64,7 @@ final class AgentSerializer
             'ownerName' => $ownerName,
             'version' => $version,
             'updatedAt' => $agent->getUpdated(),
-            'starterPrompts' => $this->starterPrompts($agent),
+            'starterPrompts' => $this->starterPrompts($visibleDefinition),
             'sharedVia' => $sharedVia,
             'canEdit' => $canEdit,
             'canStartChat' => $canStartChat,
@@ -146,12 +153,13 @@ final class AgentSerializer
     }
 
     /**
+     * @param array<string, mixed> $definition
+     *
      * @return list<string>
      */
-    private function starterPrompts(Agent $agent): array
+    private function starterPrompts(array $definition): array
     {
-        $draft = $agent->getDraft();
-        $behaviour = $draft['behaviour'] ?? null;
+        $behaviour = $definition['behaviour'] ?? null;
         if (!is_array($behaviour)) {
             return [];
         }

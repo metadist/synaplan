@@ -2,11 +2,13 @@
 
 namespace App\Repository;
 
+use App\Entity\Agent;
 use App\Entity\Prompt;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\SharedResourceIds;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -69,6 +71,7 @@ class PromptRepository extends ServiceEntityRepository
             $qb->andWhere('p.topic NOT LIKE :toolsPrefix')
                 ->setParameter('toolsPrefix', 'tools:%');
         }
+        $this->excludeUnroutableAgentTopics($qb, $userId ?? 0);
 
         $results = $qb->getQuery()->getScalarResult();
         $topics = array_map(fn ($r) => $r['topic'], $results);
@@ -125,6 +128,7 @@ class PromptRepository extends ServiceEntityRepository
                 $userQb->andWhere('p.topic NOT LIKE :toolsPrefix')
                     ->setParameter('toolsPrefix', 'tools:%');
             }
+            $this->excludeUnroutableAgentTopics($userQb, $userId);
 
             $userPrompts = $userQb->getQuery()->getResult();
         }
@@ -272,16 +276,16 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        $userPrompts = $this->createQueryBuilder('p')
+        $userQb = $this->createQueryBuilder('p')
             ->where('p.ownerId = :userId')
             ->andWhere('p.topic NOT LIKE :toolsPrefix')
             ->andWhere('p.selectionRules IS NOT NULL')
             ->andWhere('p.selectionRules != :empty')
             ->setParameter('userId', $userId)
             ->setParameter('toolsPrefix', 'tools:%')
-            ->setParameter('empty', '')
-            ->getQuery()
-            ->getResult();
+            ->setParameter('empty', '');
+        $this->excludeUnroutableAgentTopics($userQb, $userId);
+        $userPrompts = $userQb->getQuery()->getResult();
 
         // Merge: user prompts override system prompts for the same topic
         $map = [];
@@ -301,6 +305,24 @@ class PromptRepository extends ServiceEntityRepository
         }
 
         return array_values($map);
+    }
+
+    /**
+     * Keep assistant instruction prompts (`agent:*`) out of the classifier
+     * unless their assistant is published and marked routable. A pinned chat
+     * resolves the assistant directly and never goes through these lists, so
+     * an unrouted assistant stays invisible to the unpinned sorter path.
+     */
+    private function excludeUnroutableAgentTopics(QueryBuilder $qb, int $userId): void
+    {
+        $qb->andWhere(
+            'p.topic NOT LIKE :agentPrefix OR p.id IN ('
+            .'SELECT a.promptId FROM App\Entity\Agent a '
+            .'WHERE a.ownerId = :agentOwner AND a.routable = true AND a.status = :agentPublished)'
+        )
+            ->setParameter('agentPrefix', Agent::TOPIC_PREFIX.'%')
+            ->setParameter('agentOwner', $userId)
+            ->setParameter('agentPublished', Agent::STATUS_PUBLISHED);
     }
 
     /**
