@@ -367,6 +367,17 @@
             </button>
           </div>
 
+          <SharedResourceBanner
+            v-if="currentPrompt.shared"
+            class="mb-4"
+            kind="assistant"
+            :owner-name="currentPrompt.owner?.name ?? null"
+            :shared-via="sharedAssistantMeta(currentPrompt.id)?.sharedVia"
+            :permission="
+              currentPrompt.access && currentPrompt.access !== 'owner' ? currentPrompt.access : null
+            "
+          />
+
           <!-- System prompt info banner -->
           <div
             v-if="currentPrompt.isDefault && !currentPrompt.isUserOverride && !isAdmin"
@@ -1243,7 +1254,9 @@ import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { ApiError } from '@/services/api/httpClient'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 
 const SELECTION_RULES_TEMPLATE =
   'When the user mentions [TOPIC_NAME] or asks about [SPECIFIC_KEYWORDS], route to this prompt.'
@@ -1362,6 +1375,9 @@ const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 const iamShareName = ref('')
+const sharedAssistantItems = ref<IamSharedItem[]>([])
+const sharedAssistantMeta = (id: number) =>
+  sharedAssistantItems.value.find((item) => item.id === String(id))
 const canSharePrompt = computed(() => {
   const prompt = currentPrompt.value
   if (!iamSharingEnabled.value || !prompt || prompt.shared) return false
@@ -1779,6 +1795,15 @@ const loadPrompts = async () => {
   try {
     const data = await promptsApi.getPrompts(locale.value || 'en')
     const nonWidgetPrompts = data.filter((p) => !p.topic.startsWith('w_'))
+    if (isIamSharingEnabled()) {
+      try {
+        sharedAssistantItems.value = await iamApi.listSharedWithMe('assistant')
+      } catch {
+        sharedAssistantItems.value = []
+      }
+    } else {
+      sharedAssistantItems.value = []
+    }
     prompts.value = nonWidgetPrompts.map((p) => {
       const metadata = p.metadata || {}
 

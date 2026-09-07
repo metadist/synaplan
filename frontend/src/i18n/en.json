@@ -5693,13 +5693,35 @@
     "continueFailed": "Couldn't create your copy. Please try again.",
     "readOnly": "You can view this conversation. To add a message, continue it as your own copy.",
     "sharedFolder": "Shared · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "This folder belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This folder belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceDirect": "This folder belongs to {owner}. It was shared with you personally."
+      },
+      "assistant": {
+        "sourceGroup": "This assistant belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This assistant belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceDirect": "This assistant belongs to {owner}. It was shared with you personally."
+      },
+      "saved_task": {
+        "sourceGroup": "This saved task belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This saved task belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceDirect": "This saved task belongs to {owner}. It was shared with you personally."
+      },
+      "widget": {
+        "sourceGroup": "This chat widget belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This chat widget belongs to {owner}. It was shared with everyone in this organization.",
+        "sourceDirect": "This chat widget belongs to {owner}. It was shared with you personally."
+      }
+    },
     "dialog": {
       "title": "Share \"{name}\"",
       "who": "Who",
       "searchPlaceholder": "Search a person or group…",
       "permission": "Permission",
       "sharedWith": "Shared with",
-      "empty": "Not shared with anyone yet.",
+      "empty": "Only you can see this.",
       "cancel": "Cancel",
       "remove": "Remove",
       "removeTitle": "Stop sharing",
@@ -5707,10 +5729,55 @@
       "loadFailed": "Couldn't load who this is shared with.",
       "saveFailed": "Couldn't share this. Please try again.",
       "shared": "Shared with {name}.",
+      "sharedFind": "Shared with {name}. {find}",
       "removed": "Stopped sharing with {name}.",
       "removeFailed": "Couldn't stop sharing. Please try again.",
+      "permissionFailed": "Couldn't change the permission. Please try again.",
+      "noMatches": "No person or group matches.",
+      "searchFailed": "Couldn't search people or groups.",
+      "tryAgain": "Try again",
+      "ownerLine": "Owner · {name}",
       "publicLink": "Public link",
-      "openPublicLink": "Open public link"
+      "publicLinkHint": "Anyone with the link can view.",
+      "managePublicLink": "Manage public link",
+      "openPublicLink": "Manage public link",
+      "subjectType": {
+        "user": "person",
+        "group": "group"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Can view — they can open this chat read-only.",
+          "use": "Can use — they can continue this chat as their own copy."
+        },
+        "knowledge_folder": {
+          "read": "Can view — they can see the folder.",
+          "use": "Can use — the AI may use these files.",
+          "edit": "Can edit — they can change files in this folder.",
+          "manage": "Can manage — they can share this folder with others."
+        },
+        "assistant": {
+          "read": "Can view — they can see the card and clone it.",
+          "use": "Can use — they can start a chat with this assistant.",
+          "edit": "Can edit — they can change this assistant."
+        },
+        "saved_task": {
+          "read": "Can view — they can see the card.",
+          "use": "Can use — they can make their own copy."
+        },
+        "widget": {
+          "read": "Can view — they can open the widget settings.",
+          "edit": "Can edit — they can change the widget settings.",
+          "manage": "Can manage — they can share this widget with others."
+        }
+      },
+      "find": {
+        "conversation": "They will find it under Incoming chats.",
+        "knowledge_folder": "It appears in their Sources as shared.",
+        "assistant": "They will find it under Assistants → Shared with me.",
+        "saved_task": "They can use it as a template under Automations.",
+        "widget": "They can open the widget settings."
+      }
     }
   }
 }

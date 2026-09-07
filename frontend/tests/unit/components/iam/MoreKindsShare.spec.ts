@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { createI18n } from 'vue-i18n'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -25,35 +24,6 @@ vi.mock('@/composables/useNotification', () => ({
   }),
 }))
 
-const i18n = createI18n({
-  legacy: false,
-  locale: 'en',
-  messages: {
-    en: {
-      common: { close: 'Close' },
-      iam: {
-        share: 'Share',
-        everyone: 'Everyone',
-        permission: { read: 'Can view', use: 'Can use', edit: 'Can edit', manage: 'Can manage' },
-        dialog: {
-          title: 'Share "{name}"',
-          who: 'Who',
-          searchPlaceholder: 'Search',
-          permission: 'Permission',
-          sharedWith: 'Shared with',
-          empty: 'Empty',
-          cancel: 'Cancel',
-          remove: 'Remove',
-          removeTitle: 'Stop',
-          removeConfirm: 'Remove {name}?',
-          publicLink: 'Public link',
-          openPublicLink: 'Open public link',
-        },
-      },
-    },
-  },
-})
-
 describe('ShareDialog more kinds', () => {
   it('opens for an assistant without a public-link section', () => {
     const wrapper = mount(ShareDialog, {
@@ -64,12 +34,12 @@ describe('ShareDialog more kinds', () => {
         resourceName: 'Sales Helper',
       },
       global: {
-        plugins: [i18n],
-        stubs: { Teleport: true, Transition: false, SubjectPicker: true, PermissionSelect: true },
+        stubs: { Teleport: true, Transition: false },
       },
     })
 
     expect(wrapper.find('[data-testid="modal-iam-share"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="btn-iam-public-link"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="iam-share-find"]').text()).toContain('Shared with me')
   })
 })

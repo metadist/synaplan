@@ -18,8 +18,8 @@ S1–S4 and the incoming-chats UI are **merged to `main`** (#1708, #1713, #1714,
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | done | Merged to `main` as #1717. History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
 | S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | done | Merged to `main` as #1718. IAM29–IAM38 (directory sync, audit tab, admin manage-without-read, impersonation audit) |
-| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1). CI fix: `modelIdFromStored` keeps TestProvider placeholder BIDs (`-1`…`-7`). UI must walk J-IAM-3 |
-| IAM-UX Share dialog | — | planned | [`06_sprint_ux_share_dialog.md`](./06_sprint_ux_share_dialog.md). Professionalize `ShareDialog` (one-row add, kind-specific consequence) before track 2 S3 / track 4 reuse it |
+| S5 Group policies | `synaplan/` `feat/iam-group-policies` | done | Merged to `main` as #1719. IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1) |
+| IAM-UX Share dialog | `synaplan/` `feat/iam-finals` | done | IAM-UX1–4 walked. One-row ShareDialog, kind-specific consequence/find, SharedResourceBanner, after-share toast names Incoming chats. Pending commit/PR. |
 
 ## Decisions
 
@@ -119,3 +119,21 @@ kind-specific copy, empty/error, browser walk) before Vue. IAM-UX is
 the planned Share-dialog professionalization; S5 UI names J-IAM-3.
 Incoming chats (#1717) is the findability pattern to reuse, not a
 one-off. See roadmap §8.4.
+
+**2026-09-07 (IAM-UX implementation):** ShareDialog is the one-row add
+pattern (search + permission + Share). Kind-specific consequence and
+“they will find it…” copy land in all five locales. After-share toast
+names the recipient path. Shared folders, assistants, saved tasks and
+widgets answer the five-question check with `SharedResourceBanner`
+(conversations keep `SharedConversationBanner`).
+
+**2026-09-07 (IAM-UX walk / track close):** J-IAM-4 on Usage → All Chats
+as `demo@synaplan.com`: empty “Only you can see this.”; pinned picker
+(Everyone + First Test); Share adds the group; in-list permission
+Can use → Can view; Everyone share also lands in the list. Dark + V2 +
+320 px stacks the add row; permission menu uses `dropdown-panel` (white
+on `rgba(14, 22, 40, 0.95)`). Kind-specific assistant/folder/widget
+sentences are gated by unit tests — this demo account has no custom
+assistant, files, or widgets to open those dialogs. S0–S5 are on
+`main`; IAM-UX is on `feat/iam-finals` and is the last IAM product
+step before Agent Builder.

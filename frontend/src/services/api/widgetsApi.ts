@@ -36,6 +36,7 @@ export interface Widget {
   shared?: boolean
   ownerId?: number
   ownerName?: string
+  sharedVia?: { type: string; name: string } | null
 }
 
 export const CustomFieldDefSchema = z.discriminatedUnion('type', [

@@ -4708,13 +4708,35 @@
     "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
     "readOnly": "Bu sohbeti görüntüleyebilirsiniz. Mesaj eklemek için kendi kopyanız olarak devam edin.",
     "sharedFolder": "Paylaşılan · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Bu klasör {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu klasör {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceDirect": "Bu klasör {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "assistant": {
+        "sourceGroup": "Bu asistan {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu asistan {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceDirect": "Bu asistan {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "saved_task": {
+        "sourceGroup": "Bu kayıtlı görev {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu kayıtlı görev {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceDirect": "Bu kayıtlı görev {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      },
+      "widget": {
+        "sourceGroup": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Bu kuruluştaki herkesle paylaşıldı.",
+        "sourceDirect": "Bu sohbet widget'ı {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+      }
+    },
     "dialog": {
       "title": "\"{name}\" paylaş",
       "who": "Kim",
       "searchPlaceholder": "Kişi veya grup ara…",
       "permission": "İzin",
       "sharedWith": "Paylaşılan",
-      "empty": "Henüz kimseyle paylaşılmadı.",
+      "empty": "Bunu yalnızca siz görebilirsiniz.",
       "cancel": "İptal",
       "remove": "Kaldır",
       "removeTitle": "Paylaşımı durdur",
@@ -4722,10 +4744,55 @@
       "loadFailed": "Paylaşımlar yüklenemedi.",
       "saveFailed": "Paylaşılamadı. Lütfen tekrar deneyin.",
       "shared": "{name} ile paylaşıldı.",
+      "sharedFind": "{name} ile paylaşıldı. {find}",
       "removed": "{name} ile paylaşım durduruldu.",
       "removeFailed": "Paylaşım durdurulamadı. Lütfen tekrar deneyin.",
+      "permissionFailed": "İzin değiştirilemedi. Lütfen tekrar deneyin.",
+      "noMatches": "Eşleşen kişi veya grup yok.",
+      "searchFailed": "Kişi veya gruplar aranamadı.",
+      "tryAgain": "Tekrar dene",
+      "ownerLine": "Sahip · {name}",
       "publicLink": "Herkese açık bağlantı",
-      "openPublicLink": "Herkese açık bağlantıyı aç"
+      "publicLinkHint": "Bağlantısı olan herkes görüntüleyebilir.",
+      "managePublicLink": "Herkese açık bağlantıyı yönet",
+      "openPublicLink": "Herkese açık bağlantıyı yönet",
+      "subjectType": {
+        "user": "kişi",
+        "group": "grup"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Görebilir — bu sohbeti yalnızca okuyabilirler.",
+          "use": "Kullanabilir — bu sohbete kendi kopyaları olarak devam edebilirler."
+        },
+        "knowledge_folder": {
+          "read": "Görebilir — klasörü görebilirler.",
+          "use": "Kullanabilir — yapay zeka bu dosyaları kullanabilir.",
+          "edit": "Düzenleyebilir — bu klasördeki dosyaları değiştirebilirler.",
+          "manage": "Yönetebilir — bu klasörü başkalarıyla paylaşabilirler."
+        },
+        "assistant": {
+          "read": "Görebilir — kartı görebilir ve kopyalayabilirler.",
+          "use": "Kullanabilir — bu asistanla bir sohbet başlatabilirler.",
+          "edit": "Düzenleyebilir — bu asistanı değiştirebilirler."
+        },
+        "saved_task": {
+          "read": "Görebilir — kartı görebilirler.",
+          "use": "Kullanabilir — kendi kopyalarını oluşturabilirler."
+        },
+        "widget": {
+          "read": "Görebilir — widget ayarlarını açabilirler.",
+          "edit": "Düzenleyebilir — widget ayarlarını değiştirebilirler.",
+          "manage": "Yönetebilir — bu widget'ı başkalarıyla paylaşabilirler."
+        }
+      },
+      "find": {
+        "conversation": "Gelen sohbetler altında bulacaklar.",
+        "knowledge_folder": "Kaynaklar'da paylaşılan olarak görünür.",
+        "assistant": "Asistanlar → Benimle paylaşılan altında bulacaklar.",
+        "saved_task": "Otomasyonlar altında şablon olarak kullanabilirler.",
+        "widget": "Widget ayarlarını açabilirler."
+      }
     }
   }
 }

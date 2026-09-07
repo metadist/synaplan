@@ -52,6 +52,19 @@
         </div>
       </div>
 
+      <SharedResourceBanner
+        v-if="widget?.shared"
+        class="mx-4 lg:mx-6 mt-3"
+        kind="widget"
+        :owner-name="sharedWidgetMeta?.ownerName ?? widget.ownerName ?? null"
+        :shared-via="sharedWidgetMeta?.sharedVia ?? widget.sharedVia"
+        :permission="
+          widget.access && widget.access !== 'owner'
+            ? widget.access
+            : (sharedWidgetMeta?.permission ?? null)
+        "
+      />
+
       <!-- Data Processing Notice -->
       <div
         v-if="widget && !widget.config?.dataProcessingAccepted"
@@ -1253,7 +1266,9 @@ import { chatApi } from '@/services/api/chatApi'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import {
   WIDGET_RULES_BLOCK_START,
   WIDGET_RULES_BLOCK_END,
@@ -1302,6 +1317,7 @@ const dataReady = ref(false)
 const widget = ref<widgetsApi.Widget | null>(null)
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
+const sharedWidgetMeta = ref<IamSharedItem | null>(null)
 const canShareWidget = computed(
   () => isIamSharingEnabled() && widget.value !== null && widget.value.shared !== true
 )
@@ -1921,6 +1937,15 @@ const loadData = async () => {
   loading.value = true
   try {
     widget.value = await widgetsApi.getWidget(widgetId)
+    sharedWidgetMeta.value = null
+    if (widget.value.shared && isIamSharingEnabled()) {
+      try {
+        const items = await iamApi.listSharedWithMe('widget')
+        sharedWidgetMeta.value = items.find((item) => item.id === String(widget.value?.id)) ?? null
+      } catch {
+        sharedWidgetMeta.value = null
+      }
+    }
     const topic = widget.value.taskPromptTopic
     if (topic && topic !== DEFAULT_WIDGET_TOPIC) {
       const prompts = await promptsApi.getPrompts()
