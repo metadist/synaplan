@@ -1,0 +1,40 @@
+{
+  "schema": "agent.v1",
+  "models": {
+    "chat": "anthropic:claude-sonnet-4:chat",
+    "vision": null,
+    "vectorize": null
+  },
+  "knowledge": {
+    "ownFolder": true,
+    "folders": ["12:legal-contracts"],
+    "ragLimit": 8,
+    "ragMinScore": 0.6
+  },
+  "tools": {
+    "internet": true,
+    "files": true,
+    "mcpServers": [],
+    "allow": [],
+    "deny": []
+  },
+  "skills": {
+    "allow": [],
+    "deny": []
+  },
+  "parameters": {
+    "temperature": 0.3,
+    "maxTokens": 4000,
+    "language": "auto",
+    "responseSchema": null
+  },
+  "behaviour": {
+    "greeting": "How can I help?",
+    "starterPrompts": ["Review this NDA"],
+    "memory": "user"
+  },
+  "triggers": {
+    "events": [],
+    "schedules": []
+  }
+}

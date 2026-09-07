@@ -75,6 +75,9 @@ final class ApiKeyScope
     /** `/api/v1/admin/groups*` — create/rename/delete groups and memberships. Implies iam:read. */
     public const IAM_MANAGE = 'iam:manage';
 
+    /** `/api/v1/agents*` — owner CRUD for Agent Builder assistants. */
+    public const AGENTS_ALL = 'agents:*';
+
     /**
      * Paths any authenticated key may reach regardless of scopes: identity
      * introspection of the key's own account ("who am I"), needed by every
@@ -184,6 +187,7 @@ final class ApiKeyScope
      *   /api/v1/admin/groups     → iam:manage (implies iam:read)
      *   /api/v1/admin/audit      → iam:read
      *   /api/v1/admin/users/{id}/resources → iam:read
+     *   /api/v1/agents           → agents:*
      *   /api/v1/auth/me          → any key (self-service identity, see
      *                              SELF_SERVICE_PATHS)
      *   everything else          → denied for a restricted key (a scoped key
@@ -277,6 +281,10 @@ final class ApiKeyScope
             || self::matchesPrefix($path, '/api/v1/admin/config/locks')
         ) {
             return [self::IAM_MANAGE];
+        }
+
+        if (self::matchesPrefix($path, '/api/v1/agents')) {
+            return [self::AGENTS_ALL];
         }
 
         return [];

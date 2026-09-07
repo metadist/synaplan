@@ -13,6 +13,7 @@ use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
@@ -81,6 +82,7 @@ class ConfigController extends AbstractController
         private WebSpeechConfig $webSpeechConfig,
         private SavedTaskConfig $savedTaskConfig,
         private DesktopAgentConfig $desktopAgentConfig,
+        private AgentConfig $agentConfig,
         private IamConfig $iamConfig,
         private ChatReadinessService $chatReadiness,
         private DemoLoginHint $demoLoginHint,
@@ -181,6 +183,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'savedTasks', type: 'boolean', example: false, description: 'When true, AI Instructions shows Saved Task chrome. Widget chat never runs Saved Tasks.'),
                         new OA\Property(property: 'selfAware', type: 'boolean', example: true, description: 'When true, the web chat can answer what this installation can do and cite official documentation. Off restores the previous chat behaviour.'),
                         new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
+                        new OA\Property(property: 'agentsEnabled', type: 'boolean', example: false, description: 'When true, the Assistants CRUD API and stream agentId pin are available. Off by default until an operator enables Agent Builder.'),
                         new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. Off by default until an operator enables IAM groups.'),
                         new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. Off by default.'),
                         new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
@@ -484,6 +487,7 @@ class ConfigController extends AbstractController
             'memoryService' => !empty($_ENV['QDRANT_URL']), // Just check if configured, not if reachable
             'savedTasks' => $this->savedTaskConfig->isEnabled($user?->getId()),
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
+            'agentsEnabled' => $this->agentConfig->isEnabled($user?->getId()),
             'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
             'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
             'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
