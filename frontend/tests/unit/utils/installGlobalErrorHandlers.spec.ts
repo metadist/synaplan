@@ -118,13 +118,14 @@ describe('installGlobalErrorHandlers', () => {
   })
 
   // Safari / Mac: password-managers and similar content scripts reject into
-  // our page. The friend's console on web.synaplan.com showed both of these
-  // and ErrorView replaced a healthy session. None of these strings exist in
-  // our own codebase.
+  // our page. Production Safari consoles have shown these exact messages,
+  // after which ErrorView replaced a healthy session. None of these strings
+  // exist in our own codebase.
   const extensionNoiseCases: Array<{ label: string; message: string }> = [
     {
       label: 'MutationObserver target is not a Node',
-      message: "TypeError: Argument 1 ('target') to MutationObserver.observe must be an instance of Node",
+      message:
+        "TypeError: Argument 1 ('target') to MutationObserver.observe must be an instance of Node",
     },
     {
       label: 'extension tab message bus',
