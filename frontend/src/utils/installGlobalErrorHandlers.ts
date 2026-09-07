@@ -18,6 +18,18 @@ const IGNORED_PATTERNS: RegExp[] = [
   /ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)/i,
   // Browser-extension content scripts injecting into our page.
   /^Script error\.?$/i,
+  // Password-managers / Grammarly / ad-blockers on Safari and Chrome inject a
+  // MutationObserver against a node that is not in the document (or already
+  // gone). The stack is always `content.js`, never our bundle. Our own
+  // observers only target `document.body` / `document.documentElement`.
+  /MutationObserver\.observe must be an instance of Node/i,
+  // Extension message-bus leftover. Seen in the wild as
+  // `No Listener: tabs:outgoing.message.ready` — not a Synaplan event. If we
+  // let this through, ErrorView replaces the whole app on an otherwise
+  // healthy Safari tab that happens to have an extension installed.
+  /No Listener: tabs:/i,
+  // Chrome/Safari content script surviving an extension reload/update.
+  /Extension context invalidated/i,
   // Network request aborted by the user (navigation away, slow connection).
   /^The user aborted a request\.?$/i,
   /AbortError/i,
@@ -164,8 +176,14 @@ export function installGlobalErrorHandlers(app: App): void {
   windowRejectionHandler = (event: PromiseRejectionEvent) => {
     const reason = event.reason
     const message = getErrorMessage(reason)
-    if (shouldIgnore(message)) return
+    if (shouldIgnore(message)) {
+      // Stop Safari/Chrome from also logging "Unhandled Promise Rejection"
+      // for noise we have already classified as safe to ignore.
+      event.preventDefault()
+      return
+    }
     if (isTransient(message)) {
+      event.preventDefault()
       reportTransient(message ?? 'unknown', 'window:unhandledrejection')
       return
     }
