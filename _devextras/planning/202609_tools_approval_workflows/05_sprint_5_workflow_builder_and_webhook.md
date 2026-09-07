@@ -97,6 +97,14 @@ accounting as the owner (a webhook is not a way around budgets). Body (JSON, ≤
 (`from: trigger`). Runs go through `SavedTaskRunner::run(ownerId, taskId, …, 'webhook')`. `SavedTask::TRIGGER_WEBHOOK`
 re-enters the allowed trigger list; unknown token → 404, same message for a disabled task (no enumeration).
 
+**Vocabulary and the assistant side (2026-09-07):** the user sees this as an **event** trigger — "A web hook is called
+from another system → runs as you" — using the Trigger / Event / Schedule words of roadmap §6 and the row pattern in
+[`../202609_ux_user_flows/assistant-triggers.md`](../202609_ux_user_flows/assistant-triggers.md). This step also adds
+the **A web hook is called** row to the assistant's **Add event** picker (track 2 `AB39`): an `events[] { kind: "webhook" }`
+entry materialises through `AgentTriggerMaterializer` as a Saved Task with `BTRIGGERTYPE = webhook`, exactly like a
+schedule; the row shows the URL with a copy button and **Regenerate**. Until this step ships, the kind validates but is
+absent from the picker (U11).
+
 ### 2.6 `TL43` — outbound webhook hardening and n8n recipe
 
 `OutboundWebhookRunner`: `https` only, resolved host through `SsrfGuard::isBlockedIp()`, `max_redirects: 0`, `timeout: 10`,
@@ -166,7 +174,7 @@ Frontend: `SavedTaskStepsEditor.spec.ts`, `StepInputsForm.spec.ts`, `StepPicker.
 | TL39 | `feat(saved-tasks): validate step inputs and stricter-only approval override in graphs` | backend-only | TL38 |
 | TL40 | `feat(saved-tasks): add Steps editor for Saved Tasks` | ota-candidate | TL39 |
 | TL41 | `feat(saved-tasks): add templates through saved_task shares and task copy` | backend-only + ota-candidate | TL39, track 1 S1 |
-| TL42 | `feat(saved-tasks): add inbound webhook trigger with token, HMAC and rate limit` | backend-only + ota-candidate | TL38 |
+| TL42 | `feat(saved-tasks): add inbound webhook trigger with token, HMAC and rate limit (+ assistant webhook event)` | backend-only + ota-candidate | TL38, track 2 AB39 |
 | TL43 | `feat(saved-tasks): harden outbound webhook node and document the n8n recipe` | backend-only | TL38 |
 | TL44 | `feat(saved-tasks): add workflow vocabulary in five locales` | ota-candidate | TL40 |
 | TL45 | `feat(saved-tasks): register saved_tasks bundle section with paused schedules` | backend-only | TL39, track 2 S6 |
