@@ -674,7 +674,12 @@
                 data-testid="section-folder-grid"
               >
                 <div
-                  class="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-3"
+                  class="grid gap-2 sm:gap-3"
+                  :class="
+                    filterSharedWithMe
+                      ? 'grid-cols-1 sm:grid-cols-2'
+                      : 'grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+                  "
                 >
                   <div
                     v-for="folder in visibleFolders"
@@ -785,11 +790,24 @@
                       <ShareIcon class="w-3.5 h-3.5" />
                     </button>
                     <span
-                      v-if="folder.shared"
-                      class="absolute bottom-1 right-1 text-[10px] font-medium txt-secondary"
+                      v-if="folder.shared && !filterSharedWithMe"
+                      class="absolute bottom-1 right-1 max-w-[90%]"
                     >
-                      {{ $t('iam.owner') }}: {{ folder.ownerName }}
+                      <ChatKindPill
+                        :kind="sharedFolderPill(folder).kind"
+                        :label="sharedFolderPill(folder).label"
+                        size="xs"
+                      />
                     </span>
+                    <SharedResourceBanner
+                      v-if="folder.shared && filterSharedWithMe"
+                      class="mt-2"
+                      compact
+                      kind="knowledge_folder"
+                      :owner-name="folder.ownerName ?? null"
+                      :shared-via="folder.sharedVia"
+                      :permission="folder.permission"
+                    />
                   </div>
                 </div>
               </div>
@@ -1479,6 +1497,7 @@
       kind="knowledge_folder"
       :resource-id="iamShareResourceId"
       :resource-name="iamShareName"
+      :owner-name="authStore.user?.firstName || authStore.user?.email || ''"
       @close="iamShareOpen = false"
     />
 
@@ -1618,6 +1637,9 @@ import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { iamApi } from '@/services/api/iamApi'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
+import ChatKindPill from '@/components/iam/ChatKindPill.vue'
+import { kindOfSharedVia } from '@/utils/chatKind'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -1630,6 +1652,8 @@ type DisplayedFolder = {
   shared?: boolean
   ownerName?: string
   resourceId?: string
+  sharedVia?: { type: string; name: string } | null
+  permission?: string
 }
 
 /** §4.8 #2: open a chat with this knowledge folder preselected (chat-input picker). */
@@ -1641,6 +1665,10 @@ function useFolderInChat(folder: DisplayedFolder | string): void {
         ? `shared:${folder.resourceId}`
         : folder.name
   router.push({ path: '/', query: { folder: key } })
+}
+
+function sharedFolderPill(folder: DisplayedFolder) {
+  return kindOfSharedVia(folder.sharedVia, folder.ownerName)
 }
 
 function onFolderCardClick(folder: DisplayedFolder): void {
@@ -1671,7 +1699,15 @@ const folderMenuOpen = ref<number | null>(null)
 const files = ref<FileItem[]>([])
 const fileGroups = ref<Array<{ name: string; count: number }>>([])
 const sharedFolders = ref<
-  Array<{ name: string; count: number; shared: true; ownerName: string; resourceId: string }>
+  Array<{
+    name: string
+    count: number
+    shared: true
+    ownerName: string
+    resourceId: string
+    sharedVia: { type: string; name: string } | null
+    permission: string
+  }>
 >([])
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
 const iamShareOpen = ref(false)
@@ -1700,6 +1736,8 @@ const loadSharedFolders = async () => {
       shared: true as const,
       ownerName: item.ownerName ?? '',
       resourceId: item.id,
+      sharedVia: item.sharedVia ?? null,
+      permission: item.permission,
     }))
   } catch {
     sharedFolders.value = []
@@ -1813,6 +1851,8 @@ const displayedFolders = computed<DisplayedFolder[]>(() => {
     shared: true,
     ownerName: folder.ownerName,
     resourceId: folder.resourceId,
+    sharedVia: folder.sharedVia,
+    permission: folder.permission,
   }))
   return [...real, ...pending, ...shared]
 })

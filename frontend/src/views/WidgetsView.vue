@@ -101,7 +101,7 @@
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                   <span
-                    v-if="widget.shared"
+                    v-if="widget.shared && !filterShared"
                     class="px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap bg-[var(--brand)]/10 text-[var(--brand)]"
                   >
                     {{
@@ -122,6 +122,16 @@
                   </span>
                 </div>
               </div>
+
+              <SharedResourceBanner
+                v-if="widget.shared"
+                class="mb-4"
+                compact
+                kind="widget"
+                :owner-name="widget.ownerName ?? null"
+                :shared-via="widget.sharedVia"
+                :permission="widget.access && widget.access !== 'owner' ? widget.access : null"
+              />
 
               <!-- Stats -->
               <div class="mb-4 p-3 surface-chip rounded-lg space-y-3">
@@ -449,6 +459,7 @@ import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { getErrorMessage } from '@/utils/errorMessage'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { iamApi } from '@/services/api/iamApi'
 
@@ -513,6 +524,7 @@ const loadWidgets = async () => {
         shared: true,
         access: item.permission,
         ownerName: item.ownerName ?? undefined,
+        sharedVia: item.sharedVia ?? null,
       }))
     } else {
       sharedWidgets.value = []

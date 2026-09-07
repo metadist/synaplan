@@ -4707,13 +4707,35 @@
     "continueFailed": "No se pudo crear su copia. Inténtelo de nuevo.",
     "readOnly": "Puede ver esta conversación. Para añadir un mensaje, continúela como su propia copia.",
     "sharedFolder": "Compartido · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Esta carpeta pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Esta carpeta pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Esta carpeta pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "assistant": {
+        "sourceGroup": "Este asistente pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Este asistente pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "saved_task": {
+        "sourceGroup": "Esta tarea guardada pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Esta tarea guardada pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Esta tarea guardada pertenece a {owner}. Se compartió con usted personalmente."
+      },
+      "widget": {
+        "sourceGroup": "Este widget de chat pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Este widget de chat pertenece a {owner}. Se compartió con todos en esta organización.",
+        "sourceDirect": "Este widget de chat pertenece a {owner}. Se compartió con usted personalmente."
+      }
+    },
     "dialog": {
       "title": "Compartir «{name}»",
       "who": "Quién",
       "searchPlaceholder": "Buscar una persona o un grupo…",
       "permission": "Permiso",
       "sharedWith": "Compartido con",
-      "empty": "Aún no se ha compartido.",
+      "empty": "Solo usted puede ver esto.",
       "cancel": "Cancelar",
       "remove": "Quitar",
       "removeTitle": "Dejar de compartir",
@@ -4721,10 +4743,55 @@
       "loadFailed": "No se pudo cargar con quién está compartido.",
       "saveFailed": "No se pudo compartir. Inténtelo de nuevo.",
       "shared": "Compartido con {name}.",
+      "sharedFind": "Compartido con {name}. {find}",
       "removed": "Se dejó de compartir con {name}.",
       "removeFailed": "No se pudo dejar de compartir. Inténtelo de nuevo.",
+      "permissionFailed": "No se pudo cambiar el permiso. Inténtelo de nuevo.",
+      "noMatches": "Ninguna persona o grupo coincide.",
+      "searchFailed": "No se pudo buscar personas o grupos.",
+      "tryAgain": "Intentar de nuevo",
+      "ownerLine": "Propietario · {name}",
       "publicLink": "Enlace público",
-      "openPublicLink": "Abrir enlace público"
+      "publicLinkHint": "Cualquiera con el enlace puede verlo.",
+      "managePublicLink": "Gestionar enlace público",
+      "openPublicLink": "Gestionar enlace público",
+      "subjectType": {
+        "user": "persona",
+        "group": "grupo"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Puede ver — pueden abrir este chat solo para lectura.",
+          "use": "Puede usar — pueden continuar este chat como copia propia."
+        },
+        "knowledge_folder": {
+          "read": "Puede ver — pueden ver la carpeta.",
+          "use": "Puede usar — la IA puede usar estos archivos.",
+          "edit": "Puede editar — pueden cambiar archivos de esta carpeta.",
+          "manage": "Puede gestionar — pueden compartir esta carpeta con otros."
+        },
+        "assistant": {
+          "read": "Puede ver — pueden ver la tarjeta y clonarla.",
+          "use": "Puede usar — pueden iniciar un chat con este asistente.",
+          "edit": "Puede editar — pueden cambiar este asistente."
+        },
+        "saved_task": {
+          "read": "Puede ver — pueden ver la tarjeta.",
+          "use": "Puede usar — pueden crear su propia copia."
+        },
+        "widget": {
+          "read": "Puede ver — pueden abrir la configuración del widget.",
+          "edit": "Puede editar — pueden cambiar la configuración del widget.",
+          "manage": "Puede gestionar — pueden compartir este widget con otros."
+        }
+      },
+      "find": {
+        "conversation": "Lo encontrarán en Chats entrantes.",
+        "knowledge_folder": "Aparece en sus Fuentes como compartido.",
+        "assistant": "Lo encontrarán en Asistentes → Compartido conmigo.",
+        "saved_task": "Pueden usarlo como plantilla en Automatizaciones.",
+        "widget": "Pueden abrir la configuración del widget."
+      }
     }
   }
 }

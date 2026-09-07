@@ -1,11 +1,11 @@
 # Synaplan Desktop (agent client)
 
-> **Status: server side only.** The Synaplan Desktop **client is not released
-> yet.** This document describes the *server* half — the pairing, scoped keys,
-> job queue, and check-in contract that ship in the main Synaplan app (Phase A).
-> The download link and install walkthrough are added in Phase B, when the
-> client exists. Until then everything below is **off by default** and invisible
-> on every install (feature flag `DESKTOP_AGENT.ENABLED`, see below).
+> **Status.** The server half (pairing, scoped keys, job queue, check-in
+> contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (off by default).
+> The desktop client is an **unsigned 1.0 preview** you build from
+> [synaplan-desktop](https://github.com/metadist/synaplan-desktop). Signed
+> public download is deferred until notarization. The job contract stays
+> frozen at `protocol: 1`.
 
 ## What it is
 
@@ -218,13 +218,33 @@ They are asserted against the live server contract by
 server change that breaks the frozen contract fails the gate here rather than
 breaking a shipped client (invariant C9).
 
-## Testing it without a client
+## Queue walkthrough (web → computer → chat)
 
-Because the real client does not exist yet, two shell harnesses under
-[`_devextras/testing/desktop/`](../_devextras/testing/desktop/) stand in for it.
-They run against the local Docker stack (`curl` + `jq`), auto-enable the flag,
-and are **not** part of the PHPUnit gate — the equivalent assertions also exist
-as PHPUnit tests (`DesktopControllerTest`, `DesktopMcpCheckinTest`).
+With the flag on and a paired unsigned desktop client running:
+
+1. In the web app, open a chat and queue a `skill.run` job for that computer
+   (Channels → Desktop, or `POST /api/v1/desktop/jobs` with
+   `{ skill, prompt, fileIds }` only).
+2. The computer checks in over MCP (`agent_checkin`), honours top-level
+   `next_call_at`, and runs the skill with the same local tool policy as
+   interactive chat.
+3. A produced file is uploaded with `process_level=store` and reported as
+   `result.fileIds`. The web chat can then show that file.
+4. A refusal path is honest: unknown skill → `unknown_skill`; skill off or
+   not allowed to run unattended → `skill_disabled`; missing runtime →
+   `local_error`. The web card shows failed, not a forever spinner.
+
+The computer will not start the poll loop while the API key is stored in a
+plaintext file.
+
+## Testing the server without the GUI
+
+Two shell harnesses under
+[`_devextras/testing/desktop/`](../_devextras/testing/desktop/) stand in for a
+device. They run against the local Docker stack (`curl` + `jq`), auto-enable
+the flag, and are **not** part of the PHPUnit gate — the equivalent
+assertions also exist as PHPUnit tests (`DesktopControllerTest`,
+`DesktopMcpCheckinTest`).
 
 ```bash
 cd _devextras/testing/desktop

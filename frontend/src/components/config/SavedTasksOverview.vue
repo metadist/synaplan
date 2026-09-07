@@ -64,6 +64,8 @@ const sharedTasks = computed(() =>
       instructionPreview: null,
     } satisfies SavedTask,
     ownerName: item.ownerName ?? '',
+    sharedVia: item.sharedVia ?? null,
+    permission: item.permission,
   }))
 )
 
@@ -119,6 +121,8 @@ onMounted(() => {
             :task="row.task"
             shared-view
             :owner-name="row.ownerName"
+            :shared-via="row.sharedVia"
+            :permission="row.permission"
             @copied="onCopied"
           />
         </li>

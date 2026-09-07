@@ -12,13 +12,22 @@
           role="dialog"
           aria-modal="true"
         >
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold txt-primary">
-              {{ $t('iam.dialog.title', { name: resourceName }) }}
-            </h2>
+          <div class="flex items-start justify-between gap-3 mb-1">
+            <div class="min-w-0">
+              <h2 class="text-lg font-semibold txt-primary">
+                {{ $t('iam.dialog.title', { name: resourceName }) }}
+              </h2>
+              <p class="text-sm txt-secondary mt-0.5" data-testid="iam-share-owner">
+                {{
+                  ownerName.trim()
+                    ? $t('iam.dialog.ownerLine', { name: ownerName.trim() })
+                    : $t('iam.owner')
+                }}
+              </p>
+            </div>
             <button
               type="button"
-              class="icon-ghost"
+              class="icon-ghost shrink-0"
               data-testid="btn-iam-share-close"
               :aria-label="$t('common.close')"
               @click="close"
@@ -27,22 +36,17 @@
             </button>
           </div>
 
-          <SubjectPicker v-model="subject" />
-          <div class="mt-4">
-            <PermissionSelect v-model="permission" :allowed="allowedPermissions" />
-          </div>
-
-          <div class="mt-4 flex justify-end gap-2">
+          <div class="mt-4 flex flex-col sm:flex-row gap-2" data-testid="iam-share-add-row">
+            <SubjectPicker ref="picker" v-model="subject" class="sm:flex-1" :active="isOpen" />
+            <PermissionSelect
+              v-model="permission"
+              class="sm:w-44 shrink-0"
+              :allowed="allowedPermissions"
+              :kind="kind"
+            />
             <button
               type="button"
-              class="btn-secondary px-4 py-2 rounded-lg font-medium"
-              @click="close"
-            >
-              {{ $t('iam.dialog.cancel') }}
-            </button>
-            <button
-              type="button"
-              class="btn-primary px-4 py-2 rounded-lg font-medium"
+              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium w-full sm:w-auto shrink-0"
               :disabled="!subject || saving"
               data-testid="btn-iam-share-confirm"
               @click="grant"
@@ -51,27 +55,59 @@
             </button>
           </div>
 
+          <p class="mt-3 text-sm txt-primary" data-testid="iam-share-consequence">
+            {{ $t(shareConsequenceKey(kind, permission)) }}
+          </p>
+          <p class="text-sm txt-secondary" data-testid="iam-share-find">
+            {{ $t(shareFindKey(kind)) }}
+          </p>
+
           <div class="mt-6 pt-4 border-t border-light-border/20 dark:border-dark-border/8">
             <h3 class="text-sm font-medium txt-primary mb-2">{{ $t('iam.dialog.sharedWith') }}</h3>
-            <p v-if="shares.length === 0" class="text-sm txt-secondary">
+            <div v-if="loadError" class="text-sm txt-secondary" data-testid="iam-share-load-error">
+              <p>{{ $t('iam.dialog.loadFailed') }}</p>
+              <button
+                type="button"
+                class="btn-secondary mt-2 px-4 py-2.5 rounded-lg text-sm font-medium"
+                data-testid="btn-iam-share-retry"
+                @click="load"
+              >
+                {{ $t('iam.dialog.tryAgain') }}
+              </button>
+            </div>
+            <p
+              v-else-if="shares.length === 0"
+              class="text-sm txt-secondary"
+              data-testid="iam-share-empty"
+            >
               {{ $t('iam.dialog.empty') }}
             </p>
-            <ul class="space-y-2">
+            <ul v-else class="space-y-2">
               <li
                 v-for="row in shares"
                 :key="row.id"
-                class="flex items-center justify-between gap-2 text-sm rounded-lg px-2 py-1 -mx-2"
+                class="flex flex-col sm:flex-row sm:items-center gap-2 text-sm rounded-lg px-2 py-2 -mx-2"
                 :class="
                   shareKey(row) === highlightedShareKey ? 'bg-[var(--brand-alpha-light)]' : ''
                 "
+                :data-testid="`iam-share-row-${row.id}`"
               >
-                <span class="txt-primary truncate">{{ rowLabel(row) }}</span>
-                <span class="txt-secondary shrink-0">{{
-                  $t(`iam.permission.${row.permission}`)
-                }}</span>
+                <div class="min-w-0 flex-1">
+                  <p class="txt-primary truncate font-medium">{{ rowLabel(row) }}</p>
+                  <p v-if="row.subjectType !== 'everyone'" class="text-xs txt-secondary">
+                    {{ $t(`iam.dialog.subjectType.${row.subjectType}`) }}
+                  </p>
+                </div>
+                <PermissionSelect
+                  class="sm:w-40 shrink-0"
+                  :model-value="row.permission"
+                  :allowed="allowedPermissions"
+                  :kind="kind"
+                  @update:model-value="changePermission(row, $event)"
+                />
                 <button
                   type="button"
-                  class="icon-ghost icon-ghost--danger text-sm"
+                  class="icon-ghost icon-ghost--danger text-sm shrink-0"
                   :data-testid="`btn-iam-share-remove-${row.id}`"
                   @click="remove(row)"
                 >
@@ -85,14 +121,15 @@
             v-if="kind === 'conversation'"
             class="mt-6 pt-4 border-t border-light-border/20 dark:border-dark-border/8"
           >
-            <h3 class="text-sm font-medium txt-primary mb-2">{{ $t('iam.dialog.publicLink') }}</h3>
+            <h3 class="text-sm font-medium txt-primary mb-1">{{ $t('iam.dialog.publicLink') }}</h3>
+            <p class="text-sm txt-secondary mb-3">{{ $t('iam.dialog.publicLinkHint') }}</p>
             <button
               type="button"
-              class="btn-secondary px-4 py-2 rounded-lg font-medium"
+              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
               data-testid="btn-iam-public-link"
               @click="emit('publicLink')"
             >
-              {{ $t('iam.dialog.openPublicLink') }}
+              {{ $t('iam.dialog.managePublicLink') }}
             </button>
           </div>
         </div>
@@ -107,15 +144,26 @@ import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { iamApi, type IamShare, type IamSubject } from '@/services/api/iamApi'
+import {
+  defaultSharePermission,
+  SHARE_PERMISSIONS,
+  shareConsequenceKey,
+  shareFindKey,
+  type ShareKind,
+} from '@/utils/shareCopy'
 import PermissionSelect from './PermissionSelect.vue'
 import SubjectPicker from './SubjectPicker.vue'
 
-const props = defineProps<{
-  isOpen: boolean
-  kind: 'conversation' | 'knowledge_folder' | 'assistant' | 'saved_task' | 'widget'
-  resourceId: string
-  resourceName: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    isOpen: boolean
+    kind: ShareKind
+    resourceId: string
+    resourceName: string
+    ownerName?: string
+  }>(),
+  { ownerName: '' }
+)
 
 const emit = defineEmits<{
   close: []
@@ -126,11 +174,15 @@ const { t } = useI18n()
 const { confirm } = useDialog()
 const { error: showError, success: showSuccess } = useNotification()
 const subject = ref<IamSubject | null>(null)
-const permission = ref('use')
+const permission = ref(defaultSharePermission(props.kind))
 const shares = ref<IamShare[]>([])
 const saving = ref(false)
+const loadError = ref(false)
 const highlightedShareKey = ref('')
+const picker = ref<{ resetQuery: () => void } | null>(null)
 let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+const allowedPermissions = computed(() => [...SHARE_PERMISSIONS[props.kind]])
 
 const shareKey = (row: Pick<IamShare, 'subjectType' | 'subjectId'>) =>
   `${row.subjectType}:${row.subjectId}`
@@ -144,25 +196,14 @@ const markHighlighted = (key: string) => {
   }, 4000)
 }
 
-const allowedPermissions = computed(() => {
-  if (props.kind === 'conversation' || props.kind === 'saved_task') {
-    return ['read', 'use']
-  }
-  if (props.kind === 'assistant') {
-    return ['read', 'use', 'edit']
-  }
-  if (props.kind === 'widget') {
-    return ['read', 'edit', 'manage']
-  }
-  return ['read', 'use', 'edit', 'manage']
-})
-
 const load = async () => {
   if (!props.isOpen || !props.resourceId) return
   try {
     shares.value = await iamApi.listShares(props.kind, props.resourceId)
+    loadError.value = false
   } catch {
     shares.value = []
+    loadError.value = true
     showError(t('iam.dialog.loadFailed'))
   }
 }
@@ -170,7 +211,12 @@ const load = async () => {
 watch(
   () => [props.isOpen, props.kind, props.resourceId],
   () => {
-    void load()
+    if (props.isOpen) {
+      subject.value = null
+      permission.value = defaultSharePermission(props.kind)
+      picker.value?.resetQuery()
+      void load()
+    }
   },
   { immediate: true }
 )
@@ -201,13 +247,32 @@ const grant = async () => {
       permission: permission.value,
     })
     subject.value = null
+    picker.value?.resetQuery()
     await load()
     markHighlighted(key)
-    showSuccess(t('iam.dialog.shared', { name: who }))
+    showSuccess(t('iam.dialog.sharedFind', { name: who, find: t(shareFindKey(props.kind)) }))
   } catch {
     showError(t('iam.dialog.saveFailed'))
   } finally {
     saving.value = false
+  }
+}
+
+const changePermission = async (row: IamShare, next: string) => {
+  if (next === row.permission) return
+  const previous = row.permission
+  row.permission = next as IamShare['permission']
+  try {
+    await iamApi.grantShare({
+      kind: props.kind,
+      resource: props.resourceId,
+      subjectType: row.subjectType,
+      subjectId: row.subjectId,
+      permission: next,
+    })
+  } catch {
+    row.permission = previous
+    showError(t('iam.dialog.permissionFailed'))
   }
 }
 

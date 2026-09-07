@@ -5627,13 +5627,35 @@
     "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
     "readOnly": "Sie können diese Unterhaltung ansehen. Um eine Nachricht hinzuzufügen, setzen Sie sie als eigene Kopie fort.",
     "sharedFolder": "Geteilt · {name}",
+    "banner": {
+      "knowledge_folder": {
+        "sourceGroup": "Dieser Ordner gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieser Ordner gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieser Ordner gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
+      },
+      "assistant": {
+        "sourceGroup": "Dieser Assistent gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieser Assistent gehört {owner}. Er wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieser Assistent gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
+      },
+      "saved_task": {
+        "sourceGroup": "Diese gespeicherte Aufgabe gehört {owner}. Sie hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Diese gespeicherte Aufgabe gehört {owner}. Sie wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Diese gespeicherte Aufgabe gehört {owner}. Sie wurde persönlich mit Ihnen geteilt."
+      },
+      "widget": {
+        "sourceGroup": "Dieses Chat-Widget gehört {owner}. Es hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieses Chat-Widget gehört {owner}. Es wurde mit allen in dieser Organisation geteilt.",
+        "sourceDirect": "Dieses Chat-Widget gehört {owner}. Es wurde persönlich mit Ihnen geteilt."
+      }
+    },
     "dialog": {
       "title": "„{name}“ teilen",
       "who": "Wer",
       "searchPlaceholder": "Person oder Gruppe suchen…",
       "permission": "Berechtigung",
       "sharedWith": "Geteilt mit",
-      "empty": "Noch mit niemandem geteilt.",
+      "empty": "Nur Sie können das sehen.",
       "cancel": "Abbrechen",
       "remove": "Entfernen",
       "removeTitle": "Teilen beenden",
@@ -5641,10 +5663,55 @@
       "loadFailed": "Die Freigaben konnten nicht geladen werden.",
       "saveFailed": "Teilen ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
       "shared": "Mit {name} geteilt.",
+      "sharedFind": "Mit {name} geteilt. {find}",
       "removed": "Freigabe für {name} beendet.",
       "removeFailed": "Die Freigabe konnte nicht beendet werden. Bitte versuchen Sie es erneut.",
+      "permissionFailed": "Die Berechtigung konnte nicht geändert werden. Bitte versuchen Sie es erneut.",
+      "noMatches": "Keine Person oder Gruppe passt.",
+      "searchFailed": "Personen oder Gruppen konnten nicht gesucht werden.",
+      "tryAgain": "Erneut versuchen",
+      "ownerLine": "Eigentümer · {name}",
       "publicLink": "Öffentlicher Link",
-      "openPublicLink": "Öffentlichen Link öffnen"
+      "publicLinkHint": "Jeder mit dem Link kann ihn ansehen.",
+      "managePublicLink": "Öffentlichen Link verwalten",
+      "openPublicLink": "Öffentlichen Link verwalten",
+      "subjectType": {
+        "user": "Person",
+        "group": "Gruppe"
+      },
+      "consequence": {
+        "conversation": {
+          "read": "Darf ansehen — sie können diesen Chat nur lesen.",
+          "use": "Darf nutzen — sie können diesen Chat als eigene Kopie fortsetzen."
+        },
+        "knowledge_folder": {
+          "read": "Darf ansehen — sie können den Ordner sehen.",
+          "use": "Darf nutzen — die KI darf diese Dateien verwenden.",
+          "edit": "Darf bearbeiten — sie können Dateien in diesem Ordner ändern.",
+          "manage": "Darf verwalten — sie können diesen Ordner mit anderen teilen."
+        },
+        "assistant": {
+          "read": "Darf ansehen — sie können die Karte sehen und sie klonen.",
+          "use": "Darf nutzen — sie können einen Chat mit diesem Assistenten starten.",
+          "edit": "Darf bearbeiten — sie können diesen Assistenten ändern."
+        },
+        "saved_task": {
+          "read": "Darf ansehen — sie können die Karte sehen.",
+          "use": "Darf nutzen — sie können eine eigene Kopie anlegen."
+        },
+        "widget": {
+          "read": "Darf ansehen — sie können die Widget-Einstellungen öffnen.",
+          "edit": "Darf bearbeiten — sie können die Widget-Einstellungen ändern.",
+          "manage": "Darf verwalten — sie können dieses Widget mit anderen teilen."
+        }
+      },
+      "find": {
+        "conversation": "Sie finden ihn unter Eingehende Chats.",
+        "knowledge_folder": "Er erscheint bei ihnen unter Quellen als geteilt.",
+        "assistant": "Sie finden ihn unter Assistenten → Mit mir geteilt.",
+        "saved_task": "Sie können sie unter Automatisierungen als Vorlage nutzen.",
+        "widget": "Sie können die Widget-Einstellungen öffnen."
+      }
     }
   }
 }

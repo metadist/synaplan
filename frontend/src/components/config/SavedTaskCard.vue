@@ -6,13 +6,17 @@ import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
 import { ApiError } from '@/services/api/httpClient'
+import type { ShareVia } from '@/utils/shareCopy'
 
 const props = defineProps<{
   task: SavedTask
   sharedView?: boolean
   ownerName?: string
+  sharedVia?: ShareVia | null
+  permission?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -231,7 +235,7 @@ const onRunCopy = async () => {
     <div class="flex items-center justify-between gap-3">
       <div class="min-w-0">
         <h3 class="font-semibold txt-primary">{{ task.name }}</h3>
-        <p v-if="sharedView && ownerName" class="text-xs txt-secondary">
+        <p v-if="sharedView && ownerName && !sharedVia" class="text-xs txt-secondary">
           {{ $t('iam.sharedBy', { name: ownerName }) }}
         </p>
       </div>
@@ -246,6 +250,14 @@ const onRunCopy = async () => {
         {{ task.enabled ? $t('config.savedTasks.on') : $t('config.savedTasks.off') }}
       </label>
     </div>
+
+    <SharedResourceBanner
+      v-if="sharedView"
+      kind="saved_task"
+      :owner-name="ownerName ?? null"
+      :shared-via="sharedVia"
+      :permission="permission"
+    />
 
     <p
       v-if="task.instructionPreview"
