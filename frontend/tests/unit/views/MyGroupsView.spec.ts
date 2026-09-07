@@ -149,7 +149,7 @@ describe('MyGroupsView', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="btn-leave-group-9"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-leave-group-9"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="hint-leave-directory-9"]').exists()).toBe(false)
   })
 
