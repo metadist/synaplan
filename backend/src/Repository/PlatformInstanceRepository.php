@@ -31,6 +31,26 @@ class PlatformInstanceRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param list<string> $instanceIds
+     *
+     * @return array<string, PlatformInstance> keyed by instance id
+     */
+    public function findByInstanceIds(array $instanceIds): array
+    {
+        if ([] === $instanceIds) {
+            return [];
+        }
+
+        $byId = [];
+        /** @var PlatformInstance $instance */
+        foreach ($this->findBy(['instanceId' => $instanceIds]) as $instance) {
+            $byId[$instance->getInstanceId()] = $instance;
+        }
+
+        return $byId;
+    }
+
+    /**
      * @return list<PlatformInstance>
      */
     public function findAllOrdered(): array

@@ -191,10 +191,25 @@ describe('PlatformConnectView', () => {
     expect(wrapper.find('[data-testid="section-success"]').exists()).toBe(true)
   })
 
-  it('never posts the key to window.opener and errors without an Office channel', async () => {
+  it('refuses to mint a key when there is neither a relay nor an Office channel', async () => {
+    installOffice(false)
+    const { wrapper } = await mountAt('/connect/platform?client=outlook&state=nonce1')
+    await wrapper.get('[data-testid="btn-connect"]').trigger('click')
+    await flushPromises()
+
+    expect(connectOutlook).not.toHaveBeenCalled()
+    expect(assign).not.toHaveBeenCalled()
+    expect(openerPostMessage).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain(en.platformConnect.errorOfficeNotReady)
+  })
+
+  it('never posts the key to window.opener when the relay is rejected and Office is missing', async () => {
     installOffice(false)
     connectOutlook.mockResolvedValue({ success: true, redirect: null, payload: PAYLOAD })
-    const { wrapper } = await mountAt('/connect/platform?client=outlook&state=nonce1')
+    const { wrapper } = await mountAt(
+      '/connect/platform?client=outlook&state=nonce1&redirect=https://evil.example/relay'
+    )
     await wrapper.get('[data-testid="btn-connect"]').trigger('click')
     await flushPromises()
 

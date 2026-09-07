@@ -120,6 +120,23 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         return $rows;
     }
 
+    /**
+     * @param list<int> $apiKeyIds
+     *
+     * @return list<ExternalIdentity>
+     */
+    public function findByApiKeyIds(array $apiKeyIds): array
+    {
+        if ([] === $apiKeyIds) {
+            return [];
+        }
+
+        /** @var list<ExternalIdentity> $rows */
+        $rows = $this->findBy(['apiKeyId' => $apiKeyIds]);
+
+        return $rows;
+    }
+
     public function findOneByApiKeyId(int $apiKeyId): ?ExternalIdentity
     {
         $row = $this->findOneBy(['apiKeyId' => $apiKeyId]);

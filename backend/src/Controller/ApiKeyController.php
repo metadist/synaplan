@@ -82,10 +82,13 @@ class ApiKeyController extends AbstractController
         }
 
         $apiKeys = $this->apiKeyRepository->findByOwner($user->getId());
+        $linkedPlatforms = $this->platformLinkExchangeService->linkedPlatformsForKeys(
+            array_map(static fn (ApiKey $key): int => (int) $key->getId(), $apiKeys),
+        );
 
         return $this->json([
             'success' => true,
-            'api_keys' => array_map(function (ApiKey $key) {
+            'api_keys' => array_map(function (ApiKey $key) use ($linkedPlatforms) {
                 return [
                     'id' => $key->getId(),
                     'name' => $key->getName(),
@@ -94,7 +97,7 @@ class ApiKeyController extends AbstractController
                     'scopes' => $key->getScopes(),
                     'last_used' => $key->getLastUsed(),
                     'created' => $key->getCreated(),
-                    'linked_platform' => $this->platformLinkExchangeService->linkedPlatformForKey((int) $key->getId()),
+                    'linked_platform' => $linkedPlatforms[(int) $key->getId()] ?? null,
                 ];
             }, $apiKeys),
         ]);

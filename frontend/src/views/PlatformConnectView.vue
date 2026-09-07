@@ -67,7 +67,7 @@
 
           <button
             type="button"
-            class="w-full btn-primary py-3 rounded-xl font-medium transition-all duration-200 active:scale-[0.98]"
+            class="w-full btn-primary px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
             data-testid="btn-connect"
             @click="handleConnect"
           >
@@ -129,7 +129,7 @@
           </div>
           <button
             type="button"
-            class="w-full btn-primary py-3 rounded-xl font-medium"
+            class="w-full btn-primary px-4 py-3 rounded-xl text-sm font-medium"
             data-testid="btn-retry"
             @click="handleRetry"
           >
@@ -192,7 +192,8 @@ const themeStore = useTheme()
 
 const viewState = ref<ViewState>('loading')
 const errorMessage = ref<string>('')
-const officeReady = ref(false)
+/** Office.js dialog channel is available (`messageParent`); false when opened outside Outlook. */
+const officeChannelAvailable = ref(false)
 const publicHost = ref<string>('')
 const clientPolicy = ref<PlatformClientPolicy | null>(null)
 
@@ -289,13 +290,20 @@ function loadOfficeJs(): Promise<OfficeApi | null> {
  * deliberately no `window.opener.postMessage` — a popup opened by an
  * attacker page would otherwise receive the key.
  */
+function officeMessageParent(): ((data: string) => void) | null {
+  const ui = (window as unknown as { Office?: Partial<OfficeApi> }).Office?.context?.ui
+  if (!ui || typeof ui.messageParent !== 'function') {
+    return null
+  }
+  return (data: string) => ui.messageParent(data)
+}
+
 function postPayloadToOffice(payload: OutlookSignInPayload): void {
-  const office = (window as unknown as { Office?: OfficeApi }).Office
-  const messageParent = office?.context?.ui?.messageParent
-  if (typeof messageParent !== 'function') {
+  const send = officeMessageParent()
+  if (!send) {
     throw new Error(t('platformConnect.errorNoDeliveryChannel'))
   }
-  messageParent.call(office?.context.ui, JSON.stringify(payload))
+  send(JSON.stringify(payload))
 }
 
 async function handleOutlookConnect(): Promise<void> {
@@ -304,7 +312,10 @@ async function handleOutlookConnect(): Promise<void> {
     viewState.value = 'error'
     return
   }
-  if (!officeReady.value) {
+  // Without a relay to redirect to, Office.js is the only way to hand the
+  // key over — check before minting so a page opened outside Outlook does
+  // not leave an undeliverable key behind.
+  if (!requestedRelay.value && !officeChannelAvailable.value) {
     errorMessage.value = t('platformConnect.errorOfficeNotReady')
     viewState.value = 'error'
     return
@@ -434,7 +445,7 @@ async function bootstrap(): Promise<void> {
     }
 
     await loadOfficeJs()
-    officeReady.value = true
+    officeChannelAvailable.value = officeMessageParent() !== null
     viewState.value = 'ready'
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : String(err)

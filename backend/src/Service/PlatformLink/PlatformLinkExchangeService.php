@@ -209,19 +209,44 @@ final readonly class PlatformLinkExchangeService
      */
     public function linkedPlatformForKey(int $keyId): ?array
     {
-        $identity = $this->externalIdentityRepository->findOneByApiKeyId($keyId);
-        if (!$identity instanceof ExternalIdentity || '' === $identity->getInstanceId()) {
-            return null;
-        }
-        $instance = $this->instanceRepository->findByInstanceId($identity->getInstanceId());
-        if (!$instance instanceof PlatformInstance) {
-            return null;
+        return $this->linkedPlatformsForKeys([$keyId])[$keyId] ?? null;
+    }
+
+    /**
+     * Two queries for the whole list (identities by key, instances by id)
+     * instead of two per key — used by the API-keys page.
+     *
+     * @param list<int> $keyIds
+     *
+     * @return array<int, array{client: string, host: string}> keyed by API key id; keys without a link are absent
+     */
+    public function linkedPlatformsForKeys(array $keyIds): array
+    {
+        $identities = array_filter(
+            $this->externalIdentityRepository->findByApiKeyIds($keyIds),
+            static fn (ExternalIdentity $identity): bool => null !== $identity->getApiKeyId() && '' !== $identity->getInstanceId(),
+        );
+        if ([] === $identities) {
+            return [];
         }
 
-        return [
-            'client' => $instance->getClient(),
-            'host' => $instance->getHost(),
-        ];
+        $instances = $this->instanceRepository->findByInstanceIds(array_values(array_unique(array_map(
+            static fn (ExternalIdentity $identity): string => $identity->getInstanceId(),
+            $identities,
+        ))));
+
+        $linked = [];
+        foreach ($identities as $identity) {
+            $instance = $instances[$identity->getInstanceId()] ?? null;
+            if ($instance instanceof PlatformInstance) {
+                $linked[(int) $identity->getApiKeyId()] = [
+                    'client' => $instance->getClient(),
+                    'host' => $instance->getHost(),
+                ];
+            }
+        }
+
+        return $linked;
     }
 
     private function keyLabel(PlatformInstance $instance, string $externalId): string
