@@ -91,7 +91,29 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
 # ---------------------------------------------------------------------------
 FROM dev AS prod
 
+# Download and unpack the production dependencies from the lock file ALONE,
+# above the source COPY, so this layer stays cached for as long as composer.lock
+# does. Below it, any one-line edit under backend/ reinstalls the whole tree.
+#
+# Three things belong in this layer and not in the autoloader dump further down:
+# --no-scripts, because post-install-cmd runs cache:clear, which needs a runtime
+# DB connection; COMPOSER_PROCESS_TIMEOUT=0, which lifts the 300s per-process
+# limit so large packages (e.g. google/apiclient-services) still unzip when this
+# stage is built under qemu emulation (amd64 image on an Apple Silicon host); and
+# the recursive chown, which rewrites every file in vendor/ and would therefore
+# copy the whole tree into a new layer on every source change.
+#
+# --no-autoloader is required rather than an optimization: an authoritative
+# classmap has to see src/, the generated gRPC stubs and the plugins, none of
+# which exist yet.
+COPY backend/composer.json backend/composer.lock backend/symfony.lock ./
+RUN COMPOSER_PROCESS_TIMEOUT=0 composer install \
+        --prefer-dist --no-interaction --no-dev --no-scripts --no-autoloader && \
+    chown -R www-data:www-data /var/www/backend/vendor
+
 # Copy application (exclude .env files - use environment variables instead)
+# backend/vendor is excluded by .dockerignore, so this cannot overwrite the
+# vendor tree installed above with a host one.
 COPY --chown=www-data:www-data backend/ .
 RUN rm -f .env .env.example .env.local .env.*.local
 
@@ -107,20 +129,19 @@ RUN mkdir -p /var/www/backend/var/cache /var/www/backend/var/log /var/www/backen
 # Without this, --classmap-authoritative locks the autoloader to only backend classes
 COPY plugins/ /plugins/
 
-# Install dependencies with production optimizations
+# Dump the autoloader now that src/, lib/grpc/ and /plugins/ are all present.
+# The packages themselves are already installed, so this only writes the class
+# maps: it re-runs on every source change but costs a fraction of a full install.
 # Flags explained:
 # --no-dev: Skip dev dependencies (phpunit, fixtures, etc.) for smaller image
-# --no-scripts: Skip post-install scripts (cache:clear requires runtime DB connection)
-# --optimize-autoloader: Generate optimized PSR-4 class maps
+# --optimize: Generate optimized PSR-4 class maps
 # --classmap-authoritative: Never scan filesystem for classes (all classes are in composer.json)
 #   This is safe for Symfony apps where all classes are autoloaded via composer
 #   Provides significant performance improvement by eliminating file_exists() calls
-# Cache is cleared on container startup anyway via docker-entrypoint.sh
-# COMPOSER_PROCESS_TIMEOUT=0 disables the 300s per-process limit so large
-# packages (e.g. google/apiclient-services) still unzip when this stage is built
-# under qemu emulation (e.g. amd64 image on an Apple Silicon host).
-RUN COMPOSER_PROCESS_TIMEOUT=0 composer install --prefer-dist --no-interaction --no-dev --no-scripts --optimize-autoloader --classmap-authoritative && \
-    chown -R www-data:www-data /var/www/backend/vendor
+# Only the files this command writes are chowned; vendor/ as a whole was already
+# handed to www-data in the cached layer above.
+RUN composer dump-autoload --no-interaction --no-dev --optimize --classmap-authoritative && \
+    chown -R www-data:www-data /var/www/backend/vendor/autoload.php /var/www/backend/vendor/composer
 
 # Copy built frontend (built externally in CI, empty in dev)
 COPY frontend/dist /var/www/frontend
