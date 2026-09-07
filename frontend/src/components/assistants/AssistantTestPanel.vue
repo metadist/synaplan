@@ -21,7 +21,7 @@
       <input
         v-model="draft"
         type="text"
-        class="flex-1"
+        class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.tryDraftPlaceholder')"
         data-testid="input-test-message"
       />

@@ -3,13 +3,12 @@
     <h2 class="txt-primary font-medium text-lg">{{ $t('assistants.publish') }}</h2>
 
     <div class="flex flex-wrap gap-2">
-      <span class="pill px-2 py-0.5 rounded-full text-xs">{{ statusLabel }}</span>
       <span
-        v-if="store.current?.status === 'archived'"
-        class="pill px-2 py-0.5 rounded-full text-xs"
-        data-testid="badge-assistant-archived"
+        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+        :class="statusBadgeClass"
+        data-testid="badge-assistant-status"
       >
-        {{ $t('assistants.archivedBadge') }}
+        {{ statusLabel }}
       </span>
     </div>
 
@@ -18,7 +17,7 @@
       <textarea
         v-model="changelog"
         rows="3"
-        class="mt-1 w-full"
+        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.changelogPlaceholder')"
         data-testid="input-publish-changelog"
       />
@@ -112,6 +111,11 @@ const statusLabel = computed(() => {
   if (status === 'archived') return t('assistants.statusArchived')
   return t('assistants.statusDraft')
 })
+const statusBadgeClass = computed(() =>
+  store.current?.status === 'published'
+    ? 'bg-[var(--brand)]/10 text-[var(--brand)]'
+    : 'bg-[var(--bg-chip)] txt-secondary'
+)
 
 async function reload(): Promise<void> {
   const id = store.current?.id
