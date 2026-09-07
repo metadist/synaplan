@@ -16,6 +16,7 @@ use App\Service\Iam\Exception\UnknownResourceKindException;
 use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\ResourceCard;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
+use App\Service\Iam\ResourceKind\ShareableResourceKindInterface;
 
 /**
  * Grant, revoke and list shares. Sharing stays off until both IAM flags are on.
@@ -65,13 +66,7 @@ final readonly class ShareService
         if (0 === $ownerId) {
             throw new ShareNotAllowedException('This item cannot be shared.');
         }
-        if ($kindImpl instanceof AgentKind) {
-            $kindImpl->assertShareable($resourceId);
-        }
-
-        if (!in_array($level, $kindImpl->supportedPermissions(), true)) {
-            throw new ShareNotAllowedException(sprintf('This item cannot be shared with "%s".', $level->value));
-        }
+        $this->assertKindAllows($kindImpl, $resourceId, $level);
 
         if (Share::SUBJECT_EVERYONE === $subjectType) {
             $subjectId = 0;
@@ -99,6 +94,57 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Administrators can share on behalf of the owner, but not with themselves.');
         }
 
+        return $this->writeGrant((int) $actor->getId(), $kindImpl, $resourceId, $subjectType, $subjectId, $level, $ip);
+    }
+
+    /**
+     * Grant on a system-owned resource (owner 0) on behalf of the platform —
+     * used by seeders and commands, never by a request. Goes through the same
+     * kind checks and audit trail as {@see self::grant()}; the actor is 0.
+     */
+    public function grantAsSystem(string $kind, string $resourceId, string $subjectType, int $subjectId, Permission $level): Share
+    {
+        if (!in_array($subjectType, Share::SUBJECT_TYPES, true)) {
+            throw new \InvalidArgumentException('Subject must be a person, a group, or everyone.');
+        }
+        try {
+            $kindImpl = $this->registry->get($kind);
+        } catch (UnknownResourceKindException $e) {
+            throw new \InvalidArgumentException($e->getMessage(), 0, $e);
+        }
+        if (0 !== $kindImpl->ownerId($resourceId)) {
+            throw new ShareNotAllowedException('Only system-owned items can be shared by the platform.');
+        }
+        $this->assertKindAllows($kindImpl, $resourceId, $level);
+        if (Share::SUBJECT_EVERYONE === $subjectType) {
+            $subjectId = 0;
+        } else {
+            $this->assertSubjectExists($subjectType, $subjectId);
+        }
+
+        return $this->writeGrant(0, $kindImpl, $resourceId, $subjectType, $subjectId, $level, '');
+    }
+
+    private function assertKindAllows(ShareableResourceKindInterface $kindImpl, string $resourceId, Permission $level): void
+    {
+        if ($kindImpl instanceof AgentKind) {
+            $kindImpl->assertShareable($resourceId);
+        }
+        if (!in_array($level, $kindImpl->supportedPermissions(), true)) {
+            throw new ShareNotAllowedException(sprintf('This item cannot be shared with "%s".', $level->value));
+        }
+    }
+
+    private function writeGrant(
+        int $actorId,
+        ShareableResourceKindInterface $kindImpl,
+        string $resourceId,
+        string $subjectType,
+        int $subjectId,
+        Permission $level,
+        string $ip,
+    ): Share {
+        $kind = $kindImpl->key();
         $share = $this->shareRepository->findOneForSubject($kind, $resourceId, $subjectType, $subjectId);
         if (null === $share) {
             $share = new Share();
@@ -108,11 +154,11 @@ final readonly class ShareService
             $share->setSubjectId($subjectId);
         }
         $share->setPermission($level->value);
-        $share->setGrantedBy((int) $actor->getId());
+        $share->setGrantedBy($actorId);
         $this->shareRepository->save($share);
 
         $this->auditLogWriter->record(
-            (int) $actor->getId(),
+            $actorId,
             'share.grant',
             $kind,
             $resourceId,

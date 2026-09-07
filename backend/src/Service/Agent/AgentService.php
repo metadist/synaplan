@@ -198,6 +198,7 @@ final readonly class AgentService
         foreach ($this->listOwned($userId) as $agent) {
             $cards[] = $this->serializer->galleryCard(
                 $agent,
+                $agent->getDraft(),
                 $ownerName,
                 'mine',
                 $this->publishedVersionNumber($agent),
@@ -212,11 +213,18 @@ final readonly class AgentService
             if (!$agent instanceof Agent || $agent->isArchived() || $agent->getOwnerId() === $userId) {
                 continue;
             }
+            // Recipients see the published snapshot only; the draft is the
+            // owner's work in progress even for editors (they open it in the builder).
+            $published = $this->publishedVersion($agent);
+            if (null === $published) {
+                continue;
+            }
             $cards[] = $this->serializer->galleryCard(
                 $agent,
+                $published->getDefinition(),
                 $this->ownerDisplayName($agent->getOwnerId()),
                 'shared',
-                $this->publishedVersionNumber($agent),
+                $published->getVersion(),
                 $this->shareService->sharedViaFor($userId, AgentKind::KEY, (string) $id),
                 $row['permission'],
             );
@@ -341,7 +349,7 @@ final readonly class AgentService
         $prompt = new Prompt();
         $prompt->setOwnerId($ownerId);
         $prompt->setLanguage('en');
-        $prompt->setTopic('agent:'.$slug);
+        $prompt->setTopic(Agent::TOPIC_PREFIX.$slug);
         $prompt->setShortDescription($name);
         $prompt->setPrompt(null !== $text && '' !== trim($text) ? $text : self::DEFAULT_INSTRUCTION);
         $this->em->persist($prompt);
