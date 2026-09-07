@@ -20,6 +20,9 @@ renamed and extended). No new nav item.
   — manifest v2; plugins contribute plug adapters
 - [`../20260902-platform-self-awareness/05_eval_question_set.md`](../20260902-platform-self-awareness/05_eval_question_set.md)
   — the eval discipline reused for the rerank go/no-go
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract for the admin page (J-PL-1…3). Operators are
+  users too: health, Test, and a human result — not a form of keys.
 
 ---
 
@@ -196,6 +199,16 @@ service block per sidecar (private repo, no node details here).
 `/admin/setup` → label **AI infrastructure** (en) / KI-Infrastruktur /
 Infraestructura de IA / Infrastructure IA / AI altyapısı.
 
+This is Operate, not everyday work — still a user-flow. An admin who
+cannot tell whether Docling is actually reading files will not enable
+it. Journeys J-PL-1…3:
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.3.
+Each tab leads with **what this does** in one sentence, a health pill,
+and **Test** that shows a human result ("Docling read this PDF — table
+kept", "12 models will be added"). Missing sidecar = "unavailable —
+Tika used instead", never a failed upload. Sovereignty badge on the
+adapter. Chain keys and MIME families are not the first sentence.
+
 | Tab | Content |
 | --- | ------- |
 | Models & keys | Today's provider setup, plus per OpenAI-compatible endpoint: **Import models** (S5) |
@@ -282,6 +295,9 @@ Cut line: S6, then S5 probe (keep name-based guessing). Never cut C1.
 5. Import from an OpenAI-compatible endpoint creates only new rows, tags are
    editable before apply, re-import changes nothing.
 6. Full gate green after every sprint; snapshots untouched.
+7. J-PL-1…3: Test with a file / Test query / Import preview are
+   walkable; switching search changes the next chat without a restart;
+   a down sidecar never fails an upload.
 
 ---
 

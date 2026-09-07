@@ -8,6 +8,10 @@ are chunked heading-aware, and the table row is retrievable. Sidecar down or not
 **Unlocks:** the Extraction tab is the first tab of the renamed AI infrastructure page; S3 and S4 add theirs beside it.
 **Repos:** `synaplan/` (backend, frontend, `docker-compose.yml`), `synaplan-docs/` (one pointer), `synaplan-platform/` (service block, private).
 **Flag:** `PLUGS.EXTRACTION.CHAIN.document` — Docling runs only when an admin adds `docling` to the chain; fresh installs keep the S1 default.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-PL-1. Extraction tab leads with one sentence + health + **Test
+with a file** that shows a human result. Down sidecar = "Docling
+unavailable — Tika used instead", never a failed upload.
 
 ---
 
@@ -151,7 +155,7 @@ to `isLowQuality()`); `AdminPlugsExtractionControllerTest` (admin-only, 422 on u
 ## 4. Exit criteria / demo
 
 1. `docker compose --profile docling up -d`; admin moves `docling` to the top of the document chain; uploads a PDF with a revenue table; asks for one cell's value; the answer cites the table row (top 3 chunk).
-2. `docker compose stop docling`; the same upload succeeds with `strategy = tika`; the Extraction tab shows Docling unavailable with the reason.
+2. J-PL-1 walked: `docker compose stop docling`; the same upload succeeds with `strategy = tika`; **Test with a file** shows "Docling unavailable — Tika used instead."
 3. Fresh install without the profile: corpus test identical to S1; page renamed, Models & keys tab behaves like today's page.
 4. Full gate green; snapshots untouched; docs merged.
 

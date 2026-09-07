@@ -10,6 +10,12 @@ landing in `BFILES` with `source = compute`, and quotas in the existing rate-lim
 **Unlocks:** B2 (tools and policy), B3 (workspaces, egress). **Repos:** `synaplan/` only.
 **Flag:** `COMPUTE.ENABLED` (`BCONFIG` group `COMPUTE`, setting `ENABLED`, default `0` in code and seeder) **and** env
 `COMPUTE_URL` + `COMPUTE_TOKEN`. Both must be set; either missing means the feature is absent.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-CP-1. Wireframe:
+[`../202609_ux_user_flows/compute-run-card.md`](../202609_ux_user_flows/compute-run-card.md).
+`CS6` is not done until the card is walked in the chat: progress →
+result chip → existing preview; quota is a sentence; flag off offers
+nothing (U11). Never "sandbox" / "stdout" in primary copy.
 
 ---
 
@@ -136,10 +142,9 @@ bar chart of revenue per region from this file", waits for the card, asserts a `
 
 ## 4. Exit criteria / demo
 
-1. Dev instance with `--profile compute`, `COMPUTE_URL`, `COMPUTE_TOKEN`, `COMPUTE.ENABLED=1`: "Make a chart from this CSV" yields a
-   PNG chip and a `BFILES` row `BSOURCE=compute`, `BORIGINKIND=artefact`; `BCOMPUTERUNS` shows image, limits, exit code, duration, bytes, artefact ids — no script or output text.
-2. Flag off: `code_execution` listed under unavailable, planner catalog without `code_run`, characterization diff empty.
-3. Quota exceeded for a `NEW` user is a readable card message, not a 500.
+1. J-CP-1 walked: dev instance with `--profile compute`, `COMPUTE_URL`, `COMPUTE_TOKEN`, `COMPUTE.ENABLED=1`: "Make a chart from this CSV" yields the run card, a PNG chip that opens the existing preview, and a `BFILES` row `BSOURCE=compute`, `BORIGINKIND=artefact`; `BCOMPUTERUNS` shows image, limits, exit code, duration, bytes, artefact ids — no script or output text.
+2. Flag off: `code_execution` listed under unavailable, planner catalog without `code_run`, characterization diff empty; no teaser card (U11).
+3. Quota exceeded for a `NEW` user is "You have used this week's file-work limit. Nothing new was saved." on the card, not a 500.
 4. Mobile-impact: PHP `backend-only`, card `ota-candidate`, policy test green.
 
 ---

@@ -24,6 +24,9 @@ Operate → System config holds limits.
 - [`../202609_tools_approval_workflows/00_master_plan.md`](../202609_tools_approval_workflows/00_master_plan.md)
   — `code_run` is a `write`-class tool
 - `/wwwroot/synaplan-opencloud/backend` — Go sidecar precedent in the family
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract. No new page: J-CP-1/2 are chat-native. Wireframe:
+  [`../202609_ux_user_flows/compute-run-card.md`](../202609_ux_user_flows/compute-run-card.md).
 
 ---
 
@@ -175,10 +178,22 @@ the compute repo and must be green on T1.
 
 ## 5. UI
 
-No new page. In the chat: run card; in Files: artefacts with a *compute*
-badge. Operate → Feature status: compute health (tier, capacity, image
-versions). Operate → System config: default limits, quotas per tier, egress
-allowed globally (yes/no).
+No new page. Power stays behind a card in the thread the user already
+has open — the same instinct as Incoming chats (do not hide results on
+a page nobody opens). Journeys J-CP-1/2:
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.5.
+
+In the chat: run card ("Working with your file…" → result chips →
+existing preview). Logs collapsed as **Details**. Quota / refusal is a
+sentence on the card ("You have used this week's file-work limit.
+Nothing new was saved."), never a 500. **Re-run with changes** is a
+textarea with a human helper, not a `main.py` editor. In Files:
+artefacts with a *from the AI* badge (not "compute"). Operate →
+Feature status: compute health (tier, capacity, image versions) for
+operators. Operate → System config: default limits, quotas per tier,
+egress allowed globally (yes/no). B3 **Open folder** reuses Files;
+empty workspace: "Files the AI creates for you will show up here."
+Flag off: the planner never offers it; no teaser.
 
 Words (en / de / es / fr / tr): Run / Ausführen / Ejecutar / Exécuter /
 Çalıştır; Result files / Ergebnisdateien / Archivos de resultado / Fichiers
@@ -276,6 +291,8 @@ workspaces (run-only). Never cut the hostile corpus or C2.
 5. Flag off / URL unset: gate green, snapshots untouched, `code_execution`
    unavailable, no `docker.sock` in any PHP container.
 6. Contract fixtures identical in both repos (checksum test).
+7. J-CP-1 walked: CSV → card → previewable PNG; quota refusal is a
+   sentence on the card.
 
 ---
 

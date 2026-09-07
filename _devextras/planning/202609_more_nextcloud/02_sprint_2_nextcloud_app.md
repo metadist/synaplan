@@ -13,6 +13,11 @@ decisions 1, 7, 9, 11; §11 rows 3, 5.
 **Repos:** `synaplan-nextcloud/` only. App version `1.5.0 → 1.6.0`.
 **Flag:** none in the app — the mode is admin configuration (`mode` app value).
 Existing installs never change mode on upgrade.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-NC-1…3 on the Nextcloud side. Personal settings: not connected →
+**Connect Synaplan** → back as "Connected as {name}". Email conflict
+in `link` mode is "An account with this email exists — connect it"
+(J-NC-2). No key is typed or shown.
 
 ## 0. Why this sprint exists
 
@@ -144,8 +149,8 @@ More: `SynaplanClientTest::testLinkMode401ClearsPrefsAndDoesNotRemint`,
 
 ## 4. Exit criteria / demo
 
-1. Fresh install in `link` mode, instance registered with the admin key: user `jdoe` (existing Synaplan account) clicks Connect Synaplan, signs in, confirms, is redirected back "Connected as jdoe@…", then summarizes a file — the Synaplan request log shows the key `Nextcloud: <host> (jdoe)` and the answer uses that user's knowledge (master plan §10.1).
-2. Disconnect in Synaplan → next Files action shows the gate; Disconnect in Nextcloud → the key is gone from Synaplan's API keys list (§10.2).
+1. J-NC-1 walked in under a minute: fresh install in `link` mode, instance registered with the admin key: user `jdoe` (existing Synaplan account) clicks Connect Synaplan, signs in, confirms on the one card (host, uid, scopes — no key shown), is redirected back "Connected as jdoe@…", then summarizes a file — the Synaplan request log shows the key `Nextcloud: <host> (jdoe)` and the answer uses that user's knowledge (master plan §10.1).
+2. J-NC-3: Disconnect in Synaplan → next Files action shows the gate; Disconnect in Nextcloud → the key is gone from Synaplan's API keys list (§10.2).
 3. Existing `provision` install switched to `link`: provisioned users keep working; a new user sees the two-option gate; with auto-provision off only one button (§10.3).
 4. `provision` mode, taken email: unchanged hard failure (C2). `link` mode, taken email on "Create one for me": link offer appears.
 5. Anonymous registration shows as pending in Synaplan; a link attempt before approval shows `link_error=instance_pending`.

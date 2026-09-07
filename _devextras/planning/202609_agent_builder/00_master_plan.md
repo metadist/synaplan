@@ -19,6 +19,11 @@ replaces the current **Instructions** page; the gallery is a new child.
 - [`../202609_iam/00_master_plan.md`](../202609_iam/00_master_plan.md) — publishing = sharing
 - [`../202609_tools_approval_workflows/00_master_plan.md`](../202609_tools_approval_workflows/00_master_plan.md)
   — tool allow-lists and approval policies attach to an assistant
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract. Publish waits on **IAM-UX** so Share is
+  professional before a department has to find an assistant. Journeys
+  J-AB-1…6. Wireframe:
+  [`../202609_ux_user_flows/assistant-publish.md`](../202609_ux_user_flows/assistant-publish.md).
 
 ---
 
@@ -174,14 +179,38 @@ style) — the schema is versioned for a reason.
 (new: gallery + builder; replaces `Instructions` at `/ai/instructions`,
 which redirects), `Routing` (unchanged). Net change in nav item count: zero.
 
+This track is the most visible product in the roadmap. Screens without
+journeys will repeat the sharing miss: a Legal user who cannot find
+"Contract review" in ten seconds means publish failed, even if
+`BSHARES` is correct. Binding journeys J-AB-1…6 and U1–U12:
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.2.
+S3 **Share** opens the IAM-UX dialog, not the S2 stacked form.
+
+**Gallery:** cards, not a table. Chips Mine / Shared with me / Archived.
+Primary verb on the card is **Start chat** (or **Clone** for a
+view-only share). Empty Mine: one sentence + **Create assistant**.
+Empty Shared: "Nothing has been shared with you yet" — no Create on
+that chip. Cards shared *to* me show owner + version.
+
 **Builder form sections** (progressive disclosure — the first section alone
 makes a working assistant): Basics (name, icon, description, greeting,
 starters) → Instructions (the prompt, with the optional AI helper) →
 Models → Knowledge (own folder uploads + pick shared folders) → Tools &
 skills (S4) → Parameters → Tasks (S5) → Publish (version, changelog, share).
+Publish copy: "People always talk to the published version. Your edits
+stay private until you publish." Confirm via `useDialog()` names who
+will get it on their next message.
 
-**Test panel:** a side chat against the *draft* (owner only), so editing does
-not affect published users.
+**Test panel:** a side chat against the *draft* (owner only), titled
+**Try a draft**, helper "Only you see this. It is not saved in
+History." Editing does not affect published users. No Share here.
+
+**Chat:** composer pill "Talking to {name}" for the chat's lifetime.
+Archived assistants: existing chats continue with an **archived**
+badge; **Start chat** disabled with one sentence why.
+
+**Export & import (S6):** Settings section, one file, checklist of
+what is missing in plain words. Import creates drafts, never shares.
 
 **Words (en / de / es / fr / tr):** Assistant / Assistent / Asistente /
 Assistant / Asistan; Publish / Veröffentlichen / Publicar / Publier /
@@ -232,8 +261,8 @@ Collabora's AI sidebar or a coding client picks a curated assistant.
 | Sprint | Content | Exit |
 | ------ | ------- | ---- |
 | **S1 — Entity & pinned runtime** | Migrations; `AgentService`, `AgentRuntimeResolver`, `RuntimeProfile`; classifier early return; `agentId` on stream endpoint; CRUD API; flag | Owner creates a draft via API and chats with it pinned; snapshots untouched |
-| **S2 — Builder & gallery** | `/ai/assistants` gallery + builder form (Basics, Instructions, Models, Knowledge own folder); test panel; clone; `/ai/instructions` redirect; five locales; rename of `/channels/agents` label | A non-technical user builds and uses an assistant without reading docs |
-| **S3 — Publish & versions** | `BAGENTVERSIONS`, publish flow, changelog, IAM `assistant` kind (with track 1 S3), gallery "shared with me", owner usage view | Admin publishes to "Support"; a member uses v1 while the admin edits v2; publish v2 → member gets it on next message |
+| **S2 — Builder & gallery** | `/ai/assistants` gallery + builder form (Basics, Instructions, Models, Knowledge own folder); test panel; clone; `/ai/instructions` redirect; five locales; rename of `/channels/agents` label | J-AB-1 walked: empty state → create → test → Start chat, no docs |
+| **S3 — Publish & versions** | `BAGENTVERSIONS`, publish flow, changelog, IAM `assistant` kind (with track 1 S3), gallery "shared with me", owner usage view. **Depends on IAM-UX** for the Share entry | J-AB-2…4: Legal finds it under Shared with me; Sales does not; clone leaves the original; archive is not broken |
 | **S4 — Knowledge, tools, skills** | Shared folders picker (IAM `use`), tool allow/deny mapped to track 4's registry (or to today's flags until that ships), skill allow-list enforced in `TaskPlanValidator` per assistant | An assistant restricted to `chat` + `rag_search` never plans `email_me` |
 | **S5 — Tasks & channels** | Task templates → Saved Tasks; `BWIDGETS.BAGENTID`; email handler / WhatsApp binding; widget setup offers "pick an assistant" | A widget runs a published assistant; a weekly digest task ships with it |
 | **S6 — Portability & packs** | `synaplan-bundle.v1` format + `BundleExporter` / `BundleImporter` with a section registry (this track ships the `agents` and `prompts` sections; later tracks register theirs); Settings → **Export & import** (user) and Operate → System config → Export & import (admin, instance settings); plugin `provides.agents`; `assistant:<slug>` model alias in `/v1/models`; `list_assistants` MCP tool | An assistant exported on instance A works on instance B with a different model catalog; the import checklist names every missing model or key |
@@ -249,8 +278,9 @@ Cut line: S5 channels first (keep tasks). **S6 is no longer the first cut**
 — the export/import bundle became a product-owner requirement on
 2026-09-03 (roadmap §8); if capacity is short, S6 ships the `agents` +
 `prompts` sections only and the other sections follow in their tracks. Never
-cut the test panel or versions — editing a live assistant under users is the
-bug we are fixing.
+cut the test panel, versions, or the J-AB-2 findability walk — editing a
+live assistant under users is the bug we are fixing, and a published
+assistant nobody can find is the sharing lesson again.
 
 ---
 
@@ -291,6 +321,9 @@ bug we are fixing.
 5. Export → import on a second instance yields a working draft with a clear
    "pick a model" hint where the catalog differs.
 6. Flag off: gate green, snapshots untouched, `/ai/instructions` unchanged.
+7. J-AB-1 and J-AB-2 walked in the browser (U10): a non-technical user
+   builds without docs; a group member finds the published assistant
+   under Shared with me in ten seconds.
 
 ---
 

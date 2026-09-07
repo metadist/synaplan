@@ -9,6 +9,11 @@ group-level config layer sits between the user row and the global row for a smal
 **Repos:** `synaplan/` only.
 **Flag:** `IAM.GROUP_POLICIES_ENABLED` (seeded `0`). **New flag** beyond the three in master plan §0 — record it as a
 decision entry in [`STATUS.md`](./STATUS.md) when S5 starts. Off ⇒ every resolver returns exactly `[user, global]` as today.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-IAM-3. Policies is an operator surface: one group at a time, plain
+"Users cannot change this", and the member sees "Set by your
+administrator" — never a raw 409. `IAM44` / `IAM45` walk the journey
+before merge (U10).
 
 ---
 
@@ -135,8 +140,9 @@ outside the allow-list skip groups), `RateLimitServiceTierTest` (group tier over
 
 1. `policy-demo.sh` green: Support sees two models; a locked default cannot be overridden (409 with a clear message).
 2. Flag off: `ModelConfigService` characterization identical; all pre-existing config, rate-limit and OIDC tests unchanged.
-3. Policies tab edits one group at a time, shows conflicts and locks; user settings show "Set by your administrator".
+3. Policies tab edits one group at a time, shows conflicts and locks; user settings show "Set by your administrator". J-IAM-3 walked: Support sees two models; Sales is unaffected; a locked save is a sentence, not a status code.
 4. `docs/ADMIN.md` and `docs/CONFIGURATION.md` describe the allow-list, merge rules and the lock.
+5. Flag-off hides the tab (U11); dark + V2 + 320 px (U9).
 
 ---
 

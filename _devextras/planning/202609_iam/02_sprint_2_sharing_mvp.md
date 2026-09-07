@@ -10,6 +10,13 @@
 **Flag:** `IAM.SHARING_ENABLED` (seeded `0`; effective only when `IAM.GROUPS_ENABLED` is also on). Share routes 404 when
 off; RAG queries stay byte-identical; no Share action, chip or badge is rendered.
 
+**Shipped — UX lesson (2026-09-07):** this sprint delivered the
+capability. The professional user-flow (one-row Share, Incoming
+chats, five-question banner) landed afterwards (#1717) and is
+completed by **IAM-UX** in
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §7.
+Do not treat the S2 dialog ASCII as the template for later kinds.
+
 ---
 
 ## 0. Why this sprint exists

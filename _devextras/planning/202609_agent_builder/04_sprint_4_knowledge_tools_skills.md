@@ -7,6 +7,12 @@
 **Unlocks:** S5 (widgets inherit the tool/knowledge policy), track 4 S2 (approval policies attach to an assistant's tool list).
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED`. `BROUTABLE` is off per assistant; the sorter topic-list change (`AB30`) is additionally guarded by `AGENTS.ROUTABLE_ENABLED` (seeded `0`) so it merges dark.
+**User-flow:** builder sections for knowledge / tools / skills follow
+U3 and U7 in [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md):
+each picker says what the *talking user* will get, in plain words
+("The AI may use Ada's Q3 folder"). Denied skills are a sentence in
+the planner reply, not a raw capability id. Folder picker lists only
+folders the owner shared with `use`.
 
 ---
 

@@ -12,6 +12,9 @@ feature is documented for users, hosters and the platform team.
 **Unlocks:** B4. **Repos:** `synaplan/`; a page in `synaplan-docs`; a pointer in `synaplan-platform` (private).
 **Flag:** `COMPUTE.WORKSPACES_ENABLED` (default `0`), `COMPUTE.EGRESS_ENABLED` (default `0`). Both sit
 under `COMPUTE.ENABLED`; off means B1/B2 behaviour.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-CP-2. **Open folder** reuses Files. Empty: "Files the AI creates
+for you will show up here." Egress off is not a control on the card.
 
 ---
 

@@ -24,6 +24,10 @@ Sprint files: [`01_sprint_1_core_handshake.md`](./01_sprint_1_core_handshake.md)
 - [`../20260902-collabora-integration/05_epic_4_partner_platforms.md`](../20260902-collabora-integration/05_epic_4_partner_platforms.md)
   — assumes the platform app already holds a Synaplan key; this track
   produces that key per user
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract (J-NC-1…3). Wireframe:
+  [`../202609_ux_user_flows/connect-platform.md`](../202609_ux_user_flows/connect-platform.md).
+  Synamail `docs/AUTH_FLOW.md` remains the Outlook acceptance list.
 
 ---
 
@@ -161,19 +165,31 @@ redirect policy; `/addin/connect` becomes a redirect to the generic route
 
 ## 5. UI
 
+This handshake is already closer to a real flow than sharing was — keep
+it that way. Journeys J-NC-1…3:
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.6.
+The user never types or sees a key. Empty Linked-platforms explains
+*where to start* (Nextcloud settings), not Synaplan jargon.
+
 ### 5.1 Synaplan
 
 - `/connect/platform`: sign-in (existing), then a single confirmation card:
   "Connect **Nextcloud at files.example.org** as **jdoe**? This lets Nextcloud
-  use your Synaplan account for: chat, files, knowledge." → Connect / Cancel.
-- Manage → Connections → **Linked platforms**: list + Disconnect; empty state
-  explains how to connect from Nextcloud.
-- Operate → People → user detail: linked platforms as metadata badges.
+  use your Synaplan account for chat, files and knowledge." → Connect / Cancel.
+  Signed-in account + "Not you? Sign out". Failed / expired code: one
+  sentence + **Back to Nextcloud** (or Close for Outlook).
+- Manage → Connections → **Linked platforms**: list + Disconnect
+  (`useDialog` danger); empty state: "Connect from Nextcloud (or
+  ownCloud) settings — you will come back here after you confirm."
+- Operate → People → user detail: linked platforms as metadata badges;
+  pending instance registrations Approve / Reject on the same tab.
 
 ### 5.2 Nextcloud
 
 - Personal settings → Synaplan: status (not connected / connected as
   *name*, since *date*), Connect / Disconnect.
+- Email already taken in `link` mode: "An account with this email
+  exists — connect it" (J-NC-2), not a hard fail.
 - Files actions unchanged; first use without a key shows the gate.
 
 Words (en / de / es / fr / tr): Connect Synaplan / Synaplan verbinden /
@@ -251,6 +267,8 @@ no active hoster). Never cut C1/C5/C6.
 5. Outlook add-in sign-in still passes every step in Synamail's
    `docs/AUTH_FLOW.md`.
 6. Flag off: gate green in `synaplan/`; NC app tests green in both old modes.
+7. J-NC-1 walked in under a minute without typing a key; J-NC-3:
+   disconnect on either side returns the other side to Connect.
 
 ---
 

@@ -13,6 +13,10 @@ track 5 (unattended `code_run`).
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.APPROVALS_ENABLED` (same flag as S2). Off ⇒ `DagExecutor` never emits `waiting_approval`;
 `SavedTaskService` keeps refusing to schedule mutating tasks without `allow_unattended`. On ⇒ such tasks pause instead.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-TL-3. The waiting step is labelled **Waiting for you** on the run
+and in the inbox, never as a failed node. Expiry is "Nobody approved
+in time", not a timeout code. Email uses the preview sentence only.
 
 ---
 
@@ -133,9 +137,9 @@ failure → third failure pauses), `ResumeSavedTaskRunCommandHandlerTest` (rate 
 ## 4. Exit criteria / demo
 
 1. Flag off: a scheduled mutating task without `allow_unattended` is still refused at save; all S2 tests green.
-2. Flag on: "every Monday: search mail → summarize → create ticket → mail me" pauses at "create ticket"; the task card shows Waiting for approval; an email arrives; the browser is closed.
+2. J-TL-3 walked: "every Monday: search mail → summarize → create ticket → mail me" pauses at "create ticket"; the task card and run show **Waiting for you**; an email arrives with the preview sentence only; the browser is closed.
 3. Next morning the owner approves from the inbox; the run resumes at that step, "mail me" executes, the run is `completed`; the audit log shows who approved what and when.
-4. A second run left pending for 72 h expires: step `failed` with a readable reason; after three such runs the task pauses with the reason visible.
+4. A second run left pending for 72 h expires: step failed with "Nobody approved in time"; after three such runs the task pauses with that reason visible.
 5. `allow_unattended` on the same task: no pause, identical result.
 6. OpenAPI → Zod regenerated; `STATUS.md` rows `TL19`–`TL27` ticked.
 
