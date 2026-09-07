@@ -142,6 +142,37 @@ final class GroupServiceTest extends TestCase
         $this->service->removeMember($group, 8, $this->actor);
     }
 
+    public function testLeaveRemovesManualMembershipAndAudits(): void
+    {
+        $group = new Group();
+        $ref = new \ReflectionProperty(Group::class, 'id');
+        $ref->setValue($group, 4);
+        $existing = new GroupMember(4, 1);
+        $existing->setSource(GroupMember::SOURCE_MANUAL);
+        $this->members->method('findMembership')->willReturn($existing);
+        $this->members->expects(self::once())->method('remove')->with($existing);
+        $this->audit->expects(self::once())
+            ->method('save')
+            ->with(self::callback(static function (AuditLogEntry $entry): bool {
+                return 'group.member_leave' === $entry->getAction()
+                    && ['userId' => 1] === $entry->getSubject();
+            }));
+
+        $this->service->leave($group, $this->actor);
+    }
+
+    public function testLeaveRejectsDirectoryMembership(): void
+    {
+        $group = $this->directoryGroup(9);
+        $existing = new GroupMember(9, 1);
+        $existing->setSource(GroupMember::SOURCE_DIRECTORY);
+        $this->members->method('findMembership')->willReturn($existing);
+        $this->expectException(DirectoryGroupReadOnlyException::class);
+        $this->members->expects(self::never())->method('remove');
+
+        $this->service->leave($group, $this->actor);
+    }
+
     private function userWithId(int $id): User
     {
         $user = new User();

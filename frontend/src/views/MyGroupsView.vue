@@ -58,6 +58,22 @@
           <span class="txt-secondary text-sm">
             {{ $t('people.groups.memberCount', { count: group.memberCount ?? 0 }) }}
           </span>
+          <button
+            v-if="canLeave(group)"
+            type="button"
+            class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+            :data-testid="`btn-leave-group-${group.id}`"
+            @click="leaveGroup(group)"
+          >
+            {{ $t('people.myGroups.leave') }}
+          </button>
+          <span
+            v-else-if="group.membershipSource === 'directory' || group.kind === 'directory'"
+            class="text-xs txt-secondary"
+            :data-testid="`hint-leave-directory-${group.id}`"
+          >
+            {{ $t('people.myGroups.leaveDirectory') }}
+          </span>
         </li>
       </ul>
     </div>
@@ -71,16 +87,25 @@ import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
-import { iamApi, type IamGroup } from '@/services/api/iamApi'
+import { iamApi, type IamMyGroup } from '@/services/api/iamApi'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
-const { error } = useNotification()
+const { confirm } = useDialog()
+const { error, success } = useNotification()
 const loading = ref(true)
-const groups = ref<IamGroup[]>([])
+const groups = ref<IamMyGroup[]>([])
 
-onMounted(async () => {
+function canLeave(group: IamMyGroup): boolean {
+  if (group.canLeave === true) return true
+  if (group.canLeave === false) return false
+  return group.kind === 'manual'
+}
+
+async function loadGroups(): Promise<void> {
+  loading.value = true
   try {
     groups.value = await iamApi.listMyGroups()
   } catch {
@@ -88,5 +113,25 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+async function leaveGroup(group: IamMyGroup): Promise<void> {
+  const ok = await confirm({
+    title: t('people.myGroups.leave'),
+    message: t('people.myGroups.leaveConfirm', { name: group.name }),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await iamApi.leaveGroup(group.id)
+    success(t('people.myGroups.left'))
+    groups.value = groups.value.filter((row) => row.id !== group.id)
+  } catch {
+    error(t('people.myGroups.leaveFailed'))
+  }
+}
+
+onMounted(() => {
+  void loadGroups()
 })
 </script>

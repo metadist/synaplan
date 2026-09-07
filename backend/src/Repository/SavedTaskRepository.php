@@ -42,6 +42,14 @@ class SavedTaskRepository extends ServiceEntityRepository
         return $this->findOneBy(['promptId' => $promptId, 'ownerId' => $ownerId]);
     }
 
+    /**
+     * @return list<SavedTask>
+     */
+    public function findAllByPromptAndOwner(int $promptId, int $ownerId): array
+    {
+        return $this->findBy(['promptId' => $promptId, 'ownerId' => $ownerId]);
+    }
+
     public function findEnabledChatTaskForPrompt(int $promptId, int $ownerId): ?SavedTask
     {
         return $this->createQueryBuilder('t')

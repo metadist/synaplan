@@ -1767,7 +1767,9 @@
       "Tüm mesajların ve sohbetlerin",
       "Yüklenen tüm dosyalar ve bilgi tabanı belgeleri",
       "Kişisel verilerin, ayarların ve anıların",
-      "API anahtarları, widget'lar ve kimlik bilgileri"
+      "API anahtarları, widget'lar ve kimlik bilgileri",
+      "AI asistanların ve kayıtlı görevlerin",
+      "Eklenmiş olduğun grup üyelikleri"
     ],
     "retention": "Silme işlemi kalıcıdır ve anında geçerli olur. Artık veri içeren yedekler 30 gün içinde döngüden çıkarılır. Yasal olarak saklamakla yükümlü olduğumuz veriler (ör. faturalar) yalnızca yasanın gerektirdiği süre boyunca tutulur.",
     "partialTitle": "Hesabını silmeden tek tek verileri sil",
@@ -1792,6 +1794,18 @@
       {
         "name": "Bağlantılar, sohbet widget'ları ve API anahtarları",
         "how": "Kanallar'ı aç ve artık ihtiyacın olmayan bağlantıyı, widget'ı veya anahtarı kaldır."
+      },
+      {
+        "name": "AI asistanları",
+        "how": "AI asistanları'nı aç. Kendi asistanında Sil'i seç. Yayınlanmış bir asistan önce arşivlenir, sonra dosyaları ve paylaşımlarıyla birlikte kaldırılır."
+      },
+      {
+        "name": "Kayıtlı görevler",
+        "how": "Kayıtlı görevler'i aç ve oluşturduğun bir görevde Sil'i seç."
+      },
+      {
+        "name": "Eklenmiş olduğun gruplar",
+        "how": "Gruplarım'ı aç ve Ayrıl'ı seç. Bu grupla paylaşılan her şeye erişimini kaybedersin. Girişinden gelen üyelikler burada bırakılamaz."
       }
     ],
     "partialRetention": "Sildiğin ögeler hesabından anında kaybolur. Artık kopya içeren yedekler 30 gün içinde döngüden çıkarılır. Hesabındaki diğer her şey olduğu gibi kalır.",
@@ -2667,6 +2681,10 @@
       "overviewLoading": "Kayıtlı görevler yükleniyor…",
       "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
       "loadFailed": "Kayıtlı görevler yüklenemedi.",
+      "delete": "Sil",
+      "deleteConfirm": "\"{name}\" kayıtlı görevi silinsin mi? Bu görevin paylaşımları da kaldırılır.",
+      "deleteSuccess": "Kayıtlı görev silindi",
+      "deleteFailed": "Kayıtlı görev silinemedi.",
       "scheduleThis": "Bunu daha sonra tekrar çalıştır",
       "scheduleThisHint": "Bu göreve bir ad ver. Zamanlamayı sonraki ekranda seçersin.",
       "scheduledFromChat": "Kaydedildi. Ne zaman çalışacağını seç.",
@@ -4542,7 +4560,12 @@
     "myGroups": {
       "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
       "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kişiler sayfasından ekleyebilir.",
-      "emptyAdmin": "Henüz grup yok. Kişiler sayfasından bir tane oluşturun."
+      "emptyAdmin": "Henüz grup yok. Kişiler sayfasından bir tane oluşturun.",
+      "leave": "Ayrıl",
+      "leaveConfirm": "\"{name}\" grubundan ayrılmak istiyor musunuz? Bu grupla paylaşılan her şeye erişiminizi kaybedersiniz. Grup kalır.",
+      "left": "Gruptan ayrıldınız.",
+      "leaveFailed": "Gruptan ayrılamadı.",
+      "leaveDirectory": "Bu üyelik girişinizden gelir; burada ayrılamazsınız."
     },
     "users": {
       "groups": "Gruplar",
@@ -4601,6 +4624,7 @@
         "group_delete": "Grup silindi",
         "group_member_set": "Üye eklendi",
         "group_member_remove": "Üye kaldırıldı",
+        "group_member_leave": "Gruptan ayrıldı",
         "directory_sync": "Giriş grubu güncellendi",
         "impersonation_start": "Kullanıcı olarak görüntüleme başladı",
         "impersonation_stop": "Kullanıcı olarak görüntüleme bitti",
@@ -4859,8 +4883,15 @@
     "cloneSuccess": "Yeni taslak olarak kopyalandı",
     "startChatFailed": "Sohbet başlatılamadı",
     "delete": "Sil",
-    "deleteConfirm": "Bu taslak asistan silinsin mi?",
+    "deleteConfirm": "Bu taslak asistan silinsin mi? Dosyaları ve paylaşımları da kaldırılır.",
+    "deleteArchivedConfirm": "Bu arşivlenmiş asistan kalıcı olarak silinsin mi? Dosyaları ve paylaşımları da kaldırılır.",
+    "deletePublishedConfirm": "Bu asistan yayınlanmış. Önce arşivlenecek, sonra dosyaları ve paylaşımlarıyla birlikte kalıcı olarak silinecek.",
+    "deleteSuccess": "Asistan silindi",
     "deleteFailed": "Asistan silinemedi",
+    "deleteFile": "Dosyayı sil",
+    "deleteFileConfirm": "\"{name}\" bu asistandan silinsin mi?",
+    "deleteFileSuccess": "Dosya silindi",
+    "deleteFileFailed": "Dosya silinemedi",
     "sharedEmpty": "Henüz sizinle bir şey paylaşılmadı",
     "pluginsEmpty": "Henüz eklentilerden asistan yok",
     "filterArchived": "Arşivlenenler",

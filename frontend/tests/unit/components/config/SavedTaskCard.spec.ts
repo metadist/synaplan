@@ -3,11 +3,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockPush } = vi.hoisted(() => ({
+const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush } = vi.hoisted(() => ({
   mockUpdate: vi.fn(),
   mockRun: vi.fn(),
   mockRuns: vi.fn(),
   mockResume: vi.fn(),
+  mockRemove: vi.fn(),
   mockPush: vi.fn(),
 }))
 
@@ -17,6 +18,7 @@ vi.mock('@/services/api/savedTasksApi', () => ({
     run: mockRun,
     runs: mockRuns,
     resume: mockResume,
+    remove: mockRemove,
   },
 }))
 
@@ -242,5 +244,6 @@ describe('SavedTaskCard', () => {
     expect(wrapper.find('[data-testid="btn-share-saved-task"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-run-copy"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-run-now"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-delete-saved-task"]').exists()).toBe(true)
   })
 })

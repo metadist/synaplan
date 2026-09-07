@@ -52,6 +52,16 @@
       >
         {{ $t('assistants.edit') }}
       </button>
+      <button
+        v-if="card.origin === 'mine'"
+        type="button"
+        class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+        data-testid="btn-assistant-delete"
+        :disabled="cardId == null"
+        @click="emitDelete"
+      >
+        {{ $t('assistants.delete') }}
+      </button>
     </div>
   </article>
 </template>
@@ -69,6 +79,7 @@ const emit = defineEmits<{
   'start-chat': [id: number]
   clone: [id: number]
   edit: [id: number]
+  delete: [id: number]
 }>()
 
 const cardId = computed(() =>
@@ -90,6 +101,12 @@ function emitClone(): void {
 function emitEdit(): void {
   if (cardId.value != null) {
     emit('edit', cardId.value)
+  }
+}
+
+function emitDelete(): void {
+  if (cardId.value != null) {
+    emit('delete', cardId.value)
   }
 }
 

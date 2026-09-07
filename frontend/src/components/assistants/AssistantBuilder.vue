@@ -23,7 +23,7 @@
       <BuilderInstructions />
       <BuilderModels />
       <BuilderKnowledge />
-      <AssistantPublishSection />
+      <AssistantPublishSection @deleted="emit('deleted')" />
     </div>
     <AssistantTestPanel />
   </div>
@@ -39,6 +39,10 @@ import BuilderModels from './BuilderModels.vue'
 import BuilderKnowledge from './BuilderKnowledge.vue'
 import AssistantTestPanel from './AssistantTestPanel.vue'
 import AssistantPublishSection from './AssistantPublishSection.vue'
+
+const emit = defineEmits<{
+  deleted: []
+}>()
 
 const store = useAgentsStore()
 const { t } = useI18n()

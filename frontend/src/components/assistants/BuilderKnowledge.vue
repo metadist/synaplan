@@ -16,6 +16,14 @@
         class="flex items-center justify-between gap-2 text-sm txt-primary"
       >
         <span class="truncate">{{ file.fileName }}</span>
+        <button
+          type="button"
+          class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+          :data-testid="`btn-delete-knowledge-file-${file.messageId}`"
+          @click="onDeleteFile(file)"
+        >
+          {{ $t('assistants.deleteFile') }}
+        </button>
       </li>
     </ul>
     <label
@@ -54,11 +62,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { promptsApi, type PromptFile } from '@/services/api/promptsApi'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
+import { useDialog } from '@/composables/useDialog'
+import { useNotification } from '@/composables/useNotification'
 
 const store = useAgentsStore()
+const { t } = useI18n()
+const { confirm } = useDialog()
+const { error, success } = useNotification()
 const files = ref<PromptFile[]>([])
 
 const topic = computed(() => {
@@ -75,6 +89,23 @@ async function loadFiles(): Promise<void> {
     return
   }
   files.value = await promptsApi.getPromptFiles(topic.value)
+}
+
+async function onDeleteFile(file: PromptFile): Promise<void> {
+  if (!topic.value) return
+  const ok = await confirm({
+    title: t('assistants.deleteFile'),
+    message: t('assistants.deleteFileConfirm', { name: file.fileName }),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await promptsApi.deletePromptFile(topic.value, file.messageId)
+    success(t('assistants.deleteFileSuccess'))
+    await loadFiles()
+  } catch {
+    error(t('assistants.deleteFileFailed'))
+  }
 }
 
 async function onUpload(event: Event): Promise<void> {

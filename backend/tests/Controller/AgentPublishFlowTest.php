@@ -133,6 +133,10 @@ final class AgentPublishFlowTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
         $this->client->request('DELETE', '/api/v1/agents/'.$id);
         self::assertSame(Response::HTTP_NO_CONTENT, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/shares?kind=agent&resource='.$id);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertSame([], $this->json()['shares'] ?? null);
     }
 
     public function testDraftCannotBeShared(): void

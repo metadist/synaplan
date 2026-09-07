@@ -1767,7 +1767,9 @@
       "Todos tus mensajes y chats",
       "Todos los archivos subidos y documentos de la base de conocimiento",
       "Tus datos personales, ajustes y memorias",
-      "Claves de API, widgets y credenciales"
+      "Claves de API, widgets y credenciales",
+      "Tus asistentes de IA y tareas guardadas",
+      "Pertenencias a grupos a los que te añadieron"
     ],
     "retention": "La eliminación es permanente y surte efecto de inmediato. Las copias de seguridad con datos residuales se rotan en un plazo de 30 días. Los datos que estamos legalmente obligados a conservar (p. ej. facturas) se mantienen solo durante el tiempo que exige la ley.",
     "partialTitle": "Eliminar datos concretos sin borrar tu cuenta",
@@ -1792,6 +1794,18 @@
       {
         "name": "Conexiones, widgets de chat y claves de API",
         "how": "Abre Canales y elimina la conexión, el widget o la clave que ya no necesites."
+      },
+      {
+        "name": "Asistentes de IA",
+        "how": "Abre Asistentes de IA. En tu propio asistente, elige Eliminar. Un asistente publicado se archiva primero y luego se elimina, incluidos sus archivos y usos compartidos."
+      },
+      {
+        "name": "Tareas guardadas",
+        "how": "Abre Tareas guardadas y elige Eliminar en una tarea que hayas creado."
+      },
+      {
+        "name": "Grupos a los que te añadieron",
+        "how": "Abre Mis grupos y elige Salir. Pierdes el acceso a todo lo compartido con ese grupo. Las pertenencias que vienen de tu inicio de sesión no se pueden abandonar aquí."
       }
     ],
     "partialRetention": "Lo que eliminas desaparece de tu cuenta de inmediato. Las copias de seguridad con copias residuales se rotan en un plazo de 30 días. Todo lo demás de tu cuenta permanece intacto.",
@@ -2666,6 +2680,10 @@
       "overviewLoading": "Cargando tareas guardadas…",
       "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
       "loadFailed": "No se pudieron cargar las tareas guardadas.",
+      "delete": "Eliminar",
+      "deleteConfirm": "¿Eliminar la tarea guardada \"{name}\"? También se quitan los usos compartidos de esta tarea.",
+      "deleteSuccess": "Tarea guardada eliminada",
+      "deleteFailed": "No se pudo eliminar la tarea guardada.",
       "scheduleThis": "Volver a ejecutar esto más tarde",
       "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
       "scheduledFromChat": "Guardada. Elige cuándo debe ejecutarse.",
@@ -4541,7 +4559,12 @@
     "myGroups": {
       "subtitle": "Grupos a los que pertenece en esta instancia.",
       "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Personas.",
-      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Personas."
+      "emptyAdmin": "Aún no hay grupos. Cree uno en la página Personas.",
+      "leave": "Salir",
+      "leaveConfirm": "¿Salir del grupo \"{name}\"? Perderá el acceso a todo lo compartido con ese grupo. El grupo en sí permanece.",
+      "left": "Ha salido del grupo.",
+      "leaveFailed": "No se pudo salir del grupo.",
+      "leaveDirectory": "Esta pertenencia viene de su inicio de sesión y no se puede abandonar aquí."
     },
     "users": {
       "groups": "Grupos",
@@ -4600,6 +4623,7 @@
         "group_delete": "Grupo eliminado",
         "group_member_set": "Miembro añadido",
         "group_member_remove": "Miembro eliminado",
+        "group_member_leave": "Salió de un grupo",
         "directory_sync": "Grupo de inicio de sesión actualizado",
         "impersonation_start": "Empezó a ver como usuario",
         "impersonation_stop": "Dejó de ver como usuario",
@@ -4858,8 +4882,15 @@
     "cloneSuccess": "Copiado como un borrador nuevo",
     "startChatFailed": "No se pudo empezar el chat",
     "delete": "Eliminar",
-    "deleteConfirm": "¿Eliminar este borrador?",
+    "deleteConfirm": "¿Eliminar este borrador? También se quitan sus archivos y usos compartidos.",
+    "deleteArchivedConfirm": "¿Eliminar definitivamente este asistente archivado? También se quitan sus archivos y usos compartidos.",
+    "deletePublishedConfirm": "Este asistente está publicado. Se archivará y luego se eliminará definitivamente, incluidos archivos y usos compartidos.",
+    "deleteSuccess": "Asistente eliminado",
     "deleteFailed": "No se pudo eliminar el asistente",
+    "deleteFile": "Eliminar archivo",
+    "deleteFileConfirm": "¿Eliminar \"{name}\" de este asistente?",
+    "deleteFileSuccess": "Archivo eliminado",
+    "deleteFileFailed": "No se pudo eliminar el archivo",
     "sharedEmpty": "Todavía no han compartido nada contigo",
     "pluginsEmpty": "Aún no hay asistentes de plugins",
     "filterArchived": "Archivados",

@@ -1966,6 +1966,10 @@
       "overviewLoading": "Loading saved tasks…",
       "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
       "loadFailed": "Could not load saved tasks.",
+      "delete": "Delete",
+      "deleteConfirm": "Delete the saved task \"{name}\"? Shares of this task are removed too.",
+      "deleteSuccess": "Saved task deleted",
+      "deleteFailed": "Could not delete the saved task.",
       "scheduleThis": "Run this again later",
       "scheduleThisHint": "Name this task. You can set the schedule on the next screen.",
       "scheduledFromChat": "Saved. Set when it should run.",
@@ -4137,7 +4141,9 @@
       "All your messages and chats",
       "All uploaded files and knowledge-base documents",
       "Your personal data, settings and memories",
-      "API keys, widgets and credentials"
+      "API keys, widgets and credentials",
+      "Your AI assistants and saved tasks",
+      "Group memberships you were added to"
     ],
     "retention": "Deletion is permanent and takes effect immediately. Backups containing residual data are rotated out within 30 days. Data we are legally required to retain (e.g. invoices) is kept only as long as the law requires.",
     "partialTitle": "Delete individual data without deleting your account",
@@ -4162,6 +4168,18 @@
       {
         "name": "Connections, chat widgets and API keys",
         "how": "Open Channels and remove the connection, widget or key you no longer need."
+      },
+      {
+        "name": "AI assistants",
+        "how": "Open AI assistants. On your own assistant, choose Delete. A published assistant is archived first, then removed, including its files and shares."
+      },
+      {
+        "name": "Saved tasks",
+        "how": "Open Saved tasks and choose Delete on a task you created."
+      },
+      {
+        "name": "Groups you were added to",
+        "how": "Open My groups and choose Leave. You lose access to anything shared with that group. Memberships that come from your login cannot be left here."
       }
     ],
     "partialRetention": "Deleted items disappear from your account immediately. Backups containing residual copies are rotated out within 30 days. Everything else in your account stays untouched.",
@@ -5527,7 +5545,12 @@
     "myGroups": {
       "subtitle": "Groups you belong to on this instance.",
       "emptyMember": "You are not in a group yet. An administrator can add you on the People page.",
-      "emptyAdmin": "No groups yet. Create one on the People page."
+      "emptyAdmin": "No groups yet. Create one on the People page.",
+      "leave": "Leave",
+      "leaveConfirm": "Leave the group \"{name}\"? You will lose access to anything shared with that group. The group itself stays.",
+      "left": "You left the group.",
+      "leaveFailed": "Could not leave the group.",
+      "leaveDirectory": "This membership comes from your login and cannot be left here."
     },
     "users": {
       "groups": "Groups",
@@ -5586,6 +5609,7 @@
         "group_delete": "Group deleted",
         "group_member_set": "Member added",
         "group_member_remove": "Member removed",
+        "group_member_leave": "Left a group",
         "directory_sync": "Login group updated",
         "impersonation_start": "Started viewing as user",
         "impersonation_stop": "Stopped viewing as user",
@@ -5844,8 +5868,15 @@
     "cloneSuccess": "Copied as a new draft",
     "startChatFailed": "Could not start the chat",
     "delete": "Delete",
-    "deleteConfirm": "Delete this draft assistant?",
+    "deleteConfirm": "Delete this draft assistant? Its files and shares are removed too.",
+    "deleteArchivedConfirm": "Permanently delete this archived assistant? Its files and shares are removed too.",
+    "deletePublishedConfirm": "This assistant is published. It will be archived and then permanently deleted, including files and shares.",
+    "deleteSuccess": "Assistant deleted",
     "deleteFailed": "Could not delete the assistant",
+    "deleteFile": "Delete file",
+    "deleteFileConfirm": "Delete \"{name}\" from this assistant?",
+    "deleteFileSuccess": "File deleted",
+    "deleteFileFailed": "Could not delete the file",
     "sharedEmpty": "Nothing has been shared with you yet",
     "pluginsEmpty": "No assistants from plugins yet",
     "filterArchived": "Archived",
