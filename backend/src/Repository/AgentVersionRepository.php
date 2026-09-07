@@ -27,4 +27,57 @@ class AgentVersionRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    public function nextVersionNumber(int $agentId): int
+    {
+        $max = $this->createQueryBuilder('v')
+            ->select('MAX(v.version)')
+            ->where('v.agentId = :agentId')
+            ->setParameter('agentId', $agentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return ((int) $max) + 1;
+    }
+
+    public function findLatest(int $agentId): ?AgentVersion
+    {
+        $version = $this->createQueryBuilder('v')
+            ->where('v.agentId = :agentId')
+            ->setParameter('agentId', $agentId)
+            ->orderBy('v.version', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $version instanceof AgentVersion ? $version : null;
+    }
+
+    /**
+     * @return list<AgentVersion>
+     */
+    public function findAllForAgent(int $agentId): array
+    {
+        return $this->createQueryBuilder('v')
+            ->where('v.agentId = :agentId')
+            ->setParameter('agentId', $agentId)
+            ->orderBy('v.version', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByAgentAndVersion(int $agentId, int $version): ?AgentVersion
+    {
+        $row = $this->findOneBy(['agentId' => $agentId, 'version' => $version]);
+
+        return $row instanceof AgentVersion ? $row : null;
+    }
+
+    public function save(AgentVersion $version, bool $flush = true): void
+    {
+        $this->getEntityManager()->persist($version);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 }

@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Service\Agent;
 
 use App\Entity\Agent;
+use App\Entity\AgentVersion;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\AgentVersionRepository;
 use App\Repository\PromptRepository;
+use App\Repository\ShareRepository;
+use App\Repository\UserRepository;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotDraftException;
+use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ShareService;
 use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class AgentService
@@ -26,6 +32,11 @@ final readonly class AgentService
         private PromptRepository $prompts,
         private AgentDefinitionValidator $validator,
         private EntityManagerInterface $em,
+        private AgentAccess $access,
+        private ShareService $shareService,
+        private ShareRepository $shares,
+        private UserRepository $users,
+        private AgentSerializer $serializer,
     ) {
     }
 
@@ -125,7 +136,26 @@ final readonly class AgentService
         if (array_key_exists('routable', $patch)) {
             $agent->setRoutable((bool) $patch['routable']);
         }
+        if (isset($patch['status']) && is_string($patch['status'])) {
+            $this->applyStatus($agent, $patch['status']);
+        }
 
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
+    public function archive(Agent $agent): Agent
+    {
+        $this->applyStatus($agent, Agent::STATUS_ARCHIVED);
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
+    public function unarchive(Agent $agent): Agent
+    {
+        $this->applyStatus($agent, Agent::STATUS_PUBLISHED);
         $this->agents->save($agent);
 
         return $agent;
@@ -133,11 +163,12 @@ final readonly class AgentService
 
     public function delete(Agent $agent): void
     {
-        if (!$agent->isDraft()) {
+        if ($agent->isPublished()) {
             throw AgentNotDraftException::cannotDelete($agent->getStatus());
         }
         $id = $agent->getId();
         if (null !== $id) {
+            $this->shares->deleteByResource(AgentKind::KEY, (string) $id);
             $this->versions->deleteForAgent($id);
         }
         $this->agents->remove($agent);
@@ -154,23 +185,71 @@ final readonly class AgentService
     }
 
     /**
-     * Copy an owned assistant into a new draft. Files are never copied;
-     * the clone gets its own `TASKPROMPT:agent:{slug}` folder.
+     * Clone a readable assistant. Published snapshots are copied; an owner
+     * may still clone an unpublished draft. Files are never copied.
+     *
+     * @return list<array<string, mixed>>
      */
+    public function galleryCards(User $user): array
+    {
+        $userId = (int) $user->getId();
+        $ownerName = $this->serializer->displayName($user);
+        $cards = [];
+        foreach ($this->listOwned($userId) as $agent) {
+            $cards[] = $this->serializer->galleryCard(
+                $agent,
+                $ownerName,
+                'mine',
+                $this->publishedVersionNumber($agent),
+                null,
+                Permission::Manage->value,
+            );
+        }
+
+        foreach ($this->shareService->listSharedWith($userId, AgentKind::KEY) as $row) {
+            $id = (int) $row['card']->id;
+            $agent = $this->agents->find($id);
+            if (!$agent instanceof Agent || $agent->isArchived() || $agent->getOwnerId() === $userId) {
+                continue;
+            }
+            $cards[] = $this->serializer->galleryCard(
+                $agent,
+                $this->ownerDisplayName($agent->getOwnerId()),
+                'shared',
+                $this->publishedVersionNumber($agent),
+                $this->shareService->sharedViaFor($userId, AgentKind::KEY, (string) $id),
+                $row['permission'],
+            );
+        }
+
+        return $cards;
+    }
+
     public function clone(User $owner, int $sourceId): Agent
     {
-        $ownerId = (int) $owner->getId();
-        $source = $this->requireOwned($sourceId, $ownerId);
+        $source = $this->access->require($owner, $sourceId, Permission::Read);
         $sourceIdResolved = $source->getId();
         if (null === $sourceIdResolved) {
             throw AgentNotAccessibleException::forId($sourceId);
         }
 
-        $draft = $this->prepareCloneDraft($source->getDraft());
+        $ownerId = (int) $owner->getId();
+        $isOwner = $source->getOwnerId() === $ownerId;
+        $published = $this->publishedVersion($source);
+        if (null !== $published) {
+            $sourceDraft = $published->getDefinition();
+            $promptText = $published->getPromptText();
+        } elseif ($isOwner) {
+            $sourceDraft = $source->getDraft();
+            $promptText = $this->instructionText($source->getPromptId());
+        } else {
+            throw AgentNotAccessibleException::forId($sourceId);
+        }
+
+        $draft = $this->prepareCloneDraft($sourceDraft);
         $definition = $this->validator->validate($draft);
         $slug = $this->uniqueSlug($ownerId, $this->copySlugBase($source->getSlug()));
         $name = $this->cloneName($source->getName());
-        $promptText = $this->instructionText($source->getPromptId());
         $promptId = $this->createInstructionPrompt($ownerId, $slug, $name, $promptText);
 
         $agent = new Agent($ownerId, $promptId, $slug, $name, $definition->toArray());
@@ -186,6 +265,51 @@ final readonly class AgentService
         $this->agents->save($agent);
 
         return $agent;
+    }
+
+    public function publishedVersionNumber(Agent $agent): ?int
+    {
+        return $this->publishedVersion($agent)?->getVersion();
+    }
+
+    public function publishedVersion(Agent $agent): ?AgentVersion
+    {
+        $id = $agent->getPublishedVersionId();
+        if (null === $id) {
+            return null;
+        }
+        $version = $this->versions->find($id);
+
+        return $version instanceof AgentVersion ? $version : null;
+    }
+
+    private function applyStatus(Agent $agent, string $status): void
+    {
+        if (Agent::STATUS_ARCHIVED === $status) {
+            if (!$agent->hasPublishedVersion()) {
+                throw new \InvalidArgumentException('Only a published assistant can be archived');
+            }
+            $agent->setStatus(Agent::STATUS_ARCHIVED);
+
+            return;
+        }
+        if (Agent::STATUS_PUBLISHED === $status) {
+            if (!$agent->hasPublishedVersion()) {
+                throw new \InvalidArgumentException('This assistant has no published version');
+            }
+            $agent->setStatus(Agent::STATUS_PUBLISHED);
+
+            return;
+        }
+
+        throw new \InvalidArgumentException('status must be archived or published');
+    }
+
+    private function ownerDisplayName(int $ownerId): string
+    {
+        $owner = $this->users->find($ownerId);
+
+        return $owner instanceof User ? $this->serializer->displayName($owner) : '';
     }
 
     private function uniqueSlug(int $ownerId, string $base): string

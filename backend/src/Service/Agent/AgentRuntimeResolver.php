@@ -5,46 +5,109 @@ declare(strict_types=1);
 namespace App\Service\Agent;
 
 use App\Entity\Agent;
+use App\Entity\AgentVersion;
 use App\Entity\Model;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Model\ModelCatalog;
 use App\Repository\AgentRepository;
+use App\Repository\AgentVersionRepository;
+use App\Repository\MessageMetaRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
+use App\Service\Agent\Exception\AgentArchivedException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
+use App\Service\Agent\Exception\AgentNotPublishedException;
+use App\Service\Iam\Permission;
 use App\Service\ModelConfigService;
 use App\Service\Runtime\RuntimeProfile;
 
 /**
  * Turns an assistant id into a {@see RuntimeProfile} the chat path can consume.
  *
- * S1: owner-only draft. Published versions arrive in S3; shared folders in S4.
+ * Owner + draft=true uses BDRAFT. Everyone else (and the owner without draft)
+ * needs IAM `use` and runs the latest published version. Archived assistants
+ * only continue an existing chat that already carries AGENTID.
  */
 final readonly class AgentRuntimeResolver
 {
     public function __construct(
         private AgentRepository $agents,
+        private AgentVersionRepository $versions,
         private PromptRepository $prompts,
         private ModelRepository $models,
         private ModelConfigService $modelConfigService,
         private AgentDefinitionValidator $validator,
+        private AgentAccess $access,
+        private MessageMetaRepository $messageMeta,
     ) {
     }
 
-    public function resolve(int $agentId, User $user, bool $draft = true): RuntimeProfile
+    public function resolve(int $agentId, User $user, bool $draft = false, ?int $chatId = null): RuntimeProfile
     {
         $agent = $this->agents->find($agentId);
-        if (!$agent instanceof Agent || $agent->getOwnerId() !== (int) $user->getId()) {
+        if (!$agent instanceof Agent) {
             throw AgentNotAccessibleException::forId($agentId);
         }
 
-        $definition = $this->validator->validate($agent->getDraft());
+        $isOwner = $agent->getOwnerId() === (int) $user->getId();
+
+        if ($draft) {
+            if (!$isOwner) {
+                throw AgentNotAccessibleException::forId($agentId);
+            }
+
+            return $this->fromDefinition($agent, $user, $this->validator->validate($agent->getDraft()), '', null);
+        }
+
+        if (!$this->access->can($user, $agent, Permission::Use)) {
+            throw AgentNotAccessibleException::forId($agentId);
+        }
+
+        if ($agent->isArchived()) {
+            if (null === $chatId || $chatId < 1 || !$this->messageMeta->chatHasAgent($chatId, $agentId)) {
+                throw AgentArchivedException::forId($agentId);
+            }
+        }
+
+        if (!$agent->hasPublishedVersion()) {
+            if ($isOwner) {
+                return $this->fromDefinition($agent, $user, $this->validator->validate($agent->getDraft()), '', null);
+            }
+            throw AgentNotPublishedException::forId($agentId);
+        }
+
+        $version = $this->versions->find($agent->getPublishedVersionId());
+        if (!$version instanceof AgentVersion) {
+            throw AgentNotPublishedException::forId($agentId);
+        }
+
+        return $this->fromDefinition(
+            $agent,
+            $user,
+            $this->validator->validate($version->getDefinition()),
+            $version->getPromptText(),
+            $version->getId(),
+        );
+    }
+
+    private function fromDefinition(
+        Agent $agent,
+        User $user,
+        AgentDefinition $definition,
+        string $systemPrompt,
+        ?int $agentVersionId,
+    ): RuntimeProfile {
         $prompt = $this->prompts->find($agent->getPromptId());
         $topic = $prompt instanceof Prompt ? $prompt->getTopic() : 'agent:'.$agent->getSlug();
-        $systemPrompt = $prompt instanceof Prompt ? $prompt->getPrompt() : AgentService::DEFAULT_INSTRUCTION;
+        if ('' === trim($systemPrompt) && $prompt instanceof Prompt) {
+            $systemPrompt = $prompt->getPrompt();
+        }
+        if ('' === trim($systemPrompt)) {
+            $systemPrompt = AgentService::DEFAULT_INSTRUCTION;
+        }
 
         $notes = [];
         $modelIds = $this->resolveModels($definition, (int) $user->getId(), $notes);
@@ -86,7 +149,7 @@ final readonly class AgentRuntimeResolver
             skillDeny: $skillDeny,
             parameters: $definition->parameters(),
             agentId: $agent->getId(),
-            agentVersionId: $draft ? null : $agent->getPublishedVersionId(),
+            agentVersionId: $agentVersionId,
             notes: $notes,
             ragLimit: $definition->ragLimit(),
             ragMinScore: $definition->ragMinScore(),

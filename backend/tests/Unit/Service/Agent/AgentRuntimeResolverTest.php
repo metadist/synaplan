@@ -8,8 +8,11 @@ use App\Entity\Agent;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\AgentRepository;
+use App\Repository\AgentVersionRepository;
+use App\Repository\MessageMetaRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Agent\AgentAccess;
 use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
@@ -34,10 +37,13 @@ final class AgentRuntimeResolverTest extends TestCase
         $this->modelConfig = $this->createMock(ModelConfigService::class);
         $this->resolver = new AgentRuntimeResolver(
             $this->agents,
+            $this->createMock(AgentVersionRepository::class),
             $this->prompts,
             $this->models,
             $this->modelConfig,
             new AgentDefinitionValidator(),
+            $this->createMock(AgentAccess::class),
+            $this->createMock(MessageMetaRepository::class),
         );
     }
 

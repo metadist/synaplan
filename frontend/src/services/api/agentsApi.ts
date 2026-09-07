@@ -7,6 +7,10 @@ import {
   PatchApiAgentsUpdateResponseSchema,
   PostApiAgentsCloneResponseSchema,
   GetApiAgentsGalleryResponseSchema,
+  PostApiAgentsPublishResponseSchema,
+  GetApiAgentsVersionsResponseSchema,
+  GetApiAgentsVersionResponseSchema,
+  GetApiAgentsUsageResponseSchema,
 } from '@/generated/api-schemas'
 
 export type Agent = NonNullable<z.infer<typeof GetApiAgentsGetResponseSchema>['agent']>
@@ -26,6 +30,7 @@ export interface AgentWritePayload {
   promptId?: number
   draft?: Record<string, unknown>
   routable?: boolean
+  status?: 'archived' | 'published'
 }
 
 export function agentFieldPath(error: unknown): string | null {
@@ -34,6 +39,17 @@ export function agentFieldPath(error: unknown): string | null {
   }
   const path = error.details.path
   return typeof path === 'string' && path !== '' ? path : null
+}
+
+export type AgentVersionCard = NonNullable<
+  z.infer<typeof PostApiAgentsPublishResponseSchema>['version']
+>
+export type AgentVersionDetail = NonNullable<
+  z.infer<typeof GetApiAgentsVersionResponseSchema>['version']
+>
+export type AgentUsage = {
+  byVersion: NonNullable<z.infer<typeof GetApiAgentsUsageResponseSchema>['byVersion']>
+  byDay: NonNullable<z.infer<typeof GetApiAgentsUsageResponseSchema>['byDay']>
 }
 
 export const agentsApi = {
@@ -89,6 +105,52 @@ export const agentsApi = {
       schema: PostApiAgentsCloneResponseSchema,
     })
     return requireAgent(data.agent)
+  },
+
+  async publish(id: number, changelog: string): Promise<AgentVersionCard> {
+    const data = await httpClient(`/api/v1/agents/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({ changelog }),
+      schema: PostApiAgentsPublishResponseSchema,
+    })
+    if (!data.version) {
+      throw new Error('Invalid API response format: version missing')
+    }
+    return data.version
+  },
+
+  async versions(id: number): Promise<AgentVersionCard[]> {
+    const data = await httpClient(`/api/v1/agents/${id}/versions`, {
+      method: 'GET',
+      schema: GetApiAgentsVersionsResponseSchema,
+    })
+    return data.versions ?? []
+  },
+
+  async version(id: number, version: number): Promise<AgentVersionDetail> {
+    const data = await httpClient(`/api/v1/agents/${id}/versions/${version}`, {
+      method: 'GET',
+      schema: GetApiAgentsVersionResponseSchema,
+    })
+    if (!data.version) {
+      throw new Error('Invalid API response format: version missing')
+    }
+    return data.version
+  },
+
+  async usage(id: number, from?: number, to?: number): Promise<AgentUsage> {
+    const query = new URLSearchParams()
+    if (from) query.set('from', String(from))
+    if (to) query.set('to', String(to))
+    const suffix = query.size > 0 ? `?${query.toString()}` : ''
+    const data = await httpClient(`/api/v1/agents/${id}/usage${suffix}`, {
+      method: 'GET',
+      schema: GetApiAgentsUsageResponseSchema,
+    })
+    return {
+      byVersion: data.byVersion ?? [],
+      byDay: data.byDay ?? [],
+    }
   },
 }
 

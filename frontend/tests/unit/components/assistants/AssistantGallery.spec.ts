@@ -69,4 +69,14 @@ describe('AssistantGallery', () => {
     await wrapper.get('[data-testid="btn-assistant-start-chat"]').trigger('click')
     expect(wrapper.emitted('start-chat')).toEqual([[7]])
   })
+
+  it('hides archived cards on Mine and shows them on Archived', async () => {
+    const { wrapper, store } = mountGallery()
+    store.gallery = [{ ...card, status: 'archived' }]
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="list-assistant-cards"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="chip-gallery-archived"]').trigger('click')
+    expect(wrapper.get('[data-testid="badge-card-archived"]').text()).toContain('Archived')
+  })
 })

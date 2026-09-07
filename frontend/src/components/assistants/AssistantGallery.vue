@@ -50,6 +50,14 @@
     </div>
 
     <div
+      v-else-if="visibleCards.length === 0 && filter === 'archived'"
+      class="surface-card rounded-lg p-12 text-center txt-secondary"
+      data-testid="state-gallery-archived-empty"
+    >
+      {{ $t('assistants.archivedEmpty') }}
+    </div>
+
+    <div
       v-else-if="visibleCards.length === 0"
       class="surface-card rounded-lg p-12 text-center txt-secondary"
       data-testid="state-gallery-plugins-empty"
@@ -86,19 +94,24 @@ defineEmits<{
 
 const { t } = useI18n()
 const store = useAgentsStore()
-const filter = ref<'mine' | 'shared' | 'plugin'>('mine')
+const filter = ref<'mine' | 'shared' | 'plugin' | 'archived'>('mine')
 const search = ref('')
 
 const chips = computed(() => [
   { id: 'mine' as const, label: t('assistants.filterMine') },
   { id: 'shared' as const, label: t('assistants.filterShared') },
   { id: 'plugin' as const, label: t('assistants.filterPlugins') },
+  { id: 'archived' as const, label: t('assistants.filterArchived') },
 ])
 
 const visibleCards = computed(() => {
   const q = search.value.trim().toLowerCase()
   return store.gallery.filter((card) => {
-    if ((card.origin ?? 'mine') !== filter.value) {
+    if (filter.value === 'archived') {
+      if (card.status !== 'archived' || (card.origin ?? 'mine') !== 'mine') {
+        return false
+      }
+    } else if (card.status === 'archived' || (card.origin ?? 'mine') !== filter.value) {
       return false
     }
     if (!q) {

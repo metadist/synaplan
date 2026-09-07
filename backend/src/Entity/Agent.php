@@ -160,6 +160,32 @@ class Agent
         return self::STATUS_DRAFT === $this->status;
     }
 
+    public function isPublished(): bool
+    {
+        return self::STATUS_PUBLISHED === $this->status;
+    }
+
+    public function isArchived(): bool
+    {
+        return self::STATUS_ARCHIVED === $this->status;
+    }
+
+    public function setStatus(string $status): self
+    {
+        if (!in_array($status, self::STATUSES, true)) {
+            throw new \InvalidArgumentException(sprintf('Invalid assistant status "%s"', $status));
+        }
+        $this->status = $status;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function hasPublishedVersion(): bool
+    {
+        return null !== $this->publishedVersionId;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -182,6 +208,14 @@ class Agent
     public function getPublishedVersionId(): ?int
     {
         return $this->publishedVersionId;
+    }
+
+    public function setPublishedVersionId(?int $publishedVersionId): self
+    {
+        $this->publishedVersionId = $publishedVersionId;
+        $this->touch();
+
+        return $this;
     }
 
     public function getParentId(): ?int

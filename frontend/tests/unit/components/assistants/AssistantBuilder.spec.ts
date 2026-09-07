@@ -66,7 +66,7 @@ function mountBuilder() {
   const wrapper = mount(AssistantBuilder, {
     global: {
       plugins: [i18n],
-      stubs: { Icon: true },
+      stubs: { Icon: true, AssistantPublishSection: true },
     },
   })
   return { wrapper, store }

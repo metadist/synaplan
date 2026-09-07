@@ -36,6 +36,27 @@ class AgentRepository extends ServiceEntityRepository
         return $this->findOneBy(['id' => $id, 'ownerId' => $ownerId]);
     }
 
+    /**
+     * @return list<Agent>
+     */
+    public function findPublishedByOwner(int $ownerId): array
+    {
+        return $this->createQueryBuilder('a')
+            ->where('a.ownerId = :ownerId')
+            ->andWhere('a.status = :status')
+            ->andWhere('a.publishedVersionId IS NOT NULL')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('status', Agent::STATUS_PUBLISHED)
+            ->orderBy('a.updated', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByPromptIdAndOwner(int $promptId, int $ownerId): ?Agent
+    {
+        return $this->findOneBy(['promptId' => $promptId, 'ownerId' => $ownerId]);
+    }
+
     public function slugTaken(int $ownerId, string $slug, ?int $exceptId = null): bool
     {
         $qb = $this->createQueryBuilder('a')

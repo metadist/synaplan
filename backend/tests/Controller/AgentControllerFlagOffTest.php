@@ -75,6 +75,20 @@ final class AgentControllerFlagOffTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/agents/1/clone');
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request(
+            'POST',
+            '/api/v1/agents/1/publish',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['changelog' => 'nope']),
+        );
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/agents/1/versions');
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/agents/1/usage');
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
     }
 
     public function testUnauthenticatedIs401Not404(): void
