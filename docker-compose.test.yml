@@ -111,7 +111,7 @@ services:
   # collections (the backend auto-creates them on first use). Not published
   # to a host port; only app_test talks to it.
   qdrant_test:
-    image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     container_name: synaplan-qdrant-test
     restart: "no"
     networks:
