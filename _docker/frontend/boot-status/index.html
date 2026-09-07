@@ -217,7 +217,7 @@
       </div>
     </div>
     <div class="step" id="step-frontend">
-      <div class="badge" id="badge-frontend">4</div>
+      <div class="badge">4</div>
       <div>
         <div class="step-title">App interface</div>
         <div class="step-detail" id="detail-frontend">Preparing the user interface…</div>
@@ -301,8 +301,6 @@
     if (!el) return
     el.classList.remove('active', 'done', 'warn')
     if (state) el.classList.add(state)
-    const badge = el.querySelector('.badge')
-    if (state === 'done') badge.textContent = '✓'
     const detailEl = $('detail-' + id)
     if (detail !== undefined && detailEl) {
       detailEl.replaceChildren()
@@ -314,6 +312,25 @@
       detailEl.append(document.createTextNode(detail))
     }
   }
+
+  // The badges cannot be numbered in the markup: two steps are optional. The
+  // database step is dropped when the status feed reports no database, and the
+  // local-AI step only appears once an AI engine is detected — so a fixed
+  // 1..4 showed gaps like "1, 2, 4" on a stack without Ollama. Number whatever
+  // is on screen instead, and let this be the only place that writes a badge so
+  // a step that stops being done gets its number back rather than keeping a
+  // stale checkmark.
+  const renumberSteps = () => {
+    let position = 0
+    for (const step of document.querySelectorAll('.step')) {
+      if (getComputedStyle(step).display === 'none') continue
+      position += 1
+      const badge = step.querySelector('.badge')
+      if (badge) badge.textContent = step.classList.contains('done') ? '✓' : String(position)
+    }
+  }
+
+  renumberSteps()
 
   const fmtElapsed = (ms) => {
     const s = Math.floor(ms / 1000)
@@ -463,13 +480,12 @@
     let backendPct = 0
     let frontendPct = 10
 
-    // Step 1: database
-    if (!s.db) {
-      $('step-db').style.display = 'none'
-    } else if (s.db.reachable) {
-      setStep('db', 'done', 'Running')
-    } else {
-      setStep('db', 'active', 'Starting MariaDB…', true)
+    // Step 1: database. Set the visibility on every render rather than only
+    // hiding, so a feed that starts reporting a database brings the step back.
+    $('step-db').style.display = s.db ? 'flex' : 'none'
+    if (s.db) {
+      if (s.db.reachable) setStep('db', 'done', 'Running')
+      else setStep('db', 'active', 'Starting MariaDB…', true)
     }
 
     // Step 2: backend
@@ -540,6 +556,9 @@
       : overall < 60 ? 'Setting things up'
       : overall < 90 ? 'Almost there'
       : 'Final touches'
+
+    // After every step has been shown, hidden or completed above.
+    renumberSteps()
 
     if (s.frontend && s.frontend.phase === 'starting-app') probeApp()
   }
