@@ -118,7 +118,7 @@ final class ApiKeyScope
 
     /**
      * The scope set the Outlook add-in connect flow mints
-     * (`frontend/src/views/AddinConnectView.vue`). Frozen: already-issued
+     * (`App\Service\PlatformLink\OutlookConnectService`). Frozen: already-issued
      * Synamail keys carry exactly this list.
      *
      * @return list<string>

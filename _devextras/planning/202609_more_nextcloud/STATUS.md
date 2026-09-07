@@ -7,7 +7,7 @@ Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Core handshake (`NC1`–`NC7`) | `synaplan/` `feat/more-nextcloud-s1-handshake`; `Synamail/` docs only; local NC in `synaplan-nextcloud/` `feat/local-nextcloud-wsl` | implemented | Flag `PLATFORM_LINKS.ENABLED` default off. Outlook `client=outlook` is not flag-gated. Local Nextcloud on WSL: `make -C /wwwroot/synaplan-nextcloud dev-up` → http://localhost:8081 (admin/admin). Harness: `_devextras/testing/platform-links/fake-instance.sh`. |
+| S1 Core handshake (`NC1`–`NC7`) | `synaplan/` `feat/more-nextcloud-s1-handshake` → [#1745](https://github.com/metadist/synaplan/pull/1745); `Synamail/` docs only (`docs/AUTH_FLOW.md`); local NC in `synaplan-nextcloud/` `feat/local-nextcloud-wsl` | reviewed, in PR | Flag `PLATFORM_LINKS.ENABLED` default off. Outlook `client=outlook` is not flag-gated and now goes through `POST /api/v1/addin/connect`. Local Nextcloud on WSL: `make -C /wwwroot/synaplan-nextcloud dev-up` → http://localhost:8081 (admin/admin). Harness: `_devextras/testing/platform-links/fake-instance.sh`. User docs: `synaplan-docs/docs/platform-links.md`. |
 | S2 Nextcloud app | — | planned | Wave 3 — `link` mode in the Nextcloud app |
 | S3 Parity & fallbacks | — | planned | |
 
@@ -45,4 +45,28 @@ S2 (`link` mode in the Nextcloud app) stays Wave 3.
 Local Nextcloud 31.0.14 on `:8081` (admin/admin), Synaplan Integration
 settings page loads. Synaplan UI: Linked platforms empty state;
 Operate → People → Linked platforms lists pending/active; `/addin/connect`
-rewrites to `/connect/platform?…&client=outlook`. Uncommitted until asked.
+rewrites to `/connect/platform?…&client=outlook`.
+
+**2026-09-07 (code review of #1745):** findings and fixes, all in the PR:
+
+| # | Finding | Fix |
+| - | ------- | --- |
+| 1 | `PlatformConnectView` posted the fresh add-in key to `window.opener` with target origin `*` (CodeQL cross-window leak; a phishing popup on the bridge URL would receive the key). | Opener channel removed. Fallback is Office `messageParent` only, which Office restricts to the add-in that opened the dialog. |
+| 2 | The `outlook-builtin` allow-list (NC1: "today's `isSafeRedirect()` moved server-side") was dead data: `RedirectUriPolicy` could not match a candidate against a `*` instance host, and the bridge still carried its own client-side copy (CodeQL client-side redirect + XSS). | New `POST /api/v1/addin/connect` (`OutlookConnectService`, not flag-gated) mints the key and builds the relay URL on the server; the bridge follows `response.redirect`. Client allow-list deleted. |
+| 3 | `prefixMatches()` never matched a registered root URI (`https://host` → path `/` → `str_starts_with($path, '//')`). | Root prefix accepts every path on that origin; test added. |
+| 4 | `normalizeHost()` accepted `*`, which would let a partner register an any-host instance once the wildcard branch is relaxed. | Wildcard hosts rejected at registration; only the seeded built-in row carries `*`. |
+| 5 | `LinkCodeService::consume()` did GET then DEL — two concurrent exchanges could both mint a key (C5). | `RedisService::getAndDelete()` (GETDEL, Redis 7.4); test asserts GET/DEL are never used. |
+| 6 | `external_id` / `state` unbounded → `BEXTERNALIDENTITIES.BEXTERNALID VARCHAR(191)` would 500 at exchange. | Capped at 191 / 512 with a 400 at code issue. |
+| 7 | `AddinConnectView.vue` was dead code (route is a redirect) and carried the same three CodeQL alerts that are open on `main`. | Deleted with its i18n namespace; `/addin/connect` redirect and its spec stay. |
+| 8 | Port matching was strict for `https://localhost` in the built-in list while the Synamail dev server runs on `:3000`. | Port-less prefixes on local-dev hosts accept any port; every other host stays strict (corpus test unchanged). |
+
+Not changed, noted for S2/S3: `ApiKeyController::list` resolves `linked_platform`
+with two queries per key (fine for the handful of keys a user has); anonymous
+registration has no per-host dedupe, only the 10/h IP limit; re-linking an
+external id that belonged to another Synaplan user revokes that user's key and
+is audited only under the new user.
+
+Gate after the fixes: `make lint` ✓, `make -C backend phpstan` ✓ (0 errors),
+`make test` ✓ (PHPUnit 5568, Vitest 223 files), `vue-tsc` ✓,
+`fake-instance.sh --flag-off` 4/4, `fake-instance.sh` 12/12. Synamail
+`docs/AUTH_FLOW.md` step 5 and invariant 6 rewritten for the server-side list.

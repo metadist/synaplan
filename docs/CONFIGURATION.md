@@ -664,6 +664,23 @@ See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
 
 ---
 
+## Linked platforms (`PLATFORM_LINKS`)
+
+Lets users of a registered Nextcloud / ownCloud / OpenCloud instance link the
+Synaplan account they already have instead of getting a provisioned one
+(`BCONFIG` group `PLATFORM_LINKS`, owner 0). Seeded off; toggling needs no
+restart. The Outlook add-in bridge is not affected by this flag.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `PLATFORM_LINKS.ENABLED` | `0` | `/api/v1/platform-links/*`, `/api/v1/me/platform-links*`, the **Linked platforms** page and the admin tab. Off = those routes return 404 |
+
+Fixed limits (constants, not settings): link codes expire after 300 s and are
+single-use; 20 codes per user per hour; 10 anonymous instance registrations
+per IP per hour. See [Linked platforms](ADMIN.md#linked-platforms).
+
+---
+
 ## All Environment Variables
 
 See `backend/.env.example` for the complete list with descriptions.
