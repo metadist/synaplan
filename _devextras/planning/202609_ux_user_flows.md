@@ -202,6 +202,21 @@ Compute, document generation, media: a **card in the thread**. Status,
 plain-language progress, result chips that open the existing preview.
 No new page. Quota / refusal is a sentence on the card.
 
+### 4.8 Triggers: event or schedule (added 2026-09-07)
+
+Anything that starts the AI without a chat message uses **one**
+vocabulary across assistants and Saved Tasks: a **trigger** is either
+an **event** (something arrives — mail, WhatsApp, a website visitor,
+an app or coding tool, a connected app, Synaplan Desktop, a web hook)
+or a **schedule** (a point in time). Every trigger row is one generated
+sentence (what arrives / when, what it does, **who it runs as**), one
+visible on/off, a last-run status. The word list and the row pattern
+live in
+[`202609_ux_user_flows/assistant-triggers.md`](./202609_ux_user_flows/assistant-triggers.md);
+a Saved Task card and an assistant's trigger row must be
+indistinguishable in wording. `cron`, `binding`, `channel`, `topic`
+never appear in primary copy.
+
 ---
 
 ## 5. Journeys the remaining sprints must walk
@@ -265,8 +280,26 @@ still finds it. Existing chats keep the last version with an
 **J-AB-5 — Widget picks an assistant** (S5)
 Widget setup: **Pick an assistant** (published only) as the default
 path; topic binding stays as an advanced leftover. Saving the widget
-does not change the assistant. Publishing v2 updates the widget on the
-next visitor message.
+does not change the assistant. The same widget now appears as an
+**event row** in the assistant's Triggers section ("When a visitor
+writes in *Legal help* → answers as this assistant"). Publishing v2
+updates the widget on the next visitor message.
+
+**J-AB-7 — Trigger: an event and a schedule, no jargon** (S5; more
+event kinds in S6)
+Owner opens the assistant's **Triggers** section: "Someone starts a
+chat with it — always on" is the only row. **Add event → Mail
+arrives**: picks *Support mailbox*, rule *from @acme.com, containing
+"contract"*, types "Review it against our checklist and reply".
+The row reads as one sentence and says **Runs on its own (as you)**.
+**Add schedule**: every week, Monday, 08:00, "Summarise last week's
+contract questions" — no cron string visible; **Advanced** hides it.
+Publish names both triggers in the confirm. A matching mail arrives:
+the reply is pinned to the assistant; the run shows under
+Automations → Saved tasks *and* in the row ("Last: today 09:12 · ok").
+A non-matching mail is untouched. Turning the row off stops it
+immediately. Wireframe:
+[`202609_ux_user_flows/assistant-triggers.md`](./202609_ux_user_flows/assistant-triggers.md).
 
 **J-AB-6 — Move work to another instance** (S6)
 Settings → **Export & import**: one file, one sentence of what is in

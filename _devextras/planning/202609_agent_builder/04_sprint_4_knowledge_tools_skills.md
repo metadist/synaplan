@@ -82,9 +82,9 @@ interface ToolPolicySourceInterface
 - `RoutingCharacterizationTest` gains fixtures with one and with three routable assistants (flag on) and keeps every existing fixture. Re-record with `UPDATE_ROUTING_SNAPSHOTS=1`, then **every changed line** of `routing_classification.json` is listed in the PR description; existing fixtures must show zero diff, only new entries appear.
 - Merged with `AGENTS.ROUTABLE_ENABLED` seeded `0` (master plan §12 row 2).
 
-### 2.6 Parameters section (`AB31`)
+### 2.6 Advanced settings inside Models (`AB31`)
 
-`BuilderParameters.vue`: `temperature` (0–2), `maxTokens`, `language` (`auto` or a locale code), `responseSchema` (JSON textarea, validated as a JSON-schema object on save). The resolver copies them into `RuntimeProfile::$parameters`; `ChatHandler` forwards `temperature` / `maxTokens` through the existing options array to `AiFacade`, and `responseSchema` through the structured-output path (governed by the `StructuredOutputConfigSeeder` flag; unsupported provider ⇒ ignored with a note).
+Not a section of its own (2026-09-07 review: seven sections, not nine — master plan §5). `BuilderModelsAdvanced.vue` renders under an **Advanced settings** disclosure at the end of the Models section, collapsed by default: `temperature` (0–2, labelled "Creativity"), `maxTokens` ("Answer length"), `language` (`auto` or a locale code), `responseSchema` (JSON textarea, validated as a JSON-schema object on save; labelled "Response format", the only place JSON is allowed in the builder). The resolver copies them into `RuntimeProfile::$parameters`; `ChatHandler` forwards `temperature` / `maxTokens` through the existing options array to `AiFacade`, and `responseSchema` through the structured-output path (governed by the `StructuredOutputConfigSeeder` flag; unsupported provider ⇒ ignored with a note).
 
 ### 2.7 Negative tests for C6 (`AB32`)
 
@@ -103,7 +103,7 @@ Its own PR so reviewers read only tests: `AgentKnowledgeIsolationTest` and `Agen
 | C8 | New paths `backend/src/Service/Agent/Policy/**` listed `backend-only`; Vue `ota-candidate` |
 
 - Unit: `TaskPlanValidatorAllowListTest` (allowed, denied, `null` = unrestricted), `AgentRuntimeResolverScopesTest`, `AgentDefinitionValidatorTest` extended (`includeUserFiles`, `responseSchema` must be an object), `MessageSorterRoutableTest` (flag off ⇒ topic list identical).
-- Frontend: `BuilderKnowledge.spec.ts` (picker lists only `use` folders), `BuilderToolsSkills.spec.ts`, `BuilderParameters.spec.ts` (invalid JSON schema blocks save).
+- Frontend: `BuilderKnowledge.spec.ts` (picker lists only `use` folders), `BuilderToolsSkills.spec.ts`, `BuilderModelsAdvanced.spec.ts` (collapsed by default; invalid JSON schema blocks save).
 - Unfiltered backend + frontend gates; `AB30` additionally runs the characterization suite with the flag on and off.
 
 ---
@@ -126,5 +126,5 @@ Its own PR so reviewers read only tests: `AgentKnowledgeIsolationTest` and `Agen
 | AB28 | `feat(multitask): enforce assistant skill allow-list in planner and validator` | backend-only | AB27 |
 | AB29 | `feat(agents): wire BROUTABLE opt-in (builder, repository, classifier) without sorter change` | backend-only + ota-candidate | AB21 |
 | AB30 | `feat(routing): offer routable assistants to the sorter behind AGENTS.ROUTABLE_ENABLED (snapshot re-record)` | backend-only | AB29 |
-| AB31 | `feat(assistants): add Parameters section (temperature, tokens, language, response schema)` | ota-candidate + backend-only | AB13 |
+| AB31 | `feat(assistants): add Advanced settings to the Models section (creativity, length, language, response format)` | ota-candidate + backend-only | AB13 |
 | AB32 | `test(agents): add knowledge isolation and tool/skill enforcement negative tests` | backend-only | AB26, AB28 |

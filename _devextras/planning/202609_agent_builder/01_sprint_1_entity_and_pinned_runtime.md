@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS BAGENTVERSIONS (
 
 `App\Service\Agent\Definition\AgentDefinitionValidator::validate(array $json): AgentDefinition` — pure PHP, unit-tested against fixtures in `backend/tests/Fixtures/agents/`:
 
-- `schema` must equal `agent.v1`; the only top-level keys are `models`, `knowledge`, `tools`, `skills`, `parameters`, `behaviour`, `tasks`, `channels`. **Unknown keys at any level are rejected** with the JSON path in the message (`Unknown key "tools.foo" in agent.v1`).
+- `schema` must equal `agent.v1`; the only top-level keys are `models`, `knowledge`, `tools`, `skills`, `parameters`, `behaviour`, `triggers` (`events[]` / `schedules[]`, shape validated in S5 `AB33`; S1 accepts the empty object). **Unknown keys at any level are rejected** with the JSON path in the message (`Unknown key "tools.foo" in agent.v1`). There is no `tasks` or `channels` key — "when does it act" is one concept, **triggers** (master plan decision 15).
 - `models.*` values are catalog keys `service:providerId:tag` or `null`; the validator checks the *shape*, resolution happens in the resolver.
 - `behaviour.memory` accepts only `user` (master plan §12 row 1). `knowledge.folders[]` entries match `^\d+:[A-Za-z0-9:_-]+$`.
 - `AgentDefinition::defaults()` returns the empty-but-valid definition used when a draft is created with only a name.

@@ -33,7 +33,7 @@ replaces the current **Instructions** page; the gallery is a new child.
 | - | -------- | ---------------- | ------ |
 | 1 | **User-facing word: Assistant.** Code name `agent` (`BAGENTS`, `AgentService`, `/api/v1/agents`). Matches the glossary in `AGENTS.md` ("AI assistant — the AI that answers inside a widget") and the existing nav group **Assistants**. | Assistant / `agent` | ✅ 2026-09-03 |
 | 2 | **The Messages-gateway page currently labelled "AI Agents" (`/channels/agents`) is renamed** to avoid the collision — proposed **"Coding clients"** (en) under Connections. Route unchanged. | Rename | ✅ 2026-09-03 |
-| 3 | **An assistant composes; it does not replace `BPROMPTS`.** `BAGENTS.BPROMPTID` points at the instruction row; models, knowledge, tools, skills, parameters and tasks live in a versioned JSON definition (`agent.v1` schema). `BPROMPTMETA` stays the runtime store for widgets that are not migrated. | Compose | ✅ 2026-09-03 |
+| 3 | **An assistant composes; it does not replace `BPROMPTS`.** `BAGENTS.BPROMPTID` points at the instruction row; models, knowledge, tools, skills, parameters and triggers live in a versioned JSON definition (`agent.v1` schema). `BPROMPTMETA` stays the runtime store for widgets that are not migrated. | Compose | ✅ 2026-09-03 |
 | 4 | **Versioned and publishable.** `BAGENTVERSIONS` holds immutable snapshots; users always run the latest *published* version; the owner edits a draft. "Update without rebuilding" = publish a new version. | Versions | ✅ 2026-09-03 |
 | 5 | **Publishing = an IAM share** (`assistant` kind, permission `use`; `edit` for co-maintainers). "Assign to a department" = share with that group. No second permission model. | IAM only | ✅ 2026-09-03 |
 | 6 | **Talking to an assistant pins it.** A chat started from an assistant carries `agentId`; `MessageClassifier` short-circuits exactly as it does today for a pinned `PROMPTID`. Assistants are **not** added to the sorter's topic list unless the owner opts in ("also let the router pick this"). | Pinned by default | ✅ 2026-09-03 |
@@ -41,10 +41,11 @@ replaces the current **Instructions** page; the gallery is a new child.
 | 8 | **Clone is a first-class action** (copy definition + prompt as a new draft owned by the cloner; lineage kept in `BPARENTID`). Cloning a shared assistant needs `read`. | Clone | ✅ 2026-09-03 |
 | 9 | **Portable definitions — and the instance-to-instance bundle.** `agent.v1` is one section of a larger **`synaplan-bundle.v1`** archive this track defines in S6: assistants + instructions first; later tracks add their own sections (saved tasks / workflows, MCP server configs, custom tools, model preferences by catalog key, connections). **Secrets, credentials, API keys, file binaries and other users' ids are never exported**; import shows a "needs a key / needs a model" checklist. Every user exports/imports their own resources; admins additionally export/import instance-level settings. Plugin packs (`provides.agents`) use the same section format. | Bundle, no secrets, user + admin | ✅ 2026-09-03 |
 | 10 | **The builder is a form, not a chat.** The existing AI Setup Assistant (`WidgetSetupService`, `tools:widget-setup-interview`) is reused as an optional "help me write this" helper inside the form, not as the primary editor. | Form first | ✅ 2026-09-03 |
-| 11 | **Widgets and channels bind an assistant** (S5): `BWIDGETS.BAGENTID` (nullable) beside the existing `BTASKPROMPT` topic; a widget with an agent id ignores the topic. Email handler and WhatsApp bindings follow the same pattern. | Additive binding | ✅ 2026-09-03 |
+| 11 | **Widgets and channels bind an assistant** (S5): `BWIDGETS.BAGENTID` (nullable) beside the existing `BTASKPROMPT` topic; a widget with an agent id ignores the topic. Email handler and WhatsApp bindings follow the same pattern. To the user these bindings are **event triggers** (row 15). | Additive binding | ✅ 2026-09-03 |
 | 12 | **Schema (ask recorded):** `BAGENTS`, `BAGENTVERSIONS` (S1), `BWIDGETS.BAGENTID` (S5). Galera-safe `addSql`. | Ask recorded | ✅ 2026-09-03 |
 | 13 | **Characterization discipline:** with the flag off or with no pinned assistant, `MessageClassifier` / `MessageSorter` output is unchanged; snapshots are not re-recorded by this track. | Locked | ✅ 2026-09-03 |
 | 14 | **Mobile:** new PHP `backend-only`; builder + gallery `ota-candidate`. | Locked | ✅ 2026-09-03 |
+| 15 | **Triggers replace "Tasks" and "Channels".** An assistant always answers a chat; everything else that starts it is a **trigger** of one of two categories: an **event** (something arrives — mail matching a rule, a WhatsApp message, a website-widget visitor, an app or coding tool via the API, a connected MCP app, Synaplan Desktop, a web hook) or a **schedule** (a point in time). One builder section, one row pattern, the Saved Tasks words (Trigger / Schedule / Runs on its own) plus **Event**. Under the hood nothing new: conversational events are the S5 bindings (`BWIDGETS.BAGENTID`, department `agentId`, `WHATSAPP.AGENTID`) and the S6 gateway/MCP exposure; schedules and unattended events (mail rule, web hook) are ordinary `BSAVEDTASKS` rows created on publish. `agent.v1` carries `triggers.events[]` / `triggers.schedules[]` instead of `tasks[]` / `channels`. | Trigger = event or schedule | ✅ 2026-09-07 |
 
 ---
 
@@ -55,6 +56,10 @@ replaces the current **Instructions** page; the gallery is a new child.
 > settings. Whoever builds one can publish it to a group or to everyone, keep
 > improving it, and every user always talks to the current version. Users
 > can clone a published assistant and make it their own.
+
+> It acts when somebody chats with it — or when a **trigger** fires: an
+> **event** (a mail from a certain sender, a WhatsApp message, a website
+> visitor, a call from an app) or a **schedule** (every Monday at 08:00).
 
 ---
 
@@ -87,7 +92,7 @@ from the same underlying models". That is the goal.
 | Knowledge via file group key `TASKPROMPT:{topic}` | Shipped | Kept as the assistant's *own* folder; additional folders via IAM shares |
 | `ModelConfigService` (`DEFAULTMODEL` per user) | Shipped | Assistant model bindings override per capability; fall back to user defaults |
 | `SkillCatalog` / `Capability` | Shipped | S4 skill allow-list restricts what the planner may use for this assistant |
-| `BSAVEDTASKS.BPROMPTID` | Shipped | S5: an assistant can define task templates; creating one creates a Saved Task |
+| `BSAVEDTASKS` (`BTRIGGERTYPE` manual / chat / schedule / inbound_email, `BTRIGGERCONFIG`, `BALLOWUNATTENDED`) | Shipped | S5: an assistant's **schedules** and **unattended events** (mail rule, later web hook) are ordinary Saved Task rows created on publish; the trigger columns stay authoritative at runtime |
 | `WidgetSetupService` (AI Setup Assistant) | Shipped | Optional helper inside the builder (decision 10) |
 | `BWIDGETS.BTASKPROMPT` | Shipped | Stays; `BAGENTID` added beside it |
 | Plugin manifest v2 `provides.*` (planned) | Planned | `provides.agents` for assistant packs |
@@ -111,6 +116,11 @@ from the same underlying models". That is the goal.
                                      skill allow-list · parameters · response schema
                                                               ▼
                                                      ChatHandler / TaskPlanner (unchanged APIs)
+
+  Triggers (definition) ──publish──► events:  BWIDGETS.BAGENTID · department agentId · WHATSAPP.AGENTID
+                                              /v1/models alias · list_assistants (S6)
+                                     schedules + mail rule + web hook:  ordinary BSAVEDTASKS rows
+                                              (SavedTaskRunner runs as the owner, agentId pinned)
 ```
 
 ### 4.1 Schema (S1)
@@ -132,8 +142,21 @@ from the same underlying models". That is the goal.
   "skills": { "allow": ["chat", "summarize", "document_generation"], "deny": ["email_me"] },
   "parameters": { "temperature": 0.3, "maxTokens": 4000, "language": "auto", "responseSchema": null },
   "behaviour": { "greeting": "…", "starterPrompts": ["…"], "memory": "user" },
-  "tasks": [ { "name": "Weekly digest", "trigger": { "type": "schedule", "cron": "0 8 * * 1" }, "prompt": "…" } ],
-  "channels": { "widgetDefaults": { "…": "…" } }
+  "triggers": {
+    "events": [
+      { "id": "acme-mail", "kind": "mail", "mailbox": "{ownerId}:{handlerId}",
+        "rule": { "from": ["@acme.com"], "contains": ["contract", "NDA"], "match": "any" },
+        "instruction": "Review it against our checklist and reply." },
+      { "id": "legal-widget", "kind": "widget", "widget": "{ownerId}:{widgetId}",
+        "widgetDefaults": { "…": "…" } },
+      { "id": "api", "kind": "api" },
+      { "id": "mcp", "kind": "mcp" }
+    ],
+    "schedules": [
+      { "id": "weekly", "name": "Weekly digest", "every": { "unit": "week", "on": "mon", "at": "08:00" },
+        "tz": "Europe/Berlin", "instruction": "Summarise last week's contract questions.", "allowUnattended": false }
+    ]
+  }
 }
 ```
 
@@ -141,6 +164,30 @@ Model references use the catalog key form `service:providerId:tag`
 (`ModelCatalog::findBidByKey`), never raw BIDs, so definitions survive
 export/import. Unknown keys are rejected on import (`deny_unknown_fields`
 style) — the schema is versioned for a reason.
+
+**Triggers (decision 15).** `events[].kind` ∈ `mail` · `whatsapp` ·
+`widget` · `api` · `mcp` · `desktop` · `webhook`; `schedules[]` carry
+either `every` (the picker's plain form) or `cron` (Advanced), always
+`tz` and a required `instruction`. Each entry has a stable `id` so the
+rows it creates survive renames. Runtime mapping — nothing new is
+invented:
+
+| Kind | Who runs it | Where it lives at runtime | Sprint |
+| ---- | ----------- | ------------------------- | ------ |
+| chat (implicit, always on) | the person talking | `agentId` on the stream endpoint (S1) | S1 |
+| `widget` | the visitor session | `BWIDGETS.BAGENTID` | S5 |
+| `whatsapp` | the person writing | `BCONFIG WHATSAPP.AGENTID` | S5 |
+| `mail` (department option) | the mail's user context, as today | department `agentId` in `InboundEmailHandler::$departments` | S5 |
+| `mail` (rule option) | **the owner, on its own** | `BSAVEDTASKS` with `BTRIGGERTYPE = inbound_email`, `BTRIGGERCONFIG.filter` (additive), `agentId` | S5 |
+| `api` | the API key's user | `assistant:<slug>` alias in `/v1/models` | S6 |
+| `mcp` | the MCP session's user | `list_assistants` + `synaplan_chat.agentId` | S6 |
+| `desktop` | the paired user | same as `mcp` for `desktop:*`-scoped keys; a desktop job later | S6 |
+| `webhook` | **the owner, on its own** | `BSAVEDTASKS` with `BTRIGGERTYPE = webhook` (track 4 TL42) | track 4 S5 |
+| schedule | **the owner, on its own** | `BSAVEDTASKS` with `BTRIGGERTYPE = schedule` | S5 |
+
+Instance-bound references (`mailbox`, `widget`, a WhatsApp number) are
+exported as **kind only** with a checklist item ("needs a mailbox"), never
+as ids — the bundle rule of §4.4 and roadmap §8.1.
 
 ### 4.3 Runtime
 
@@ -193,13 +240,39 @@ Empty Shared: "Nothing has been shared with you yet" — no Create on
 that chip. Cards shared *to* me show owner + version.
 
 **Builder form sections** (progressive disclosure — the first section alone
-makes a working assistant): Basics (name, icon, description, greeting,
-starters) → Instructions (the prompt, with the optional AI helper) →
-Models → Knowledge (own folder uploads + pick shared folders) → Tools &
-skills (S4) → Parameters → Tasks (S5) → Publish (version, changelog, share).
-Publish copy: "People always talk to the published version. Your edits
-stay private until you publish." Confirm via `useDialog()` names who
-will get it on their next message.
+makes a working assistant). **Seven, not nine** (2026-09-07 review):
+Basics (name, icon, description, greeting, starters) → Instructions (the
+prompt, with the optional AI helper) → Models (with an **Advanced
+settings** disclosure holding the former Parameters: temperature, length,
+language, response format) → Knowledge (own folder uploads + pick shared
+folders) → Tools & skills (S4) → **Triggers** (S5; more event kinds in
+S6) → Publish (version, changelog, share). Publish copy: "People always
+talk to the published version. Your edits stay private until you
+publish." Confirm via `useDialog()` names who will get it on their next
+message **and which triggers switch** ("Website widget *Legal help*,
+Support mailbox rule, Every Monday 08:00, 12 people in Legal").
+
+**Triggers section** (replaces the planned *Tasks* and *Channels*;
+wireframe
+[`../202609_ux_user_flows/assistant-triggers.md`](../202609_ux_user_flows/assistant-triggers.md)):
+one question — *when should this assistant act?* First row, always on:
+"Someone starts a chat with it". Then **Events — when something arrives**
+(**Add event**: Mail arrives · A visitor writes · A WhatsApp message ·
+An app or coding tool · A connected app · Synaplan Desktop · A web hook;
+kinds whose mechanism has not shipped are absent, not greyed) and
+**Schedule — at a point in time** (**Add schedule**: every day / weekday
+/ week / month at a time in the user's zone; cron only under Advanced).
+Every row is one generated sentence — what arrives or when, what it
+does, **who it runs as** ("Runs as the visitor" / "Runs on its own (as
+you)") — plus one visible on/off and the last run. Rows created here and
+the same binding made from the widget editor, the mailbox page or the
+Saved tasks list are the **same row**, editable from either side; the
+row says where its run history lives ("Saved under Automations → Saved
+tasks"). Why this replaces Tasks + Channels: "Tasks" collided with Saved
+Tasks one nav group away, "Channels" was a read-only mirror of things
+configured elsewhere, cron was in primary copy, and API / MCP / Desktop
+reachability was an invisible flag in S6. A trigger row makes all four
+visible in the one place the owner already is.
 
 **Test panel:** a side chat against the *draft* (owner only), titled
 **Try a draft**, helper "Only you see this. It is not saved in
@@ -216,8 +289,13 @@ what is missing in plain words. Import creates drafts, never shares.
 Assistant / Asistan; Publish / Veröffentlichen / Publicar / Publier /
 Yayınla; Clone / Duplizieren / Duplicar / Dupliquer / Kopyala; Version /
 Version / Versión / Version / Sürüm; Instructions / Anweisungen /
-Instrucciones / Instructions / Talimatlar. "Prompt topic", "task prompt",
-"system prompt" leave the primary copy.
+Instrucciones / Instructions / Talimatlar; Trigger / Auslöser / Activador
+/ Déclencheur / Tetikleyici; Event / Ereignis / Evento / Événement /
+Olay; Schedule / Zeitplan / Programación / Planification / Zamanlama;
+Runs on its own / Läuft selbstständig / Se ejecuta por sí sola /
+S'exécute seul / Kendi başına çalışır. "Prompt topic", "task prompt",
+"system prompt", "binding", "channel", "task template", "cron" (outside
+Advanced) leave the primary copy.
 
 ---
 
@@ -233,11 +311,13 @@ Instrucciones / Instructions / Talimatlar. "Prompt topic", "task prompt",
 | `GET/POST` | `/api/v1/agents/{id}/export`, `/api/v1/agents/import` | S6 | Portable definitions |
 | `POST` | `/api/v1/messages/stream` (existing) gains optional `agentId` | S1 | Pinned chat |
 | `GET` | `/api/v1/agents/{id}/usage` | S3 | Owner's metadata-only usage |
+| `GET` | `/api/v1/agents/{id}/triggers` | S5 | Resolved trigger rows (kind, sentence parts, runs-as, status, last run, where it lives) — the one read the section needs |
 
 MCP server: `list_prompts` gains a sibling `list_assistants`; `synaplan_chat`
 accepts `agentId`. OpenAI gateway: an assistant is addressable as a model
-alias `assistant:<slug>` in `/v1/models` (opt-in per assistant) — that is how
-Collabora's AI sidebar or a coding client picks a curated assistant.
+alias `assistant:<slug>` in `/v1/models` (the `api` event trigger, off
+until the owner adds it) — that is how Collabora's AI sidebar or a coding
+client picks a curated assistant. `list_assistants` is the `mcp` event.
 
 ---
 
@@ -249,7 +329,7 @@ Collabora's AI sidebar or a coding client picks a curated assistant.
 | C2 | No `agentId` on a message ⇒ `MessageClassifier` / `MessageSorter` results identical; snapshots untouched | Characterization suite |
 | C3 | Prompts API contract unchanged (widgets, Synamail, Desktop use it) | Existing API tests |
 | C4 | Widgets without `BAGENTID` behave exactly as today | Widget E2E |
-| C5 | Saved Tasks contract unchanged; assistant tasks create ordinary `BSAVEDTASKS` rows | Saved task tests |
+| C5 | Saved Tasks contract unchanged; assistant schedules and unattended events create ordinary `BSAVEDTASKS` rows whose trigger columns stay authoritative; `BTRIGGERCONFIG.filter` is additive (absent ⇒ every mail, as today) | Saved task tests |
 | C6 | An assistant cannot grant a user access to knowledge the owner did not share (`use`) — runtime re-checks IAM per request | Negative tests |
 | C7 | Import never creates shares, credentials or file rows | Import tests |
 | C8 | Mobile: `backend-only` + `ota-candidate` only | mobile-impact script |
@@ -263,18 +343,20 @@ Collabora's AI sidebar or a coding client picks a curated assistant.
 | **S1 — Entity & pinned runtime** | Migrations; `AgentService`, `AgentRuntimeResolver`, `RuntimeProfile`; classifier early return; `agentId` on stream endpoint; CRUD API; flag | Owner creates a draft via API and chats with it pinned; snapshots untouched |
 | **S2 — Builder & gallery** | `/ai/assistants` gallery + builder form (Basics, Instructions, Models, Knowledge own folder); test panel; clone; `/ai/instructions` redirect; five locales; rename of `/channels/agents` label | J-AB-1 walked: empty state → create → test → Start chat, no docs |
 | **S3 — Publish & versions** | `BAGENTVERSIONS`, publish flow, changelog, IAM `assistant` kind (with track 1 S3), gallery "shared with me", owner usage view. **Depends on IAM-UX** for the Share entry | J-AB-2…4: Legal finds it under Shared with me; Sales does not; clone leaves the original; archive is not broken |
-| **S4 — Knowledge, tools, skills** | Shared folders picker (IAM `use`), tool allow/deny mapped to track 4's registry (or to today's flags until that ships), skill allow-list enforced in `TaskPlanValidator` per assistant | An assistant restricted to `chat` + `rag_search` never plans `email_me` |
-| **S5 — Tasks & channels** | Task templates → Saved Tasks; `BWIDGETS.BAGENTID`; email handler / WhatsApp binding; widget setup offers "pick an assistant" | A widget runs a published assistant; a weekly digest task ships with it |
-| **S6 — Portability & packs** | `synaplan-bundle.v1` format + `BundleExporter` / `BundleImporter` with a section registry (this track ships the `agents` and `prompts` sections; later tracks register theirs); Settings → **Export & import** (user) and Operate → System config → Export & import (admin, instance settings); plugin `provides.agents`; `assistant:<slug>` model alias in `/v1/models`; `list_assistants` MCP tool | An assistant exported on instance A works on instance B with a different model catalog; the import checklist names every missing model or key |
+| **S4 — Knowledge, tools, skills** | Shared folders picker (IAM `use`), tool allow/deny mapped to track 4's registry (or to today's flags until that ships), skill allow-list enforced in `TaskPlanValidator` per assistant; Advanced settings inside Models | An assistant restricted to `chat` + `rag_search` never plans `email_me` |
+| **S5 — Triggers: events & schedules** | `triggers` in `agent.v1`; `AgentTriggerMaterializer` (schedules + mail rule → Saved Tasks, `BTRIGGERCONFIG.filter` additive); `BWIDGETS.BAGENTID`; department / WhatsApp binding; widget setup offers "pick an assistant"; **Triggers** builder section + `/triggers` endpoint | J-AB-5 and J-AB-7: a widget runs a published assistant; a mail from `@acme.com` containing "contract" is answered by it; a Monday 08:00 schedule runs — no cron, no "binding" on screen |
+| **S6 — Portability & packs** | `synaplan-bundle.v1` format + `BundleExporter` / `BundleImporter` with a section registry (this track ships the `agents` and `prompts` sections; later tracks register theirs); Settings → **Export & import** (user) and Operate → System config → Export & import (admin, instance settings); plugin `provides.agents`; event kinds `api` (`assistant:<slug>` alias in `/v1/models`), `mcp` (`list_assistants`) and `desktop` appear in **Add event** | An assistant exported on instance A works on instance B with a different model catalog; the import checklist names every missing model, key, mailbox or widget |
 
 Sprint files: [`01`](./01_sprint_1_entity_and_pinned_runtime.md) ·
 [`02`](./02_sprint_2_builder_and_gallery.md) ·
 [`03`](./03_sprint_3_publish_and_versions.md) ·
 [`04`](./04_sprint_4_knowledge_tools_skills.md) ·
-[`05`](./05_sprint_5_tasks_and_channels.md) ·
+[`05`](./05_sprint_5_triggers.md) ·
 [`06`](./06_sprint_6_portability_and_packs.md).
 
-Cut line: S5 channels first (keep tasks). **S6 is no longer the first cut**
+Cut line: S5 event kinds `whatsapp` and the mail **department** option
+first (keep the mail **rule**, `widget` and schedules — they are the
+J-AB-7 demo). **S6 is no longer the first cut**
 — the export/import bundle became a product-owner requirement on
 2026-09-03 (roadmap §8); if capacity is short, S6 ships the `agents` +
 `prompts` sections only and the other sections follow in their tracks. Never
@@ -324,6 +406,12 @@ assistant nobody can find is the sharing lesson again.
 7. J-AB-1 and J-AB-2 walked in the browser (U10): a non-technical user
    builds without docs; a group member finds the published assistant
    under Shared with me in ten seconds.
+8. J-AB-7 walked: the owner adds a mail event ("from @acme.com,
+   containing contract") and a Monday 08:00 schedule in the Triggers
+   section without seeing `cron`, `binding` or `topic`; a matching mail
+   is answered pinned, a non-matching one is untouched; the same rows
+   show under Automations → Saved tasks; the off switch stops them at
+   once.
 
 ---
 
@@ -338,3 +426,5 @@ assistant nobody can find is the sharing lesson again.
 | 5 | Nav | `/ai/assistants` **replaces** `/ai/instructions` (301 in the router); instructions are edited inside the assistant. |
 | 6 | Gateway page label | `/channels/agents` → **"Coding clients"** (de: Coding-Clients, es: Clientes de programación, fr: Clients de codage, tr: Kodlama istemcileri). |
 | 7 | Bundle ownership (from IAM row 1) | This track defines `synaplan-bundle.v1` in S6 and ships the user-facing Export & import section in Settings; admins get the instance-level variant in Operate → System config. |
+| 8 | Wording for "when does it act" (2026-09-07) | **Trigger = event or schedule** (decision row 15). Channels are events; the cron scheduler is the schedule; "Someone starts a chat" is always on. Tasks and Channels sections are gone; one **Triggers** section; Parameters folds into Models → Advanced settings (seven sections). |
+| 9 | Mail as an event needs a rule (2026-09-07) | `inbound_email` Saved Task trigger gains an optional, additive `BTRIGGERCONFIG.filter` (`from[]`, `contains[]`, `match any/all`) evaluated by the ingress before a run is created. Owned by S5 `AB37`; absent filter = today's behaviour (C5). The AI-routed **department** option stays as the second choice for mailboxes that already sort into departments. |

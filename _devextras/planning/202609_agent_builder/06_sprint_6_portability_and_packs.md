@@ -3,7 +3,7 @@
 **Track 2 (Agent Builder), sprint 6 of 6.** Steps `AB40`–`AB49`.
 
 **Goal:** A user exports their assistants and instructions as a `synaplan-bundle.v1` file and imports it on another instance with a different model catalog; the import shows a checklist of what is missing ("needs a model", "needs a key") and never creates shares, credentials or file rows. The same section format ships assistants inside plugins. Assistants become addressable from outside: `assistant:<slug>` in the OpenAI gateway's `/v1/models` and a `list_assistants` MCP tool.
-**Depends on:** S3 (published definitions are what is exported), S5 (tasks and channel defaults are part of the definition). Track 1 S1 for the admin variant's audit row. Manifest v2 `provides.*` (open-plugin-platform plan) — if it has not landed, `AB46` lands the `provides.agents` reader as the first `provides.*` key.
+**Depends on:** S3 (published definitions are what is exported), S5 (`triggers` are part of the definition; the **Add event** picker this sprint extends). Track 1 S1 for the admin variant's audit row. Manifest v2 `provides.*` (open-plugin-platform plan) — if it has not landed, `AB46` lands the `provides.agents` reader as the first `provides.*` key.
 **Unlocks:** track 3 (`model_preferences` section), track 4 (`mcp_servers`, `custom_tools`, `saved_tasks` sections), the connections owner (`connections`). **This file is the reference those sprint files cite (§3.1).**
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED` gates the `agents` section, the alias and the MCP tool; the bundle endpoints themselves are gated by `BUNDLE.ENABLED` (seeded `0`) so later tracks can ship sections while assistants stay off on an install.
@@ -79,7 +79,7 @@ interface BundleSectionInterface
 
 ### 2.2 `agents` section (`AB41`)
 
-`AgentBundleSection` exports published definitions (`BDEFINITION` of the published version; drafts opt-in per assistant) with `key = BSLUG`, `prompt = <prompt key>`, `parent` (slug, only if the parent is in the same bundle), `icon`, `description`. **Stripped on export:** `knowledge.folders` entries other than the own folder (they name another owner); `tools.mcpServers` ids are replaced by MCP server *names* so track 4's section can rebind. `preview()` per item: unresolvable `models.*` ⇒ **needs a model** (`chat`, …); unknown MCP server names ⇒ **needs an MCP server**; dropped folders ⇒ note. `apply()` creates **drafts** (`BSOURCE = import`, `BSTATUS = draft`, no version, no share), slug deduplicated with `-imported`.
+`AgentBundleSection` exports published definitions (`BDEFINITION` of the published version; drafts opt-in per assistant) with `key = BSLUG`, `prompt = <prompt key>`, `parent` (slug, only if the parent is in the same bundle), `icon`, `description`. **Stripped on export:** `knowledge.folders` entries other than the own folder (they name another owner); `tools.mcpServers` ids are replaced by MCP server *names* so track 4's section can rebind; `triggers.events[]` of kind `mail` / `widget` / `whatsapp` keep `kind`, `rule` and `instruction` but drop `mailbox`, `widget`, `number` (instance ids, other owners); schedules are exported complete but imported **disabled**. `preview()` per item: unresolvable `models.*` ⇒ **needs a model** (`chat`, …); unknown MCP server names ⇒ **needs an MCP server**; dropped folders ⇒ note; a target-less event ⇒ **needs a mailbox** / **needs a widget** / **needs a WhatsApp number**; a disabled schedule ⇒ "Schedules are off until you turn them on." `apply()` creates **drafts** (`BSOURCE = import`, `BSTATUS = draft`, no version, no share), slug deduplicated with `-imported`.
 
 ### 2.3 `prompts` section (`AB42`)
 
@@ -107,13 +107,13 @@ Limits via `RateLimitService` actions `bundle_export` (20 / h) and `bundle_impor
 
 Manifest v2 key `provides.agents: ["agents/*.json"]`; each file is a `synaplan-bundle.v1` document restricted to `agents` + `prompts`. `PluginAgentInstaller` runs at plugin enable (admin action): imports as the enabling admin with `BSOURCE = plugin:<id>`, publishes v1, shares with `everyone` (`use`) through `AccessGate` — the one place an import *does* create a share, because the admin explicitly enabled the plugin; the admin can unshare. Re-enable with a changed file ⇒ new version, not a new assistant. Example pack `plugins/hello_world/agents/hello.json`.
 
-### 2.7 `assistant:<slug>` in `/v1/models` (`AB47`)
+### 2.7 The `api` event — `assistant:<slug>` in `/v1/models` (`AB47`)
 
-`agent.v1` gains optional `channels.modelAlias: true` (default `false`). `OpenAICompatibleController::listModels()` appends `{ id: "assistant:<slug>", object: "model", owned_by: "synaplan" }` for every published assistant with the alias on that the key's user may `use`. `/v1/chat/completions` with such a `model` resolves the assistant, sets `agentId` and runs the pinned path on the assistant's `models.chat`. Unknown alias ⇒ the existing "model not found" error; `ApiKeyScope` unchanged (aliases need `messages:*` or wildcard as today).
+The owner adds **An app or coding tool** in the Triggers section (S5 `AB39`); that writes `triggers.events[] { kind: "api" }` — there is no separate flag. The row reads "Apps and coding tools may pick this assistant · Model name: `assistant:contract-review` · Runs as the caller" with a copy button. `OpenAICompatibleController::listModels()` appends `{ id: "assistant:<slug>", object: "model", owned_by: "synaplan" }` for every published assistant with an enabled `api` event that the key's user may `use`. `/v1/chat/completions` with such a `model` resolves the assistant, sets `agentId` and runs the pinned path on the assistant's `models.chat`. Unknown alias ⇒ the existing "model not found" error; `ApiKeyScope` unchanged (aliases need `messages:*` or wildcard as today).
 
-### 2.8 `list_assistants` MCP tool and `agentId` on `synaplan_chat` (`AB48`)
+### 2.8 The `mcp` and `desktop` events — `list_assistants` and `agentId` on `synaplan_chat` (`AB48`)
 
-`McpServerFactory`: tool `list_assistants` (read-only, `openWorldHint: false`) returns `slug`, `name`, `description`, `version`, `origin` for the user's gallery; the `synaplan_chat` input schema gains optional `agentId` (slug or int), forwarded into the classification options. Desktop and Outlook clients pick the tool up with no change on their side.
+Two more rows in **Add event**: **A connected app** (`kind: "mcp"` — Desktop, Outlook, other MCP apps; the word MCP appears only in the row's small print) and **Synaplan Desktop** (`kind: "desktop"`). `McpServerFactory`: tool `list_assistants` (read-only, `openWorldHint: false`) returns `slug`, `name`, `description`, `version`, `origin` for the assistants in the user's gallery that have an enabled `mcp` event — or an enabled `desktop` event when the session's key carries a `desktop:*` scope; the `synaplan_chat` input schema gains optional `agentId` (slug or int), forwarded into the classification options. Desktop and Outlook clients pick the tool up with no change on their side. `desktop` is deliberately its own kind although it rides on the same tool: the row can later grow "and run its skills on the user's computer" (a `skill.run` desktop job, `20260829-desktop-agent-client/`) without a schema change. Both rows say "Runs as the person using the app".
 
 ### 2.9 C7 tests (`AB49`)
 
@@ -154,7 +154,7 @@ Each of those sprints registers one class implementing `BundleSectionInterface`,
 
 1. J-AB-6 walked: on instance A the admin exports "Contract review" + its instruction from Settings → Export & import. On instance B (different catalog, no Anthropic key) the preview says "Needs a model: chat" in plain words; after import the draft opens in the builder with the model picker highlighted; nothing else was created (C7 suite).
 2. Enabling `hello_world` installs its pack; the gallery shows it under **From plugins** for every user; the admin unshares it.
-3. A coding client lists `assistant:contract-review` in `/v1/models` and a completion against it runs pinned; the Desktop client's MCP session shows `list_assistants`.
+3. The owner adds **An app or coding tool** and **A connected app** in the Triggers section; a coding client then lists `assistant:contract-review` in `/v1/models` and a completion against it runs pinned; the Desktop client's MCP session shows it in `list_assistants`. Removing the rows hides both again. Import of a definition with `mail` / `widget` events yields checklist items "needs a mailbox" / "needs a widget" and no ids.
 4. Settings → Export & import and Operate → System config → Export & import both work; the admin variant lists the excluded secret keys explicitly.
 
 ---
@@ -170,6 +170,6 @@ Each of those sprints registers one class implementing `BundleSectionInterface`,
 | AB44 | `feat(settings): add Export & import panel (user scope)` | ota-candidate | AB43 |
 | AB45 | `feat(admin): add Export & import to System config (instance scope)` | ota-candidate + backend-only | AB43 |
 | AB46 | `feat(plugins): install assistant packs from manifest provides.agents` | backend-only | AB41, AB20 |
-| AB47 | `feat(gateway): expose opt-in assistant:<slug> aliases in /v1/models` | backend-only | AB21 |
-| AB48 | `feat(mcp): add list_assistants tool and agentId on synaplan_chat` | backend-only | AB21 |
+| AB47 | `feat(gateway): expose assistant:<slug> aliases in /v1/models for the api event trigger` | backend-only + ota-candidate | AB21, AB39 |
+| AB48 | `feat(mcp): add list_assistants tool and agentId on synaplan_chat for the mcp and desktop events` | backend-only + ota-candidate | AB21, AB39 |
 | AB49 | `test(bundle): add C7 never-export / never-create suites and catalog round-trip` | backend-only | AB43, AB46 |
