@@ -5,6 +5,7 @@ import { ref, computed } from 'vue'
 import { authService, type AuthUser, type ImpersonatorInfo } from '@/services/authService'
 import { useConfigStore } from '@/stores/config'
 import { clearPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { beginSessionTeardown, endSessionTeardown } from '@/services/sessionTeardown'
 import { redeemPendingIapPurchaseAfterAuth } from '@/services/iapPostAuthRedemption'
 
 export type User = AuthUser
@@ -139,6 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
   function syncFromAuthService(): void {
     user.value = authService.getUser().value
     impersonator.value = authService.getImpersonator().value
+    if (user.value) endSessionTeardown()
     publishPrincipal()
   }
 
@@ -259,6 +261,11 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout(silent = false): Promise<void> {
+    // Before anything is cleared: from here until the browser leaves this page
+    // an unauthenticated state is the expected state, and nothing may navigate
+    // on its own or keep talking to protected endpoints. See sessionTeardown.
+    beginSessionTeardown()
+
     // Clear user immediately to prevent any auth checks during logout
     user.value = null
     impersonator.value = null

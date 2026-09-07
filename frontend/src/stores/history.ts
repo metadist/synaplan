@@ -11,6 +11,7 @@ import {
 } from '@/utils/messageMapper'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
 
 // Re-export so existing consumers keep importing from the store module.
@@ -21,6 +22,10 @@ export { parseContentWithThinking }
 // Helper function to check authentication and redirect if needed
 // Uses authService which holds user info in memory (not localStorage)
 function checkAuthOrRedirect(): boolean {
+  // A logout in progress owns the next navigation: redirecting here would
+  // cancel it (see sessionTeardown). Bail out silently instead.
+  if (isSessionTerminating()) return false
+
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
     // Only genuine expired sessions (prior login on this browser) get the

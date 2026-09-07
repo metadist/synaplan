@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useChatsStore } from '@/stores/chats'
 import { useHistoryStore } from '@/stores/history'
+import { endSessionTeardown, isSessionTerminating } from '@/services/sessionTeardown'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 
@@ -108,6 +109,8 @@ vi.mock('@/stores/userFeedback', () => ({
 describe('useAuthStore — impersonation', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // Module-scoped and deliberately not cleared by logout itself.
+    endSessionTeardown()
     refreshUserMock.mockClear()
     startApiMock.mockReset()
     stopApiMock.mockReset()
@@ -377,6 +380,8 @@ describe('useAuthStore — impersonation', () => {
     const store = useAuthStore()
     await store.refreshUser()
     expect(store.isImpersonating).toBe(true)
+    // Signing in clears any teardown left over from an earlier session.
+    expect(isSessionTerminating()).toBe(false)
 
     await store.logout()
 
@@ -386,5 +391,8 @@ describe('useAuthStore — impersonation', () => {
     // The realtime client must be torn down before the auth cookie is
     // cleared so it cannot keep retrying with stale credentials.
     expect(realtimeDisconnectMock).toHaveBeenCalledOnce()
+    // Logout owns the next navigation from here on; the stores must not
+    // redirect or keep calling protected endpoints (see sessionTeardown).
+    expect(isSessionTerminating()).toBe(true)
   })
 })

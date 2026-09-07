@@ -8,6 +8,7 @@ import { useIncomingStore } from '@/stores/incoming'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
 
@@ -22,6 +23,10 @@ const HISTORY_PAGE_SIZE = 20
 // successful login (session hint) — a never-logged-in guest gets the neutral
 // `auth_required`, so they never see the misleading "session expired" message.
 function checkAuthOrRedirect(): boolean {
+  // A logout in progress owns the next navigation: redirecting here would
+  // cancel it (see sessionTeardown). Bail out silently instead.
+  if (isSessionTerminating()) return false
+
   if (!authService.isAuthenticated()) {
     console.warn('🔒 Not authenticated - redirecting to login')
     const reason = hasSessionHint() ? 'session_expired' : 'auth_required'
