@@ -30,18 +30,16 @@ final class LinkCodeServiceTest extends TestCase
                 return true;
             }
         );
-        $this->redis->method('get')->willReturnCallback(
+        $this->redis->method('getAndDelete')->willReturnCallback(
             function (string $key): ?string {
-                return $this->store[$key] ?? null;
-            }
-        );
-        $this->redis->method('delete')->willReturnCallback(
-            function (string $key): bool {
+                $value = $this->store[$key] ?? null;
                 unset($this->store[$key]);
 
-                return true;
+                return $value;
             }
         );
+        $this->redis->expects(self::never())->method('get');
+        $this->redis->expects(self::never())->method('delete');
         $this->service = new LinkCodeService($this->redis);
     }
 

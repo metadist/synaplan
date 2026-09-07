@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { httpClient } from './httpClient'
 import {
   ApprovePlatformInstanceResponseSchema,
+  ConnectOutlookAddinResponseSchema,
   CreatePlatformLinkCodeResponseSchema,
   DisconnectMyPlatformLinkResponseSchema,
   GetPlatformInstancePublicResponseSchema,
@@ -18,7 +19,31 @@ export type AdminPlatformInstance = NonNullable<
   z.infer<typeof ListAdminPlatformInstancesResponseSchema>['instances']
 >[number]
 
+export type OutlookConnectResult = z.infer<typeof ConnectOutlookAddinResponseSchema>
+export type OutlookSignInPayload = OutlookConnectResult['payload']
+
 export const platformLinksApi = {
+  /**
+   * Outlook add-in connect. The server mints the add-in key and decides
+   * whether the relay may receive it (allow-list in `outlook-builtin`).
+   * Not gated by PLATFORM_LINKS.ENABLED.
+   */
+  async connectOutlook(payload: {
+    state: string
+    redirectUri: string
+    baseUrl: string
+  }): Promise<OutlookConnectResult> {
+    return httpClient('/api/v1/addin/connect', {
+      method: 'POST',
+      body: JSON.stringify({
+        state: payload.state,
+        redirect_uri: payload.redirectUri || null,
+        base_url: payload.baseUrl || null,
+      }),
+      schema: ConnectOutlookAddinResponseSchema,
+    })
+  },
+
   async getPublicInstance(instanceId: string): Promise<{ client: string; host: string }> {
     const data = await httpClient(`/api/v1/platform-links/instances/${instanceId}/public`, {
       method: 'GET',

@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { createI18n } from 'vue-i18n'
 import { nextTick, ref } from 'vue'
 
-const createApiKey = vi.fn()
+const connectOutlook = vi.fn()
 const getPublicInstance = vi.fn()
 const createLinkCode = vi.fn()
 const getConfigSync = vi.fn()
@@ -13,12 +13,9 @@ const isAuthenticated = ref(true)
 const userEmail = ref('demo@synaplan.com')
 const logout = vi.fn()
 
-vi.mock('@/services/api/apiKeysApi', () => ({
-  createApiKey: (...args: unknown[]) => createApiKey(...args),
-}))
-
 vi.mock('@/services/api/platformLinksApi', () => ({
   platformLinksApi: {
+    connectOutlook: (...args: unknown[]) => connectOutlook(...args),
     getPublicInstance: (...args: unknown[]) => getPublicInstance(...args),
     createLinkCode: (...args: unknown[]) => createLinkCode(...args),
   },
@@ -53,11 +50,33 @@ import PlatformConnectView from '@/views/PlatformConnectView.vue'
 import en from '@/i18n/en.json'
 
 const assign = vi.fn()
+const messageParent = vi.fn()
+const openerPostMessage = vi.fn()
+
+const PAYLOAD = {
+  state: 'nonce1',
+  apiKey: 'sk_test',
+  keyId: 9,
+  email: 'demo@synaplan.com',
+  baseUrl: 'https://web.synaplan.com',
+}
+
+type OfficeStub = {
+  onReady: (cb: () => void) => void
+  context?: { ui: { messageParent: (data: string) => void } }
+}
+
+function installOffice(withMessageParent: boolean): void {
+  const office: OfficeStub = { onReady: (cb) => cb() }
+  if (withMessageParent) {
+    office.context = { ui: { messageParent } }
+  }
+  ;(window as unknown as { Office?: OfficeStub }).Office = office
+}
 
 function messages() {
   return {
     platformConnect: en.platformConnect,
-    addinConnect: en.addinConnect,
   }
 }
 
@@ -88,15 +107,19 @@ describe('PlatformConnectView', () => {
     isAuthenticated.value = true
     userEmail.value = 'demo@synaplan.com'
     getConfigSync.mockReturnValue({ features: { platformLinksEnabled: false } })
-    createApiKey.mockReset()
+    connectOutlook.mockReset()
     getPublicInstance.mockReset()
     createLinkCode.mockReset()
     logout.mockReset()
     assign.mockReset()
+    messageParent.mockReset()
+    openerPostMessage.mockReset()
     vi.stubGlobal('location', { ...window.location, assign, origin: 'https://web.synaplan.com' })
-    ;(window as unknown as { Office?: { onReady: (cb: () => void) => void } }).Office = {
-      onReady: (cb) => cb(),
-    }
+    Object.defineProperty(window, 'opener', {
+      configurable: true,
+      value: { closed: false, postMessage: openerPostMessage },
+    })
+    installOffice(true)
   })
 
   it('shows the Outlook confirm card when platformLinksEnabled is false', async () => {
@@ -114,7 +137,7 @@ describe('PlatformConnectView', () => {
     expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('not recognised')
     expect(getPublicInstance).not.toHaveBeenCalled()
-    expect(createApiKey).not.toHaveBeenCalled()
+    expect(connectOutlook).not.toHaveBeenCalled()
   })
 
   it('redirects unauthenticated Outlook users with the full path', async () => {
@@ -129,33 +152,55 @@ describe('PlatformConnectView', () => {
     expect(redirect).toContain('redirect=c')
   })
 
-  it('assigns the relay with a payload fragment for Outlook', async () => {
-    createApiKey.mockResolvedValue({
+  it('follows the server-built relay redirect for Outlook', async () => {
+    const relay = 'https://localhost:3000/src/dialog/auth-relay.html'
+    connectOutlook.mockResolvedValue({
       success: true,
-      api_key: { id: 9, key: 'sk_test', name: 'Outlook', scopes: [] },
+      redirect: `${relay}#payload=abc`,
+      payload: PAYLOAD,
     })
     const { wrapper } = await mountAt(
-      '/connect/platform?client=outlook&state=nonce1&redirect=https://localhost/src/dialog/auth-relay.html'
+      `/connect/platform?client=outlook&state=nonce1&redirect=${encodeURIComponent(relay)}`
     )
     await wrapper.get('[data-testid="btn-connect"]').trigger('click')
     await flushPromises()
-    expect(createApiKey).toHaveBeenCalled()
-    expect(assign).toHaveBeenCalled()
-    const url = String(assign.mock.calls[0][0])
-    expect(url).toContain('https://localhost/src/dialog/auth-relay.html')
-    expect(url).toContain('#payload=')
+
+    expect(connectOutlook).toHaveBeenCalledWith({
+      state: 'nonce1',
+      redirectUri: relay,
+      baseUrl: 'https://web.synaplan.com',
+    })
+    expect(assign).toHaveBeenCalledWith(`${relay}#payload=abc`)
+    expect(messageParent).not.toHaveBeenCalled()
+    expect(openerPostMessage).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="section-success"]').exists()).toBe(true)
   })
 
-  it('ignores an unsafe relay host', async () => {
-    createApiKey.mockResolvedValue({
-      success: true,
-      api_key: { id: 9, key: 'sk_test', name: 'Outlook', scopes: [] },
-    })
+  it('falls back to Office messageParent when the server rejects the relay', async () => {
+    connectOutlook.mockResolvedValue({ success: true, redirect: null, payload: PAYLOAD })
     const { wrapper } = await mountAt(
       '/connect/platform?client=outlook&state=nonce1&redirect=https://evil.example/relay'
     )
     await wrapper.get('[data-testid="btn-connect"]').trigger('click')
     await flushPromises()
+
     expect(assign).not.toHaveBeenCalled()
+    expect(messageParent).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(messageParent.mock.calls[0][0]))).toEqual(PAYLOAD)
+    expect(openerPostMessage).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="section-success"]').exists()).toBe(true)
+  })
+
+  it('never posts the key to window.opener and errors without an Office channel', async () => {
+    installOffice(false)
+    connectOutlook.mockResolvedValue({ success: true, redirect: null, payload: PAYLOAD })
+    const { wrapper } = await mountAt('/connect/platform?client=outlook&state=nonce1')
+    await wrapper.get('[data-testid="btn-connect"]').trigger('click')
+    await flushPromises()
+
+    expect(assign).not.toHaveBeenCalled()
+    expect(openerPostMessage).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Open this page from inside Outlook')
   })
 })

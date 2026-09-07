@@ -157,18 +157,22 @@ import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
 import { useTheme } from '@/composables/useTheme'
 import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
-import { createApiKey } from '@/services/api/apiKeysApi'
-import { platformLinksApi } from '@/services/api/platformLinksApi'
+import { platformLinksApi, type OutlookSignInPayload } from '@/services/api/platformLinksApi'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 import { resolvePlatformClient, type PlatformClientPolicy } from '@/platform-connect/clients'
 
-interface SignInPayload {
-  state: string
-  apiKey: string
-  keyId: number
-  email: string
-  baseUrl: string
-}
+/**
+ * /connect/platform — the shared "connect a platform" confirm card.
+ *
+ * Outlook (`client=outlook`, delivery `fragment-payload`): the server mints
+ * the add-in key and builds the relay redirect; the relay host must be on the
+ * `outlook-builtin` allow-list in BPLATFORMINSTANCES. This page never decides
+ * where the key travels and never posts it to an unknown window.
+ *
+ * Nextcloud / ownCloud / OpenCloud (`link-code`): the server issues a one-time
+ * code and the browser follows the redirect it returns. The key is minted
+ * server-to-server on exchange and never reaches this page.
+ */
 
 interface OfficeUi {
   messageParent: (data: string) => void
@@ -226,26 +230,8 @@ const targetBaseUrl = computed(() => {
   return window.location.origin
 })
 
-function isSafeRedirect(url: string): boolean {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return false
-    const h = u.hostname
-    return (
-      h === 'localhost' ||
-      h === '127.0.0.1' ||
-      h === 'addin.synaplan.com' ||
-      h.endsWith('.synaplan.com')
-    )
-  } catch {
-    return false
-  }
-}
-
-const redirectTarget = computed(() => {
-  const raw = route.query.redirect as string | undefined
-  return raw && isSafeRedirect(raw) ? raw : ''
-})
+/** Relay page requested by the add-in; the server validates it, not this page. */
+const requestedRelay = computed(() => ((route.query.redirect as string | undefined) ?? '').trim())
 
 function cycleLanguage(): void {
   const currentIndex = supportedLanguages.indexOf(
@@ -296,43 +282,20 @@ function loadOfficeJs(): Promise<OfficeApi | null> {
   })
 }
 
-function buildKeyName(): string {
-  const ua = navigator.userAgent
-  let host = 'browser'
-  const m = ua.match(/Windows NT|Mac OS X|Linux/i)
-  if (m) host = m[0]
-  return `Outlook Add-in (${host})`
-}
-
-async function postPayloadToParent(payload: SignInPayload): Promise<void> {
-  const serialized = JSON.stringify(payload)
-  let sent = false
-
-  try {
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(serialized, '*')
-      sent = true
-    }
-  } catch {
-    // channel 2 may still succeed
+/**
+ * Fallback delivery when the server returned no relay redirect: the Office
+ * dialog channel. Office restricts `messageParent` to the add-in that opened
+ * the dialog, so the key cannot land in a foreign window. There is
+ * deliberately no `window.opener.postMessage` — a popup opened by an
+ * attacker page would otherwise receive the key.
+ */
+function postPayloadToOffice(payload: OutlookSignInPayload): void {
+  const office = (window as unknown as { Office?: OfficeApi }).Office
+  const messageParent = office?.context?.ui?.messageParent
+  if (typeof messageParent !== 'function') {
+    throw new Error(t('platformConnect.errorNoDeliveryChannel'))
   }
-
-  try {
-    const office = (window as unknown as { Office?: OfficeApi }).Office
-    if (office?.context?.ui?.messageParent) {
-      office.context.ui.messageParent(serialized)
-      sent = true
-    }
-  } catch {
-    // channel 1 may have succeeded
-  }
-
-  if (!sent) {
-    throw new Error(
-      'No channel available to deliver the sign-in payload to the parent — ' +
-        'window.opener is missing and Office.js is not present.'
-    )
-  }
+  messageParent.call(office?.context.ui, JSON.stringify(payload))
 }
 
 async function handleOutlookConnect(): Promise<void> {
@@ -352,32 +315,23 @@ async function handleOutlookConnect(): Promise<void> {
     return
   }
 
-  const response = await createApiKey({
-    name: buildKeyName(),
-    scopes: ['messages:*', 'chats:*', 'files:*', 'rag:*'],
+  const response = await platformLinksApi.connectOutlook({
+    state: stateNonce.value,
+    redirectUri: requestedRelay.value,
+    baseUrl: targetBaseUrl.value,
   })
-
-  if (!response.success || !response.api_key?.key) {
+  if (!response.success || !response.payload?.apiKey) {
     throw new Error(t('platformConnect.errorIssuanceFailed'))
   }
 
-  const payload: SignInPayload = {
-    state: stateNonce.value,
-    apiKey: response.api_key.key,
-    keyId: response.api_key.id,
-    email: userEmail.value,
-    baseUrl: targetBaseUrl.value,
-  }
-
-  if (redirectTarget.value) {
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
-    const sep = redirectTarget.value.includes('#') ? '&' : '#'
+  if (response.redirect) {
+    // Server-built relay URL (allow-listed host, payload in the fragment).
     viewState.value = 'success'
-    window.location.assign(`${redirectTarget.value}${sep}payload=${encodeURIComponent(encoded)}`)
+    window.location.assign(response.redirect)
     return
   }
 
-  await postPayloadToParent(payload)
+  postPayloadToOffice(response.payload)
   viewState.value = 'success'
 }
 

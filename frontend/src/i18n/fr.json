@@ -148,7 +148,6 @@
     "widgetChats": "Chats du widget",
     "widgetDetail": "Détail du widget",
     "liveSupport": "Assistance en direct",
-    "addinConnect": "Connecter le complément Outlook",
     "platformConnect": "Connecter Synaplan",
     "linkedPlatforms": "Plateformes liées",
     "accountDeletion": "Suppression du compte",
@@ -222,24 +221,6 @@
       "countersResetFailed": "L’historique des erreurs n’a pas pu être effacé."
     }
   },
-  "addinConnect": {
-    "title": "Connecter à Synaplan",
-    "subtitle": "Autorisez le complément Outlook Synamail à utiliser ce compte Synaplan.",
-    "loading": "Vérification de votre session…",
-    "confirmPrompt": "Connecter cet Outlook à :",
-    "connectButton": "Connecter Outlook",
-    "scopesNote": "Accorde l’accès aux messages, chats, fichiers et à la recherche RAG.",
-    "connecting": "Émission d’une clé API sécurisée…",
-    "successTitle": "Connecté.",
-    "successSubtitle": "Vous pouvez fermer cette fenêtre si elle ne se ferme pas toute seule.",
-    "errorTitle": "Impossible de se connecter",
-    "retry": "Réessayer",
-    "helpLine": "Cette fenêtre est ouverte par le complément Synamail. Vous pouvez la fermer en toute sécurité.",
-    "errorMissingState": "Paramètre state manquant. Rouvrez le complément et réessayez.",
-    "errorOfficeNotReady": "Office.js n’est pas disponible. Cette page doit être ouverte depuis Outlook.",
-    "errorNotSignedIn": "Vous n’êtes pas connecté. Actualisez la fenêtre et reconnectez-vous.",
-    "errorIssuanceFailed": "Synaplan n’a pas pu émettre de clé API pour ce compte."
-  },
   "platformConnect": {
     "title": "Connecter Synaplan",
     "subtitle": "Autoriser {client} à utiliser ce compte Synaplan.",
@@ -260,6 +241,7 @@
     "errorIssuanceFailed": "Synaplan n’a pas pu terminer cette connexion.",
     "errorUnknownClient": "Cette demande de connexion n’est pas reconnue.",
     "errorFlagOff": "La liaison de cette plateforme n’est pas activée sur cette instance Synaplan.",
+    "errorNoDeliveryChannel": "Synaplan n’a pas pu transmettre la connexion à Outlook. Ouvrez cette page depuis Outlook et réessayez.",
     "clients": {
       "outlook": "Outlook",
       "nextcloud": "Nextcloud",

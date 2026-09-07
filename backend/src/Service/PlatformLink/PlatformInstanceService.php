@@ -22,6 +22,11 @@ final readonly class PlatformInstanceService
     public const REGISTER_IP_LIMIT = 10;
     public const REGISTER_IP_WINDOW = 3600;
 
+    /** Matches BEXTERNALIDENTITIES.BEXTERNALID (VARCHAR(191)). */
+    public const EXTERNAL_ID_MAX_LENGTH = 191;
+    /** Generous cap for the partner's CSRF nonce, which only round-trips. */
+    public const STATE_MAX_LENGTH = 512;
+
     public function __construct(
         private PlatformInstanceRepository $instanceRepository,
         private ExternalIdentityRepository $externalIdentityRepository,
@@ -216,8 +221,14 @@ final readonly class PlatformInstanceService
         if ('' === $externalId) {
             throw new PlatformLinkValidationException('external_id is required.');
         }
+        if (mb_strlen($externalId) > self::EXTERNAL_ID_MAX_LENGTH) {
+            throw new PlatformLinkValidationException(sprintf('external_id must be at most %d characters.', self::EXTERNAL_ID_MAX_LENGTH));
+        }
         if ('' === $state) {
             throw new PlatformLinkValidationException('state is required.');
+        }
+        if (mb_strlen($state) > self::STATE_MAX_LENGTH) {
+            throw new PlatformLinkValidationException(sprintf('state must be at most %d characters.', self::STATE_MAX_LENGTH));
         }
         if (!$this->redirectUriPolicy->matchesRegisteredPrefix($redirectUri, $instance->getHost(), $instance->getRedirectUris())) {
             $this->auditLogWriter->record(

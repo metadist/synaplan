@@ -65,6 +65,8 @@ final readonly class LinkCodeService
 
     /**
      * Consume a code once. Returns null for unknown, expired, or already-used codes.
+     * The read and the delete are one Redis command (GETDEL) so two exchanges
+     * racing on the same code cannot both succeed (C5).
      *
      * @return array{userId: int, instanceId: string, externalId: string, redirectUri: string, withMemories: bool, expiresAt: int}|null
      */
@@ -75,12 +77,10 @@ final readonly class LinkCodeService
             return null;
         }
 
-        $raw = $this->redis->get(self::CODE_PREFIX.$code);
+        $raw = $this->redis->getAndDelete(self::CODE_PREFIX.$code);
         if (null === $raw) {
             return null;
         }
-
-        $this->redis->delete(self::CODE_PREFIX.$code);
 
         $decoded = json_decode($raw, true);
         if (!\is_array($decoded) || !isset($decoded['userId'], $decoded['instanceId'], $decoded['externalId'])) {

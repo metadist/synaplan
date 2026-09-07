@@ -46,6 +46,11 @@ final readonly class RedirectUriPolicy
         if (str_contains($raw, '\\') || str_contains($raw, '@') || str_contains($raw, ' ')) {
             throw new PlatformLinkValidationException('Host is not a valid hostname.');
         }
+        if (str_contains($raw, '*')) {
+            // Only the seeded Outlook built-in row may carry a wildcard host;
+            // a registrable instance with `*` would accept any redirect target.
+            throw new PlatformLinkValidationException('Wildcard hosts cannot be registered.');
+        }
 
         if (str_contains($raw, '://')) {
             $parsed = parse_url($raw);
@@ -105,6 +110,12 @@ final readonly class RedirectUriPolicy
 
     /**
      * True when $redirectUri prefix-matches one registered entry on $instanceHost.
+     *
+     * For the Outlook built-in row the instance host is `*`: the candidate is
+     * then only checked against the hosts carried by the registered prefixes
+     * (`https://localhost`, `https://*.synaplan.com`, …), never against `*`.
+     *
+     * @param list<mixed> $registered
      */
     public function matchesRegisteredPrefix(string $redirectUri, string $instanceHost, array $registered): bool
     {
@@ -170,15 +181,21 @@ final readonly class RedirectUriPolicy
         $this->assertAllowedScheme($scheme, $host);
 
         $expected = $this->splitHostPort($instanceHost);
-        if (!$allowWildcardHost || !str_contains($expected['host'], '*')) {
+        $instanceIsWildcard = str_contains($expected['host'], '*');
+        if ($instanceIsWildcard) {
+            // Built-in row: registered prefixes may name any host under the
+            // pattern; candidates are matched against those prefixes in
+            // prefixMatches(), so no instance-host comparison happens here.
+            if ($allowWildcardHost && !$this->wildcardHostMatches($expected['host'], $host)) {
+                throw new PlatformLinkValidationException('Redirect URI host must match the registered instance host.');
+            }
+        } else {
             if ($host !== $expected['host']) {
                 throw new PlatformLinkValidationException('Redirect URI host must match the registered instance host.');
             }
             if (null !== $expected['port'] && (int) ($parsed['port'] ?? 0) !== $expected['port']) {
                 throw new PlatformLinkValidationException('Redirect URI port must match the registered instance host.');
             }
-        } elseif (!$this->wildcardHostMatches($expected['host'], $host)) {
-            throw new PlatformLinkValidationException('Redirect URI host must match the registered instance host.');
         }
 
         $path = (string) ($parsed['path'] ?? '/');
@@ -213,14 +230,32 @@ final readonly class RedirectUriPolicy
         } elseif ($allowed['host'] !== $candidate['host']) {
             return false;
         }
-        if ($allowed['port'] !== $candidate['port']) {
+        if ($allowed['port'] !== $candidate['port'] && !$this->portFreeLocalPrefix($allowed)) {
             return false;
         }
 
-        $prefix = '' === rtrim($allowed['path'], '/') ? '/' : rtrim($allowed['path'], '/');
+        $prefix = rtrim($allowed['path'], '/');
         $path = $candidate['path'];
+        if ('' === $prefix) {
+            // Registered root (`https://host` or `https://host/`): every path
+            // on that origin is below it.
+            return str_starts_with($path, '/');
+        }
 
         return $path === $prefix || $path === $prefix.'/' || str_starts_with($path, $prefix.'/');
+    }
+
+    /**
+     * A registered prefix on the developer's own machine without an explicit
+     * port (`https://localhost`) accepts any port: the Outlook add-in dev
+     * server picks its own (`:3000`), and localhost is not reachable by an
+     * attacker. Every other host keeps strict port matching.
+     *
+     * @param array{scheme: string, host: string, port: ?int, path: string} $allowed
+     */
+    private function portFreeLocalPrefix(array $allowed): bool
+    {
+        return null === $allowed['port'] && $this->isLocalDevHost($allowed['host']);
     }
 
     private function wildcardHostMatches(string $pattern, string $host): bool

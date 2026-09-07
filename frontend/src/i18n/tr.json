@@ -147,7 +147,6 @@
     "widgetSessions": "Widget Oturumları",
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
-    "addinConnect": "Outlook eklentisini bağla",
     "platformConnect": "Synaplan’ı bağla",
     "linkedPlatforms": "Bağlı platformlar",
     "accountDeletion": "Hesap Silme",
@@ -221,24 +220,6 @@
       "countersResetFailed": "Hata geçmişi temizlenemedi."
     }
   },
-  "addinConnect": {
-    "title": "Synaplan'a bağlan",
-    "subtitle": "Synamail Outlook eklentisinin bu Synaplan hesabını kullanmasına izin ver.",
-    "loading": "Oturumun denetleniyor…",
-    "confirmPrompt": "Bu Outlook'u şuna bağla:",
-    "connectButton": "Outlook'u bağla",
-    "scopesNote": "Mesajlara, sohbetlere, dosyalara ve RAG aramaya erişim sağlar.",
-    "connecting": "Güvenli bir API anahtarı oluşturuluyor…",
-    "successTitle": "Bağlandı.",
-    "successSubtitle": "Bu pencere kendiliğinden kapanmazsa kapatabilirsin.",
-    "errorTitle": "Bağlanılamadı",
-    "retry": "Tekrar dene",
-    "helpLine": "Bu pencere Synamail eklentisi tarafından açıldı. Kapatması güvenlidir.",
-    "errorMissingState": "state parametresi eksik. Eklentiyi yeniden açıp tekrar dene.",
-    "errorOfficeNotReady": "Office.js kullanılabilir değil. Bu sayfa Outlook içinden açılmalıdır.",
-    "errorNotSignedIn": "Oturum açmadın. Pencereyi yenileyip tekrar oturum aç.",
-    "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
-  },
   "platformConnect": {
     "title": "Synaplan’ı bağla",
     "subtitle": "{client} uygulamasının bu Synaplan hesabını kullanmasına izin ver.",
@@ -259,6 +240,7 @@
     "errorIssuanceFailed": "Synaplan bu bağlantıyı tamamlayamadı.",
     "errorUnknownClient": "Bu bağlantı isteği tanınmıyor.",
     "errorFlagOff": "Bu platformu bağlamak bu Synaplan kurulumunda açık değil.",
+    "errorNoDeliveryChannel": "Synaplan bağlantıyı Outlook'a geri iletemedi. Bu sayfayı Outlook içinden açıp yeniden deneyin.",
     "clients": {
       "outlook": "Outlook",
       "nextcloud": "Nextcloud",
