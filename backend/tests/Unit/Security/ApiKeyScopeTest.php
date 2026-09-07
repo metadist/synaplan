@@ -263,6 +263,34 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users'));
     }
 
+    public function testPlatformLinkScopesEqualProvisionedScopes(): void
+    {
+        self::assertSame(
+            ApiKeyScope::provisionedPlatformScopes(),
+            ApiKeyScope::platformLinkScopes(),
+        );
+        self::assertSame(['chat', 'files', 'rag'], ApiKeyScope::platformLinkScopes());
+        self::assertSame(['chat', 'files', 'rag', 'memories'], ApiKeyScope::platformLinkScopes(true));
+    }
+
+    public function testGrandfatherUnchanged(): void
+    {
+        self::assertSame([
+            'messages:*',
+            'chats:*',
+            'files:*',
+            'rag:*',
+        ], ApiKeyScope::addinScopes());
+        self::assertSame([
+            'desktop:messages',
+            'desktop:mcp',
+            'desktop:files',
+            'desktop:jobs',
+        ], ApiKeyScope::pairingScopes());
+        self::assertFalse(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/admin/users'));
+        self::assertTrue(ApiKeyScope::allows(ApiKeyScope::platformLinkScopes(), '/api/v1/auth/me'));
+    }
+
     public function testSelfRevokeMatchesOnlyOwnKeyViaDelete(): void
     {
         self::assertTrue(ApiKeyScope::isSelfRevoke('DELETE', '/api/v1/apikeys/12', 12));

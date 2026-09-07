@@ -19,6 +19,7 @@
       <UsersTab v-if="activeTab === 'users'" show-iam-columns />
       <GroupsTab v-else-if="activeTab === 'groups'" />
       <PoliciesTab v-else-if="activeTab === 'policies'" />
+      <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
       <AuditTab v-else />
     </div>
   </MainLayout>
@@ -33,11 +34,13 @@ import UsersTab from '@/components/people/UsersTab.vue'
 import GroupsTab from '@/components/people/GroupsTab.vue'
 import PoliciesTab from '@/components/people/PoliciesTab.vue'
 import AuditTab from '@/components/people/AuditTab.vue'
+import PlatformInstancesTab from '@/components/people/PlatformInstancesTab.vue'
 import { isIamPoliciesEnabled } from '@/composables/useIamFeature'
+import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const activeTab = ref<'users' | 'groups' | 'policies' | 'audit'>('users')
+const activeTab = ref<'users' | 'groups' | 'policies' | 'linked-platforms' | 'audit'>('users')
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const tabs: TabNavItem[] = [
@@ -62,6 +65,14 @@ const tabNavItems = computed<TabNavItem[]>(() => {
       testid: 'tab-policies',
     })
   }
+  if (isPlatformLinksEnabled()) {
+    tabs.push({
+      id: 'linked-platforms',
+      label: t('people.tabs.linkedPlatforms'),
+      icon: 'mdi:link-variant',
+      testid: 'tab-linked-platforms',
+    })
+  }
   tabs.push({
     id: 'audit',
     label: t('people.tabs.audit'),
@@ -72,7 +83,13 @@ const tabNavItems = computed<TabNavItem[]>(() => {
 })
 
 function onTabNavChange(id: string) {
-  if (id === 'users' || id === 'groups' || id === 'policies' || id === 'audit') {
+  if (
+    id === 'users' ||
+    id === 'groups' ||
+    id === 'policies' ||
+    id === 'linked-platforms' ||
+    id === 'audit'
+  ) {
     activeTab.value = id
   }
 }

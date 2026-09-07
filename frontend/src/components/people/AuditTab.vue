@@ -105,6 +105,16 @@ const ACTION_KEYS: Record<string, string> = {
   'impersonation.start': 'people.audit.action.impersonation_start',
   'impersonation.stop': 'people.audit.action.impersonation_stop',
   'admin.metadata_view': 'people.audit.action.admin_metadata_view',
+  'policy.set': 'people.audit.action.policy_set',
+  'policy.lock': 'people.audit.action.policy_lock',
+  'platform_link.linked': 'people.audit.action.platform_link_linked',
+  'platform_link.disconnected': 'people.audit.action.platform_link_disconnected',
+  'platform_link.reassigned': 'people.audit.action.platform_link_reassigned',
+  'platform_link.exchange_failed': 'people.audit.action.platform_link_exchange_failed',
+  'platform_link.redirect_rejected': 'people.audit.action.platform_link_redirect_rejected',
+  'platform_instance.registered': 'people.audit.action.platform_instance_registered',
+  'platform_instance.approved': 'people.audit.action.platform_instance_approved',
+  'platform_instance.revoked': 'people.audit.action.platform_instance_revoked',
 }
 
 const selectedAction = ref<string | undefined>(undefined)

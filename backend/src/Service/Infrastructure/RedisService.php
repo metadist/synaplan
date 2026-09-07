@@ -173,6 +173,31 @@ final class RedisService
         }
     }
 
+    /**
+     * Atomically read and delete a key (GETDEL, Redis >= 6.2). Exactly one
+     * concurrent caller receives the value; everyone else gets null. Use this
+     * for one-time tokens where a GET followed by a DEL would leave a window
+     * in which two callers both see the value.
+     */
+    public function getAndDelete(string $key): ?string
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return null;
+        }
+
+        try {
+            /** @var mixed $value predis' stub says string, but a missing key yields null */
+            $value = $client->getdel($this->prefix($key));
+
+            return \is_string($value) ? $value : null;
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('GETDEL', $key, $e);
+
+            return null;
+        }
+    }
+
     public function exists(string $key): bool
     {
         $client = $this->client();

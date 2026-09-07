@@ -15,6 +15,7 @@ export interface ApiKey {
   scopes: string[]
   last_used: number | null
   created: number
+  linked_platform?: { client: string; host: string } | null
 }
 
 export interface CreateApiKeyRequest {

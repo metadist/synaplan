@@ -147,7 +147,8 @@
     "widgetSessions": "Widget Oturumları",
     "widgetChats": "Widget Sohbetleri",
     "liveSupport": "Canlı Destek",
-    "addinConnect": "Outlook eklentisini bağla",
+    "platformConnect": "Synaplan’ı bağla",
+    "linkedPlatforms": "Bağlı platformlar",
     "accountDeletion": "Hesap Silme",
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
@@ -219,23 +220,53 @@
       "countersResetFailed": "Hata geçmişi temizlenemedi."
     }
   },
-  "addinConnect": {
-    "title": "Synaplan'a bağlan",
-    "subtitle": "Synamail Outlook eklentisinin bu Synaplan hesabını kullanmasına izin ver.",
-    "loading": "Oturumun denetleniyor…",
-    "confirmPrompt": "Bu Outlook'u şuna bağla:",
-    "connectButton": "Outlook'u bağla",
-    "scopesNote": "Mesajlara, sohbetlere, dosyalara ve RAG aramaya erişim sağlar.",
-    "connecting": "Güvenli bir API anahtarı oluşturuluyor…",
+  "platformConnect": {
+    "title": "Synaplan’ı bağla",
+    "subtitle": "{client} uygulamasının bu Synaplan hesabını kullanmasına izin ver.",
+    "loading": "Oturumunuz kontrol ediliyor…",
+    "confirmPrompt": "{host} üzerindeki {client} uygulamasını {uid} olarak bağla?",
+    "connectButton": "{client} bağla",
+    "scopesNote": "Sohbetlere, dosyalara ve aramaya erişim verir. Anahtar platformda kalır — buraya yazmazsınız.",
+    "connecting": "Bağlanıyor…",
     "successTitle": "Bağlandı.",
-    "successSubtitle": "Bu pencere kendiliğinden kapanmazsa kapatabilirsin.",
+    "successSubtitle": "Kendiliğinden kapanmazsa bu pencereyi kapatabilirsiniz.",
     "errorTitle": "Bağlanılamadı",
-    "retry": "Tekrar dene",
-    "helpLine": "Bu pencere Synamail eklentisi tarafından açıldı. Kapatması güvenlidir.",
-    "errorMissingState": "state parametresi eksik. Eklentiyi yeniden açıp tekrar dene.",
-    "errorOfficeNotReady": "Office.js kullanılabilir değil. Bu sayfa Outlook içinden açılmalıdır.",
-    "errorNotSignedIn": "Oturum açmadın. Pencereyi yenileyip tekrar oturum aç.",
-    "errorIssuanceFailed": "Synaplan bu hesap için bir API anahtarı veremedi."
+    "retry": "Yeniden dene",
+    "helpLine": "Bu pencere başka bir uygulama tarafından açıldı. Kapatmak güvenlidir.",
+    "notYou": "Siz değil misiniz? Çıkış yapın",
+    "errorMissingState": "Bu bağlantı isteği eksik. Diğer uygulamadan yeniden başlayın.",
+    "errorOfficeNotReady": "Office.js kullanılamıyor. Bu sayfa Outlook içinden açılmalıdır.",
+    "errorNotSignedIn": "Oturum açmadınız. Pencereyi yenileyip yeniden oturum açın.",
+    "errorIssuanceFailed": "Synaplan bu bağlantıyı tamamlayamadı.",
+    "errorUnknownClient": "Bu bağlantı isteği tanınmıyor.",
+    "errorFlagOff": "Bu platformu bağlamak bu Synaplan kurulumunda açık değil.",
+    "errorNoDeliveryChannel": "Synaplan bağlantıyı Outlook'a geri iletemedi. Bu sayfayı Outlook içinden açıp yeniden deneyin.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "bu uygulama"
+    }
+  },
+  "linkedPlatforms": {
+    "title": "Bağlı platformlar",
+    "description": "Bu Synaplan hesabını kullanabilen platformlar. Bağlantılar her zaman diğer uygulamada başlar.",
+    "empty": "Henüz bağlı platform yok. Bağlantıyı Nextcloud’da başlatın — buraya bir anahtar yazmazsınız.",
+    "table": {
+      "client": "Platform",
+      "host": "Adres",
+      "uid": "Hesap",
+      "key": "Anahtar",
+      "lastSeen": "Son kullanım",
+      "actions": "İşlemler"
+    },
+    "disconnect": "Bağlantıyı kes",
+    "disconnectTitle": "Bu platformun bağlantısı kesilsin mi?",
+    "disconnectConfirm": "{host} bağlantısı kesilsin mi? Bu platform artık bu hesabı kullanamaz.",
+    "disconnected": "Platform bağlantısı kesildi.",
+    "disconnectError": "Platformun bağlantısı kesilemedi.",
+    "loadError": "Bağlı platformlar yüklenemedi."
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
@@ -669,6 +700,7 @@
   },
   "nav": {
     "desktop": "Masaüstü",
+    "linkedPlatforms": "Bağlı platformlar",
     "chat": "Sohbet",
     "new": "Yeni",
     "newDescription": "Yeni bir sohbet başlat",
@@ -3194,6 +3226,7 @@
         "lastUsed": "Son Kullanım",
         "actions": "İşlemler"
       },
+      "linkedPlatform": "Bağlı platform",
       "status": {
         "active": "Aktif",
         "inactive": "Pasif"
@@ -4553,6 +4586,7 @@
       "users": "Kullanıcılar",
       "groups": "Gruplar",
       "policies": "Kurallar",
+      "linkedPlatforms": "Bağlı platformlar",
       "audit": "Kayıt"
     },
     "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
@@ -4630,7 +4664,36 @@
         "impersonation_stop": "Kullanıcı olarak görüntüleme bitti",
         "admin_metadata_view": "Kaynak listesine bakıldı",
         "policy_set": "Grup kuralları güncellendi",
-        "policy_lock": "Ayar kilitlendi"
+        "policy_lock": "Ayar kilitlendi",
+        "platform_link_linked": "Platform bağlandı",
+        "platform_link_disconnected": "Platform bağlantısı kesildi",
+        "platform_link_reassigned": "Platform bağlantısı başka bir hesaba taşındı",
+        "platform_link_exchange_failed": "Platform bağlantısı başarısız",
+        "platform_link_redirect_rejected": "Platform yönlendirmesi reddedildi",
+        "platform_instance_registered": "Platform kaydedildi",
+        "platform_instance_approved": "Platform onaylandı",
+        "platform_instance_revoked": "Platform iptal edildi"
+      }
+    },
+    "linkedPlatforms": {
+      "empty": "Henüz kayıtlı platform yok.",
+      "client": "Platform",
+      "host": "Adres",
+      "status": "Durum",
+      "actions": "İşlemler",
+      "approve": "Onayla",
+      "revoke": "İptal et",
+      "approved": "Platform onaylandı.",
+      "revoked": "Platform iptal edildi.",
+      "approveError": "Platform onaylanamadı.",
+      "revokeError": "Platform iptal edilemedi.",
+      "loadError": "Platformlar yüklenemedi.",
+      "revokeTitle": "Bu platform iptal edilsin mi?",
+      "revokeConfirm": "Bu platform iptal edilsin mi? Bağlı tüm anahtarlar çalışmayı durdurur.",
+      "statusValue": {
+        "active": "Etkin",
+        "pending": "Onay bekliyor",
+        "revoked": "İptal edildi"
       }
     },
     "policies": {

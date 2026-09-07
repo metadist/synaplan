@@ -46,6 +46,20 @@ test('classifies People page as ota-candidate', () => {
   assert.equal(result.classification, 'ota-candidate')
 })
 
+test('classifies platform-connect handshake as ota-candidate', () => {
+  const result = classifyFiles(
+    [
+      entry('frontend/src/platform-connect/clients.ts', 'A'),
+      entry('frontend/src/views/PlatformConnectView.vue', 'A'),
+      entry('frontend/src/composables/usePlatformLinksFeature.ts', 'A'),
+      entry('frontend/src/components/config/LinkedPlatformsConfiguration.vue', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'ota-candidate')
+})
+
 test('classifies Share dialog as ota-candidate', () => {
   const result = classifyFiles([entry('frontend/src/components/iam/ShareDialog.vue', 'A')], policy)
 

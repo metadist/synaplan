@@ -70,6 +70,12 @@ class ExternalIdentityRepository extends ServiceEntityRepository
 
     /**
      * Insert or update the (source, instanceId, externalId) row and bump lastSeen.
+     *
+     * The row is keyed by the external identity, not by the Synaplan user, so
+     * an existing row is re-owned: the caller has just proven that this
+     * external identity belongs to `$userId` now. Leaving the old owner behind
+     * would let them disconnect the link and revoke the new owner's key, while
+     * the new owner would not see the link at all.
      */
     public function upsert(
         int $userId,
@@ -81,7 +87,6 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         $identity = $this->findOneByTriple($source, $instanceId, $externalId);
         if (null === $identity) {
             $identity = new ExternalIdentity();
-            $identity->setUserId($userId);
             $identity->setSource($source);
             $identity->setInstanceId($instanceId);
             $identity->setExternalId($externalId);
@@ -89,6 +94,7 @@ class ExternalIdentityRepository extends ServiceEntityRepository
             $this->getEntityManager()->persist($identity);
         }
 
+        $identity->setUserId($userId);
         $identity->touchLastSeen();
         if (null !== $apiKeyId) {
             $identity->setApiKeyId($apiKeyId);
@@ -107,5 +113,48 @@ class ExternalIdentityRepository extends ServiceEntityRepository
             ->setParameter('userId', $userId)
             ->getQuery()
             ->execute();
+    }
+
+    /**
+     * @return list<ExternalIdentity>
+     */
+    public function findByInstanceId(string $instanceId): array
+    {
+        /** @var list<ExternalIdentity> $rows */
+        $rows = $this->findBy(['instanceId' => $instanceId]);
+
+        return $rows;
+    }
+
+    /**
+     * @param list<int> $apiKeyIds
+     *
+     * @return list<ExternalIdentity>
+     */
+    public function findByApiKeyIds(array $apiKeyIds): array
+    {
+        if ([] === $apiKeyIds) {
+            return [];
+        }
+
+        /** @var list<ExternalIdentity> $rows */
+        $rows = $this->findBy(['apiKeyId' => $apiKeyIds]);
+
+        return $rows;
+    }
+
+    public function findOneByApiKeyId(int $apiKeyId): ?ExternalIdentity
+    {
+        $row = $this->findOneBy(['apiKeyId' => $apiKeyId]);
+
+        return $row instanceof ExternalIdentity ? $row : null;
+    }
+
+    public function remove(ExternalIdentity $identity, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($identity);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
     }
 }

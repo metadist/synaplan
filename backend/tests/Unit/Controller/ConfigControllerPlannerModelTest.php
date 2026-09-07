@@ -89,6 +89,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(\App\Service\SavedTask\SavedTaskConfig::class),
             $this->createStub(\App\Service\Desktop\DesktopAgentConfig::class),
             $this->createStub(\App\Service\Agent\AgentConfig::class),
+            $this->createStub(\App\Service\PlatformLink\PlatformLinksConfig::class),
             $this->createStub(\App\Service\Iam\IamConfig::class),
             $this->createStub(ChatReadinessService::class),
             new DemoLoginHint(

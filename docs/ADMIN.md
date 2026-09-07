@@ -612,6 +612,56 @@ entry makes it invent a capability.
 | OpenAI-compatible API | [OPENAI_COMPATIBLE_API.md](OPENAI_COMPATIBLE_API.md) |
 | Anthropic-compatible API (Claude Code) | [ANTHROPIC_COMPATIBLE_API.md](ANTHROPIC_COMPATIBLE_API.md) |
 
+### Linked platforms
+
+A **linked platform** is a Nextcloud, ownCloud or OpenCloud server whose users
+sign in to Synaplan with the account they already have, instead of the partner
+app minting a fresh Synaplan account per user. The partner instance registers
+once; each of its users then links once, in the browser, while signed in to
+Synaplan. The result is a scoped API key (`chat`, `files`, `rag`, optionally
+`memories`) that the partner app stores and that the user can revoke at any
+time. The Outlook add-in (Synamail) uses the same bridge page and is always on.
+
+Everything under `/api/v1/platform-links/*` and `/api/v1/me/platform-links*`
+is gated by `PLATFORM_LINKS.ENABLED` (seeded `0`); with the flag off those
+routes answer **404** and nothing in the UI changes.
+
+```sql
+INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'PLATFORM_LINKS', 'ENABLED', '1')
+ON DUPLICATE KEY UPDATE BVALUE = '1';
+```
+
+Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
+`BEXTERNALIDENTITIES` stay; issued keys keep working until revoked.
+
+**Approving instances.** A partner instance registered by a signed-in
+administrator is `active` immediately. One registered anonymously or by a
+regular user is `pending` and cannot issue link codes until an administrator
+approves it under **Operate → People → Linked platforms** (host, client,
+status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
+10 per hour per address. Revoking an instance also revokes every key it
+issued.
+
+**What a user sees.** **Channels & integrations → Linked platforms** lists the
+user's own links (platform, host, external id, key name) with *Disconnect*,
+which revokes that key. API keys minted this way carry a *linked platform*
+badge on the API-keys page. Link codes live five minutes, are single-use, and
+a user may issue at most 20 per hour.
+
+**Security model.** Redirect targets are prefix-matched against the URIs the
+instance registered (HTTPS only outside dev, same host, same port, no
+wildcard hosts). A rejected redirect is audited as
+`platform_link.redirect_rejected`; every register, approve, revoke, link and
+disconnect writes a People → Audit row. Re-linking an external id that already
+belonged to another Synaplan account revokes the old key and moves the link to
+the new account (`platform_link.reassigned`, audited under both) — one external
+user is never two Synaplan accounts at once.
+
+Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
+(`--flag-off` proves the 404 contract). Endpoint reference:
+[Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
+
 ---
 
 ## Troubleshooting

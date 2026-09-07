@@ -118,7 +118,7 @@ final class ApiKeyScope
 
     /**
      * The scope set the Outlook add-in connect flow mints
-     * (`frontend/src/views/AddinConnectView.vue`). Frozen: already-issued
+     * (`App\Service\PlatformLink\OutlookConnectService`). Frozen: already-issued
      * Synamail keys carry exactly this list.
      *
      * @return list<string>
@@ -131,6 +131,37 @@ final class ApiKeyScope
             self::ADDIN_FILES,
             self::ADDIN_RAG,
         ];
+    }
+
+    /**
+     * Scopes minted for a linked Nextcloud / ownCloud user. Equal to the
+     * strings `POST /api/v1/admin/users/{id}/api-keys` receives from the
+     * partner apps today (`chat`, `files`, `rag`) plus `memories` when the
+     * partner admin enabled them. Mapping those strings onto paths is a
+     * separate security fix (C4) — this method must not invent new names.
+     *
+     * @return list<string>
+     */
+    public static function platformLinkScopes(bool $withMemories = false): array
+    {
+        $scopes = ['chat', 'files', 'rag'];
+        if ($withMemories) {
+            $scopes[] = 'memories';
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * The scope list a provisioned Nextcloud / ownCloud user key carries
+     * when memories are off. Kept next to {@see platformLinkScopes()} so C4
+     * can assert equality without importing the partner app.
+     *
+     * @return list<string>
+     */
+    public static function provisionedPlatformScopes(): array
+    {
+        return ['chat', 'files', 'rag'];
     }
 
     /**

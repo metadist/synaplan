@@ -134,6 +134,14 @@ security:
         # When DESKTOP_AGENT.ENABLED is off the controller still 404s (C8).
         - { path: ^/api/v1/desktop/pair$, roles: PUBLIC_ACCESS }
 
+        # Partner-instance handshake: anonymous register (pending), public
+        # confirm-card lookup, instance self-check, and code exchange. All
+        # 404 when PLATFORM_LINKS.ENABLED is off. Session routes stay auth'd.
+        - { path: ^/api/v1/platform-links/instances$, methods: [POST], roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/instances/self$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
+
         # Public shared chat endpoint (no auth required)
         - { path: ^/api/v1/chats/shared/, roles: PUBLIC_ACCESS }
 

@@ -147,7 +147,8 @@
     "widgetSessions": "Sesiones de Widget",
     "widgetChats": "Chats de Widget",
     "liveSupport": "Soporte en vivo",
-    "addinConnect": "Conectar complemento de Outlook",
+    "platformConnect": "Conectar Synaplan",
+    "linkedPlatforms": "Plataformas vinculadas",
     "accountDeletion": "Eliminación de cuenta",
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
@@ -219,23 +220,53 @@
       "countersResetFailed": "No se pudo borrar el historial de errores."
     }
   },
-  "addinConnect": {
-    "title": "Conectar a Synaplan",
-    "subtitle": "Autoriza al complemento Synamail de Outlook a usar esta cuenta de Synaplan.",
+  "platformConnect": {
+    "title": "Conectar Synaplan",
+    "subtitle": "Autoriza a {client} a usar esta cuenta de Synaplan.",
     "loading": "Comprobando tu sesión…",
-    "confirmPrompt": "Conectar este Outlook a:",
-    "connectButton": "Conectar Outlook",
-    "scopesNote": "Concede acceso a mensajes, chats, archivos y búsqueda RAG.",
-    "connecting": "Emitiendo una clave de API segura…",
+    "confirmPrompt": "¿Conectar {client} en {host} como {uid}?",
+    "connectButton": "Conectar {client}",
+    "scopesNote": "Concede acceso a chats, archivos y búsqueda. La clave permanece en la plataforma: no la escribes aquí.",
+    "connecting": "Conectando…",
     "successTitle": "Conectado.",
-    "successSubtitle": "Puedes cerrar esta ventana si no se cierra por sí sola.",
+    "successSubtitle": "Puedes cerrar esta ventana si no se cierra sola.",
     "errorTitle": "No se pudo conectar",
     "retry": "Reintentar",
-    "helpLine": "Esta ventana se abre desde el complemento Synamail. Es seguro cerrarla.",
-    "errorMissingState": "Falta el parámetro state. Vuelve a abrir el complemento e inténtalo de nuevo.",
+    "helpLine": "Esta ventana la abrió otra aplicación. Es seguro cerrarla.",
+    "notYou": "¿No eres tú? Cerrar sesión",
+    "errorMissingState": "Esta solicitud de conexión está incompleta. Empieza de nuevo en la otra aplicación.",
     "errorOfficeNotReady": "Office.js no está disponible. Esta página debe abrirse desde Outlook.",
-    "errorNotSignedIn": "No has iniciado sesión. Actualiza la ventana y vuelve a iniciar sesión.",
-    "errorIssuanceFailed": "Synaplan no pudo emitir una clave de API para esta cuenta."
+    "errorNotSignedIn": "No has iniciado sesión. Actualiza la ventana e inicia sesión de nuevo.",
+    "errorIssuanceFailed": "Synaplan no pudo completar esta conexión.",
+    "errorUnknownClient": "Esta solicitud de conexión no se reconoce.",
+    "errorFlagOff": "Vincular esta plataforma no está activado en esta instancia de Synaplan.",
+    "errorNoDeliveryChannel": "Synaplan no pudo devolver la conexión a Outlook. Abre esta página desde Outlook e inténtalo de nuevo.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "esta aplicación"
+    }
+  },
+  "linkedPlatforms": {
+    "title": "Plataformas vinculadas",
+    "description": "Plataformas que pueden usar esta cuenta de Synaplan. Las conexiones siempre empiezan en la otra aplicación.",
+    "empty": "Aún no hay plataformas vinculadas. Empieza la conexión en Nextcloud: no escribirás ninguna clave aquí.",
+    "table": {
+      "client": "Plataforma",
+      "host": "Dirección",
+      "uid": "Cuenta",
+      "key": "Clave",
+      "lastSeen": "Último uso",
+      "actions": "Acciones"
+    },
+    "disconnect": "Desconectar",
+    "disconnectTitle": "¿Desconectar esta plataforma?",
+    "disconnectConfirm": "¿Desconectar {host}? Esa plataforma ya no podrá usar esta cuenta.",
+    "disconnected": "Plataforma desconectada.",
+    "disconnectError": "No se pudo desconectar la plataforma.",
+    "loadError": "No se pudieron cargar las plataformas vinculadas."
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
@@ -669,6 +700,7 @@
   },
   "nav": {
     "desktop": "Escritorio",
+    "linkedPlatforms": "Plataformas vinculadas",
     "chat": "Chat",
     "new": "Nuevo",
     "newDescription": "Iniciar un nuevo chat",
@@ -3193,6 +3225,7 @@
         "lastUsed": "Último uso",
         "actions": "Acciones"
       },
+      "linkedPlatform": "Plataforma vinculada",
       "status": {
         "active": "Activo",
         "inactive": "Inactivo"
@@ -4552,6 +4585,7 @@
       "users": "Usuarios",
       "groups": "Grupos",
       "policies": "Políticas",
+      "linkedPlatforms": "Plataformas vinculadas",
       "audit": "Auditoría"
     },
     "usersMoved": "Los usuarios están ahora en la página Personas.",
@@ -4629,7 +4663,36 @@
         "impersonation_stop": "Dejó de ver como usuario",
         "admin_metadata_view": "Consultó la lista de recursos",
         "policy_set": "Políticas de grupo actualizadas",
-        "policy_lock": "Ajuste bloqueado"
+        "policy_lock": "Ajuste bloqueado",
+        "platform_link_linked": "Plataforma vinculada",
+        "platform_link_disconnected": "Plataforma desconectada",
+        "platform_link_reassigned": "Vínculo de plataforma movido a otra cuenta",
+        "platform_link_exchange_failed": "Error al vincular la plataforma",
+        "platform_link_redirect_rejected": "Redirección de plataforma rechazada",
+        "platform_instance_registered": "Plataforma registrada",
+        "platform_instance_approved": "Plataforma aprobada",
+        "platform_instance_revoked": "Plataforma revocada"
+      }
+    },
+    "linkedPlatforms": {
+      "empty": "Aún no se ha registrado ninguna plataforma.",
+      "client": "Plataforma",
+      "host": "Dirección",
+      "status": "Estado",
+      "actions": "Acciones",
+      "approve": "Aprobar",
+      "revoke": "Revocar",
+      "approved": "Plataforma aprobada.",
+      "revoked": "Plataforma revocada.",
+      "approveError": "No se pudo aprobar la plataforma.",
+      "revokeError": "No se pudo revocar la plataforma.",
+      "loadError": "No se pudieron cargar las plataformas.",
+      "revokeTitle": "¿Revocar esta plataforma?",
+      "revokeConfirm": "¿Revocar esta plataforma? Todas las claves vinculadas dejarán de funcionar.",
+      "statusValue": {
+        "active": "Activa",
+        "pending": "En espera de aprobación",
+        "revoked": "Revocada"
       }
     },
     "policies": {

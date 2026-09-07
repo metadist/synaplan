@@ -52,6 +52,10 @@
           <DesktopConfiguration />
         </div>
 
+        <div v-else-if="currentPage === 'platform-links'" data-testid="section-platform-links">
+          <LinkedPlatformsConfiguration />
+        </div>
+
         <div
           v-else-if="currentPage === 'api-documentation'"
           data-testid="section-api-documentation"
@@ -79,6 +83,7 @@ import ConnectionsConfiguration from '@/components/config/ConnectionsConfigurati
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import MessagesGatewayConfiguration from '@/components/config/MessagesGatewayConfiguration.vue'
 import DesktopConfiguration from '@/components/config/DesktopConfiguration.vue'
+import LinkedPlatformsConfiguration from '@/components/config/LinkedPlatformsConfiguration.vue'
 
 const route = useRoute()
 
@@ -93,6 +98,7 @@ const currentPage = computed(() => {
   if (path.startsWith('/channels/connections')) return 'connections'
   if (path.startsWith('/channels/tasks')) return 'saved-tasks'
   if (path.startsWith('/channels/desktop')) return 'desktop'
+  if (path.startsWith('/channels/platform-links')) return 'platform-links'
   if (path.startsWith('/channels')) return 'inbound'
   if (path.startsWith('/ai/providers/higgsfield')) return 'ai-provider-higgsfield'
   if (path.startsWith('/ai/models')) return 'ai-models'

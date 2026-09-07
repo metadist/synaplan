@@ -147,7 +147,8 @@
     "widgetChats": "Widget Chats",
     "widgetDetail": "Widget Detail",
     "liveSupport": "Live Support",
-    "addinConnect": "Connect Outlook Add-in",
+    "platformConnect": "Connect Synaplan",
+    "linkedPlatforms": "Linked platforms",
     "accountDeletion": "Account Deletion",
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
@@ -220,23 +221,53 @@
       "countersResetFailed": "The error history could not be cleared."
     }
   },
-  "addinConnect": {
-    "title": "Connect to Synaplan",
-    "subtitle": "Authorise the Synamail Outlook add-in to use this Synaplan account.",
+  "platformConnect": {
+    "title": "Connect Synaplan",
+    "subtitle": "Authorise {client} to use this Synaplan account.",
     "loading": "Checking your session…",
-    "confirmPrompt": "Connect this Outlook to:",
-    "connectButton": "Connect Outlook",
-    "scopesNote": "Grants access to messages, chats, files and RAG search.",
-    "connecting": "Issuing a secure API key…",
+    "confirmPrompt": "Connect {client} at {host} as {uid}?",
+    "connectButton": "Connect {client}",
+    "scopesNote": "Grants access to chats, files and search. The key stays on the platform — you do not type it.",
+    "connecting": "Connecting…",
     "successTitle": "Connected.",
     "successSubtitle": "You can close this window if it doesn't close on its own.",
     "errorTitle": "Couldn't connect",
     "retry": "Try again",
-    "helpLine": "This window is opened by the Synamail add-in. It is safe to close.",
-    "errorMissingState": "Missing state parameter. Reopen the add-in and try again.",
+    "helpLine": "This window was opened by another app. It is safe to close.",
+    "notYou": "Not you? Sign out",
+    "errorMissingState": "This connection request is incomplete. Start again from the other app.",
     "errorOfficeNotReady": "Office.js is not available. This page must be opened from inside Outlook.",
     "errorNotSignedIn": "You are not signed in. Refresh the window and sign in again.",
-    "errorIssuanceFailed": "Synaplan could not issue an API key for this account."
+    "errorIssuanceFailed": "Synaplan could not finish this connection.",
+    "errorUnknownClient": "This connection request is not recognised.",
+    "errorFlagOff": "Linking this platform is not enabled on this Synaplan instance.",
+    "errorNoDeliveryChannel": "Synaplan could not hand the connection back to Outlook. Open this page from inside Outlook and try again.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "this app"
+    }
+  },
+  "linkedPlatforms": {
+    "title": "Linked platforms",
+    "description": "Platforms that can use this Synaplan account. Connections always start in the other app.",
+    "empty": "No platforms are linked yet. Start the connection in Nextcloud — you will not type a key here.",
+    "table": {
+      "client": "Platform",
+      "host": "Address",
+      "uid": "Account",
+      "key": "Key",
+      "lastSeen": "Last used",
+      "actions": "Actions"
+    },
+    "disconnect": "Disconnect",
+    "disconnectTitle": "Disconnect this platform?",
+    "disconnectConfirm": "Disconnect {host}? That platform will no longer be able to use this account.",
+    "disconnected": "Platform disconnected.",
+    "disconnectError": "The platform could not be disconnected.",
+    "loadError": "Linked platforms could not be loaded."
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",
@@ -724,6 +755,7 @@
     "menu": "Menu",
     "aiAgents": "Coding clients",
     "desktop": "Desktop",
+    "linkedPlatforms": "Linked platforms",
     "manage": "Manage",
     "manageDescription": "Assistants, automations, channels and connections",
     "myGroups": "My groups",
@@ -2293,6 +2325,7 @@
         "lastUsed": "Last used",
         "actions": "Actions"
       },
+      "linkedPlatform": "Linked platform",
       "status": {
         "active": "Active",
         "inactive": "Inactive"
@@ -5538,6 +5571,7 @@
       "users": "Users",
       "groups": "Groups",
       "policies": "Policies",
+      "linkedPlatforms": "Linked platforms",
       "audit": "Audit"
     },
     "usersMoved": "Users now live on the People page.",
@@ -5615,7 +5649,36 @@
         "impersonation_stop": "Stopped viewing as user",
         "admin_metadata_view": "Looked at resource list",
         "policy_set": "Updated group policies",
-        "policy_lock": "Locked a setting"
+        "policy_lock": "Locked a setting",
+        "platform_link_linked": "Platform linked",
+        "platform_link_disconnected": "Platform disconnected",
+        "platform_link_reassigned": "Platform link moved to another account",
+        "platform_link_exchange_failed": "Platform link failed",
+        "platform_link_redirect_rejected": "Platform redirect rejected",
+        "platform_instance_registered": "Platform registered",
+        "platform_instance_approved": "Platform approved",
+        "platform_instance_revoked": "Platform revoked"
+      }
+    },
+    "linkedPlatforms": {
+      "empty": "No platforms have registered yet.",
+      "client": "Platform",
+      "host": "Address",
+      "status": "Status",
+      "actions": "Actions",
+      "approve": "Approve",
+      "revoke": "Revoke",
+      "approved": "Platform approved.",
+      "revoked": "Platform revoked.",
+      "approveError": "The platform could not be approved.",
+      "revokeError": "The platform could not be revoked.",
+      "loadError": "Platforms could not be loaded.",
+      "revokeTitle": "Revoke this platform?",
+      "revokeConfirm": "Revoke this platform? Every linked key for it will stop working.",
+      "statusValue": {
+        "active": "Active",
+        "pending": "Waiting for approval",
+        "revoked": "Revoked"
       }
     },
     "policies": {

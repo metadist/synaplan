@@ -30,6 +30,14 @@ vi.mock('@/services/api/iamApi', () => ({
   },
 }))
 
+vi.mock('@/services/api/platformLinksApi', () => ({
+  platformLinksApi: {
+    listAdminInstances: vi.fn().mockResolvedValue([]),
+    approveInstance: vi.fn(),
+    revokeInstance: vi.fn(),
+  },
+}))
+
 vi.mock('@/services/api/adminApi', () => ({
   adminApi: {
     getUsers: (...args: unknown[]) => mockGetUsers(...args),
@@ -115,8 +123,17 @@ describe('PeopleView', () => {
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(false)
+  })
+
+  it('shows the Linked platforms tab when features.platformLinksEnabled is on', async () => {
+    getConfigSync.mockReturnValue({ features: { platformLinksEnabled: true } })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(true)
   })
 
   it('shows the Policies tab when features.iamPolicies is on', async () => {
