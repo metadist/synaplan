@@ -32,6 +32,20 @@ class PlatformInstance
 
     public const OUTLOOK_BUILTIN_ID = 'outlook-builtin';
 
+    /**
+     * Relay prefixes the Outlook add-in (Synamail) may be redirected to. The
+     * former client-side `isSafeRedirect()` allow-list; seeded by the
+     * migration and re-asserted by `PlatformLinksConfigSeeder`.
+     *
+     * @var list<string>
+     */
+    public const OUTLOOK_BUILTIN_REDIRECT_URIS = [
+        'https://localhost',
+        'https://127.0.0.1',
+        'https://addin.synaplan.com',
+        'https://*.synaplan.com',
+    ];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]

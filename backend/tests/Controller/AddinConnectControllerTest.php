@@ -132,7 +132,7 @@ final class AddinConnectControllerTest extends WebTestCase
             PlatformInstance::CLIENT_OUTLOOK,
             PlatformInstance::OUTLOOK_BUILTIN_ID,
             '*',
-            ['https://localhost', 'https://127.0.0.1', 'https://addin.synaplan.com', 'https://*.synaplan.com'],
+            PlatformInstance::OUTLOOK_BUILTIN_REDIRECT_URIS,
             PlatformInstance::STATUS_ACTIVE,
         ));
     }
