@@ -124,6 +124,36 @@ final class AdminUserProvisioningServiceTest extends TestCase
         $this->assertSame('active', $result['entity']->getStatus());
     }
 
+    public function testFindByExternalIdentityStillReadsUserDetails(): void
+    {
+        $user = $this->userWithId(42);
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('findOneByTriple')->willReturn(null);
+
+        $qb = $this->createStub(QueryBuilder::class);
+        $qb->method('where')->willReturnSelf();
+        $qb->method('andWhere')->willReturnSelf();
+        $qb->method('setParameter')->willReturnSelf();
+        $qb->method('setMaxResults')->willReturnSelf();
+        $query = $this->createStub(Query::class);
+        $query->method('getOneOrNullResult')->willReturn($user);
+        $qb->method('getQuery')->willReturn($query);
+
+        $users = $this->createStub(UserRepository::class);
+        $users->method('createQueryBuilder')->willReturn($qb);
+
+        $service = new AdminUserProvisioningService(
+            $users,
+            $this->apiKeyRepository,
+            $this->em,
+            $this->userLifecycle,
+            new NullLogger(),
+            $identities,
+        );
+
+        self::assertSame($user, $service->findByExternalIdentity('nextcloud', 'alice'));
+    }
+
     public function testMintApiKeyDefaultsToWildcardScope(): void
     {
         $this->apiKeyRepository->method('save');

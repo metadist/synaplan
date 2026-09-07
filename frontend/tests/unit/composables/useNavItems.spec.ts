@@ -14,7 +14,12 @@ import {
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
 
-const runtimeFeatures = { savedTasks: true, iamGroups: false, agentsEnabled: false }
+const runtimeFeatures = {
+  savedTasks: true,
+  iamGroups: false,
+  agentsEnabled: false,
+  platformLinksEnabled: false,
+}
 
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
@@ -58,6 +63,7 @@ const navMessages = {
     savedTasks: 'Saved tasks',
     aiAgents: 'Coding clients',
     assistants: 'Assistants',
+    linkedPlatforms: 'Linked platforms',
     toolsDocSummary: 'Summarizer',
     configAiModels: 'Models',
     configTaskPrompts: 'Instructions',
@@ -151,6 +157,7 @@ describe('useNavItems rail', () => {
     runtimeFeatures.savedTasks = true
     runtimeFeatures.iamGroups = false
     runtimeFeatures.agentsEnabled = false
+    runtimeFeatures.platformLinksEnabled = false
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -179,6 +186,7 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('doc-summary')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')
+    expect(childKeys).not.toContain('linked-platforms')
     const promptChild = (manage?.children ?? []).find(
       (child: { key: string }) => child.key === 'task-prompts'
     )
@@ -187,6 +195,21 @@ describe('useNavItems rail', () => {
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
     ).toEqual(new Set(['assistants', 'automations', 'channels', 'connections']))
+  })
+
+  it('hides Linked platforms when the flag is off and shows it when on', () => {
+    const off = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const offManage = off.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((offManage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
+      'linked-platforms'
+    )
+
+    runtimeFeatures.platformLinksEnabled = true
+    const on = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((onManage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
+      'linked-platforms'
+    )
   })
 
   it('replaces Instructions with Assistants when the flag is on', () => {

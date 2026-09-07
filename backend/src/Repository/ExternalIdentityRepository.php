@@ -108,4 +108,30 @@ class ExternalIdentityRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    /**
+     * @return list<ExternalIdentity>
+     */
+    public function findByInstanceId(string $instanceId): array
+    {
+        /** @var list<ExternalIdentity> $rows */
+        $rows = $this->findBy(['instanceId' => $instanceId]);
+
+        return $rows;
+    }
+
+    public function findOneByApiKeyId(int $apiKeyId): ?ExternalIdentity
+    {
+        $row = $this->findOneBy(['apiKeyId' => $apiKeyId]);
+
+        return $row instanceof ExternalIdentity ? $row : null;
+    }
+
+    public function remove(ExternalIdentity $identity, bool $flush = true): void
+    {
+        $this->getEntityManager()->remove($identity);
+        if ($flush) {
+            $this->getEntityManager()->flush();
+        }
+    }
 }

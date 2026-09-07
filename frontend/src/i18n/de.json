@@ -149,6 +149,8 @@
     "widgetDetail": "Widget-Detail",
     "liveSupport": "Live-Support",
     "addinConnect": "Outlook-Add-in verbinden",
+    "platformConnect": "Synaplan verbinden",
+    "linkedPlatforms": "Verknüpfte Plattformen",
     "accountDeletion": "Konto löschen",
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
@@ -237,6 +239,53 @@
     "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
     "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",
     "errorIssuanceFailed": "Synaplan konnte für dieses Konto keinen API-Schlüssel ausstellen."
+  },
+  "platformConnect": {
+    "title": "Synaplan verbinden",
+    "subtitle": "Erlaube {client}, dieses Synaplan-Konto zu verwenden.",
+    "loading": "Sitzung wird geprüft…",
+    "confirmPrompt": "{client} unter {host} als {uid} verbinden?",
+    "connectButton": "{client} verbinden",
+    "scopesNote": "Gewährt Zugriff auf Chats, Dateien und Suche. Der Schlüssel bleibt auf der Plattform — du tippst ihn nicht ein.",
+    "connecting": "Verbinden…",
+    "successTitle": "Verbunden.",
+    "successSubtitle": "Du kannst dieses Fenster schließen, falls es sich nicht selbst schließt.",
+    "errorTitle": "Verbindung fehlgeschlagen",
+    "retry": "Erneut versuchen",
+    "helpLine": "Dieses Fenster wurde von einer anderen App geöffnet. Es kann gefahrlos geschlossen werden.",
+    "notYou": "Nicht du? Abmelden",
+    "errorMissingState": "Diese Verbindungsanfrage ist unvollständig. Starte erneut in der anderen App.",
+    "errorOfficeNotReady": "Office.js ist nicht verfügbar. Diese Seite muss aus Outlook heraus geöffnet werden.",
+    "errorNotSignedIn": "Du bist nicht angemeldet. Bitte das Fenster aktualisieren und erneut anmelden.",
+    "errorIssuanceFailed": "Synaplan konnte diese Verbindung nicht abschließen.",
+    "errorUnknownClient": "Diese Verbindungsanfrage wird nicht erkannt.",
+    "errorFlagOff": "Das Verknüpfen dieser Plattform ist auf dieser Synaplan-Instanz nicht aktiviert.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "diese App"
+    }
+  },
+  "linkedPlatforms": {
+    "title": "Verknüpfte Plattformen",
+    "description": "Plattformen, die dieses Synaplan-Konto nutzen können. Verbindungen starten immer in der anderen App.",
+    "empty": "Noch keine Plattformen verknüpft. Starte die Verbindung in Nextcloud — du tippst hier keinen Schlüssel ein.",
+    "table": {
+      "client": "Plattform",
+      "host": "Adresse",
+      "uid": "Konto",
+      "key": "Schlüssel",
+      "lastSeen": "Zuletzt genutzt",
+      "actions": "Aktionen"
+    },
+    "disconnect": "Trennen",
+    "disconnectTitle": "Diese Plattform trennen?",
+    "disconnectConfirm": "{host} trennen? Diese Plattform kann das Konto dann nicht mehr nutzen.",
+    "disconnected": "Plattform getrennt.",
+    "disconnectError": "Die Plattform konnte nicht getrennt werden.",
+    "loadError": "Verknüpfte Plattformen konnten nicht geladen werden."
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",
@@ -728,7 +777,8 @@
     "groupTools": "Werkzeuge",
     "liveSupport": "Live-Support",
     "usage": "Nutzung",
-    "assistants": "Assistenten"
+    "assistants": "Assistenten",
+    "linkedPlatforms": "Verknüpfte Plattformen"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -2392,6 +2442,7 @@
         "lastUsed": "Zuletzt verwendet",
         "actions": "Aktionen"
       },
+      "linkedPlatform": "Verknüpfte Plattform",
       "status": {
         "active": "Aktiv",
         "inactive": "Inaktiv"
@@ -5472,6 +5523,7 @@
       "users": "Benutzer",
       "groups": "Gruppen",
       "policies": "Richtlinien",
+      "linkedPlatforms": "Verknüpfte Plattformen",
       "audit": "Protokoll"
     },
     "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
@@ -5549,7 +5601,35 @@
         "impersonation_stop": "Ansicht als Benutzer beendet",
         "admin_metadata_view": "Ressourcenliste angesehen",
         "policy_set": "Gruppenrichtlinien geändert",
-        "policy_lock": "Einstellung gesperrt"
+        "policy_lock": "Einstellung gesperrt",
+        "platform_link_linked": "Plattform verknüpft",
+        "platform_link_disconnected": "Plattform getrennt",
+        "platform_link_exchange_failed": "Plattformverknüpfung fehlgeschlagen",
+        "platform_link_redirect_rejected": "Plattform-Weiterleitung abgelehnt",
+        "platform_instance_registered": "Plattform registriert",
+        "platform_instance_approved": "Plattform freigegeben",
+        "platform_instance_revoked": "Plattform widerrufen"
+      }
+    },
+    "linkedPlatforms": {
+      "empty": "Es hat sich noch keine Plattform registriert.",
+      "client": "Plattform",
+      "host": "Adresse",
+      "status": "Status",
+      "actions": "Aktionen",
+      "approve": "Freigeben",
+      "revoke": "Widerrufen",
+      "approved": "Plattform freigegeben.",
+      "revoked": "Plattform widerrufen.",
+      "approveError": "Die Plattform konnte nicht freigegeben werden.",
+      "revokeError": "Die Plattform konnte nicht widerrufen werden.",
+      "loadError": "Plattformen konnten nicht geladen werden.",
+      "revokeTitle": "Diese Plattform widerrufen?",
+      "revokeConfirm": "Diese Plattform widerrufen? Alle verknüpften Schlüssel funktionieren dann nicht mehr.",
+      "statusValue": {
+        "active": "Aktiv",
+        "pending": "Wartet auf Freigabe",
+        "revoked": "Widerrufen"
       }
     },
     "policies": {

@@ -14,6 +14,7 @@ import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
+import { isPlatformLinksEnabled } from './usePlatformLinksFeature'
 import { isIamGroupsEnabled } from './useIamFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 
@@ -284,6 +285,16 @@ export function useNavItems() {
                 key: 'desktop',
                 path: '/channels/desktop',
                 label: t('nav.desktop'),
+                ...grouped('connections', connections),
+              },
+            ]
+          : []),
+        ...(isPlatformLinksEnabled()
+          ? [
+              {
+                key: 'linked-platforms',
+                path: '/channels/platform-links',
+                label: t('nav.linkedPlatforms'),
                 ...grouped('connections', connections),
               },
             ]

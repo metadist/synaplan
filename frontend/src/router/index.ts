@@ -126,15 +126,24 @@ const router = createRouter({
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.login' },
     },
     {
-      // Bridge page loaded inside an Office.context.ui.displayDialogAsync
-      // popup from the Synamail Outlook add-in. Issues a scoped API key
-      // and posts it back to the parent taskpane via messageParent.
-      // See AddinConnectView.vue for the protocol details, and
-      // Synamail/docs/SYNAPLAN_INTEGRATION.md for the cross-repo plan.
+      // Partner-platform confirm card (Nextcloud / ownCloud / Outlook).
+      // Outlook keeps working when PLATFORM_LINKS is off. Synamail still
+      // opens /addin/connect; that route redirects here with client=outlook.
+      path: '/connect/platform',
+      name: 'platform-connect',
+      component: () => import('@/views/PlatformConnectView.vue'),
+      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.platformConnect' },
+    },
+    {
+      // Kept so Synamail's buildDialogUrl stays unchanged. Every query
+      // param survives; client=outlook is forced last so a forged client
+      // on this legacy path cannot switch delivery mode.
       path: '/addin/connect',
       name: 'addin-connect',
-      component: () => import('@/views/AddinConnectView.vue'),
-      meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.addinConnect' },
+      redirect: (to) => ({
+        path: '/connect/platform',
+        query: { ...to.query, client: 'outlook' },
+      }),
     },
     {
       path: '/logged-out',
@@ -281,6 +290,12 @@ const router = createRouter({
       name: 'channels-desktop',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.desktop' },
+    },
+    {
+      path: '/channels/platform-links',
+      name: 'channels-platform-links',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.linkedPlatforms' },
     },
     {
       path: '/channels/api',

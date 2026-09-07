@@ -149,6 +149,8 @@
     "widgetDetail": "Détail du widget",
     "liveSupport": "Assistance en direct",
     "addinConnect": "Connecter le complément Outlook",
+    "platformConnect": "Connecter Synaplan",
+    "linkedPlatforms": "Plateformes liées",
     "accountDeletion": "Suppression du compte",
     "onboarding": "Bienvenue",
     "mcpServers": "Serveurs MCP",
@@ -237,6 +239,53 @@
     "errorOfficeNotReady": "Office.js n’est pas disponible. Cette page doit être ouverte depuis Outlook.",
     "errorNotSignedIn": "Vous n’êtes pas connecté. Actualisez la fenêtre et reconnectez-vous.",
     "errorIssuanceFailed": "Synaplan n’a pas pu émettre de clé API pour ce compte."
+  },
+  "platformConnect": {
+    "title": "Connecter Synaplan",
+    "subtitle": "Autoriser {client} à utiliser ce compte Synaplan.",
+    "loading": "Vérification de votre session…",
+    "confirmPrompt": "Connecter {client} sur {host} en tant que {uid} ?",
+    "connectButton": "Connecter {client}",
+    "scopesNote": "Accorde l’accès aux discussions, fichiers et recherche. La clé reste sur la plateforme — vous ne la saisissez pas.",
+    "connecting": "Connexion…",
+    "successTitle": "Connecté.",
+    "successSubtitle": "Vous pouvez fermer cette fenêtre si elle ne se ferme pas toute seule.",
+    "errorTitle": "Connexion impossible",
+    "retry": "Réessayer",
+    "helpLine": "Cette fenêtre a été ouverte par une autre application. Vous pouvez la fermer.",
+    "notYou": "Ce n’est pas vous ? Se déconnecter",
+    "errorMissingState": "Cette demande de connexion est incomplète. Recommencez depuis l’autre application.",
+    "errorOfficeNotReady": "Office.js n’est pas disponible. Cette page doit être ouverte depuis Outlook.",
+    "errorNotSignedIn": "Vous n’êtes pas connecté. Actualisez la fenêtre et connectez-vous à nouveau.",
+    "errorIssuanceFailed": "Synaplan n’a pas pu terminer cette connexion.",
+    "errorUnknownClient": "Cette demande de connexion n’est pas reconnue.",
+    "errorFlagOff": "La liaison de cette plateforme n’est pas activée sur cette instance Synaplan.",
+    "clients": {
+      "outlook": "Outlook",
+      "nextcloud": "Nextcloud",
+      "owncloud": "ownCloud",
+      "opencloud": "OpenCloud",
+      "unknown": "cette application"
+    }
+  },
+  "linkedPlatforms": {
+    "title": "Plateformes liées",
+    "description": "Plateformes qui peuvent utiliser ce compte Synaplan. Les connexions commencent toujours dans l’autre application.",
+    "empty": "Aucune plateforme n’est encore liée. Démarrez la connexion dans Nextcloud — vous ne saisissez aucune clé ici.",
+    "table": {
+      "client": "Plateforme",
+      "host": "Adresse",
+      "uid": "Compte",
+      "key": "Clé",
+      "lastSeen": "Dernière utilisation",
+      "actions": "Actions"
+    },
+    "disconnect": "Déconnecter",
+    "disconnectTitle": "Déconnecter cette plateforme ?",
+    "disconnectConfirm": "Déconnecter {host} ? Cette plateforme ne pourra plus utiliser ce compte.",
+    "disconnected": "Plateforme déconnectée.",
+    "disconnectError": "La plateforme n’a pas pu être déconnectée.",
+    "loadError": "Les plateformes liées n’ont pas pu être chargées."
   },
   "welcome": "Bienvenue",
   "welcomeUser": "Bienvenue, {name}",
@@ -732,7 +781,8 @@
     "groupTools": "Outils",
     "liveSupport": "Assistance en direct",
     "usage": "Utilisation",
-    "assistants": "Assistants"
+    "assistants": "Assistants",
+    "linkedPlatforms": "Plateformes liées"
   },
   "chatInput": {
     "placeholder": "Saisissez votre message…",
@@ -2291,6 +2341,7 @@
         "lastUsed": "Dernière utilisation",
         "actions": "Actions"
       },
+      "linkedPlatform": "Plateforme liée",
       "status": {
         "active": "Active",
         "inactive": "Inactive"
@@ -5538,6 +5589,7 @@
       "users": "Utilisateurs",
       "groups": "Groupes",
       "policies": "Règles",
+      "linkedPlatforms": "Plateformes liées",
       "audit": "Journal"
     },
     "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
@@ -5615,7 +5667,35 @@
         "impersonation_stop": "A cessé de voir en tant qu’utilisateur",
         "admin_metadata_view": "A consulté la liste des ressources",
         "policy_set": "Règles de groupe mises à jour",
-        "policy_lock": "Réglage verrouillé"
+        "policy_lock": "Réglage verrouillé",
+        "platform_link_linked": "Plateforme liée",
+        "platform_link_disconnected": "Plateforme déconnectée",
+        "platform_link_exchange_failed": "Échec de la liaison",
+        "platform_link_redirect_rejected": "Redirection de plateforme refusée",
+        "platform_instance_registered": "Plateforme enregistrée",
+        "platform_instance_approved": "Plateforme approuvée",
+        "platform_instance_revoked": "Plateforme révoquée"
+      }
+    },
+    "linkedPlatforms": {
+      "empty": "Aucune plateforme ne s’est encore enregistrée.",
+      "client": "Plateforme",
+      "host": "Adresse",
+      "status": "Statut",
+      "actions": "Actions",
+      "approve": "Approuver",
+      "revoke": "Révoquer",
+      "approved": "Plateforme approuvée.",
+      "revoked": "Plateforme révoquée.",
+      "approveError": "La plateforme n’a pas pu être approuvée.",
+      "revokeError": "La plateforme n’a pas pu être révoquée.",
+      "loadError": "Les plateformes n’ont pas pu être chargées.",
+      "revokeTitle": "Révoquer cette plateforme ?",
+      "revokeConfirm": "Révoquer cette plateforme ? Toutes les clés liées cesseront de fonctionner.",
+      "statusValue": {
+        "active": "Active",
+        "pending": "En attente d’approbation",
+        "revoked": "Révoquée"
       }
     },
     "policies": {

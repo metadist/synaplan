@@ -64,6 +64,7 @@
     "reason": "The change is limited to the web layer delivered inside the app bundle (Vue/TypeScript application code, styling, translations, static assets, or web build configuration), which Apple ADPLA 3.3.2 and Google Play permit over the air because it runs in the system WebView.",
     "patterns": [
       "frontend/src/**",
+      "frontend/src/platform-connect/**",
       "frontend/public/**",
       "frontend/index.html",
       "frontend/package.json",

@@ -1,15 +1,14 @@
 # Status — More Nextcloud
 
 Track 6 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
-[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03; awaiting technical plan review
-before the first sprint starts.**
+[`00_master_plan.md`](./00_master_plan.md).
 
 ## Steps
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Core handshake | — | planned | |
-| S2 Nextcloud app | — | planned | |
+| S1 Core handshake (`NC1`–`NC7`) | `synaplan/` `feat/more-nextcloud-s1-handshake`; `Synamail/` docs only; local NC in `synaplan-nextcloud/` `feat/local-nextcloud-wsl` | implemented | Flag `PLATFORM_LINKS.ENABLED` default off. Outlook `client=outlook` is not flag-gated. Local Nextcloud on WSL: `make -C /wwwroot/synaplan-nextcloud dev-up` → http://localhost:8081 (admin/admin). Harness: `_devextras/testing/platform-links/fake-instance.sh`. |
+| S2 Nextcloud app | — | planned | Wave 3 — `link` mode in the Nextcloud app |
 | S3 Parity & fallbacks | — | planned | |
 
 ## Decisions
@@ -34,3 +33,16 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 **2026-09-07 (UX contract):** keep the handshake as a flow, not a
 settings form. See
 [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.6.
+
+**2026-09-07 (S1 implementation):** Wave 2 S1 landed on
+`feat/more-nextcloud-s1-handshake` — `BPLATFORMINSTANCES`, instance
+register/approve/revoke, link-code + exchange, `PlatformConnectView`,
+Linked platforms pages, Synamail `AUTH_FLOW.md`, `fake-instance.sh`.
+S2 (`link` mode in the Nextcloud app) stays Wave 3.
+
+**2026-09-07 (Wave 2 check):** `fake-instance.sh --flag-off` 4/4;
+`fake-instance.sh` 12/12 (register as seeded admin, code as demo).
+Local Nextcloud 31.0.14 on `:8081` (admin/admin), Synaplan Integration
+settings page loads. Synaplan UI: Linked platforms empty state;
+Operate → People → Linked platforms lists pending/active; `/addin/connect`
+rewrites to `/connect/platform?…&client=outlook`. Uncommitted until asked.

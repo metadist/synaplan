@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\ApiKey;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
+use App\Service\PlatformLink\PlatformLinkExchangeService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,6 +24,7 @@ class ApiKeyController extends AbstractController
 {
     public function __construct(
         private ApiKeyRepository $apiKeyRepository,
+        private PlatformLinkExchangeService $platformLinkExchangeService,
     ) {
     }
 
@@ -55,6 +57,15 @@ class ApiKeyController extends AbstractController
                                     new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string')),
                                     new OA\Property(property: 'last_used', type: 'string', format: 'date-time', nullable: true),
                                     new OA\Property(property: 'created', type: 'string', format: 'date-time'),
+                                    new OA\Property(
+                                        property: 'linked_platform',
+                                        type: 'object',
+                                        nullable: true,
+                                        properties: [
+                                            new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
+                                            new OA\Property(property: 'host', type: 'string', example: 'files.example.org'),
+                                        ]
+                                    ),
                                 ]
                             )
                         ),
@@ -83,6 +94,7 @@ class ApiKeyController extends AbstractController
                     'scopes' => $key->getScopes(),
                     'last_used' => $key->getLastUsed(),
                     'created' => $key->getCreated(),
+                    'linked_platform' => $this->platformLinkExchangeService->linkedPlatformForKey((int) $key->getId()),
                 ];
             }, $apiKeys),
         ]);

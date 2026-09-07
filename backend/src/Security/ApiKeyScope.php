@@ -134,6 +134,37 @@ final class ApiKeyScope
     }
 
     /**
+     * Scopes minted for a linked Nextcloud / ownCloud user. Equal to the
+     * strings `POST /api/v1/admin/users/{id}/api-keys` receives from the
+     * partner apps today (`chat`, `files`, `rag`) plus `memories` when the
+     * partner admin enabled them. Mapping those strings onto paths is a
+     * separate security fix (C4) — this method must not invent new names.
+     *
+     * @return list<string>
+     */
+    public static function platformLinkScopes(bool $withMemories = false): array
+    {
+        $scopes = ['chat', 'files', 'rag'];
+        if ($withMemories) {
+            $scopes[] = 'memories';
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * The scope list a provisioned Nextcloud / ownCloud user key carries
+     * when memories are off. Kept next to {@see platformLinkScopes()} so C4
+     * can assert equality without importing the partner app.
+     *
+     * @return list<string>
+     */
+    public static function provisionedPlatformScopes(): array
+    {
+        return ['chat', 'files', 'rag'];
+    }
+
+    /**
      * A key is restricted iff its scope list is non-empty, is not a
      * legacy-webhook-only list, and does not contain `*`.
      *

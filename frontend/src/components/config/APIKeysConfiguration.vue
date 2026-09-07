@@ -215,6 +215,13 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center gap-2">
                   <span class="text-sm font-medium txt-primary">{{ apiKey.name }}</span>
+                  <span
+                    v-if="apiKey.linkedPlatform"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 txt-brand"
+                    data-testid="badge-linked-platform"
+                  >
+                    {{ $t('config.apiKeys.linkedPlatform') }}
+                  </span>
                   <span class="text-xs txt-secondary">
                     ({{ apiKey.usageCount }} {{ $t('config.apiKeys.usageCount') }})
                   </span>
@@ -436,6 +443,7 @@ interface UIApiKey {
   lastUsed: number | null
   usageCount: number
   scopes: string[]
+  linkedPlatform: { client: string; host: string } | null
 }
 
 const apiKeys = ref<UIApiKey[]>([])
@@ -467,6 +475,7 @@ const loadAPIKeys = async () => {
       lastUsed: key.last_used || null,
       usageCount: 0, // Backend doesn't track this yet
       scopes: key.scopes,
+      linkedPlatform: key.linked_platform ?? null,
     }))
   } catch (err: unknown) {
     console.error('Failed to load API keys:', err)
@@ -512,6 +521,7 @@ const createAPIKey = async () => {
       lastUsed: null,
       usageCount: 0,
       scopes: response.api_key.scopes,
+      linkedPlatform: null,
     }
 
     apiKeys.value.unshift(newKey)
