@@ -193,6 +193,8 @@ Rebasing cannot save the group here, and a Dependency Dashboard checkbox does no
 
 If the block will outlast a single PR, the cleaner option is a scoped `allowedVersions` rule in `renovate.json5` so Renovate stays in charge instead of you hand-building branches repeatedly. It must be its own rule — Renovate rejects `allowedVersions` and `matchUpdateTypes` in the same rule, and every group rule here has `matchUpdateTypes`. That has not been needed yet, and it is a deliberate config change, so agree it explicitly before adding one.
 
+When you do touch `renovate.json5`, note that `renovate-config-validator` is a weak gate: it checks option *names* but not matcher semantics. It passes `matchPackageNames: ["*", "!x/**"]`, which Renovate rejects at runtime — and that rejection stops **all** dependency PRs until the default branch is fixed (#1729). Read the matcher rules from Renovate's docs, and expect config errors to surface only after merge.
+
 ## 9. Temporary Pins (revert when upstream releases)
 
 Track dependencies pinned to an untagged/dev branch as a stopgap. Revert each to a
