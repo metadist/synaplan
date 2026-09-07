@@ -300,7 +300,7 @@ const onRunCopy = async () => {
       </p>
       <button
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium mt-2"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
         @click="onResume"
       >
         {{ $t('config.savedTasks.resume') }}
@@ -311,7 +311,7 @@ const onRunCopy = async () => {
       <button
         v-if="sharedView"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         :disabled="copying"
         data-testid="btn-run-copy"
         @click="onRunCopy"
@@ -321,7 +321,7 @@ const onRunCopy = async () => {
       <button
         v-else
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         :disabled="running"
         data-testid="btn-run-now"
         @click="onRunNow"
@@ -331,7 +331,7 @@ const onRunCopy = async () => {
       <button
         v-if="iamSharingEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
@@ -340,7 +340,7 @@ const onRunCopy = async () => {
       <button
         v-if="!sharedView"
         type="button"
-        class="btn-danger inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="btn-delete-saved-task"
         @click="onDelete"
       >

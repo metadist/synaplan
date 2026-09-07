@@ -3,14 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush } = vi.hoisted(() => ({
-  mockUpdate: vi.fn(),
-  mockRun: vi.fn(),
-  mockRuns: vi.fn(),
-  mockResume: vi.fn(),
-  mockRemove: vi.fn(),
-  mockPush: vi.fn(),
-}))
+const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush, mockConfirm } =
+  vi.hoisted(() => ({
+    mockUpdate: vi.fn(),
+    mockRun: vi.fn(),
+    mockRuns: vi.fn(),
+    mockResume: vi.fn(),
+    mockRemove: vi.fn(),
+    mockPush: vi.fn(),
+    mockConfirm: vi.fn(),
+  }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
   savedTasksApi: {
@@ -31,7 +33,7 @@ vi.mock('@/composables/useIamFeature', () => ({
 }))
 
 vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ confirm: vi.fn().mockResolvedValue(false) }),
+  useDialog: () => ({ confirm: (...args: unknown[]) => mockConfirm(...args) }),
 }))
 
 vi.mock('vue-router', () => ({
@@ -88,6 +90,7 @@ const mountCard = (value: SavedTask) =>
 describe('SavedTaskCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockConfirm.mockResolvedValue(false)
     mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
       task({ ...patch } as Partial<SavedTask>)
     )
@@ -245,5 +248,31 @@ describe('SavedTaskCard', () => {
     expect(wrapper.find('[data-testid="btn-run-copy"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-run-now"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="btn-delete-saved-task"]').exists()).toBe(true)
+  })
+
+  it('deletes after confirm and emits deleted', async () => {
+    mockConfirm.mockResolvedValue(true)
+    mockRemove.mockResolvedValue(undefined)
+    const wrapper = mountCard(task())
+    await wrapper.get('[data-testid="btn-delete-saved-task"]').trigger('click')
+    await flushPromises()
+
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Delete',
+        danger: true,
+      })
+    )
+    expect(mockRemove).toHaveBeenCalledWith(7)
+    expect(wrapper.emitted('deleted')).toEqual([[7]])
+  })
+
+  it('does not delete when the confirm is cancelled', async () => {
+    const wrapper = mountCard(task())
+    await wrapper.get('[data-testid="btn-delete-saved-task"]').trigger('click')
+    await flushPromises()
+
+    expect(mockRemove).not.toHaveBeenCalled()
+    expect(wrapper.emitted('deleted')).toBeUndefined()
   })
 })

@@ -25,8 +25,9 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Removes everything that belongs to an assistant before the BAGENTS row
  * itself is deleted: shares, versions, the instruction prompt, the own
- * knowledge folder (files + vectors + folder shares), and saved tasks
- * bound to that prompt.
+ * knowledge folder (files + folder shares), and saved tasks bound to that
+ * prompt. Filesystem and Qdrant deletes are returned as
+ * {@see AgentExternalCleanup} and must run after the caller commits.
  */
 final readonly class AgentCascadeCleanup
 {
@@ -45,7 +46,7 @@ final readonly class AgentCascadeCleanup
     ) {
     }
 
-    public function unshareAndRemoveDependents(Agent $agent): void
+    public function unshareAndRemoveDependents(Agent $agent): AgentExternalCleanup
     {
         $id = $agent->getId();
         if (null !== $id) {
@@ -53,12 +54,22 @@ final readonly class AgentCascadeCleanup
             $this->versions->deleteForAgent($id);
         }
 
-        $this->removeOwnKnowledge($agent);
+        $external = $this->detachOwnKnowledge($agent);
         $this->removeBoundSavedTasks($agent);
         $this->removeInstructionPrompt($agent);
+
+        return $external;
     }
 
-    private function removeOwnKnowledge(Agent $agent): void
+    public function purgeExternal(AgentExternalCleanup $cleanup): void
+    {
+        $this->vectorStorage->deleteByGroupKey($cleanup->ownerId, $cleanup->groupKey);
+        foreach ($cleanup->filePaths as $path) {
+            $this->fileStorage->deleteFile($path);
+        }
+    }
+
+    private function detachOwnKnowledge(Agent $agent): AgentExternalCleanup
     {
         $ownerId = $agent->getOwnerId();
         $groupKey = AgentKnowledgeFolders::ownFolder($agent);
@@ -66,17 +77,19 @@ final readonly class AgentCascadeCleanup
             KnowledgeFolderKind::KEY,
             KnowledgeFolderKind::resourceId($ownerId, $groupKey),
         );
-        $this->vectorStorage->deleteByGroupKey($ownerId, $groupKey);
 
+        $filePaths = [];
         foreach ($this->files->findByUserAndGroupKey($ownerId, $groupKey) as $file) {
             $this->documentRevisions->deleteForFile($file);
             $path = $file->getFilePath();
             if ('' !== $path) {
-                $this->fileStorage->deleteFile($path);
+                $filePaths[] = $path;
             }
             $this->em->remove($file);
         }
         $this->em->flush();
+
+        return new AgentExternalCleanup($ownerId, $groupKey, $filePaths);
     }
 
     private function removeBoundSavedTasks(Agent $agent): void

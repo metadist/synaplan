@@ -165,8 +165,9 @@ final readonly class AgentService
         if ($agent->isPublished()) {
             throw AgentNotDraftException::cannotDelete($agent->getStatus());
         }
-        $this->cascade->unshareAndRemoveDependents($agent);
+        $external = $this->cascade->unshareAndRemoveDependents($agent);
         $this->agents->remove($agent);
+        $this->cascade->purgeExternal($external);
     }
 
     public function requireOwned(int $id, int $ownerId): Agent
