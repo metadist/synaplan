@@ -180,7 +180,7 @@ Rebasing cannot save the group here, and a Dependency Dashboard checkbox does no
 
 **Land the rest by hand.** Precedent: #942 (Frontend Core) was blocked by vite 8.0.13 (Rolldown minification bug). The remedy was a human branch `chore/frontend-core-safe` that applied the safe bumps with vite held at 8.0.11, merged as #967, after which #942 was closed pointing at it. Reuse that shape — human branch, a `chore(deps):` subject naming the skipped package and the reason, then close the group PR with that reason. Renovate reopens the skipped package by itself once a fixed version exists.
 
-If the block will outlast a single PR, the cleaner option is a scoped `allowedVersions` rule in `renovate.json5` so Renovate stays in charge instead of you hand-building branches repeatedly. That has not been needed here yet — it is a deliberate config change, so agree it explicitly before adding one.
+If the block will outlast a single PR, the cleaner option is a scoped `allowedVersions` rule in `renovate.json5` so Renovate stays in charge instead of you hand-building branches repeatedly. It must be its own rule — Renovate rejects `allowedVersions` and `matchUpdateTypes` in the same rule, and every group rule here has `matchUpdateTypes`. That has not been needed yet, and it is a deliberate config change, so agree it explicitly before adding one.
 
 ## 9. Temporary Pins (revert when upstream releases)
 

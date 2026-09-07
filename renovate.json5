@@ -9,7 +9,8 @@
   "timezone": "Europe/Berlin",
   "prHourlyLimit": 2,
   // Make the implicit Renovate default (10) explicit. Grouping already collapses
-  // minor/patch into ~6 buckets, so this is a backlog cap, not a per-dependency knob.
+  // minor/patch into ~6 buckets plus one for Docker digests, so this is a backlog
+  // cap, not a per-dependency knob.
   "prConcurrentLimit": 10,
   "prCreation": "immediate",
   "dependencyDashboard": true,
@@ -76,6 +77,23 @@
       "groupName": "Docker Images",
       "matchManagers": ["dockerfile", "docker-compose"],
       "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      // Digest bumps matched NO rule above (every group is minor/patch only), so
+      // each one opened its own PR: ~12 per month, each replaying the full CI
+      // pipeline because ci.yml has no path filters. They also sort FIRST in
+      // Renovate's creation order (pinDigest > pin > digest > patch > minor >
+      // major), so they were consuming the prHourlyLimit ahead of the real
+      // dependency updates. There is nothing to review per package either -- a
+      // digest has no changelog, it is classified by its tag
+      // (docs/DEPENDENCY_UPDATES.md §7). Our own ghcr.io images stay individual:
+      // a digest move on a release artifact of ours is a deployment event, not
+      // third-party noise.
+      "description": "Docker digest bumps grouped -- no changelog exists, review is tag-based",
+      "groupName": "Docker Digests",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "matchPackageNames": ["*", "!ghcr.io/metadist/**"]
     },
     {
       "description": "Major updates: always individual, manual review",
