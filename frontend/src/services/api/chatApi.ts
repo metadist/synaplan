@@ -8,6 +8,7 @@ import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
+import { isSessionTerminating } from '@/services/sessionTeardown'
 import { GetApiChatsMessagesResponseSchema } from '@/generated/api-schemas'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 
@@ -232,8 +233,14 @@ async function getSseToken(): Promise<string | null> {
 
       return cachedSseToken
     } catch (error) {
-      // If error is "Authentication required", redirect to login
-      if (error instanceof Error && error.message === 'Authentication required') {
+      // If error is "Authentication required", redirect to login — unless a
+      // logout is already under way, whose navigation this would cancel
+      // (see sessionTeardown).
+      if (
+        error instanceof Error &&
+        error.message === 'Authentication required' &&
+        !isSessionTerminating()
+      ) {
         // Trigger auth failure handling (redirect to login)
         window.location.href = `/login?reason=session_expired`
       }
