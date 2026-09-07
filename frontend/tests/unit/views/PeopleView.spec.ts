@@ -6,6 +6,11 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 const listAdminGroups = vi.fn()
 const mockGetUsers = vi.fn()
 const listAudit = vi.fn()
+const getConfigSync = vi.fn()
+
+vi.mock('@/services/api/httpClient', () => ({
+  getConfigSync: () => getConfigSync(),
+}))
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
@@ -18,6 +23,10 @@ vi.mock('@/services/api/iamApi', () => ({
     removeMember: vi.fn(),
     listMyGroups: vi.fn(),
     listAudit: (...args: unknown[]) => listAudit(...args),
+    getGroupConfig: vi.fn().mockResolvedValue({ settings: {}, conflicts: {} }),
+    listLocks: vi.fn().mockResolvedValue({}),
+    putGroupConfig: vi.fn(),
+    patchLocks: vi.fn(),
   },
 }))
 
@@ -63,6 +72,8 @@ function mountView() {
 
 describe('PeopleView', () => {
   beforeEach(() => {
+    getConfigSync.mockReset()
+    getConfigSync.mockReturnValue({ features: {} })
     listAdminGroups.mockReset()
     mockGetUsers.mockReset()
     mockGetUsers.mockResolvedValue({ users: [], total: 0, page: 1, limit: 50 })
@@ -103,8 +114,17 @@ describe('PeopleView', () => {
     expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(false)
+  })
+
+  it('shows the Policies tab when features.iamPolicies is on', async () => {
+    getConfigSync.mockReturnValue({ features: { iamPolicies: true } })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(true)
   })
 
   it('lists audit events on the Audit tab', async () => {

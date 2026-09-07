@@ -18,6 +18,10 @@ import {
   MarkSharedSeenResponseSchema,
   ContinueSharedChatResponseSchema,
   ListAdminAuditResponseSchema,
+  GetAdminGroupConfigResponseSchema,
+  PutAdminGroupConfigResponseSchema,
+  GetAdminConfigLocksResponseSchema,
+  PatchAdminConfigLocksResponseSchema,
 } from '@/generated/api-schemas'
 
 export type IamAuditEntry = NonNullable<
@@ -36,6 +40,10 @@ export type IamSubject = NonNullable<
 export type IamSharedItem = NonNullable<
   z.infer<typeof ListSharedWithMeResponseSchema>['items']
 >[number]
+
+export type IamGroupConfigSetting = NonNullable<
+  z.infer<typeof GetAdminGroupConfigResponseSchema>['settings']
+>[string]
 
 export const iamApi = {
   async listAdminGroups(): Promise<IamGroup[]> {
@@ -206,6 +214,55 @@ export const iamApi = {
       params: query,
       schema: ListAdminAuditResponseSchema,
     })
+  },
+
+  async getGroupConfig(groupId: number): Promise<{
+    settings: Record<string, IamGroupConfigSetting>
+    conflicts: Record<string, string[]>
+  }> {
+    const data = await httpClient(`/api/v1/admin/groups/${groupId}/config`, {
+      method: 'GET',
+      schema: GetAdminGroupConfigResponseSchema,
+    })
+    return {
+      settings: (data.settings ?? {}) as Record<string, IamGroupConfigSetting>,
+      conflicts: (data.conflicts ?? {}) as Record<string, string[]>,
+    }
+  },
+
+  async putGroupConfig(
+    groupId: number,
+    body: Record<string, unknown>
+  ): Promise<{
+    settings: Record<string, IamGroupConfigSetting>
+    conflicts: Record<string, string[]>
+  }> {
+    const data = await httpClient(`/api/v1/admin/groups/${groupId}/config`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      schema: PutAdminGroupConfigResponseSchema,
+    })
+    return {
+      settings: (data.settings ?? {}) as Record<string, IamGroupConfigSetting>,
+      conflicts: (data.conflicts ?? {}) as Record<string, string[]>,
+    }
+  },
+
+  async listLocks(): Promise<Record<string, boolean>> {
+    const data = await httpClient('/api/v1/admin/config/locks', {
+      method: 'GET',
+      schema: GetAdminConfigLocksResponseSchema,
+    })
+    return (data.locks ?? {}) as Record<string, boolean>
+  },
+
+  async patchLocks(body: Record<string, boolean>): Promise<Record<string, boolean>> {
+    const data = await httpClient('/api/v1/admin/config/locks', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+      schema: PatchAdminConfigLocksResponseSchema,
+    })
+    return (data.locks ?? {}) as Record<string, boolean>
   },
 
   async continueChat(chatId: number): Promise<{ id: number; title: string }> {

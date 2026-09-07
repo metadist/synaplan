@@ -274,6 +274,7 @@ final class ApiKeyScope
 
         if (self::matchesPrefix($path, '/api/v1/shares')
             || self::matchesPrefix($path, '/api/v1/admin/groups')
+            || self::matchesPrefix($path, '/api/v1/admin/config/locks')
         ) {
             return [self::IAM_MANAGE];
         }

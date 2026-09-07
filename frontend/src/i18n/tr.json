@@ -3367,7 +3367,9 @@
         "this_week": "Bu Hafta",
         "this_month": "Bu Ay"
       }
-    }
+    },
+    "setByAdmin": "Yöneticiniz tarafından ayarlandı",
+    "fromGroup": "Grubunuzun varsayılanı"
   },
   "channels": {
     "title": "Kanallar",
@@ -4529,6 +4531,7 @@
     "tabs": {
       "users": "Kullanıcılar",
       "groups": "Gruplar",
+      "policies": "Kurallar",
       "audit": "Kayıt"
     },
     "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
@@ -4598,7 +4601,49 @@
         "directory_sync": "Giriş grubu güncellendi",
         "impersonation_start": "Kullanıcı olarak görüntüleme başladı",
         "impersonation_stop": "Kullanıcı olarak görüntüleme bitti",
-        "admin_metadata_view": "Kaynak listesine bakıldı"
+        "admin_metadata_view": "Kaynak listesine bakıldı",
+        "policy_set": "Grup kuralları güncellendi",
+        "policy_lock": "Ayar kilitlendi"
+      }
+    },
+    "policies": {
+      "group": "Grup",
+      "chooseGroup": "Bir grup seçin",
+      "helper": "Bu ayarlar gruptaki herkes için geçerlidir. Kilitlenmedikçe kişisel ayar öne geçer.",
+      "pickGroup": "Kurallarını düzenlemek için bir grup seçin.",
+      "defaultModels": "Varsayılan modeller",
+      "allowedModels": "İzin verilen modeller",
+      "allowedHelper": "Herkesin tüm modelleri kullanması için boş bırakın. Bir liste seçimi sınırlar.",
+      "features": "Özellikler",
+      "rateLimit": "Kullanım sınırı düzeyi",
+      "useGlobal": "Kurulum varsayılanını kullan",
+      "useBillingTier": "Kişinin planını kullan",
+      "conflict": "Başka bir grup farklı bir varsayılan belirlemiş. En küçük numaralı grup kazanır.",
+      "locks": "Kilitli varsayılanlar",
+      "locksHelper": "Kullanıcılar bunu değiştiremez.",
+      "save": "Kuralları kaydet",
+      "saved": "Grup kuralları kaydedildi.",
+      "lockSaved": "Kilit güncellendi.",
+      "loadError": "Kurallar yüklenemedi.",
+      "saveError": "Kurallar kaydedilemedi.",
+      "capability": {
+        "CHAT": "Sohbet",
+        "VECTORIZE": "Arama",
+        "PIC2TEXT": "Görüntüden metin",
+        "SOUND2TEXT": "Konuşmadan metin",
+        "MEM": "Bellek",
+        "TOOLS": "Araçlar"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Kayıtlı görevler",
+        "DESKTOP_AGENT_ENABLED": "Masaüstü aracısı",
+        "DOCUMENT_TOOLS_ENABLED": "Belge araçları",
+        "MULTITASK_ROUTING_ENABLED": "Çok adımlı yönlendirme",
+        "MULTITASK_PARALLEL_ENABLED": "Paralel adımlar",
+        "MULTITASK_URL_FETCH_ENABLED": "Web sayfalarını getir",
+        "MULTITASK_MCP_FETCH_ENABLED": "Bağlı araçlardan oku",
+        "MULTITASK_MCP_ACTION_ENABLED": "Bağlı araçlarla işlem yap",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-posta ara"
       }
     }
   },

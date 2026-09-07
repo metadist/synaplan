@@ -1482,6 +1482,8 @@
     "header": "Type to find a file to give the AI"
   },
   "config": {
+    "setByAdmin": "Set by your administrator",
+    "fromGroup": "Default from your group",
     "aiModels": {
       "title": "AI Models",
       "description": "Configure and manage your AI models",
@@ -5514,6 +5516,7 @@
     "tabs": {
       "users": "Users",
       "groups": "Groups",
+      "policies": "Policies",
       "audit": "Audit"
     },
     "usersMoved": "Users now live on the People page.",
@@ -5583,7 +5586,49 @@
         "directory_sync": "Login group updated",
         "impersonation_start": "Started viewing as user",
         "impersonation_stop": "Stopped viewing as user",
-        "admin_metadata_view": "Looked at resource list"
+        "admin_metadata_view": "Looked at resource list",
+        "policy_set": "Updated group policies",
+        "policy_lock": "Locked a setting"
+      }
+    },
+    "policies": {
+      "group": "Group",
+      "chooseGroup": "Select a group",
+      "helper": "These settings apply to everyone in the group. A personal setting still wins unless you lock the default.",
+      "pickGroup": "Select a group to edit its policies.",
+      "defaultModels": "Default models",
+      "allowedModels": "Allowed models",
+      "allowedHelper": "Leave empty so people can use every model. A list limits what they can pick.",
+      "features": "Features",
+      "rateLimit": "Rate-limit tier",
+      "useGlobal": "Use the instance default",
+      "useBillingTier": "Use the person’s plan",
+      "conflict": "Another group sets a different default. The group with the lowest number wins.",
+      "locks": "Locked defaults",
+      "locksHelper": "Users cannot change this.",
+      "save": "Save policies",
+      "saved": "Group policies saved.",
+      "lockSaved": "Lock updated.",
+      "loadError": "Policies could not be loaded.",
+      "saveError": "Policies could not be saved.",
+      "capability": {
+        "CHAT": "Chat",
+        "VECTORIZE": "Search",
+        "PIC2TEXT": "Image to text",
+        "SOUND2TEXT": "Speech to text",
+        "MEM": "Memory",
+        "TOOLS": "Tools"
+      },
+      "feature": {
+        "SAVEDTASKS_ENABLED": "Saved tasks",
+        "DESKTOP_AGENT_ENABLED": "Desktop agent",
+        "DOCUMENT_TOOLS_ENABLED": "Document tools",
+        "MULTITASK_ROUTING_ENABLED": "Multi-step routing",
+        "MULTITASK_PARALLEL_ENABLED": "Parallel steps",
+        "MULTITASK_URL_FETCH_ENABLED": "Fetch web pages",
+        "MULTITASK_MCP_FETCH_ENABLED": "Read from connected tools",
+        "MULTITASK_MCP_ACTION_ENABLED": "Act through connected tools",
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Search email"
       }
     }
   },

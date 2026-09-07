@@ -1,25 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Entity;
 
-use App\Repository\ConfigRepository;
+use App\Repository\GroupConfigRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: ConfigRepository::class)]
-#[ORM\Table(name: 'BCONFIG')]
-#[ORM\UniqueConstraint(name: 'uniq_config_owner_group_setting', columns: ['BOWNERID', 'BGROUP', 'BSETTING'])]
-#[ORM\Index(columns: ['BGROUP'], name: 'idx_group')]
-#[ORM\Index(columns: ['BSETTING'], name: 'idx_setting')]
-class Config
+#[ORM\Entity(repositoryClass: GroupConfigRepository::class)]
+#[ORM\Table(name: 'BGROUPCONFIG')]
+#[ORM\UniqueConstraint(name: 'uniq_groupconfig_group_setting', columns: ['BGROUPID', 'BGROUP', 'BSETTING'])]
+#[ORM\Index(columns: ['BGROUPID'], name: 'idx_groupconfig_group')]
+class GroupConfig
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
     private ?int $id = null;
 
-    #[ORM\Column(name: 'BOWNERID', type: 'bigint')]
-    private int $ownerId = 0;
+    #[ORM\Column(name: 'BGROUPID', type: 'bigint')]
+    private int $groupId = 0;
 
     #[ORM\Column(name: 'BGROUP', length: 64)]
     private string $group = '';
@@ -27,28 +28,35 @@ class Config
     #[ORM\Column(name: 'BSETTING', length: 96)]
     private string $setting = '';
 
-    // Types::TEXT (LONGTEXT on MariaDB): rows may hold AES-256-CBC ciphertext
-    // (encrypted provider API keys, OpenAI-compatible endpoint JSON) that
-    // exceeds the old VARCHAR(250). Widened by Version20260729120000.
     #[ORM\Column(name: 'BVALUE', type: Types::TEXT)]
     private string $value = '';
 
-    #[ORM\Column(name: 'BLOCKED', type: Types::BOOLEAN, options: ['default' => false])]
-    private bool $blocked = false;
+    #[ORM\Column(name: 'BCREATED', type: 'bigint')]
+    private int $created;
+
+    #[ORM\Column(name: 'BUPDATED', type: 'bigint')]
+    private int $updated;
+
+    public function __construct()
+    {
+        $now = time();
+        $this->created = $now;
+        $this->updated = $now;
+    }
 
     public function getId(): ?int
     {
         return $this->id;
     }
 
-    public function getOwnerId(): int
+    public function getGroupId(): int
     {
-        return $this->ownerId;
+        return $this->groupId;
     }
 
-    public function setOwnerId(int $ownerId): self
+    public function setGroupId(int $groupId): self
     {
-        $this->ownerId = $ownerId;
+        $this->groupId = $groupId;
 
         return $this;
     }
@@ -85,19 +93,18 @@ class Config
     public function setValue(string $value): self
     {
         $this->value = $value;
+        $this->updated = time();
 
         return $this;
     }
 
-    public function isBlocked(): bool
+    public function getCreated(): int
     {
-        return $this->blocked;
+        return $this->created;
     }
 
-    public function setBlocked(bool $blocked): self
+    public function getUpdated(): int
     {
-        $this->blocked = $blocked;
-
-        return $this;
+        return $this->updated;
     }
 }

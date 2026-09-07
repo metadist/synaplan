@@ -7,6 +7,8 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\Policy\PolicyAllowList;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -44,6 +46,7 @@ final class RateLimitService
         private CostCalculationService $costCalculationService,
         private SubscriptionRepository $subscriptionRepository,
         private TopupRepository $topupRepository,
+        private ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
     }
 
@@ -82,7 +85,7 @@ final class RateLimitService
             ];
         }
 
-        $level = $user->getRateLimitLevel();
+        $level = $this->resolveRateLimitLevel($user);
 
         $this->logger->debug('Rate limit check', [
             'user_id' => $user->getId(),
@@ -606,6 +609,28 @@ final class RateLimitService
         }
 
         return [(int) $periodStart, (int) $periodEnd];
+    }
+
+    /**
+     * Group policy may replace BUSERLEVEL for the limits table only.
+     * Billing / subscription stay on {@see User::getRateLimitLevel()}.
+     */
+    private function resolveRateLimitLevel(User $user): string
+    {
+        $level = $user->getRateLimitLevel();
+        if ('ADMIN' === $level || null === $this->layeredConfigResolver) {
+            return $level;
+        }
+        $tier = $this->layeredConfigResolver->resolve((int) $user->getId(), 'RATELIMITS', 'TIER');
+        if (null === $tier) {
+            return $level;
+        }
+        $tier = strtoupper(trim($tier));
+        if (!in_array($tier, PolicyAllowList::TIERS, true)) {
+            return $level;
+        }
+
+        return $tier;
     }
 
     /**

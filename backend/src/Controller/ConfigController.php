@@ -19,12 +19,14 @@ use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\GuestChatConfig;
 use App\Service\Iam\IamConfig;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MailerConfig;
@@ -91,6 +93,8 @@ class ConfigController extends AbstractController
         private readonly string $qdrantUrl,
         private readonly ?SelfAwareConfig $selfAwareConfig = null,
         private readonly ?CapabilityInventory $capabilityInventory = null,
+        private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
+        private readonly ?GroupPolicyService $groupPolicyService = null,
     ) {
     }
 
@@ -180,6 +184,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. Off by default until an operator enables IAM groups.'),
                         new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. Off by default.'),
                         new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
+                        new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, People shows Policies and group defaults / allowed models apply. Requires iamGroups. Off by default.'),
                         new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
                         new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. Off by default.'),
                     ]
@@ -482,6 +487,7 @@ class ConfigController extends AbstractController
             'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
             'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
             'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
+            'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
             'officeConvertEnabled' => $this->isOfficeConvertConfigured(),
             'documentToolsEnabled' => true === filter_var(
@@ -999,6 +1005,12 @@ class ConfigController extends AbstractController
         }
         usort($providers, static fn (array $a, array $b): int => strcasecmp($a['displayName'], $b['displayName']));
 
+        if (null !== $this->groupPolicyService && !$this->isGranted('ROLE_ADMIN')) {
+            foreach ($grouped as $capability => $rows) {
+                $grouped[$capability] = $this->groupPolicyService->filterModelsByAllowList($user->getId(), $rows);
+            }
+        }
+
         return $this->json([
             'success' => true,
             'models' => $grouped,
@@ -1042,6 +1054,18 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'ANALYZE', type: 'integer', nullable: true, example: 53),
                     ]
                 ),
+                new OA\Property(
+                    property: 'locked',
+                    type: 'object',
+                    description: 'Per-capability lock from the administrator (users cannot change these)',
+                    additionalProperties: new OA\AdditionalProperties(type: 'boolean')
+                ),
+                new OA\Property(
+                    property: 'sources',
+                    type: 'object',
+                    description: 'Where each default comes from: admin, group, or user',
+                    additionalProperties: new OA\AdditionalProperties(type: 'string', enum: ['admin', 'group', 'user'])
+                ),
             ]
         )
     )]
@@ -1056,6 +1080,8 @@ class ConfigController extends AbstractController
         $capabilities = ['SORT', 'CHAT', 'MEM', 'VECTORIZE', 'PIC2TEXT', 'TEXT2PIC', 'PIC2PIC', 'TEXT2VID', 'IMG2VID', 'SOUND2TEXT', 'TEXT2SOUND', 'ANALYZE'];
 
         $defaults = [];
+        $locked = [];
+        $sources = [];
 
         foreach ($capabilities as $capability) {
             // VECTORIZE is system-wide (single Qdrant collection,
@@ -1069,6 +1095,17 @@ class ConfigController extends AbstractController
                     'group' => 'DEFAULTMODEL',
                     'setting' => 'VECTORIZE',
                 ]);
+                $source = null !== $config ? 'admin' : null;
+            } elseif (null !== $this->layeredConfigResolver && $this->iamConfig->isGroupPoliciesEnabled($userId)) {
+                $raw = $this->layeredConfigResolver->resolve($userId, 'DEFAULTMODEL', $capability);
+                $modelId = null !== $raw && null !== $this->groupPolicyService
+                    ? $this->groupPolicyService->modelIdFromStored($raw)
+                    : (is_numeric((string) $raw) ? (int) $raw : null);
+                $model = null !== $modelId ? $this->modelRepository->find($modelId) : null;
+                $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $locked[$capability] = $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
+                $sources[$capability] = $this->layeredConfigResolver->source($userId, 'DEFAULTMODEL', $capability);
+                continue;
             } else {
                 // Try user-specific config first
                 $config = $this->configRepository->findOneBy([
@@ -1076,6 +1113,7 @@ class ConfigController extends AbstractController
                     'group' => 'DEFAULTMODEL',
                     'setting' => $capability,
                 ]);
+                $source = 'user';
 
                 // Fall back to global config
                 if (!$config) {
@@ -1084,6 +1122,7 @@ class ConfigController extends AbstractController
                         'group' => 'DEFAULTMODEL',
                         'setting' => $capability,
                     ]);
+                    $source = null !== $config ? 'admin' : null;
                 }
             }
 
@@ -1092,14 +1131,20 @@ class ConfigController extends AbstractController
                 $model = $this->modelRepository->find($modelId);
                 // Only return model ID if the model still exists and is active
                 $defaults[$capability] = ($model && 1 === $model->getActive()) ? $modelId : null;
+                $sources[$capability] = $source;
             } else {
                 $defaults[$capability] = null;
+                $sources[$capability] = $source;
             }
+            $locked[$capability] = null !== $this->layeredConfigResolver
+                && $this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, $userId);
         }
 
         return $this->json([
             'success' => true,
             'defaults' => $defaults,
+            'locked' => $locked,
+            'sources' => $sources,
         ]);
     }
 
@@ -1155,6 +1200,17 @@ class ConfigController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid request body')]
+    #[OA\Response(
+        response: 409,
+        description: 'A locked default cannot be overridden',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'This setting is set by your administrator'),
+                new OA\Property(property: 'code', type: 'string', example: 'iam.settingLocked'),
+                new OA\Property(property: 'capability', type: 'string', example: 'CHAT'),
+            ]
+        )
+    )]
     #[OA\Response(response: 401, description: 'Not authenticated')]
     #[OA\Response(
         response: 403,
@@ -1234,6 +1290,26 @@ class ConfigController extends AbstractController
                     'message' => $e->getMessage(),
                     'currentLevel' => $e->currentLevel,
                 ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
+        if (!$global && null !== $this->layeredConfigResolver
+            && $this->iamConfig->isGroupPoliciesEnabled((int) $user->getId())
+        ) {
+            foreach ($data['defaults'] as $capability => $modelId) {
+                if (!is_string($capability)) {
+                    continue;
+                }
+                if ('VECTORIZE' === $capability && !$vectorizeChanged) {
+                    continue;
+                }
+                if ($this->layeredConfigResolver->isLocked('DEFAULTMODEL', $capability, (int) $user->getId())) {
+                    return $this->json([
+                        'error' => 'This setting is set by your administrator',
+                        'code' => 'iam.settingLocked',
+                        'capability' => $capability,
+                    ], Response::HTTP_CONFLICT);
+                }
             }
         }
 

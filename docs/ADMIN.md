@@ -384,10 +384,13 @@ When the flag is off:
 
 When the flag is on:
 
-- Operate shows **People** (`/admin/people`) with **Users** and **Groups**.
+- Operate shows **People** (`/admin/people`) with **Users**, **Groups**, and
+  **Audit**. **Policies** appears only when group policies are also on.
 - An admin can create a manual group, add people by email, and set the role
   to member or manager.
-- Groups that come from company login (`kind=directory`) are read-only here.
+- Groups that come from company login (`kind=directory`) can still receive
+  extra people by hand; memberships that came from login update at the next
+  sign-in.
 - Sharing a folder or conversation with a group is gated separately by
   `IAM.SHARING_ENABLED` (effective only when groups are also on).
 
@@ -447,9 +450,37 @@ them. **Operate → People → Users** has **View as user** for audited
 impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
 to hide that action.
 
-Enable both switches under **Operate → System configuration → Access →
-Sharing** (`IAM_GROUPS_ENABLED`, then `IAM_SHARING_ENABLED`). The page
-reloads the runtime config so People and Share appear without a restart.
+### Group policies and locked defaults
+
+Turn **Group policies** on under **Operate → System configuration → Access →
+Sharing** (`IAM_GROUP_POLICIES_ENABLED`). People & groups must already be on.
+The seeder inserts the flag as `0`. Off means every resolver still reads only
+`[user, global]` and never touches `BGROUPCONFIG`.
+
+When the flag is on, People shows a **Policies** tab. Pick one group at a
+time and set:
+
+| Setting | What it does | Several groups |
+| ------- | ------------ | -------------- |
+| Default models (`DEFAULTMODEL.*`) | Suggested model per capability | First group by id |
+| Allowed models (`MODELS.ALLOWED`) | Empty = every model; a list hides the rest | Union |
+| Features (saved tasks, desktop agent, document tools, multi-step) | On if any group turns the feature on | OR |
+| Rate-limit tier (`RATELIMITS.TIER`) | Which limit table `checkLimit()` uses | Highest of NEW / PRO / TEAM / BUSINESS |
+
+A personal setting still wins unless you lock the global row. Locked defaults
+show **Set by your administrator** on the user's model settings; a group
+default (when not locked) shows **Default from your group**. Changing a locked
+setting returns **409** `iam.settingLocked`.
+
+Search embeddings (`VECTORIZE`) stay instance-wide: you can store a group
+default, but the indexer and the user's Search dropdown still use the global
+row.
+
+Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
+
+Enable the People, sharing, and (optionally) policy switches under
+**Operate → System configuration → Access → Sharing**. The page reloads the
+runtime config so People, Share, and Policies appear without a restart.
 SQL remains available for automation:
 
 ```sql

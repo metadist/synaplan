@@ -9,6 +9,7 @@ use App\Entity\Group;
 use App\Entity\GroupMember;
 use App\Entity\User;
 use App\Repository\AuditLogEntryRepository;
+use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\GroupRepository;
 use App\Repository\ShareRepository;
@@ -40,6 +41,7 @@ final class GroupServiceTest extends TestCase
             $this->users,
             new AuditLogWriter($this->audit),
             $this->createMock(ShareRepository::class),
+            $this->createMock(GroupConfigRepository::class),
         );
         $this->actor = $this->userWithId(1);
     }

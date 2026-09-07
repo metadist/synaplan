@@ -18,6 +18,7 @@
 
       <UsersTab v-if="activeTab === 'users'" show-iam-columns />
       <GroupsTab v-else-if="activeTab === 'groups'" />
+      <PoliciesTab v-else-if="activeTab === 'policies'" />
       <AuditTab v-else />
     </div>
   </MainLayout>
@@ -30,25 +31,48 @@ import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import UsersTab from '@/components/people/UsersTab.vue'
 import GroupsTab from '@/components/people/GroupsTab.vue'
+import PoliciesTab from '@/components/people/PoliciesTab.vue'
 import AuditTab from '@/components/people/AuditTab.vue'
+import { isIamPoliciesEnabled } from '@/composables/useIamFeature'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const activeTab = ref<'users' | 'groups' | 'audit'>('users')
+const activeTab = ref<'users' | 'groups' | 'policies' | 'audit'>('users')
 
-const tabNavItems = computed<TabNavItem[]>(() => [
-  { id: 'users', label: t('people.tabs.users'), icon: 'mdi:account-multiple', testid: 'tab-users' },
-  { id: 'groups', label: t('people.tabs.groups'), icon: 'mdi:account-group', testid: 'tab-groups' },
-  {
+const tabNavItems = computed<TabNavItem[]>(() => {
+  const tabs: TabNavItem[] = [
+    {
+      id: 'users',
+      label: t('people.tabs.users'),
+      icon: 'mdi:account-multiple',
+      testid: 'tab-users',
+    },
+    {
+      id: 'groups',
+      label: t('people.tabs.groups'),
+      icon: 'mdi:account-group',
+      testid: 'tab-groups',
+    },
+  ]
+  if (isIamPoliciesEnabled()) {
+    tabs.push({
+      id: 'policies',
+      label: t('people.tabs.policies'),
+      icon: 'mdi:shield-account',
+      testid: 'tab-policies',
+    })
+  }
+  tabs.push({
     id: 'audit',
     label: t('people.tabs.audit'),
     icon: 'mdi:clipboard-text-clock',
     testid: 'tab-audit',
-  },
-])
+  })
+  return tabs
+})
 
 function onTabNavChange(id: string) {
-  if (id === 'users' || id === 'groups' || id === 'audit') {
+  if (id === 'users' || id === 'groups' || id === 'policies' || id === 'audit') {
     activeTab.value = id
   }
 }

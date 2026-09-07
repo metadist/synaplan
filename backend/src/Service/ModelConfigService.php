@@ -12,6 +12,8 @@ use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Seed\DefaultModelConfigSeeder;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\Policy\GroupPolicyService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -67,6 +69,8 @@ final readonly class ModelConfigService
         private OllamaModelInventory $ollamaModelInventory,
         private ModelHealthRepository $modelHealthRepository,
         private LoggerInterface $logger,
+        private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?GroupPolicyService $groupPolicyService = null,
     ) {
     }
 
@@ -419,10 +423,8 @@ final readonly class ModelConfigService
         $setting = strtoupper($capability);
         $preferred = null;
 
-        // Read lazily: a usable per-user binding must not cost a global lookup.
-        foreach ($userId ? [$userId, 0] : [0] as $ownerId) {
-            $modelId = $this->readDefaultModel($ownerId, $setting);
-            if (null === $modelId) {
+        foreach ($this->eachDefaultModelId($userId, $setting) as $modelId) {
+            if (!$this->isAllowedModel($userId, $modelId)) {
                 continue;
             }
 
@@ -433,7 +435,7 @@ final readonly class ModelConfigService
             $preferred ??= $modelId;
         }
 
-        $fallback = $this->firstUsableModelForCapability($setting);
+        $fallback = $this->firstUsableModelForCapability($setting, $userId);
         if (null !== $fallback) {
             return $fallback;
         }
@@ -450,7 +452,7 @@ final readonly class ModelConfigService
      * lands on something the user could have chosen themselves; the MEM tag has
      * no selectable rows at all, which is why the hidden pass exists.
      */
-    private function firstUsableModelForCapability(string $setting): ?int
+    private function firstUsableModelForCapability(string $setting, ?int $userId = null): ?int
     {
         $tag = self::CAPABILITY_TAGS[$setting] ?? null;
         if (null === $tag) {
@@ -466,10 +468,14 @@ final readonly class ModelConfigService
             foreach ([true, false] as $selectableOnly) {
                 // findByTag() orders by quality DESC, id ASC.
                 foreach ($this->modelRepository->findByTag($tag, $selectableOnly) as $model) {
+                    $modelId = (int) $model->getId();
+                    if (!$this->isAllowedModel($userId, $modelId)) {
+                        continue;
+                    }
                     if (!$this->isModelUsable($model)) {
                         continue;
                     }
-                    if ($healthyOnly && $this->isModelOffline((int) $model->getId())) {
+                    if ($healthyOnly && $this->isModelOffline($modelId)) {
                         continue;
                     }
 
@@ -537,7 +543,7 @@ final readonly class ModelConfigService
             return $modelId;
         }
 
-        if (!$this->isModelProviderUsable($modelId)) {
+        if (!$this->isAllowedModel($userId, $modelId) || !$this->isModelProviderUsable($modelId)) {
             return $this->getDefaultModel($capability, $userId);
         }
 
@@ -559,6 +565,53 @@ final readonly class ModelConfigService
         }
 
         return $modelId;
+    }
+
+    /**
+     * Yields configured model ids in precedence order (user, then group, then
+     * global). Lazy so an early usable hit does not read later owners — existing
+     * unit tests pin that findOneBy count.
+     *
+     * @return iterable<int>
+     */
+    private function eachDefaultModelId(?int $userId, string $setting): iterable
+    {
+        if (null !== $this->layeredConfigResolver) {
+            foreach ($this->layeredConfigResolver->chain($userId, 'DEFAULTMODEL', $setting) as $raw) {
+                $id = $this->interpretStoredModelId($raw);
+                if (null !== $id) {
+                    yield $id;
+                }
+            }
+
+            return;
+        }
+
+        foreach ($userId ? [$userId, 0] : [0] as $ownerId) {
+            $modelId = $this->readDefaultModel($ownerId, $setting);
+            if (null !== $modelId) {
+                yield $modelId;
+            }
+        }
+    }
+
+    private function interpretStoredModelId(string $raw): ?int
+    {
+        if (null !== $this->groupPolicyService) {
+            return $this->groupPolicyService->modelIdFromStored($raw);
+        }
+        $raw = trim($raw);
+        if ('' === $raw || !is_numeric($raw)) {
+            return null;
+        }
+        $id = (int) $raw;
+
+        return 0 !== $id ? $id : null;
+    }
+
+    private function isAllowedModel(?int $userId, int $modelId): bool
+    {
+        return null === $this->groupPolicyService || $this->groupPolicyService->isModelAllowed($userId, $modelId);
     }
 
     private function readDefaultModel(int $ownerId, string $setting): ?int

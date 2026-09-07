@@ -7,6 +7,7 @@ namespace App\Service\Iam;
 use App\Entity\Group;
 use App\Entity\GroupMember;
 use App\Entity\User;
+use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\GroupRepository;
 use App\Repository\ShareRepository;
@@ -26,6 +27,7 @@ final readonly class GroupService
         private UserRepository $userRepository,
         private AuditLogWriter $auditLogWriter,
         private ShareRepository $shareRepository,
+        private GroupConfigRepository $groupConfigRepository,
     ) {
     }
 
@@ -119,6 +121,7 @@ final readonly class GroupService
         $name = $group->getName();
         $this->groupMemberRepository->deleteByGroupId($groupId);
         $this->shareRepository->deleteBySubjectGroup($groupId);
+        $this->groupConfigRepository->deleteByGroupId($groupId);
         $this->groupRepository->remove($group);
 
         $this->auditLogWriter->record(

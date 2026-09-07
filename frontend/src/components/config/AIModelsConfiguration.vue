@@ -92,6 +92,20 @@
               <LockClosedIcon class="w-3 h-3" />
               {{ $t('config.embeddingSwitch.premium.badge') }}
             </span>
+            <span
+              v-if="isCapabilityLocked(capability as Capability)"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-[var(--brand)]/10 text-[var(--brand)] border border-[var(--brand)]/30"
+              data-testid="badge-set-by-admin"
+            >
+              {{ $t('config.setByAdmin') }}
+            </span>
+            <span
+              v-else-if="defaultSources[capability as Capability] === 'group'"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium txt-secondary"
+              data-testid="badge-from-group"
+            >
+              {{ $t('config.fromGroup') }}
+            </span>
           </label>
           <div class="relative">
             <button
@@ -100,15 +114,20 @@
                 'w-full px-4 py-3 pl-10 pr-10 rounded-lg surface-card border txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-all text-left',
                 'border-light-border/30 dark:border-dark-border/20 hover:border-[var(--brand)]/50',
                 openDropdown === capability && 'ring-2 ring-[var(--brand)]',
-                capability === 'VECTORIZE' &&
-                  isVectorizeAdminOnly &&
+                ((capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                  isCapabilityLocked(capability as Capability)) &&
                   'opacity-60 cursor-not-allowed hover:border-light-border/30 dark:hover:border-dark-border/20',
               ]"
-              :disabled="capability === 'VECTORIZE' && isVectorizeAdminOnly"
+              :disabled="
+                (capability === 'VECTORIZE' && isVectorizeAdminOnly) ||
+                isCapabilityLocked(capability as Capability)
+              "
               :title="
-                capability === 'VECTORIZE' && isVectorizeAdminOnly
-                  ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
-                  : undefined
+                isCapabilityLocked(capability as Capability)
+                  ? $t('config.setByAdmin')
+                  : capability === 'VECTORIZE' && isVectorizeAdminOnly
+                    ? $t('config.embeddingSwitch.adminOnly.lockTooltip')
+                    : undefined
               "
               data-testid="btn-model-dropdown"
               @click="toggleDropdown(capability as Capability)"
@@ -644,6 +663,8 @@ const allProvidersAvailable = computed(() => {
   const keyProviders = providers.value.filter((p) => p.requiresKey)
   return keyProviders.length > 0 && keyProviders.every((p) => p.available)
 })
+const defaultLocked = ref<Partial<Record<Capability, boolean>>>({})
+const defaultSources = ref<Partial<Record<Capability, 'admin' | 'group' | 'user'>>>({})
 const defaultConfig = ref<Record<Capability, number | null>>({
   SORT: null,
   CHAT: null,
@@ -853,6 +874,8 @@ const loadData = async () => {
       }
       defaultConfig.value = mergedDefaults
       originalConfig.value = { ...mergedDefaults }
+      defaultLocked.value = defaultsRes.locked ?? {}
+      defaultSources.value = defaultsRes.sources ?? {}
     }
   } catch (error) {
     console.error('Failed to load models:', error)
@@ -901,11 +924,18 @@ const getSelectedModelObj = (purpose: Capability): AIModel | null => {
   return selectedId ? (models.find((m) => m.id === selectedId) ?? null) : null
 }
 
+function isCapabilityLocked(capability: Capability): boolean {
+  return defaultLocked.value[capability] === true
+}
+
 const toggleDropdown = (capability: Capability) => {
   // Belt-and-braces: the button has `:disabled` for non-admin VECTORIZE,
   // but a determined user could still toggle the v-if dropdown via the
   // devtools or a stale ref. Bail here so the dropdown never opens.
-  if (capability === 'VECTORIZE' && isVectorizeAdminOnly.value) {
+  if (
+    isCapabilityLocked(capability) ||
+    (capability === 'VECTORIZE' && isVectorizeAdminOnly.value)
+  ) {
     openDropdown.value = null
     return
   }
@@ -1241,7 +1271,9 @@ const saveConfiguration = async () => {
     // 403 `{ error: 'requires_premium', message: 'Switching the embedding
     // model requires an active paid subscription. Current level: NEW.', ... }`
     // and `httpClient.ApiError` now exposes both the message and the code.
-    if (err instanceof ApiError && 403 === err.status) {
+    if (err instanceof ApiError && 409 === err.status) {
+      showError(t('config.setByAdmin'))
+    } else if (err instanceof ApiError && 403 === err.status) {
       const reason =
         'requires_premium' === err.code
           ? t('config.aiModels.saveErrorPremiumRequired', { reason: err.message })

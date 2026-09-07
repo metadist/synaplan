@@ -8,12 +8,13 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 
 /**
- * Feature-flag resolver for IAM (groups, sharing, directory sync).
+ * Feature-flag resolver for IAM (groups, sharing, directory sync, policies).
  *
  * Flags live in BCONFIG group {@see self::CONFIG_GROUP}:
  *   - GROUPS_ENABLED — People page, group API, AccessGate may consult groups
  *   - SHARING_ENABLED — BSHARES + Share dialog (S2)
  *   - DIRECTORY_SYNC_ENABLED — OIDC group claim upsert (S4)
+ *   - GROUP_POLICIES_ENABLED — People → Policies and group-layer defaults (S5)
  *
  * Resolution mirrors {@see \App\Service\Desktop\DesktopAgentConfig}: a per-user
  * row (BOWNERID = userId) overrides the global row (BOWNERID = 0), which
@@ -28,6 +29,7 @@ final readonly class IamConfig
     public const KEY_GROUPS_ENABLED = 'GROUPS_ENABLED';
     public const KEY_SHARING_ENABLED = 'SHARING_ENABLED';
     public const KEY_DIRECTORY_SYNC_ENABLED = 'DIRECTORY_SYNC_ENABLED';
+    public const KEY_GROUP_POLICIES_ENABLED = 'GROUP_POLICIES_ENABLED';
     public const KEY_DIRECTORY_GROUPS_CLAIM = 'DIRECTORY_GROUPS_CLAIM';
     public const KEY_DIRECTORY_GROUP_NAMES = 'DIRECTORY_GROUP_NAMES';
     public const KEY_EVERYONE_SHARES = 'EVERYONE_SHARES';
@@ -92,6 +94,12 @@ final readonly class IamConfig
     public function isDirectorySyncEnabled(?int $userId): bool
     {
         return $this->resolveFlag(self::KEY_DIRECTORY_SYNC_ENABLED, $userId, self::DEFAULT_ENABLED);
+    }
+
+    public function isGroupPoliciesEnabled(?int $userId): bool
+    {
+        return $this->isGroupsEnabled($userId)
+            && $this->resolveFlag(self::KEY_GROUP_POLICIES_ENABLED, $userId, self::DEFAULT_ENABLED);
     }
 
     public function directoryGroupsClaim(?int $userId): string
