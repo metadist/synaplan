@@ -12,6 +12,8 @@ use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentService;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
@@ -54,6 +56,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\InputBag;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -128,6 +131,7 @@ class StreamController extends AbstractController
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
         private ?AgentConfig $agentConfig = null,
+        private ?AgentService $agentService = null,
     ) {
     }
 
@@ -275,7 +279,7 @@ class StreamController extends AbstractController
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(
@@ -400,6 +404,13 @@ class StreamController extends AbstractController
         required: false,
         description: 'ID of an assistant to pin this chat to. When AGENTS.ENABLED is on, classification skips the sorter and the reply uses that assistant. Ignored when the flag is off. The prompt must belong to the current user.',
         schema: new OA\Schema(type: 'integer', example: 7)
+    )]
+    #[OA\Parameter(
+        name: 'draft',
+        in: 'query',
+        required: false,
+        description: 'When 1, pin the owner\'s unpublished draft (test panel). Non-owners receive 403. Ignored when agentId is absent.',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Parameter(
         name: 'ragGroupKey',
@@ -587,6 +598,13 @@ class StreamController extends AbstractController
         $promptId = $params->get('promptId');
         $agentIdParam = $params->getInt('agentId') ?: null;
         $pinnedAgentId = $this->resolvePinnedAgentId($user, $agentIdParam);
+        $draftRequested = $this->isTruthyFlag($params->get('draft'));
+        if ($draftRequested) {
+            $draftDenied = $this->denyDraftIfNotOwner($user, $pinnedAgentId);
+            if (null !== $draftDenied) {
+                return $draftDenied;
+            }
+        }
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
@@ -731,7 +749,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -1078,6 +1096,9 @@ class StreamController extends AbstractController
 
                 if (null !== $pinnedAgentId) {
                     $processingOptions['agentId'] = $pinnedAgentId;
+                    if ($draftRequested) {
+                        $processingOptions['agentDraft'] = true;
+                    }
                 }
 
                 // Quoted reference ("Mention in chat"): ChatHandler injects this
@@ -3010,6 +3031,29 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
+     * Owner-only draft test mode. Missing pin or a foreign assistant → 403.
+     */
+    private function denyDraftIfNotOwner(?User $user, ?int $agentId): ?JsonResponse
+    {
+        if (null === $user || null === $agentId || $agentId < 1 || null === $this->agentService) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $this->agentService->requireOwned($agentId, (int) $user->getId());
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function isTruthyFlag(mixed $value): bool
+    {
+        return true === $value || 1 === $value || '1' === (string) $value || 'true' === $value;
     }
 
     private function resolvePinnedAgentId(?User $user, ?int $agentId): ?int

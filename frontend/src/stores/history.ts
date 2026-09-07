@@ -127,6 +127,8 @@ export interface Message {
   quotedText?: string | null
   /** Backend id of the message the quote was taken from. */
   quotedMessageId?: number | null
+  /** Assistant this turn was pinned to (`AGENTID` meta). */
+  agentId?: number | null
   files?: MessageFile[] // Attached files
   documentChanges?: Array<{
     labelKey: string

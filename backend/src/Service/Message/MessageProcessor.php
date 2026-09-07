@@ -1412,7 +1412,7 @@ final readonly class MessageProcessor
             return $options;
         }
         if ($hasFixedPrompt || null === $this->agentConfig || !$this->agentConfig->isEnabled($message->getUserId())) {
-            unset($options['agentId']);
+            unset($options['agentId'], $options['agentDraft']);
         }
 
         return $options;
@@ -1428,6 +1428,9 @@ final readonly class MessageProcessor
         $out = [];
         if (!empty($options['agentId'])) {
             $out['agentId'] = (int) $options['agentId'];
+        }
+        if (array_key_exists('agentDraft', $options)) {
+            $out['agentDraft'] = (bool) $options['agentDraft'];
         }
 
         return $out;

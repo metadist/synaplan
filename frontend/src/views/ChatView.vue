@@ -339,6 +339,17 @@
             </span>
           </div>
         </template>
+        <template v-else-if="pinnedAssistantName" #banner>
+          <div
+            class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
+            data-testid="banner-pinned-assistant"
+          >
+            <Icon icon="mdi:robot-outline" class="w-4 h-4 txt-brand flex-shrink-0" />
+            <span class="txt-primary">
+              {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
+            </span>
+          </div>
+        </template>
       </ChatInput>
 
       <!--
@@ -520,6 +531,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
+import { usePinnedAssistant } from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
@@ -671,6 +683,7 @@ const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
+const { agentId: pinnedAgentId, name: pinnedAssistantName } = usePinnedAssistant()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
@@ -2067,6 +2080,7 @@ const handleContinueResponse = async (message: Message) => {
     trackId,
     language: locale.value,
     continueMessageId: message.backendMessageId,
+    agentId: pinnedAgentId.value ?? undefined,
     onUpdate: (data) => {
       if (data.status === 'data' && data.chunk) {
         fullContent += data.chunk
@@ -3117,6 +3131,7 @@ const streamAIResponse = async (
         ragGroupKey: options?.ragGroupKey,
         quotedText: options?.quotedText,
         quotedMessageId: options?.quotedMessageId,
+        agentId: pinnedAgentId.value ?? undefined,
         onUpdate: (data: StreamUpdatePayload) => {
           // CRITICAL: Check abort signal at the very beginning
           if (streamingAbortController?.signal.aborted) {

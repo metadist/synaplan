@@ -153,6 +153,41 @@ final readonly class AgentService
         return $agent;
     }
 
+    /**
+     * Copy an owned assistant into a new draft. Files are never copied;
+     * the clone gets its own `TASKPROMPT:agent:{slug}` folder.
+     */
+    public function clone(User $owner, int $sourceId): Agent
+    {
+        $ownerId = (int) $owner->getId();
+        $source = $this->requireOwned($sourceId, $ownerId);
+        $sourceIdResolved = $source->getId();
+        if (null === $sourceIdResolved) {
+            throw AgentNotAccessibleException::forId($sourceId);
+        }
+
+        $draft = $this->prepareCloneDraft($source->getDraft());
+        $definition = $this->validator->validate($draft);
+        $slug = $this->uniqueSlug($ownerId, $this->copySlugBase($source->getSlug()));
+        $name = $this->cloneName($source->getName());
+        $promptText = $this->instructionText($source->getPromptId());
+        $promptId = $this->createInstructionPrompt($ownerId, $slug, $name, $promptText);
+
+        $agent = new Agent($ownerId, $promptId, $slug, $name, $definition->toArray());
+        $agent->setParentId($sourceIdResolved);
+        $agent->setSource(Agent::SOURCE_MANUAL);
+        if (null !== $source->getDescription()) {
+            $agent->setDescription($source->getDescription());
+        }
+        if ('' !== $source->getIcon()) {
+            $agent->setIcon($source->getIcon());
+        }
+
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
     private function uniqueSlug(int $ownerId, string $base): string
     {
         $slug = $base;
@@ -177,14 +212,14 @@ final readonly class AgentService
         return $promptId;
     }
 
-    private function createInstructionPrompt(int $ownerId, string $slug, string $name): int
+    private function createInstructionPrompt(int $ownerId, string $slug, string $name, ?string $text = null): int
     {
         $prompt = new Prompt();
         $prompt->setOwnerId($ownerId);
         $prompt->setLanguage('en');
         $prompt->setTopic('agent:'.$slug);
         $prompt->setShortDescription($name);
-        $prompt->setPrompt(self::DEFAULT_INSTRUCTION);
+        $prompt->setPrompt(null !== $text && '' !== trim($text) ? $text : self::DEFAULT_INSTRUCTION);
         $this->em->persist($prompt);
         $this->em->flush();
 
@@ -201,5 +236,48 @@ final readonly class AgentService
         if (strlen($icon) > 64) {
             throw new \InvalidArgumentException('icon must be at most 64 characters');
         }
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     *
+     * @return array<string, mixed>
+     */
+    private function prepareCloneDraft(array $draft): array
+    {
+        $knowledge = $draft['knowledge'] ?? [];
+        if (!is_array($knowledge)) {
+            $knowledge = [];
+        }
+        $knowledge['ownFolder'] = true;
+        $draft['knowledge'] = $knowledge;
+
+        return $draft;
+    }
+
+    private function copySlugBase(string $sourceSlug): string
+    {
+        $suffix = '-copy';
+        $maxBase = AgentSlugger::MAX_LENGTH - strlen($suffix);
+        $trimmed = rtrim(substr($sourceSlug, 0, $maxBase), '-');
+
+        return $trimmed.$suffix;
+    }
+
+    private function cloneName(string $name): string
+    {
+        $copy = $name.' copy';
+
+        return strlen($copy) > 128 ? $name : $copy;
+    }
+
+    private function instructionText(int $promptId): string
+    {
+        $prompt = $this->prompts->find($promptId);
+        if ($prompt instanceof Prompt && '' !== trim($prompt->getPrompt())) {
+            return $prompt->getPrompt();
+        }
+
+        return self::DEFAULT_INSTRUCTION;
     }
 }

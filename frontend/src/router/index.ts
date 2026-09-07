@@ -26,6 +26,7 @@ import {
 } from '@/router/setupGate'
 import { i18n } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
+import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -310,6 +311,21 @@ const router = createRouter({
       name: 'ai-instructions',
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configTaskPrompts' },
+      beforeEnter: instructionsRouteGuard,
+    },
+    {
+      path: '/ai/assistants',
+      name: 'ai-assistants',
+      component: () => import('@/views/AssistantsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.assistants' },
+      beforeEnter: assistantsRouteGuard,
+    },
+    {
+      path: '/ai/assistants/:id',
+      name: 'ai-assistant-builder',
+      component: () => import('@/views/AssistantsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder' },
+      beforeEnter: assistantsRouteGuard,
     },
     {
       path: '/ai/routing',

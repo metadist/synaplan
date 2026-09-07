@@ -9,7 +9,7 @@ before the first sprint starts.**
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
 | S1 Entity & pinned runtime | `feat/agent-builder-s1` / synaplan | done | AB1–AB8: BAGENTS + BAGENTVERSIONS, `AGENTS.ENABLED` off, owner CRUD, `agentId` pin, Zod schemas regenerated |
-| S2 Builder & gallery | — | planned | J-AB-1; empty state is the first Vue |
+| S2 Builder & gallery | `feat/agent-builder-s2` / synaplan | done | AB9–AB13, AB15–AB17; AB14 helper deferred |
 | S3 Publish & versions | — | planned | J-AB-2…4; Share waits on IAM-UX |
 | S4 Knowledge, tools, skills | — | planned | Parameters folded into Models → Advanced settings |
 | S5 Triggers: events & schedules | — | planned | J-AB-5, J-AB-7; was "Tasks & channels" until 2026-09-07 |
@@ -44,6 +44,11 @@ permission model and not the S2 stacked dialog.
 `AGENTS.ENABLED` seeded off, owner CRUD, `agentId` classifier pin, Zod schemas
 regenerated. Gate green without re-recording `routing_classification.json`. Next:
 S2 gallery/builder (separate branch).
+
+**2026-09-07 (S2 implemented on `feat/agent-builder-s2`):** gallery + clone
+APIs, owner-only draft stream, Assistants gallery/builder (flag-gated),
+start-chat pill, Coding clients rename. Prompt API unchanged. AB14
+Help-me-write deferred. Gate green. Next: S3 publish/versions/share.
 
 **2026-09-07 (trigger wording, second UX pass):** the plan had spread
 "when does this assistant act" over a *Tasks* section (schedules, cron
