@@ -16,7 +16,8 @@
 # Flags (all optional; without a terminal the defaults apply):
 #   --mode try|server      installation mode                  [try]
 #   --dir PATH             install directory                  [./synaplan]
-#   --minimal              try mode: cloud-AI-only dev stack (smaller download)
+#   --minimal              deprecated: the try-mode stack is cloud-AI-only by
+#                          default; add local AI with COMPOSE_PROFILES=local-ai
 #   --domain URL           server mode: public URL, e.g. https://ai.example.com
 #   --admin-email ADDR     server mode: first administrator login
 #   --admin-password PASS  server mode: its password (omit to auto-generate)
@@ -147,12 +148,13 @@ cd "$INSTALL_DIR"
 # ---------------------------------------------------------------------------
 if [ "$MODE" = "try" ]; then
     COMPOSE_FILE="docker-compose.yml"
+    # --minimal is accepted but no longer selects a different file: local AI
+    # moved behind the `local-ai` profile, so the standard stack IS the
+    # cloud-AI-only one.
     if [ "$MINIMAL" = "true" ]; then
-        COMPOSE_FILE="docker-compose-minimal.yml"
-        step "Starting the minimal stack (cloud AI only, ~5 GB)"
-    else
-        step "Starting the standard stack (~9 GB on first run)"
+        say "Note: --minimal is the default now (local AI is opt-in via COMPOSE_PROFILES=local-ai)."
     fi
+    step "Starting the standard stack (cloud AI only, ~3 GB on first run)"
 
     docker compose -f "$COMPOSE_FILE" up -d
 

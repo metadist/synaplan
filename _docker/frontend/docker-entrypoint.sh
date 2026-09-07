@@ -24,6 +24,17 @@ write_boot_phase() {
 
 write_boot_phase "init"
 
+# Local AI is opt-in (COMPOSE_PROFILES=local-ai). Without the profile there is
+# no Ollama on the network, so the boot page must not probe it -- an empty URL
+# drops the "Local AI model" step and lists Ollama as an opt-in block instead
+# of leaving a step spinning on a container that was never started. Same
+# list-ELEMENT match as the backend and worker roles in docker-compose.yml.
+case ",${COMPOSE_PROFILES:-}," in
+    *,local-ai,*) : ;;
+    *) BOOT_STATUS_OLLAMA_URL="" ;;
+esac
+export BOOT_STATUS_OLLAMA_URL
+
 if [ -f /boot-status/server.mjs ]; then
     echo "🕐 Serving boot-status onboarding page on :5173 (until the dev server is ready)..."
     node /boot-status/server.mjs &

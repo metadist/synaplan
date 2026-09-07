@@ -354,14 +354,14 @@
   // the compose file and start with the stack; the others sit behind a
   // Compose profile and are off until asked for.
   const BLOCKS = [
-    { id: 'ollama', name: 'Ollama', role: 'Local AI on your own hardware — embeddings for document search, optional local chat',
-      defaultOn: true, stop: 'docker compose stop ollama' },
     { id: 'qdrant', name: 'Qdrant', role: 'Vector database — AI memories, feedback analysis, large-scale RAG (document search itself runs on MariaDB VECTOR without it)',
       defaultOn: true, stop: 'docker compose stop qdrant' },
     { id: 'centrifugo', name: 'Centrifugo', role: 'Live support — human takeover of widget chats, typing indicators, operator notifications',
       defaultOn: true, stop: 'REALTIME_ENABLED=false docker compose up -d' },
     { id: 'tika', name: 'Apache Tika', role: 'Text extraction from PDF, Word, Excel and 1000+ formats for RAG',
       defaultOn: true, stop: 'docker compose stop tika' },
+    { id: 'ollama', name: 'Ollama', role: 'Local AI on your own hardware — embeddings for document search, optional local chat (~1 GB of weights)',
+      defaultOn: false, start: 'COMPOSE_PROFILES=local-ai docker compose up -d' },
     { id: 'collabora', name: 'Collabora CODE', role: 'Office files — thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM)',
       defaultOn: false, start: 'docker compose --profile office up -d' },
     { id: 'tts', name: 'Text-to-speech', role: 'Spoken answers — four built-in voices (en, de, es, tr)',
