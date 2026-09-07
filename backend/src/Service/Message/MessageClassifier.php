@@ -638,7 +638,8 @@ final readonly class MessageClassifier
         }
 
         try {
-            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, true);
+            $useDraft = array_key_exists('agentDraft', $options) ? (bool) $options['agentDraft'] : true;
+            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $useDraft);
         } catch (AgentNotAccessibleException) {
             return null;
         }

@@ -211,12 +211,24 @@ final readonly class MessageApiFormatter
             'errorReason' => $errorFields['errorReason'],
             'canRetryModel' => $errorFields['canRetryModel'],
             'errorDebug' => $errorFields['errorDebug'],
+            'agentId' => $this->agentIdFromMeta($m),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
                 'type' => $m->getFileType(),
             ] : null,
         ];
+    }
+
+    private function agentIdFromMeta(Message $m): ?int
+    {
+        $raw = $m->getMeta('AGENTID');
+        if (null === $raw || !is_numeric($raw)) {
+            return null;
+        }
+        $id = (int) $raw;
+
+        return $id > 0 ? $id : null;
     }
 
     /**

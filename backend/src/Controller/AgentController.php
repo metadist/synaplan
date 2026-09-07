@@ -182,6 +182,113 @@ final class AgentController extends AbstractController
         return $this->json(['success' => true, 'agent' => $this->serializer->full($agent)], Response::HTTP_CREATED);
     }
 
+    #[Route('/gallery', name: 'gallery', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/agents/gallery',
+        summary: 'Gallery cards for the current user\'s assistants',
+        description: 'S2 returns mine only. Cards never include the draft JSON. Shared and plugin origins arrive in later sprints.',
+        tags: ['Agents'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Gallery cards',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'cards', type: 'array', items: new OA\Items(
+                            type: 'object',
+                            properties: [
+                                new OA\Property(property: 'id', type: 'integer', example: 1),
+                                new OA\Property(property: 'slug', type: 'string', example: 'contract-review'),
+                                new OA\Property(property: 'name', type: 'string', example: 'Contract review'),
+                                new OA\Property(property: 'description', type: 'string', nullable: true),
+                                new OA\Property(property: 'icon', type: 'string', example: ''),
+                                new OA\Property(property: 'status', type: 'string', example: 'draft'),
+                                new OA\Property(property: 'origin', type: 'string', enum: ['mine', 'shared', 'plugin'], example: 'mine'),
+                                new OA\Property(property: 'ownerName', type: 'string', example: 'Ada'),
+                                new OA\Property(property: 'version', type: 'integer', nullable: true, example: null),
+                                new OA\Property(property: 'updatedAt', type: 'integer', example: 1757232000),
+                                new OA\Property(property: 'starterPrompts', type: 'array', items: new OA\Items(type: 'string'), example: ['Review this NDA']),
+                            ]
+                        )),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function gallery(#[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        $ownerName = $this->serializer->displayName($user);
+        $cards = array_map(
+            fn ($agent) => $this->serializer->galleryCard($agent, $ownerName),
+            $this->service->listOwned((int) $user->getId()),
+        );
+
+        return $this->json(['success' => true, 'cards' => $cards]);
+    }
+
+    #[Route('/{id}/clone', name: 'clone', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/agents/{id}/clone',
+        summary: 'Clone an owned assistant into a new draft',
+        description: 'Copies the draft and instruction text. Sets parentId to the source. Files in the source own-folder are not copied. Foreign ids return 404.',
+        tags: ['Agents'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Cloned assistant including the draft',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'agent', type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 2),
+                        new OA\Property(property: 'slug', type: 'string', example: 'contract-review-copy'),
+                        new OA\Property(property: 'name', type: 'string'),
+                        new OA\Property(property: 'description', type: 'string', nullable: true),
+                        new OA\Property(property: 'icon', type: 'string'),
+                        new OA\Property(property: 'status', type: 'string', example: 'draft'),
+                        new OA\Property(property: 'promptId', type: 'integer', example: 43),
+                        new OA\Property(property: 'parentId', type: 'integer', nullable: true, example: 1),
+                        new OA\Property(property: 'source', type: 'string', example: 'manual'),
+                        new OA\Property(property: 'routable', type: 'boolean', example: false),
+                        new OA\Property(property: 'publishedVersionId', type: 'integer', nullable: true),
+                        new OA\Property(property: 'draft', type: 'object'),
+                        new OA\Property(property: 'createdAt', type: 'integer'),
+                        new OA\Property(property: 'updatedAt', type: 'integer'),
+                    ]),
+                ])
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function clone(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        try {
+            $agent = $this->service->clone($user, $id);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AgentDefinitionException $e) {
+            return $this->json(['error' => $e->getMessage(), 'path' => $e->path], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true, 'agent' => $this->serializer->full($agent)], Response::HTTP_CREATED);
+    }
+
     #[Route('/{id}', name: 'get', methods: ['GET'], requirements: ['id' => '\d+'])]
     #[OA\Get(
         path: '/api/v1/agents/{id}',

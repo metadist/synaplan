@@ -189,9 +189,25 @@ class Agent
         return $this->parentId;
     }
 
+    public function setParentId(?int $parentId): self
+    {
+        $this->parentId = $parentId;
+        $this->touch();
+
+        return $this;
+    }
+
     public function getSource(): string
     {
         return $this->source;
+    }
+
+    public function setSource(string $source): self
+    {
+        $this->source = $source;
+        $this->touch();
+
+        return $this;
     }
 
     public function isRoutable(): bool

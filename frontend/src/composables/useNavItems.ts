@@ -15,6 +15,7 @@ import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 import { isIamGroupsEnabled } from './useIamFeature'
+import { isAgentsEnabled } from './useAgentsFeature'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -205,8 +206,8 @@ export function useNavItems() {
         },
         {
           key: 'task-prompts',
-          path: '/ai/instructions',
-          label: t('nav.configTaskPrompts'),
+          path: isAgentsEnabled() ? '/ai/assistants' : '/ai/instructions',
+          label: isAgentsEnabled() ? t('nav.assistants') : t('nav.configTaskPrompts'),
           ...grouped('assistants', assistants),
         },
         {

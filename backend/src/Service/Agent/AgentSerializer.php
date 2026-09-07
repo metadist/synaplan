@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Agent;
 
 use App\Entity\Agent;
+use App\Entity\User;
 
 final class AgentSerializer
 {
@@ -23,6 +24,28 @@ final class AgentSerializer
             'icon' => $agent->getIcon(),
             'status' => $agent->getStatus(),
             'updatedAt' => $agent->getUpdated(),
+        ];
+    }
+
+    /**
+     * Gallery card — never includes the draft JSON.
+     *
+     * @return array<string, mixed>
+     */
+    public function galleryCard(Agent $agent, string $ownerName, string $origin = 'mine'): array
+    {
+        return [
+            'id' => $agent->getId(),
+            'slug' => $agent->getSlug(),
+            'name' => $agent->getName(),
+            'description' => $agent->getDescription(),
+            'icon' => $agent->getIcon(),
+            'status' => $agent->getStatus(),
+            'origin' => $origin,
+            'ownerName' => $ownerName,
+            'version' => null,
+            'updatedAt' => $agent->getUpdated(),
+            'starterPrompts' => $this->starterPrompts($agent),
         ];
     }
 
@@ -49,5 +72,51 @@ final class AgentSerializer
             'createdAt' => $agent->getCreated(),
             'updatedAt' => $agent->getUpdated(),
         ];
+    }
+
+    public function displayName(User $user): string
+    {
+        $details = $user->getUserDetails();
+        foreach (['full_name', 'first_name'] as $key) {
+            $value = $details[$key] ?? null;
+            if (is_string($value) && '' !== trim($value)) {
+                return trim($value);
+            }
+        }
+
+        return (string) $user->getMail();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function starterPrompts(Agent $agent): array
+    {
+        $draft = $agent->getDraft();
+        $behaviour = $draft['behaviour'] ?? null;
+        if (!is_array($behaviour)) {
+            return [];
+        }
+        $raw = $behaviour['starterPrompts'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $item) {
+            if (!is_string($item)) {
+                continue;
+            }
+            $text = trim($item);
+            if ('' === $text) {
+                continue;
+            }
+            $out[] = $text;
+            if (3 === count($out)) {
+                break;
+            }
+        }
+
+        return $out;
     }
 }
