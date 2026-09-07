@@ -3,8 +3,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush, mockConfirm } =
-  vi.hoisted(() => ({
+const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush, mockConfirm } = vi.hoisted(
+  () => ({
     mockUpdate: vi.fn(),
     mockRun: vi.fn(),
     mockRuns: vi.fn(),
@@ -12,7 +12,8 @@ const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush, mockCon
     mockRemove: vi.fn(),
     mockPush: vi.fn(),
     mockConfirm: vi.fn(),
-  }))
+  })
+)
 
 vi.mock('@/services/api/savedTasksApi', () => ({
   savedTasksApi: {
