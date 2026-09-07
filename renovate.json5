@@ -86,14 +86,28 @@
       // major), so they were consuming the prHourlyLimit ahead of the real
       // dependency updates. There is nothing to review per package either -- a
       // digest has no changelog, it is classified by its tag
-      // (docs/DEPENDENCY_UPDATES.md §7). Our own ghcr.io images stay individual:
-      // a digest move on a release artifact of ours is a deployment event, not
-      // third-party noise.
+      // (docs/DEPENDENCY_UPDATES.md §7).
       "description": "Docker digest bumps grouped -- no changelog exists, review is tag-based",
       "groupName": "Docker Digests",
       "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["digest", "pinDigest"]
+    },
+    {
+      // Separates our own release artifacts from the third-party batch above: a
+      // digest move on one of our images is a deployment event, not upstream
+      // noise. Relies on the same "last match wins" ordering as the groups above.
+      //
+      // Do NOT express this as an exclusion on the rule above. Renovate rejects
+      // `matchPackageNames: ["*", "!ghcr.io/metadist/**"]` -- the check is
+      // `(matchers.includes('*') || matchers.includes('**')) && length > 1`, so a
+      // bare `*` may never share the array. It broke Renovate entirely once
+      // (#1729), and `renovate-config-validator` does NOT catch it: the error
+      // surfaces only at runtime, on the default branch, after merge.
+      "description": "Digests of our own images kept out of the third-party batch",
+      "groupName": "Synaplan Image Digests",
+      "matchManagers": ["dockerfile", "docker-compose"],
       "matchUpdateTypes": ["digest", "pinDigest"],
-      "matchPackageNames": ["*", "!ghcr.io/metadist/**"]
+      "matchPackageNames": ["ghcr.io/metadist/**"]
     },
     {
       "description": "Major updates: always individual, manual review",
