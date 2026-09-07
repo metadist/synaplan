@@ -847,6 +847,11 @@ services:
             $oidcClientId: '%env(OIDC_CLIENT_ID)%'
             $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
 
+    App\Service\Iam\DirectoryGroupSync:
+        arguments:
+            $oidcClientId: '%env(OIDC_CLIENT_ID)%'
+            $oidcDiscoveryUrl: '%env(string:default::OIDC_DISCOVERY_URL)%'
+
     # Keycloak OIDC OAuth Controller
     App\Controller\KeycloakAuthController:
         arguments:

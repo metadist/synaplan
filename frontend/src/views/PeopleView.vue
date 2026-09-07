@@ -17,7 +17,8 @@
       </PageHeader>
 
       <UsersTab v-if="activeTab === 'users'" show-iam-columns />
-      <GroupsTab v-else />
+      <GroupsTab v-else-if="activeTab === 'groups'" />
+      <AuditTab v-else />
     </div>
   </MainLayout>
 </template>
@@ -29,18 +30,25 @@ import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import UsersTab from '@/components/people/UsersTab.vue'
 import GroupsTab from '@/components/people/GroupsTab.vue'
+import AuditTab from '@/components/people/AuditTab.vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const activeTab = ref<'users' | 'groups'>('users')
+const activeTab = ref<'users' | 'groups' | 'audit'>('users')
 
 const tabNavItems = computed<TabNavItem[]>(() => [
   { id: 'users', label: t('people.tabs.users'), icon: 'mdi:account-multiple', testid: 'tab-users' },
   { id: 'groups', label: t('people.tabs.groups'), icon: 'mdi:account-group', testid: 'tab-groups' },
+  {
+    id: 'audit',
+    label: t('people.tabs.audit'),
+    icon: 'mdi:clipboard-text-clock',
+    testid: 'tab-audit',
+  },
 ])
 
 function onTabNavChange(id: string) {
-  if (id === 'users' || id === 'groups') {
+  if (id === 'users' || id === 'groups' || id === 'audit') {
     activeTab.value = id
   }
 }

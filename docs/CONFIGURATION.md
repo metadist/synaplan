@@ -628,6 +628,28 @@ AUTH_COOKIE_SECURE=
 
 ---
 
+## People, sharing and directory (`IAM`)
+
+These live in **Operate → System configuration → Access → Sharing** (`BCONFIG`
+group `IAM`, owner 0). They take effect immediately — no restart. All flags
+seed **off** so an existing install stays unchanged until you turn them on.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `IAM.GROUPS_ENABLED` | `0` | People page, groups, audit tab |
+| `IAM.SHARING_ENABLED` | `0` | Share dialog and “Shared with me” (requires groups) |
+| `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
+| `IAM.DIRECTORY_SYNC_ENABLED` | `0` | Put people into groups from the OIDC groups claim at sign-in |
+| `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
+| `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
+| `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
+| `IAM.AUDIT_RETENTION_DAYS` | `365` | Days to keep People audit rows; `0` keeps them forever |
+
+See [People, groups and sharing](ADMIN.md#people-groups-and-sharing) in the
+admin guide.
+
+---
+
 ## All Environment Variables
 
 See `backend/.env.example` for the complete list with descriptions.

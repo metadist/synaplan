@@ -414,8 +414,38 @@ Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
   Revoking the share closes them again on the next request.
 - The public link token of a conversation is only returned to its owner; a
   group share never exposes it.
-- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) is reserved for OIDC group sync
-  (S4) and has no effect yet.
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) puts people into groups from the
+  company login (OIDC groups claim) at sign-in. Role mapping is unchanged.
+  Directory groups show **From your login** on People; you can still add extra
+  people by hand. Login-managed memberships update at the next sign-in.
+
+### Directory groups
+
+Turn **Directory groups** on under **Operate → System configuration → Access →
+Sharing** (`IAM_DIRECTORY_SYNC_ENABLED`). Optional settings:
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path (same resolver as OIDC roles) |
+| `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
+
+Acceptance script: `_devextras/testing/iam/directory-demo.sh`. OpenCloud
+token-exchange check: `_devextras/testing/iam/opencloud-regression.md`.
+
+### Audit
+
+People → **Audit** lists who shared what, group changes, login-group updates,
+impersonation, and when an admin opened another user's resource list. Rows
+never include content. `app:iam:reap-audit` deletes rows older than
+`IAM.AUDIT_RETENTION_DAYS` (default 365; `0` keeps them forever).
+
+### Admin privacy and impersonation
+
+Administrators can share, unshare and delete (manage) but they cannot read
+another person's chats, files or assistants unless those items are shared with
+them. **Operate → People → Users** has **View as user** for audited
+impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
+to hide that action.
 
 Enable both switches under **Operate → System configuration → Access →
 Sharing** (`IAM_GROUPS_ENABLED`, then `IAM_SHARING_ENABLED`). The page

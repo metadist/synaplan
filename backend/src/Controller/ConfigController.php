@@ -179,6 +179,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
                         new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. Off by default until an operator enables IAM groups.'),
                         new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. Off by default.'),
+                        new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
                         new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
                         new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. Off by default.'),
                     ]
@@ -480,6 +481,7 @@ class ConfigController extends AbstractController
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
             'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
             'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
+            'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
             'officeConvertEnabled' => $this->isOfficeConvertConfigured(),
             'documentToolsEnabled' => true === filter_var(

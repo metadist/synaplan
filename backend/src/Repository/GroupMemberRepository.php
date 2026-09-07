@@ -62,6 +62,17 @@ class GroupMemberRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<GroupMember>
+     */
+    public function findDirectoryByUserId(int $userId): array
+    {
+        /** @var list<GroupMember> $members */
+        $members = $this->findBy(['userId' => $userId, 'source' => GroupMember::SOURCE_DIRECTORY]);
+
+        return $members;
+    }
+
+    /**
      * @param list<int> $userIds
      *
      * @return list<GroupMember>

@@ -7,6 +7,8 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AuthCookieFactory;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Request;
@@ -69,6 +71,8 @@ final readonly class ImpersonationService
         private UserRepository $userRepository,
         private LoggerInterface $logger,
         private AuthCookieFactory $authCookieFactory,
+        private AuditLogWriter $auditLogWriter,
+        private IamConfig $iamConfig,
     ) {
     }
 
@@ -92,6 +96,9 @@ final readonly class ImpersonationService
         Request $request,
         Response $response,
     ): void {
+        if ($this->iamConfig->isImpersonationDisabled((int) $admin->getId())) {
+            throw new AccessDeniedException('iam.impersonationDisabled');
+        }
         $this->assertCanImpersonate($admin, $target, $request);
 
         $currentRefresh = $request->cookies->get(TokenService::REFRESH_COOKIE);
@@ -117,12 +124,21 @@ final readonly class ImpersonationService
         $response->headers->setCookie($this->tokenService->createAccessCookie($impersonationAccess));
         $response->headers->setCookie($this->tokenService->createClearRefreshCookie());
 
+        $ip = (string) $request->getClientIp();
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'impersonation.start',
+            'user',
+            (string) $target->getId(),
+            ['targetUserId' => (int) $target->getId()],
+            $ip,
+        );
         $this->logger->warning('Admin started impersonation', [
             'admin_id' => $admin->getId(),
             'admin_email' => $admin->getMail(),
             'target_user_id' => $target->getId(),
             'target_email' => $target->getMail(),
-            'ip' => $request->getClientIp(),
+            'ip' => $ip,
         ]);
     }
 
@@ -168,10 +184,19 @@ final readonly class ImpersonationService
         $response->headers->setCookie($this->tokenService->createRefreshCookie($stashRefresh));
         $this->attachClearStashCookies($response);
 
+        $ip = (string) $request->getClientIp();
+        $this->auditLogWriter->record(
+            (int) $admin->getId(),
+            'impersonation.stop',
+            'user',
+            (string) $admin->getId(),
+            ['targetUserId' => (int) $admin->getId()],
+            $ip,
+        );
         $this->logger->warning('Admin stopped impersonation', [
             'admin_id' => $admin->getId(),
             'admin_email' => $admin->getMail(),
-            'ip' => $request->getClientIp(),
+            'ip' => $ip,
         ]);
 
         return $admin;

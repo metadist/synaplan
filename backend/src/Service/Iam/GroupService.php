@@ -14,7 +14,9 @@ use App\Repository\UserRepository;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
 
 /**
- * Manual group CRUD + membership. Directory groups are read-only here (S4 writes them).
+ * Manual group CRUD + membership. Directory groups cannot be renamed or
+ * deleted here; manual members may still be added. Directory memberships
+ * are written by {@see DirectoryGroupSync}.
  */
 final readonly class GroupService
 {
@@ -131,8 +133,6 @@ final readonly class GroupService
 
     public function setMember(Group $group, int $userId, string $role, User $actor, string $ip = ''): GroupMember
     {
-        $this->assertManualGroup($group);
-
         if (!in_array($role, GroupMember::ROLES, true)) {
             throw new \InvalidArgumentException('Role must be member or manager.');
         }
@@ -147,6 +147,8 @@ final readonly class GroupService
         if (null === $member) {
             $member = new GroupMember($groupId, $userId);
             $member->setSource(GroupMember::SOURCE_MANUAL);
+        } elseif (GroupMember::SOURCE_DIRECTORY === $member->getSource()) {
+            throw new DirectoryGroupReadOnlyException($groupId);
         }
         $member->setRole($role);
         $this->groupMemberRepository->save($member);
@@ -165,12 +167,13 @@ final readonly class GroupService
 
     public function removeMember(Group $group, int $userId, User $actor, string $ip = ''): void
     {
-        $this->assertManualGroup($group);
-
         $groupId = (int) $group->getId();
         $member = $this->groupMemberRepository->findMembership($groupId, $userId);
         if (null === $member) {
             return;
+        }
+        if (GroupMember::SOURCE_DIRECTORY === $member->getSource()) {
+            throw new DirectoryGroupReadOnlyException($groupId);
         }
 
         $this->groupMemberRepository->remove($member);
@@ -284,6 +287,7 @@ final readonly class GroupService
             'slug' => $group->getSlug(),
             'description' => $group->getDescription(),
             'kind' => $group->getKind(),
+            'externalSource' => $group->getExternalSource(),
             'memberCount' => $memberCount ?? $this->memberCount($group),
             'created' => $group->getCreated(),
             'updated' => $group->getUpdated(),

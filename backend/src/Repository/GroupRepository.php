@@ -39,6 +39,11 @@ class GroupRepository extends ServiceEntityRepository
         return $this->findOneBy(['slug' => $slug]);
     }
 
+    public function findOneByExternal(string $source, string $externalId): ?Group
+    {
+        return $this->findOneBy(['externalSource' => $source, 'externalId' => $externalId]);
+    }
+
     /**
      * @return list<Group>
      */
