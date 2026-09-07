@@ -60,13 +60,21 @@ rewrites to `/connect/platform?…&client=outlook`.
 | 7 | `AddinConnectView.vue` was dead code (route is a redirect) and carried the same three CodeQL alerts that are open on `main`. | Deleted with its i18n namespace; `/addin/connect` redirect and its spec stay. |
 | 8 | Port matching was strict for `https://localhost` in the built-in list while the Synamail dev server runs on `:3000`. | Port-less prefixes on local-dev hosts accept any port; every other host stays strict (corpus test unchanged). |
 
-Not changed, noted for S2/S3: `ApiKeyController::list` resolves `linked_platform`
-with two queries per key (fine for the handful of keys a user has); anonymous
-registration has no per-host dedupe, only the 10/h IP limit; re-linking an
-external id that belonged to another Synaplan user revokes that user's key and
-is audited only under the new user.
+Second round (Copilot + Bugbot), same PR:
+
+| # | Finding | Fix |
+| - | ------- | --- |
+| 9 | `officeReady` was set `true` even when `loadOfficeJs()` failed, so its guard never blocked anything — the key was minted and only then failed to deliver. | `officeChannelAvailable` (true only when `Office.context.ui.messageParent` exists). With no relay **and** no Office channel the view errors before calling the server. The guard also no longer blocks relay connects, which never need Office.js. |
+| 10 | `ApiKeyController::list` resolved `linked_platform` with two queries per key. | `linkedPlatformsForKeys()` — two queries for the whole list. |
+| 11 | Connect and retry buttons carried a bare `btn-primary` (no padding/text size). | Full house chain on both. |
+| 12 | CI-only failure: `doctrine:fixtures:load` runs after the migrations and purges `BPLATFORMINSTANCES`, dropping the seeded `outlook-builtin` row. | `PlatformLinksConfigSeeder` re-asserts the row insert-if-missing; repository test covers delete → seed → present → idempotent. |
+| 13 | **`upsert()` only set `userId` on insert.** Exchanging the same `(client, instance, external_id)` for a different Synaplan user updated the key but left the row with the previous owner, who could then disconnect it and revoke the new owner's key — while the new owner never saw the link. | The row is keyed by the external identity, so it is re-owned on update; the move is audited under both accounts as `platform_link.reassigned`. Functional test asserts the old owner loses the link and gets 404 on disconnect (it fails without the one-line fix). |
+
+Not changed, noted for S2/S3: anonymous registration has no per-host dedupe,
+only the 10/h IP limit.
 
 Gate after the fixes: `make lint` ✓, `make -C backend phpstan` ✓ (0 errors),
-`make test` ✓ (PHPUnit 5568, Vitest 223 files), `vue-tsc` ✓,
-`fake-instance.sh --flag-off` 4/4, `fake-instance.sh` 12/12. Synamail
-`docs/AUTH_FLOW.md` step 5 and invariant 6 rewritten for the server-side list.
+`make test` ✓ (PHPUnit 5569, Vitest 223 files), `vue-tsc` ✓,
+`fake-instance.sh --flag-off` 4/4, `fake-instance.sh` 12/12. CI on #1745 green
+including CodeQL. Synamail `docs/AUTH_FLOW.md` step 5 and invariant 6 rewritten
+for the server-side list (metadist/Synamail#70).

@@ -654,7 +654,9 @@ instance registered (HTTPS only outside dev, same host, same port, no
 wildcard hosts). A rejected redirect is audited as
 `platform_link.redirect_rejected`; every register, approve, revoke, link and
 disconnect writes a People → Audit row. Re-linking an external id that already
-belonged to another Synaplan account revokes the old key first.
+belonged to another Synaplan account revokes the old key and moves the link to
+the new account (`platform_link.reassigned`, audited under both) — one external
+user is never two Synaplan accounts at once.
 
 Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
 (`--flag-off` proves the 404 contract). Endpoint reference:
