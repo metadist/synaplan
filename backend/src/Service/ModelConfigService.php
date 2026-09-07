@@ -606,7 +606,7 @@ final readonly class ModelConfigService
         }
         $id = (int) $raw;
 
-        return $id > 0 ? $id : null;
+        return 0 !== $id ? $id : null;
     }
 
     private function isAllowedModel(?int $userId, int $modelId): bool

@@ -8,9 +8,13 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
+use App\Repository\GroupConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
+use App\Service\Config\LayeredConfigResolver;
+use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -289,6 +293,42 @@ class ModelConfigServiceTest extends TestCase
     {
         $this->givenModels([]);
         $this->givenDefaultModelRows([1 => -1, 0 => 9]);
+
+        self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
+    }
+
+    /**
+     * S5 wires LayeredConfigResolver + GroupPolicyService into getDefaultModel.
+     * The policy parser must still accept TestProvider placeholder BIDs (-1…-7)
+     * or CI/E2E silently route at a cloud model (HuggingFace 401 on #1719).
+     */
+    public function testGetDefaultModelKeepsPlaceholderIdThroughGroupPolicyParser(): void
+    {
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('chain')->with(1, 'DEFAULTMODEL', 'CHAT')->willReturn(['-1']);
+        $resolver->method('allowedCatalogKeys')->willReturn([]);
+
+        $policy = new GroupPolicyService(
+            $resolver,
+            $this->createMock(GroupConfigRepository::class),
+            $this->configRepository,
+            $this->modelRepository,
+            $this->createMock(AuditLogWriter::class),
+        );
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+            $policy,
+        );
+        $this->givenModels([]);
 
         self::assertSame(-1, $this->service->getDefaultModel('CHAT', 1));
     }

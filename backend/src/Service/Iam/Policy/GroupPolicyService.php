@@ -245,7 +245,11 @@ final readonly class GroupPolicyService
         if (is_numeric($raw)) {
             $id = (int) $raw;
 
-            return $id > 0 ? $id : null;
+            // 0 is not a BID. Negative ids are the catalog's placeholder /
+            // TestProvider convention (ModelSeeder::TEST_MODELS) and must keep
+            // resolving — dropping them silently routes PHPUnit and E2E at the
+            // first "usable" cloud model.
+            return 0 !== $id ? $id : null;
         }
 
         return ModelCatalog::findBidByKey($raw);
