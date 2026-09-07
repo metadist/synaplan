@@ -13,6 +13,7 @@ use App\Repository\GroupRepository;
 use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\Exception\DirectoryGroupReadOnlyException;
+use App\Service\Iam\Exception\GroupMembershipNotFoundException;
 
 /**
  * Manual group CRUD + membership. Directory groups cannot be renamed or
@@ -192,7 +193,35 @@ final readonly class GroupService
     }
 
     /**
-     * @return list<array{group: Group, role: string}>
+     * The current user leaves a group they were added to. Directory-synced
+     * memberships stay read-only (they return at the next sign-in).
+     */
+    public function leave(Group $group, User $actor, string $ip = ''): void
+    {
+        $userId = (int) $actor->getId();
+        $groupId = (int) $group->getId();
+        $member = $this->groupMemberRepository->findMembership($groupId, $userId);
+        if (null === $member) {
+            throw new GroupMembershipNotFoundException($groupId);
+        }
+        if (GroupMember::SOURCE_DIRECTORY === $member->getSource()) {
+            throw new DirectoryGroupReadOnlyException($groupId);
+        }
+
+        $this->groupMemberRepository->remove($member);
+
+        $this->auditLogWriter->record(
+            $userId,
+            'group.member_leave',
+            'group',
+            (string) $groupId,
+            ['userId' => $userId],
+            $ip,
+        );
+    }
+
+    /**
+     * @return list<array{group: Group, role: string, source: string}>
      */
     public function groupsOf(int $userId): array
     {
@@ -213,7 +242,11 @@ final readonly class GroupService
             if (null === $group) {
                 continue;
             }
-            $out[] = ['group' => $group, 'role' => $membership->getRole()];
+            $out[] = [
+                'group' => $group,
+                'role' => $membership->getRole(),
+                'source' => $membership->getSource(),
+            ];
         }
 
         return $out;
@@ -282,8 +315,12 @@ final readonly class GroupService
     /**
      * @return array<string, mixed>
      */
-    public function serializeGroup(Group $group, ?int $memberCount = null, ?string $role = null): array
-    {
+    public function serializeGroup(
+        Group $group,
+        ?int $memberCount = null,
+        ?string $role = null,
+        ?string $membershipSource = null,
+    ): array {
         $payload = [
             'id' => $group->getId(),
             'name' => $group->getName(),
@@ -297,6 +334,10 @@ final readonly class GroupService
         ];
         if (null !== $role) {
             $payload['role'] = $role;
+        }
+        if (null !== $membershipSource) {
+            $payload['membershipSource'] = $membershipSource;
+            $payload['canLeave'] = GroupMember::SOURCE_MANUAL === $membershipSource;
         }
 
         return $payload;

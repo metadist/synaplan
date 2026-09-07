@@ -1964,6 +1964,10 @@
       "overviewLoading": "Chargement des tâches enregistrées…",
       "overviewEmpty": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou enregistrez une instruction personnalisée sous",
       "loadFailed": "Impossible de charger les tâches enregistrées.",
+      "delete": "Supprimer",
+      "deleteConfirm": "Supprimer la tâche enregistrée « {name} » ? Les partages de cette tâche sont aussi retirés.",
+      "deleteSuccess": "Tâche enregistrée supprimée",
+      "deleteFailed": "Impossible de supprimer la tâche enregistrée.",
       "scheduleThis": "Relancer plus tard",
       "scheduleThisHint": "Donnez un nom à cette tâche. Vous pourrez définir le planning à l’écran suivant.",
       "scheduledFromChat": "Enregistrée. Indiquez quand elle doit s’exécuter.",
@@ -4137,7 +4141,9 @@
       "Tous vos messages et chats",
       "Tous les fichiers téléversés et documents de la base de connaissances",
       "Vos données personnelles, réglages et mémoires",
-      "Clés API, widgets et identifiants"
+      "Clés API, widgets et identifiants",
+      "Vos assistants IA et tâches enregistrées",
+      "Appartenances à des groupes auxquels vous avez été ajouté"
     ],
     "retention": "La suppression est définitive et prend effet immédiatement. Les sauvegardes contenant des données résiduelles sont renouvelées sous 30 jours. Les données que nous sommes légalement tenus de conserver (p. ex. les factures) ne le sont que le temps exigé par la loi.",
     "partialTitle": "Supprimer des données individuelles sans supprimer votre compte",
@@ -4162,6 +4168,18 @@
       {
         "name": "Connexions, widgets de chat et clés API",
         "how": "Ouvrez Canaux et retirez la connexion, le widget ou la clé dont vous n’avez plus besoin."
+      },
+      {
+        "name": "Assistants IA",
+        "how": "Ouvrez Assistants IA. Sur votre propre assistant, choisissez Supprimer. Un assistant publié est d’abord archivé, puis retiré, y compris ses fichiers et partages."
+      },
+      {
+        "name": "Tâches enregistrées",
+        "how": "Ouvrez Tâches enregistrées et choisissez Supprimer sur une tâche que vous avez créée."
+      },
+      {
+        "name": "Groupes auxquels vous avez été ajouté",
+        "how": "Ouvrez Mes groupes et choisissez Quitter. Vous perdez l’accès à tout ce qui est partagé avec ce groupe. Les appartenances issues de votre connexion ne peuvent pas être quittées ici."
       }
     ],
     "partialRetention": "Les éléments supprimés disparaissent de votre compte immédiatement. Les sauvegardes contenant des copies résiduelles sont renouvelées sous 30 jours. Tout le reste de votre compte reste inchangé.",
@@ -5527,7 +5545,12 @@
     "myGroups": {
       "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
       "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",
-      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes."
+      "emptyAdmin": "Aucun groupe pour le moment. Créez-en un sur la page Personnes.",
+      "leave": "Quitter",
+      "leaveConfirm": "Quitter le groupe « {name} » ? Vous perdrez l’accès à tout ce qui est partagé avec ce groupe. Le groupe lui-même reste.",
+      "left": "Vous avez quitté le groupe.",
+      "leaveFailed": "Impossible de quitter le groupe.",
+      "leaveDirectory": "Cette appartenance vient de votre connexion et ne peut pas être quittée ici."
     },
     "users": {
       "groups": "Groupes",
@@ -5586,6 +5609,7 @@
         "group_delete": "Groupe supprimé",
         "group_member_set": "Membre ajouté",
         "group_member_remove": "Membre retiré",
+        "group_member_leave": "A quitté un groupe",
         "directory_sync": "Groupe de connexion mis à jour",
         "impersonation_start": "A commencé à voir en tant qu’utilisateur",
         "impersonation_stop": "A cessé de voir en tant qu’utilisateur",
@@ -5844,8 +5868,15 @@
     "cloneSuccess": "Copié comme nouveau brouillon",
     "startChatFailed": "Impossible de démarrer le chat",
     "delete": "Supprimer",
-    "deleteConfirm": "Supprimer ce brouillon ?",
+    "deleteConfirm": "Supprimer ce brouillon ? Ses fichiers et partages sont aussi retirés.",
+    "deleteArchivedConfirm": "Supprimer définitivement cet assistant archivé ? Ses fichiers et partages sont aussi retirés.",
+    "deletePublishedConfirm": "Cet assistant est publié. Il sera d’abord archivé, puis définitivement supprimé, y compris ses fichiers et partages.",
+    "deleteSuccess": "Assistant supprimé",
     "deleteFailed": "Impossible de supprimer l’assistant",
+    "deleteFile": "Supprimer le fichier",
+    "deleteFileConfirm": "Supprimer « {name} » de cet assistant ?",
+    "deleteFileSuccess": "Fichier supprimé",
+    "deleteFileFailed": "Impossible de supprimer le fichier",
     "sharedEmpty": "Rien n’a encore été partagé avec vous",
     "pluginsEmpty": "Aucun assistant provenant de plugins",
     "filterArchived": "Archivés",

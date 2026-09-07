@@ -29,6 +29,7 @@ vi.mock('@/services/api/promptsApi', () => ({
     updatePrompt: vi.fn(),
     getPromptFiles: vi.fn().mockResolvedValue([]),
     uploadPromptFile: vi.fn(),
+    deletePromptFile: vi.fn(),
   },
 }))
 
@@ -45,6 +46,10 @@ vi.mock('@/services/api/chatApi', () => ({
 
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
+}))
+
+vi.mock('@/composables/useDialog', () => ({
+  useDialog: () => ({ confirm: vi.fn().mockResolvedValue(false) }),
 }))
 
 function mountBuilder() {

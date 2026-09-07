@@ -63,6 +63,8 @@ final class GroupControllerTest extends WebTestCase
         self::assertCount(1, $groups);
         self::assertSame('Sales', $groups[0]['name']);
         self::assertSame('member', $groups[0]['role']);
+        self::assertTrue($groups[0]['canLeave']);
+        self::assertSame('manual', $groups[0]['membershipSource']);
     }
 
     public function testIamReadKeyCanListMine(): void
@@ -96,6 +98,48 @@ final class GroupControllerTest extends WebTestCase
         $groups = json_decode((string) $this->client->getResponse()->getContent(), true)['groups'];
         self::assertCount(1, $groups);
         self::assertSame('Sales', $groups[0]['name']);
+    }
+
+    public function testLeaveRemovesManualMembership(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('iam-leave-on@synaplan.internal');
+        $group = new Group();
+        $group->setName('Sales');
+        $group->setSlug('sales-leave-'.uniqid());
+        $this->em->persist($group);
+        $this->em->flush();
+        $member = new GroupMember((int) $group->getId(), (int) $user->getId());
+        $this->em->persist($member);
+        $this->em->flush();
+
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('DELETE', '/api/v1/groups/'.$group->getId().'/membership');
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(GroupMember::class)->findMembership((int) $group->getId(), (int) $user->getId()));
+    }
+
+    public function testLeaveDirectoryMembershipIs409(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('iam-leave-dir@synaplan.internal');
+        $group = new Group();
+        $group->setName('From login');
+        $group->setSlug('dir-leave-'.uniqid());
+        $group->setKind(Group::KIND_DIRECTORY);
+        $this->em->persist($group);
+        $this->em->flush();
+        $member = new GroupMember((int) $group->getId(), (int) $user->getId());
+        $member->setSource(GroupMember::SOURCE_DIRECTORY);
+        $this->em->persist($member);
+        $this->em->flush();
+
+        $this->authenticateClient($this->client, $user);
+        $this->client->request('DELETE', '/api/v1/groups/'.$group->getId().'/membership');
+
+        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
     }
 
     private function enableFlag(): void

@@ -60,6 +60,14 @@
       >
         {{ $t('assistants.unarchive') }}
       </button>
+      <button
+        type="button"
+        class="btn-danger px-4 py-2.5 rounded-lg text-sm font-medium"
+        data-testid="btn-delete-assistant"
+        @click="onDelete"
+      >
+        {{ $t('assistants.delete') }}
+      </button>
     </div>
 
     <ul v-if="versions.length > 0" class="space-y-2" data-testid="list-assistant-versions">
@@ -92,6 +100,10 @@ import { agentsApi, type AgentUsage, type AgentVersionCard } from '@/services/ap
 import { useAgentsStore } from '@/stores/agents'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import AssistantUsagePanel from './AssistantUsagePanel.vue'
+
+const emit = defineEmits<{
+  deleted: []
+}>()
 
 const store = useAgentsStore()
 const { t } = useI18n()
@@ -183,6 +195,32 @@ async function onUnarchive(): Promise<void> {
     await store.load(id)
   } catch {
     error(t('assistants.archiveFailed'))
+  }
+}
+
+async function onDelete(): Promise<void> {
+  const agent = store.current
+  if (agent?.id == null) return
+  const published = agent.status === 'published'
+  const ok = await confirm({
+    title: t('assistants.delete'),
+    message: published
+      ? t('assistants.deletePublishedConfirm')
+      : agent.status === 'archived'
+        ? t('assistants.deleteArchivedConfirm')
+        : t('assistants.deleteConfirm'),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    if (published) {
+      await agentsApi.update(agent.id, { status: 'archived' })
+    }
+    await store.remove(agent.id)
+    success(t('assistants.deleteSuccess'))
+    emit('deleted')
+  } catch {
+    error(t('assistants.deleteFailed'))
   }
 }
 

@@ -17,6 +17,7 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
       publish: vi.fn(),
       update: vi.fn(),
       get: vi.fn(),
+      remove: vi.fn(),
     },
   }
 })
@@ -61,5 +62,6 @@ describe('AssistantPublishSection', () => {
     const share = wrapper.get('[data-testid="btn-share-assistant"]')
     expect(share.text()).toBe('Share')
     expect((share.element as HTMLButtonElement).disabled).toBe(true)
+    expect(wrapper.get('[data-testid="btn-delete-assistant"]').text()).toBe('Delete')
   })
 })

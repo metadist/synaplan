@@ -383,6 +383,20 @@ class FileRepository extends ServiceEntityRepository
         return $map;
     }
 
+    /**
+     * @return list<File>
+     */
+    public function findByUserAndGroupKey(int $userId, string $groupKey): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.userId = :userId')
+            ->andWhere('f.groupKey = :groupKey')
+            ->setParameter('userId', $userId)
+            ->setParameter('groupKey', $groupKey)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function existsForUserAndGroupKey(int $userId, string $groupKey): bool
     {
         $count = (int) $this->createQueryBuilder('f')

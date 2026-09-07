@@ -100,6 +100,7 @@ const ACTION_KEYS: Record<string, string> = {
   'group.delete': 'people.audit.action.group_delete',
   'group.member_set': 'people.audit.action.group_member_set',
   'group.member_remove': 'people.audit.action.group_member_remove',
+  'group.member_leave': 'people.audit.action.group_member_leave',
   'directory.sync': 'people.audit.action.directory_sync',
   'impersonation.start': 'people.audit.action.impersonation_start',
   'impersonation.stop': 'people.audit.action.impersonation_stop',

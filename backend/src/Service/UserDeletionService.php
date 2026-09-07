@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Entity\SavedTask;
 use App\Entity\User;
+use App\Repository\AgentRepository;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ChatRepository;
 use App\Repository\ConfigRepository;
@@ -21,6 +22,8 @@ use App\Repository\PluginDataRepository;
 use App\Repository\PromptMetaRepository;
 use App\Repository\PromptRepository;
 use App\Repository\RevectorizeRunRepository;
+use App\Repository\SavedTaskRepository;
+use App\Repository\SavedTaskRunRepository;
 use App\Repository\SessionRepository;
 use App\Repository\ShareRepository;
 use App\Repository\TokenRepository;
@@ -29,7 +32,11 @@ use App\Repository\UseLogRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Agent\AgentCascadeCleanup;
+use App\Service\Agent\AgentExternalCleanup;
 use App\Service\File\FileStorageService;
+use App\Service\Iam\ResourceKind\AgentKind;
+use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -66,6 +73,10 @@ final readonly class UserDeletionService
         private GroupMemberRepository $groupMemberRepository,
         private ExternalIdentityRepository $externalIdentityRepository,
         private ShareRepository $shareRepository,
+        private AgentRepository $agentRepository,
+        private AgentCascadeCleanup $agentCascade,
+        private SavedTaskRepository $savedTaskRepository,
+        private SavedTaskRunRepository $savedTaskRunRepository,
         private LoggerInterface $logger,
     ) {
     }
@@ -98,6 +109,8 @@ final readonly class UserDeletionService
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteShares($userId);
+            $agentExternal = $this->deleteAgents($userId);
+            $this->deleteSavedTasks($userId);
             $this->deleteChats($userId);
             $this->deleteMessages($userId);
             $this->deleteEmailVerificationAttempts($email);
@@ -121,6 +134,7 @@ final readonly class UserDeletionService
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->purgeAgentExternal($agentExternal);
             $this->purgeMemoryIndex($userId);
             $this->purgeDigestIndex($userId);
             $this->cleanupUserDirectories($userId);
@@ -173,6 +187,8 @@ final readonly class UserDeletionService
             $this->deleteUseLogs($userId);
             $this->deleteWidgets($userId);
             $this->deleteShares($userId);
+            $agentExternal = $this->deleteAgents($userId);
+            $this->deleteSavedTasks($userId);
             $this->deleteChats($userId);
             $this->deleteMessages($userId);
             $this->deleteEmailVerificationAttempts($email);
@@ -193,6 +209,7 @@ final readonly class UserDeletionService
             $this->em->getConnection()->commit();
 
             // Best-effort cleanup outside transaction (external services & filesystem)
+            $this->purgeAgentExternal($agentExternal);
             $this->purgeMemoryIndex($userId);
             $this->purgeDigestIndex($userId);
             $this->cleanupUserDirectories($userId);
@@ -452,6 +469,9 @@ final readonly class UserDeletionService
         foreach ($this->em->getRepository(SavedTask::class)->findBy(['ownerId' => $userId]) as $task) {
             $this->shareRepository->deleteByResource('saved_task', (string) $task->getId());
         }
+        foreach ($this->agentRepository->findByOwner($userId) as $agent) {
+            $this->shareRepository->deleteByResource(AgentKind::KEY, (string) $agent->getId());
+        }
         $this->shareRepository->deleteByOwnerKnowledgeFolders($userId);
 
         // Plugin-declared kinds share by plugin_data.id; a stale row would
@@ -464,6 +484,53 @@ final readonly class UserDeletionService
             }
         }
         $this->shareRepository->deleteByPluginDataIds($pluginDataIds);
+    }
+
+    /**
+     * @return list<AgentExternalCleanup>
+     */
+    private function deleteAgents(int $userId): array
+    {
+        $pending = [];
+        foreach ($this->agentRepository->findByOwner($userId) as $agent) {
+            $pending[] = $this->agentCascade->unshareAndRemoveDependents($agent);
+            $this->em->remove($agent);
+        }
+
+        return $pending;
+    }
+
+    /**
+     * Best-effort: MariaDB rows are already gone; a Qdrant or filesystem
+     * failure only leaves orphaned vectors or files.
+     *
+     * @param list<AgentExternalCleanup> $pending
+     */
+    private function purgeAgentExternal(array $pending): void
+    {
+        foreach ($pending as $cleanup) {
+            try {
+                $this->agentCascade->purgeExternal($cleanup);
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to purge assistant files or vectors after delete', [
+                    'owner_id' => $cleanup->ownerId,
+                    'group_key' => $cleanup->groupKey,
+                    'exception' => $e,
+                ]);
+            }
+        }
+    }
+
+    private function deleteSavedTasks(int $userId): void
+    {
+        foreach ($this->savedTaskRepository->findByOwner($userId) as $task) {
+            $taskId = $task->getId();
+            if (null !== $taskId) {
+                $this->shareRepository->deleteByResource(SavedTaskKind::KEY, (string) $taskId);
+                $this->savedTaskRunRepository->deleteForTask($taskId);
+            }
+            $this->em->remove($task);
+        }
     }
 
     private function deleteRevectorizeRuns(int $userId): void

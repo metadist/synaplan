@@ -73,6 +73,7 @@
         @start-chat="$emit('start-chat', $event)"
         @clone="$emit('clone', $event)"
         @edit="$emit('edit', $event)"
+        @delete="$emit('delete', $event)"
       />
     </div>
   </div>
@@ -90,6 +91,7 @@ defineEmits<{
   'start-chat': [id: number]
   clone: [id: number]
   edit: [id: number]
+  delete: [id: number]
 }>()
 
 const { t } = useI18n()

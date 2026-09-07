@@ -6,6 +6,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Group;
 use App\Entity\GroupMember;
+use App\Entity\Share;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
@@ -133,6 +134,18 @@ final class AgentPublishFlowTest extends WebTestCase
         $this->authenticateClient($this->client, $owner);
         $this->client->request('DELETE', '/api/v1/agents/'.$id);
         self::assertSame(Response::HTTP_NO_CONTENT, $this->client->getResponse()->getStatusCode());
+
+        $this->client->request('GET', '/api/v1/agents/'.$id);
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->em->clear();
+        self::assertSame(
+            [],
+            $this->em->getRepository(Share::class)->findBy([
+                'resourceKind' => 'agent',
+                'resourceId' => (string) $id,
+            ]),
+        );
     }
 
     public function testDraftCannotBeShared(): void

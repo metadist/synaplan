@@ -44,6 +44,10 @@ const onCopied = (task: SavedTask) => {
   filterShared.value = false
 }
 
+const onDeleted = (id: number) => {
+  tasks.value = tasks.value.filter((row) => row.id !== id)
+}
+
 const sharedTasks = computed(() =>
   sharedItems.value.map((item) => ({
     task: {
@@ -130,7 +134,7 @@ onMounted(() => {
 
       <ul v-else class="space-y-4">
         <li v-for="task in tasks" :key="task.id">
-          <SavedTaskCard :task="task" @updated="onUpdated" />
+          <SavedTaskCard :task="task" @updated="onUpdated" @deleted="onDeleted" />
         </li>
       </ul>
     </template>

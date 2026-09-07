@@ -22,6 +22,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   updated: [task: SavedTask]
   copied: [task: SavedTask]
+  deleted: [id: number]
 }>()
 
 const { t, te, locale } = useI18n()
@@ -207,6 +208,22 @@ const openResults = () => {
   void router.push({ path: '/', query: { chat: String(props.task.chatId) } })
 }
 
+const onDelete = async () => {
+  const ok = await dialog.confirm({
+    title: t('config.savedTasks.delete'),
+    message: t('config.savedTasks.deleteConfirm', { name: props.task.name }),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    await savedTasksApi.remove(props.task.id)
+    success(t('config.savedTasks.deleteSuccess'))
+    emit('deleted', props.task.id)
+  } catch {
+    showError(t('config.savedTasks.deleteFailed'))
+  }
+}
+
 const onRunCopy = async () => {
   const ok = await dialog.confirm({
     title: t('iam.runCopy'),
@@ -283,7 +300,7 @@ const onRunCopy = async () => {
       </p>
       <button
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium mt-2"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
         @click="onResume"
       >
         {{ $t('config.savedTasks.resume') }}
@@ -294,7 +311,7 @@ const onRunCopy = async () => {
       <button
         v-if="sharedView"
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         :disabled="copying"
         data-testid="btn-run-copy"
         @click="onRunCopy"
@@ -304,7 +321,7 @@ const onRunCopy = async () => {
       <button
         v-else
         type="button"
-        class="btn-primary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-primary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         :disabled="running"
         data-testid="btn-run-now"
         @click="onRunNow"
@@ -314,11 +331,20 @@ const onRunCopy = async () => {
       <button
         v-if="iamSharingEnabled && !sharedView"
         type="button"
-        class="btn-secondary inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium"
+        class="btn-secondary inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
         {{ $t('iam.share') }}
+      </button>
+      <button
+        v-if="!sharedView"
+        type="button"
+        class="btn-danger inline-flex items-center px-4 py-2.5 rounded-lg text-sm font-medium"
+        data-testid="btn-delete-saved-task"
+        @click="onDelete"
+      >
+        {{ $t('config.savedTasks.delete') }}
       </button>
       <select
         v-if="!sharedView"

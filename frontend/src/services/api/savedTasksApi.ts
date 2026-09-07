@@ -165,6 +165,10 @@ export const savedTasksApi = {
     return asTask(data.task)
   },
 
+  async remove(id: number): Promise<void> {
+    await httpClient(`/api/v1/saved-tasks/${id}`, { method: 'DELETE' })
+  },
+
   async resume(id: number): Promise<SavedTask> {
     const data = await httpClient(`/api/v1/saved-tasks/${id}/resume`, {
       method: 'POST',

@@ -50,6 +50,14 @@ export const useAgentsStore = defineStore('agents', () => {
     return agent
   }
 
+  async function remove(id: number): Promise<void> {
+    await agentsApi.remove(id)
+    if (current.value?.id === id) {
+      current.value = null
+    }
+    gallery.value = gallery.value.filter((card) => card.id !== id)
+  }
+
   function markDirty(): void {
     dirty.value = true
     scheduleSave()
@@ -141,6 +149,7 @@ export const useAgentsStore = defineStore('agents', () => {
     load,
     create,
     clone,
+    remove,
     markDirty,
     saveDraft,
     clear,

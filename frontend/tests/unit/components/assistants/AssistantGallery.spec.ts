@@ -70,6 +70,15 @@ describe('AssistantGallery', () => {
     expect(wrapper.emitted('start-chat')).toEqual([[7]])
   })
 
+  it('emits delete for an assistant you own', async () => {
+    const { wrapper, store } = mountGallery()
+    store.gallery = [card]
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-testid="btn-assistant-delete"]').trigger('click')
+    expect(wrapper.emitted('delete')).toEqual([[7]])
+  })
+
   it('hides archived cards on Mine and shows them on Archived', async () => {
     const { wrapper, store } = mountGallery()
     store.gallery = [{ ...card, status: 'archived' }]

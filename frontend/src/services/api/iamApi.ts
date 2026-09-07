@@ -8,6 +8,7 @@ import {
   ListAdminGroupMembersResponseSchema,
   PutAdminGroupMemberResponseSchema,
   DeleteAdminGroupMemberResponseSchema,
+  LeaveMyGroupResponseSchema,
   ListMyGroupsResponseSchema,
   ListSharesResponseSchema,
   GrantShareResponseSchema,
@@ -29,6 +30,7 @@ export type IamAuditEntry = NonNullable<
 >[number]
 
 export type IamGroup = NonNullable<z.infer<typeof ListAdminGroupsResponseSchema>['groups']>[number]
+export type IamMyGroup = NonNullable<z.infer<typeof ListMyGroupsResponseSchema>['groups']>[number]
 export type IamGroupMember = NonNullable<
   z.infer<typeof ListAdminGroupMembersResponseSchema>['members']
 >[number]
@@ -110,12 +112,19 @@ export const iamApi = {
     })
   },
 
-  async listMyGroups(): Promise<IamGroup[]> {
+  async listMyGroups(): Promise<IamMyGroup[]> {
     const data = await httpClient('/api/v1/groups/mine', {
       method: 'GET',
       schema: ListMyGroupsResponseSchema,
     })
     return data.groups ?? []
+  },
+
+  async leaveGroup(id: number): Promise<void> {
+    await httpClient(`/api/v1/groups/${id}/membership`, {
+      method: 'DELETE',
+      schema: LeaveMyGroupResponseSchema,
+    })
   },
 
   async listShares(kind: string, resource: string): Promise<IamShare[]> {

@@ -26,13 +26,14 @@
         </button>
       </PageHeader>
 
-      <AssistantBuilder v-if="builderMode && store.current" />
+      <AssistantBuilder v-if="builderMode && store.current" @deleted="onDeleted" />
       <AssistantGallery
         v-else-if="!builderMode"
         @create="createAssistant"
         @start-chat="startChat"
         @clone="cloneAssistant"
         @edit="editAssistant"
+        @delete="deleteAssistant"
       />
     </div>
   </MainLayout>
@@ -47,12 +48,15 @@ import PageHeader from '@/components/PageHeader.vue'
 import AssistantGallery from '@/components/assistants/AssistantGallery.vue'
 import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
 import { useAgentsStore } from '@/stores/agents'
+import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import { agentsApi } from '@/services/api/agentsApi'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const store = useAgentsStore()
+const { confirm } = useDialog()
 const { error, success } = useNotification()
 
 const builderMode = computed(() => route.name === 'ai-assistant-builder')
@@ -94,6 +98,34 @@ function editAssistant(id: number): void {
 
 function startChat(id: number): void {
   void router.push({ name: 'chat', query: { agentId: String(id) } })
+}
+
+async function onDeleted(): Promise<void> {
+  await router.push({ name: 'ai-assistants' })
+}
+
+async function deleteAssistant(id: number): Promise<void> {
+  const card = store.gallery.find((row) => row.id === id)
+  const published = card?.status === 'published'
+  const ok = await confirm({
+    title: t('assistants.delete'),
+    message: published
+      ? t('assistants.deletePublishedConfirm')
+      : card?.status === 'archived'
+        ? t('assistants.deleteArchivedConfirm')
+        : t('assistants.deleteConfirm'),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    if (published) {
+      await agentsApi.update(id, { status: 'archived' })
+    }
+    await store.remove(id)
+    success(t('assistants.deleteSuccess'))
+  } catch {
+    error(t('assistants.deleteFailed'))
+  }
 }
 
 async function cloneAssistant(id: number): Promise<void> {

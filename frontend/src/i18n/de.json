@@ -1135,7 +1135,9 @@
       "Alle deine Nachrichten und Chats",
       "Alle hochgeladenen Dateien und Wissensdatenbank-Dokumente",
       "Deine persönlichen Daten, Einstellungen und Erinnerungen",
-      "API-Schlüssel, Widgets und Zugangsdaten"
+      "API-Schlüssel, Widgets und Zugangsdaten",
+      "Deine KI-Assistenten und gespeicherten Aufgaben",
+      "Gruppenmitgliedschaften, zu denen du hinzugefügt wurdest"
     ],
     "retention": "Die Löschung ist endgültig und wirkt sofort. Backups mit verbliebenen Daten werden innerhalb von 30 Tagen rotiert. Gesetzlich aufbewahrungspflichtige Daten (z. B. Rechnungen) werden nur so lange aufbewahrt, wie es das Gesetz verlangt.",
     "partialTitle": "Einzelne Daten löschen, ohne das Konto aufzugeben",
@@ -1160,6 +1162,18 @@
       {
         "name": "Verbindungen, Chat-Widgets und API-Schlüssel",
         "how": "Öffne Kanäle und entferne dort die Verbindung, das Widget oder den Schlüssel, den du nicht mehr brauchst."
+      },
+      {
+        "name": "KI-Assistenten",
+        "how": "Öffne KI-Assistenten. Bei deinem eigenen Assistenten wähle Löschen. Ein veröffentlichter Assistent wird zuerst archiviert und dann entfernt, einschließlich Dateien und Freigaben."
+      },
+      {
+        "name": "Gespeicherte Aufgaben",
+        "how": "Öffne Gespeicherte Aufgaben und wähle Löschen bei einer Aufgabe, die du erstellt hast."
+      },
+      {
+        "name": "Gruppen, zu denen du hinzugefügt wurdest",
+        "how": "Öffne Meine Gruppen und wähle Verlassen. Du verlierst den Zugriff auf alles, was mit dieser Gruppe geteilt wurde. Mitgliedschaften aus der Anmeldung können hier nicht verlassen werden."
       }
     ],
     "partialRetention": "Gelöschte Inhalte verschwinden sofort aus deinem Konto. Backups mit verbliebenen Kopien werden innerhalb von 30 Tagen rotiert. Alles andere in deinem Konto bleibt unberührt.",
@@ -2064,6 +2078,10 @@
       "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
       "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
       "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
+      "delete": "Löschen",
+      "deleteConfirm": "Die gespeicherte Aufgabe \"{name}\" löschen? Freigaben dieser Aufgabe werden ebenfalls entfernt.",
+      "deleteSuccess": "Gespeicherte Aufgabe gelöscht",
+      "deleteFailed": "Die gespeicherte Aufgabe konnte nicht gelöscht werden.",
       "scheduleThis": "Später erneut ausführen",
       "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
       "scheduledFromChat": "Gespeichert. Lege fest, wann sie laufen soll.",
@@ -5461,7 +5479,12 @@
     "myGroups": {
       "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",
       "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Personen hinzufügen.",
-      "emptyAdmin": "Noch keine Gruppen. Legen Sie eine auf der Seite Personen an."
+      "emptyAdmin": "Noch keine Gruppen. Legen Sie eine auf der Seite Personen an.",
+      "leave": "Verlassen",
+      "leaveConfirm": "Die Gruppe \"{name}\" verlassen? Sie verlieren den Zugriff auf alles, was mit dieser Gruppe geteilt wurde. Die Gruppe selbst bleibt.",
+      "left": "Sie haben die Gruppe verlassen.",
+      "leaveFailed": "Die Gruppe konnte nicht verlassen werden.",
+      "leaveDirectory": "Diese Mitgliedschaft kommt aus Ihrer Anmeldung und kann hier nicht verlassen werden."
     },
     "users": {
       "groups": "Gruppen",
@@ -5520,6 +5543,7 @@
         "group_delete": "Gruppe gelöscht",
         "group_member_set": "Mitglied hinzugefügt",
         "group_member_remove": "Mitglied entfernt",
+        "group_member_leave": "Gruppe verlassen",
         "directory_sync": "Anmeldegruppe aktualisiert",
         "impersonation_start": "Ansicht als Benutzer gestartet",
         "impersonation_stop": "Ansicht als Benutzer beendet",
@@ -5778,8 +5802,15 @@
     "cloneSuccess": "Als neuer Entwurf kopiert",
     "startChatFailed": "Der Chat konnte nicht gestartet werden",
     "delete": "Löschen",
-    "deleteConfirm": "Diesen Entwurf löschen?",
+    "deleteConfirm": "Diesen Entwurf löschen? Dateien und Freigaben werden ebenfalls entfernt.",
+    "deleteArchivedConfirm": "Diesen archivierten Assistenten endgültig löschen? Dateien und Freigaben werden ebenfalls entfernt.",
+    "deletePublishedConfirm": "Dieser Assistent ist veröffentlicht. Er wird zuerst archiviert und dann endgültig gelöscht, einschließlich Dateien und Freigaben.",
+    "deleteSuccess": "Assistent gelöscht",
     "deleteFailed": "Der Assistent konnte nicht gelöscht werden",
+    "deleteFile": "Datei löschen",
+    "deleteFileConfirm": "\"{name}\" von diesem Assistenten löschen?",
+    "deleteFileSuccess": "Datei gelöscht",
+    "deleteFileFailed": "Die Datei konnte nicht gelöscht werden",
     "sharedEmpty": "Es wurde noch nichts mit dir geteilt",
     "pluginsEmpty": "Noch keine Assistenten aus Plugins",
     "filterArchived": "Archiviert",

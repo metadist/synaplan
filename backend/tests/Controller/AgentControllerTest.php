@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
@@ -70,8 +71,11 @@ final class AgentControllerTest extends WebTestCase
         self::assertTrue($updated['routable']);
         self::assertSame('anthropic:claude-sonnet-4:chat', $updated['draft']['models']['chat']);
 
+        $promptId = (int) $created['promptId'];
         $this->client->request('DELETE', '/api/v1/agents/'.$id);
         self::assertSame(Response::HTTP_NO_CONTENT, $this->client->getResponse()->getStatusCode());
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(Prompt::class)->find($promptId));
     }
 
     public function testForeignIdIs404(): void

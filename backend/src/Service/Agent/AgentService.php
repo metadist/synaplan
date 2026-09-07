@@ -11,7 +11,6 @@ use App\Entity\User;
 use App\Repository\AgentRepository;
 use App\Repository\AgentVersionRepository;
 use App\Repository\PromptRepository;
-use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
@@ -34,7 +33,7 @@ final readonly class AgentService
         private EntityManagerInterface $em,
         private AgentAccess $access,
         private ShareService $shareService,
-        private ShareRepository $shares,
+        private AgentCascadeCleanup $cascade,
         private UserRepository $users,
         private AgentSerializer $serializer,
     ) {
@@ -166,12 +165,9 @@ final readonly class AgentService
         if ($agent->isPublished()) {
             throw AgentNotDraftException::cannotDelete($agent->getStatus());
         }
-        $id = $agent->getId();
-        if (null !== $id) {
-            $this->shares->deleteByResource(AgentKind::KEY, (string) $id);
-            $this->versions->deleteForAgent($id);
-        }
+        $external = $this->cascade->unshareAndRemoveDependents($agent);
         $this->agents->remove($agent);
+        $this->cascade->purgeExternal($external);
     }
 
     public function requireOwned(int $id, int $ownerId): Agent
