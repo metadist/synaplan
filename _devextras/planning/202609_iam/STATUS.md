@@ -18,7 +18,8 @@ S1–S4 and the incoming-chats UI are **merged to `main`** (#1708, #1713, #1714,
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | done | Merged to `main` as #1717. History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
 | S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | done | Merged to `main` as #1718. IAM29–IAM38 (directory sync, audit tab, admin manage-without-read, impersonation audit) |
-| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1). CI fix: `modelIdFromStored` keeps TestProvider placeholder BIDs (`-1`…`-7`) |
+| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1). CI fix: `modelIdFromStored` keeps TestProvider placeholder BIDs (`-1`…`-7`). UI must walk J-IAM-3 |
+| IAM-UX Share dialog | — | planned | [`06_sprint_ux_share_dialog.md`](./06_sprint_ux_share_dialog.md). Professionalize `ShareDialog` (one-row add, kind-specific consequence) before track 2 S3 / track 4 reuse it |
 
 ## Decisions
 
@@ -32,6 +33,7 @@ S1–S4 and the incoming-chats UI are **merged to `main`** (#1708, #1713, #1714,
 | 2026-09-05 | S1 shipped on `main`. S2 started on `feat/iam-sharing-mvp`. Public docs: `synaplan-docs` `feat/docs-people-and-groups`. |
 | 2026-09-06 | S2 (#1713) and S3 (#1714) merged to `main`. The planned "Shared with me" filter had landed only on the statistics chat browser, so a group member could not find incoming chats. Extra UI sprint on `feat/iam-incoming-chats`: History sheet + ChatBrowser show incoming as group pills and own chats as private, with filter buttons; Account gets a red dot and **Incoming chats** (`/chats/incoming`, sibling of the Files inbox at `/files/incoming`); opening a shared chat names the owner and the group / everyone / person it came through. |
 | 2026-09-06 | S5 will introduce `IAM.GROUP_POLICIES_ENABLED` (seeded `0`) as a fourth flag beyond master plan §0 row 11. Off ⇒ resolvers stay `[user, global]` (C1). Recorded here as required by [`05_sprint_5_group_policies.md`](./05_sprint_5_group_policies.md). |
+| 2026-09-07 | **UX contract.** Sharing shipped as a capability; the first UI was not a professional flow (dialog + a chip people did not open). [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) is binding for remaining IAM UI (S5 J-IAM-3) and for **IAM-UX** (Share dialog v2) before later tracks reuse it. No code in that planning change. |
 
 ## Review log
 
@@ -110,3 +112,10 @@ incoming-chats `continueChat`, and S5 policy APIs together.
 test-catalog placeholder BIDs (`-1`…`-7`). PHPUnit and E2E then fell through
 to the first "usable" cloud model (HuggingFace 401 / "AI service is not set
 up"). Parser now keeps any non-zero integer, matching pre-S5 `readDefaultModel`.
+
+**2026-09-07 (UX contract):** product-owner review of the 2026-09
+roadmap. Remaining tracks must plan the whole user-flow (findability,
+kind-specific copy, empty/error, browser walk) before Vue. IAM-UX is
+the planned Share-dialog professionalization; S5 UI names J-IAM-3.
+Incoming chats (#1717) is the findability pattern to reuse, not a
+one-off. See roadmap §8.4.

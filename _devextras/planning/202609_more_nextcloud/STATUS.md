@@ -20,6 +20,7 @@ before the first sprint starts.**
 | 2026-09-03 | All 14 checklist rows accepted: `link` mode added beside `shared` and `provision`; auth-code style handshake; registered instances; `BEXTERNALIDENTITIES` rows; 1:n identities; email conflict → link offer; same key scopes; no merge; Linked platforms page; NC admin settings shrink. |
 | 2026-09-03 | Open questions resolved: instance registration via admin key **and** pending-approval UI; signed-in account only on the confirm screen; auto-provision inside `link` mode is admin opt-in. |
 | 2026-09-03 | Parity scope verified in code: **ownCloud Online yes** (same provisioning model, `UserAccountService.php`); **OpenCloud out** (RFC 8693 token exchange already gives per-user identity; regression check moves to IAM S4). `AddinConnectView` is generalized with Synamail `docs/AUTH_FLOW.md` as S1 acceptance. |
+| 2026-09-07 | **UX contract.** J-NC-1…3: one confirm card, no typed key, disconnect from either side, email-conflict offer in `link` mode. |
 
 ## Review log
 
@@ -29,3 +30,7 @@ codebase state (see roadmap §5).
 **2026-09-03 (second pass):** all §0 rows ticked via the product-owner
 questionnaire; open questions converted into the master plan's decisions table;
 sprint files written. Next: technical plan review (roadmap §7 step 3).
+
+**2026-09-07 (UX contract):** keep the handshake as a flow, not a
+settings form. See
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.6.

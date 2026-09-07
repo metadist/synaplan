@@ -13,6 +13,11 @@ section. Master plan §0 rows 9, 10, 11; §4.5; §12 rows 7, 9.
 **Repos:** `synaplan/` only. Cut line (master plan §8): webhook trigger (`TL42`–`TL43`) ships before the editor if capacity is short.
 **Flag:** `WORKFLOWS.BUILDER_ENABLED` (default off) gates the editor, the new node kinds in the validator and
 the webhook route; the outbound webhook hardening (`TL43`) is unconditional because it only tightens.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-TL-5. The Saved Task card stays the default path (five questions
+from the saved-tasks UX doc). **Steps** is a numbered list. Webhook
+URL lives behind "Let another system start this". **Save as
+template** is an IAM-UX share, not a second object.
 
 ---
 
@@ -145,7 +150,7 @@ Frontend: `SavedTaskStepsEditor.spec.ts`, `StepInputsForm.spec.ts`, `StepPicker.
 ## 4. Exit criteria / demo
 
 1. Flag off: task card unchanged, validator unchanged, webhook route 404, snapshots untouched.
-2. Flag on: a user builds "every Monday 08:00: search mail (last 7 days) → summarize with the Support assistant → create ticket (custom tool, needs approval) → mail me" in the Steps editor without typing JSON; validator errors appear per step.
+2. J-TL-5 walked: a user builds "every Monday 08:00: search mail (last 7 days) → summarize with the Support assistant → create ticket (custom tool, needs approval) → mail me" in the Steps editor without typing JSON; the card still answers the five Saved-Task questions; validator errors appear per step.
 3. The Monday run pauses at "create ticket"; approving from the inbox (S3) finishes the run; "mail me" contains the ticket summary.
 4. n8n posts to the task's webhook URL with a valid signature; the run starts with the payload available as "from trigger"; a bad signature is refused.
 5. The last step "Send to webhook" delivers a signed POST to n8n; an attempt to point it at an internal address is refused at save.

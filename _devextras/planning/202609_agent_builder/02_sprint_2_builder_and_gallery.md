@@ -7,6 +7,12 @@
 **Unlocks:** S3 (publish button and version list plug into this form), S4/S5 (further form sections), S6 (Export & import lives beside this UI).
 **Repos:** `synaplan/` only. **Class:** `ota-candidate` (Vue, i18n, generated schemas) + `backend-only` for `AB9`, `AB10`, `AB14a`.
 **Flag:** `AGENTS.ENABLED` off ⇒ nav shows `Instructions` as today, `/ai/assistants` is not registered, no redirect is installed. The label rename in `AB17` is **not** flag-gated (decision 2 is a plain copy fix).
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-AB-1. Wireframe:
+[`../202609_ux_user_flows/assistant-publish.md`](../202609_ux_user_flows/assistant-publish.md)
+(gallery + test panel). First Vue deliverable is the empty-state
+sentence + **Create assistant**, not the form fields. U1–U12 apply
+to `AB12`–`AB16`.
 
 ---
 
@@ -111,9 +117,9 @@ A **Help me write this** button opens a drawer that runs the existing `WidgetSet
 ## 4. Exit criteria / demo
 
 1. Flag off: `/ai/instructions` renders as today; no "AI Agents" string remains anywhere in `frontend/src/`.
-2. Flag on: the demo user creates "Contract review" in the form, writes the instructions (optionally with the helper), picks a model, uploads one file, tests in the panel, clicks **Start chat** from the gallery and gets a grounded answer. No docs consulted.
+2. Flag on: J-AB-1 walked in the browser (U10) — empty gallery → Create → Basics/Instructions/one model/one file → **Try a draft** (not in History) → **Start chat** with pill "Talking to Contract review". No docs consulted. Empty Shared chip has no Create button.
 3. **Clone** produces an independent draft; editing it does not change the original (`BPARENTID` set).
-4. `/ai/instructions` and `/config/task-prompts` land on `/ai/assistants`; five locales complete; dark, V2 and 320 px verified for gallery, builder and test panel.
+4. `/ai/instructions` and `/config/task-prompts` land on `/ai/assistants`; five locales complete; dark, V2 and 320 px verified for gallery, builder and test panel (U9). Flag off hides the route (U11).
 
 ---
 

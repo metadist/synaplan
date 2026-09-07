@@ -22,6 +22,7 @@ before the first sprint starts.**
 | 2026-09-03 | All 14 checklist rows accepted: one registry, read/write/destructive, auto/approve/block defaults, pause-and-resume for unattended runs, 72 h expiry, HTTP + OpenAPI custom tools, tools as IAM kind, step-list builder, n8n stays an interface. |
 | 2026-09-03 | Open questions resolved: document tools `write → auto` (own-artefact exception); "always allow" = per-user override that never loosens `block`; notifications in-app + email with instant/daily-digest user setting; inbox under Manage → Automations → Approvals. |
 | 2026-09-03 | Bundle sections (roadmap §8.1): `mcp_servers` in S1, `custom_tools` in S4, `saved_tasks` in S5 — never credentials or tokens. |
+| 2026-09-07 | **UX contract.** J-TL-1…5 binding. Card + inbox findability is the sharing lesson applied to approvals. Tool/template Share waits on IAM-UX. |
 
 ## Review log
 
@@ -31,3 +32,7 @@ codebase state (see roadmap §5).
 **2026-09-03 (second pass):** all §0 rows ticked via the product-owner
 questionnaire; open questions converted into the master plan's decisions table;
 sprint files written. Next: technical plan review (roadmap §7 step 3).
+
+**2026-09-07 (UX contract):** an approval the owner cannot find after
+closing the tab is not governance. See
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.4.

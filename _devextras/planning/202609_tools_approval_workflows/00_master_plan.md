@@ -21,6 +21,11 @@ inbox) and Manage → Connections (custom tools live beside MCP servers).
   `AI/OpenAI/OpenAiGatewayToolLoop.php`, `Service/Document/Tool/*`
 - [`../202609_secure_compute/00_master_plan.md`](../202609_secure_compute/00_master_plan.md)
   — `code_run` is a write-class tool governed by this track's policy
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract. Approvals and custom tools follow J-TL-1…5.
+  Wireframe:
+  [`../202609_ux_user_flows/approval-and-inbox.md`](../202609_ux_user_flows/approval-and-inbox.md).
+  Tool / template **Share** waits on IAM-UX.
 
 ---
 
@@ -191,13 +196,19 @@ template = IAM share of kind `saved_task` with `use` (run a copy).
 
 ## 5. UI
 
+This track asks a person to **decide** while the product is acting.
+A card nobody understands, or an inbox nobody can find after they
+close the tab, is a liability — the same class of miss as sharing
+without Incoming chats. Binding journeys J-TL-1…5 and U1–U12:
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.4.
+
 | Surface | Change | Class |
 | ------- | ------ | ----- |
-| Chat | `ApprovalCard.vue` (replaces the Phase M-specific card): what will happen, the arguments in plain words, Approve / Reject / "Always allow for this assistant" (only if policy allows loosening at that level) | ota |
-| Manage → Automations → **Approvals** | Inbox: pending (with age and expiry), decided; approve/reject; deep link to the chat or task run. Badge count on the nav child | ota |
-| Manage → Connections → **Custom tools** | List, HTTP tool editor, OpenAPI import wizard, "Try it" against the user's own input, Share (IAM) | ota |
-| Manage → Automations → Saved Tasks | **Steps** editor, "waiting for approval" state on the task card and run history | ota |
-| Operate → System config | Instance defaults per side-effect class; approval expiry default | ota |
+| Chat | `ApprovalCard.vue`: what will happen, arguments in plain words, "Nothing has been created yet", expiry, Approve / Reject / "Always allow for this assistant" (only if policy allows). Destructive / `block` is a sentence in the reply, not a card with a disabled Approve | ota |
+| Manage → Automations → **Approvals** | Inbox (Incoming-chats pattern): Pending / Decided; preview, age, expiry; Approve / Reject; **Open chat** / **Open run**. Badge on the Automations child. Empty: "Nothing needs your approval." | ota |
+| Manage → Connections → **Custom tools** | Cards + empty "Add a tool" / "Import from a description". Class as Reads data / Changes something / Deletes something. Try it: read shows a result, write shows the request and does not send. Share = IAM-UX dialog | ota |
+| Manage → Automations → Saved Tasks | Card stays the default path (five Saved-Task questions). **Steps** is a numbered list, not a canvas. Waiting step: **Waiting for you**, never a failed node. Webhook URL behind "Let another system start this" | ota |
+| Operate → System config | Instance defaults per class in the same plain words; approval expiry default | ota |
 
 Words (en / de / es / fr / tr): Approve / Genehmigen / Aprobar / Approuver /
 Onayla; Reject / Ablehnen / Rechazar / Refuser / Reddet; Waiting for
@@ -263,7 +274,8 @@ Sprint files: [`01`](./01_sprint_1_registry_refactor.md) ·
 
 Cut line: S5 webhook trigger first, then the OpenAPI import (keep manual
 HTTP tools). Never cut S3 — an approval that only works while the tab is
-open is not governance.
+open is not governance. Never cut J-TL-1+2 (card + inbox findability)
+or the IAM-UX wait on tool/template Share.
 
 ---
 
@@ -306,6 +318,9 @@ open is not governance.
 5. A user with no technical background builds a five-step workflow in the
    steps editor and it runs on schedule.
 6. Full gate green after every sprint; S1 leaves every snapshot untouched.
+7. J-TL-1 and J-TL-2 walked: a write shows the card; closing the tab
+   still lets the owner decide from Approvals; a `destructive` action
+   is a sentence, not a dead button.
 
 ---
 

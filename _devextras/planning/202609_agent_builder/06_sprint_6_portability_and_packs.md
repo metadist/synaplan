@@ -7,6 +7,12 @@
 **Unlocks:** track 3 (`model_preferences` section), track 4 (`mcp_servers`, `custom_tools`, `saved_tasks` sections), the connections owner (`connections`). **This file is the reference those sprint files cite (§3.1).**
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED` gates the `agents` section, the alias and the MCP tool; the bundle endpoints themselves are gated by `BUNDLE.ENABLED` (seeded `0`) so later tracks can ship sections while assistants stay off on an install.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-AB-6. Settings → Export & import is one file and one sentence of
+what is in it. Import checklist uses "needs a model" / "needs a
+key" — never catalog keys as the only text. Empty checklist ⇒
+**Import** is the only primary button. Import creates drafts, never
+shares (already C7; the UI must say so).
 
 ---
 
@@ -146,7 +152,7 @@ Each of those sprints registers one class implementing `BundleSectionInterface`,
 
 ## 4. Exit criteria / demo
 
-1. On instance A the admin exports "Contract review" + its instruction. On instance B (different catalog, no Anthropic key) the preview says "Needs a model: chat"; after import the draft opens in the builder with the model picker highlighted; nothing else was created (C7 suite).
+1. J-AB-6 walked: on instance A the admin exports "Contract review" + its instruction from Settings → Export & import. On instance B (different catalog, no Anthropic key) the preview says "Needs a model: chat" in plain words; after import the draft opens in the builder with the model picker highlighted; nothing else was created (C7 suite).
 2. Enabling `hello_world` installs its pack; the gallery shows it under **From plugins** for every user; the admin unshares it.
 3. A coding client lists `assistant:contract-review` in `/v1/models` and a completion against it runs pinned; the Desktop client's MCP session shows `list_assistants`.
 4. Settings → Export & import and Operate → System config → Export & import both work; the admin variant lists the excluded secret keys explicitly.

@@ -3,7 +3,9 @@
 **Status:** Decisions ticked 2026-09-03 (product-owner questionnaire; log in
 [`STATUS.md`](./STATUS.md)). Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md).
 Sprint files: [`01_sprint_1_groups_core.md`](./01_sprint_1_groups_core.md) …
-[`05_sprint_5_group_policies.md`](./05_sprint_5_group_policies.md).
+[`05_sprint_5_group_policies.md`](./05_sprint_5_group_policies.md),
+plus [`06_sprint_ux_share_dialog.md`](./06_sprint_ux_share_dialog.md)
+(IAM-UX, after S3).
 **Owner surface:** Operate → **People** (admin) and a **Share** action on
 resource cards (everyone). No new top-level nav item.
 **Flags:** `IAM.GROUPS_ENABLED`, `IAM.SHARING_ENABLED`, `IAM.DIRECTORY_SYNC_ENABLED`
@@ -18,6 +20,9 @@ resource cards (everyone). No new top-level nav item.
   — manifest v2 `provides.*` (plugins contribute shareable resource kinds)
 - Track 2 (assistants are the second shareable kind), track 6 (external
   identities table is introduced here and reused there)
+- [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding
+  user-flow contract (U1–U12). S2/S3 shipped the capability; **IAM-UX**
+  professionalizes `ShareDialog` before later tracks reuse it.
 
 ---
 
@@ -189,7 +194,12 @@ talk to it".
 ## 5. Admin UI and end-user UI
 
 Contract: the current navigation is lean (Work / Manage / Operate) and this
-track must not undo that.
+track must not undo that. **A listed screen is not a user-flow.** Remaining
+UI (S4 Audit / directory, S5 Policies, IAM-UX) follows
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) journeys
+J-IAM-1…4. S2 specified a dialog and a filter chip; members could not
+find incoming chats until #1717. Do not ship another surface that only
+exists as a component name.
 
 ### 5.1 Operate → People (admin, `/admin/people`)
 
@@ -208,14 +218,21 @@ simplification, not an addition.
 - One `ShareDialog.vue`, opened from a **Share** action on: a knowledge
   folder card (`/files`), a conversation (chat header menu), an assistant
   card, a saved task card, a widget card. Same component, kind passed in.
-- Content: current shares list (avatar / group chip, permission dropdown,
-  remove), an add row (search people and groups; "Everyone in this
-  organization" as a pinned entry), permission per row. Public link section
-  unchanged where it exists today.
-- No new page. "Shared with me" is a filter chip on the existing lists
-  (`/files`, `/ai/instructions`, chat history) — S2/S3.
+- **Shipped S2 shape (lesson):** stacked search + radio permissions +
+  confirm, then the list. Recipients could not find group-shared chats.
+  **Target shape (IAM-UX):** one-row add (subject + permission + Share),
+  in-list permission change, owner line, kind-specific consequence +
+  "they will find it…". Wireframe:
+  [`../202609_ux_user_flows/share-dialog-v2.md`](../202609_ux_user_flows/share-dialog-v2.md).
+- Public link section unchanged where it exists today.
+- **Findability (learned in #1717, now the pattern):** History and the
+  detailed list show Group / Private filters; Account gets a red dot and
+  **Incoming chats** (`/chats/incoming`, sibling of Files inbox). "Shared
+  with me" remains a chip on Sources, Assistants, Widgets, Automations.
+  A filter chip on a list people do not open is not a flow.
 - Badges: a small "shared" icon on cards that are shared, an owner avatar on
-  cards shared *to* me.
+  cards shared *to* me. Opening a shared resource answers §5.3 on the
+  open surface (banner / pill), not only inside the dialog.
 
 ### 5.3 Five-question check (from `08_ux_and_i18n.md` discipline)
 
@@ -291,12 +308,13 @@ Named tests live in the sprint files; the list is binding.
 | **S2 — Sharing MVP** ([file](./02_sprint_2_sharing_mvp.md)) | `BSHARES`; ShareDialog; share a **knowledge folder** (`use`) → `RagScopeResolver` + both vector stores; share a **conversation** (`read`, `use` = continue as copy incl. its files); "Shared with me" filters; flag `IAM.SHARING_ENABLED` | Acceptance demo: "add this chat with its files to my team", team member continues it and RAG finds the files |
 | **S3 — More kinds** ([file](./03_sprint_3_more_kinds.md)) | `assistant` (BPROMPTS — coordinates with track 2 S3), `saved_task` (read/use = run a copy), `widget` (read/edit for co-editing); plugin-declared kinds via manifest v2 | Admin publishes a system-like assistant to one group only |
 | **S4 — Directory & privacy** ([file](./04_sprint_4_directory_and_privacy.md)) | OIDC groups claim sync; audit log + Audit tab; admin metadata-only enforcement; impersonation audit + `disabled` option; regression check that OpenCloud token-exchanged users (RFC 8693 bearer, same Keycloak realm) resolve to the same `BUSER` and therefore see their groups and shares | A user logging in via Keycloak lands in the right groups; admin sees who shared what, not the content |
-| **S5 — Group policies** ([file](./05_sprint_5_group_policies.md)) | `BGROUPCONFIG`, `BCONFIG.BLOCKED`, resolution user → groups → global for allow-listed settings; Policies tab | "Support may only use these two models" holds; a locked default cannot be overridden |
+| **S5 — Group policies** ([file](./05_sprint_5_group_policies.md)) | `BGROUPCONFIG`, `BCONFIG.BLOCKED`, resolution user → groups → global for allow-listed settings; Policies tab | "Support may only use these two models" holds; a locked default cannot be overridden (journey J-IAM-3) |
+| **IAM-UX — Share dialog professionalization** ([`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §7) | One-row add, kind-specific consequence, open-resource five-question check on every S3 kind, after-share toast names the recipient path | J-IAM-4 walked; required **before** track 2 S3 Publish and track 4 tool/template share reuse the dialog |
 | **v2 candidates** | SCIM 2.0; nested groups; ownership transfer; support access (time-boxed read grant to an admin); per-group budgets | Decided per hoster demand |
 
 Cut line: if scope slips, cut **S5** first, then **S4 audit tab** (keep the
-log). Never cut C2 tests or the ShareDialog polish — a confusing sharing UI
-is worse than no sharing.
+log). Never cut C2 tests or **IAM-UX** — a confusing sharing UI is worse
+than no sharing, and later tracks must not inherit the S2 dialog as-is.
 
 ---
 
@@ -344,6 +362,11 @@ is worse than no sharing.
    identical.
 6. The People page replaces the old Users tab; total nav item count in
    Operate grows by exactly one.
+7. Remaining UI (S4, S5, IAM-UX) walks J-IAM-1…4 in
+   [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md): a
+   directory group is obviously read-only, Audit never opens content,
+   a locked model default is a sentence not a status code, and Share
+   tells both sides where the other person will look.
 
 ---
 

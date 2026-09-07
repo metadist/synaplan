@@ -11,6 +11,11 @@ become a portable bundle section.
 **Unlocks:** hosters with vLLM / LiteLLM / TGI endpoints stop typing models by hand (hosting-partner CORE-1 P3 closes).
 **Repos:** `synaplan/` only.
 **Flag:** none — import is an admin action; the probe is an opt-in checkbox per preview (decision §12.8).
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-PL-3. Preview table: name, editable tags, already-there badge.
+Apply adds only new rows. Re-import: "Nothing new." Probe checkbox
+off by default, labelled "Check what each model can do (uses a
+little credit)."
 
 ---
 
@@ -146,8 +151,8 @@ unknown field rejected; unresolvable key → checklist); `ModelImportDialog.spec
 
 ## 4. Exit criteria / demo
 
-1. Admin registers a vLLM endpoint, clicks Import models, sees 12 rows with guessed tags, fixes one tag, applies: 12 rows created in under a minute; the chat picker offers them.
-2. Import again: `created 0, skipped 12`. Toggle one model off, import again: still off.
+1. J-PL-3 walked: admin registers a vLLM endpoint, clicks Import models, sees 12 rows with guessed tags, fixes one tag, applies: 12 rows created in under a minute; the chat picker offers them. Probe checkbox stays off unless chosen.
+2. Import again: the UI says "Nothing new" (`created 0, skipped 12`). Toggle one model off, import again: still off.
 3. Remove a model from vLLM; after the next `app:model:health-check` run the row shows "not offered by endpoint" and is soft-disabled; add it back, it recovers.
 4. Export bundle contains `model_preferences` with catalog keys and no secret; import on a second instance reports `needs a model` for the missing endpoint models.
 

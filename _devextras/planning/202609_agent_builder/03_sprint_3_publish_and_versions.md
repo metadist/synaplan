@@ -3,10 +3,17 @@
 **Track 2 (Agent Builder), sprint 3 of 6.** Steps `AB18`–`AB25`.
 
 **Goal:** The owner publishes an immutable version, shares the assistant through IAM (`assistant` kind, `use` / `edit`), and members see it under "Shared with me". Users always run the latest published version while the owner keeps editing the draft; archiving stops new chats without breaking running ones. The owner sees who uses the assistant — metadata only.
-**Depends on:** S1, S2; **track 1 (IAM) S1–S2** merged (`AccessGate`, `IamVoter`, `ShareableResourceKindInterface`, `BSHARES`, `ShareDialog.vue`). The `assistant` kind descriptor is written here and registered together with track 1 S3's other kinds (coordinate in both `STATUS.md` files).
+**Depends on:** S1, S2; **track 1 (IAM) S1–S2** merged (`AccessGate`, `IamVoter`, `ShareableResourceKindInterface`, `BSHARES`, `ShareDialog.vue`); **IAM-UX** (`202609_iam/06_sprint_ux_share_dialog.md`) before `AB22` opens Share for publish. The `assistant` kind descriptor is written here and registered together with track 1 S3's other kinds (coordinate in both `STATUS.md` files).
 **Unlocks:** S4 (shared folders need the published/`use` path), S5 (widgets bind to a published assistant), S6 (export of published definitions).
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED`; group targets additionally require track 1's `IAM.GROUPS_ENABLED` (user / everyone targets work without it).
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-AB-2, J-AB-3, J-AB-4. Wireframe:
+[`../202609_ux_user_flows/assistant-publish.md`](../202609_ux_user_flows/assistant-publish.md).
+**Share opens the IAM-UX dialog** (`202609_ux_user_flows.md` §7) — do
+not reuse the S2 stacked form as the publish entry. A Legal member
+who cannot find the card under Shared with me in ten seconds means
+this sprint is not done (U2).
 
 ---
 
@@ -111,9 +118,9 @@ Semantics: `read` = see the card and clone; `use` = read + start a chat; `edit` 
 
 ## 4. Exit criteria / demo
 
-1. Admin publishes "Contract review" v1 to group "Legal". A Legal member finds it under **Shared with me**, chats, gets grounded answers. A Sales member does not see it and gets 404 with a guessed id.
+1. J-AB-2 walked (U10): admin publishes "Contract review" v1 to "Legal" with a changelog in plain words; Share uses the IAM-UX dialog and the consequence names Assistants → Shared with me. A Legal member finds the card in ten seconds (owner + version), **Start chat**. A Sales member does not see it and gets 404 with a guessed id.
 2. Admin edits the instructions and tests in the panel; the member still gets v1. Admin publishes v2 with a changelog; the member's next message runs v2 (visible in message meta), no action on their side.
-3. Owner archives it: the member's open chat continues with an **archived** badge; **Start chat** is gone from the gallery.
+3. J-AB-4: owner archives it; the member's open chat continues with an **archived** badge; **Start chat** is gone from the gallery with one sentence why. J-AB-3: Clone leaves the original untouched.
 4. Owner usage view shows messages and cost per version and a user *count*, nothing else. `AssistantResourceKind` appears in track 1's kind registry test.
 
 ---
@@ -126,7 +133,7 @@ Semantics: `read` = see the card and clone; `use` = read + start a chat; `edit` 
 | AB19 | `feat(agents): add version list and version detail endpoints` | backend-only | AB18 |
 | AB20 | `feat(iam): register assistant as a shareable resource kind` | backend-only | AB18, IAM S1 |
 | AB21 | `feat(agents): resolve published version with IAM use check and archived rule` | backend-only | AB20 |
-| AB22 | `feat(assistants): add Publish section, share dialog and shared-with-me gallery` | ota-candidate + backend-only | AB19, AB21, IAM S2 |
+| AB22 | `feat(assistants): add Publish section, share dialog and shared-with-me gallery` | ota-candidate + backend-only | AB19, AB21, IAM-UX |
 | AB23 | `feat(agents): record agent metadata in usage log and add owner usage view` | backend-only + ota-candidate | AB21 |
 | AB24 | `feat(assistants): archive and unarchive with existing-chat continuation` | backend-only + ota-candidate | AB21, AB22 |
 | AB25 | `feat(agents): add app:agents:seed-system command for read-only system assistants` | backend-only | AB20 |

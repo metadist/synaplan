@@ -10,6 +10,10 @@ an audit row an admin can read on People → **Audit**; admins manage everything
 **Flag:** `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) gates the claim sync. Audit writes and admin metadata-only enforcement
 follow `IAM.GROUPS_ENABLED`. Settings: `IAM.DIRECTORY_GROUPS_CLAIM = groups`, `IAM.ADMIN_IMPERSONATION = audited`,
 `IAM.AUDIT_RETENTION_DAYS = 365`.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-IAM-1 (directory group is obviously read-only) and J-IAM-2 (Audit
+never opens content). `IAM36` / `IAM37` are not done until those
+journeys walk (U10) and empty/error/flag-off states exist (U5, U8, U11).
 
 ---
 
@@ -135,8 +139,9 @@ unfiltered gate `make lint && make -C backend phpstan && make test && docker com
 
 1. `directory-demo.sh` green: Keycloak group appears after one login, disappears after removal, manual membership survives.
 2. OpenCloud regression: a token-exchanged user sees the same groups and shares as in the browser (`IAM34` test + runbook).
-3. Admin opens People → Audit and sees who shared what with whom and every impersonation; no route returns another user's content to an admin.
+3. Admin opens People → Audit and sees who shared what with whom and every impersonation; no route returns another user's content to an admin. J-IAM-2: empty state is a sentence, a row never opens the chat or file.
 4. `IAM.ADMIN_IMPERSONATION = disabled` blocks the action with a clear message; default behavior identical plus the audit row.
+5. J-IAM-1: a directory group shows **From your login** and cannot be renamed; helper text names the next sign-in. Dark + V2 + 320 px on Audit and Groups (U9).
 
 ---
 

@@ -7,6 +7,10 @@
 **Unlocks:** S6 (tasks and channel defaults are part of the exported definition), track 4 S5 (workflow builder reads `tasks[]`).
 **Repos:** `synaplan/` only. **Class:** `backend-only` + `ota-candidate`.
 **Flag:** `AGENTS.ENABLED`; task templates additionally require the Saved Tasks flag (`SavedTaskConfig::isEnabled($ownerId)`) — off ⇒ the Tasks section is hidden and templates are stored but not materialised.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-AB-5. Widget setup: **Pick an assistant** (published only) is the
+default path; topic binding is an advanced leftover, not the first
+control. Tasks section hidden when Saved Tasks is off (U11).
 
 ---
 
@@ -96,7 +100,7 @@ Per-user setting `BCONFIG` group `WHATSAPP`, setting `AGENTID` (nullable, writte
 ## 4. Exit criteria / demo
 
 1. "Contract review" defines "Weekly digest" (`0 8 * * 1`); publishing creates a Saved Task owned by the admin, visible under Saved tasks and in the builder with its next run.
-2. The demo widget is switched to the assistant in the wizard; a visitor's question is answered from the shared folder; the widget row still has its topic. Publishing v2 changes the widget's answers without touching it.
+2. J-AB-5 walked: the demo widget is switched via **Pick an assistant** (the first control, not an advanced leftover); a visitor's question is answered from the shared folder; the widget row still has its topic. Publishing v2 changes the widget's answers without touching it.
 3. A support-mailbox department bound to the assistant replies pinned; the WhatsApp demo number bound to it replies pinned.
 4. Widgets, handlers and numbers without a binding: E2E and feature suites green, options arrays identical.
 

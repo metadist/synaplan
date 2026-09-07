@@ -12,6 +12,11 @@ registers. Master plan §0 rows 7, 8, 12; §4.4; §12 rows 8, 9.
 **Unlocks:** S5 (a tool is a workflow step); a plugin-free integration path for customers.
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.CUSTOM_HTTP_ENABLED` (default off). Off ⇒ `CustomToolSource` returns `[]`, `/api/v1/tools/custom*` 404, no nav tab.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-TL-4. Empty tab: one sentence + **Add a tool** / **Import from a
+description**. Class in plain words. Try it never sends a write.
+**Share waits on IAM-UX** and uses the kind-specific consequence
+("Support's assistants can call this. Your login stays yours.").
 
 ---
 
@@ -149,7 +154,7 @@ credential, audit actor = caller), frontend specs for the four components, i18n 
 1. Flag off: no tab, routes 404, registry unchanged.
 2. Flag on: create "Create helpdesk ticket" (POST, bearer credential, class "changes something"); "Try it" shows the resolved request with `***`; in chat the assistant proposes the tool, `ApprovalCard` appears, approve creates the ticket, the reply quotes `response.summary`.
 3. Import the helpdesk OpenAPI spec: read operations run silently, `DELETE` operations are blocked by default.
-4. Share the tool with the Support group (`use`): a member calls it, the ticket is created with the owner's credential, the audit row names the member.
+4. J-TL-4 Share (IAM-UX dialog): share with Support (`use`); the owner sees the consequence sentence; a member finds the tool under Custom tools → Shared with me, calls it, cannot see the credential; the ticket is created with the owner's credential; the audit row names the member.
 5. Export → import on another instance: the tool arrives disabled with "needs a credential"; attaching one enables it.
 
 ---

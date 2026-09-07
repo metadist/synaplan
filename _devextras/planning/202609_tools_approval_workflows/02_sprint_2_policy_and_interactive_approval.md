@@ -13,6 +13,13 @@ without them. Master plan §0 rows 3, 4; §4.2; §12 rows 2, 3, 4, 5.
 **Repos:** `synaplan/` only.
 **Flag:** `TOOLS.APPROVALS_ENABLED` (default off). Off ⇒ `decide()` is not consulted and every loop
 behaves as after S1. On ⇒ policy enforced, `/api/v1/approvals` routes live, inbox visible.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-TL-1, J-TL-2. Wireframe:
+[`../202609_ux_user_flows/approval-and-inbox.md`](../202609_ux_user_flows/approval-and-inbox.md).
+`TL14` / `TL16` are not done until the card *and* the closed-tab
+inbox path are walked (U2, U10). Empty inbox is a next-action
+sentence (U5). Destructive / `block` is a reply sentence, not a
+disabled Approve.
 
 ---
 
@@ -137,9 +144,9 @@ Frontend: `ApprovalCard.spec.ts`, `ApprovalsInbox.spec.ts`, `useApprovalsStore.s
 ## 4. Exit criteria / demo
 
 1. Flag off: no routes, no nav child, snapshots untouched, gateways identical.
-2. Flag on, chat: a `read` MCP tool runs silently; a `write` tool shows the card; Approve executes and the answer continues; Reject explains.
-3. A `destructive` tool is refused with one understandable sentence; the audit log records it.
-4. Close the tab after the card appears; the item is in the inbox; approving there produces the follow-up message in the chat.
+2. J-TL-1 walked: a `read` MCP tool runs silently; a `write` tool shows the card ("Nothing has been created yet"); Approve executes and the answer continues; Reject explains that nothing was created.
+3. A `destructive` tool is refused with one understandable sentence; the audit log records it. No Approve button.
+4. J-TL-2 walked: close the tab after the card appears; Automations badge shows 1; Approvals → Pending has the preview; approving there produces the follow-up message in the chat. Empty inbox copy from the wireframe.
 5. "Always allow for this assistant" skips the card next time for that user and tool; it has no effect on a `block`.
 6. An instant email arrives for the first pending item; further items within the hour arrive as one digest.
 

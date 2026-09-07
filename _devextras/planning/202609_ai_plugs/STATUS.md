@@ -23,6 +23,7 @@ before the first sprint starts.**
 | 2026-09-03 | All 15 checklist rows accepted: three ports, refactor-first, Docling sidecar, Brave default + SearXNG first, catalog-managed rerank with eval gate, model import UI, one admin page renamed **AI infrastructure**. |
 | 2026-09-03 | Open questions resolved: Perplexity = search adapter (answer capability) **and** optional chat provider; extraction chain instance-only; `TIKA_*` env bootstrap-only; `LlmReranker` included, off; capability probe opt-in. |
 | 2026-09-03 | S5 registers the `model_preferences` bundle section with the track-2 registry (roadmap §8.1). |
+| 2026-09-07 | **UX contract.** J-PL-1…3: each admin tab leads with a sentence, health, and Test that shows a human result. A down sidecar never fails an upload. |
 
 ## Review log
 
@@ -32,3 +33,6 @@ codebase state (see roadmap §5).
 **2026-09-03 (second pass):** all §0 rows ticked via the product-owner
 questionnaire; open questions converted into the master plan's decisions table;
 sprint files written. Next: technical plan review (roadmap §7 step 3).
+
+**2026-09-07 (UX contract):** Operate is still a user-flow. See
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.3.

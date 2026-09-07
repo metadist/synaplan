@@ -10,6 +10,13 @@ manifest v2. An admin publishes a system-like assistant to **one** group only; n
 **Repos:** `synaplan/` only; plugin repos consume the manifest field later.
 **Flag:** `IAM.SHARING_ENABLED` (no new flag). New kinds register in the registry but are unreachable when sharing is off.
 
+**Shipped — UX lesson (2026-09-07):** kinds reuse `ShareDialog` and a
+"Shared with me" chip. That is not enough findability — see Incoming
+chats (#1717) and **IAM-UX** in
+[`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §4.1 / §7
+before track 2 publish or track 4 tool/template share treat this as
+the finished UI.
+
 ---
 
 ## 0. Why this sprint exists

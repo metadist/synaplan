@@ -15,6 +15,11 @@ master plan decisions 2, 3, 4, 6, 8, 10, 13 and §11 rows 1, 2, 7.
 default off in code and seeder). Every `/api/v1/platform-links/*` and
 `/api/v1/me/platform-links*` route 404s when off. The `client=outlook` path of
 `PlatformConnectView` is **not** flag-gated: it is today's shipped behaviour.
+**User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
+J-NC-1 (confirm card) and J-NC-3 (disconnect either side). Wireframe:
+[`../202609_ux_user_flows/connect-platform.md`](../202609_ux_user_flows/connect-platform.md).
+`NC4` / `NC5` walk those journeys; empty Linked platforms explains
+to start in Nextcloud. Outlook still follows `docs/AUTH_FLOW.md`.
 
 ## 0. Why this sprint exists
 
@@ -154,7 +159,7 @@ Synamail `docs/AUTH_FLOW.md` steps as acceptance tests (`PlatformConnectView.spe
 ## 4. Exit criteria / demo
 
 1. Flag off: `fake-instance.sh` gets 404 on every `platform-links` route; the Outlook flow passes steps 1–8 on the local bridge.
-2. Flag on: `fake-instance.sh` completes end to end; the key is restricted; the link appears under Connections → Linked platforms and as a badge in API keys; Disconnect revokes it; an anonymous registration exchanges only after Approve in Operate → People.
+2. J-NC-1 / J-NC-3 walked: `fake-instance.sh` completes end to end; the confirm card names host, uid and scopes; the link appears under Connections → Linked platforms and as a badge in API keys; Disconnect (confirm) revokes it and the empty state explains to start in Nextcloud; an anonymous registration exchanges only after Approve in Operate → People.
 3. OpenAPI → Zod regenerated; five locales; C1–C8 named in every PR description.
 
 ## 5. Step table
