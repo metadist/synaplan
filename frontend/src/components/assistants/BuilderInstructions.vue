@@ -5,7 +5,7 @@
     <textarea
       v-model="text"
       rows="10"
-      class="w-full"
+      class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
       :placeholder="$t('assistants.instructionsPlaceholder')"
       data-testid="input-assistant-instructions"
       @change="save"

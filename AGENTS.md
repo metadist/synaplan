@@ -222,7 +222,7 @@ Every text field, textarea and select must carry the full house chain:
 ```
 
 - Full-width form field: the chain above (drop `mt-1` when the field is not under a label, use `flex-1 min-w-0` instead of `w-full` inside a row).
-- `px-4 py-2` + no `text-sm` is the larger variant used on standalone forms — match the nearby fields, don't invent a size.
+- `px-4 py-2` without `text-sm` is the larger variant used on standalone forms — match the nearby fields, don't invent a size.
 - Add `disabled:opacity-50 disabled:cursor-not-allowed` whenever the control binds `:disabled`.
 - **Do not rely on `style-v2.css` §17b.** It force-feeds a border and background to bare fields in the V2 design only — it supplies no padding or radius, and V1 gets nothing at all. A field that "looks fine" in the default V2 design can be invisible in V1.
 - Only use a token that actually exists. `var(--danger)` is **not defined** — inline error text is `text-sm text-red-600 dark:text-red-400`.

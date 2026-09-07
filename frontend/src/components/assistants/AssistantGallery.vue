@@ -15,7 +15,7 @@
       <input
         v-model="search"
         type="search"
-        class="ml-auto min-w-[12rem] flex-1 max-w-xs"
+        class="ml-auto min-w-[12rem] flex-1 max-w-xs px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.searchPlaceholder')"
         data-testid="input-gallery-search"
       />
