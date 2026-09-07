@@ -7,7 +7,7 @@ description: AI-powered knowledge management system with RAG, chat widgets, and 
 
 Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, embeddable chat widgets, WhatsApp/Email integration, multiple AI providers (Ollama, OpenAI, Anthropic, Groq, Gemini, xAI).
 
-**Stack:** PHP 8.3/Symfony 7, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
+**Stack:** PHP 8.4/Symfony 8.1, Vue 3/TypeScript/Vite, Docker Compose, frankenphp/caddy.
 
 ## Repository Architecture
 
