@@ -254,6 +254,80 @@ final class PlatformLinkControllerTest extends WebTestCase
     }
 
     /**
+     * The same external id linked again by a different Synaplan account moves
+     * the link: the row is re-owned, so the previous owner can no longer see
+     * or disconnect it (which would revoke the new owner's key).
+     */
+    public function testRelinkingAnExternalIdMovesTheLinkToTheNewOwner(): void
+    {
+        $this->enableFlag();
+        $admin = $this->createUser('pl-move-admin@synaplan.internal', 'ADMIN');
+        $first = $this->createUser('pl-move-first@synaplan.internal');
+        $second = $this->createUser('pl-move-second@synaplan.internal');
+
+        $this->authenticateClient($this->client, $admin);
+        $this->postJson('/api/v1/platform-links/instances', $this->registerBody('move.example'));
+        $instance = $this->json();
+
+        $firstLink = $this->link($instance, $first, 'shared-uid', 'nonce-move-1');
+        $secondLink = $this->link($instance, $second, 'shared-uid', 'nonce-move-2');
+
+        // The first owner's key is gone and the link is no longer listed for them.
+        self::assertNull($this->em->getRepository(ApiKey::class)->find($firstLink['api_key']['id']));
+        $this->authenticateClient($this->client, $first);
+        $this->client->request('GET', '/api/v1/me/platform-links');
+        $lostLinks = $this->json()['links'];
+        self::assertSame([], $lostLinks);
+
+        // The new owner sees exactly one link, with the still-valid key.
+        $this->authenticateClient($this->client, $second);
+        $this->client->request('GET', '/api/v1/me/platform-links');
+        $links = $this->json()['links'];
+        self::assertIsArray($links);
+        self::assertCount(1, $links);
+        self::assertSame((int) $second->getId(), $secondLink['user']['id']);
+
+        // The previous owner cannot disconnect the link they lost.
+        $this->authenticateClient($this->client, $first);
+        $this->client->request('DELETE', '/api/v1/me/platform-links/'.$links[0]['id']);
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secondLink['api_key']['key']]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * Issues a link code as $user and exchanges it as the instance.
+     *
+     * @param array{instance_id: string, instance_secret: string} $instance
+     *
+     * @return array<string, mixed> the exchange response
+     */
+    private function link(array $instance, User $user, string $externalId, string $state): array
+    {
+        $this->authenticateClient($this->client, $user);
+        $this->postJson('/api/v1/platform-links/codes', [
+            'instance_id' => $instance['instance_id'],
+            'external_id' => $externalId,
+            'redirect_uri' => 'https://move.example/apps/synaplan_integration/link/callback',
+            'state' => $state,
+        ]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        $code = $this->codeFromRedirect($this->json()['redirect']);
+
+        $this->client->getCookieJar()->clear();
+        $this->postJson('/api/v1/platform-links/exchange', [
+            'instance_id' => $instance['instance_id'],
+            'instance_secret' => $instance['instance_secret'],
+            'code' => $code,
+        ]);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+
+        return $this->json();
+    }
+
+    /**
      * @return array{client: string, host: string, redirect_uris: list<string>}
      */
     private function registerBody(string $host): array

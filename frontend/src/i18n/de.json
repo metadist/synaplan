@@ -5586,6 +5586,7 @@
         "policy_lock": "Einstellung gesperrt",
         "platform_link_linked": "Plattform verknüpft",
         "platform_link_disconnected": "Plattform getrennt",
+        "platform_link_reassigned": "Plattform-Verknüpfung zu anderem Konto verschoben",
         "platform_link_exchange_failed": "Plattformverknüpfung fehlgeschlagen",
         "platform_link_redirect_rejected": "Plattform-Weiterleitung abgelehnt",
         "platform_instance_registered": "Plattform registriert",

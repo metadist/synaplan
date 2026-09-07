@@ -4666,6 +4666,7 @@
         "policy_lock": "Ajuste bloqueado",
         "platform_link_linked": "Plataforma vinculada",
         "platform_link_disconnected": "Plataforma desconectada",
+        "platform_link_reassigned": "Vínculo de plataforma movido a otra cuenta",
         "platform_link_exchange_failed": "Error al vincular la plataforma",
         "platform_link_redirect_rejected": "Redirección de plataforma rechazada",
         "platform_instance_registered": "Plataforma registrada",

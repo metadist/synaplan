@@ -4667,6 +4667,7 @@
         "policy_lock": "Ayar kilitlendi",
         "platform_link_linked": "Platform bağlandı",
         "platform_link_disconnected": "Platform bağlantısı kesildi",
+        "platform_link_reassigned": "Platform bağlantısı başka bir hesaba taşındı",
         "platform_link_exchange_failed": "Platform bağlantısı başarısız",
         "platform_link_redirect_rejected": "Platform yönlendirmesi reddedildi",
         "platform_instance_registered": "Platform kaydedildi",

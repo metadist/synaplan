@@ -77,6 +77,7 @@ final readonly class PlatformLinkExchangeService
             $instance->getInstanceId(),
             $payload['externalId'],
         );
+        $previousOwnerId = $existing instanceof ExternalIdentity ? $existing->getUserId() : null;
         if ($existing instanceof ExternalIdentity && null !== $existing->getApiKeyId()) {
             $previous = $this->apiKeyRepository->find($existing->getApiKeyId());
             if ($previous instanceof ApiKey) {
@@ -118,6 +119,28 @@ final readonly class PlatformLinkExchangeService
             ],
             $ip,
         );
+
+        // The external id moved to another Synaplan account: the previous
+        // owner's key was revoked above and the link is no longer theirs.
+        // Audited under both accounts so it shows up in either audit filter.
+        if (null !== $previousOwnerId && $previousOwnerId !== (int) $user->getId()) {
+            foreach ([$previousOwnerId, (int) $user->getId()] as $actorId) {
+                $this->auditLogWriter->record(
+                    $actorId,
+                    'platform_link.reassigned',
+                    'platform_link',
+                    (string) $identity->getId(),
+                    [
+                        'client' => $instance->getClient(),
+                        'host' => $instance->getHost(),
+                        'external_id' => $payload['externalId'],
+                        'previous_user_id' => $previousOwnerId,
+                        'new_user_id' => (int) $user->getId(),
+                    ],
+                    $ip,
+                );
+            }
+        }
 
         if ($this->userRepository->count([]) !== $userCountBefore
             || $user->getMail() !== $mailBefore

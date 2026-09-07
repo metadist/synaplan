@@ -5652,6 +5652,7 @@
         "policy_lock": "Réglage verrouillé",
         "platform_link_linked": "Plateforme liée",
         "platform_link_disconnected": "Plateforme déconnectée",
+        "platform_link_reassigned": "Lien de plateforme déplacé vers un autre compte",
         "platform_link_exchange_failed": "Échec de la liaison",
         "platform_link_redirect_rejected": "Redirection de plateforme refusée",
         "platform_instance_registered": "Plateforme enregistrée",

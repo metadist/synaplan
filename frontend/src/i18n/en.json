@@ -5652,6 +5652,7 @@
         "policy_lock": "Locked a setting",
         "platform_link_linked": "Platform linked",
         "platform_link_disconnected": "Platform disconnected",
+        "platform_link_reassigned": "Platform link moved to another account",
         "platform_link_exchange_failed": "Platform link failed",
         "platform_link_redirect_rejected": "Platform redirect rejected",
         "platform_instance_registered": "Platform registered",
