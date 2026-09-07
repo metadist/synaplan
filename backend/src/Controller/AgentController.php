@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\AgentDefinitionV1;
 use App\Entity\User;
 use App\Repository\AgentVersionRepository;
 use App\Repository\UseLogRepository;
@@ -18,6 +19,7 @@ use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotDraftException;
 use App\Service\Agent\Exception\AgentNothingChangedException;
 use App\Service\Iam\Permission;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -105,21 +107,7 @@ final class AgentController extends AbstractController
                     new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Reviews NDAs against our checklist'),
                     new OA\Property(property: 'icon', type: 'string', example: ''),
                     new OA\Property(property: 'promptId', type: 'integer', nullable: true, example: 12),
-                    new OA\Property(
-                        property: 'draft',
-                        type: 'object',
-                        description: 'Full agent.v1 document. Unknown keys are rejected.',
-                        properties: [
-                            new OA\Property(property: 'schema', type: 'string', example: 'agent.v1'),
-                            new OA\Property(property: 'models', type: 'object', example: ['chat' => 'anthropic:claude-sonnet-4:chat', 'vision' => null, 'vectorize' => null]),
-                            new OA\Property(property: 'knowledge', type: 'object'),
-                            new OA\Property(property: 'tools', type: 'object'),
-                            new OA\Property(property: 'skills', type: 'object'),
-                            new OA\Property(property: 'parameters', type: 'object'),
-                            new OA\Property(property: 'behaviour', type: 'object'),
-                            new OA\Property(property: 'triggers', type: 'object'),
-                        ]
-                    ),
+                    new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class), description: 'Full or partial agent.v1 document; unknown keys are rejected, missing sections take defaults.'),
                 ]
             )
         ),
@@ -142,7 +130,7 @@ final class AgentController extends AbstractController
                             new OA\Property(property: 'source', type: 'string', example: 'manual'),
                             new OA\Property(property: 'routable', type: 'boolean', example: false),
                             new OA\Property(property: 'publishedVersionId', type: 'integer', nullable: true),
-                            new OA\Property(property: 'draft', type: 'object'),
+                            new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class)),
                             new OA\Property(property: 'createdAt', type: 'integer'),
                             new OA\Property(property: 'updatedAt', type: 'integer'),
                         ]),
@@ -273,7 +261,7 @@ final class AgentController extends AbstractController
                         new OA\Property(property: 'source', type: 'string', example: 'manual'),
                         new OA\Property(property: 'routable', type: 'boolean', example: false),
                         new OA\Property(property: 'publishedVersionId', type: 'integer', nullable: true),
-                        new OA\Property(property: 'draft', type: 'object'),
+                        new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class)),
                         new OA\Property(property: 'createdAt', type: 'integer'),
                         new OA\Property(property: 'updatedAt', type: 'integer'),
                     ]),
@@ -326,7 +314,7 @@ final class AgentController extends AbstractController
                         new OA\Property(property: 'source', type: 'string', example: 'manual'),
                         new OA\Property(property: 'routable', type: 'boolean', example: false),
                         new OA\Property(property: 'publishedVersionId', type: 'integer', nullable: true),
-                        new OA\Property(property: 'draft', type: 'object'),
+                        new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class)),
                         new OA\Property(property: 'createdAt', type: 'integer'),
                         new OA\Property(property: 'updatedAt', type: 'integer'),
                     ]),
@@ -370,7 +358,7 @@ final class AgentController extends AbstractController
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'description', type: 'string', nullable: true),
                 new OA\Property(property: 'icon', type: 'string'),
-                new OA\Property(property: 'draft', type: 'object'),
+                new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class)),
                 new OA\Property(property: 'routable', type: 'boolean'),
                 new OA\Property(property: 'status', type: 'string', enum: ['archived', 'published']),
             ])
@@ -393,7 +381,7 @@ final class AgentController extends AbstractController
                         new OA\Property(property: 'source', type: 'string', example: 'manual'),
                         new OA\Property(property: 'routable', type: 'boolean', example: false),
                         new OA\Property(property: 'publishedVersionId', type: 'integer', nullable: true),
-                        new OA\Property(property: 'draft', type: 'object'),
+                        new OA\Property(property: 'draft', ref: new Model(type: AgentDefinitionV1::class)),
                         new OA\Property(property: 'createdAt', type: 'integer'),
                         new OA\Property(property: 'updatedAt', type: 'integer'),
                     ]),
@@ -600,7 +588,7 @@ final class AgentController extends AbstractController
                         new OA\Property(property: 'changelog', type: 'string', nullable: true),
                         new OA\Property(property: 'publishedByName', type: 'string'),
                         new OA\Property(property: 'createdAt', type: 'integer'),
-                        new OA\Property(property: 'definition', type: 'object'),
+                        new OA\Property(property: 'definition', ref: new Model(type: AgentDefinitionV1::class)),
                         new OA\Property(property: 'promptText', type: 'string'),
                     ]),
                 ])

@@ -9,9 +9,11 @@ use App\Service\RAG\RagScopeResolver;
 /**
  * The resolved chat runtime: prompt, models, RAG scopes, tools, skills.
  *
- * Always present on the chat path. The default profile is "the user's
- * defaults"; a pinned assistant is the same object with those fields
- * filled from `agent.v1`. ChatHandler has no `if ($agent)` branch.
+ * Resolved once by {@see \App\Service\Agent\AgentPinResolver} when a turn
+ * is pinned to an assistant and handed down as `runtime_profile`. Consumers
+ * read RAG scope, limit and score from this object; nothing is copied into
+ * scalar classification/option keys. Unpinned turns carry no profile and
+ * follow the classifier path unchanged.
  */
 final readonly class RuntimeProfile
 {
@@ -49,7 +51,7 @@ final readonly class RuntimeProfile
      *
      * A scope owned by someone other than the viewer (a shared assistant's
      * knowledge) is emitted in the `shared:{ownerId}:{folder}` form, which
-     * {@see \App\Service\RAG\RagScopeResolver} checks against the viewer's
+     * {@see RagScopeResolver} checks against the viewer's
      * grants before searching the owner's files.
      */
     public function primaryRagGroupKey(): ?string

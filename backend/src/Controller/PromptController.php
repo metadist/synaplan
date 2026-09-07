@@ -158,14 +158,7 @@ class PromptController extends AbstractController
         // Get all user-specific prompts (no language filter).
         // User overrides must always be visible regardless of the current UI language,
         // otherwise switching languages hides the override and causes 409 on re-creation.
-        $userPrompts = $this->promptRepository->createQueryBuilder('p')
-            ->where('p.ownerId = :userId')
-            ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('userId', $user->getId())
-            ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.topic', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $userPrompts = $this->promptRepository->findOwnedForListing((int) $user->getId());
 
         // Build result: user prompts override system prompts
         $promptsMap = [];

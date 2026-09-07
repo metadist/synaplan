@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import AssistantTestPanel from '@/components/assistants/AssistantTestPanel.vue'
+import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
@@ -14,18 +15,21 @@ vi.mock('@/services/api/chatApi', () => ({
   },
 }))
 
-vi.mock('@/services/api/agentsApi', () => ({
-  agentsApi: {
-    gallery: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    clone: vi.fn(),
-    remove: vi.fn(),
-    list: vi.fn(),
-  },
-  agentFieldPath: () => null,
-}))
+vi.mock('@/services/api/agentsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()
+  return {
+    ...actual,
+    agentsApi: {
+      gallery: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      clone: vi.fn(),
+      remove: vi.fn(),
+      list: vi.fn(),
+    },
+  }
+})
 
 function mountPanel() {
   setActivePinia(createPinia())
@@ -42,7 +46,7 @@ function mountPanel() {
     source: 'manual',
     routable: false,
     publishedVersionId: null,
-    draft: { schema: 'agent.v1', models: { chat: null } },
+    draft: emptyAgentDraft(),
     createdAt: 1,
     updatedAt: 1,
   }

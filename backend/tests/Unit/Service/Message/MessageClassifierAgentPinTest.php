@@ -6,12 +6,9 @@ namespace App\Tests\Unit\Service\Message;
 
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\Message;
-use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
-use App\Repository\UserRepository;
-use App\Service\Agent\AgentConfig;
-use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentPinResolver;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessageSorter;
@@ -28,17 +25,13 @@ use Psr\Log\LoggerInterface;
 final class MessageClassifierAgentPinTest extends TestCase
 {
     private MessageSorter&MockObject $sorter;
-    private AgentRuntimeResolver&MockObject $resolver;
-    private AgentConfig&MockObject $agentConfig;
-    private UserRepository&MockObject $users;
+    private AgentPinResolver&MockObject $agentPin;
     private MessageClassifier $classifier;
 
     protected function setUp(): void
     {
         $this->sorter = $this->createMock(MessageSorter::class);
-        $this->resolver = $this->createMock(AgentRuntimeResolver::class);
-        $this->agentConfig = $this->createMock(AgentConfig::class);
-        $this->users = $this->createMock(UserRepository::class);
+        $this->agentPin = $this->createMock(AgentPinResolver::class);
 
         $configRepo = $this->createMock(ConfigRepository::class);
         $configRepo->method('getValue')->willReturn('0');
@@ -55,19 +48,12 @@ final class MessageClassifierAgentPinTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),
             new ToolCallingCapability(),
-            agentConfig: $this->agentConfig,
-            agentRuntimeResolver: $this->resolver,
-            userRepository: $this->users,
+            $this->agentPin,
         );
     }
 
-    public function testAgentIdSkipsTheSorter(): void
+    public function testAPinnedTurnSkipsTheSorterAndCarriesOnlyTheProfile(): void
     {
-        $user = $this->createMock(User::class);
-        $user->method('getId')->willReturn(4);
-        $this->users->expects(self::once())->method('find')->with(4)->willReturn($user);
-        $this->agentConfig->expects(self::once())->method('isEnabled')->with(4)->willReturn(true);
-
         $profile = new RuntimeProfile(
             promptId: 20,
             promptTopic: 'agent:contract-review',
@@ -84,10 +70,12 @@ final class MessageClassifierAgentPinTest extends TestCase
             ragLimit: 8,
             ragMinScore: 0.6,
         );
-        $this->resolver->expects(self::once())->method('resolve')->with(7, $user, false, null)->willReturn($profile);
+        $message = $this->message(4, 'Please review this NDA');
+        $this->agentPin->expects(self::once())->method('resolve')
+            ->with($message, ['agentId' => 7])
+            ->willReturn($profile);
         $this->sorter->expects(self::never())->method('classify');
 
-        $message = $this->message(4, 'Please review this NDA');
         $result = $this->classifier->classify($message, [], null, true, ['agentId' => 7]);
 
         self::assertTrue($result['skip_sorting']);
@@ -96,25 +84,31 @@ final class MessageClassifierAgentPinTest extends TestCase
         self::assertSame(20, $result['prompt_id']);
         self::assertSame(7, $result['agent_id']);
         self::assertNull($result['agent_version_id']);
-        self::assertSame('TASKPROMPT:agent:contract-review', $result['rag_group_key']);
-        self::assertArrayNotHasKey('sorting_usage', $result);
+        self::assertSame(11, $result['model_id']);
         self::assertSame($profile, $result['runtime_profile']);
+        self::assertArrayNotHasKey('sorting_usage', $result);
+
+        // The profile is the one seam: RAG scope is never copied into scalars.
+        self::assertArrayNotHasKey('rag_group_key', $result);
+        self::assertArrayNotHasKey('rag_limit', $result);
+        self::assertArrayNotHasKey('rag_min_score', $result);
     }
 
-    public function testSorterIsCalledWithoutAgentId(): void
+    public function testSorterIsCalledWhenNothingIsPinned(): void
     {
+        $this->agentPin->method('resolve')->willReturn(null);
         $this->sorter->expects(self::once())->method('classify')->willReturn([
             'topic' => 'general',
             'language' => 'en',
             'intent' => 'chat',
             'source' => 'ai_sorting',
         ]);
-        $this->resolver->expects(self::never())->method('resolve');
 
         $result = $this->classifier->classify($this->message(4, 'hello there'), []);
 
         self::assertSame('general', $result['topic']);
         self::assertSame('ai_sorting', $result['source']);
+        self::assertArrayNotHasKey('runtime_profile', $result);
     }
 
     private function message(int $userId, string $text): Message

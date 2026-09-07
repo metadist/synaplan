@@ -3,21 +3,25 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
+import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 import en from '@/i18n/en.json'
 
-vi.mock('@/services/api/agentsApi', () => ({
-  agentsApi: {
-    gallery: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-    clone: vi.fn(),
-    remove: vi.fn(),
-    list: vi.fn(),
-  },
-  agentFieldPath: () => null,
-}))
+vi.mock('@/services/api/agentsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()
+  return {
+    ...actual,
+    agentsApi: {
+      gallery: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      clone: vi.fn(),
+      remove: vi.fn(),
+      list: vi.fn(),
+    },
+  }
+})
 
 vi.mock('@/services/api/promptsApi', () => ({
   promptsApi: {
@@ -58,7 +62,7 @@ function mountBuilder() {
     source: 'manual',
     routable: false,
     publishedVersionId: null,
-    draft: { schema: 'agent.v1', models: { chat: null } },
+    draft: emptyAgentDraft(),
     createdAt: 1,
     updatedAt: 1,
   }

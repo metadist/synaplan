@@ -78,6 +78,10 @@ final readonly class SavedTaskKind implements ShareableResourceKindInterface
         return [Permission::Read, Permission::Use];
     }
 
+    public function assertShareable(string $resourceId): void
+    {
+    }
+
     private function findTask(string $resourceId): ?SavedTask
     {
         if ('' === $resourceId || !ctype_digit($resourceId)) {

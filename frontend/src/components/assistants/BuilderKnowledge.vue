@@ -55,8 +55,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { promptsApi, type PromptFile } from '@/services/api/promptsApi'
+import { emptyAgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import { asRecord } from './draftHelpers'
 
 const store = useAgentsStore()
 const files = ref<PromptFile[]>([])
@@ -66,9 +66,8 @@ const topic = computed(() => {
   return slug ? `agent:${slug}` : ''
 })
 
-const knowledge = computed(() => asRecord(asRecord(store.current?.draft).knowledge))
-const ragLimit = computed(() => Number(knowledge.value.ragLimit ?? 8))
-const ragMinScore = computed(() => Number(knowledge.value.ragMinScore ?? 0.6))
+const ragLimit = computed(() => store.current?.draft?.knowledge.ragLimit ?? 8)
+const ragMinScore = computed(() => store.current?.draft?.knowledge.ragMinScore ?? 0.6)
 
 async function loadFiles(): Promise<void> {
   if (!topic.value) {
@@ -93,10 +92,10 @@ function patchKnowledge(key: 'ragLimit' | 'ragMinScore', value: number): void {
   if (!store.current) {
     return
   }
-  const draft = asRecord(store.current.draft)
+  const draft = store.current.draft ?? emptyAgentDraft()
   store.current.draft = {
     ...draft,
-    knowledge: { ...asRecord(draft.knowledge), ownFolder: true, [key]: value },
+    knowledge: { ...draft.knowledge, ownFolder: true, [key]: value },
   }
   store.markDirty()
 }

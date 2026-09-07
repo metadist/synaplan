@@ -140,19 +140,19 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
-     * Overlay a RuntimeProfile onto classification/options when present.
-     * Absent profile ⇒ byte-identical to the previous keys.
+     * Pick up the RuntimeProfile the classifier resolved (if any) and let it
+     * own the prompt identity. Absent profile ⇒ byte-identical classification.
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options
      *
-     * @return array{0: array<string, mixed>, 1: array<string, mixed>, 2: RuntimeProfile|null}
+     * @return array{0: array<string, mixed>, 1: RuntimeProfile|null}
      */
     private function applyRuntimeProfile(array $classification, array $options): array
     {
         $profile = $options['runtime_profile'] ?? $classification['runtime_profile'] ?? null;
         if (!$profile instanceof RuntimeProfile) {
-            return [$classification, $options, null];
+            return [$classification, null];
         }
 
         if ('' !== $profile->promptTopic) {
@@ -161,20 +161,36 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (null !== $profile->promptId) {
             $classification['prompt_id'] = $profile->promptId;
         }
-        if (null === ($options['rag_group_key'] ?? null) && null !== $profile->primaryRagGroupKey()) {
-            $options['rag_group_key'] = $profile->primaryRagGroupKey();
-        }
-        if (null === ($classification['rag_group_key'] ?? null) && null !== $profile->primaryRagGroupKey()) {
-            $classification['rag_group_key'] = $profile->primaryRagGroupKey();
-        }
-        if (!isset($options['rag_limit']) && null !== $profile->ragLimit) {
-            $options['rag_limit'] = $profile->ragLimit;
-        }
-        if (!isset($options['rag_min_score']) && null !== $profile->ragMinScore) {
-            $options['rag_min_score'] = $profile->ragMinScore;
+
+        return [$classification, $profile];
+    }
+
+    /**
+     * RAG scope for this turn: an explicit caller scope (widget / API
+     * `rag_group_key`) wins, then the RuntimeProfile, then the defaults.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: string|null, 1: int, 2: float} group key, limit, min score
+     */
+    private function ragSettings(?RuntimeProfile $profile, array $classification, array $options): array
+    {
+        $groupKey = $options['rag_group_key'] ?? $classification['rag_group_key'] ?? null;
+        $limit = $options['rag_limit'] ?? $classification['rag_limit'] ?? null;
+        $minScore = $options['rag_min_score'] ?? $classification['rag_min_score'] ?? null;
+
+        if ($profile instanceof RuntimeProfile) {
+            $groupKey ??= $profile->primaryRagGroupKey();
+            $limit ??= $profile->ragLimit;
+            $minScore ??= $profile->ragMinScore;
         }
 
-        return [$classification, $options, $profile];
+        return [
+            is_string($groupKey) && '' !== $groupKey ? $groupKey : null,
+            null !== $limit ? max(1, min(50, (int) $limit)) : 20,
+            null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2,
+        ];
     }
 
     /**
@@ -406,7 +422,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // forcing every non-streaming caller to construct one.
         $perfTimer = new PerfTimer();
 
-        [$classification, $options, $profile] = $this->applyRuntimeProfile($classification, $options);
+        [$classification, $profile] = $this->applyRuntimeProfile($classification, $options);
 
         $topic = $classification['topic'] ?? 'general';
         $language = $classification['language'] ?? 'en';
@@ -419,9 +435,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             unset($classification['search_results']);
         }
 
-        $ragGroupKey = $classification['rag_group_key'] ?? null;
-        $ragLimit = isset($classification['rag_limit']) ? max(1, min(50, (int) $classification['rag_limit'])) : 20;
-        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.2;
+        [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
 
         // Issue #615: the non-streaming path (email / generic webhook)
@@ -972,7 +986,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $perfTimer = new PerfTimer();
         }
 
-        [$classification, $options, $profile] = $this->applyRuntimeProfile($classification, $options);
+        [$classification, $profile] = $this->applyRuntimeProfile($classification, $options);
 
         // Load prompt WITH metadata based on topic from classification.
         // Phase 1b: reuse the bundle that MessageProcessor already resolved when present.
@@ -1008,9 +1022,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $ragContext = '';
         $ragResultsCount = 0;
 
-        $ragGroupKey = $options['rag_group_key'] ?? ($classification['rag_group_key'] ?? null);
-        $ragLimit = isset($options['rag_limit']) ? max(1, min(50, (int) $options['rag_limit'])) : 20;
-        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.2;
+        [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
 
         if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";

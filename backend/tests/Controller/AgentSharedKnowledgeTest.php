@@ -159,6 +159,55 @@ final class AgentSharedKnowledgeTest extends WebTestCase
     }
 
     /**
+     * S3.5 kind split: the instruction row an assistant owns is reachable
+     * only through the `agent` kind — it is neither listed as an instruction
+     * nor shareable as one.
+     */
+    public function testAssistantInstructionRowIsNotAStandaloneInstruction(): void
+    {
+        $owner = $this->createUser('agent-kind-owner@synaplan.internal');
+        $ownerId = (int) $owner->getId();
+        $recipient = $this->createUser('agent-kind-recipient@synaplan.internal');
+        $this->authenticateClient($this->client, $owner);
+
+        $this->postJson('/api/v1/agents', ['name' => 'Kind split '.uniqid()]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $agent = $this->json()['agent'];
+        $agentId = (int) $agent['id'];
+        $promptId = (int) $agent['promptId'];
+        $topic = 'agent:'.$agent['slug'];
+
+        $this->client->request('GET', '/api/v1/prompts');
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $listed = array_column($this->json()['prompts'] ?? [], 'topic');
+        self::assertNotContains($topic, $listed, 'an assistant\'s instruction is not an instruction of its own');
+
+        $prompts = static::getContainer()->get(PromptRepository::class);
+        self::assertNotContains($topic, array_map(static fn ($p) => $p->getTopic(), $prompts->findAllForUser($ownerId)));
+
+        $this->postJson('/api/v1/agents/'.$agentId.'/publish', ['changelog' => 'v1']);
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'assistant',
+            'resource' => (string) $promptId,
+            'subjectType' => 'user',
+            'subjectId' => (int) $recipient->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+
+        $this->postJson('/api/v1/shares', [
+            'kind' => 'agent',
+            'resource' => (string) $agentId,
+            'subjectType' => 'user',
+            'subjectId' => (int) $recipient->getId(),
+            'permission' => 'use',
+        ]);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     private function postJson(string $uri, array $payload): void

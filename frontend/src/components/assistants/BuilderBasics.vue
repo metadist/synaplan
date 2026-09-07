@@ -63,31 +63,28 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { emptyAgentDraft, type AgentDraft } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
-import { asRecord, asStringList } from './draftHelpers'
 
 const store = useAgentsStore()
 
 const name = computed(() => store.current?.name ?? '')
 const description = computed(() => store.current?.description ?? '')
-const behaviour = computed(() => asRecord(asRecord(store.current?.draft).behaviour))
-const greeting = computed(() =>
-  typeof behaviour.value.greeting === 'string' ? behaviour.value.greeting : ''
-)
-const starterPrompts = computed(() => asStringList(behaviour.value.starterPrompts))
+const greeting = computed(() => store.current?.draft?.behaviour.greeting ?? '')
+const starterPrompts = computed(() => store.current?.draft?.behaviour.starterPrompts ?? [])
 
 function errorFor(path: string): string | undefined {
   return store.fieldErrors[path]
 }
 
-function mutateDraft(patchBehaviour: Record<string, unknown>): void {
+function mutateDraft(patchBehaviour: Partial<AgentDraft['behaviour']>): void {
   if (!store.current) {
     return
   }
-  const draft = asRecord(store.current.draft)
+  const draft = store.current.draft ?? emptyAgentDraft()
   store.current.draft = {
     ...draft,
-    behaviour: { ...asRecord(draft.behaviour), memory: 'user', ...patchBehaviour },
+    behaviour: { ...draft.behaviour, ...patchBehaviour },
   }
   store.markDirty()
 }

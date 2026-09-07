@@ -91,7 +91,7 @@ export const useAgentsStore = defineStore('agents', () => {
         name: agent.name,
         description: agent.description ?? null,
         icon: agent.icon,
-        draft: (agent.draft ?? {}) as Record<string, unknown>,
+        draft: agent.draft,
       })
       const local = current.value
       if (local && local.id === saved.id && dirty.value) {

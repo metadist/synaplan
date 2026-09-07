@@ -23,8 +23,8 @@ import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAgentsStore } from '@/stores/agents'
+import { emptyAgentDraft } from '@/services/api/agentsApi'
 import type { AIModel, Capability } from '@/types/ai-models'
-import { asRecord } from './draftHelpers'
 
 const { t } = useI18n()
 const store = useAgentsStore()
@@ -55,8 +55,7 @@ const slots = computed(() =>
 )
 
 function modelKey(slot: 'chat' | 'vision' | 'vectorize'): string | null {
-  const models = asRecord(asRecord(store.current?.draft).models)
-  const value = models[slot]
+  const value = store.current?.draft?.models[slot]
   return typeof value === 'string' && value !== '' ? value : null
 }
 
@@ -64,10 +63,11 @@ function patch(slot: 'chat' | 'vision' | 'vectorize', value: string): void {
   if (!store.current) {
     return
   }
-  const draft = asRecord(store.current.draft)
-  const models = { ...asRecord(draft.models) }
-  models[slot] = value === '' ? null : value
-  store.current.draft = { ...draft, models }
+  const draft = store.current.draft ?? emptyAgentDraft()
+  store.current.draft = {
+    ...draft,
+    models: { ...draft.models, [slot]: value === '' ? null : value },
+  }
   store.markDirty()
 }
 

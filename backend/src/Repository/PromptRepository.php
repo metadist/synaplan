@@ -237,14 +237,7 @@ class PromptRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        $userPrompts = $this->createQueryBuilder('p')
-            ->where('p.ownerId = :userId')
-            ->andWhere('p.topic NOT LIKE :toolsPrefix')
-            ->setParameter('userId', $userId)
-            ->setParameter('toolsPrefix', 'tools:%')
-            ->orderBy('p.topic', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $userPrompts = $this->findOwnedForListing($userId);
 
         // Merge: user prompts override system prompts for the same topic
         $map = [];
@@ -261,6 +254,30 @@ class PromptRepository extends ServiceEntityRepository
         }
 
         return array_values($map);
+    }
+
+    /**
+     * A user's own instruction prompts as the UI, MCP and share pickers list
+     * them: without internal `tools:*` rows and without the `agent:*` rows an
+     * assistant owns (those are edited and shared through the assistant).
+     *
+     * @return list<Prompt>
+     */
+    public function findOwnedForListing(int $userId): array
+    {
+        /** @var list<Prompt> $rows */
+        $rows = $this->createQueryBuilder('p')
+            ->where('p.ownerId = :userId')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.topic NOT LIKE :agentPrefix')
+            ->setParameter('userId', $userId)
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('agentPrefix', Agent::TOPIC_PREFIX.'%')
+            ->orderBy('p.topic', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 
     /**

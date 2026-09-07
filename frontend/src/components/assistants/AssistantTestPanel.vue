@@ -42,7 +42,6 @@ import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi } from '@/services/api/chatApi'
 import { useAgentsStore } from '@/stores/agents'
-import { asRecord } from './draftHelpers'
 
 const store = useAgentsStore()
 const authStore = useAuthStore()
@@ -51,8 +50,8 @@ const sending = ref(false)
 const lines = ref<string[]>([])
 
 const usingDefaultChat = computed(() => {
-  const models = asRecord(asRecord(store.current?.draft).models)
-  return models.chat == null || models.chat === ''
+  const chat = store.current?.draft?.models.chat
+  return chat == null || chat === ''
 })
 
 function send(): void {

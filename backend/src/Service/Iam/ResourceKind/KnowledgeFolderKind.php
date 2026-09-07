@@ -75,6 +75,10 @@ final readonly class KnowledgeFolderKind implements ShareableResourceKindInterfa
         return [Permission::Read, Permission::Use, Permission::Edit, Permission::Manage];
     }
 
+    public function assertShareable(string $resourceId): void
+    {
+    }
+
     public static function resourceId(int $ownerId, string $groupKey): string
     {
         return $ownerId.':'.$groupKey;

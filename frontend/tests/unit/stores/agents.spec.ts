@@ -1,16 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-import type { Agent } from '@/services/api/agentsApi'
+import { emptyAgentDraft, type Agent } from '@/services/api/agentsApi'
 import { useAgentsStore } from '@/stores/agents'
 
 const updateMock = vi.fn()
-vi.mock('@/services/api/agentsApi', () => ({
-  agentsApi: {
-    update: (...args: unknown[]) => updateMock(...args),
-  },
-  agentFieldPath: () => null,
-}))
+vi.mock('@/services/api/agentsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/api/agentsApi')>()
+  return {
+    ...actual,
+    agentsApi: {
+      ...actual.agentsApi,
+      update: (...args: unknown[]) => updateMock(...args),
+    },
+  }
+})
 
 function agent(overrides: Partial<Agent> = {}): Agent {
   return {
@@ -25,7 +29,7 @@ function agent(overrides: Partial<Agent> = {}): Agent {
     source: 'manual',
     routable: false,
     publishedVersionId: null,
-    draft: { schema: 'agent.v1', behaviour: { starterPrompts: [] } },
+    draft: emptyAgentDraft(),
     createdAt: 1,
     updatedAt: 1,
     ...overrides,

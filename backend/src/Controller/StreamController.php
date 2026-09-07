@@ -131,11 +131,11 @@ class StreamController extends AbstractController
         private ChatRunService $chatRunService,
         private ChatErrorPresenter $chatErrorPresenter,
         private ChatErrorNotifier $chatErrorNotifier,
+        private AgentConfig $agentConfig,
+        private AgentService $agentService,
+        private AgentRuntimeResolver $agentRuntimeResolver,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
-        private ?AgentConfig $agentConfig = null,
-        private ?AgentService $agentService = null,
-        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
     ) {
     }
 
@@ -3054,7 +3054,7 @@ class StreamController extends AbstractController
      */
     private function denyDraftIfNotOwner(?User $user, ?int $agentId): ?JsonResponse
     {
-        if (null === $user || null === $agentId || $agentId < 1 || null === $this->agentService) {
+        if (null === $user || null === $agentId || $agentId < 1) {
             return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
         }
 
@@ -3077,7 +3077,7 @@ class StreamController extends AbstractController
         if (null === $user || null === $agentId || $agentId < 1) {
             return null;
         }
-        if (null === $this->agentConfig || !$this->agentConfig->isEnabled((int) $user->getId())) {
+        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
             return null;
         }
 
@@ -3090,7 +3090,7 @@ class StreamController extends AbstractController
     private function denyAgentRuntime(?User $user, ?int $agentId, bool $draft, ?int $chatId, ?int &$agentVersionId): ?JsonResponse
     {
         $agentVersionId = null;
-        if (null === $user || null === $agentId || $agentId < 1 || null === $this->agentRuntimeResolver) {
+        if (null === $user || null === $agentId || $agentId < 1) {
             return null;
         }
 

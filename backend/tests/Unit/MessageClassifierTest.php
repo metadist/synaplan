@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\MessageMeta;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Agent\AgentPinResolver;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
@@ -62,6 +63,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($this->configRepository),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
     }
 
@@ -655,6 +657,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -702,6 +705,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -873,6 +877,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -946,6 +951,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -1022,6 +1028,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -1070,6 +1077,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -1139,6 +1147,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $message = $this->createMock(Message::class);
@@ -1193,6 +1202,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $previousFileMessage = $this->createMock(Message::class);
@@ -1249,6 +1259,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $previousReply = $this->createMock(Message::class);
@@ -1300,6 +1311,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1361,6 +1373,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
         );
 
         $fileTurn = $this->createMock(Message::class);
@@ -1885,6 +1898,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             new SelfAwareConfig($configRepo),
         );
     }
@@ -1930,6 +1944,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             new NativeToolRoutingConfig($configRepo),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             new SelfAwareConfig($configRepo),
         );
     }
@@ -1976,6 +1991,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             new SelfAwareConfig($configRepo),
         );
     }
@@ -2073,6 +2089,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             new SelfAwareConfig($configRepo),
             $converter,
         );
@@ -2111,6 +2128,7 @@ class MessageClassifierTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             officeConverter: $converter,
             multitaskConfig: new MultitaskRoutingConfig($configRepo),
         );

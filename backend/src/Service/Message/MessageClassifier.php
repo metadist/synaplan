@@ -5,12 +5,9 @@ namespace App\Service\Message;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
-use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
-use App\Repository\UserRepository;
-use App\Service\Agent\AgentConfig;
-use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentPinResolver;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
@@ -84,13 +81,11 @@ final readonly class MessageClassifier
         private EmbeddingRouterConfig $embeddingRouterConfig,
         private NativeToolRoutingConfig $nativeToolRoutingConfig,
         private ToolCallingCapability $toolCallingCapability,
+        private AgentPinResolver $agentPin,
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficeConverterClient $officeConverter = null,
         private ?DocumentToolsConfig $documentToolsConfig = null,
         private ?MultitaskRoutingConfig $multitaskConfig = null,
-        private ?AgentConfig $agentConfig = null,
-        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
-        private ?UserRepository $userRepository = null,
     ) {
     }
 
@@ -601,49 +596,19 @@ final readonly class MessageClassifier
      * Runs before the fast-path and before PROMPTID so a pinned chat never
      * becomes `general`. MessageSorter is never invoked on this path.
      *
+     * The RuntimeProfile travels as `runtime_profile`; RAG scope, limit and
+     * score are read from it downstream and never copied into scalar keys.
+     *
      * @param array<string, mixed> $options
      *
      * @return array<string, mixed>|null
      */
     private function tryPinAgent(Message $message, array $options): ?array
     {
-        $agentId = isset($options['agentId']) ? (int) $options['agentId'] : 0;
-        $messageId = $message->getId();
-        if ($agentId < 1 && null !== $messageId) {
-            $meta = $this->messageMetaRepository->findOneBy([
-                'messageId' => $messageId,
-                'metaKey' => 'AGENTID',
-            ]);
-            if ($meta && is_numeric($meta->getMetaValue())) {
-                $agentId = (int) $meta->getMetaValue();
-            }
-        }
-        if ($agentId < 1) {
+        $profile = $this->agentPin->resolve($message, $options);
+        if (null === $profile) {
             return null;
         }
-
-        $userId = $message->getUserId();
-        if (null === $this->agentConfig
-            || !$this->agentConfig->isEnabled($userId)
-            || null === $this->agentRuntimeResolver
-            || null === $this->userRepository
-        ) {
-            return null;
-        }
-
-        $user = $this->userRepository->find($userId);
-        if (!$user instanceof User) {
-            return null;
-        }
-
-        $useDraft = array_key_exists('agentDraft', $options) ? (bool) $options['agentDraft'] : false;
-        $chatId = $message->getChatId();
-        $profile = $this->agentRuntimeResolver->resolve(
-            $agentId,
-            $user,
-            $useDraft,
-            null !== $chatId && $chatId > 0 ? $chatId : null,
-        );
 
         $decision = RoutingDecision::deterministic(RoutingLayer::AgentPin, $profile->promptTopic);
         $language = $message->getLanguage();
@@ -652,7 +617,7 @@ final readonly class MessageClassifier
         }
 
         $this->logger->info('MessageClassifier: Using agent pin (skipped AI sorter)', [
-            'message_id' => $messageId,
+            'message_id' => $message->getId(),
             'agent_id' => $profile->agentId,
             'topic' => $profile->promptTopic,
         ]);
@@ -667,9 +632,6 @@ final readonly class MessageClassifier
             'prompt_id' => $profile->promptId,
             'agent_id' => $profile->agentId,
             'agent_version_id' => $profile->agentVersionId,
-            'rag_group_key' => $profile->primaryRagGroupKey(),
-            'rag_limit' => $profile->ragLimit,
-            'rag_min_score' => $profile->ragMinScore,
             'model_id' => $profile->modelIds['chat'] ?? null,
             'runtime_profile' => $profile,
         ], $decision->toClassificationFields());

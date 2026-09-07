@@ -81,6 +81,10 @@ final readonly class WidgetKind implements ShareableResourceKindInterface
         return [Permission::Read, Permission::Edit, Permission::Manage];
     }
 
+    public function assertShareable(string $resourceId): void
+    {
+    }
+
     private function findWidget(string $resourceId): ?Widget
     {
         if ('' === $resourceId || !ctype_digit($resourceId)) {

@@ -15,7 +15,11 @@ use App\Service\Agent\Exception\AgentDefinitionException;
  */
 final class AgentDefinitionValidator
 {
-    private const ROOT_KEYS = [
+    /**
+     * The accepted key sets, public so the OpenAPI component
+     * ({@see \App\DTO\AgentDefinitionV1}) can be checked against them.
+     */
+    public const ROOT_KEYS = [
         'schema',
         'models',
         'knowledge',
@@ -26,22 +30,22 @@ final class AgentDefinitionValidator
         'triggers',
     ];
 
-    private const MODEL_KEYS = ['chat', 'vision', 'vectorize'];
+    public const MODEL_KEYS = ['chat', 'vision', 'vectorize'];
 
-    private const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'ragLimit', 'ragMinScore'];
+    public const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'ragLimit', 'ragMinScore'];
 
-    private const TOOL_KEYS = ['internet', 'files', 'mcpServers', 'allow', 'deny'];
+    public const TOOL_KEYS = ['internet', 'files', 'mcpServers', 'allow', 'deny'];
 
-    private const SKILL_KEYS = ['allow', 'deny'];
+    public const SKILL_KEYS = ['allow', 'deny'];
 
-    private const PARAMETER_KEYS = ['temperature', 'maxTokens', 'language', 'responseSchema'];
+    public const PARAMETER_KEYS = ['temperature', 'maxTokens', 'language', 'responseSchema'];
 
-    private const BEHAVIOUR_KEYS = ['greeting', 'starterPrompts', 'memory'];
+    public const BEHAVIOUR_KEYS = ['greeting', 'starterPrompts', 'memory'];
 
-    private const TRIGGER_KEYS = ['events', 'schedules'];
+    public const TRIGGER_KEYS = ['events', 'schedules'];
 
     /** S5 known event keys — accepted here so later sprints do not reopen the schema. */
-    private const EVENT_KEYS = [
+    public const EVENT_KEYS = [
         'id',
         'kind',
         'mailbox',
@@ -54,7 +58,7 @@ final class AgentDefinitionValidator
         'department',
     ];
 
-    private const SCHEDULE_KEYS = [
+    public const SCHEDULE_KEYS = [
         'id',
         'name',
         'every',
@@ -65,7 +69,7 @@ final class AgentDefinitionValidator
         'enabled',
     ];
 
-    private const EVENT_KINDS = ['mail', 'whatsapp', 'widget', 'api', 'mcp', 'desktop', 'webhook'];
+    public const EVENT_KINDS = ['mail', 'whatsapp', 'widget', 'api', 'mcp', 'desktop', 'webhook'];
 
     private const MODEL_KEY_PATTERN = '/^[a-z0-9._-]+:[a-z0-9._-]+(?::[a-z0-9._-]+)?$/i';
 

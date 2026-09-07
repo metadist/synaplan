@@ -64,7 +64,7 @@ final readonly class MessageProcessor
         private TaskPlanStore $taskPlanStore,
         private TaskPlanExecutor $taskPlanExecutor,
         private ConversationSummaryService $conversationSummaryService,
-        private ?AgentConfig $agentConfig = null,
+        private AgentConfig $agentConfig,
     ) {
     }
 
@@ -1411,7 +1411,7 @@ final readonly class MessageProcessor
         if (empty($options['agentId'])) {
             return $options;
         }
-        if ($hasFixedPrompt || null === $this->agentConfig || !$this->agentConfig->isEnabled($message->getUserId())) {
+        if ($hasFixedPrompt || !$this->agentConfig->isEnabled($message->getUserId())) {
             unset($options['agentId'], $options['agentDraft']);
         }
 
@@ -1444,18 +1444,12 @@ final readonly class MessageProcessor
      */
     private function afterClassify(array $classification, array &$options): array
     {
+        // The profile is the one runtime seam: handlers read RAG scope,
+        // limit and score from the object, so nothing is copied into
+        // scalar option keys here.
         $profile = $classification['runtime_profile'] ?? null;
         if ($profile instanceof RuntimeProfile) {
             $options['runtime_profile'] = $profile;
-            if (empty($options['rag_group_key']) && null !== $profile->primaryRagGroupKey()) {
-                $options['rag_group_key'] = $profile->primaryRagGroupKey();
-            }
-            if (!isset($options['rag_limit']) && null !== $profile->ragLimit) {
-                $options['rag_limit'] = $profile->ragLimit;
-            }
-            if (!isset($options['rag_min_score']) && null !== $profile->ragMinScore) {
-                $options['rag_min_score'] = $profile->ragMinScore;
-            }
         }
 
         return $classification;

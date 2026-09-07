@@ -10,6 +10,8 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentService;
 use App\Service\BillingService;
 use App\Service\Chat\ChatTitleService;
 use App\Service\ConversationSummaryRefreshDispatcher;
@@ -79,7 +81,9 @@ final class StreamAgentIdTest extends TestCase
             ChatRunServiceFactory::withoutRedis(),
             $this->createMock(ChatErrorPresenter::class),
             $this->createMock(ChatErrorNotifier::class),
-            agentConfig: $this->agentConfig,
+            $this->agentConfig,
+            $this->createMock(AgentService::class),
+            $this->createMock(AgentRuntimeResolver::class),
         );
     }
 

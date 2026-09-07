@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { ApiError, httpClient } from './httpClient'
 import {
+  AgentDefinitionV1,
   GetApiAgentsListResponseSchema,
   GetApiAgentsGetResponseSchema,
   PostApiAgentsCreateResponseSchema,
@@ -13,6 +14,27 @@ import {
   GetApiAgentsUsageResponseSchema,
 } from '@/generated/api-schemas'
 
+/**
+ * The `agent.v1` document as one artifact: generated from the backend's
+ * `AgentDefinitionV1` OpenAPI component. Matches
+ * {@see AgentDefinition::defaults()} so a missing section is never `undefined`
+ * in the builder.
+ */
+export type AgentDraft = z.infer<typeof AgentDefinitionV1>
+
+export function emptyAgentDraft(): AgentDraft {
+  return {
+    schema: 'agent.v1',
+    models: { chat: null, vision: null, vectorize: null },
+    knowledge: { ownFolder: true, folders: [], ragLimit: 8, ragMinScore: 0.6 },
+    tools: { internet: true, files: true, mcpServers: [], allow: [], deny: [] },
+    skills: { allow: [], deny: [] },
+    parameters: { temperature: 0.7, maxTokens: 4000, language: 'auto', responseSchema: null },
+    behaviour: { greeting: '', starterPrompts: [], memory: 'user' },
+    triggers: { events: [], schedules: [] },
+  }
+}
+
 export type Agent = NonNullable<z.infer<typeof GetApiAgentsGetResponseSchema>['agent']>
 export type AgentSummary = NonNullable<
   z.infer<typeof GetApiAgentsListResponseSchema>['agents']
@@ -21,14 +43,12 @@ export type GalleryCard = NonNullable<
   z.infer<typeof GetApiAgentsGalleryResponseSchema>['cards']
 >[number]
 
-export type AgentDraft = NonNullable<Agent>['draft']
-
 export interface AgentWritePayload {
   name?: string
   description?: string | null
   icon?: string
   promptId?: number
-  draft?: Record<string, unknown>
+  draft?: AgentDraft
   routable?: boolean
   status?: 'archived' | 'published'
 }
@@ -158,5 +178,11 @@ function requireAgent(agent: Agent | undefined): Agent {
   if (!agent) {
     throw new Error('Invalid API response format: agent missing')
   }
-  return agent
+  return {
+    ...agent,
+    draft: AgentDefinitionV1.parse({
+      ...emptyAgentDraft(),
+      ...(agent.draft ?? {}),
+    }),
+  }
 }
