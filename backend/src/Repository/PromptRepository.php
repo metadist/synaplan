@@ -192,6 +192,16 @@ class PromptRepository extends ServiceEntityRepository
             if ($userPrompt) {
                 return $userPrompt;
             }
+        }
+
+        // Global (ownerId = 0) wins over anything another user shared: a share
+        // adds topics, it never replaces a system prompt for the recipient.
+        $global = $this->findByTopic($topic, 0);
+        if ($global instanceof Prompt) {
+            return $global;
+        }
+
+        if ($userId > 0) {
             foreach ($this->findSharedPrompts($userId) as $shared) {
                 if ($shared->getTopic() === $topic) {
                     return $shared;
@@ -199,8 +209,7 @@ class PromptRepository extends ServiceEntityRepository
             }
         }
 
-        // Fallback to global (ownerId = 0)
-        return $this->findByTopic($topic, 0);
+        return null;
     }
 
     /**
@@ -304,6 +313,14 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
+     * Prompts other users shared with this one at `use` or higher.
+     *
+     * A share can only add topics the recipient does not already get from
+     * the system: `tools:*` topics and topics that exist as a system prompt
+     * are dropped here, so a shared prompt can never stand in for the
+     * classifier, memory or default-chat prompt of the person it was shared
+     * with.
+     *
      * @return list<Prompt>
      */
     private function findSharedPrompts(int $userId): array
@@ -316,7 +333,10 @@ class PromptRepository extends ServiceEntityRepository
         /** @var list<Prompt> $rows */
         $rows = $this->createQueryBuilder('p')
             ->where('p.id IN (:ids)')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.topic NOT IN (SELECT s.topic FROM App\Entity\Prompt s WHERE s.ownerId = 0)')
             ->setParameter('ids', $ids)
+            ->setParameter('toolsPrefix', 'tools:%')
             ->getQuery()
             ->getResult();
 

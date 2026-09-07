@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\GroupMemberRepository;
 use App\Repository\GroupRepository;
 use App\Service\Auth\OidcClaimResolver;
+use Psr\Log\LoggerInterface;
 
 /**
  * Upserts directory groups from an OIDC claim and reconciles this user's
@@ -25,6 +26,7 @@ final readonly class DirectoryGroupSync
         private GroupRepository $groupRepository,
         private GroupMemberRepository $groupMemberRepository,
         private AuditLogWriter $auditLogWriter,
+        private LoggerInterface $logger,
         private string $oidcClientId = '',
         private string $oidcDiscoveryUrl = '',
     ) {
@@ -65,6 +67,16 @@ final readonly class DirectoryGroupSync
 
         $desiredGroupIds = [];
         foreach ($externalIds as $externalId) {
+            // A claim value that does not fit the identity column cannot be
+            // matched reliably on the next login, so it is skipped rather than
+            // truncated into a collision with another group.
+            if ('' === trim($externalId) || mb_strlen($externalId) > Group::EXTERNAL_ID_MAX_LENGTH) {
+                $this->logger->warning('Directory group claim skipped: value empty or too long', [
+                    'source' => $source,
+                    'length' => mb_strlen($externalId),
+                ]);
+                continue;
+            }
             $group = $this->upsertDirectoryGroup($source, $externalId, $names[$externalId] ?? $externalId);
             $desiredGroupIds[(int) $group->getId()] = $group;
         }
@@ -108,9 +120,17 @@ final readonly class DirectoryGroupSync
 
     private function upsertDirectoryGroup(string $source, string $externalId, string $displayName): Group
     {
+        $displayName = trim($displayName);
+        if ('' === $displayName) {
+            $displayName = $externalId;
+        }
+        if (mb_strlen($displayName) > Group::NAME_MAX_LENGTH) {
+            $displayName = rtrim(mb_substr($displayName, 0, Group::NAME_MAX_LENGTH - 1)).'…';
+        }
+
         $existing = $this->groupRepository->findOneByExternal($source, $externalId);
         if ($existing instanceof Group) {
-            if ($existing->getName() !== $displayName && '' !== trim($displayName)) {
+            if ($existing->getName() !== $displayName) {
                 $existing->setName($displayName);
                 $this->groupRepository->save($existing);
             }

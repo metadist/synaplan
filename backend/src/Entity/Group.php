@@ -22,12 +22,15 @@ class Group
     public const KIND_MANUAL = 'manual';
     public const KIND_DIRECTORY = 'directory';
 
+    public const NAME_MAX_LENGTH = 128;
+    public const EXTERNAL_ID_MAX_LENGTH = 191;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
     private ?int $id = null;
 
-    #[ORM\Column(name: 'BNAME', length: 128)]
+    #[ORM\Column(name: 'BNAME', length: self::NAME_MAX_LENGTH)]
     private string $name = '';
 
     #[ORM\Column(name: 'BSLUG', length: 128)]
@@ -42,7 +45,7 @@ class Group
     #[ORM\Column(name: 'BEXTERNALSOURCE', length: 191, nullable: true)]
     private ?string $externalSource = null;
 
-    #[ORM\Column(name: 'BEXTERNALID', length: 191, nullable: true)]
+    #[ORM\Column(name: 'BEXTERNALID', length: self::EXTERNAL_ID_MAX_LENGTH, nullable: true)]
     private ?string $externalId = null;
 
     /** Reserved for v2 nested groups; unused in v1. */

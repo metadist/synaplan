@@ -24,6 +24,7 @@ use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\UploadOptions;
+use App\Service\Iam\KnowledgeFolderShareCleanup;
 use App\Service\Iam\SharedFileAccess;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
@@ -67,6 +68,7 @@ class FileController extends AbstractController
         private DocumentRevisionService $documentRevisionService,
         private DocumentOfficeMergeService $documentOfficeMergeService,
         private SharedFileAccess $sharedFileAccess,
+        private KnowledgeFolderShareCleanup $folderShareCleanup,
     ) {
     }
 
@@ -1148,7 +1150,9 @@ class FileController extends AbstractController
             $this->storageService->deleteFile($file->getFilePath());
         }
 
+        $groupKey = $file->getGroupKey();
         $this->fileRepository->delete($file);
+        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $groupKey);
 
         return $this->json(['success' => true, 'message' => 'File deleted successfully']);
     }
@@ -1405,7 +1409,11 @@ class FileController extends AbstractController
             return $this->json(['error' => 'groupKey is required'], Response::HTTP_BAD_REQUEST);
         }
 
+        $previousGroupKey = $file->getGroupKey();
         $this->fileRepository->updateGroupKey($file, $newGroupKey);
+        if ($previousGroupKey !== $newGroupKey) {
+            $this->folderShareCleanup->forgetIfEmpty($user->getId(), $previousGroupKey);
+        }
 
         $chunksUpdated = $this->vectorStorageFacade->updateGroupKey($user->getId(), $file->getId(), $newGroupKey);
 
@@ -1440,8 +1448,10 @@ class FileController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
+        $previousGroupKey = $file->getGroupKey();
         $file->setGroupKey(null);
         $this->fileRepository->save($file);
+        $this->folderShareCleanup->forgetIfEmpty($user->getId(), $previousGroupKey);
 
         // Keep the vectors — just move them to the ungrouped DEFAULT bucket so
         // the file stays searchable globally but no longer belongs to a folder.

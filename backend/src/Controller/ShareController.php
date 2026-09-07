@@ -17,6 +17,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -28,6 +29,7 @@ final class ShareController extends AbstractController
         private readonly ShareService $shareService,
         private readonly AccessGate $accessGate,
         private readonly SharedInbox $sharedInbox,
+        private readonly RateLimiterFactoryInterface $iamSubjectSearchLimiter,
     ) {
     }
 
@@ -282,6 +284,7 @@ final class ShareController extends AbstractController
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feature disabled'),
+            new OA\Response(response: 429, description: 'Too many searches — try again in a minute'),
         ]
     )]
     public function subjects(Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -291,6 +294,11 @@ final class ShareController extends AbstractController
             return $denied;
         }
         \assert($user instanceof User);
+
+        $limit = $this->iamSubjectSearchLimiter->create('user:'.$user->getId())->consume();
+        if (!$limit->isAccepted()) {
+            return $this->json(['error' => 'Too many searches. Try again in a minute.'], Response::HTTP_TOO_MANY_REQUESTS);
+        }
 
         return $this->json([
             'subjects' => $this->shareService->searchSubjects($user, (string) $request->query->get('q', '')),

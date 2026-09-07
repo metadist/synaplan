@@ -85,6 +85,16 @@ final readonly class ShareService
             throw new ShareNotAllowedException('Only the owner or someone who can manage this item may share it.');
         }
 
+        // An administrator manages shares on the owner's behalf without holding
+        // a grant of their own. That power must not become a way to read the
+        // content: a subject that includes the actor (themselves, a group they
+        // belong to, everyone) is refused unless the actor already holds access.
+        if (null === $this->accessGate->highestGranted($actor, $kind, $resourceId)
+            && $this->subjectReaches($actor, $subjectType, $subjectId)
+        ) {
+            throw new ShareNotAllowedException('Administrators can share on behalf of the owner, but not with themselves.');
+        }
+
         $share = $this->shareRepository->findOneForSubject($kind, $resourceId, $subjectType, $subjectId);
         if (null === $share) {
             $share = new Share();
@@ -440,6 +450,21 @@ final readonly class ShareService
         }
 
         return $candidateLevel->implies($currentLevel);
+    }
+
+    /**
+     * Would a grant to this subject give the actor access?
+     */
+    private function subjectReaches(User $actor, string $subjectType, int $subjectId): bool
+    {
+        $actorId = (int) $actor->getId();
+
+        return match ($subjectType) {
+            Share::SUBJECT_EVERYONE => true,
+            Share::SUBJECT_USER => $subjectId === $actorId,
+            Share::SUBJECT_GROUP => null !== $this->groupMemberRepository->findMembership($subjectId, $actorId),
+            default => false,
+        };
     }
 
     private static function subjectSpecificity(Share $share): int
