@@ -17,6 +17,7 @@ use App\Service\Iam\ConversationCopyService;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\ConversationKind;
+use App\Service\Iam\ShareService;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Multitask\InProgressTurnResolver;
 use App\Service\PastedContentText;
@@ -50,6 +51,7 @@ class ChatController extends AbstractController
         private IamConfig $iamConfig,
         private ConversationCopyService $conversationCopyService,
         private ShareRepository $shareRepository,
+        private ShareService $shareService,
         private UserRepository $userRepository,
     ) {
     }
@@ -314,6 +316,17 @@ class ChatController extends AbstractController
                                         new OA\Property(property: 'name', type: 'string'),
                                     ]
                                 ),
+                                new OA\Property(
+                                    property: 'sharedVia',
+                                    type: 'object',
+                                    nullable: true,
+                                    description: 'How this chat reached the viewer. Null when they own it.',
+                                    required: ['type', 'name'],
+                                    properties: [
+                                        new OA\Property(property: 'type', type: 'string', enum: ['user', 'group', 'everyone'], example: 'group'),
+                                        new OA\Property(property: 'name', type: 'string', example: 'Sales', description: 'Group name, or empty for "everyone" / a direct share'),
+                                    ]
+                                ),
                             ]
                         ),
                     ]
@@ -358,6 +371,11 @@ class ChatController extends AbstractController
                 'widgetSession' => $isOwner ? ($sessionInfo[$chat->getId()] ?? null) : null,
                 'access' => $access,
                 'owner' => $this->conversationOwner($chat),
+                'sharedVia' => $isOwner ? null : $this->shareService->sharedViaFor(
+                    (int) $user->getId(),
+                    ConversationKind::KEY,
+                    (string) $chat->getId(),
+                ),
             ],
         ]);
     }

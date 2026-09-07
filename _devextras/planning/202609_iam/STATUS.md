@@ -3,20 +3,22 @@
 Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
 
-S1 Groups core is **merged to `main`** (`feat/iam-groups-core`, PR #1708).
-S2 Sharing MVP is on `feat/iam-sharing-mvp` (IAM11–IAM20; PR #1713 green).
-S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; [draft PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on S2, targeting `main` so CI runs).
+S1–S3 are **merged to `main`**. Sharing works in the API, but after merge we
+had to improve the UI: a group member could not find chats shared with them.
+That follow-up lives on `feat/iam-incoming-chats` ([PR #1717](https://github.com/metadist/synaplan/pull/1717)).
+S4 Directory & privacy and S5 Group policies start from that branch.
 
 ## Steps
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
 | S0 Concept & UI | — | done | Checklist ticked 2026-09-03; wireframes in S1/S2 |
-| S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 (`8e8ad71ef`) |
-| S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | in review | IAM11–IAM20; PR #1713 All Checks Passed |
-| S3 More kinds | `synaplan/` `feat/iam-more-kinds` | draft PR | IAM21–IAM28; [PR #1714](https://github.com/metadist/synaplan/pull/1714) stacked on #1713, opened against `main` for CI. Public docs: [synaplan-docs#14](https://github.com/metadist/synaplan-docs/pull/14) |
-| S4 Directory & privacy | — | planned | |
-| S5 Group policies | — | planned | |
+| S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 |
+| S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | done | Merged to `main` as #1713 |
+| S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
+| Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | in review | [PR #1717](https://github.com/metadist/synaplan/pull/1717). History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
+| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in progress | IAM29–IAM38; stacked on #1717 |
+| S5 Group policies | — | planned | IAM39–IAM46; first cut line. New flag `IAM.GROUP_POLICIES_ENABLED` (seeded off) |
 
 ## Decisions
 
@@ -28,6 +30,8 @@ S3 More kinds is on `feat/iam-more-kinds` (IAM21–IAM28; [draft PR #1714](https
 | 2026-09-03 | S4 gains a regression check for OpenCloud token-exchanged users (same `BUSER`, therefore same groups and shares) — consequence of track 6 excluding OpenCloud. |
 | 2026-09-03 | S0 closed except wireframes (People, ShareDialog), which are the first deliverable of S1. |
 | 2026-09-05 | S1 shipped on `main`. S2 started on `feat/iam-sharing-mvp`. Public docs: `synaplan-docs` `feat/docs-people-and-groups`. |
+| 2026-09-06 | S2 (#1713) and S3 (#1714) merged to `main`. The planned "Shared with me" filter had landed only on the statistics chat browser, so a group member could not find incoming chats. Extra UI sprint on `feat/iam-incoming-chats`: History sheet + ChatBrowser show incoming as group pills and own chats as private, with filter buttons; Account gets a red dot and **Incoming chats** (`/chats/incoming`, sibling of the Files inbox at `/files/incoming`); opening a shared chat names the owner and the group / everyone / person it came through. |
+| 2026-09-06 | S5 will introduce `IAM.GROUP_POLICIES_ENABLED` (seeded `0`) as a fourth flag beyond master plan §0 row 11. Off ⇒ resolvers stay `[user, global]` (C1). Recorded here as required by [`05_sprint_5_group_policies.md`](./05_sprint_5_group_policies.md). |
 
 ## Review log
 
@@ -50,9 +54,9 @@ Saved tasks copy as the member's own run. Widgets support read and co-edit;
 embed and sessions stay owner-only. Plugin manifests may declare
 `provides.resourceKinds`.
 
-**2026-09-06:** PR #1714 converted back to draft. Copilot lite review on S3:
-Share dialog / subject search catch API errors; conversation access no longer
-defaults to writable while the check is in flight.
+**2026-09-06:** S3 merged. Copilot lite review on S3: Share dialog / subject
+search catch API errors; conversation access no longer defaults to writable
+while the check is in flight.
 
 **2026-09-06 (pre-merge security + house-rules review of S1–S3):** findings
 fixed on `feat/iam-sharing-mvp` (S2, merged into S3):
@@ -81,3 +85,14 @@ name/email (standard share-picker behaviour, instance = organization).
 Follow-ups (not blocking): `UsersTab.vue` is 410 lines (moved from
 `AdminView`, split later); `PromptController::list` still builds queries
 inline (pre-existing).
+
+**2026-09-06 (incoming chats UI):** After S2/S3 a member of a group still
+could not see a chat shared with that group. The plan said "no new top-level
+nav item" and "filter chip on existing lists", but the only chip was on the
+statistics browser. We kept the lean-nav contract and added:
+
+- Kind pills + All / Private / Group filters on History and the detailed list.
+- Account red dot + **Incoming chats** (not a new rail item).
+- `/chats/incoming` as the chat inbox (Files → Incoming stayed at `/files/incoming`).
+- Opening a shared chat now answers the five-question check: who owns it, which
+  group (or everyone / person) it came through, what the viewer may do.

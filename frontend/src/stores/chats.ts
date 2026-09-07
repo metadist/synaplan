@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { httpClient } from '@/services/api/httpClient'
 import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
+import { useIncomingStore } from '@/stores/incoming'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
@@ -62,10 +63,18 @@ export function isDefaultChatTitle(title: string, localizedNewChat?: string): bo
   )
 }
 
+export type ConversationSharedVia = { type: 'user' | 'group' | 'everyone'; name: string }
+
+export type ConversationSource = {
+  owner: { id: number; name: string } | null
+  sharedVia: ConversationSharedVia | null
+}
+
 export const useChatsStore = defineStore('chats', () => {
   const chats = ref<Chat[]>([])
   const activeChatId = ref<number | null>(readActiveChatId())
   const conversationAccess = ref<'owner' | 'read' | 'use' | null>(null)
+  const conversationSource = ref<ConversationSource | null>(null)
   let conversationAccessSeq = 0
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -144,9 +153,25 @@ export const useChatsStore = defineStore('chats', () => {
       return
     }
 
+    // An incoming (shared-with-me) chat is not in my own list but is a valid
+    // thing to have open. Keep it while the incoming list confirms it.
+    if (candidateId && !candidate && useIncomingStore().isOpenable(candidateId)) {
+      updateActiveChatSelection(candidateId)
+      return
+    }
+
     const firstRegularChat = chats.value.find((chat) => !chat.widgetSession)
     updateActiveChatSelection(firstRegularChat ? firstRegularChat.id : null)
   }
+
+  // Once the incoming list has arrived, an active chat that is neither mine nor
+  // shared with me (revoked share, stale storage) falls back like before.
+  watch(
+    () => useIncomingStore().loaded,
+    (incomingLoaded) => {
+      if (incomingLoaded && chats.value.length > 0) ensureValidActiveChat()
+    }
+  )
 
   async function loadChats() {
     if (!checkAuthOrRedirect()) return
@@ -432,25 +457,54 @@ export const useChatsStore = defineStore('chats', () => {
     }
   }
 
+  function parseSharedVia(value: unknown): ConversationSharedVia | null {
+    if (!value || typeof value !== 'object') return null
+    const type = 'type' in value ? String(value.type) : ''
+    if (type !== 'user' && type !== 'group' && type !== 'everyone') return null
+    const name = 'name' in value && typeof value.name === 'string' ? value.name : ''
+    return { type, name }
+  }
+
+  function parseOwner(value: unknown): ConversationSource['owner'] {
+    if (!value || typeof value !== 'object') return null
+    const id = 'id' in value ? Number(value.id) : 0
+    const name = 'name' in value && typeof value.name === 'string' ? value.name : ''
+    if (!id) return null
+    return { id, name }
+  }
+
   async function loadConversationAccess(chatId: number) {
     if (!isIamSharingEnabled()) {
       conversationAccess.value = 'owner'
+      conversationSource.value = null
       return
     }
     const seq = ++conversationAccessSeq
     conversationAccess.value = null
+    conversationSource.value = null
     try {
-      const data = await httpClient<{ chat: { access?: string } }>(`/api/v1/chats/${chatId}`)
+      const data = await httpClient<{
+        chat: {
+          access?: string
+          owner?: { id: number; name: string }
+          sharedVia?: ConversationSharedVia | null
+        }
+      }>(`/api/v1/chats/${chatId}`)
       if (seq !== conversationAccessSeq) {
         return
       }
       const access = data.chat.access
       conversationAccess.value = access === 'read' || access === 'use' ? access : 'owner'
+      conversationSource.value = {
+        owner: parseOwner(data.chat.owner),
+        sharedVia: parseSharedVia(data.chat.sharedVia),
+      }
     } catch {
       if (seq !== conversationAccessSeq) {
         return
       }
       conversationAccess.value = null
+      conversationSource.value = null
     }
   }
 
@@ -545,6 +599,7 @@ export const useChatsStore = defineStore('chats', () => {
   function $reset() {
     chats.value = []
     conversationAccess.value = null
+    conversationSource.value = null
     conversationAccessSeq = 0
     activeRunChatIds.value = new Set()
     historyChats.value = []
@@ -560,6 +615,7 @@ export const useChatsStore = defineStore('chats', () => {
     chats,
     activeChatId,
     conversationAccess,
+    conversationSource,
     loadConversationAccess,
     activeChat,
     loading,

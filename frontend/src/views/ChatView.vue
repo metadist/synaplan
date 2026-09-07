@@ -290,22 +290,15 @@
            centered hero composer) means the "+" menu and its dropdowns always
            open upward with room and are never clipped by the chat container's
            overflow (issue #1285). -->
-      <div
-        v-if="sharedConversationLocked"
-        class="mx-4 mb-3 p-4 surface-card rounded-xl"
-        data-testid="banner-shared-conversation"
-      >
-        <p class="text-sm txt-secondary mb-3">{{ $t('iam.readOnly') }}</p>
-        <button
-          v-if="chatsStore.conversationAccess === 'use'"
-          type="button"
-          class="btn-primary"
-          data-testid="btn-continue-as-copy"
-          @click="continueSharedConversation"
-        >
-          {{ $t('iam.continueAsCopy') }}
-        </button>
-      </div>
+      <SharedConversationBanner
+        v-if="sharedConversationLocked && sharedConversationAccess"
+        class="mx-4 mb-3"
+        :owner-name="sharedConversationOwnerName"
+        :shared-via="chatsStore.conversationSource?.sharedVia ?? null"
+        :access="sharedConversationAccess"
+        :can-continue="chatsStore.conversationAccess === 'use'"
+        @continue="continueSharedConversation"
+      />
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -515,6 +508,7 @@ import {
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import SharedConversationBanner from '@/components/iam/SharedConversationBanner.vue'
 import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
@@ -632,6 +626,14 @@ const historyStore = useHistoryStore()
 const chatsStore = useChatsStore()
 const sharedConversationLocked = computed(
   () => chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+)
+const sharedConversationAccess = computed(() =>
+  chatsStore.conversationAccess === 'read' || chatsStore.conversationAccess === 'use'
+    ? chatsStore.conversationAccess
+    : null
+)
+const sharedConversationOwnerName = computed(
+  () => chatsStore.conversationSource?.owner?.name?.trim() || null
 )
 const canComposeSharedChat = computed(() => {
   if (isGuestMode.value) {

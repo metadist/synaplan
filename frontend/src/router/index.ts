@@ -463,6 +463,14 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups' },
     },
     {
+      // Conversations other people or groups shared with me ("incoming").
+      // Sibling of /files/incoming, which is the file inbox.
+      path: '/chats/incoming',
+      name: 'chats-incoming',
+      component: () => import('@/views/IncomingChatsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.incoming' },
+    },
+    {
       // Dead end for an account that still carries a deployment-generated
       // password. The beforeEach guard sends it here and lets nothing else
       // through until the change succeeds.

@@ -10,6 +10,7 @@ use App\Service\Iam\Exception\ShareNotAllowedException;
 use App\Service\Iam\Exception\UnknownResourceKindException;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
+use App\Service\Iam\SharedInbox;
 use App\Service\Iam\ShareService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,6 +27,7 @@ final class ShareController extends AbstractController
         private readonly IamConfig $iamConfig,
         private readonly ShareService $shareService,
         private readonly AccessGate $accessGate,
+        private readonly SharedInbox $sharedInbox,
     ) {
     }
 
@@ -315,7 +317,7 @@ final class ShareController extends AbstractController
                             property: 'items',
                             type: 'array',
                             items: new OA\Items(
-                                required: ['id', 'name', 'icon', 'permission'],
+                                required: ['id', 'name', 'icon', 'permission', 'sharedVia', 'sharedAt', 'isNew'],
                                 properties: [
                                     new OA\Property(property: 'id', type: 'string'),
                                     new OA\Property(property: 'name', type: 'string'),
@@ -324,6 +326,18 @@ final class ShareController extends AbstractController
                                     new OA\Property(property: 'permission', type: 'string'),
                                     new OA\Property(property: 'ownerId', type: 'integer', nullable: true),
                                     new OA\Property(property: 'ownerName', type: 'string', nullable: true),
+                                    new OA\Property(
+                                        property: 'sharedVia',
+                                        description: 'The subject through which the item reaches this user (the winning grant)',
+                                        required: ['type', 'name'],
+                                        properties: [
+                                            new OA\Property(property: 'type', type: 'string', enum: ['user', 'group', 'everyone']),
+                                            new OA\Property(property: 'name', type: 'string', description: 'Group name, or empty for "everyone" / a direct share', example: 'Sales'),
+                                        ],
+                                        type: 'object',
+                                    ),
+                                    new OA\Property(property: 'sharedAt', type: 'integer', description: 'Unix time the item first reached this user', example: 1788721849),
+                                    new OA\Property(property: 'isNew', type: 'boolean', description: 'Arrived after the user last opened their incoming list', example: true),
                                 ]
                             )
                         ),
@@ -346,23 +360,127 @@ final class ShareController extends AbstractController
         if ('' === $kind) {
             return $this->json(['error' => 'kind is required.'], Response::HTTP_BAD_REQUEST);
         }
+        $userId = (int) $user->getId();
 
         try {
-            $rows = $this->shareService->listSharedWith((int) $user->getId(), $kind);
+            $rows = $this->shareService->listSharedWith($userId, $kind);
+        } catch (UnknownResourceKindException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+        $lastSeenAt = $this->sharedInbox->lastSeenAt($userId, $kind);
+
+        return $this->json([
+            'items' => array_map(
+                fn (array $row) => $this->shareService->serializeSharedItem($row, $userId, $lastSeenAt),
+                $rows,
+            ),
+        ]);
+    }
+
+    #[Route('/api/v1/me/shared/unseen', name: 'me_shared_unseen', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/me/shared/unseen',
+        operationId: 'countUnseenShared',
+        summary: 'How many items of a kind reached me since I last opened my incoming list',
+        tags: ['IAM Sharing'],
+        parameters: [
+            new OA\Parameter(name: 'kind', in: 'query', required: true, schema: new OA\Schema(type: 'string', example: 'conversation')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Unseen count',
+                content: new OA\JsonContent(
+                    required: ['count', 'lastSeenAt'],
+                    properties: [
+                        new OA\Property(property: 'count', type: 'integer', example: 2),
+                        new OA\Property(property: 'lastSeenAt', type: 'integer', description: 'Unix time of the last visit, 0 if never', example: 1788721849),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'kind is required or unknown'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function unseenShared(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        $kind = (string) $request->query->get('kind', '');
+        if ('' === $kind) {
+            return $this->json(['error' => 'kind is required.'], Response::HTTP_BAD_REQUEST);
+        }
+        $userId = (int) $user->getId();
+
+        try {
+            $count = $this->sharedInbox->countUnseen($userId, $kind);
         } catch (UnknownResourceKindException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
         return $this->json([
-            'items' => array_map(
-                fn (array $row) => $this->shareService->serializeSharedCard(
-                    $row['card'],
-                    $row['permission'],
-                    $row['ownerId'],
-                ),
-                $rows,
-            ),
+            'count' => $count,
+            'lastSeenAt' => $this->sharedInbox->lastSeenAt($userId, $kind),
         ]);
+    }
+
+    #[Route('/api/v1/me/shared/seen', name: 'me_shared_seen', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/me/shared/seen',
+        operationId: 'markSharedSeen',
+        summary: 'Mark my incoming list of a kind as seen (clears the "new" indicator)',
+        tags: ['IAM Sharing'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['kind'],
+                properties: [
+                    new OA\Property(property: 'kind', type: 'string', example: 'conversation'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Watermark moved',
+                content: new OA\JsonContent(
+                    required: ['success', 'lastSeenAt'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'lastSeenAt', type: 'integer', example: 1788721849),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'kind is required or unknown'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Feature disabled'),
+        ]
+    )]
+    public function markSharedSeen(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        $payload = json_decode((string) $request->getContent(), true);
+        $kind = is_array($payload) ? (string) ($payload['kind'] ?? '') : '';
+        if ('' === $kind) {
+            return $this->json(['error' => 'kind is required.'], Response::HTTP_BAD_REQUEST);
+        }
+        $userId = (int) $user->getId();
+
+        try {
+            $lastSeenAt = $this->sharedInbox->markSeen($userId, $kind);
+        } catch (UnknownResourceKindException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true, 'lastSeenAt' => $lastSeenAt]);
     }
 
     private function guard(?User $user): ?JsonResponse
