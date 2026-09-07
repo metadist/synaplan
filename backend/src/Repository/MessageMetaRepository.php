@@ -83,6 +83,23 @@ class MessageMetaRepository extends ServiceEntityRepository
         }
     }
 
+    public function chatHasAgent(int $chatId, int $agentId): bool
+    {
+        $count = $this->createQueryBuilder('meta')
+            ->select('COUNT(meta.id)')
+            ->innerJoin('meta.message', 'm')
+            ->where('m.chatId = :chatId')
+            ->andWhere('meta.metaKey = :key')
+            ->andWhere('meta.metaValue = :value')
+            ->setParameter('chatId', $chatId)
+            ->setParameter('key', 'AGENTID')
+            ->setParameter('value', (string) $agentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (int) $count > 0;
+    }
+
     /**
      * Remove a meta row.
      */

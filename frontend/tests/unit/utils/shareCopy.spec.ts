@@ -18,5 +18,8 @@ describe('shareCopy', () => {
       'iam.dialog.consequence.conversation.use'
     )
     expect(shareFindKey('assistant')).toBe('iam.dialog.find.assistant')
+    expect(shareFindKey('agent')).toBe('iam.dialog.find.assistant')
+    expect(shareConsequenceKey('agent', 'use')).toBe('iam.dialog.consequence.assistant.use')
+    expect(defaultSharePermission('agent')).toBe('use')
   })
 })

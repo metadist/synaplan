@@ -11,7 +11,6 @@ use App\Repository\MessageMetaRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentRuntimeResolver;
-use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
@@ -637,12 +636,14 @@ final readonly class MessageClassifier
             return null;
         }
 
-        try {
-            $useDraft = array_key_exists('agentDraft', $options) ? (bool) $options['agentDraft'] : true;
-            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $useDraft);
-        } catch (AgentNotAccessibleException) {
-            return null;
-        }
+        $useDraft = array_key_exists('agentDraft', $options) ? (bool) $options['agentDraft'] : false;
+        $chatId = $message->getChatId();
+        $profile = $this->agentRuntimeResolver->resolve(
+            $agentId,
+            $user,
+            $useDraft,
+            null !== $chatId && $chatId > 0 ? $chatId : null,
+        );
 
         $decision = RoutingDecision::deterministic(RoutingLayer::AgentPin, $profile->promptTopic);
         $language = $message->getLanguage();

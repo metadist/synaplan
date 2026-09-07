@@ -13,6 +13,7 @@ use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
 use App\Service\Iam\Exception\ShareNotAllowedException;
 use App\Service\Iam\Exception\UnknownResourceKindException;
+use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\ResourceCard;
 use App\Service\Iam\ResourceKind\ResourceKindRegistry;
 
@@ -63,6 +64,9 @@ final readonly class ShareService
         }
         if (0 === $ownerId) {
             throw new ShareNotAllowedException('This item cannot be shared.');
+        }
+        if ($kindImpl instanceof AgentKind) {
+            $kindImpl->assertShareable($resourceId);
         }
 
         if (!in_array($level, $kindImpl->supportedPermissions(), true)) {

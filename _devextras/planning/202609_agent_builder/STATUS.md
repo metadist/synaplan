@@ -10,7 +10,7 @@ before the first sprint starts.**
 | ------------- | ------------- | ----- | ----- |
 | S1 Entity & pinned runtime | `feat/agent-builder-s1` / synaplan | done | AB1–AB8: BAGENTS + BAGENTVERSIONS, `AGENTS.ENABLED` off, owner CRUD, `agentId` pin, Zod schemas regenerated |
 | S2 Builder & gallery | `feat/agent-builder-s2` / synaplan | done | AB9–AB13, AB15–AB17; AB14 helper deferred |
-| S3 Publish & versions | — | planned | J-AB-2…4; Share waits on IAM-UX |
+| S3 Publish & versions | `feat/agent-builder-s3` / synaplan | done | AB18–AB25; IAM kind `agent` (BPROMPTS keeps `assistant`); share copy reuses assistant strings |
 | S4 Knowledge, tools, skills | — | planned | Parameters folded into Models → Advanced settings |
 | S5 Triggers: events & schedules | — | planned | J-AB-5, J-AB-7; was "Tasks & channels" until 2026-09-07 |
 | S6 Portability & packs | — | planned | adds `api` / `mcp` / `desktop` event kinds to the picker |
@@ -45,10 +45,21 @@ permission model and not the S2 stacked dialog.
 regenerated. Gate green without re-recording `routing_classification.json`. Next:
 S2 gallery/builder (separate branch).
 
+**2026-09-07 (S3 kind key):** IAM already bound `assistant` to BPROMPTS
+ids. BAGENTS uses a new `agent` kind so numeric ids cannot collide.
+Share dialog copy reuses the assistant strings (Assistants → Shared
+with me).
+
 **2026-09-07 (S2 implemented on `feat/agent-builder-s2`):** gallery + clone
 APIs, owner-only draft stream, Assistants gallery/builder (flag-gated),
 start-chat pill, Coding clients rename. Prompt API unchanged. AB14
 Help-me-write deferred. Gate green. Next: S3 publish/versions/share.
+
+**2026-09-07 (S3 implemented on `feat/agent-builder-s3`):** publish +
+immutable versions, IAM kind `agent`, gallery Shared with me, clone of
+published snapshot, archive/unarchive, usage aggregates, `app:agents:seed-system`
+(not run by `app:seed`). Prompt API / `assistant` kind unchanged. Next: S4
+knowledge, tools, skills.
 
 **2026-09-07 (trigger wording, second UX pass):** the plan had spread
 "when does this assistant act" over a *Tasks* section (schedules, cron

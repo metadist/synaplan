@@ -8,6 +8,6 @@ final class AgentNotDraftException extends \RuntimeException
 {
     public static function cannotDelete(string $status): self
     {
-        return new self(sprintf('Only draft assistants can be deleted in this version (status is "%s")', $status));
+        return new self(sprintf('Only draft or archived assistants can be deleted (status is "%s")', $status));
     }
 }

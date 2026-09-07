@@ -12,8 +12,11 @@ use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
 use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\AgentService;
+use App\Service\Agent\Exception\AgentArchivedException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
+use App\Service\Agent\Exception\AgentNotPublishedException;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
@@ -132,6 +135,7 @@ class StreamController extends AbstractController
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
         private ?AgentConfig $agentConfig = null,
         private ?AgentService $agentService = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
     ) {
     }
 
@@ -605,6 +609,11 @@ class StreamController extends AbstractController
                 return $draftDenied;
             }
         }
+        $pinnedAgentVersionId = null;
+        $agentAccessDenied = $this->denyAgentRuntime($user, $pinnedAgentId, $draftRequested, is_numeric($chatId) ? (int) $chatId : null, $pinnedAgentVersionId);
+        if (null !== $agentAccessDenied) {
+            return $agentAccessDenied;
+        }
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
@@ -749,7 +758,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -787,7 +796,7 @@ class StreamController extends AbstractController
             );
 
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage, $pinnedAgentId) {
+            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage, $pinnedAgentId, $pinnedAgentVersionId) {
                 if (!$incomingMessage) {
                     return null;
                 }
@@ -824,7 +833,7 @@ class StreamController extends AbstractController
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
-                    $this->stampAgentId($outgoingMessage, $pinnedAgentId);
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     $displayProvider = $intendedChat['provider'] ?? $provider;
                     $displayModel = $intendedChat['name'] ?? 'unknown';
@@ -963,7 +972,7 @@ class StreamController extends AbstractController
                     }
                 }
 
-                $this->stampAgentId($incomingMessage, $pinnedAgentId);
+                $this->stampAgentId($incomingMessage, $pinnedAgentId, $pinnedAgentVersionId);
                 if (null !== $pinnedAgentId && !$incognito) {
                     $this->em->flush();
                 }
@@ -1098,6 +1107,9 @@ class StreamController extends AbstractController
                     $processingOptions['agentId'] = $pinnedAgentId;
                     if ($draftRequested) {
                         $processingOptions['agentDraft'] = true;
+                    }
+                    if (null !== $pinnedAgentVersionId) {
+                        $processingOptions['agentVersionId'] = $pinnedAgentVersionId;
                     }
                 }
 
@@ -1496,7 +1508,7 @@ class StreamController extends AbstractController
                         $this->em->persist($outgoingMessage);
                         $this->em->flush(); // Flush to get message ID for metadata
                     }
-                    $this->stampAgentId($outgoingMessage, $pinnedAgentId);
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Store error details in metadata (show user's selected chat model, not literal "error")
                     $outgoingMessage->setMeta(
@@ -1767,7 +1779,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
-                    $this->stampAgentId($outgoingMessage, $pinnedAgentId);
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Incognito: the OUT message stays transient. addFile() below
                     // is in-memory only — the File rows themselves exist (marked
@@ -2016,6 +2028,8 @@ class StreamController extends AbstractController
                     'source' => $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
                     'response_text' => $finalText,
                     'input_text' => $messageText,
+                    'agentId' => $pinnedAgentId,
+                    'agentVersionId' => $pinnedAgentVersionId,
                 ]);
 
                 // Usage taximeter (issue: chat usage display). Build the
@@ -2892,6 +2906,8 @@ class StreamController extends AbstractController
                 'source' => $source,
                 'response_text' => $content,
                 'input_text' => $message->getText(),
+                'agentId' => $options['agentId'] ?? null,
+                'agentVersionId' => $options['agentVersionId'] ?? null,
             ]);
 
             // Usage taximeter (mirrors the streaming branch): per-message usage
@@ -3068,12 +3084,37 @@ class StreamController extends AbstractController
         return $agentId;
     }
 
-    private function stampAgentId(Message $message, ?int $agentId): void
+    /**
+     * @param-out int|null $agentVersionId
+     */
+    private function denyAgentRuntime(?User $user, ?int $agentId, bool $draft, ?int $chatId, ?int &$agentVersionId): ?JsonResponse
+    {
+        $agentVersionId = null;
+        if (null === $user || null === $agentId || $agentId < 1 || null === $this->agentRuntimeResolver) {
+            return null;
+        }
+
+        try {
+            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $draft, $chatId);
+            $agentVersionId = $profile->agentVersionId;
+        } catch (AgentNotAccessibleException|AgentNotPublishedException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AgentArchivedException) {
+            return $this->json(['error' => 'archived'], Response::HTTP_GONE);
+        }
+
+        return null;
+    }
+
+    private function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void
     {
         if (null === $agentId || $agentId < 1) {
             return;
         }
         $message->setMeta('AGENTID', (string) $agentId);
+        if (null !== $agentVersionId && $agentVersionId > 0) {
+            $message->setMeta('AGENTVERSIONID', (string) $agentVersionId);
+        }
     }
 
     /**

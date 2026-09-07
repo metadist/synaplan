@@ -17,6 +17,9 @@
           <span v-if="card.version != null">
             · {{ $t('assistants.version') }} {{ card.version }}</span
           >
+          <span v-if="card.status === 'archived'" data-testid="badge-card-archived">
+            · {{ $t('assistants.archivedBadge') }}</span
+          >
         </p>
       </div>
     </div>
@@ -25,7 +28,7 @@
         type="button"
         class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="btn-assistant-start-chat"
-        :disabled="cardId == null"
+        :disabled="cardId == null || card.canStartChat === false || card.status === 'archived'"
         @click="emitStartChat"
       >
         {{ $t('assistants.startChat') }}
@@ -40,7 +43,7 @@
         {{ $t('assistants.clone') }}
       </button>
       <button
-        v-if="card.origin === 'mine'"
+        v-if="card.origin === 'mine' || card.canEdit === true"
         type="button"
         class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
         data-testid="btn-assistant-edit"

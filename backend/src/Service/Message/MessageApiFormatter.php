@@ -212,6 +212,7 @@ final readonly class MessageApiFormatter
             'canRetryModel' => $errorFields['canRetryModel'],
             'errorDebug' => $errorFields['errorDebug'],
             'agentId' => $this->agentIdFromMeta($m),
+            'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
@@ -222,7 +223,12 @@ final readonly class MessageApiFormatter
 
     private function agentIdFromMeta(Message $m): ?int
     {
-        $raw = $m->getMeta('AGENTID');
+        return $this->intMeta($m, 'AGENTID');
+    }
+
+    private function intMeta(Message $m, string $key): ?int
+    {
+        $raw = $m->getMeta($key);
         if (null === $raw || !is_numeric($raw)) {
             return null;
         }

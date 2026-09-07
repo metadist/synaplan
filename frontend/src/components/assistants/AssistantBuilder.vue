@@ -23,6 +23,7 @@
       <BuilderInstructions />
       <BuilderModels />
       <BuilderKnowledge />
+      <AssistantPublishSection />
     </div>
     <AssistantTestPanel />
   </div>
@@ -37,6 +38,7 @@ import BuilderInstructions from './BuilderInstructions.vue'
 import BuilderModels from './BuilderModels.vue'
 import BuilderKnowledge from './BuilderKnowledge.vue'
 import AssistantTestPanel from './AssistantTestPanel.vue'
+import AssistantPublishSection from './AssistantPublishSection.vue'
 
 const store = useAgentsStore()
 const { t } = useI18n()

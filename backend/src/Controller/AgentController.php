@@ -5,12 +5,19 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\AgentVersionRepository;
+use App\Repository\UseLogRepository;
+use App\Repository\UserRepository;
+use App\Service\Agent\AgentAccess;
 use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentPublisher;
 use App\Service\Agent\AgentSerializer;
 use App\Service\Agent\AgentService;
 use App\Service\Agent\Exception\AgentDefinitionException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotDraftException;
+use App\Service\Agent\Exception\AgentNothingChangedException;
+use App\Service\Iam\Permission;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +34,11 @@ final class AgentController extends AbstractController
         private AgentConfig $config,
         private AgentService $service,
         private AgentSerializer $serializer,
+        private AgentAccess $access,
+        private AgentPublisher $publisher,
+        private AgentVersionRepository $versions,
+        private UseLogRepository $useLogs,
+        private UserRepository $users,
     ) {
     }
 
@@ -186,7 +198,7 @@ final class AgentController extends AbstractController
     #[OA\Get(
         path: '/api/v1/agents/gallery',
         summary: 'Gallery cards for the current user\'s assistants',
-        description: 'S2 returns mine only. Cards never include the draft JSON. Shared and plugin origins arrive in later sprints.',
+        description: 'Mine plus assistants shared with the caller (origin=shared). Cards never include the draft JSON.',
         tags: ['Agents'],
         responses: [
             new OA\Response(
@@ -209,6 +221,13 @@ final class AgentController extends AbstractController
                                 new OA\Property(property: 'version', type: 'integer', nullable: true, example: null),
                                 new OA\Property(property: 'updatedAt', type: 'integer', example: 1757232000),
                                 new OA\Property(property: 'starterPrompts', type: 'array', items: new OA\Items(type: 'string'), example: ['Review this NDA']),
+                                new OA\Property(property: 'sharedVia', type: 'object', nullable: true, properties: [
+                                    new OA\Property(property: 'type', type: 'string', example: 'group'),
+                                    new OA\Property(property: 'name', type: 'string', example: 'Legal'),
+                                ]),
+                                new OA\Property(property: 'canEdit', type: 'boolean', example: true),
+                                new OA\Property(property: 'canStartChat', type: 'boolean', example: true),
+                                new OA\Property(property: 'canClone', type: 'boolean', example: true),
                             ]
                         )),
                     ]
@@ -226,20 +245,14 @@ final class AgentController extends AbstractController
         }
         \assert($user instanceof User);
 
-        $ownerName = $this->serializer->displayName($user);
-        $cards = array_map(
-            fn ($agent) => $this->serializer->galleryCard($agent, $ownerName),
-            $this->service->listOwned((int) $user->getId()),
-        );
-
-        return $this->json(['success' => true, 'cards' => $cards]);
+        return $this->json(['success' => true, 'cards' => $this->service->galleryCards($user)]);
     }
 
     #[Route('/{id}/clone', name: 'clone', methods: ['POST'], requirements: ['id' => '\d+'])]
     #[OA\Post(
         path: '/api/v1/agents/{id}/clone',
-        summary: 'Clone an owned assistant into a new draft',
-        description: 'Copies the draft and instruction text. Sets parentId to the source. Files in the source own-folder are not copied. Foreign ids return 404.',
+        summary: 'Clone a readable assistant into a new draft',
+        description: 'Copies the published definition and prompt text when a version exists; the owner may clone an unpublished draft. IAM read is enough. Files are never copied. Foreign ids return 404.',
         tags: ['Agents'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
@@ -292,7 +305,7 @@ final class AgentController extends AbstractController
     #[Route('/{id}', name: 'get', methods: ['GET'], requirements: ['id' => '\d+'])]
     #[OA\Get(
         path: '/api/v1/agents/{id}',
-        summary: 'Get one owned assistant including its draft',
+        summary: 'Get one assistant. Editors receive the draft; readers do not.',
         tags: ['Agents'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
@@ -332,19 +345,23 @@ final class AgentController extends AbstractController
         \assert($user instanceof User);
 
         try {
-            $agent = $this->service->requireOwned($id, (int) $user->getId());
+            $agent = $this->access->require($user, $id, Permission::Read);
         } catch (AgentNotAccessibleException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(['success' => true, 'agent' => $this->serializer->full($agent)]);
+        $payload = $this->access->can($user, $agent, Permission::Edit)
+            ? $this->serializer->full($agent)
+            : $this->serializer->publicView($agent);
+
+        return $this->json(['success' => true, 'agent' => $payload]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PATCH'], requirements: ['id' => '\d+'])]
     #[OA\Patch(
         path: '/api/v1/agents/{id}',
-        summary: 'Update an owned assistant',
-        description: 'Partial update. When draft is sent it is validated as a whole agent.v1 document. routable is stored but has no classifier effect until S4.',
+        summary: 'Update an assistant',
+        description: 'Partial update for the owner or an IAM editor. status archived|published is owner-only. When draft is sent it is validated as a whole agent.v1 document.',
         tags: ['Agents'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         requestBody: new OA\RequestBody(
@@ -355,6 +372,7 @@ final class AgentController extends AbstractController
                 new OA\Property(property: 'icon', type: 'string'),
                 new OA\Property(property: 'draft', type: 'object'),
                 new OA\Property(property: 'routable', type: 'boolean'),
+                new OA\Property(property: 'status', type: 'string', enum: ['archived', 'published']),
             ])
         ),
         responses: [
@@ -402,8 +420,12 @@ final class AgentController extends AbstractController
         \assert($user instanceof User);
 
         try {
-            $agent = $this->service->requireOwned($id, (int) $user->getId());
-            $agent = $this->service->update($agent, $request->toArray());
+            $data = $request->toArray();
+            $needsOwner = array_key_exists('status', $data);
+            $agent = $needsOwner
+                ? $this->service->requireOwned($id, (int) $user->getId())
+                : $this->access->require($user, $id, Permission::Edit);
+            $agent = $this->service->update($agent, $data);
         } catch (AgentNotAccessibleException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         } catch (AgentDefinitionException $e) {
@@ -418,8 +440,8 @@ final class AgentController extends AbstractController
     #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
     #[OA\Delete(
         path: '/api/v1/agents/{id}',
-        summary: 'Delete a draft assistant',
-        description: 'Drafts only in S1. Published and archived assistants cannot be deleted yet.',
+        summary: 'Delete a draft or archived assistant',
+        description: 'Published assistants cannot be deleted. Archived assistants delete versions and shares first.',
         tags: ['Agents'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
@@ -447,6 +469,235 @@ final class AgentController extends AbstractController
         }
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
+    }
+
+    #[Route('/{id}/publish', name: 'publish', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/agents/{id}/publish',
+        summary: 'Publish an immutable version',
+        tags: ['Agents'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'changelog', type: 'string', example: 'Clearer instructions for NDAs'),
+        ])),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Published version card',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'version', type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 3),
+                        new OA\Property(property: 'version', type: 'integer', example: 1),
+                        new OA\Property(property: 'changelog', type: 'string', nullable: true, example: 'First cut'),
+                        new OA\Property(property: 'publishedByName', type: 'string', example: 'Ada'),
+                        new OA\Property(property: 'createdAt', type: 'integer', example: 1757232000),
+                    ]),
+                ])
+            ),
+            new OA\Response(response: 400, description: 'Invalid draft'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+            new OA\Response(response: 409, description: 'nothing_changed'),
+        ]
+    )]
+    public function publish(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        $changelog = '';
+        $data = $request->toArray();
+        if (isset($data['changelog']) && is_string($data['changelog'])) {
+            $changelog = $data['changelog'];
+        }
+
+        try {
+            $agent = $this->access->require($user, $id, Permission::Edit);
+            $version = $this->publisher->publish($agent, $user, $changelog);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AgentNothingChangedException) {
+            return $this->json(['error' => 'nothing_changed'], Response::HTTP_CONFLICT);
+        } catch (AgentDefinitionException $e) {
+            return $this->json(['error' => $e->getMessage(), 'path' => $e->path], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json([
+            'success' => true,
+            'version' => $this->serializer->versionCard($version, $this->serializer->displayName($user)),
+        ]);
+    }
+
+    #[Route('/{id}/versions', name: 'versions', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/agents/{id}/versions',
+        summary: 'List published versions (no definitions)',
+        tags: ['Agents'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Version cards',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'versions', type: 'array', items: new OA\Items(type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'version', type: 'integer'),
+                        new OA\Property(property: 'changelog', type: 'string', nullable: true),
+                        new OA\Property(property: 'publishedByName', type: 'string'),
+                        new OA\Property(property: 'createdAt', type: 'integer'),
+                    ])),
+                ])
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function versions(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        try {
+            $agent = $this->access->require($user, $id, Permission::Read);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $cards = [];
+        foreach ($this->versions->findAllForAgent((int) $agent->getId()) as $version) {
+            $cards[] = $this->serializer->versionCard($version, $this->publisherName($version->getPublishedBy()));
+        }
+
+        return $this->json(['success' => true, 'versions' => $cards]);
+    }
+
+    #[Route('/{id}/versions/{version}', name: 'version', methods: ['GET'], requirements: ['id' => '\d+', 'version' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/agents/{id}/versions/{version}',
+        summary: 'Version detail including the definition (owner or edit)',
+        tags: ['Agents'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'version', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Version detail',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'version', type: 'object', properties: [
+                        new OA\Property(property: 'id', type: 'integer'),
+                        new OA\Property(property: 'version', type: 'integer'),
+                        new OA\Property(property: 'changelog', type: 'string', nullable: true),
+                        new OA\Property(property: 'publishedByName', type: 'string'),
+                        new OA\Property(property: 'createdAt', type: 'integer'),
+                        new OA\Property(property: 'definition', type: 'object'),
+                        new OA\Property(property: 'promptText', type: 'string'),
+                    ]),
+                ])
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function version(int $id, int $version, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        try {
+            $agent = $this->access->require($user, $id, Permission::Edit);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $row = $this->versions->findByAgentAndVersion((int) $agent->getId(), $version);
+        if (null === $row) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'success' => true,
+            'version' => $this->serializer->versionDetail($row, $this->publisherName($row->getPublishedBy())),
+        ]);
+    }
+
+    #[Route('/{id}/usage', name: 'usage', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/agents/{id}/usage',
+        summary: 'Owner usage totals per version and per day (no user identities)',
+        tags: ['Agents'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'from', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'to', in: 'query', required: false, schema: new OA\Schema(type: 'integer')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Usage aggregates',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'success', type: 'boolean', example: true),
+                    new OA\Property(property: 'byVersion', type: 'array', items: new OA\Items(type: 'object', properties: [
+                        new OA\Property(property: 'agentVersionId', type: 'integer', nullable: true),
+                        new OA\Property(property: 'version', type: 'integer', nullable: true),
+                        new OA\Property(property: 'messages', type: 'integer'),
+                        new OA\Property(property: 'tokens', type: 'integer'),
+                        new OA\Property(property: 'cost', type: 'string'),
+                        new OA\Property(property: 'distinctUsers', type: 'integer'),
+                    ])),
+                    new OA\Property(property: 'byDay', type: 'array', items: new OA\Items(type: 'object', properties: [
+                        new OA\Property(property: 'day', type: 'string', example: '2026-09-07'),
+                        new OA\Property(property: 'messages', type: 'integer'),
+                        new OA\Property(property: 'tokens', type: 'integer'),
+                        new OA\Property(property: 'cost', type: 'string'),
+                    ])),
+                ])
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function usage(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+
+        try {
+            $this->access->require($user, $id, Permission::Edit);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $to = $request->query->getInt('to') ?: time();
+        $from = $request->query->getInt('from') ?: ($to - 30 * 86400);
+        if ($from > $to) {
+            return $this->json(['error' => 'from must be before to'], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true] + $this->useLogs->aggregateForAgent($id, $from, $to));
+    }
+
+    private function publisherName(int $userId): string
+    {
+        $publisher = $this->users->find($userId);
+
+        return $publisher instanceof User ? $this->serializer->displayName($publisher) : '';
     }
 
     private function guard(?User $user): ?JsonResponse

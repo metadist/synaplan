@@ -84,7 +84,7 @@ final class MessageClassifierAgentPinTest extends TestCase
             ragLimit: 8,
             ragMinScore: 0.6,
         );
-        $this->resolver->expects(self::once())->method('resolve')->with(7, $user, true)->willReturn($profile);
+        $this->resolver->expects(self::once())->method('resolve')->with(7, $user, false, null)->willReturn($profile);
         $this->sorter->expects(self::never())->method('classify');
 
         $message = $this->message(4, 'Please review this NDA');
@@ -127,6 +127,7 @@ final class MessageClassifierAgentPinTest extends TestCase
         $message->method('getFile')->willReturn(0);
         $message->method('getFiles')->willReturn(new \Doctrine\Common\Collections\ArrayCollection());
         $message->method('getTopic')->willReturn('CHAT');
+        $message->method('getChatId')->willReturn(null);
 
         return $message;
     }
