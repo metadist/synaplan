@@ -5,8 +5,13 @@ namespace App\Service\Message;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Repository\UserRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
@@ -84,6 +89,9 @@ final readonly class MessageClassifier
         private ?OfficeConverterClient $officeConverter = null,
         private ?DocumentToolsConfig $documentToolsConfig = null,
         private ?MultitaskRoutingConfig $multitaskConfig = null,
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
+        private ?UserRepository $userRepository = null,
     ) {
     }
 
@@ -97,14 +105,20 @@ final readonly class MessageClassifier
      *                                      false by {@see InferenceRouter} when a deferral came
      *                                      back unhonoured, so the second pass takes the AI
      *                                      sorter instead of deferring again
+     * @param array   $options              Optional pin (`agentId`) and other classifier hints
      *
      * @return array ['topic' => string, 'language' => string, 'source' => string, 'skip_sorting' => bool]
      */
-    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null, bool $allowRoutingDeferral = true): array
+    public function classify(Message $message, array $conversationHistory = [], ?int $overrideModelId = null, bool $allowRoutingDeferral = true, array $options = []): array
     {
         $userId = $message->getUserId();
         $messageId = $message->getId();
         $text = $message->getText();
+
+        $pinned = $this->tryPinAgent($message, $options);
+        if (null !== $pinned) {
+            return $pinned;
+        }
 
         $this->logger->info('MessageClassifier: Starting classification', [
             'message_id' => $messageId,
@@ -583,6 +597,82 @@ final readonly class MessageClassifier
      * Check for prompt override (Again function)
      * Returns prompt ID if set, null otherwise.
      */
+    /**
+     * Pin the turn to an assistant when `agentId` is present and the flag is on.
+     * Runs before the fast-path and before PROMPTID so a pinned chat never
+     * becomes `general`. MessageSorter is never invoked on this path.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>|null
+     */
+    private function tryPinAgent(Message $message, array $options): ?array
+    {
+        $agentId = isset($options['agentId']) ? (int) $options['agentId'] : 0;
+        $messageId = $message->getId();
+        if ($agentId < 1 && null !== $messageId) {
+            $meta = $this->messageMetaRepository->findOneBy([
+                'messageId' => $messageId,
+                'metaKey' => 'AGENTID',
+            ]);
+            if ($meta && is_numeric($meta->getMetaValue())) {
+                $agentId = (int) $meta->getMetaValue();
+            }
+        }
+        if ($agentId < 1) {
+            return null;
+        }
+
+        $userId = $message->getUserId();
+        if (null === $this->agentConfig
+            || !$this->agentConfig->isEnabled($userId)
+            || null === $this->agentRuntimeResolver
+            || null === $this->userRepository
+        ) {
+            return null;
+        }
+
+        $user = $this->userRepository->find($userId);
+        if (!$user instanceof User) {
+            return null;
+        }
+
+        try {
+            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, true);
+        } catch (AgentNotAccessibleException) {
+            return null;
+        }
+
+        $decision = RoutingDecision::deterministic(RoutingLayer::AgentPin, $profile->promptTopic);
+        $language = $message->getLanguage();
+        if (!$language || 'NN' === $language) {
+            $language = 'en';
+        }
+
+        $this->logger->info('MessageClassifier: Using agent pin (skipped AI sorter)', [
+            'message_id' => $messageId,
+            'agent_id' => $profile->agentId,
+            'topic' => $profile->promptTopic,
+        ]);
+
+        return array_merge([
+            'topic' => $profile->promptTopic,
+            'language' => $language,
+            'web_search' => null,
+            'source' => $decision->toClassificationSource(),
+            'skip_sorting' => true,
+            'intent' => 'chat',
+            'prompt_id' => $profile->promptId,
+            'agent_id' => $profile->agentId,
+            'agent_version_id' => $profile->agentVersionId,
+            'rag_group_key' => $profile->primaryRagGroupKey(),
+            'rag_limit' => $profile->ragLimit,
+            'rag_min_score' => $profile->ragMinScore,
+            'model_id' => $profile->modelIds['chat'] ?? null,
+            'runtime_profile' => $profile,
+        ], $decision->toClassificationFields());
+    }
+
     private function checkPromptOverride(?int $messageId): ?string
     {
         // Transient (incognito) messages are never persisted, so no PROMPTID

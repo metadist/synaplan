@@ -27,6 +27,9 @@ enum RoutingLayer: string
     /** "Again" with a specific prompt/topic re-selected by the user. */
     case PromptOverride = 'prompt_override';
 
+    /** Chat pinned to an assistant via `agentId` — MessageSorter is never called. */
+    case AgentPin = 'agent';
+
     /** Slash command (/pic, /vid, /tts, /search, /lang, /web, /list, /docs). */
     case ToolCommand = 'tool_command';
 

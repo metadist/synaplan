@@ -5,6 +5,7 @@ namespace App\Service\Message;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\ModelConfigService;
@@ -14,6 +15,7 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
@@ -62,6 +64,7 @@ final readonly class MessageProcessor
         private TaskPlanStore $taskPlanStore,
         private TaskPlanExecutor $taskPlanExecutor,
         private ConversationSummaryService $conversationSummaryService,
+        private ?AgentConfig $agentConfig = null,
     ) {
     }
 
@@ -102,6 +105,8 @@ final readonly class MessageProcessor
 
             // Check if this is a Widget request with fixed task prompt
             // If so, skip classification entirely and use the fixed prompt
+            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
+            $options = $this->applyAgentPinToOptions($message, $options, $hasFixedPrompt);
             $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
 
             // Step 2: Classification (Sorting) - skip if "Again" or Widget with fixed prompt
@@ -170,7 +175,8 @@ final readonly class MessageProcessor
             } elseif (!empty($options['is_widget_mode'])) {
                 // Widget Mode without fixed prompt: still disable memories
                 $perfTimer->start('classify');
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
+                $classification = $this->afterClassify($classification, $options);
                 $perfTimer->stop('classify');
                 $classification['is_widget_mode'] = true;
             } elseif ($isAgainRequest) {
@@ -271,19 +277,23 @@ final readonly class MessageProcessor
                     // Run classification (override_model_id is NOT passed to classifier;
                     // it's added to classification below so ChatHandler can use it)
                     $perfTimer->start('classify');
-                    $classification = $this->classifier->classify($message, $conversationHistory);
+                    $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
                     $perfTimer->stop('classify');
                 }
 
-                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
-                $sortingModelId = $classification['model_id'] ?? null;
-                $sortingProvider = $classification['provider'] ?? null;
-                $sortingModelName = $classification['model_name'] ?? null;
+                $classification = $this->afterClassify($classification, $options);
 
-                // Remove sorting model info from classification
-                unset($classification['model_id']);
-                unset($classification['provider']);
-                unset($classification['model_name']);
+                // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler!)
+                // An agent pin puts the *chat* model on model_id — keep it.
+                if ('agent' !== ($classification['source'] ?? '')) {
+                    $sortingModelId = $classification['model_id'] ?? null;
+                    $sortingProvider = $classification['provider'] ?? null;
+                    $sortingModelName = $classification['model_name'] ?? null;
+
+                    unset($classification['model_id']);
+                    unset($classification['provider']);
+                    unset($classification['model_name']);
+                }
 
                 // User-selected model from dropdown → pass through as override_model_id
                 if (!empty($options['override_model_id'])) {
@@ -672,6 +682,8 @@ final readonly class MessageProcessor
             $sortingModelName = null;
             $isAgainRequest = !empty($options['is_again']);
             $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
+            $options = $this->applyAgentPinToOptions($message, $options, $hasFixedPrompt);
+            $hasFixedPrompt = isset($options['fixed_task_prompt']) && !empty($options['fixed_task_prompt']);
             $languageOverride = $options['language'] ?? null;
 
             if (!$hasFixedPrompt && !$isAgainRequest) {
@@ -798,16 +810,19 @@ final readonly class MessageProcessor
                     'model_id' => $classification['model_id'],
                 ]);
             } else {
-                $classification = $this->classifier->classify($message, $conversationHistory);
+                $classification = $this->classifier->classify($message, $conversationHistory, null, true, $this->classifyOptions($options));
+                $classification = $this->afterClassify($classification, $options);
 
                 // IMPORTANT: Save sorting model info separately (don't pass to ChatHandler).
-                $sortingModelId = $classification['model_id'] ?? null;
-                $sortingProvider = $classification['provider'] ?? null;
-                $sortingModelName = $classification['model_name'] ?? null;
+                if ('agent' !== ($classification['source'] ?? '')) {
+                    $sortingModelId = $classification['model_id'] ?? null;
+                    $sortingProvider = $classification['provider'] ?? null;
+                    $sortingModelName = $classification['model_name'] ?? null;
 
-                unset($classification['model_id']);
-                unset($classification['provider']);
-                unset($classification['model_name']);
+                    unset($classification['model_id']);
+                    unset($classification['provider']);
+                    unset($classification['model_name']);
+                }
 
                 // User-selected model from dropdown → pass through as override_model_id
                 if (!empty($options['override_model_id'])) {
@@ -1382,6 +1397,65 @@ final readonly class MessageProcessor
         }
 
         return 'en';
+    }
+
+    /**
+     * Drop agentId when the flag is off so stream callers cannot pin a chat.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function applyAgentPinToOptions(Message $message, array $options, bool $hasFixedPrompt): array
+    {
+        if (empty($options['agentId'])) {
+            return $options;
+        }
+        if ($hasFixedPrompt || null === $this->agentConfig || !$this->agentConfig->isEnabled($message->getUserId())) {
+            unset($options['agentId']);
+        }
+
+        return $options;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function classifyOptions(array $options): array
+    {
+        $out = [];
+        if (!empty($options['agentId'])) {
+            $out['agentId'] = (int) $options['agentId'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function afterClassify(array $classification, array &$options): array
+    {
+        $profile = $classification['runtime_profile'] ?? null;
+        if ($profile instanceof RuntimeProfile) {
+            $options['runtime_profile'] = $profile;
+            if (empty($options['rag_group_key']) && null !== $profile->primaryRagGroupKey()) {
+                $options['rag_group_key'] = $profile->primaryRagGroupKey();
+            }
+            if (!isset($options['rag_limit']) && null !== $profile->ragLimit) {
+                $options['rag_limit'] = $profile->ragLimit;
+            }
+            if (!isset($options['rag_min_score']) && null !== $profile->ragMinScore) {
+                $options['rag_min_score'] = $profile->ragMinScore;
+            }
+        }
+
+        return $classification;
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void

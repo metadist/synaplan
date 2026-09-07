@@ -8,7 +8,7 @@ before the first sprint starts.**
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Entity & pinned runtime | — | planned | |
+| S1 Entity & pinned runtime | `feat/agent-builder-s1` / synaplan | done | AB1–AB8: BAGENTS + BAGENTVERSIONS, `AGENTS.ENABLED` off, owner CRUD, `agentId` pin, Zod schemas regenerated |
 | S2 Builder & gallery | — | planned | J-AB-1; empty state is the first Vue |
 | S3 Publish & versions | — | planned | J-AB-2…4; Share waits on IAM-UX |
 | S4 Knowledge, tools, skills | — | planned | Parameters folded into Models → Advanced settings |
@@ -39,6 +39,11 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 **2026-09-07 (UX contract):** remaining UI sprints name journeys and
 walk them before merge (U1–U12). Publish/share is not a second
 permission model and not the S2 stacked dialog.
+
+**2026-09-07 (S1 implemented on `feat/agent-builder-s1`):** BAGENTS / BAGENTVERSIONS,
+`AGENTS.ENABLED` seeded off, owner CRUD, `agentId` classifier pin, Zod schemas
+regenerated. Gate green without re-recording `routing_classification.json`. Next:
+S2 gallery/builder (separate branch).
 
 **2026-09-07 (trigger wording, second UX pass):** the plan had spread
 "when does this assistant act" over a *Tasks* section (schedules, cron
