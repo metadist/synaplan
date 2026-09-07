@@ -318,8 +318,8 @@ jobs:
             echo "Running installations keep the version their operator pinned."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Deliberately a separate, optional channel from DISCORD_E2E_FLAKY_WEBHOOK:
-      # a version rollout is an operations event, not a test result. Silent when
+      # Deliberately a separate, optional channel from DISCORD_REPORT_LOGS_WEBHOOK:
+      # a version rollout is an operations event, not a routine report. Silent when
       # nothing happened, so a nightly run on an empty branch stays quiet.
       - name: Report to Discord
         if: always() && steps.proposal.outputs.number != ''

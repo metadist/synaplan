@@ -537,6 +537,94 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('gpt-image-1', $output);
     }
 
+    public function testResolutionTierDriftIsDetectedWhenHeadlineMatches(): void
+    {
+        // Veo-shaped row: the headline per-second rate still agrees with LiteLLM's
+        // base rate, but the 1080p tier that billing actually charges from has
+        // moved. Comparing the headline alone reports "unchanged" and hides a live
+        // mispricing, which is exactly how the Veo 3.1 Fast overcharge stayed
+        // invisible.
+        $model = $this->createNonTokenModelMock(
+            'google',
+            'veo-3.1-fast-generate-preview',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.10,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 195,
+            resolutionPrices: ['720p' => 0.10, '1080p' => 0.18, '4K' => 0.30],
+        );
+
+        $this->mockLiteLLMResponse([
+            'gemini/veo-3.1-fast-generate-preview' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.10,
+                'output_cost_per_second_1080p' => 0.12,
+                'output_cost_per_second_4k' => 0.30,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('Non-per-token price drift', $output);
+        $this->assertStringContainsString('resolution tiers', $output);
+        $this->assertStringContainsString('1080p:', $output);
+        // The tiers that agree must not be listed, or every report becomes noise.
+        $this->assertStringNotContainsString('720p:', $output);
+        $this->assertStringNotContainsString('4K:', $output);
+    }
+
+    public function testResolutionTierWithoutUpstreamKeyBillsAtTheBaseRate(): void
+    {
+        // Veo 3.1 Standard: Google charges one rate for both 720p and 1080p, so
+        // LiteLLM publishes no _1080p key at all — it only lists tiers that cost
+        // more than the base. An absent tier key therefore means "bills at the base
+        // rate" and must not be read as drift.
+        $model = $this->createNonTokenModelMock(
+            'google',
+            'veo-3.1-generate-preview',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.40,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 45,
+            resolutionPrices: ['720p' => 0.40, '1080p' => 0.40, '4K' => 0.60],
+        );
+
+        $this->mockLiteLLMResponse([
+            'gemini/veo-3.1-generate-preview' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.40,
+                'output_cost_per_second_4k' => 0.60,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Non-per-token price drift', $output);
+    }
+
     public function testModeMismatchImageIsReportedNotDrift(): void
     {
         // dall-e-3 is per_token in the catalog, LiteLLM flat per_image → mode
@@ -642,7 +730,7 @@ class SyncModelPricesCommandTest extends TestCase
     {
         // A per_token catalog model that LiteLLM reports as flat per_image is a
         // structural mode mismatch — permanent, so it must NEVER fail the drift gate
-        // (otherwise the weekly CI would be red forever).
+        // (otherwise the scheduled CI would be red forever).
         $model = $this->createModelMock('openai', 'dall-e-3', 0.0, 0.0);
 
         $this->mockLiteLLMResponse([
@@ -695,7 +783,13 @@ class SyncModelPricesCommandTest extends TestCase
         string $outUnit,
         string $mode,
         int $id = 1,
+        array $resolutionPrices = [],
     ): Model {
+        $json = ['pricing_mode' => $mode];
+        if ([] !== $resolutionPrices) {
+            $json['resolution_prices'] = $resolutionPrices;
+        }
+
         $model = $this->createMock(Model::class);
         $model->method('getId')->willReturn($id);
         $model->method('getService')->willReturn($service);
@@ -704,7 +798,7 @@ class SyncModelPricesCommandTest extends TestCase
         $model->method('getPriceOut')->willReturn($priceOut);
         $model->method('getInUnit')->willReturn($inUnit);
         $model->method('getOutUnit')->willReturn($outUnit);
-        $model->method('getJson')->willReturn(['pricing_mode' => $mode]);
+        $model->method('getJson')->willReturn($json);
 
         return $model;
     }

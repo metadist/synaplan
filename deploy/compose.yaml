@@ -281,7 +281,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.19.0@sha256:057ee3a8da769fe7310dd3537b4dc7583bf87a95ce8ac43c0af5a46bc580d1fc
+    image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
@@ -297,24 +297,26 @@ services:
   # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
   # (or `--profile office`). No published port.
   collabora:
-    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
     profiles: [office]
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
     mem_limit: 2g
-    # CODE 25.04 dropped curl (CollaboraOnline/online#11856). Same /dev/tcp
-    # probe as the ollama service below; coolwsd --probe is 26.04+.
+    # CODE 26.04 is distroless: no bash, so the /dev/tcp probe of 25.04 cannot
+    # run here. coolwsd --probe is the upstream check (it is what the image's
+    # own HEALTHCHECK runs) and needs the exec form — a plain string would go
+    # through CMD-SHELL and fail for the same reason.
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9980 && printf 'GET /hosting/capabilities HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      test: ["CMD", "/usr/bin/coolwsd", "--probe", "--use-env-vars"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 120s
     restart: unless-stopped
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:020e4134285e2ef4d8fd801234176de3b4faadc992a3eb06c8e66a2f9d4c4ba2
+    image: ollama/ollama:latest@sha256:32931b46719f673c05fdbaa81ccb26da18ea4a1c57590a754874ab28ba269eb2
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

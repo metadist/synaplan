@@ -70,10 +70,7 @@ final readonly class BootstrapAdminConfiguration
      */
     public function password(): string
     {
-        $password = $this->password->getValue();
-        \assert(\is_string($password));
-
-        return $password;
+        return $this->password->getValue();
     }
 
     /**

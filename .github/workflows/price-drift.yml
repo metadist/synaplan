@@ -1,17 +1,24 @@
 name: Price Drift Check
 
-# Weekly guard that flags when a provider has changed prices upstream while our
+# Daily guard that flags when a provider has changed prices upstream while our
 # ModelCatalog.php still holds the old value. It runs `app:sync-model-prices
-# --dry-run --fail-on-drift`, which only reports drift for per-token models
-# (media/audio models are skipped by the #1318 mode guard). On drift it opens
-# (or comments on) a GitHub issue so a human can verify against the official
-# price page and update the catalog. This is informational — it deliberately
-# lives OUTSIDE the PR CI because it depends on an external source (LiteLLM)
-# that changes independently of our code.
+# --dry-run --fail-on-drift`, which reports drift for per-token models AND for
+# media/audio models whose pricing mode matches upstream, resolution tiers
+# included. The #1318 mode guard only blocks the automatic WRITE for those rows,
+# it never suppresses the detection; what it does exclude is a structural
+# `pricing_mode` mismatch, which is listed in the report but never fails the run
+# because the two sides measure different things and can never reconcile.
+#
+# Every run posts its report to Discord (#report-logs) so the channel carries a
+# daily record. On drift it also opens (or comments on) a GitHub issue so a human
+# can verify against the official price page and update the catalog; an unchanged
+# drift is not re-commented. This is informational — it deliberately lives
+# OUTSIDE the PR CI because it depends on an external source (LiteLLM) that
+# changes independently of our code.
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # every Monday 06:00 UTC
+    - cron: "0 6 * * *" # every day 06:00 UTC
   workflow_dispatch: {}
 
 permissions:
@@ -101,26 +108,110 @@ jobs:
       - name: Check for price drift
         id: drift
         working-directory: backend
+        env:
+          # Symfony's Terminal reads COLUMNS, and SymfonyStyle caps a block at its
+          # own MAX_LINE_LENGTH of 120. Without this the report wraps at the CI
+          # default of 80 and every model line breaks mid-sentence.
+          COLUMNS: 120
         run: |
           set +e
           php bin/console app:sync-model-prices --dry-run --fail-on-drift 2>&1 | tee drift-report.txt
           code=${PIPESTATUS[0]}
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+
+          # Just the models a human has to act on. The mode-mismatch and unmatched
+          # sections are steady state (they are reported every single run), so they
+          # stay out of both the Discord field and the change signature below.
+          awk '
+            /^Non-per-token price drift/ { section = 1; next }
+            /^Pricing-mode mismatch|^Unmatched|^Null-price protected/ { section = 0 }
+            section && /^ \* / { print }
+            /\[DRY-RUN\]/ { print }
+          ' drift-report.txt > drift-flagged.txt
+
+          # The counter block, which SymfonyStyle wraps over several lines at 120
+          # chars. Kept verbatim rather than re-joined: Discord renders it in a code
+          # block where the wrapping is harmless.
+          awk '/Price sync complete:/ { found = 1 } found { print; if (/unmatched/) exit }' \
+            drift-report.txt > drift-summary.txt
+
+          {
+            echo "exit_code=$code"
+            # Order-independent hash of the flagged set, with no timestamp in it,
+            # so a daily run can tell "same drift as yesterday" from "new drift".
+            echo "signature=$(sort drift-flagged.txt | sha256sum | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+
           exit "$code"
+
+      # Daily record of the check in #report-logs, drift or not. Runs even when a
+      # setup step above broke, because a monitor that silently stops reporting is
+      # worse than a noisy one. Optional: no webhook configured → no post.
+      - name: Report to Discord
+        if: always()
+        env:
+          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
+          CODE: ${{ steps.drift.outputs.exit_code }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          [ -n "${HOOK:-}" ] || exit 0
+
+          case "${CODE:-}" in
+            0) title="✅ No model price drift"; colour=3066993 ;;
+            2) title="⚠️ Model price drift detected"; colour=16776960 ;;
+            *) title="❌ Price drift check could not run"; colour=15158332 ;;
+          esac
+
+          summary="$(cat backend/drift-summary.txt 2>/dev/null || true)"
+          [ -n "$summary" ] || summary="No report produced — the check broke before it could compare prices."
+
+          flagged="$(cat backend/drift-flagged.txt 2>/dev/null || true)"
+          [ -n "$flagged" ] || flagged="none"
+
+          # Match DiscordNotificationService embed shape (title/fields/footer/timestamp).
+          # Field values max 1024; the full report stays in the run log and, on
+          # drift, in the GitHub issue.
+          payload="$(jq -n \
+            --arg title "$title" \
+            --arg summary "$summary" \
+            --arg flagged "$flagged" \
+            --arg run "$RUN_URL" \
+            --argjson colour "$colour" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              embeds: [{
+                title: $title,
+                color: $colour,
+                fields: [
+                  { name: "Summary", value: ("```\n" + ($summary | .[0:900]) + "\n```"), inline: false },
+                  { name: "Flagged models", value: ("```\n" + ($flagged | .[0:900]) + "\n```"), inline: false },
+                  { name: "Workflow", value: ("[Open run](" + $run + ")"), inline: true }
+                ],
+                footer: { text: "Synaplan price drift" },
+                timestamp: $ts
+              }]
+            }')"
+
+          curl --fail-with-body --silent --show-error --retry 3 \
+            -H 'Content-Type: application/json' \
+            -d "$payload" \
+            "$HOOK" \
+            || echo "::warning::Discord notification failed"
 
       - name: Open or update drift issue
         if: failure() && steps.drift.outputs.exit_code == '2'
         working-directory: backend
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIGNATURE: ${{ steps.drift.outputs.signature }}
         run: |
           TITLE="Price drift detected — verify against official provider pages"
           {
-            echo "The weekly price-drift check found per-token models whose price differs from the LiteLLM database (a provider likely changed prices)."
+            echo "The daily price-drift check found models whose price differs from the LiteLLM database (a provider likely changed prices)."
             echo ""
-            echo "**What to do:** verify each flagged model against its official price page and update \`backend/src/Model/ModelCatalog.php\`, then re-seed. Follow the playbook in \`docs/PRICING_MAINTENANCE.md\`."
+            echo "**What to do:** verify each flagged model against its official price page and update \`backend/src/Model/ModelCatalog.php\`, then ship a migration so existing installs get the corrected price. Follow the playbook in \`docs/PRICING_MAINTENANCE.md\`."
             echo ""
-            echo "_Media/audio models (per_image / per_character / per_second) are intentionally skipped by the sync guard (#1318) and never appear here._"
+            echo "_Per-token rows are the ones the sync could write itself. Media/audio rows (per_image / per_character / per_second, individual resolution tiers included) are compared and reported but never auto-written (#1318), so they always need a hand-authored catalog edit. Structural \`pricing_mode\` mismatches appear in the report below but never fail the check._"
             echo ""
             echo "<details><summary>Dry-run report ($(date -u +%Y-%m-%dT%H:%MZ))</summary>"
             echo ""
@@ -131,10 +222,21 @@ jobs:
             echo "</details>"
             echo ""
             echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "<!-- drift-signature: $SIGNATURE -->"
           } > drift-body.md
 
           EXISTING=$(gh issue list --state open --search "in:title \"Price drift detected\"" --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
+            # The check runs daily now, so an unresolved drift would otherwise
+            # stack one identical comment per day. Only report again once the set
+            # of flagged models actually changes.
+            if gh issue view "$EXISTING" --json body,comments \
+                 --jq '[.body] + [.comments[].body] | join("\n")' \
+                 | grep -qF "drift-signature: $SIGNATURE"; then
+              echo "Same flagged models as the last report on #$EXISTING — not commenting again."
+              exit 0
+            fi
             echo "Commenting on existing drift issue #$EXISTING"
             gh issue comment "$EXISTING" --body-file drift-body.md
           else

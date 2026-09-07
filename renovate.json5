@@ -9,7 +9,8 @@
   "timezone": "Europe/Berlin",
   "prHourlyLimit": 2,
   // Make the implicit Renovate default (10) explicit. Grouping already collapses
-  // minor/patch into ~6 buckets, so this is a backlog cap, not a per-dependency knob.
+  // minor/patch into ~6 buckets plus one for Docker digests, so this is a backlog
+  // cap, not a per-dependency knob.
   "prConcurrentLimit": 10,
   "prCreation": "immediate",
   "dependencyDashboard": true,
@@ -76,6 +77,37 @@
       "groupName": "Docker Images",
       "matchManagers": ["dockerfile", "docker-compose"],
       "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      // Digest bumps matched NO rule above (every group is minor/patch only), so
+      // each one opened its own PR: ~12 per month, each replaying the full CI
+      // pipeline because ci.yml has no path filters. They also sort FIRST in
+      // Renovate's creation order (pinDigest > pin > digest > patch > minor >
+      // major), so they were consuming the prHourlyLimit ahead of the real
+      // dependency updates. There is nothing to review per package either -- a
+      // digest has no changelog, it is classified by its tag
+      // (docs/DEPENDENCY_UPDATES.md §7).
+      "description": "Docker digest bumps grouped -- no changelog exists, review is tag-based",
+      "groupName": "Docker Digests",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["digest", "pinDigest"]
+    },
+    {
+      // Separates our own release artifacts from the third-party batch above: a
+      // digest move on one of our images is a deployment event, not upstream
+      // noise. Relies on the same "last match wins" ordering as the groups above.
+      //
+      // Do NOT express this as an exclusion on the rule above. Renovate rejects
+      // `matchPackageNames: ["*", "!ghcr.io/metadist/**"]` -- the check is
+      // `(matchers.includes('*') || matchers.includes('**')) && length > 1`, so a
+      // bare `*` may never share the array. It broke Renovate entirely once
+      // (#1729), and `renovate-config-validator` does NOT catch it: the error
+      // surfaces only at runtime, on the default branch, after merge.
+      "description": "Digests of our own images kept out of the third-party batch",
+      "groupName": "Synaplan Image Digests",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "matchPackageNames": ["ghcr.io/metadist/**"]
     },
     {
       "description": "Major updates: always individual, manual review",
