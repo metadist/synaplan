@@ -109,7 +109,7 @@ class OidcUserService
             } catch (\Throwable $e) {
                 $this->logger->error('Directory group sync failed; login continues without group changes', [
                     'user_id' => $user->getId(),
-                    'error' => $e->getMessage(),
+                    'exception' => $e,
                 ]);
             }
         }
