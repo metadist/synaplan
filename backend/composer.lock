@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0ad01e703c7409abf745440ee28b5924",
+    "content-hash": "5833b10ab0d103534c13d835c9202787",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -3581,16 +3581,16 @@
         },
         {
             "name": "google/protobuf",
-            "version": "v5.36.0",
+            "version": "v5.36.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/protocolbuffers/protobuf-php.git",
-                "reference": "9c105104b54709ecd902494ab340ed2122789b2d"
+                "reference": "d64d16befba8632967f604b9644c0bb8f64cfbc3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/9c105104b54709ecd902494ab340ed2122789b2d",
-                "reference": "9c105104b54709ecd902494ab340ed2122789b2d",
+                "url": "https://api.github.com/repos/protocolbuffers/protobuf-php/zipball/d64d16befba8632967f604b9644c0bb8f64cfbc3",
+                "reference": "d64d16befba8632967f604b9644c0bb8f64cfbc3",
                 "shasum": ""
             },
             "require": {
@@ -3619,9 +3619,9 @@
                 "proto"
             ],
             "support": {
-                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.36.0"
+                "source": "https://github.com/protocolbuffers/protobuf-php/tree/v5.36.1"
             },
-            "time": "2026-08-20T13:06:50+00:00"
+            "time": "2026-08-31T22:07:31+00:00"
         },
         {
             "name": "google/recaptcha",
@@ -4115,16 +4115,16 @@
         },
         {
             "name": "hoels/app-store-server-library-php",
-            "version": "2.0.0",
+            "version": "2.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hoels/app-store-server-library-php.git",
-                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4"
+                "reference": "b2b04981a7e1234f194ae585f792d3add296b302"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/a47a74bbd298ee372324ce75108e06e824ec8ad4",
-                "reference": "a47a74bbd298ee372324ce75108e06e824ec8ad4",
+                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/b2b04981a7e1234f194ae585f792d3add296b302",
+                "reference": "b2b04981a7e1234f194ae585f792d3add296b302",
                 "shasum": ""
             },
             "require": {
@@ -4160,9 +4160,9 @@
             "description": "The PHP server library for the App Store Server API and App Store Server Notifications.",
             "support": {
                 "issues": "https://github.com/hoels/app-store-server-library-php/issues",
-                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.0.0"
+                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.2.0"
             },
-            "time": "2026-03-01T15:30:51+00:00"
+            "time": "2026-09-03T21:36:49+00:00"
         },
         {
             "name": "hoels/ocsp-php",
@@ -5426,16 +5426,16 @@
         },
         {
             "name": "nelmio/api-doc-bundle",
-            "version": "v5.11.1",
+            "version": "v5.12.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nelmio/NelmioApiDocBundle.git",
-                "reference": "86d8ca816c0951f542c0095ac3680cab172c7920"
+                "reference": "a8ddb642c9ce1b134bf5084714d8475f79d8d06a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nelmio/NelmioApiDocBundle/zipball/86d8ca816c0951f542c0095ac3680cab172c7920",
-                "reference": "86d8ca816c0951f542c0095ac3680cab172c7920",
+                "url": "https://api.github.com/repos/nelmio/NelmioApiDocBundle/zipball/a8ddb642c9ce1b134bf5084714d8475f79d8d06a",
+                "reference": "a8ddb642c9ce1b134bf5084714d8475f79d8d06a",
                 "shasum": ""
             },
             "require": {
@@ -5536,7 +5536,7 @@
             ],
             "support": {
                 "issues": "https://github.com/nelmio/NelmioApiDocBundle/issues",
-                "source": "https://github.com/nelmio/NelmioApiDocBundle/tree/v5.11.1"
+                "source": "https://github.com/nelmio/NelmioApiDocBundle/tree/v5.12.0"
             },
             "funding": [
                 {
@@ -5544,7 +5544,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-08-12T10:26:23+00:00"
+            "time": "2026-09-03T13:29:16+00:00"
         },
         {
             "name": "nelmio/cors-bundle",
@@ -7169,16 +7169,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "2.3.4",
+            "version": "2.3.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "98dbc9412932af5825e6d5aa5d6bc4de7d82538a"
+                "reference": "148cefffaf0233e4c08cc13db8a195a56dd6dfe9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/98dbc9412932af5825e6d5aa5d6bc4de7d82538a",
-                "reference": "98dbc9412932af5825e6d5aa5d6bc4de7d82538a",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/148cefffaf0233e4c08cc13db8a195a56dd6dfe9",
+                "reference": "148cefffaf0233e4c08cc13db8a195a56dd6dfe9",
                 "shasum": ""
             },
             "require": {
@@ -7210,9 +7210,9 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.4"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.5"
             },
-            "time": "2026-08-30T16:25:38+00:00"
+            "time": "2026-08-31T16:05:28+00:00"
         },
         {
             "name": "predis/predis",
@@ -8175,16 +8175,16 @@
         },
         {
             "name": "stripe/stripe-php",
-            "version": "v21.3.0",
+            "version": "v21.3.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/stripe/stripe-php.git",
-                "reference": "fe99159b9ee0a74be3c12c0305e5338e0b9905c3"
+                "reference": "12986995cd5e229cc094d4b57de056f8e2e6e5a9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/fe99159b9ee0a74be3c12c0305e5338e0b9905c3",
-                "reference": "fe99159b9ee0a74be3c12c0305e5338e0b9905c3",
+                "url": "https://api.github.com/repos/stripe/stripe-php/zipball/12986995cd5e229cc094d4b57de056f8e2e6e5a9",
+                "reference": "12986995cd5e229cc094d4b57de056f8e2e6e5a9",
                 "shasum": ""
             },
             "require": {
@@ -8231,9 +8231,9 @@
             ],
             "support": {
                 "issues": "https://github.com/stripe/stripe-php/issues",
-                "source": "https://github.com/stripe/stripe-php/tree/v21.3.0"
+                "source": "https://github.com/stripe/stripe-php/tree/v21.3.1"
             },
-            "time": "2026-08-27T04:12:06+00:00"
+            "time": "2026-09-01T18:42:58+00:00"
         },
         {
             "name": "symfony/asset",
