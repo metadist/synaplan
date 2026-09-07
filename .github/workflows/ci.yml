@@ -886,7 +886,7 @@ jobs:
 
       - name: Notify Discord if any flaky tests
         env:
-          HOOK: ${{ secrets.DISCORD_E2E_FLAKY_WEBHOOK }}
+          HOOK: ${{ secrets.DISCORD_REPORT_LOGS_WEBHOOK }}
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

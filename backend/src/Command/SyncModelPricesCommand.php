@@ -26,13 +26,24 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class SyncModelPricesCommand extends Command
 {
     /**
-     * Exit code returned when --fail-on-drift is set and per-token price drift
-     * was detected. Distinct from Command::FAILURE (1, generic error) so CI can
-     * tell "provider prices moved" apart from "the command itself broke".
+     * Exit code returned when --fail-on-drift is set and price drift was
+     * detected — either a per-token price the sync could apply itself, or a
+     * same-mode non-per-token price (a headline rate or a single resolution
+     * tier) that only a human may write. Distinct from Command::FAILURE
+     * (1, generic error) so CI can tell "provider prices moved" apart from
+     * "the command itself broke".
      */
     private const EXIT_DRIFT_DETECTED = 2;
 
     private const LITELLM_URL = 'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
+
+    /**
+     * LiteLLM key prefix for a per-second rate that applies to one resolution
+     * tier only, e.g. `output_cost_per_second_1080p` / `_4k`. The suffix is the
+     * lowercased tier name, which is how it maps onto our own
+     * `json.resolution_prices` keys ('720p', '1080p', '4K').
+     */
+    private const RESOLUTION_TIER_PREFIX = 'output_cost_per_second_';
 
     private const LOCAL_PROVIDERS = ['ollama', 'triton', 'test', 'piper', 'thehive'];
 
@@ -65,7 +76,7 @@ class SyncModelPricesCommand extends Command
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show changes without applying')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Override admin-set prices')
             ->addOption('provider', null, InputOption::VALUE_REQUIRED, 'Only sync a specific provider')
-            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any per-token price drift is detected (for scheduled CI drift checks; use with --dry-run)');
+            ->addOption('fail-on-drift', null, InputOption::VALUE_NONE, 'Exit with code 2 if any price drift is detected — per-token, or same-mode non-per-token including individual resolution tiers (for the scheduled CI drift check; use with --dry-run)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -150,13 +161,17 @@ class SyncModelPricesCommand extends Command
             // Case 2 — same non-per-token mode on both sides (per_second, per_image,
             // per_character). The prices ARE comparable once normalised to a single
             // unit, so we DETECT drift here (this is what makes whisper/tts/veo/imagen
-            // checkable at all, #1318). We do not auto-write: these catalog rows are
+            // checkable at all, #1318). Resolution-tiered rows are compared tier by
+            // tier as well, because a provider can reprice 1080p or 4K while the
+            // headline rate stays put. We do not auto-write: these catalog rows are
             // hand-authored with unit conventions and tier JSON the flat sync can't
             // reproduce. A human updates ModelCatalog.php after verifying the source.
             if ('per_token' !== $currentMode) {
-                if ($this->nonTokenPriceDrifted($model, $pricing)) {
+                $tierDrift = $this->driftedResolutionTiers($model, $pricing);
+
+                if ($this->nonTokenPriceDrifted($model, $pricing) || [] !== $tierDrift) {
                     ++$nonTokenDrift;
-                    $nonTokenDriftList[] = sprintf(
+                    $entry = sprintf(
                         '%s/%s (ID %d, %s) — DB: in=%.8f/%s out=%.8f/%s | LiteLLM: in=%.8f out=%.8f (per unit)',
                         $service,
                         $model->getProviderId(),
@@ -169,6 +184,12 @@ class SyncModelPricesCommand extends Command
                         $pricing['price_in'],
                         $pricing['price_out'],
                     );
+
+                    if ([] !== $tierDrift) {
+                        $entry .= sprintf(' | resolution tiers: %s', implode(', ', $tierDrift));
+                    }
+
+                    $nonTokenDriftList[] = $entry;
                 } else {
                     ++$unchanged;
                 }
@@ -321,6 +342,51 @@ class SyncModelPricesCommand extends Command
     }
 
     /**
+     * Compares a resolution-tiered per-second row against LiteLLM tier by tier.
+     *
+     * `priceOut` only carries the headline rate (the base tier), so comparing it
+     * alone is blind to a provider repricing 1080p or 4K on its own — and blind
+     * to our own tiers drifting apart from the headline. We therefore walk
+     * `json.resolution_prices`, the table billing actually charges from
+     * ({@see CostCalculationService::lookupResolutionPrice}), and resolve each
+     * tier's upstream rate from `output_cost_per_second_<tier>`. LiteLLM only
+     * publishes that key for tiers priced above its base rate, so an absent key
+     * means "bills at the base rate" rather than "unknown".
+     *
+     * @param array{pricing_mode: string, price_in: float, price_out: float, in_unit: string, out_unit: string, cache_price_in: float, mode_prices: array<string, float>} $pricing
+     *
+     * @return list<string> human-readable "<tier>: <ours> vs <theirs>" entries, empty when every tier agrees
+     */
+    private function driftedResolutionTiers(Model $model, array $pricing): array
+    {
+        if ('per_second' !== $pricing['pricing_mode']) {
+            return [];
+        }
+
+        $catalogTiers = $model->getJson()['resolution_prices'] ?? null;
+        if (!is_array($catalogTiers)) {
+            return [];
+        }
+
+        $drifted = [];
+
+        foreach ($catalogTiers as $tier => $catalogPrice) {
+            if (!is_numeric($catalogPrice)) {
+                continue;
+            }
+
+            $upstream = $pricing['mode_prices'][self::RESOLUTION_TIER_PREFIX.strtolower((string) $tier)]
+                ?? $pricing['price_out'];
+
+            if ($this->pricesDiffer((float) $catalogPrice, $upstream)) {
+                $drifted[] = sprintf('%s: %.8f vs %.8f', $tier, (float) $catalogPrice, $upstream);
+            }
+        }
+
+        return $drifted;
+    }
+
+    /**
      * True when two per-unit prices differ beyond a 0.1% relative tolerance (with a
      * tiny absolute floor for the zero case).
      */
@@ -424,9 +490,21 @@ class SyncModelPricesCommand extends Command
             ];
         }
 
-        // Video generation: billed per second of output
+        // Video generation: billed per second of output. `output_cost_per_second`
+        // is the base rate; LiteLLM adds a key per resolution tier that costs more
+        // than the base (`output_cost_per_second_1080p`, `_4k`) and omits the ones
+        // that bill at the base rate. They are carried in mode_prices so the drift
+        // check can compare our json.resolution_prices tier by tier instead of
+        // only matching headline against base.
         if ('video_generation' === $mode && isset($litellmModel['output_cost_per_second'])) {
             $pricePerSec = (float) $litellmModel['output_cost_per_second'];
+            $modePrices = ['output_cost_per_second' => $pricePerSec];
+
+            foreach ($litellmModel as $key => $value) {
+                if (str_starts_with((string) $key, self::RESOLUTION_TIER_PREFIX) && is_numeric($value)) {
+                    $modePrices[(string) $key] = (float) $value;
+                }
+            }
 
             return [
                 'pricing_mode' => 'per_second',
@@ -435,7 +513,7 @@ class SyncModelPricesCommand extends Command
                 'in_unit' => 'perSec',
                 'out_unit' => 'perSec',
                 'cache_price_in' => 0.0,
-                'mode_prices' => ['output_cost_per_second' => $pricePerSec],
+                'mode_prices' => $modePrices,
             ];
         }
 
