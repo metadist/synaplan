@@ -8,7 +8,7 @@
         <select
           id="policy-group"
           v-model="selectedId"
-          class="w-full"
+          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="select-policy-group"
         >
           <option :value="null" disabled>{{ $t('people.policies.chooseGroup') }}</option>
@@ -39,7 +39,7 @@
               >
                 <span class="font-medium">{{ $t(`people.policies.capability.${cap}`) }}</span>
                 <select
-                  class="w-full mt-1"
+                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
                   :value="stringSetting(`DEFAULTMODEL.${cap}`)"
                   :disabled="isLocked(`DEFAULTMODEL.${cap}`)"
                   :data-testid="`select-default-${cap}`"
@@ -122,7 +122,7 @@
               {{ $t('people.policies.rateLimit') }}
             </h3>
             <select
-              class="w-full"
+              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
               :value="stringSetting('RATELIMITS.TIER')"
               :disabled="isLocked('RATELIMITS.TIER')"
               data-testid="select-rate-tier"

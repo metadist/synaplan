@@ -31,7 +31,7 @@
         type="number"
         min="1"
         max="50"
-        class="mt-1 w-full"
+        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="input-rag-limit"
         @input="patchKnowledge('ragLimit', Number(($event.target as HTMLInputElement).value))"
       />
@@ -44,7 +44,7 @@
         min="0"
         max="1"
         step="0.05"
-        class="mt-1 w-full"
+        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         data-testid="input-rag-min-score"
         @input="patchKnowledge('ragMinScore', Number(($event.target as HTMLInputElement).value))"
       />

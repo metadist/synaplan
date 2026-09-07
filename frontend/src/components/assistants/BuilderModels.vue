@@ -4,7 +4,7 @@
     <label v-for="slot in slots" :key="slot.key" class="block">
       <span class="txt-secondary text-sm">{{ slot.label }}</span>
       <select
-        class="mt-1 w-full"
+        class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :value="modelKey(slot.key) ?? ''"
         :data-testid="`select-model-${slot.key}`"
         @change="patch(slot.key, ($event.target as HTMLSelectElement).value)"
