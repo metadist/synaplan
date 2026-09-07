@@ -3,10 +3,10 @@
 Track 1 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
 
-S1–S3 are **merged to `main`**. Sharing works in the API, but after merge we
-had to improve the UI: a group member could not find chats shared with them.
-That follow-up lives on `feat/iam-incoming-chats` ([PR #1717](https://github.com/metadist/synaplan/pull/1717)).
-S4 Directory & privacy and S5 Group policies start from that branch.
+S1–S4 and the incoming-chats UI are **merged to `main`** (#1708, #1713, #1714,
+[#1717](https://github.com/metadist/synaplan/pull/1717),
+[#1718](https://github.com/metadist/synaplan/pull/1718)). S5 Group policies is
+[PR #1719](https://github.com/metadist/synaplan/pull/1719).
 
 ## Steps
 
@@ -16,9 +16,9 @@ S4 Directory & privacy and S5 Group policies start from that branch.
 | S1 Groups core | `synaplan/` `feat/iam-groups-core` | done | Merged to `main` as #1708 |
 | S2 Sharing MVP | `synaplan/` `feat/iam-sharing-mvp` | done | Merged to `main` as #1713 |
 | S3 More kinds | `synaplan/` `feat/iam-more-kinds` | done | Merged to `main` as #1714 |
-| Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | in review | [PR #1717](https://github.com/metadist/synaplan/pull/1717). History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
-| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | in review | [PR #1718](https://github.com/metadist/synaplan/pull/1718). Stacked on #1717 |
-| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). Stacked on #1718. CI fix: `modelIdFromStored` must keep TestProvider placeholder BIDs (`-1`…`-7`) |
+| Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | done | Merged to `main` as #1717. History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
+| S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | done | Merged to `main` as #1718. IAM29–IAM38 (directory sync, audit tab, admin manage-without-read, impersonation audit) |
+| S5 Group policies | `synaplan/` `feat/iam-group-policies` | in review | [PR #1719](https://github.com/metadist/synaplan/pull/1719). IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1). CI fix: `modelIdFromStored` keeps TestProvider placeholder BIDs (`-1`…`-7`) |
 
 ## Decisions
 
@@ -97,11 +97,14 @@ statistics browser. We kept the lean-nav contract and added:
 - Opening a shared chat now answers the five-question check: who owns it, which
   group (or everyone / person) it came through, what the viewer may do.
 
-**2026-09-06 (S4 / S5):** S4 is [PR #1718](https://github.com/metadist/synaplan/pull/1718).
+**2026-09-06 (S4 / S5):** S4 shipped as [PR #1718](https://github.com/metadist/synaplan/pull/1718).
 S5 Group policies is [PR #1719](https://github.com/metadist/synaplan/pull/1719):
 `BGROUPCONFIG`, `BCONFIG.BLOCKED`, `LayeredConfigResolver`, People → **Policies**,
 and locked / group-set defaults on the user model settings page. Flag
-`IAM.GROUP_POLICIES_ENABLED` seeds off (C1). Merge order: #1717 → #1718 → #1719.
+`IAM.GROUP_POLICIES_ENABLED` seeds off (C1).
+
+**2026-09-07:** #1717 and #1718 merged to `main`. #1719 keeps People `listAudit`,
+incoming-chats `continueChat`, and S5 policy APIs together.
 
 **2026-09-07 (S5 CI):** `GroupPolicyService::modelIdFromStored` rejected the
 test-catalog placeholder BIDs (`-1`…`-7`). PHPUnit and E2E then fell through
