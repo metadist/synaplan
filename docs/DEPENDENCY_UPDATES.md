@@ -27,9 +27,9 @@ For each open Renovate PR, work through these steps **in order**. Stop at the fi
 
 For **every** open PR, do all four:
 
-1. **Read the diff:** `gh pr diff <NR> --repo metadist/synaplan` (incl. `--name-only`). Understand what changes — including lockfile collateral.
+1. **Read the diff:** `gh pr diff <NR>` (incl. `--name-only`). Understand what changes — including lockfile collateral.
 2. **Check changelogs / release notes** for affected versions: breaking changes, deprecations, migration steps. Compare against the diff. If release notes are unavailable, state it explicitly and assess risk from diff + peer dependencies. Digest bumps have no release notes *by construction* — classify them by their tag (§7) instead of blocking them for missing notes.
-3. **Read PR comments and review threads:** `gh pr view <NR> --repo metadist/synaplan --comments`. Look for:
+3. **Read PR comments and review threads:** `gh pr view <NR> --comments`. Look for:
    - Reviewer concerns, blockers, or required follow-ups not yet resolved.
    - Renovate bot notes about conflicts, rebases, dependency-dashboard links, or "depends on" markers.
    - Cross-references to issues or other PRs (e.g. "blocked by #123", "supersedes #456").
@@ -60,13 +60,13 @@ Read the **entire** dashboard at <https://github.com/metadist/synaplan/issues/30
 
 ## 3. Conflict Analysis
 
-Group changed paths per PR. When multiple PRs touch the **same file**, decide:
+Group changed paths per PR with `gh pr diff <NR> --name-only`. PRs that share no file merge independently. When two PRs touch the **same file**, decide:
 
 **Rebase between merges** (sequential) when:
 
 - The shared file is a **lockfile** (`package-lock.json`, `composer.lock`) — integrity hashes make text conflicts inevitable.
 - The changes touch **overlapping or adjacent lines** (check hunk headers with `gh pr diff <NR> | grep "^@@"`).
-- The changes are **semantically coupled** — e.g. one PR changes a function signature, another calls it.
+- The changes are **semantically coupled**. This happens because Renovate branches here carry source fixes, not just manifests (§5 and §8 tell you to push them there): #680 landed a test fix, #967 touched `stores/auth.ts`. Two such branches editing the same source file are coupled even if the hunks are far apart.
 
 **Parallel merge is safe** when all of these are true:
 
@@ -74,15 +74,26 @@ Group changed paths per PR. When multiple PRs touch the **same file**, decide:
 - Each PR changes a **single, isolated line** in a **different region** of the file (hunks don't overlap, ≥10 lines apart).
 - The changes are **semantically independent** — e.g. different Docker action versions, different service digests, different CI job configs.
 
-PRs that share **no files at all** can always be merged independently.
-
 ## 4. Peer Dependency & Ecosystem Compatibility
 
 **Every major update** must pass this check before it can be merged or even recommended for local testing. No PR moves forward without it. **If peer dependency information cannot be found or is ambiguous, mark the PR as blocked.**
 
 For each major PR:
 
-1. **Check the new version against `main`:** look up peer dependencies in the npm registry, packagist, or the package's own `package.json` / `composer.json`. Verify every peer is satisfied by the versions currently on `main`.
+1. **Check the new version against `main`** with commands, not from memory. Query the *specific* version — an aggregated lookup shows the union of all versions and proves nothing. Check the **first and the latest** version in the range; requirements change between minors.
+
+   ```bash
+   # Composer
+   docker compose exec -T backend composer show -a <vendor/package> <version>
+   docker compose exec -T backend composer why-not <vendor/package> <version>
+
+   # npm
+   npm view <package>@<version> peerDependencies --json
+   npm view <package>@<version> engines --json
+   npm view <package> versions --json | tail -20
+   ```
+
+   Verify every peer is satisfied by the versions currently on `main`. "Probably compatible" is not an outcome — either the command output shows it, or the PR is blocked.
 2. **Walk the ecosystem chains** — one major often requires others. Common chains:
    - Frontend: **Vite ↔ Vitest ↔ @vitejs/plugin-vue ↔ vue-tsc ↔ TypeScript**
    - Backend: **PHPUnit ↔ PHP version ↔ Symfony ↔ Doctrine**
@@ -120,7 +131,7 @@ Nothing of the above may carry local testing artifacts — removed Dockerfile di
 
 ## 6. Merge Order
 
-Goal: minimize rebase cycles. This is the expensive part of the process, not a stylistic preference: `ci.yml` has no path filters, so every force-push replays the full pipeline (~7 min, ~7 concurrent jobs, 8-way E2E matrix) on runners shared across the org. Grouped PRs have averaged roughly a dozen CI runs each — median 11 force-pushes, 54 in #1615 — because Renovate rewrites the branch whenever *any* package in the group gets a new release. An idling group PR therefore keeps costing pipelines: merge it or mark it blocked, but don't leave it open to accumulate.
+Goal: minimize rebase cycles. This is the expensive part of the process, not a stylistic preference, and the mechanism is structural: `ci.yml` has no path filters, so every force-push replays the *entire* pipeline including the E2E matrix — and Renovate force-pushes a group branch whenever **any** package in that group gets a new release. A group PR left open therefore keeps buying full pipelines for as long as it idles (measured over the first five months of grouping: about a dozen CI runs per grouped PR). Merge it or mark it blocked; don't let it sit.
 
 1. **Security fixes first** — regardless of major/minor/patch, regardless of hotspot group.
 2. **Independent PRs and safe parallel groups:** PRs with no shared files, plus PRs that share a file but qualify for parallel merge (see section 3).
@@ -135,12 +146,12 @@ Decide based on **what the update affects**, not just whether it's a major.
 
 ### Merge directly (CI is sufficient)
 
-- **Patch/minor bumps:** lockfile-only, no constraint changes, no changelog risk.
+- **Patch/minor bumps** where `gh pr diff <NR> --name-only` lists only lockfiles — no `composer.json` / `package.json` constraint change, no source file.
 - **CI-infrastructure majors** (GitHub Actions): CI has already validated itself by running green. Local testing is not possible or useful.
 - **Docker digests:** depends on the tag — see "Digest bumps" below.
 - **Test-infrastructure majors** (happy-dom, Vitest, PHPUnit) when CI is fully green incl. E2E: the CI run *is* the test — it ran the entire test suite with the new version.
 
-All of the above still require: CI fully green (incl. E2E), no peer dependency conflicts (verified in step 4), no known risk from changelog.
+All of the above still require: CI fully green (incl. E2E), and no peer dependency conflict (§4, by command output). They do **not** waive the changelog review — you still do checklist item 2 and it has to come back empty. "No changelog risk" is the *result* of reading the changelog, never a reason to skip it.
 
 ### Digest bumps
 
@@ -152,8 +163,8 @@ Digest updates are the single largest stream of dependency PRs and there is no c
 
 ### Test locally
 
-- **Build-affecting majors** (Vite, TypeScript, Webpack): changes how production output is generated. CI covers build + E2E but may miss subtle runtime differences. Check out the branch, build, and manually verify.
-- **Runtime/framework majors** (Symfony, Doctrine, Vue, vue-router): affects application behavior. Test locally beyond what CI covers.
+- **Build-affecting majors** (Vite, TypeScript, Webpack): changes how production output is generated, which CI's build+E2E does not fully cover. Run `make -C frontend build` (app **and** widget), then load the app and check: browser console free of new errors, chat streaming still arrives (SSE), and the widget still boots from `dist-widget/` against a different origin. Name what you checked.
+- **Runtime/framework majors** (Symfony, Doctrine, Vue, vue-router): affects application behavior. Exercise the paths CI does not: send a chat message end to end, upload and search a document (RAG), and open one page per changed area. Name the pages and features you exercised — "tested locally" without that list is not a result.
 - **Coordinated upgrades:** check out a fresh branch, apply all related PRs, install dependencies, run full test suite.
 - **Any PR with source code changes** or version constraint changes in `package.json` / `composer.json`.
 
