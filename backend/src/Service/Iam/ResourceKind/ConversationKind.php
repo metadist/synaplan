@@ -78,6 +78,10 @@ final readonly class ConversationKind implements ShareableResourceKindInterface
         return [Permission::Read, Permission::Use];
     }
 
+    public function assertShareable(string $resourceId): void
+    {
+    }
+
     private function findChat(string $resourceId): ?Chat
     {
         if ('' === $resourceId || !ctype_digit($resourceId)) {

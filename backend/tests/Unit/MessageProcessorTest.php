@@ -5,6 +5,7 @@ namespace App\Tests\Unit;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
@@ -72,7 +73,8 @@ class MessageProcessorTest extends TestCase
             $this->createMock(TaskPlanner::class),
             $this->createMock(TaskPlanStore::class),
             $this->createMock(TaskPlanExecutor::class),
-            $this->conversationSummaryService
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
         );
     }
 

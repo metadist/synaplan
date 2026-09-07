@@ -9,6 +9,8 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\Share;
+use App\Repository\AgentRepository;
+use App\Repository\AgentVersionRepository;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\GroupMemberRepository;
@@ -47,6 +49,8 @@ final class KnowledgeIsolationTest extends TestCase
             $this->createMock(MessageRepository::class),
             $this->createMock(FileRepository::class),
             $this->createMock(PromptRepository::class),
+            $this->createMock(AgentRepository::class),
+            $this->createMock(AgentVersionRepository::class),
         );
     }
 
@@ -147,6 +151,8 @@ final class KnowledgeIsolationTest extends TestCase
             $messages,
             $files,
             $this->createMock(PromptRepository::class),
+            $this->createMock(AgentRepository::class),
+            $this->createMock(AgentVersionRepository::class),
         );
 
         $scopes = $resolver->resolve(3, null);
@@ -198,6 +204,8 @@ final class KnowledgeIsolationTest extends TestCase
             $this->createMock(MessageRepository::class),
             $this->createMock(FileRepository::class),
             $prompts,
+            $this->createMock(AgentRepository::class),
+            $this->createMock(AgentVersionRepository::class),
         );
 
         $scopes = $resolver->resolve(3, null);
@@ -247,6 +255,8 @@ final class KnowledgeIsolationTest extends TestCase
             $messages,
             $files,
             $this->createMock(PromptRepository::class),
+            $this->createMock(AgentRepository::class),
+            $this->createMock(AgentVersionRepository::class),
         );
 
         $scopes = $resolver->resolve(3, null);

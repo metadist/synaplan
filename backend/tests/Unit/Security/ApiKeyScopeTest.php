@@ -252,6 +252,17 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::isRestricted([]));
     }
 
+    public function testAgentsScopeReachesAgentsOnly(): void
+    {
+        $scopes = [ApiKeyScope::AGENTS_ALL];
+
+        self::assertTrue(ApiKeyScope::isRestricted($scopes));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/agents'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/agents/12'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/prompts'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/users'));
+    }
+
     public function testSelfRevokeMatchesOnlyOwnKeyViaDelete(): void
     {
         self::assertTrue(ApiKeyScope::isSelfRevoke('DELETE', '/api/v1/apikeys/12', 12));

@@ -77,6 +77,10 @@ final readonly class PluginResourceKind implements ShareableResourceKindInterfac
         return $this->permissions;
     }
 
+    public function assertShareable(string $resourceId): void
+    {
+    }
+
     public function dataType(): string
     {
         return $this->dataType;

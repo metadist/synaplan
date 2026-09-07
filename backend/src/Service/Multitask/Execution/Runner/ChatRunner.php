@@ -18,6 +18,7 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\SelfAware\SelfAwarePromptDecorator;
@@ -250,10 +251,21 @@ final readonly class ChatRunner implements TaskRunner
         $groupKey = $context->classification['rag_group_key']
             ?? $context->options['rag_group_key']
             ?? null;
-        $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
+        $limit = $context->options['rag_limit'] ?? null;
+        $minScore = $context->options['rag_min_score'] ?? null;
 
-        $limit = isset($context->options['rag_limit']) ? max(1, min(50, (int) $context->options['rag_limit'])) : 20;
-        $minScore = isset($context->options['rag_min_score']) ? max(0.0, min(1.0, (float) $context->options['rag_min_score'])) : 0.2;
+        // A pinned assistant carries its scope in the RuntimeProfile, never
+        // as scalar copies (see ChatHandler::ragSettings).
+        $profile = $context->options['runtime_profile'] ?? null;
+        if ($profile instanceof RuntimeProfile) {
+            $groupKey ??= $profile->primaryRagGroupKey();
+            $limit ??= $profile->ragLimit;
+            $minScore ??= $profile->ragMinScore;
+        }
+
+        $groupKey = is_string($groupKey) && '' !== $groupKey ? $groupKey : null;
+        $limit = null !== $limit ? max(1, min(50, (int) $limit)) : 20;
+        $minScore = null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2;
 
         try {
             $results = $this->vectorSearchService->semanticSearch(

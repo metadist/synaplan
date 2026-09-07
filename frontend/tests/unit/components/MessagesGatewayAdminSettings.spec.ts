@@ -4,7 +4,7 @@ import MessagesGatewayAdminSettings from '@/components/config/messagesGateway/Me
 import type { MessagesGatewayStatus } from '@/services/api/messagesGatewayApi'
 
 /**
- * The AI Agents settings panel writes one setting per control, so a patch that
+ * The Coding clients settings panel writes one setting per control, so a patch that
  * carries more than the changed key would silently reset a neighbouring
  * setting. It also has to make a setting that cannot take effect obviously
  * inert instead of letting an admin toggle something with no consequence.

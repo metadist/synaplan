@@ -8,9 +8,10 @@ before the first sprint starts.**
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Entity & pinned runtime | — | planned | |
-| S2 Builder & gallery | — | planned | J-AB-1; empty state is the first Vue |
-| S3 Publish & versions | — | planned | J-AB-2…4; Share waits on IAM-UX |
+| S1 Entity & pinned runtime | `feat/agent-builder-s1` / synaplan | done | AB1–AB8: BAGENTS + BAGENTVERSIONS, `AGENTS.ENABLED` off, owner CRUD, `agentId` pin, Zod schemas regenerated |
+| S2 Builder & gallery | `feat/agent-builder-s2` / synaplan | done | AB9–AB13, AB15–AB17; AB14 helper deferred |
+| S3 Publish & versions | `feat/agent-builder-s3` / synaplan | done | AB18–AB25; IAM kind `agent` (BPROMPTS keeps `assistant`); share copy reuses assistant strings |
+| S3.5 Runtime / kind / schema refactor | `feat/agent-builder-s3-5-refactor` / synaplan | done | One `RuntimeProfile` seam; kind split settled; `agent.v1` is one OpenAPI artifact; agent deps required |
 | S4 Knowledge, tools, skills | — | planned | Parameters folded into Models → Advanced settings |
 | S5 Triggers: events & schedules | — | planned | J-AB-5, J-AB-7; was "Tasks & channels" until 2026-09-07 |
 | S6 Portability & packs | — | planned | adds `api` / `mcp` / `desktop` event kinds to the picker |
@@ -26,6 +27,10 @@ before the first sprint starts.**
 | 2026-09-07 | **UX contract.** Journeys J-AB-1…6 in [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) are binding. S3 Share waits on IAM-UX. A published assistant a group member cannot find in ten seconds is not done. |
 | 2026-09-07 | **Trigger = event or schedule** (decision row 15, product-owner proposal). Channels are **events** (mail with a sender/keyword rule, WhatsApp, website widget, API / coding tools, MCP-connected apps, Synaplan Desktop, web hook); the cron scheduler is the **schedule**; "someone starts a chat" is always on. *Tasks* + *Channels* sections → one **Triggers** section; `agent.v1` `tasks` / `channels` → `triggers.events[]` / `triggers.schedules[]`; `05_sprint_5_tasks_and_channels.md` → [`05_sprint_5_triggers.md`](./05_sprint_5_triggers.md). One additive Saved Tasks contract: `BTRIGGERCONFIG.filter` on `inbound_email`. J-AB-7 added; wireframe [`../202609_ux_user_flows/assistant-triggers.md`](../202609_ux_user_flows/assistant-triggers.md). |
 | 2026-09-07 | **Builder: seven sections, not nine.** Parameters folds into Models → Advanced settings (creativity, length, language, response format). Publish confirm names the triggers that switch versions, not just the groups. |
+| 2026-09-07 | **S3.5 — one runtime seam.** A pinned turn is resolved once by `AgentPinResolver` into a `RuntimeProfile`. Classifier / processor / ChatHandler / ChatRunner read RAG scope, limit and score from that object. Scalar copies (`rag_group_key` / `rag_limit` / `rag_min_score` on the pin path) are gone. Dead `RuntimeProfileFactory` deleted. Unpinned turns are unchanged. |
+| 2026-09-07 | **S3.5 — kind split settled.** `assistant` = BPROMPTS instruction rows. `agent` = published BAGENTS. An `agent:*` instruction is an implementation detail of the assistant: not listed on `/api/v1/prompts`, not shareable as `assistant`. `assertShareable()` lives on the kind interface; ShareService no longer special-cases `AgentKind`. |
+| 2026-09-07 | **S3.5 — `agent.v1` is one artifact.** OpenAPI component `AgentDefinitionV1` is the wire shape; every draft/definition property refs it; frontend `AgentDraft` is generated from it; `AgentDefinitionValidator` still enforces on write; `AgentDefinitionSchemaParityTest` fails if the two key sets drift. |
+| 2026-09-07 | **S3.5 — required agent deps.** `AgentPinResolver` is required on `MessageClassifier`. `AgentConfig` is required on `MessageProcessor`. `AgentConfig` / `AgentService` / `AgentRuntimeResolver` are required on `StreamController`. Feature-off is `isEnabled() === false`, not a missing service. |
 
 ## Review log
 
@@ -40,6 +45,27 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 walk them before merge (U1–U12). Publish/share is not a second
 permission model and not the S2 stacked dialog.
 
+**2026-09-07 (S1 implemented on `feat/agent-builder-s1`):** BAGENTS / BAGENTVERSIONS,
+`AGENTS.ENABLED` seeded off, owner CRUD, `agentId` classifier pin, Zod schemas
+regenerated. Gate green without re-recording `routing_classification.json`. Next:
+S2 gallery/builder (separate branch).
+
+**2026-09-07 (S3 kind key):** IAM already bound `assistant` to BPROMPTS
+ids. BAGENTS uses a new `agent` kind so numeric ids cannot collide.
+Share dialog copy reuses the assistant strings (Assistants → Shared
+with me).
+
+**2026-09-07 (S2 implemented on `feat/agent-builder-s2`):** gallery + clone
+APIs, owner-only draft stream, Assistants gallery/builder (flag-gated),
+start-chat pill, Coding clients rename. Prompt API unchanged. AB14
+Help-me-write deferred. Gate green. Next: S3 publish/versions/share.
+
+**2026-09-07 (S3 implemented on `feat/agent-builder-s3`):** publish +
+immutable versions, IAM kind `agent`, gallery Shared with me, clone of
+published snapshot, archive/unarchive, usage aggregates, `app:agents:seed-system`
+(not run by `app:seed`). Prompt API / `assistant` kind unchanged. Next: S4
+knowledge, tools, skills.
+
 **2026-09-07 (trigger wording, second UX pass):** the plan had spread
 "when does this assistant act" over a *Tasks* section (schedules, cron
 in primary copy), a read-only *Channels* mirror of bindings configured
@@ -50,3 +76,7 @@ the Saved Tasks words plus **Event**, and a mail rule (sender,
 keywords) as the first real event. Also found and fixed: nine builder
 sections, "Tasks" colliding with Saved Tasks one nav group away, no
 visible "runs as", Desktop absent from the assistant picture.
+
+**2026-09-07 (S3.5 refactor, rule 4):** a refactor sprint before S4 on
+the same seam. Decisions above. Next: S4 knowledge, tools, skills on
+top of the single runtime object and the typed `agent.v1` document.

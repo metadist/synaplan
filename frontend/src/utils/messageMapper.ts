@@ -304,6 +304,7 @@ export interface ApiLoadedMessageRow {
   multitask?: boolean
   quotedText?: string | null
   quotedMessageId?: number | null
+  agentId?: number | null
   file?: { path: string; type: string }
   files?: ApiLoadedAttachmentFile[]
   /** Per-node render state for DAG turns — present only on OUT messages of DAG turns. */
@@ -551,6 +552,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     backendMessageId: m.id,
     quotedText: m.quotedText ?? null,
     quotedMessageId: m.quotedMessageId ?? null,
+    agentId: m.agentId && m.agentId > 0 ? m.agentId : null,
     files: files.length > 0 ? files : undefined,
     aiModels: m.aiModels || null,
     webSearch: m.webSearch || null,

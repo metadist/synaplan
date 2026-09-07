@@ -11,6 +11,7 @@ use App\Entity\MessageMeta;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Service\Agent\AgentPinResolver;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\MessageClassifier;
@@ -292,6 +293,7 @@ final class RoutingCharacterizationTest extends TestCase
             new EmbeddingRouterConfig($configRepo),
             $this->disabledNativeToolRouting(),
             new ToolCallingCapability(),
+            $this->createMock(AgentPinResolver::class),
             officeConverter: $converter,
             multitaskConfig: new MultitaskRoutingConfig($configRepo),
         );

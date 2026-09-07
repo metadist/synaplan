@@ -59,7 +59,7 @@ That is the whole local-hosting onboarding. After chat works, open **Channels �
 - **Local-model progress is visible.** A download card in the setup wizard (and in `docker compose logs -f backend`) shows how far the optional Ollama pull has got; cloud chat works while it runs.
 - **`.env` still works.** Keys already in `backend/.env` are imported into the encrypted store on first use, and a key you later save in the UI wins permanently.
 
-**No cloud key at all?** Start with `ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes.
+**No cloud key at all?** Start with `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true docker compose up -d` to run Ollama and pull a local chat model (`gpt-oss:20b`, ~14 GB, GPU or a strong CPU recommended). Chat begins working when the download finishes.
 
 ### Host it on your own server
 
@@ -205,8 +205,8 @@ Everything below is the same platform, packaged for different homes. Pick what f
 
 - **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
 - **Git**
-- **8 GB RAM** minimum (16 GB recommended for the local-AI standard install)
-- **~9 GB free disk** for the standard install (~5 GB for minimal, +~14 GB if you enable the local chat model)
+- **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
+- **~3 GB free disk** for the standard install (+~1 GB for the `local-ai` profile, +~14 GB if you also enable the local chat model)
 - Free TCP ports `5173`, `8000`, `8082`, `8025`, `3307`, `6333`, `11435`
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `docker compose up -d` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. The pre-built `ghcr.io/metadist/synaplan` image published for production deployments is `linux/amd64` only, so pulling it instead means running the whole backend under emulation. The first local build takes a few minutes; every later start is a cache hit. Two optional dev tools (phpMyAdmin, MailHog) are still amd64-only upstream images — if you keep them, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so those two emulate quickly.
@@ -217,19 +217,19 @@ Everything below is the same platform, packaged for different homes. Pick what f
 
 | Mode | Command | Size | Best For |
 |------|---------|------|----------|
-| **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~9 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--minimal` and `--mode server` available) |
-| **Standard** | `docker compose up -d` | ~9 GB | Local try-out: full features, local embeddings (local chat model optional, +~14 GB) |
-| **Minimal** | `docker compose -f docker-compose-minimal.yml up -d` | ~5 GB | Fastest first boot — cloud AI only (Groq/OpenAI) |
+| **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~3 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--minimal` and `--mode server` available) |
+| **Standard** | `docker compose up -d` | ~3 GB | Local try-out: full features, cloud AI — add one provider key and chat works |
+| **+ local AI** | `COMPOSE_PROFILES=local-ai docker compose up -d` | ~4 GB | Adds Ollama and the `bge-m3` embedding model on your own hardware (local chat model optional, +~14 GB) |
 | **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
 | **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
 
-The standard install downloads the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
+No AI weights are downloaded by default, so the first boot is dominated by the Docker images and `npm ci`. `COMPOSE_PROFILES=local-ai` is the same switch a self-hosted install uses in `deploy/.env`, and it pulls the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
 
 Prefer the shell to the UI for provider keys? Keys in `backend/.env` still work — the backend reads that file when the container starts and imports the key into the encrypted store on first use. Write the key before starting, or restart the containers afterwards:
 
 ```bash
 echo "GROQ_API_KEY=your_key" >> backend/.env
-docker compose -f docker-compose-minimal.yml up -d
+docker compose up -d
 # already running? pick up the new key with:
 # docker compose restart backend worker
 ```
@@ -312,8 +312,8 @@ Synaplan is provider-neutral: connect the providers you want in **Admin → AI P
 | Block | Gives you | Default | Switch |
 |-------|-----------|---------|--------|
 | **Core** — `frontend`, `backend`, `worker`, `db` (MariaDB), `redis` | The app, its API, async jobs, storage, cache and queues | always on | — |
-| **Ollama** (`ollama`) | Local AI on your hardware: `bge-m3` embeddings for document search, optional local chat (`ENABLE_LOCAL_GPT_OSS=true`) | on (standard) · absent (minimal) | `docker compose stop ollama` — or use `docker-compose-minimal.yml` |
-| **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on (standard) · absent (minimal) | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
+| **Ollama** (`ollama`) | Local AI on your hardware: `bge-m3` embeddings for document search, optional local chat (`ENABLE_LOCAL_GPT_OSS=true`) | **off** | `COMPOSE_PROFILES=local-ai docker compose up -d` — the same switch as `deploy/.env` in production |
+| **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
 | **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false docker compose up -d` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
 | **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
 | **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](#office-documents-optional-collabora-code) | **off** | `docker compose --profile office up -d` |

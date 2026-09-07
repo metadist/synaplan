@@ -50,6 +50,7 @@ use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\SelfAware\SelfAwarePromptDecorator;
@@ -136,6 +137,60 @@ final readonly class ChatHandler implements MessageHandlerInterface
     public function getName(): string
     {
         return 'chat';
+    }
+
+    /**
+     * Pick up the RuntimeProfile the classifier resolved (if any) and let it
+     * own the prompt identity. Absent profile ⇒ byte-identical classification.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: array<string, mixed>, 1: RuntimeProfile|null}
+     */
+    private function applyRuntimeProfile(array $classification, array $options): array
+    {
+        $profile = $options['runtime_profile'] ?? $classification['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            return [$classification, null];
+        }
+
+        if ('' !== $profile->promptTopic) {
+            $classification['topic'] = $profile->promptTopic;
+        }
+        if (null !== $profile->promptId) {
+            $classification['prompt_id'] = $profile->promptId;
+        }
+
+        return [$classification, $profile];
+    }
+
+    /**
+     * RAG scope for this turn: an explicit caller scope (widget / API
+     * `rag_group_key`) wins, then the RuntimeProfile, then the defaults.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: string|null, 1: int, 2: float} group key, limit, min score
+     */
+    private function ragSettings(?RuntimeProfile $profile, array $classification, array $options): array
+    {
+        $groupKey = $options['rag_group_key'] ?? $classification['rag_group_key'] ?? null;
+        $limit = $options['rag_limit'] ?? $classification['rag_limit'] ?? null;
+        $minScore = $options['rag_min_score'] ?? $classification['rag_min_score'] ?? null;
+
+        if ($profile instanceof RuntimeProfile) {
+            $groupKey ??= $profile->primaryRagGroupKey();
+            $limit ??= $profile->ragLimit;
+            $minScore ??= $profile->ragMinScore;
+        }
+
+        return [
+            is_string($groupKey) && '' !== $groupKey ? $groupKey : null,
+            null !== $limit ? max(1, min(50, (int) $limit)) : 20,
+            null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2,
+        ];
     }
 
     /**
@@ -367,6 +422,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // forcing every non-streaming caller to construct one.
         $perfTimer = new PerfTimer();
 
+        [$classification, $profile] = $this->applyRuntimeProfile($classification, $options);
+
         $topic = $classification['topic'] ?? 'general';
         $language = $classification['language'] ?? 'en';
 
@@ -378,9 +435,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             unset($classification['search_results']);
         }
 
-        $ragGroupKey = $classification['rag_group_key'] ?? null;
-        $ragLimit = isset($classification['rag_limit']) ? max(1, min(50, (int) $classification['rag_limit'])) : 20;
-        $ragMinScore = isset($classification['rag_min_score']) ? max(0.0, min(1.0, (float) $classification['rag_min_score'])) : 0.2;
+        [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
         $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
 
         // Issue #615: the non-streaming path (email / generic webhook)
@@ -447,6 +502,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
         } elseif (isset($classification['override_model_id']) && (int) $classification['override_model_id'] > 0) {
             $modelId = (int) $classification['override_model_id'];
             $this->logger->info('ChatHandler: Using widget config model override', [
+                'model_id' => $modelId,
+                'user_id' => $message->getUserId(),
+            ]);
+        } elseif ($profile instanceof RuntimeProfile && isset($profile->modelIds['chat']) && $profile->modelIds['chat']) {
+            $modelId = (int) $profile->modelIds['chat'];
+            $this->logger->info('ChatHandler: Using runtime profile chat model', [
                 'model_id' => $modelId,
                 'user_id' => $message->getUserId(),
             ]);
@@ -531,7 +592,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $options['include_generated_images'] = $this->shouldIncludeGeneratedImages($modelId, $effectiveUserId);
 
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
-        if ($promptData && isset($promptData['prompt'])) {
+        if ($profile instanceof RuntimeProfile && null !== $profile->systemPrompt && '' !== $profile->systemPrompt) {
+            $systemPrompt = $profile->systemPrompt;
+            $this->logger->info('ChatHandler: Using runtime profile system prompt', [
+                'topic' => $topic,
+                'prompt_length' => strlen($systemPrompt),
+            ]);
+        } elseif ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
             $this->logger->info('ChatHandler: Using custom prompt content', [
                 'topic' => $topic,
@@ -919,6 +986,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $perfTimer = new PerfTimer();
         }
 
+        [$classification, $profile] = $this->applyRuntimeProfile($classification, $options);
+
         // Load prompt WITH metadata based on topic from classification.
         // Phase 1b: reuse the bundle that MessageProcessor already resolved when present.
         $topic = $classification['topic'] ?? 'general';
@@ -953,9 +1022,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $ragContext = '';
         $ragResultsCount = 0;
 
-        $ragGroupKey = $options['rag_group_key'] ?? ($classification['rag_group_key'] ?? null);
-        $ragLimit = isset($options['rag_limit']) ? max(1, min(50, (int) $options['rag_limit'])) : 20;
-        $ragMinScore = isset($options['rag_min_score']) ? max(0.0, min(1.0, (float) $options['rag_min_score'])) : 0.2;
+        [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
 
         if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
@@ -1127,7 +1194,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 'user_id' => $message->getUserId(),
             ]);
         }
-        // 3. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
+        // 3. Assistant runtime profile (pinned agentId)
+        elseif ($profile instanceof RuntimeProfile && isset($profile->modelIds['chat']) && $profile->modelIds['chat']) {
+            $modelId = $profile->modelIds['chat'];
+            $this->logger->info('ChatHandler: Using runtime profile chat model', [
+                'model_id' => $modelId,
+                'user_id' => $message->getUserId(),
+            ]);
+        }
+        // 4. Check if prompt metadata defines a model (and it's not AUTOMATED = -1)
         elseif (isset($promptMetadata['aiModel']) && $promptMetadata['aiModel'] > 0) {
             $modelId = $promptMetadata['aiModel'];
             $this->logger->info('ChatHandler: Using prompt metadata model', [
@@ -1187,8 +1262,13 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Simple system prompt for streaming (like old system)
         $systemPrompt = 'You are the Synaplan.com AI assistant. Please answer in the language of the user.';
 
-        // Use prompt content from metadata if available
-        if ($promptData && isset($promptData['prompt'])) {
+        if ($profile instanceof RuntimeProfile && null !== $profile->systemPrompt && '' !== $profile->systemPrompt) {
+            $systemPrompt = $profile->systemPrompt;
+            $this->logger->info('ChatHandler: Using runtime profile system prompt', [
+                'topic' => $topic,
+                'prompt_length' => strlen($systemPrompt),
+            ]);
+        } elseif ($promptData && isset($promptData['prompt'])) {
             $systemPrompt = $promptData['prompt']->getPrompt();
             $this->logger->info('ChatHandler: Using custom prompt content', [
                 'topic' => $topic,

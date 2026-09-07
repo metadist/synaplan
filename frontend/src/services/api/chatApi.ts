@@ -719,6 +719,10 @@ export const chatApi = {
     incognito?: boolean
     /** Incognito only: the in-memory transcript (oldest first) for context. */
     history?: IncognitoHistoryEntry[]
+    /** Pin this turn to an assistant (gallery chat or test panel). */
+    agentId?: number
+    /** Owner-only: use the unpublished draft (test panel). */
+    draft?: boolean
   }): () => void {
     const paramsObj: Record<string, string | IncognitoHistoryEntry[]> = {
       message: opts.message,
@@ -741,6 +745,8 @@ export const chatApi = {
     if (opts.ragGroupKey) paramsObj.ragGroupKey = opts.ragGroupKey
     if (opts.quotedText) paramsObj.quotedText = opts.quotedText
     if (opts.quotedMessageId) paramsObj.quotedMessageId = opts.quotedMessageId.toString()
+    if (opts.agentId) paramsObj.agentId = opts.agentId.toString()
+    if (opts.draft) paramsObj.draft = '1'
 
     if (opts.fileIds && opts.fileIds.length > 0) {
       paramsObj.fileIds = opts.fileIds.join(',')

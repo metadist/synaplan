@@ -14,7 +14,7 @@ import {
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
 
-const runtimeFeatures = { savedTasks: true, iamGroups: false }
+const runtimeFeatures = { savedTasks: true, iamGroups: false, agentsEnabled: false }
 
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
@@ -56,7 +56,8 @@ const navMessages = {
     mcpServers: 'MCP Servers',
     configApiKeys: 'API Keys',
     savedTasks: 'Saved tasks',
-    aiAgents: 'AI Agents',
+    aiAgents: 'Coding clients',
+    assistants: 'Assistants',
     toolsDocSummary: 'Summarizer',
     configAiModels: 'Models',
     configTaskPrompts: 'Instructions',
@@ -149,6 +150,7 @@ describe('useNavItems rail', () => {
     pluginList.length = 0
     runtimeFeatures.savedTasks = true
     runtimeFeatures.iamGroups = false
+    runtimeFeatures.agentsEnabled = false
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -177,9 +179,25 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('doc-summary')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')
+    const promptChild = (manage?.children ?? []).find(
+      (child: { key: string }) => child.key === 'task-prompts'
+    )
+    expect(promptChild?.label).toBe('Instructions')
+    expect(promptChild?.path).toBe('/ai/instructions')
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
     ).toEqual(new Set(['assistants', 'automations', 'channels', 'connections']))
+  })
+
+  it('replaces Instructions with Assistants when the flag is on', () => {
+    runtimeFeatures.agentsEnabled = true
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    const promptChild = (manage?.children ?? []).find(
+      (child: { key: string }) => child.key === 'task-prompts'
+    )
+    expect(promptChild?.label).toBe('Assistants')
+    expect(promptChild?.path).toBe('/ai/assistants')
   })
 
   it('admin also sees Operate', () => {

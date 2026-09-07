@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace App\Service\RAG;
 
+use App\Entity\Agent;
+use App\Entity\AgentVersion;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Prompt;
 use App\Entity\Share;
+use App\Repository\AgentRepository;
+use App\Repository\AgentVersionRepository;
 use App\Repository\ChatRepository;
 use App\Repository\FileRepository;
 use App\Repository\GroupMemberRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
 use App\Repository\ShareRepository;
+use App\Service\Agent\AgentKnowledgeFolders;
+use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Permission;
+use App\Service\Iam\ResourceKind\AgentKind;
 use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\ConversationKind;
 use App\Service\Iam\ResourceKind\KnowledgeFolderKind;
@@ -37,6 +44,8 @@ final readonly class RagScopeResolver
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
         private PromptRepository $promptRepository,
+        private AgentRepository $agentRepository,
+        private AgentVersionRepository $agentVersionRepository,
     ) {
     }
 
@@ -73,6 +82,11 @@ final readonly class RagScopeResolver
         }
 
         return $this->dedupe($scopes);
+    }
+
+    public static function sharedPickerKey(int $ownerId, string $folder): string
+    {
+        return self::PICKER_PREFIX.$ownerId.':'.$folder;
     }
 
     /**
@@ -241,6 +255,9 @@ final readonly class RagScopeResolver
 
     private function canUseFolder(int $userId, int $ownerId, string $groupKey): bool
     {
+        if ($ownerId === $userId) {
+            return true;
+        }
         $resourceId = KnowledgeFolderKind::resourceId($ownerId, $groupKey);
         foreach ($this->sharesReaching($userId, KnowledgeFolderKind::KEY) as $share) {
             if ($share->getResourceId() !== $resourceId) {
@@ -252,7 +269,40 @@ final readonly class RagScopeResolver
             }
         }
 
-        return $ownerId === $userId;
+        return $this->canUseAgentFolder($userId, $ownerId, $groupKey);
+    }
+
+    /**
+     * A published assistant shared at "Can use" carries its owner's knowledge
+     * folders with it — the recipient searches them while chatting with that
+     * assistant, and only those (what the published version declares).
+     */
+    private function canUseAgentFolder(int $userId, int $ownerId, string $groupKey): bool
+    {
+        foreach ($this->sharesReaching($userId, AgentKind::KEY) as $share) {
+            $permission = Permission::tryFrom($share->getPermission());
+            if (null === $permission || !$permission->implies(Permission::Use)) {
+                continue;
+            }
+            if (!ctype_digit($share->getResourceId())) {
+                continue;
+            }
+            $agent = $this->agentRepository->find((int) $share->getResourceId());
+            if (!$agent instanceof Agent || $agent->getOwnerId() !== $ownerId || $agent->isArchived()) {
+                continue;
+            }
+            $versionId = $agent->getPublishedVersionId();
+            $version = null === $versionId ? null : $this->agentVersionRepository->find($versionId);
+            if (!$version instanceof AgentVersion) {
+                continue;
+            }
+            $folders = AgentKnowledgeFolders::ownerFolders($agent, new AgentDefinition($version->getDefinition()));
+            if (in_array($groupKey, $folders, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

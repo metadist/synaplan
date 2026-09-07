@@ -1,32 +1,32 @@
 # Synaplan - Standard Installation (Recommended)
 #
-# This is the default configuration for Synaplan with all features:
-# - Local Ollama AI models (gpt-oss:20b, bge-m3)
-# - Whisper audio transcription with model downloads
-# - All features enabled
-# - Download size: ~9GB
+# Cloud AI by default, exactly like a self-hosted install (deploy/compose.yaml):
+# - No AI weights are downloaded; add one provider key and chat works
+# - Whisper audio transcription (tiny model, ~75 MB)
+# - Download size: ~3 GB
 #
 # Usage:
 #   docker compose up -d
 #
-# To switch to minimal install (cloud AI only, smaller footprint):
-#   docker compose down
-#   docker compose -f docker-compose-minimal.yml up -d
+# To add local AI (Ollama + the bge-m3 embedding model, ~1 GB extra):
+#   COMPOSE_PROFILES=local-ai docker compose up -d
+# The same variable does the same thing in production -- see deploy/README.md.
 #
 # Lean by design -- core vs optional building blocks
 # ---------------------------------------------------
 # Core (always):     frontend, backend, worker, db (MariaDB), redis
-# On by default,     ollama (local AI), qdrant (memories / vectors),
-#   switchable:      centrifugo (live support), tika (text extraction)
+# On by default,     qdrant (memories / vectors), centrifugo (live support),
+#   switchable:      tika (text extraction), whisper (audio transcription)
 #                    -> stop one:  docker compose stop <name>
 #                       (Synaplan keeps running; the matching feature hides)
 #                    -> keep it off across restarts: give it a profile in a
 #                       docker-compose.override.yml, e.g.
 #                         services: { qdrant: { profiles: [optional] } }
-# Opt-in profiles:   office (Collabora CODE, office files, ~2 GB RAM)
-#                    tts    (Piper text-to-speech)
-#                    oidc   (Keycloak, SSO test realm)
-#                    -> docker compose --profile office --profile tts up -d
+# Opt-in profiles:   local-ai (Ollama + local embedding model, ~1 GB)
+#                    office   (Collabora CODE, office files, ~2 GB RAM)
+#                    tts      (Piper text-to-speech)
+#                    oidc     (Keycloak, SSO test realm)
+#                    -> COMPOSE_PROFILES=local-ai,office docker compose up -d
 # The boot page at http://localhost:5173 shows which blocks are running.
 #
 services:
@@ -62,12 +62,11 @@ services:
          screen shows every boot step (database, backend, AI model
          download) and switches to the app automatically.
 
-         The first start can take 5-15 minutes depending on your
+         The first start takes a few minutes depending on your
          machine and connection. In the background Docker is:
            - building the backend dev image (first run only)
            - installing frontend dependencies (npm ci)
            - running database migrations + seeding
-           - downloading the local embedding model (~1 GB)
 
          When everything is ready:
            App      http://localhost:5173
@@ -82,10 +81,10 @@ services:
          LEAN BY DESIGN -- optional building blocks
            Core is small: app + MariaDB + Redis. Everything else is a
            block you switch on when you need it, off when you don't:
-             Ollama      local AI            on   (docker compose stop ollama)
              Qdrant      memories / vectors  on   (docker compose stop qdrant)
              Centrifugo  live support        on   (REALTIME_ENABLED=false)
              Tika        text extraction     on   (docker compose stop tika)
+             Ollama      local AI            off  (COMPOSE_PROFILES=local-ai)
              Collabora   office files        off  (--profile office)
              TTS         spoken answers      off  (--profile tts)
            Off = Synaplan keeps running, the feature simply stays hidden.
@@ -163,6 +162,10 @@ services:
       # comma-separated allow-list to restrict to ONLY those hosts.
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
       # Probed by the boot-status onboarding page (see /boot-status mount).
+      # The entrypoint blanks the Ollama URL unless the `local-ai` profile is
+      # on, so the page shows local AI as an opt-in block instead of probing a
+      # container that was never started.
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       BOOT_STATUS_OLLAMA_URL: http://ollama:11434
       BOOT_STATUS_DB_HOST: db
       # Optional building blocks the boot page lists with a live on/off state
@@ -292,7 +295,16 @@ services:
       FRONTEND_URL: http://localhost:5173
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama:11434
+      # Empty until the `local-ai` profile sets it in the command below. An
+      # empty URL means "no local AI here", which the health probes report as
+      # not-configured rather than as an outage (#1704).
+      # The command wrapper exports it for the app process only, so a
+      # `docker compose exec backend php bin/console …` session does NOT see
+      # it. Put OLLAMA_BASE_URL=http://ollama:11434 next to
+      # COMPOSE_PROFILES=local-ai in ./.env when you need console commands to
+      # reach the local models too.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
@@ -327,7 +339,7 @@ services:
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       # AI Provider API Keys (loaded from backend/.env via env_file above)
       # GROQ_API_KEY is automatically loaded from backend/.env
-      AUTO_DOWNLOAD_MODELS: ${AUTO_DOWNLOAD_MODELS:-true}
+      AUTO_DOWNLOAD_MODELS: "false"
       ENABLE_LOCAL_GPT_OSS: ${ENABLE_LOCAL_GPT_OSS:-false}
       # reCAPTCHA (optional - disabled by default)
       RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
@@ -356,6 +368,22 @@ services:
       # your env if you need more / less. Honored by base-php's
       # 99-synaplan-env.ini render step.
       PHP_MAX_FILE_UPLOADS: "100"
+    # Local AI is opt-in: `COMPOSE_PROFILES=local-ai docker compose up -d`.
+    # Compose cannot make one service's environment depend on an enabled
+    # profile, so the app roles derive it here -- the same wrapper, and the
+    # same list-ELEMENT match, that deploy/compose.yaml uses in production.
+    # Matching the whole value instead would let "local-ai,office" start
+    # Ollama while leaving the app pointed at no local AI at all.
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        case ",$${COMPOSE_PROFILES:-}," in
+          *,local-ai,*)
+            export OLLAMA_BASE_URL=http://ollama:11434
+            export AUTO_DOWNLOAD_MODELS=true
+            ;;
+        esac
+        exec /usr/local/bin/docker-entrypoint.sh
     depends_on:
       db:
         condition: service_healthy
@@ -452,7 +480,9 @@ services:
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
-      OLLAMA_BASE_URL: http://ollama:11434
+      # Empty until the `local-ai` profile sets it in the command below.
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
@@ -488,6 +518,15 @@ services:
     command:
       - |
         set -u
+
+        # Local AI is opt-in and must resolve to the SAME answer as the backend
+        # role, otherwise a queued embedding job would look for an Ollama the
+        # web container knows nothing about. Same wrapper as deploy/compose.yaml.
+        case ",$${COMPOSE_PROFILES:-}," in
+          *,local-ai,*)
+            export OLLAMA_BASE_URL=http://ollama:11434
+            ;;
+        esac
 
         # Resolve the env once so cache:warmup, dbal:run-sql, and
         # messenger:consume all agree. APP_ENV is set in the service env
@@ -706,7 +745,12 @@ services:
       - synaplan-network
 
   # Ollama - Local AI Models (GPU-accelerated if NVIDIA available)
+  #
+  # Opt-in: `COMPOSE_PROFILES=local-ai docker compose up -d`. Off by default so
+  # a fresh clone reaches a working app without pulling ~1 GB of weights; the
+  # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
+    profiles: [local-ai]
     image: ollama/ollama:latest@sha256:32931b46719f673c05fdbaa81ccb26da18ea4a1c57590a754874ab28ba269eb2
     container_name: synaplan-ollama
     ports:

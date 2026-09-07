@@ -105,6 +105,9 @@ final class StreamControllerDeferredMemoryDispatchTest extends TestCase
             ChatRunServiceFactory::withoutRedis(),
             $this->createMock(ChatErrorPresenter::class),
             $this->createMock(ChatErrorNotifier::class),
+            $this->createMock(\App\Service\Agent\AgentConfig::class),
+            $this->createMock(\App\Service\Agent\AgentService::class),
+            $this->createMock(\App\Service\Agent\AgentRuntimeResolver::class),
         );
     }
 

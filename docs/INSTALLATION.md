@@ -251,10 +251,10 @@ deployment contract.
 
 - **Docker** & **Docker Compose** (v2.0+)
 - **Git**
-- 8GB RAM minimum (16GB recommended for local AI)
-- ~9GB disk space (Standard) or ~5GB (Minimal). Add ~14GB if you enable the local
-  chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
-  [Standard Development Stack](#standard-development-stack))
+- 8GB RAM minimum (16GB recommended once you add the `local-ai` profile)
+- ~3GB disk space. Add ~1GB for the `local-ai` profile, and ~14GB more if you
+  also enable the local chat model (`ENABLE_LOCAL_GPT_OSS=true`, see
+  [Local AI Profile](#local-ai-profile))
 
 > **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The
 > Quick Start below already does: `docker compose up -d` builds the backend and
@@ -281,28 +281,17 @@ That's it! Visit http://localhost:5173 after ~2 minutes, log in as
 
 ### Standard Development Stack
 
-Full-featured installation with local AI models and audio transcription.
+Full-featured installation on cloud AI — no model weights are downloaded.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
-| Ollama embedding model | ~4 GB | `bge-m3` for RAG / semantic search |
-| **Total** | **~9 GB** | Everything except the local chat model |
+| Base services | ~3 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika, Qdrant |
+| Whisper `tiny` | ~75 MB | Local audio transcription, no key needed |
+| **Total** | **~3 GB** | Chat works as soon as you add one provider key |
 
 ```bash
 docker compose up -d
 ```
-
-**Local chat model is opt-in.** The standard install downloads the embedding model
-only. A local chat model (`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong
-CPU box) is pulled only when you ask for it:
-
-```bash
-ENABLE_LOCAL_GPT_OSS=true docker compose up -d
-```
-
-Until then — or while the download runs — chat needs a cloud provider key
-(see [Connect an AI Provider](#connect-an-ai-provider)).
 
 **What's included:**
 - Full web app and REST API
@@ -311,36 +300,42 @@ Until then — or while the download runs — chat needs a cloud provider key
 - Redis (cache, sessions, locks, message queues, realtime engine)
 - Centrifugo WebSocket gateway (live chat takeover, realtime events)
 - Background worker (Symfony Messenger consumer for async AI/indexing jobs)
-- Local Ollama server (embedding model downloaded automatically, chat model opt-in)
 - Whisper audio transcription
 - Cloud AI support (Groq, OpenAI, Anthropic, Gemini, xAI, …)
 - Qdrant vector database (AI memories, RAG, feedback)
 - Dev tools (phpMyAdmin, MailHog)
 
-### Minimal Development Stack (Cloud AI Only)
+### Local AI Profile
 
-Fastest way to start—uses cloud AI providers, skips large local models.
+Adds an Ollama server and the `bge-m3` embedding model, so RAG and semantic
+search run on your own hardware with no provider key.
 
 | Component | Size | Description |
 |-----------|------|-------------|
-| Base services | ~5 GB | Backend, frontend, worker, database, Redis, Centrifugo, Tika |
-| **Total** | **~5 GB** | No local AI models (`AUTO_DOWNLOAD_MODELS=false`) |
+| Ollama + `bge-m3` | ~1 GB | Embeddings for RAG / semantic search |
 
 ```bash
-# Start minimal stack
-docker compose -f docker-compose-minimal.yml up -d
+COMPOSE_PROFILES=local-ai docker compose up -d
 ```
 
-**Excluded (saves ~4 GB):**
-- Ollama (local AI models)
-- Whisper models (audio transcription)
-- Local embedding models
+`COMPOSE_PROFILES` is the same switch a self-hosted install uses in
+`deploy/.env`, so the development stack and production behave identically.
+Combine profiles with a comma (`local-ai,office`).
 
-**Upgrade to Standard later:**
+**Local chat model is opt-in on top of that.** A local chat model
+(`gpt-oss:20b`, another ~14 GB, needs a GPU or a strong CPU box) is pulled only
+when you ask for it:
+
 ```bash
-docker compose -f docker-compose-minimal.yml down
-docker compose up -d
+COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true docker compose up -d
 ```
+
+Until then — or while the download runs — chat needs a cloud provider key
+(see [Connect an AI Provider](#connect-an-ai-provider)).
+
+> `docker compose exec` sessions do not inherit the URL the profile exports, so
+> add `OLLAMA_BASE_URL=http://ollama:11434` next to `COMPOSE_PROFILES=local-ai`
+> in `./.env` when console commands must reach the local models too.
 
 ---
 
@@ -379,8 +374,8 @@ On first start, the system:
 3. Generates JWT keypair for authentication
 4. Creates database schema
 5. Loads test fixtures (if database is empty)
-6. Downloads the Ollama embedding model in the background — standard install only,
-   and only while `AUTO_DOWNLOAD_MODELS=true` (the Minimal stack sets it to `false`)
+6. Downloads the Ollama embedding model in the background — only with the
+   `local-ai` profile, which is what sets `AUTO_DOWNLOAD_MODELS=true`
 7. Points chat at a provider that has a usable key, if the default one has none
 8. Starts all services
 

@@ -30,4 +30,14 @@ interface ShareableResourceKindInterface
      * @return list<Permission>
      */
     public function supportedPermissions(): array;
+
+    /**
+     * Refuse a grant on a resource that exists but is not in a shareable
+     * state (draft, archived, owned by another kind). Owner and permission
+     * checks happen in {@see \App\Service\Iam\ShareService}; this is the
+     * kind's own veto.
+     *
+     * @throws \App\Service\Iam\Exception\ShareNotAllowedException
+     */
+    public function assertShareable(string $resourceId): void;
 }

@@ -553,9 +553,9 @@ else
     # showing a download that is no longer happening.
     write_ollama_download_status "idle" "" "" ""
     echo ""
-    echo "⏭️  Skipping automatic model downloads"
-    echo "   💡 Tip: Use 'AUTO_DOWNLOAD_MODELS=true docker compose up -d'"
-    echo "   Models will download automatically when first used"
+    echo "⏭️  Skipping automatic model downloads (no local AI configured)"
+    echo "   💡 Tip: run local AI with 'COMPOSE_PROFILES=local-ai docker compose up -d'"
+    echo "   Cloud providers need no download — add a key under Admin → AI Providers"
 fi
 
 # Clear and warmup cache

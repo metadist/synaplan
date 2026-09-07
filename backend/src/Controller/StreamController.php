@@ -11,6 +11,12 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Message\ExtractMemoriesCommand;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentService;
+use App\Service\Agent\Exception\AgentArchivedException;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
+use App\Service\Agent\Exception\AgentNotPublishedException;
 use App\Service\Chat\ChatTitleService;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
@@ -53,6 +59,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\InputBag;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -124,6 +131,9 @@ class StreamController extends AbstractController
         private ChatRunService $chatRunService,
         private ChatErrorPresenter $chatErrorPresenter,
         private ChatErrorNotifier $chatErrorNotifier,
+        private AgentConfig $agentConfig,
+        private AgentService $agentService,
+        private AgentRuntimeResolver $agentRuntimeResolver,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
     ) {
@@ -273,7 +283,7 @@ class StreamController extends AbstractController
     #[OA\Post(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response (POST body)',
-        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
+        description: 'Same SSE stream as the GET variant, but all parameters travel in a JSON body so arbitrarily long messages never hit URL length limits. Accepts every parameter the GET variant documents (message, chatId, trackId, reasoning, webSearch, modelId, fileIds, voiceReply, isAgain, promptTopic, promptId, agentId, draft, ragGroupKey, quotedText, quotedMessageId, continueMessageId, disableMemories, guestSession, incognito, history) as JSON properties; body values override query parameters. This is the default transport used by the web chat.',
         security: [['Bearer' => []]],
         tags: ['Messages'],
         requestBody: new OA\RequestBody(
@@ -391,6 +401,20 @@ class StreamController extends AbstractController
         required: false,
         description: 'ID of a specific prompt to use. Takes precedence over promptTopic. The prompt must belong to the current user or be a system prompt.',
         schema: new OA\Schema(type: 'integer', example: 42)
+    )]
+    #[OA\Parameter(
+        name: 'agentId',
+        in: 'query',
+        required: false,
+        description: 'ID of an assistant to pin this chat to. When AGENTS.ENABLED is on, classification skips the sorter and the reply uses that assistant. Ignored when the flag is off. The prompt must belong to the current user.',
+        schema: new OA\Schema(type: 'integer', example: 7)
+    )]
+    #[OA\Parameter(
+        name: 'draft',
+        in: 'query',
+        required: false,
+        description: 'When 1, pin the owner\'s unpublished draft (test panel). Non-owners receive 403. Ignored when agentId is absent.',
+        schema: new OA\Schema(type: 'string', enum: ['0', '1'], example: '0')
     )]
     #[OA\Parameter(
         name: 'ragGroupKey',
@@ -576,6 +600,20 @@ class StreamController extends AbstractController
         $fileIds = $params->get('fileIds', ''); // NEW: comma-separated list or single ID
         $promptTopic = $params->get('promptTopic');
         $promptId = $params->get('promptId');
+        $agentIdParam = $params->getInt('agentId') ?: null;
+        $pinnedAgentId = $this->resolvePinnedAgentId($user, $agentIdParam);
+        $draftRequested = $this->isTruthyFlag($params->get('draft'));
+        if ($draftRequested) {
+            $draftDenied = $this->denyDraftIfNotOwner($user, $pinnedAgentId);
+            if (null !== $draftDenied) {
+                return $draftDenied;
+            }
+        }
+        $pinnedAgentVersionId = null;
+        $agentAccessDenied = $this->denyAgentRuntime($user, $pinnedAgentId, $draftRequested, is_numeric($chatId) ? (int) $chatId : null, $pinnedAgentVersionId);
+        if (null !== $agentAccessDenied) {
+            return $agentAccessDenied;
+        }
         // Typed accessor: `get()` would hand back an array for `ragGroupKey[]=…`,
         // which then flows into a string-typed processing option and 500s
         // downstream. `getString()` rejects non-scalar input with a clean 400,
@@ -720,7 +758,7 @@ class StreamController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
         $response->headers->set('Connection', 'keep-alive');
 
-        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory) {
+        $response->setCallback(function () use ($user, $messageText, $trackId, $chatId, $includeReasoning, $webSearch, $uiLanguage, $modelId, $isAgain, $fileIdArray, $isWidgetMode, $isGuestMode, $fixedTaskPromptTopic, $ragGroupKey, $widgetSession, $guestSession, $rateLimitError, $voiceReply, $continueMessageId, $disableMemories, $clientCountry, $quotedText, $quotedMessageId, $incognito, $incognitoHistory, $pinnedAgentId, $draftRequested, $pinnedAgentVersionId) {
             // Disable output buffering
             while (ob_get_level()) {
                 ob_end_clean();
@@ -758,7 +796,7 @@ class StreamController extends AbstractController
             );
 
             // Helper to save error message
-            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage) {
+            $saveError = function ($chat, $incomingMessage, ChatErrorView $view, string $provider = 'system') use ($user, $trackId, $intendedChat, $incognito, $uiLanguage, $pinnedAgentId, $pinnedAgentVersionId) {
                 if (!$incomingMessage) {
                     return null;
                 }
@@ -795,6 +833,7 @@ class StreamController extends AbstractController
 
                     $this->em->persist($outgoingMessage);
                     $this->em->flush();
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     $displayProvider = $intendedChat['provider'] ?? $provider;
                     $displayModel = $intendedChat['name'] ?? 'unknown';
@@ -933,6 +972,11 @@ class StreamController extends AbstractController
                     }
                 }
 
+                $this->stampAgentId($incomingMessage, $pinnedAgentId, $pinnedAgentVersionId);
+                if (null !== $pinnedAgentId && !$incognito) {
+                    $this->em->flush();
+                }
+
                 // Issue #1024: relay the operator prompt to WhatsApp before AI processing so
                 // the full conversation flow (prompt + response) is visible on the WhatsApp side.
                 // Guards: widget/guest users are not platform operators; continue-messages use a
@@ -1058,6 +1102,16 @@ class StreamController extends AbstractController
                     // duplicate media recordUsage() below.
                     'record_media_usage' => true,
                 ];
+
+                if (null !== $pinnedAgentId) {
+                    $processingOptions['agentId'] = $pinnedAgentId;
+                    if ($draftRequested) {
+                        $processingOptions['agentDraft'] = true;
+                    }
+                    if (null !== $pinnedAgentVersionId) {
+                        $processingOptions['agentVersionId'] = $pinnedAgentVersionId;
+                    }
+                }
 
                 // Quoted reference ("Mention in chat"): ChatHandler injects this
                 // as a dedicated context block in the system prompt.
@@ -1454,6 +1508,7 @@ class StreamController extends AbstractController
                         $this->em->persist($outgoingMessage);
                         $this->em->flush(); // Flush to get message ID for metadata
                     }
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Store error details in metadata (show user's selected chat model, not literal "error")
                     $outgoingMessage->setMeta(
@@ -1724,6 +1779,7 @@ class StreamController extends AbstractController
                     $outgoingMessage->setText($finalText);
                     $outgoingMessage->setDirection('OUT');
                     $outgoingMessage->setStatus('complete');
+                    $this->stampAgentId($outgoingMessage, $pinnedAgentId, $pinnedAgentVersionId);
 
                     // Incognito: the OUT message stays transient. addFile() below
                     // is in-memory only — the File rows themselves exist (marked
@@ -1972,6 +2028,8 @@ class StreamController extends AbstractController
                     'source' => $isWidgetMode ? 'WIDGET' : ($isGuestMode ? 'GUEST' : 'WEB'),
                     'response_text' => $finalText,
                     'input_text' => $messageText,
+                    'agentId' => $pinnedAgentId,
+                    'agentVersionId' => $pinnedAgentVersionId,
                 ]);
 
                 // Usage taximeter (issue: chat usage display). Build the
@@ -2848,6 +2906,8 @@ class StreamController extends AbstractController
                 'source' => $source,
                 'response_text' => $content,
                 'input_text' => $message->getText(),
+                'agentId' => $options['agentId'] ?? null,
+                'agentVersionId' => $options['agentVersionId'] ?? null,
             ]);
 
             // Usage taximeter (mirrors the streaming branch): per-message usage
@@ -2987,6 +3047,74 @@ class StreamController extends AbstractController
         }
 
         $this->memoryExtractionDispatcher->dispatch($payload);
+    }
+
+    /**
+     * Owner-only draft test mode. Missing pin or a foreign assistant → 403.
+     */
+    private function denyDraftIfNotOwner(?User $user, ?int $agentId): ?JsonResponse
+    {
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $this->agentService->requireOwned($agentId, (int) $user->getId());
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Forbidden'], Response::HTTP_FORBIDDEN);
+        }
+
+        return null;
+    }
+
+    private function isTruthyFlag(mixed $value): bool
+    {
+        return true === $value || 1 === $value || '1' === (string) $value || 'true' === $value;
+    }
+
+    private function resolvePinnedAgentId(?User $user, ?int $agentId): ?int
+    {
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return null;
+        }
+        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
+            return null;
+        }
+
+        return $agentId;
+    }
+
+    /**
+     * @param-out int|null $agentVersionId
+     */
+    private function denyAgentRuntime(?User $user, ?int $agentId, bool $draft, ?int $chatId, ?int &$agentVersionId): ?JsonResponse
+    {
+        $agentVersionId = null;
+        if (null === $user || null === $agentId || $agentId < 1) {
+            return null;
+        }
+
+        try {
+            $profile = $this->agentRuntimeResolver->resolve($agentId, $user, $draft, $chatId);
+            $agentVersionId = $profile->agentVersionId;
+        } catch (AgentNotAccessibleException|AgentNotPublishedException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        } catch (AgentArchivedException) {
+            return $this->json(['error' => 'archived'], Response::HTTP_GONE);
+        }
+
+        return null;
+    }
+
+    private function stampAgentId(Message $message, ?int $agentId, ?int $agentVersionId = null): void
+    {
+        if (null === $agentId || $agentId < 1) {
+            return;
+        }
+        $message->setMeta('AGENTID', (string) $agentId);
+        if (null !== $agentVersionId && $agentVersionId > 0) {
+            $message->setMeta('AGENTVERSIONID', (string) $agentVersionId);
+        }
     }
 
     /**
