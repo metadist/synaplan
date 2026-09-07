@@ -102,7 +102,16 @@ class OidcUserService
         $lastSeen = $this->lastSeenForClaims($user, $claims);
         $this->upsertExternalIdentity($user, $claims);
         if ($this->directoryGroupSync->shouldRun($user, $refreshToken, $lastSeen)) {
-            $this->directoryGroupSync->sync($user, $claims);
+            // Group reconciliation is best-effort: a malformed claim or a
+            // transient write failure must not turn a valid login into an error.
+            try {
+                $this->directoryGroupSync->sync($user, $claims);
+            } catch (\Throwable $e) {
+                $this->logger->error('Directory group sync failed; login continues without group changes', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         if ($isNewUser) {

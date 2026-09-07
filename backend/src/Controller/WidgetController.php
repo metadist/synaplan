@@ -311,7 +311,8 @@ class WidgetController extends AbstractController
         }
 
         // Visitor statistics belong to the owner (like the session list); a
-        // read share shows the configuration only.
+        // read share shows the configuration only — minus the credentials
+        // it carries (Slack webhook, external API token).
         $isOwner = $widget->getOwnerId() === (int) $user->getId();
         $widgetPayload = [
             'id' => $widget->getId(),
@@ -319,7 +320,7 @@ class WidgetController extends AbstractController
             'name' => $widget->getName(),
             'taskPromptTopic' => $widget->getTaskPromptTopic(),
             'status' => $widget->getStatus(),
-            'config' => $widget->getConfig(),
+            'config' => $isOwner ? $widget->getConfig() : self::withoutSecrets($widget->getConfig()),
             'allowedDomains' => $widget->getAllowedDomains(),
             'isActive' => $this->widgetService->isWidgetActive($widget),
             'created' => $widget->getCreated(),
@@ -373,8 +374,10 @@ class WidgetController extends AbstractController
                 $this->widgetService->updateWidgetName($widget, $data['name']);
             }
 
-            if (isset($data['config'])) {
-                $this->widgetService->updateWidget($widget, $data['config']);
+            if (isset($data['config']) && is_array($data['config'])) {
+                // An editor only ever saw the masked credentials; a round-trip
+                // of the mask must not overwrite the owner's real values.
+                $this->widgetService->updateWidget($widget, self::withoutSecretMasks($data['config']));
             }
 
             if (isset($data['status']) && in_array($data['status'], ['active', 'inactive'])) {
@@ -1468,6 +1471,45 @@ class WidgetController extends AbstractController
         }
 
         return ['urls' => $urls, 'promptId' => $prompt->getId()];
+    }
+
+    /**
+     * Config keys that are credentials. They are the owner's alone; a sharee
+     * sees that the integration is configured, never the secret itself.
+     */
+    private const SECRET_CONFIG_KEYS = ['slackWebhookUrl', 'externalApiToken'];
+    private const SECRET_MASK = '***';
+
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutSecrets(array $config): array
+    {
+        foreach (self::SECRET_CONFIG_KEYS as $key) {
+            if (isset($config[$key]) && is_string($config[$key]) && '' !== $config[$key]) {
+                $config[$key] = self::SECRET_MASK;
+            }
+        }
+
+        return $config;
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutSecretMasks(array $config): array
+    {
+        foreach (self::SECRET_CONFIG_KEYS as $key) {
+            if (self::SECRET_MASK === ($config[$key] ?? null)) {
+                unset($config[$key]);
+            }
+        }
+
+        return $config;
     }
 
     private function widgetAccess(User $user, Widget $widget): string

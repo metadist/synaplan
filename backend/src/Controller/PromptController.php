@@ -1071,6 +1071,17 @@ class PromptController extends AbstractController
             }
         }
 
+        // The `tools:` namespace is reserved for system prompts on update as
+        // on create — a user-owned prompt renamed into it would be picked up by
+        // internal pipelines once shared (see PromptRepository::findSharedPrompts).
+        if (isset($data['topic']) && is_string($data['topic'])
+            && 0 !== $prompt->getOwnerId() && str_starts_with(trim($data['topic']), 'tools:')
+        ) {
+            return $this->json([
+                'error' => 'Cannot use the "tools:" prefix - reserved for system prompts',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
         // Update fields if provided
         if (isset($data['shortDescription'])) {
             $prompt->setShortDescription(trim($data['shortDescription']));

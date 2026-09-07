@@ -48,3 +48,13 @@ framework:
             limit: 10
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # People picker (`GET /api/v1/iam/subjects`), keyed per user in
+        # ShareController. A person typing a name fires one request per
+        # keystroke, so 60/minute is generous for real use while making a
+        # scripted walk over the directory (one probe per letter) slow
+        # enough to be pointless.
+        iam_subject_search:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'

@@ -19,26 +19,54 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
-     * People picker: match email or the JSON name fields in BUSERDETAILS.
+     * Shortest query the people picker answers. Anything shorter matches too
+     * many accounts to be a lookup and turns the endpoint into an enumerator.
+     */
+    public const SEARCH_MIN_LENGTH = 2;
+
+    /**
+     * BUSERDETAILS keys that hold a person's name. Only these are searched:
+     * the JSON also carries phone, address, provider subjects, Stripe ids and
+     * the pending phone-verification code, none of which may be probed
+     * through a substring match.
+     */
+    private const SEARCHABLE_NAME_KEYS = ['full_name', 'first_name', 'last_name', 'firstName', 'lastName', 'display_name'];
+
+    /**
+     * People picker: match the email address or one of the name fields.
      *
      * @return list<User>
      */
     public function searchByEmailOrName(string $query, int $limit = 20): array
     {
         $query = trim($query);
-        if ('' === $query) {
+        if (mb_strlen($query) < self::SEARCH_MIN_LENGTH) {
             return [];
         }
 
-        $escaped = $this->escapeLike($query);
+        $pattern = '%'.$this->escapeLike($query).'%';
+        $nameMatches = [];
+        foreach (self::SEARCHABLE_NAME_KEYS as $key) {
+            $nameMatches[] = sprintf("JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.%s')) LIKE :q ESCAPE '!'", $key);
+        }
+        $sql = sprintf(
+            "SELECT BID FROM BUSER WHERE BMAIL LIKE :q ESCAPE '!' OR %s ORDER BY BMAIL ASC LIMIT %d",
+            implode(' OR ', $nameMatches),
+            max(1, $limit),
+        );
+
+        $stmt = $this->getEntityManager()->getConnection()->prepare($sql);
+        $stmt->bindValue('q', $pattern);
+        $ids = array_map('intval', $stmt->executeQuery()->fetchFirstColumn());
+        if ([] === $ids) {
+            return [];
+        }
 
         /** @var list<User> $users */
         $users = $this->createQueryBuilder('u')
-            ->where("u.mail LIKE :q ESCAPE '!'")
-            ->orWhere("u.userDetails LIKE :q ESCAPE '!'")
-            ->setParameter('q', '%'.$escaped.'%')
+            ->where('u.id IN (:ids)')
+            ->setParameter('ids', $ids)
             ->orderBy('u.mail', 'ASC')
-            ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
 

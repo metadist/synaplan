@@ -15,6 +15,7 @@ use App\Service\Iam\DirectoryGroupSync;
 use App\Service\Iam\IamConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class DirectoryGroupSyncTest extends TestCase
 {
@@ -36,6 +37,7 @@ final class DirectoryGroupSyncTest extends TestCase
             $this->groups,
             $this->members,
             $this->audit,
+            new NullLogger(),
             'synaplan',
             'https://idp.example/realms/synaplan/.well-known/openid-configuration',
         );
@@ -135,6 +137,35 @@ final class DirectoryGroupSyncTest extends TestCase
         ]);
 
         self::assertSame('ADMIN', $user->getUserLevel());
+    }
+
+    public function testOversizedClaimIsSkippedAndLongNameIsTruncated(): void
+    {
+        $this->iamConfig->method('isDirectorySyncEnabled')->willReturn(true);
+        $this->iamConfig->method('directoryGroupsClaim')->willReturn('groups');
+        $longName = str_repeat('Vertrieb ', 30);
+        $this->iamConfig->method('directoryGroupNames')->willReturn(['sales' => $longName]);
+        $this->groups->method('findOneByExternal')->willReturn(null);
+        $this->groups->method('findOneBySlug')->willReturn(null);
+
+        $saved = [];
+        $this->groups->method('save')->willReturnCallback(static function (Group $group) use (&$saved): void {
+            $ref = new \ReflectionProperty(Group::class, 'id');
+            $ref->setValue($group, 31);
+            $saved[] = $group;
+        });
+        $this->members->method('findDirectoryByUserId')->willReturn([]);
+        $this->members->method('findMembership')->willReturn(null);
+
+        $this->sync->sync($this->userWithId(4), [
+            'sub' => 's1',
+            'iss' => 'https://idp.example/realms/synaplan',
+            'groups' => ['sales', str_repeat('x', Group::EXTERNAL_ID_MAX_LENGTH + 1), ''],
+        ]);
+
+        self::assertCount(1, $saved, 'only the well-formed claim creates a group');
+        self::assertSame('sales', $saved[0]->getExternalId());
+        self::assertLessThanOrEqual(Group::NAME_MAX_LENGTH, mb_strlen($saved[0]->getName()));
     }
 
     private function userWithId(int $id): User
