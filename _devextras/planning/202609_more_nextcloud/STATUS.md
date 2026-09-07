@@ -8,7 +8,7 @@ before the first sprint starts.**
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Core handshake | — | planned | |
+| S1 Core handshake | `feat/more-nextcloud-s1` / synaplan | in progress | NC1: BPLATFORMINSTANCES + PLATFORM_LINKS.ENABLED off |
 | S2 Nextcloud app | — | planned | |
 | S3 Parity & fallbacks | — | planned | |
 
@@ -34,3 +34,8 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 **2026-09-07 (UX contract):** keep the handshake as a flow, not a
 settings form. See
 [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.6.
+
+**2026-09-07 (NC1 started on `feat/more-nextcloud-s1`):** Galera-safe
+`BPLATFORMINSTANCES` + Outlook built-in allow-list row, `PLATFORM_LINKS.ENABLED`
+seeded off, `features.platformLinksEnabled` on runtime config. Next: NC2
+instance registration.

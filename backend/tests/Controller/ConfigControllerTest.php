@@ -57,6 +57,8 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertFalse($data['features']['officeConvertEnabled']);
         $this->assertArrayHasKey('documentToolsEnabled', $data['features']);
         $this->assertFalse($data['features']['documentToolsEnabled']);
+        $this->assertArrayHasKey('platformLinksEnabled', $data['features']);
+        $this->assertFalse($data['features']['platformLinksEnabled']);
     }
 
     /**

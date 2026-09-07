@@ -21,6 +21,7 @@ use App\Seed\ModelRetirementSeeder;
 use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\NativeToolRoutingConfigSeeder;
+use App\Seed\PlatformLinksConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SavedTaskConfigSeeder;
@@ -61,6 +62,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  16. file-context  (BCONFIG: FILE_CONTEXT conversation-file flags, ownerId=0 — default OFF)
  *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default OFF until GA)
  *  17b. iam          (BCONFIG: IAM.* flags, ownerId=0 — default OFF)
+ *  17c. platform-links (BCONFIG: PLATFORM_LINKS.ENABLED, ownerId=0 — default OFF)
  *  18. self-aware    (BCONFIG: SELF_AWARE flags, ownerId=0 — default ON)
  *  19. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
  *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
@@ -97,6 +99,7 @@ final class SeedAllCommand extends Command
         private readonly SavedTaskConfigSeeder $savedTaskConfigSeeder,
         private readonly FileContextConfigSeeder $fileContextConfigSeeder,
         private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
+        private readonly PlatformLinksConfigSeeder $platformLinksConfigSeeder,
         private readonly IamConfigSeeder $iamConfigSeeder,
         private readonly SelfAwareConfigSeeder $selfAwareConfigSeeder,
         private readonly StructuredOutputConfigSeeder $structuredOutputConfigSeeder,
@@ -130,6 +133,7 @@ final class SeedAllCommand extends Command
             "  16. file-context flags         (BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF)\n".
             "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default OFF until GA)\n".
             "  17b. iam flags                 (BCONFIG, group=IAM, ownerId=0 — default OFF)\n".
+            "  17c. platform-links flag       (BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default OFF)\n".
             "  18. self-aware flags           (BCONFIG, group=SELF_AWARE, ownerId=0 — default ON)\n".
             "  19. structured-output flag     (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
             "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
@@ -165,6 +169,7 @@ final class SeedAllCommand extends Command
             ['file-context', fn (): SeedResult => $this->fileContextConfigSeeder->seed()],
             ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
             ['iam', fn (): SeedResult => $this->iamConfigSeeder->seed()],
+            ['platform-links', fn (): SeedResult => $this->platformLinksConfigSeeder->seed()],
             ['self-aware', fn (): SeedResult => $this->selfAwareConfigSeeder->seed()],
             ['structured-output', fn (): SeedResult => $this->structuredOutputConfigSeeder->seed()],
             ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
