@@ -900,21 +900,23 @@ services:
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
   # No published port: the backend talks to collabora:9980 on the compose network.
   collabora:
-    image: collabora/code:25.04.10.3.1@sha256:a51dd5d1741dea5d19f49d9997de2c321bf582076015ec4015941f3f00a5f4c0
+    image: collabora/code:26.04.3.2.1@sha256:379b8f1fc955dd6d01ba24adf61d1b177048ddaae179ae8c1e6a6342daccb282
     container_name: synaplan-collabora
     profiles: [office]
     restart: unless-stopped
     mem_limit: 2g
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2
-    # CODE 25.04 dropped curl (CollaboraOnline/online#11856). Same /dev/tcp
-    # probe as deploy/compose.yaml's ollama service; coolwsd --probe is 26.04+.
+    # CODE 26.04 is distroless: no bash, so the /dev/tcp probe of 25.04 cannot
+    # run here. coolwsd --probe is the upstream check (it is what the image's
+    # own HEALTHCHECK runs) and needs the exec form — a plain string would go
+    # through CMD-SHELL and fail for the same reason.
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9980 && printf 'GET /hosting/capabilities HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      test: ["CMD", "/usr/bin/coolwsd", "--probe", "--use-env-vars"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 120s
     networks:
       - synaplan-network
 
