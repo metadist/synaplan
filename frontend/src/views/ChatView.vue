@@ -167,14 +167,12 @@
                 <Icon icon="mdi:incognito" class="w-6 h-6 txt-brand" aria-hidden="true" />
               </div>
               <h2 class="text-2xl font-semibold txt-primary mb-2">
-                {{ incognitoStore.active ? $t('incognito.emptyTitle') : welcomeGreeting }}
+                {{ emptyLandingTitle }}
               </h2>
               <p class="txt-secondary">
-                {{
-                  incognitoStore.active ? $t('incognito.emptyHint') : $t('chatInput.placeholder')
-                }}
+                {{ emptyLandingHint }}
               </p>
-              <SelfAwareEmptyHint @ask="handleSendMessage" />
+              <SelfAwareEmptyHint v-if="!pinnedAgentId" @ask="handleSendMessage" />
             </div>
 
             <!-- Speed config: the expanded mix card greets the user on every
@@ -189,7 +187,12 @@
               <ModelMixPanel @select="dismissInlineMixPanel" />
             </div>
 
-            <ExamplePrompts v-if="showExamplePrompts" @pick="handleExamplePick" />
+            <AssistantStarterPrompts
+              v-if="pinnedAgentId && pinnedStarterPrompts.length > 0"
+              :prompts="pinnedStarterPrompts"
+              @pick="handleExamplePick"
+            />
+            <ExamplePrompts v-else-if="showExamplePrompts" @pick="handleExamplePick" />
             <MarketingNews v-if="!authStore.isAuthenticated && configStore.marketingNews.enabled" />
           </div>
 
@@ -304,7 +307,11 @@
         ref="chatInputRef"
         :is-streaming="isStreaming"
         :is-guest-mode="isGuestMode"
-        :banner-visible="showPendingPurchaseBanner || (isGuestMode && guestStore.shouldShowBanner)"
+        :banner-visible="
+          showPendingPurchaseBanner ||
+          (isGuestMode && guestStore.shouldShowBanner) ||
+          Boolean(pinnedAgentId)
+        "
         :quote="quoting.pendingQuote.value"
         @send="handleSendMessage"
         @stop="handleUserStop"
@@ -313,22 +320,21 @@
       >
         <!-- Native onboarding: a signed-out store purchase waiting to be
              linked to an account outranks the guest quota banner. -->
-        <template v-if="showPendingPurchaseBanner" #banner>
+        <template #banner>
           <PendingPurchaseBanner
+            v-if="showPendingPurchaseBanner"
             :visible="showPendingPurchaseBanner"
             @dismiss="pendingPurchaseBannerDismissed = true"
           />
-        </template>
-        <template v-else-if="isGuestMode" #banner>
           <GuestBanner
+            v-else-if="isGuestMode"
             :visible="guestStore.shouldShowBanner"
             :remaining="guestStore.remainingMessages"
             :max-messages="guestStore.maxMessages"
             @dismiss="guestStore.dismissBanner()"
           />
-        </template>
-        <template v-else-if="incognitoStore.active" #banner>
           <div
+            v-else-if="incognitoStore.active"
             class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
             data-testid="banner-incognito"
           >
@@ -338,9 +344,8 @@
               — {{ $t('incognito.bannerText') }}
             </span>
           </div>
-        </template>
-        <template v-else-if="pinnedAssistantName" #banner>
           <div
+            v-else-if="pinnedAgentId && pinnedAssistantName"
             class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
             data-testid="banner-pinned-assistant"
           >
@@ -499,6 +504,7 @@ import ChatInput from '@/components/ChatInput.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
 import ExamplePrompts from '@/components/ExamplePrompts.vue'
+import AssistantStarterPrompts from '@/components/assistants/AssistantStarterPrompts.vue'
 import SelfAwareEmptyHint from '@/components/chat/SelfAwareEmptyHint.vue'
 import { parsePlatformDocs } from '@/components/chat/refs/DocRefPill'
 import ConsumptionBar from '@/components/usage/ConsumptionBar.vue'
@@ -531,7 +537,7 @@ import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'
 import { useMessageDigestsStore } from '@/stores/messageDigests'
 import { useIncognitoStore } from '@/stores/incognito'
-import { usePinnedAssistant } from '@/composables/usePinnedAssistant'
+import { shouldOpenFreshAssistantChat, usePinnedAssistant } from '@/composables/usePinnedAssistant'
 import IncognitoToggle from '@/components/IncognitoToggle.vue'
 import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
@@ -683,7 +689,13 @@ const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const messageDigestsStore = useMessageDigestsStore()
 const incognitoStore = useIncognitoStore()
-const { agentId: pinnedAgentId, name: pinnedAssistantName } = usePinnedAssistant()
+const {
+  agentId: pinnedAgentId,
+  queryAgentId,
+  name: pinnedAssistantName,
+  greeting: pinnedAssistantGreeting,
+  starterPrompts: pinnedStarterPrompts,
+} = usePinnedAssistant()
 const promoTips = usePromoTips()
 const { getDateLabel } = useDateFormat()
 
@@ -713,6 +725,24 @@ const showPendingPurchaseBanner = computed(
 const welcomeGreeting = computed(() => {
   const firstName = authStore.user?.firstName?.trim()
   return firstName ? t('welcomeUser', { name: firstName }) : t('welcome')
+})
+const emptyLandingTitle = computed(() => {
+  if (incognitoStore.active) {
+    return t('incognito.emptyTitle')
+  }
+  if (pinnedAgentId.value) {
+    return pinnedAssistantGreeting.value || pinnedAssistantName.value || welcomeGreeting.value
+  }
+  return welcomeGreeting.value
+})
+const emptyLandingHint = computed(() => {
+  if (incognitoStore.active) {
+    return t('incognito.emptyHint')
+  }
+  if (pinnedAgentId.value && pinnedAssistantName.value) {
+    return t('assistants.emptyHint', { name: pinnedAssistantName.value })
+  }
+  return t('chatInput.placeholder')
 })
 const showGuestSignupModal = ref(false)
 const featureGateOpen = ref(false)
@@ -1123,7 +1153,8 @@ onMounted(async () => {
   // chat — for a task saved from a chat turn that was the original prompt
   // with the old output.
   const requestedChatId = Number(route.query.chat)
-  if (Number.isInteger(requestedChatId) && requestedChatId > 0) {
+  const openedSpecificChat = Number.isInteger(requestedChatId) && requestedChatId > 0
+  if (openedSpecificChat) {
     chatsStore.setActiveChat(requestedChatId)
     router.replace({ query: { ...route.query, chat: undefined } })
   }
@@ -1137,6 +1168,15 @@ onMounted(async () => {
     // A turn that was still generating when the page was reloaded keeps
     // writing into this bubble instead of being lost.
     void resumeActiveRunIfAny()
+  }
+
+  // Start chat from an assistant must not reopen an unrelated last thread.
+  // A ?chat= deep link (Saved Tasks) keeps that thread even if agentId is set.
+  if (
+    !openedSpecificChat &&
+    shouldOpenFreshAssistantChat(queryAgentId.value, historyStore.messages)
+  ) {
+    await chatsStore.findOrCreateEmptyChat()
   }
 
   // Usage taximeter: seed today's totals once and rebuild the session from the
@@ -1492,6 +1532,15 @@ watch(
     }
   }
 )
+
+watch(queryAgentId, async (id) => {
+  if (!id || !authStore.isAuthenticated) {
+    return
+  }
+  if (shouldOpenFreshAssistantChat(id, historyStore.messages)) {
+    await chatsStore.findOrCreateEmptyChat()
+  }
+})
 
 const userTextBefore = (messageId: string | number): string => {
   const list = historyStore.messages

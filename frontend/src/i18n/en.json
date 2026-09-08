@@ -5884,6 +5884,8 @@
     "filterPlugins": "From plugins",
     "searchPlaceholder": "Search assistants",
     "talkingTo": "Talking to {name}",
+    "emptyHint": "This chat uses {name}.",
+    "suggested": "Try one of these",
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved",

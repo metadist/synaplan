@@ -5818,6 +5818,8 @@
     "filterPlugins": "Aus Plugins",
     "searchPlaceholder": "Assistenten suchen",
     "talkingTo": "Im Gespräch mit {name}",
+    "emptyHint": "Dieser Chat verwendet {name}.",
+    "suggested": "Probieren Sie eines davon",
     "save": "Speichern",
     "saving": "Speichern…",
     "saved": "Gespeichert",

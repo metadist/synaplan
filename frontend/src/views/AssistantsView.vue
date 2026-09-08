@@ -48,6 +48,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AssistantGallery from '@/components/assistants/AssistantGallery.vue'
 import AssistantBuilder from '@/components/assistants/AssistantBuilder.vue'
 import { useAgentsStore } from '@/stores/agents'
+import { useChatsStore } from '@/stores/chats'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { agentsApi } from '@/services/api/agentsApi'
@@ -56,6 +57,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const store = useAgentsStore()
+const chatsStore = useChatsStore()
 const { confirm } = useDialog()
 const { error, success } = useNotification()
 
@@ -96,8 +98,17 @@ function editAssistant(id: number): void {
   void router.push({ name: 'ai-assistant-builder', params: { id: String(id) } })
 }
 
-function startChat(id: number): void {
-  void router.push({ name: 'chat', query: { agentId: String(id) } })
+async function startChat(id: number): Promise<void> {
+  try {
+    if (chatsStore.chats.length === 0) {
+      await chatsStore.loadChats()
+    }
+    await chatsStore.findOrCreateEmptyChat()
+  } catch {
+    error(t('assistants.startChatFailed'))
+    return
+  }
+  await router.push({ name: 'chat', query: { agentId: String(id) } })
 }
 
 async function onDeleted(): Promise<void> {
