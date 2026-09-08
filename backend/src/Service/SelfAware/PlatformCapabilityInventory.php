@@ -194,7 +194,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'System Config → AI Models → SOUND2TEXT',
             'using-synaplan',
         );
-        $webSearchOn = $this->webSearch->isEnabled();
+        $webSearchOn = $this->webSearch->isEnabled($userId > 0 ? $userId : null);
         $facts[] = $this->fact(
             'web_search',
             'Web search',

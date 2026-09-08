@@ -2117,7 +2117,7 @@ class ConfigController extends AbstractController
         // ========== AI Features ==========
 
         // Web Search (Brave API)
-        $braveEnabled = $this->webSearch->isEnabled();
+        $braveEnabled = $this->webSearch->isEnabled($user->getId());
         $features['web-search'] = [
             'id' => 'web-search',
             'category' => 'AI Features',

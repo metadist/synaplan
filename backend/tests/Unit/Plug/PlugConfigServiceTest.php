@@ -56,6 +56,32 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertSame(['docling'], $service->extraExtractorKeys('document'));
     }
 
+    public function testNonNumericQualityAndRerankValuesFallBackToDefaults(): void
+    {
+        $service = new PlugConfigService($this->repo([
+            [0, PlugConfigService::KEY_QUALITY_MIN_LENGTH, 'ten'],
+            [0, PlugConfigService::KEY_QUALITY_MIN_ENTROPY, 'high'],
+            [0, PlugConfigService::KEY_RERANK_CANDIDATES_MULTIPLIER, ''],
+            [0, PlugConfigService::KEY_RERANK_LATENCY_BUDGET_MS, 'fast'],
+        ]));
+
+        $this->assertSame(PlugConfigService::DEFAULT_MIN_LENGTH, $service->qualityMinLength());
+        $this->assertSame(PlugConfigService::DEFAULT_MIN_ENTROPY, $service->qualityMinEntropy());
+        $this->assertSame(PlugConfigService::DEFAULT_RERANK_MULTIPLIER, $service->rerankCandidatesMultiplier());
+        $this->assertSame(PlugConfigService::DEFAULT_RERANK_LATENCY_MS, $service->rerankLatencyBudgetMs());
+    }
+
+    public function testNumericQualityOverridesAreKept(): void
+    {
+        $service = new PlugConfigService($this->repo([
+            [0, PlugConfigService::KEY_QUALITY_MIN_LENGTH, '25'],
+            [0, PlugConfigService::KEY_QUALITY_MIN_ENTROPY, '4.5'],
+        ]));
+
+        $this->assertSame(25, $service->qualityMinLength());
+        $this->assertSame(4.5, $service->qualityMinEntropy());
+    }
+
     /**
      * @param list<array{0: int, 1: string, 2: string}> $rows
      */

@@ -56,25 +56,36 @@ final readonly class SearchResultSet
     }
 
     /**
-     * Byte-identical to BraveSearchService::formatResultsForAI().
+     * Byte-identical to BraveSearchService::formatResultsForAI() for a complete
+     * Brave payload. Missing provider-neutral keys fall back instead of
+     * triggering undefined-index warnings.
      */
     public function formatForAi(): string
     {
         $legacy = $this->legacy;
-        if (empty($legacy['results'])) {
+        $results = isset($legacy['results']) && \is_array($legacy['results'])
+            ? $legacy['results']
+            : $this->results;
+        if ([] === $results) {
             return 'No search results found for query: '.($legacy['query'] ?? 'unknown');
         }
 
-        $formatted = "Web Search Results for: \"{$legacy['query']}\"\n\n";
-        $formatted .= "Found {$legacy['query_metadata']['total']} results:\n\n";
+        $query = \is_string($legacy['query'] ?? null) ? $legacy['query'] : $this->query;
+        $meta = \is_array($legacy['query_metadata'] ?? null) ? $legacy['query_metadata'] : $this->meta;
+        $total = $meta['total'] ?? \count($results);
 
-        foreach ($legacy['results'] as $index => $result) {
+        $formatted = "Web Search Results for: \"{$query}\"\n\n";
+        $formatted .= "Found {$total} results:\n\n";
+
+        foreach ($results as $index => $result) {
             if (!\is_array($result)) {
                 continue;
             }
             $num = $index + 1;
-            $formatted .= "[{$num}] {$result['title']}\n";
-            $formatted .= "URL: {$result['url']}\n";
+            $title = \is_scalar($result['title'] ?? null) ? (string) $result['title'] : '';
+            $url = \is_scalar($result['url'] ?? null) ? (string) $result['url'] : '';
+            $formatted .= "[{$num}] {$title}\n";
+            $formatted .= "URL: {$url}\n";
 
             if (!empty($result['description'])) {
                 $formatted .= "Description: {$result['description']}\n";

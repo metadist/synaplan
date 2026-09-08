@@ -111,16 +111,12 @@ final readonly class PlugConfigService
 
     public function qualityMinLength(): int
     {
-        $raw = $this->readGlobal(self::KEY_QUALITY_MIN_LENGTH, (string) self::DEFAULT_MIN_LENGTH);
-
-        return (int) $raw;
+        return $this->readInt(self::KEY_QUALITY_MIN_LENGTH, self::DEFAULT_MIN_LENGTH);
     }
 
     public function qualityMinEntropy(): float
     {
-        $raw = $this->readGlobal(self::KEY_QUALITY_MIN_ENTROPY, (string) self::DEFAULT_MIN_ENTROPY);
-
-        return (float) $raw;
+        return $this->readFloat(self::KEY_QUALITY_MIN_ENTROPY, self::DEFAULT_MIN_ENTROPY);
     }
 
     public function webSearchProvider(?int $userId): string
@@ -149,12 +145,12 @@ final readonly class PlugConfigService
 
     public function rerankCandidatesMultiplier(): int
     {
-        return (int) $this->readGlobal(self::KEY_RERANK_CANDIDATES_MULTIPLIER, (string) self::DEFAULT_RERANK_MULTIPLIER);
+        return $this->readInt(self::KEY_RERANK_CANDIDATES_MULTIPLIER, self::DEFAULT_RERANK_MULTIPLIER);
     }
 
     public function rerankLatencyBudgetMs(): int
     {
-        return (int) $this->readGlobal(self::KEY_RERANK_LATENCY_BUDGET_MS, (string) self::DEFAULT_RERANK_LATENCY_MS);
+        return $this->readInt(self::KEY_RERANK_LATENCY_BUDGET_MS, self::DEFAULT_RERANK_LATENCY_MS);
     }
 
     private function readGlobal(string $setting, string $default): string
@@ -162,6 +158,26 @@ final readonly class PlugConfigService
         $value = $this->configRepository->getValue(0, self::CONFIG_GROUP, $setting);
 
         return null !== $value ? $value : $default;
+    }
+
+    private function readInt(string $setting, int $default): int
+    {
+        $raw = trim($this->readGlobal($setting, (string) $default));
+        if ('' === $raw || !is_numeric($raw)) {
+            return $default;
+        }
+
+        return (int) $raw;
+    }
+
+    private function readFloat(string $setting, float $default): float
+    {
+        $raw = trim($this->readGlobal($setting, (string) $default));
+        if ('' === $raw || !is_numeric($raw)) {
+            return $default;
+        }
+
+        return (float) $raw;
     }
 
     /**
