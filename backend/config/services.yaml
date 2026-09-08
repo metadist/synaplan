@@ -141,6 +141,10 @@ parameters:
     env(TIKA_RETRY_BACKOFF_MS): '1000'
     env(TIKA_MIN_LENGTH): '10'
     env(TIKA_MIN_ENTROPY): '3.0'
+    # Docling sidecar. Empty = off (OSS / fresh-install default).
+    env(DOCLING_BASE_URL): ''
+    env(DOCLING_TIMEOUT_MS): '120000'
+    env(DOCLING_MAX_BYTES): '52428800'
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
@@ -1014,6 +1018,15 @@ services:
             $tikaRetryBackoffMs: '%env(int:TIKA_RETRY_BACKOFF_MS)%'
             $tikaHttpUser: '%env(TIKA_HTTP_USER)%'
             $tikaHttpPass: '%env(TIKA_HTTP_PASS)%'
+
+    App\Plug\Extraction\Docling\DoclingClient:
+        arguments:
+            $baseUrl: '%env(DOCLING_BASE_URL)%'
+            $timeoutMs: '%env(int:DOCLING_TIMEOUT_MS)%'
+
+    App\Plug\Extraction\Adapter\DoclingExtractor:
+        arguments:
+            $maxBytes: '%env(int:DOCLING_MAX_BYTES)%'
 
     App\Service\File\Office\OfficeConverterClient:
         arguments:

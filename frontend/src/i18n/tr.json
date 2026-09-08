@@ -133,7 +133,7 @@
     "adminFeatures": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminConfig": "Sistem Yapılandırması",
-    "adminSetup": "AI Sağlayıcı Kurulumu",
+    "adminSetup": "AI altyapısı",
     "adminPeople": "Kişiler",
     "myGroups": "Gruplarım",
     "incoming": "Gelen sohbetler",
@@ -738,7 +738,7 @@
     "adminFeatureStatus": "Özellik Durumu",
     "adminModelStatus": "Model Durumu",
     "adminSystemConfig": "Sistem Yapılandırması",
-    "adminProviderSetup": "AI Sağlayıcıları",
+    "adminProviderSetup": "AI altyapısı",
     "adminPeople": "Kişiler",
     "profile": "Profil",
     "more": "Daha fazla",
@@ -1143,7 +1143,11 @@
     }
   },
   "adminSetup": {
-    "title": "AI Sağlayıcı Kurulumu",
+    "title": "AI altyapısı",
+    "tabs": {
+      "models": "Modeller ve anahtarlar",
+      "extraction": "Çıkarım"
+    },
     "description": "Ekibinizin sohbet edebilmesi için bir AI sağlayıcısı bağlayın. Anahtarlar sunucunuzda şifrelenmiş olarak saklanır ve anında geçerli olur — yeniden başlatma gerekmez.",
     "statusReadyTitle": "AI'nız hazır",
     "statusReadyText": "Varsayılan sohbet modelinin çalışan bir sağlayıcısı var. Aşağıdan istediğiniz zaman başka sağlayıcılar ekleyebilirsiniz.",
@@ -1186,6 +1190,48 @@
     "localAi": {
       "title": "Yerel AI (Ollama) — anahtar gerekmez",
       "description": "Standart kurulum, tamamen kendi donanımınızda çalışan yerel AI modelleri içerir. İlk başlatmada model indirme biraz sürebilir; yukarıdaki bulut sağlayıcıları anında kullanılabilir."
+    }
+  },
+  "aiInfra": {
+    "extraction": {
+      "lead": "Belgelerin nasıl metne dönüşeceğini seçin. Docling tabloları ve başlıkları korur; çalışmıyorsa Tika kullanılır ve yükleme asla başarısız olmaz.",
+      "family": {
+        "document": "Belgeler",
+        "text": "Düz metin",
+        "image": "Görseller",
+        "audio": "Ses",
+        "audio_no_cloud": "Bulut STT olmadan ses",
+        "video": "Video"
+      },
+      "moveUp": "Yukarı",
+      "moveDown": "Aşağı",
+      "remove": "Kaldır",
+      "add": "Ekle",
+      "addPlaceholder": "Bir bağdaştırıcı ekle…",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "testTitle": "Bir dosyayla dene",
+      "testHint": "Bir örnek yükleyin. Hangi bağdaştırıcının kazandığını ve diğerlerinin neden kaybettiğini görürsünüz.",
+      "testButton": "Bir dosyayla dene",
+      "testing": "Deneniyor…",
+      "winner": "Kazanan: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling kullanılamıyor — yerine Tika kullanıldı",
+      "save": "Zinciri kaydet",
+      "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
+      "saveFailed": "Çıkarım zinciri kaydedilemedi",
+      "loadFailed": "Çıkarım ayarları yüklenemedi",
+      "verdict": {
+        "quality_ok": "kabul edildi",
+        "not_applicable": "denetlenmedi",
+        "markdown_structure": "kabul edildi (tablo veya başlık)",
+        "empty": "boş",
+        "low_quality": "çok az yararlı metin",
+        "unavailable": "kullanılamıyor",
+        "unsupported": "bu dosyayı desteklemiyor",
+        "unknown": "bilinmeyen bağdaştırıcı",
+        "skipped": "atlandı"
+      }
     }
   },
   "providerHelp": {

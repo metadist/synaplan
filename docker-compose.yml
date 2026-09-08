@@ -308,6 +308,11 @@ services:
       QDRANT_URL: http://qdrant:6333
       TRITON_SERVER_URL: ${TRITON_SERVER_URL:-}
       TIKA_BASE_URL: http://tika:9998
+      # Optional Docling sidecar (profile `docling`). The URL is always set so
+      # enabling the profile needs no extra env; an empty .env value keeps it
+      # off outside compose. A down sidecar is unavailable, never a failed upload.
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
       # Collabora CODE convert-to. Local default is the compose service name.
       # Override with OFFICE_CONVERT_URL for an external CODE, or set
       # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
@@ -485,6 +490,8 @@ services:
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
       TIKA_BASE_URL: http://tika:9998
+      DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
+      DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
@@ -816,6 +823,27 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+    networks:
+      - synaplan-network
+
+  # Optional Docling document extraction — https://github.com/docling-project/docling-serve
+  # CPU image (~4.4 GB) so the sidecar runs without a GPU. Not started by default.
+  # Enable with:  docker compose --profile docling up -d
+  # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
+  # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
+  docling:
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.32.0@sha256:576fc2074ac77bcfbf3fe27633aa0dd89b452a170b2cd31689c8751e94d60f7a
+    container_name: synaplan-docling
+    profiles: [docling]
+    restart: unless-stopped
+    environment:
+      DOCLING_SERVE_ENABLE_UI: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
     networks:
       - synaplan-network
 

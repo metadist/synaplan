@@ -25,6 +25,7 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertSame(['video_analysis'], $service->extractionChain('video'));
         $this->assertSame(10, $service->qualityMinLength());
         $this->assertSame(3.0, $service->qualityMinEntropy());
+        $this->assertSame(['pdf'], $service->qualityApplyTo());
         $this->assertSame('brave', $service->webSearchProvider(null));
         $this->assertSame('', $service->webSearchFallback());
         $this->assertFalse($service->isRerankEnabled());
@@ -80,6 +81,29 @@ final class PlugConfigServiceTest extends TestCase
 
         $this->assertSame(25, $service->qualityMinLength());
         $this->assertSame(4.5, $service->qualityMinEntropy());
+    }
+
+    public function testSetChainPersistsKnownKeys(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue')->with(
+            0,
+            PlugConfigService::CONFIG_GROUP,
+            PlugConfigService::KEY_CHAIN_DOCUMENT,
+            'docling,tika,pdf_vision',
+        );
+
+        $service = new PlugConfigService($repo);
+        $service->setChain('document', ['docling', 'tika', 'pdf_vision'], ['docling', 'tika', 'pdf_vision', 'native']);
+    }
+
+    public function testSetChainRejectsUnknownKey(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unknown extractor key: nope');
+
+        $service = new PlugConfigService($this->repo([]));
+        $service->setChain('document', ['nope'], ['tika']);
     }
 
     /**

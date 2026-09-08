@@ -135,7 +135,7 @@
     "adminFeatures": "État des fonctionnalités",
     "adminModelStatus": "État des modèles",
     "adminConfig": "Configuration système",
-    "adminSetup": "Configuration des fournisseurs IA",
+    "adminSetup": "Infrastructure IA",
     "adminPeople": "Personnes",
     "myGroups": "Mes groupes",
     "incoming": "Chats reçus",
@@ -749,7 +749,7 @@
     "adminFeatureStatus": "État des fonctionnalités",
     "adminModelStatus": "État des modèles",
     "adminSystemConfig": "Configuration système",
-    "adminProviderSetup": "Fournisseurs IA",
+    "adminProviderSetup": "Infrastructure IA",
     "adminPeople": "Personnes",
     "more": "Plus",
     "moreDescription": "Autres sections et compte",
@@ -2838,7 +2838,11 @@
     }
   },
   "adminSetup": {
-    "title": "Configuration des fournisseurs IA",
+    "title": "Infrastructure IA",
+    "tabs": {
+      "models": "Modèles et clés",
+      "extraction": "Extraction"
+    },
     "description": "Connectez un fournisseur IA pour que votre équipe puisse discuter. Les clés sont stockées chiffrées sur votre serveur et prennent effet immédiatement — aucun redémarrage n’est nécessaire.",
     "statusReadyTitle": "Votre IA est prête",
     "statusReadyText": "Le modèle de chat par défaut a un fournisseur fonctionnel. Vous pouvez ajouter d’autres fournisseurs ci-dessous à tout moment.",
@@ -2881,6 +2885,48 @@
     "localAi": {
       "title": "IA locale (Ollama) — aucune clé nécessaire",
       "description": "L’installation standard inclut des modèles IA locaux qui s’exécutent entièrement sur votre matériel. Le téléchargement des modèles peut prendre du temps au premier démarrage ; les fournisseurs cloud ci-dessus sont disponibles immédiatement."
+    }
+  },
+  "aiInfra": {
+    "extraction": {
+      "lead": "Choisissez comment un document devient du texte. Docling conserve les tableaux et les titres ; s’il n’est pas lancé, Tika prend le relais et l’envoi n’échoue jamais.",
+      "family": {
+        "document": "Documents",
+        "text": "Texte brut",
+        "image": "Images",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio sans STT cloud",
+        "video": "Vidéo"
+      },
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "remove": "Retirer",
+      "add": "Ajouter",
+      "addPlaceholder": "Ajouter un adaptateur…",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "testTitle": "Tester avec un fichier",
+      "testHint": "Envoyez un exemple. Vous verrez quel adaptateur a gagné et pourquoi les autres n’ont pas été retenus.",
+      "testButton": "Tester avec un fichier",
+      "testing": "Test en cours…",
+      "winner": "Gagnant : {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling indisponible — Tika a été utilisé",
+      "save": "Enregistrer la chaîne",
+      "saved": "Chaîne d’extraction enregistrée. Le prochain envoi l’utilise.",
+      "saveFailed": "Impossible d’enregistrer la chaîne d’extraction",
+      "loadFailed": "Impossible de charger les réglages d’extraction",
+      "verdict": {
+        "quality_ok": "accepté",
+        "not_applicable": "non filtré",
+        "markdown_structure": "accepté (tableaux ou titres)",
+        "empty": "vide",
+        "low_quality": "trop peu de texte utile",
+        "unavailable": "indisponible",
+        "unsupported": "ne prend pas en charge ce fichier",
+        "unknown": "adaptateur inconnu",
+        "skipped": "ignoré"
+      }
     }
   },
   "providerHelp": {

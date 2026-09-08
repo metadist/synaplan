@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\File;
 
 use App\AI\Service\AiFacade;
 use App\Plug\Extraction\ContentExtractorInterface;
+use App\Plug\Extraction\ExtractionQualityGate;
 use App\Plug\Extraction\ExtractionRegistry;
 use App\Plug\Extraction\ExtractionRequest;
 use App\Plug\Extraction\ExtractionResult;
@@ -127,13 +128,144 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
         @unlink($dir.'/'.$relative);
     }
 
+    public function testExtraExtractorLowQualityPdfFallsThroughWhenGateInjected(): void
+    {
+        $dir = sys_get_temp_dir();
+        $relative = 'plugs-lowq-'.uniqid('', true).'.pdf';
+        copy(dirname(__DIR__, 3).'/Fixtures/extraction/files/tiny.pdf', $dir.'/'.$relative);
+
+        $extra = new class implements ContentExtractorInterface {
+            public function key(): string
+            {
+                return 'docling';
+            }
+
+            public function descriptor(): PlugDescriptor
+            {
+                return new PlugDescriptor('docling', 'Docling', '', [], 'self-hosted');
+            }
+
+            public function supports(ExtractionRequest $request): bool
+            {
+                return 'pdf' === $request->ext;
+            }
+
+            public function extract(ExtractionRequest $request): ExtractionResult
+            {
+                return ExtractionResult::of('aaaaaaa', 'docling', ['file' => basename($request->absolutePath)]);
+            }
+
+            public function health(): PlugHealth
+            {
+                return PlugHealth::available();
+            }
+        };
+
+        $plugConfig = $this->createMock(PlugConfigService::class);
+        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+        $plugConfig->method('qualityApplyTo')->willReturn(['pdf']);
+        $plugConfig->method('qualityMinLength')->willReturn(10);
+        $plugConfig->method('qualityMinEntropy')->willReturn(3.0);
+
+        $tika = $this->createMock(TikaClient::class);
+        $tika->method('isEnabled')->willReturn(true);
+        $tika->method('extractText')->willReturn([
+            'The quarterly revenue for EMEA was 4.2 million EUR in Q3 2025 according to finance.',
+            [],
+        ]);
+
+        $processor = new FileProcessor(
+            $tika,
+            $this->createStub(PdfRasterizer::class),
+            new TextCleaner(),
+            $this->createStub(AiFacade::class),
+            $this->createStub(WhisperService::class),
+            $this->createStub(VideoAnalysisService::class),
+            new HeicConverter(new NullLogger()),
+            new NullLogger(),
+            $dir,
+            10,
+            3.0,
+            '/nonexistent/ffmpeg',
+            null,
+            null,
+            new ExtractionRegistry([$extra], $plugConfig, new NullLogger()),
+            $plugConfig,
+            new ExtractionQualityGate($plugConfig, new TextCleaner()),
+        );
+
+        [$text, $meta] = $processor->extractText($relative, 'pdf');
+
+        $this->assertStringContainsString('EMEA', $text);
+        $this->assertSame('tika', $meta['strategy'] ?? null);
+        @unlink($dir.'/'.$relative);
+    }
+
+    public function testDoclingExceptionFallsThroughToTikaOnPdf(): void
+    {
+        $dir = sys_get_temp_dir();
+        $relative = 'plugs-c7-'.uniqid('', true).'.pdf';
+        copy(dirname(__DIR__, 3).'/Fixtures/extraction/files/tiny.pdf', $dir.'/'.$relative);
+
+        $extra = new class implements ContentExtractorInterface {
+            public function key(): string
+            {
+                return 'docling';
+            }
+
+            public function descriptor(): PlugDescriptor
+            {
+                return new PlugDescriptor('docling', 'Docling', '', [], 'self-hosted');
+            }
+
+            public function supports(ExtractionRequest $request): bool
+            {
+                return 'pdf' === $request->ext;
+            }
+
+            public function extract(ExtractionRequest $request): ExtractionResult
+            {
+                throw new \RuntimeException('sidecar down for '.$request->ext);
+            }
+
+            public function health(): PlugHealth
+            {
+                return PlugHealth::unavailable('connection refused');
+            }
+        };
+
+        $plugConfig = $this->createMock(PlugConfigService::class);
+        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+
+        $tika = $this->createMock(TikaClient::class);
+        $tika->method('isEnabled')->willReturn(true);
+        $tika->method('extractText')->willReturn([
+            'The quarterly revenue for EMEA was 4.2 million EUR in Q3 2025 according to finance.',
+            [],
+        ]);
+
+        $processor = $this->processor(
+            new ExtractionRegistry([$extra], $plugConfig, new NullLogger()),
+            $plugConfig,
+            $dir,
+            $tika,
+        );
+
+        [$text, $meta] = $processor->extractText($relative, 'pdf');
+
+        $this->assertStringContainsString('EMEA', $text);
+        $this->assertSame('tika', $meta['strategy'] ?? null);
+        @unlink($dir.'/'.$relative);
+    }
+
     private function processor(
         ExtractionRegistry $registry,
         PlugConfigService $plugConfig,
         string $uploadDir,
+        ?TikaClient $tika = null,
     ): FileProcessor {
         return new FileProcessor(
-            $this->createStub(TikaClient::class),
+            $tika ?? $this->createStub(TikaClient::class),
             $this->createStub(PdfRasterizer::class),
             new TextCleaner(),
             $this->createStub(AiFacade::class),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Plug;
 
+use App\Plug\Extraction\ExtractionRegistry;
 use App\Repository\ConfigRepository;
 
 /**
@@ -26,6 +27,7 @@ final readonly class PlugConfigService
     public const KEY_CHAIN_VIDEO = 'EXTRACTION.CHAIN.video';
     public const KEY_QUALITY_MIN_LENGTH = 'EXTRACTION.QUALITY.min_length';
     public const KEY_QUALITY_MIN_ENTROPY = 'EXTRACTION.QUALITY.min_entropy';
+    public const KEY_QUALITY_APPLY_TO = 'EXTRACTION.QUALITY.apply_to';
     public const KEY_WEB_SEARCH_PROVIDER = 'WEB_SEARCH.PROVIDER';
     public const KEY_WEB_SEARCH_FALLBACK = 'WEB_SEARCH.FALLBACK';
     public const KEY_RERANK_ENABLED = 'RERANK.ENABLED';
@@ -40,6 +42,10 @@ final readonly class PlugConfigService
     public const DEFAULT_CHAIN_VIDEO = 'video_analysis';
     public const DEFAULT_MIN_LENGTH = 10;
     public const DEFAULT_MIN_ENTROPY = 3.0;
+    public const DEFAULT_QUALITY_APPLY_TO = 'pdf';
+
+    /** @var list<string> */
+    public const FAMILIES = ['text', 'document', 'image', 'audio', 'audio_no_cloud', 'video'];
     public const DEFAULT_WEB_SEARCH_PROVIDER = 'brave';
     public const DEFAULT_RERANK_ENABLED = false;
     public const DEFAULT_RERANK_MULTIPLIER = 4;
@@ -117,6 +123,101 @@ final readonly class PlugConfigService
     public function qualityMinEntropy(): float
     {
         return $this->readFloat(self::KEY_QUALITY_MIN_ENTROPY, self::DEFAULT_MIN_ENTROPY);
+    }
+
+    /**
+     * Extensions / families the quality gate applies to. Seeded `pdf`.
+     *
+     * @return list<string>
+     */
+    public function qualityApplyTo(): array
+    {
+        return $this->splitList($this->readGlobal(self::KEY_QUALITY_APPLY_TO, self::DEFAULT_QUALITY_APPLY_TO));
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    public function allChains(): array
+    {
+        return [
+            'text' => $this->extractionChain('text'),
+            'document' => $this->extractionChain('document'),
+            'image' => $this->extractionChain('image'),
+            'audio' => $this->extractionChain('audio', true),
+            'audio_no_cloud' => $this->extractionChain('audio', false),
+            'video' => $this->extractionChain('video'),
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function knownExtractorKeys(ExtractionRegistry $registry): array
+    {
+        $keys = self::BUILTIN_EXTRACTOR_KEYS;
+        foreach ($registry->all() as $adapter) {
+            $keys[] = $adapter->key();
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * Persist one family's adapter order. Unknown family or key → InvalidArgumentException.
+     *
+     * @param list<mixed>  $keys
+     * @param list<string> $knownKeys
+     */
+    public function setChain(string $family, array $keys, array $knownKeys): void
+    {
+        $setting = $this->chainSetting($family);
+        $normalized = [];
+        foreach ($keys as $key) {
+            if (!\is_string($key)) {
+                throw new \InvalidArgumentException('Extractor keys must be strings');
+            }
+            $trimmed = strtolower(trim($key));
+            if ('' === $trimmed) {
+                continue;
+            }
+            if (!\in_array($trimmed, $knownKeys, true)) {
+                throw new \InvalidArgumentException('Unknown extractor key: '.$trimmed);
+            }
+            $normalized[] = $trimmed;
+        }
+
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, $setting, implode(',', $normalized));
+    }
+
+    /**
+     * @param array<mixed, mixed> $chains
+     * @param list<string>        $knownKeys
+     */
+    public function setChains(array $chains, array $knownKeys): void
+    {
+        foreach ($chains as $family => $keys) {
+            if (!\is_string($family)) {
+                throw new \InvalidArgumentException('Unknown extraction family');
+            }
+            if (!\is_array($keys)) {
+                throw new \InvalidArgumentException('Chain for '.$family.' must be a list of keys');
+            }
+            $this->setChain($family, $keys, $knownKeys);
+        }
+    }
+
+    private function chainSetting(string $family): string
+    {
+        return match ($family) {
+            'text' => self::KEY_CHAIN_TEXT,
+            'document' => self::KEY_CHAIN_DOCUMENT,
+            'image' => self::KEY_CHAIN_IMAGE,
+            'audio' => self::KEY_CHAIN_AUDIO,
+            'audio_no_cloud' => self::KEY_CHAIN_AUDIO_NO_CLOUD,
+            'video' => self::KEY_CHAIN_VIDEO,
+            default => throw new \InvalidArgumentException('Unknown extraction family: '.$family),
+        };
     }
 
     public function webSearchProvider(?int $userId): string

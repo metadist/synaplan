@@ -21,7 +21,7 @@ Upload → Extract → Vectorize → Store → Search → Generate
 ```
 
 1. **Upload** - Drop files into the system
-2. **Extract** - Tika extracts text; OCR for images; Whisper for audio
+2. **Extract** - Tika (default) or optional Docling extracts text; OCR for images; Whisper for audio
 3. **Vectorize** - bge-m3 creates 1024-dimensional embeddings
 4. **Store** - MariaDB VECTOR type stores embeddings natively
 5. **Search** - Cosine similarity finds relevant documents
@@ -149,6 +149,6 @@ owner's name. **Can view** alone never adds chunks to a search.
 - **Embedding Model**: bge-m3 (1024 dimensions)
 - **Vector Storage**: MariaDB 11.8 native VECTOR type
 - **Similarity**: VEC_DISTANCE_COSINE function
-- **Text Extraction**: Apache Tika (and future chain adapters via `PLUGS`; see [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs))
-- **OCR**: Tesseract (via Tika)
+- **Text Extraction**: Apache Tika by default. Optional Docling (`docling` Compose profile + Extraction tab) returns markdown with tables and headings; those files are chunked heading-aware. See [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs).
+- **OCR**: Tesseract (via Tika); Docling can OCR when the sidecar is on
 - **Audio**: Whisper.cpp with FFmpeg

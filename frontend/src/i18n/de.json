@@ -135,7 +135,7 @@
     "adminFeatures": "Feature-Status",
     "adminModelStatus": "Modell-Status",
     "adminConfig": "Systemkonfiguration",
-    "adminSetup": "KI-Anbieter einrichten",
+    "adminSetup": "KI-Infrastruktur",
     "adminPeople": "Personen",
     "myGroups": "Meine Gruppen",
     "incoming": "Eingehende Chats",
@@ -745,7 +745,7 @@
     "adminFeatureStatus": "Feature-Status",
     "adminModelStatus": "Modell-Status",
     "adminSystemConfig": "Systemkonfiguration",
-    "adminProviderSetup": "KI-Anbieter",
+    "adminProviderSetup": "KI-Infrastruktur",
     "adminPeople": "Personen",
     "more": "Mehr",
     "moreDescription": "Weitere Bereiche und Konto",
@@ -2932,7 +2932,11 @@
     }
   },
   "adminSetup": {
-    "title": "KI-Anbieter einrichten",
+    "title": "KI-Infrastruktur",
+    "tabs": {
+      "models": "Modelle & Schlüssel",
+      "extraction": "Extraktion"
+    },
     "description": "Verbinde einen KI-Anbieter, damit dein Team chatten kann. Schlüssel werden verschlüsselt auf deinem Server gespeichert und gelten sofort — kein Neustart nötig.",
     "statusReadyTitle": "Deine KI ist bereit",
     "statusReadyText": "Das Standard-Chat-Modell hat einen funktionierenden Anbieter. Du kannst unten jederzeit weitere Anbieter hinzufügen.",
@@ -2975,6 +2979,48 @@
     "localAi": {
       "title": "Lokale KI (Ollama) — kein Schlüssel nötig",
       "description": "Die Standard-Installation enthält lokale KI-Modelle, die vollständig auf deiner Hardware laufen. Der Modell-Download kann beim ersten Start etwas dauern; die Cloud-Anbieter oben sind sofort verfügbar."
+    }
+  },
+  "aiInfra": {
+    "extraction": {
+      "lead": "Legen Sie fest, wie Dokumente zu Text werden. Docling erhält Tabellen und Überschriften; wenn es nicht läuft, übernimmt Tika — Uploads schlagen nie fehl.",
+      "family": {
+        "document": "Dokumente",
+        "text": "Klartext",
+        "image": "Bilder",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio ohne Cloud-STT",
+        "video": "Video"
+      },
+      "moveUp": "Hoch",
+      "moveDown": "Runter",
+      "remove": "Entfernen",
+      "add": "Hinzufügen",
+      "addPlaceholder": "Adapter hinzufügen…",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "testTitle": "Mit einer Datei testen",
+      "testHint": "Laden Sie eine Beispieldatei hoch. Sie sehen, welcher Adapter gewonnen hat und warum die anderen nicht.",
+      "testButton": "Mit einer Datei testen",
+      "testing": "Test läuft…",
+      "winner": "Gewinner: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling nicht verfügbar — stattdessen Tika verwendet",
+      "save": "Kette speichern",
+      "saved": "Extraktionskette gespeichert. Der nächste Upload nutzt sie.",
+      "saveFailed": "Die Extraktionskette konnte nicht gespeichert werden",
+      "loadFailed": "Extraktionseinstellungen konnten nicht geladen werden",
+      "verdict": {
+        "quality_ok": "akzeptiert",
+        "not_applicable": "nicht geprüft",
+        "markdown_structure": "akzeptiert (Tabellen oder Überschriften)",
+        "empty": "leer",
+        "low_quality": "zu wenig brauchbarer Text",
+        "unavailable": "nicht verfügbar",
+        "unsupported": "unterstützt diese Datei nicht",
+        "unknown": "unbekannter Adapter",
+        "skipped": "übersprungen"
+      }
     }
   },
   "providerHelp": {
