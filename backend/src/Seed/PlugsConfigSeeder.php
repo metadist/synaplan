@@ -44,6 +44,7 @@ final readonly class PlugsConfigSeeder
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_CHAIN_VIDEO, 'value' => PlugConfigService::DEFAULT_CHAIN_VIDEO],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_QUALITY_MIN_LENGTH, 'value' => (string) PlugConfigService::DEFAULT_MIN_LENGTH],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_QUALITY_MIN_ENTROPY, 'value' => sprintf('%.1f', PlugConfigService::DEFAULT_MIN_ENTROPY)],
+            ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_QUALITY_APPLY_TO, 'value' => PlugConfigService::DEFAULT_QUALITY_APPLY_TO],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'value' => PlugConfigService::DEFAULT_WEB_SEARCH_PROVIDER],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_WEB_SEARCH_FALLBACK, 'value' => ''],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_ENABLED, 'value' => '0'],

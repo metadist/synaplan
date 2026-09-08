@@ -442,4 +442,37 @@ final class SystemConfigServiceTest extends TestCase
             $values['CONVERSATION_SUMMARY_TIERS']['value'],
         );
     }
+
+    public function testDoclingFieldsLiveOnTheProcessingTabNextToTika(): void
+    {
+        $schema = $this->service->getSchema();
+
+        self::assertSame(
+            ['DOCLING_BASE_URL', 'DOCLING_TIMEOUT_MS', 'DOCLING_MAX_BYTES'],
+            $schema['tabs']['processing']['sections']['docling']['fields'],
+        );
+        self::assertSame('processing', $schema['fields']['DOCLING_BASE_URL']['tab']);
+        self::assertSame('url', $schema['fields']['DOCLING_BASE_URL']['type']);
+        self::assertSame('docling', $schema['fields']['DOCLING_TIMEOUT_MS']['section']);
+    }
+
+    public function testDoclingConnectionTestFailsWhenUrlIsEmpty(): void
+    {
+        $envWasSet = \array_key_exists('DOCLING_BASE_URL', $_ENV);
+        $original = $envWasSet ? $_ENV['DOCLING_BASE_URL'] : null;
+        $_ENV['DOCLING_BASE_URL'] = '';
+
+        try {
+            $result = $this->service->testConnection('docling');
+
+            self::assertFalse($result['success']);
+            self::assertStringContainsString('DOCLING_BASE_URL', $result['message']);
+        } finally {
+            if ($envWasSet) {
+                $_ENV['DOCLING_BASE_URL'] = $original;
+            } else {
+                unset($_ENV['DOCLING_BASE_URL']);
+            }
+        }
+    }
 }

@@ -1,0 +1,11 @@
+{
+  "status": "success",
+  "document": {
+    "md_content": "# Invoice\n\n## Revenue by region\n\n| Region | Q3 |\n| --- | --- |\n| EMEA | 4.2 |\n",
+    "text_content": "Invoice\nRevenue by region\nRegion Q3\nEMEA 4.2\n",
+    "pages": 1
+  },
+  "timings": {
+    "total": 0.12
+  }
+}

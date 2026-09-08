@@ -54,6 +54,22 @@ final readonly class ExtractionResult
     }
 
     /**
+     * @param ExtractionMeta $meta
+     */
+    public function withMeta(array $meta): self
+    {
+        return new self(
+            $this->text,
+            $this->markdown,
+            $this->strategy,
+            $meta,
+            $this->pages,
+            $this->rewrittenAbsolutePath,
+            $this->rewrittenExt,
+        );
+    }
+
+    /**
      * FileProcessor::extractText return shape: [text, meta].
      *
      * @return array{0: string, 1: array<string, mixed>}

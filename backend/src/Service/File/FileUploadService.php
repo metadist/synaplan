@@ -291,7 +291,15 @@ final readonly class FileUploadService
 
         $extractedText = $file->getFileText();
         if (in_array($processLevel, ['vectorize', 'full'], true) && '' !== trim($extractedText)) {
-            $result = $this->vectorize($file, $extractedText, $user, $groupKey, $fileExtension, $result);
+            $result = $this->vectorize(
+                $file,
+                $extractedText,
+                $user,
+                $groupKey,
+                $fileExtension,
+                $result,
+                is_string($result['extraction_markdown'] ?? null) ? $result['extraction_markdown'] : null,
+            );
 
             // Delete-after-embed (CORE-4): when the caller does not want the
             // binary retained, drop it once vectors exist. We keep the row, the
@@ -464,6 +472,7 @@ final readonly class FileUploadService
 
             $result['extracted_text_length'] = strlen($extractedText);
             $result['extraction_strategy'] = $extractMeta['strategy'] ?? 'unknown';
+            $result['extraction_markdown'] = $this->markdownFromMeta($extractMeta);
 
             if ('extract' === $processLevel) {
                 return $result;
@@ -490,6 +499,7 @@ final readonly class FileUploadService
         ?string $groupKey,
         string $fileExtension,
         array $result,
+        ?string $markdown = null,
     ): array {
         try {
             $vectorResult = $this->vectorizationService->vectorizeAndStore(
@@ -498,6 +508,7 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey ?? '',
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
             );
 
             if ($vectorResult['success']) {
@@ -550,6 +561,7 @@ final readonly class FileUploadService
         }
 
         $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        $asyncMarkdown = null;
 
         if ('uploaded' === $file->getStatus()) {
             $file->setStatus('extracting');
@@ -561,6 +573,7 @@ final readonly class FileUploadService
                     $fileExtension,
                     $user->getId(),
                 );
+                $asyncMarkdown = $this->markdownFromMeta($extractMeta);
 
                 $file->setFileText($extractedText);
                 $file->setStatus('extracted');
@@ -617,6 +630,7 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $asyncMarkdown,
             );
 
             if ($vectorResult['success']) {
@@ -673,6 +687,7 @@ final readonly class FileUploadService
             $file->getFileName() ?: '',
             $file->getFilePath() ?: '',
         );
+        $markdown = null;
 
         if ('' === trim($extractedText)) {
             $absolutePath = $this->uploadDir.'/'.ltrim($file->getFilePath(), '/');
@@ -681,7 +696,8 @@ final readonly class FileUploadService
             }
 
             try {
-                [$extractedText] = $this->fileProcessor->extractText($file->getFilePath(), $fileExtension, $user->getId());
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText($file->getFilePath(), $fileExtension, $user->getId());
+                $markdown = $this->markdownFromMeta($extractMeta);
                 $file->setFileText($extractedText);
                 $file->setStatus('extracted');
                 $this->em->flush();
@@ -701,6 +717,7 @@ final readonly class FileUploadService
                 $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
             );
 
             if ($vectorResult['success']) {
@@ -771,16 +788,18 @@ final readonly class FileUploadService
         // synthesized script into BFILETEXT). Re-running Whisper/Tika would
         // either fail or overwrite that with duration metadata.
         $existingText = trim($file->getFileText());
+        $markdown = null;
         if ('audio' === $category && '' !== $existingText) {
             $extractedText = $file->getFileText();
         } else {
             try {
-                [$extractedText] = $this->fileProcessor->extractText(
+                [$extractedText, $extractMeta] = $this->fileProcessor->extractText(
                     $file->getFilePath(),
                     $fileExtension,
                     $user->getId(),
                     $file->isMedia(),
                 );
+                $markdown = $this->markdownFromMeta($extractMeta);
             } catch (\Throwable $e) {
                 $file->setStatus('error');
                 $this->em->flush();
@@ -823,6 +842,7 @@ final readonly class FileUploadService
                 (int) $file->getId(),
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
+                $markdown,
             );
         } catch (\Throwable $e) {
             $file->setStatus('extracted');
@@ -914,5 +934,15 @@ final readonly class FileUploadService
             'chunksCreated' => $vectorResult['chunks_created'],
             'groupKey' => $groupKey,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private function markdownFromMeta(array $meta): ?string
+    {
+        $markdown = $meta['markdown'] ?? null;
+
+        return \is_string($markdown) && '' !== $markdown ? $markdown : null;
     }
 }

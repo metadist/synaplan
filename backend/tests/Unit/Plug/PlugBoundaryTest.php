@@ -27,6 +27,15 @@ final class PlugBoundaryTest extends TestCase
         $this->assertSame([], $violations, "TikaClient imports outside the plug boundary:\n".implode("\n", $violations));
     }
 
+    public function testDoclingClientIsNotImportedOutsideThePlugBoundary(): void
+    {
+        $violations = $this->scan('use App\\Plug\\Extraction\\Docling\\DoclingClient', [
+            '/Plug/',
+        ]);
+
+        $this->assertSame([], $violations, "DoclingClient imports outside the plug boundary:\n".implode("\n", $violations));
+    }
+
     public function testBraveSearchServiceIsNotImportedOutsideThePlugBoundary(): void
     {
         $violations = $this->scan(self::BRAVE_USE, [

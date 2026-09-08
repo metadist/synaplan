@@ -74,7 +74,7 @@ const navMessages = {
     adminDashboard: 'Overview',
     adminFeatureStatus: 'Feature Status',
     adminModelStatus: 'Model Status',
-    adminProviderSetup: 'AI providers',
+    adminProviderSetup: 'AI infrastructure',
     adminSystemConfig: 'System configuration',
     adminPeople: 'People',
   },

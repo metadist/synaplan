@@ -128,6 +128,7 @@ final readonly class SystemConfigService
                 'label' => 'Processing',
                 'sections' => [
                     'tika' => ['label' => 'Apache Tika', 'fields' => ['TIKA_BASE_URL', 'TIKA_TIMEOUT_MS', 'TIKA_RETRIES', 'TIKA_HTTP_USER', 'TIKA_HTTP_PASS']],
+                    'docling' => ['label' => 'Docling', 'fields' => ['DOCLING_BASE_URL', 'DOCLING_TIMEOUT_MS', 'DOCLING_MAX_BYTES']],
                     'rasterize' => ['label' => 'PDF Rasterizer', 'fields' => ['RASTERIZE_DPI', 'RASTERIZE_PAGE_CAP', 'RASTERIZE_TIMEOUT_MS']],
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
@@ -631,6 +632,7 @@ final readonly class SystemConfigService
         return match ($service) {
             'ollama' => $this->testOllama(),
             'tika' => $this->testTika(),
+            'docling' => $this->testDocling(),
             'qdrant' => $this->testQdrant(),
             'mailer' => $this->testMailer(),
             'piper' => $this->testPiperTts(),
@@ -854,6 +856,37 @@ final readonly class SystemConfigService
             }
 
             return ['success' => false, 'message' => 'Tika returned HTTP '.$httpCode];
+        } catch (\Throwable $e) {
+            return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
+        }
+    }
+
+    /**
+     * @return array{success: bool, message: string, details?: array<string, mixed>}
+     */
+    private function testDocling(): array
+    {
+        $url = $this->getEnvValue('DOCLING_BASE_URL');
+        if (!$url || 'disabled' === strtolower($url)) {
+            return ['success' => false, 'message' => 'DOCLING_BASE_URL not configured'];
+        }
+
+        try {
+            $ch = curl_init(rtrim($url, '/').'/health');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if (200 === $httpCode) {
+                return ['success' => true, 'message' => 'Connected to Docling'];
+            }
+
+            return ['success' => false, 'message' => 'Docling returned HTTP '.$httpCode];
         } catch (\Throwable $e) {
             return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
         }
@@ -1893,6 +1926,22 @@ final readonly class SystemConfigService
                 'tab' => 'processing', 'section' => 'tika', 'type' => 'password',
                 'sensitive' => true, 'description' => 'HTTP auth password',
                 'default' => '',
+            ],
+            'DOCLING_BASE_URL' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'url',
+                'sensitive' => false, 'description' => 'Docling serve URL (empty = off)',
+                'default' => '',
+                'placeholder' => 'http://docling:5001',
+            ],
+            'DOCLING_TIMEOUT_MS' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Request timeout (ms)',
+                'default' => '120000',
+            ],
+            'DOCLING_MAX_BYTES' => [
+                'tab' => 'processing', 'section' => 'docling', 'type' => 'number',
+                'sensitive' => false, 'description' => 'Max file size (bytes)',
+                'default' => '52428800',
             ],
             'RASTERIZE_DPI' => [
                 'tab' => 'processing', 'section' => 'rasterize', 'type' => 'number',

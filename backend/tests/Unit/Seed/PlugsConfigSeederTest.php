@@ -31,6 +31,7 @@ final class PlugsConfigSeederTest extends TestCase
             PlugConfigService::KEY_CHAIN_VIDEO => 'video_analysis',
             PlugConfigService::KEY_QUALITY_MIN_LENGTH => '10',
             PlugConfigService::KEY_QUALITY_MIN_ENTROPY => sprintf('%.1f', PlugConfigService::DEFAULT_MIN_ENTROPY),
+            PlugConfigService::KEY_QUALITY_APPLY_TO => 'pdf',
             PlugConfigService::KEY_WEB_SEARCH_PROVIDER => 'brave',
             PlugConfigService::KEY_WEB_SEARCH_FALLBACK => '',
             PlugConfigService::KEY_RERANK_ENABLED => '0',

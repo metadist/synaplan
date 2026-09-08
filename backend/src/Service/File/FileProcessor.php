@@ -4,8 +4,10 @@ namespace App\Service\File;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Plug\Extraction\ExtractionQualityGate;
 use App\Plug\Extraction\ExtractionRegistry;
 use App\Plug\Extraction\ExtractionRequest;
+use App\Plug\Extraction\ExtractionResult;
 use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
@@ -128,6 +130,7 @@ final readonly class FileProcessor
         private ?StructuredTextExtractor $structuredTextExtractor = null,
         private ?ExtractionRegistry $extractionRegistry = null,
         private ?PlugConfigService $plugConfig = null,
+        private ?ExtractionQualityGate $qualityGate = null,
     ) {
     }
 
@@ -237,11 +240,23 @@ final readonly class FileProcessor
             try {
                 $result = $adapter->extract($request);
             } catch (\Throwable $e) {
-                $this->logger->warning('FileProcessor: extra extractor failed, falling through', [
+                $this->logger->info('FileProcessor: extra extractor failed, falling through', [
                     'key' => $key,
                     'error' => $e->getMessage(),
                 ]);
                 continue;
+            }
+
+            if (null !== $this->qualityGate) {
+                $verdict = $this->qualityGate->verdict($result, $request);
+                $result = $result->withMeta(array_merge($result->meta, ['gate' => $verdict->toArray()]));
+                if (!$verdict->passed) {
+                    $this->logger->info('FileProcessor: extra extractor lost quality gate', [
+                        'key' => $key,
+                        'reason' => $verdict->reason,
+                    ]);
+                    continue;
+                }
             }
 
             if ($result->hasText()) {
@@ -251,6 +266,20 @@ final readonly class FileProcessor
                 ]);
 
                 return $result->toLegacyPair();
+            }
+
+            if (null !== $result->markdown && '' !== trim($result->markdown)) {
+                $this->logger->info('FileProcessor: extra extractor succeeded', [
+                    'key' => $key,
+                    'strategy' => $result->strategy,
+                ]);
+
+                return ExtractionResult::of(
+                    $result->markdown,
+                    $result->strategy,
+                    $result->meta,
+                    $result->markdown,
+                )->toLegacyPair();
             }
         }
 
@@ -387,11 +416,27 @@ final readonly class FileProcessor
         if (is_string($tikaText)) {
             $tikaText = $this->textCleaner->clean($tikaText);
             $isPdf = $this->isPdfMime($mime) || 'pdf' === $ext;
+            $tikaMeta = is_array($tikaMeta) ? $tikaMeta : [];
 
-            // Check quality for PDFs
-            $lowQuality = $isPdf
-                ? $this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy)
-                : false;
+            if (null !== $this->qualityGate) {
+                $tikaResult = ExtractionResult::of($tikaText, 'tika', $meta + $tikaMeta);
+                $gateRequest = new ExtractionRequest(
+                    $absolutePath,
+                    $relativePath,
+                    $mime,
+                    $ext,
+                    $userId,
+                    $describe,
+                    $this->detectFamily($mime, $ext),
+                );
+                $verdict = $this->qualityGate->verdict($tikaResult, $gateRequest);
+                $meta['gate'] = $verdict->toArray();
+                $lowQuality = !$verdict->passed;
+            } else {
+                $lowQuality = $isPdf
+                    ? $this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy)
+                    : false;
+            }
 
             if (mb_strlen(trim($tikaText)) > 0 && !$lowQuality) {
                 $this->logger->info('FileProcessor: Tika extraction success', [
@@ -443,8 +488,15 @@ final readonly class FileProcessor
             [$tikaText, $tikaMeta] = $this->tikaClient->extractText($pdf, 'application/pdf');
             if (is_string($tikaText)) {
                 $tikaText = $this->textCleaner->clean($tikaText);
-                if (mb_strlen(trim($tikaText)) > 0
-                    && !$this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy)) {
+                $usable = mb_strlen(trim($tikaText)) > 0;
+                if ($usable && null !== $this->qualityGate) {
+                    $tmp = ExtractionResult::of($tikaText, 'tika_office_pdf', $meta);
+                    $req = new ExtractionRequest($pdf, '', 'application/pdf', 'pdf', $userId, false, 'document');
+                    $usable = $this->qualityGate->verdict($tmp, $req)->passed;
+                } elseif ($usable) {
+                    $usable = !$this->textCleaner->isLowQuality($tikaText, $this->tikaMinLength, $this->tikaMinEntropy);
+                }
+                if ($usable) {
                     $this->logger->info('FileProcessor: Tika extraction after office→PDF convert', [
                         'strategy' => 'tika_office_pdf',
                         'bytes' => strlen($tikaText),

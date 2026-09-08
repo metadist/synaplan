@@ -134,7 +134,7 @@
     "adminFeatures": "Feature Status",
     "adminModelStatus": "Model Status",
     "adminConfig": "System Configuration",
-    "adminSetup": "AI Provider Setup",
+    "adminSetup": "AI infrastructure",
     "adminPeople": "People",
     "myGroups": "My groups",
     "incoming": "Incoming chats",
@@ -748,7 +748,7 @@
     "adminFeatureStatus": "Feature Status",
     "adminModelStatus": "Model Status",
     "adminSystemConfig": "System configuration",
-    "adminProviderSetup": "AI providers",
+    "adminProviderSetup": "AI infrastructure",
     "adminPeople": "People",
     "more": "More",
     "moreDescription": "More sections and account",
@@ -2838,7 +2838,11 @@
     }
   },
   "adminSetup": {
-    "title": "AI Provider Setup",
+    "title": "AI infrastructure",
+    "tabs": {
+      "models": "Models & keys",
+      "extraction": "Extraction"
+    },
     "description": "Connect an AI provider so your team can chat. Keys are stored encrypted on your server and take effect immediately — no restart needed.",
     "statusReadyTitle": "Your AI is ready",
     "statusReadyText": "The default chat model has a working provider. You can add more providers below at any time.",
@@ -2881,6 +2885,55 @@
     "localAi": {
       "title": "Local AI (Ollama) — no key needed",
       "description": "The standard installation includes local AI models that run entirely on your hardware. Downloading models can take a while on first start; cloud providers above are available instantly."
+    }
+  },
+  "aiInfra": {
+    "extraction": {
+      "lead": "Choose how documents are turned into text. Docling keeps tables and headings; if it is not running, Tika is used instead and uploads never fail.",
+      "family": {
+        "document": "Documents",
+        "text": "Plain text",
+        "image": "Images",
+        "audio": "Audio",
+        "audio_no_cloud": "Audio without cloud STT",
+        "video": "Video"
+      },
+      "moveUp": "Up",
+      "moveDown": "Down",
+      "remove": "Remove",
+      "add": "Add",
+      "addPlaceholder": "Add an adapter…",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "testSidecar": {
+        "tika": "Test Tika",
+        "docling": "Test Docling"
+      },
+      "testingSidecar": "Testing…",
+      "sidecarSettings": "URL, timeout and a connection test for Tika and Docling live under System configuration → Processing.",
+      "sidecarSettingsLink": "Open Processing settings",
+      "testTitle": "Test with a file",
+      "testHint": "Upload a sample. You will see which adapter won and why the others did not.",
+      "testButton": "Test with a file",
+      "testing": "Testing…",
+      "winner": "Winner: {winner}",
+      "attemptMs": "{ms} ms",
+      "doclingUnavailableTika": "Docling unavailable — Tika used instead",
+      "save": "Save chain",
+      "saved": "Extraction chain saved. The next upload uses it.",
+      "saveFailed": "The extraction chain could not be saved",
+      "loadFailed": "Could not load extraction settings",
+      "verdict": {
+        "quality_ok": "accepted",
+        "not_applicable": "not gated",
+        "markdown_structure": "accepted (tables or headings)",
+        "empty": "empty",
+        "low_quality": "too little useful text",
+        "unavailable": "unavailable",
+        "unsupported": "does not support this file",
+        "unknown": "unknown adapter",
+        "skipped": "skipped"
+      }
     }
   },
   "providerHelp": {

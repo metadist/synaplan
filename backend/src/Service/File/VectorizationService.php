@@ -35,11 +35,12 @@ final readonly class VectorizationService
     /**
      * Vectorize file content and store in RAG database.
      *
-     * @param string $fileText  Extracted text from file
-     * @param int    $userId    User ID
-     * @param int    $messageId Message ID
-     * @param string $groupKey  Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
-     * @param int    $fileType  File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
+     * @param string      $fileText  Extracted text from file
+     * @param int         $userId    User ID
+     * @param int         $messageId Message ID
+     * @param string      $groupKey  Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
+     * @param int         $fileType  File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
+     * @param string|null $markdown  When set, chunks with {@see TextChunker::chunkifyMarkdown()}
      *
      * @return array ['success' => bool, 'chunks_created' => int, 'error' => string|null, 'provider' => string]
      */
@@ -49,6 +50,7 @@ final readonly class VectorizationService
         int $messageId,
         string $groupKey = 'DEFAULT',
         int $fileType = 0,
+        ?string $markdown = null,
     ): array {
         if (empty($fileText)) {
             $this->logger->warning('VectorizationService: Empty text, skipping', [
@@ -106,8 +108,14 @@ final readonly class VectorizationService
                 'storage_provider' => $this->vectorStorage->getProviderName(),
             ]);
 
-            // Chunk the text
-            $chunks = $this->textChunker->chunkify($fileText);
+            // Chunk the text (markdown path when an extractor returned md)
+            $chunks = [];
+            if (null !== $markdown && '' !== trim($markdown)) {
+                $chunks = $this->textChunker->chunkifyMarkdown($markdown);
+            }
+            if ([] === $chunks) {
+                $chunks = $this->textChunker->chunkify($fileText);
+            }
 
             if (empty($chunks)) {
                 $this->logger->warning('VectorizationService: No chunks created');

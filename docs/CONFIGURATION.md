@@ -698,6 +698,7 @@ migration to roll out a new default.
 | `EXTRACTION.CHAIN.video` | `video_analysis` | Transcript + key-frame describe |
 | `EXTRACTION.QUALITY.min_length` | `10` | PDF quality gate (bootstrap from `TIKA_MIN_LENGTH`) |
 | `EXTRACTION.QUALITY.min_entropy` | `3.0` | PDF quality gate (bootstrap from `TIKA_MIN_ENTROPY`) |
+| `EXTRACTION.QUALITY.apply_to` | `pdf` | Families / extensions the quality gate runs on |
 | `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter. Per-user override allowed |
 | `WEB_SEARCH.FALLBACK` | _(empty)_ | Unused until a second provider ships |
 | `RERANK.ENABLED` | `0` | Off. Eval-gated; no adapter in this release |
@@ -705,8 +706,19 @@ migration to roll out a new default.
 | `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this |
 
 Unknown chain keys are skipped. Keys that FileProcessor does not already
-implement (for example a future `docling`) run first, then the built-in
-strategies. A down extra adapter never fails an upload.
+implement (today: `docling`) run first, then the built-in strategies. A
+down extra adapter never fails an upload. Fresh installs do **not** put
+`docling` on the document chain — an admin adds it under **Operate →
+AI infrastructure → Extraction**.
+
+`DOCLING_BASE_URL` (empty = off) points at the optional `docling`
+Compose profile (`docker compose --profile docling up -d`). The CPU
+image needs about 4 GB during OCR; there is no `mem_limit` in dev.
+`DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
+to 50 MB. Admins edit those the same way as Tika: **System
+configuration → Processing → Docling** (URL, timeout, max bytes, then
+**Test connection**). Markdown from Docling is chunked heading-aware
+(tables stay together; oversized tables repeat the header row).
 
 See [AI plugs](ADMIN.md#ai-plugs-s1).
 

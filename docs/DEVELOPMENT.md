@@ -69,6 +69,25 @@ This is **not** host `apt install libreoffice` and **not** the LibreOffice
 binary Desktop looks for on the user’s PC. The PHP app talks only to
 `OFFICE_CONVERT_URL` over HTTP.
 
+### Docling extraction (optional)
+
+PDFs with tables and two-column layouts extract more cleanly when the
+**Docling** sidecar is running. It is **off by default**
+(`profiles: [docling]`). Compose sets `DOCLING_BASE_URL=http://docling:5001`;
+leave that empty in `.env` to keep Docling off. A down sidecar never fails
+an upload — Tika stays the fallback. Enable Docling in
+**Operate → AI infrastructure → Extraction** (add `docling` to the
+document chain). URL, timeout and **Test connection** match Tika under
+**System configuration → Processing → Docling**. Then:
+
+```bash
+docker compose --profile docling up -d
+```
+
+The CPU image is about 4.4 GB and needs a few GB of RAM during OCR. There
+is no `mem_limit` in this compose file (cgroup limits break some
+sandboxes). GPU variants belong in `synaplan-platform`.
+
 #### Troubleshooting stuck media jobs
 
 The chat bubble for an async video shows `Auftrag läuft noch / Job still running` indefinitely:
@@ -260,6 +279,7 @@ make test    # Run tests
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
 | Collabora CODE (profile `office`, no published port) | `http://collabora:9980` on the compose network |
+| Docling (profile `docling`, no published port) | `http://docling:5001` on the compose network |
 
 ### GPU Support for Local AI Models
 
