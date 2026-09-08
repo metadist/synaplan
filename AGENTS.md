@@ -60,9 +60,11 @@ docker compose exec -T db mariadb -usynaplan_user -psynaplan_password synaplan -
 3. **Preserve ALL functionality** from both branches unless explicitly instructed.
 4. **If unsure, ASK** — throwing away code is worse than asking.
 
-### MANDATORY Pre-Commit Gate — Run Tests BEFORE Every Commit
+### MANDATORY Local CI Gate — Run Tests BEFORE Every Commit / Push
 
-This is the ENFORCED local mirror of the GitHub `CI` workflow — each step maps 1:1 to a CI job, and the `All Checks Passed` gate goes red if you skip one. If any step fails, fix it before committing. No exceptions.
+Do **not** push and wait for GitHub. The `CI` workflow is ~10–15 minutes; a miss costs another full cycle. Run the same jobs locally first. If any step fails, fix it before committing. No exceptions.
+
+#### 1. Unit / static — required before every commit
 
 | Local step | CI job it mirrors |
 | ---------- | ----------------- |
@@ -73,19 +75,44 @@ This is the ENFORCED local mirror of the GitHub `CI` workflow — each step maps
 | `docker compose exec -T frontend npm run check:types` | Frontend (Vue/TypeScript) — vue-tsc |
 | `make -C frontend test` | Frontend (Vue/TypeScript) — Vitest |
 
-**One-shot (this IS the gate — green here ⇒ green CI):**
+```bash
+make ci-local
+# same as:
+# make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+```
+
+`make ci-local` is **not** full CI. Green here only means the unit/static jobs will pass. Playwright is a separate required job (below).
+
+#### 2. E2E — required before every push / PR
+
+GitHub `All Checks Passed` also requires the Playwright matrix. Run it locally against the running dev stack (`docker compose up -d`, Vite on `:5173`):
+
+| Local step | CI job it mirrors |
+| ---------- | ----------------- |
+| `make test-e2e` | E2E Tests (chromium [1/3] [2/3] [3/3]) — `@ci` suite |
+| `make -C frontend test-e2e-layout` | E2E Tests (chromium Mobile) — when layout / nav / viewport changed |
+| `cd frontend && npm run test:e2e:firefox` | E2E Tests (firefox) — when `@crossbrowser` flows changed |
+| `cd frontend && npm run test:e2e:oidc` / `test:e2e:oidc-redirect` | OIDC jobs — when auth / OIDC changed |
+| `cd frontend && npm run test:e2e:ollama` | E2E Tests (chromium Ollama) — when chat-model / Ollama path changed |
+| `make test-e2e-full` | Same `@ci` suite on the production test image (`:8001`) — when Docker / compose / the shipped `dist/` changed |
+
+**Minimum before every push** that touches frontend, routes, OpenAPI consumed by the UI, Saved Tasks, chat, or auth:
 
 ```bash
-make lint && make -C backend phpstan && make test && docker compose exec -T frontend npm run check:types
+make ci-local && make test-e2e
 ```
+
+Backend-only PHP with no HTTP/UI contract change may skip Playwright. A selector, i18n, or route miss will **not** show up in Vitest — only in E2E.
+
+Host Playwright once: `make -C frontend deps-host` then `npx playwright install --with-deps`. See `docs/E2E_TESTING.md`.
 
 **Rules:**
 
-- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`) is NOT the gate — always finish with the unfiltered `make` targets.
+- A green FILTERED run (`phpunit --filter ...`, `phpstan analyse <path>`, `vitest <file>`, `npx playwright test tests/foo.spec.ts`) is NOT the gate — always finish with the unfiltered `make` targets (and `make test-e2e` before push).
 - `make -C backend phpstan` analyses `src/` **and** `tests/` — never scope it to a single path.
-- If you only changed backend PHP, you may skip frontend checks (and vice versa).
+- If you only changed backend PHP, you may skip frontend unit checks (and vice versa). You may **not** skip E2E when the change is user-visible or OpenAPI-facing.
 - If you changed backend OpenAPI annotations: `make -C frontend generate-schemas`, then re-run `vue-tsc`.
-- **NEVER** commit with failing tests.
+- **NEVER** commit with failing tests. **NEVER** use GitHub as the first E2E run.
 
 ### Common pre-commit traps
 
@@ -108,6 +135,9 @@ Real failure modes that have caused red CI more than once:
   ```
 
 - **Heuristic changes ≠ production effect.** If a config flag (e.g. `CLASSIFIER.FAST_PATH_ENABLED`) defaults a code path OFF, new logic there passes tests and is still a no-op in prod. Check the `BCONFIG` default and confirm the path is reachable before claiming a fix.
+- **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
+- **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
+- **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.62.1-noble` image with `--network host`.
 
 ### Mobile App Compatibility
 
@@ -150,8 +180,9 @@ mobile support a narrow, reviewable compatibility layer:
 
 ```bash
 docker compose up -d / down            # Start/stop services
-make lint && make -C backend phpstan && make test   # Quality gate
-make build                              # Frontend app + widget
+make ci-local                          # Unit/static gate (lint, phpstan, tests, vue-tsc)
+make test-e2e                          # Playwright @ci — required before push
+make build                             # Frontend app + widget
 make help / make -C backend help / make -C frontend help
 
 # Dev URLs

@@ -80,6 +80,9 @@ const toastCompare = (compare: UrlWatchCompare) => {
 }
 
 const onCheck = async (id: number) => {
+  if (checkingId.value !== null) {
+    return
+  }
   checkingId.value = id
   try {
     const result = await urlWatchesApi.refresh(id)
@@ -183,7 +186,7 @@ onMounted(() => {
           <button
             type="button"
             class="btn-secondary px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="checkingId === watch.id"
+            :disabled="checkingId !== null"
             data-testid="url-watch-check"
             @click="onCheck(watch.id)"
           >

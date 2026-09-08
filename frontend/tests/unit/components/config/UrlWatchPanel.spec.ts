@@ -3,11 +3,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import UrlWatchPanel from '@/components/config/UrlWatchPanel.vue'
 import type { UrlWatch } from '@/services/api/urlWatchesApi'
 
-const { mockList, mockCreate, mockRemove, mockConfirm } = vi.hoisted(() => ({
+const { mockList, mockCreate, mockRemove, mockConfirm, mockRefresh } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockCreate: vi.fn(),
   mockRemove: vi.fn(),
   mockConfirm: vi.fn(),
+  mockRefresh: vi.fn(),
 }))
 
 vi.mock('@/services/api/urlWatchesApi', () => ({
@@ -16,7 +17,7 @@ vi.mock('@/services/api/urlWatchesApi', () => ({
     create: mockCreate,
     remove: mockRemove,
     get: vi.fn(),
-    refresh: vi.fn(),
+    refresh: mockRefresh,
   },
 }))
 
@@ -85,5 +86,44 @@ describe('UrlWatchPanel', () => {
     await flushPromises()
     expect(mockRemove).toHaveBeenCalledWith(3)
     expect(wrapper.find('[data-testid="url-watch-empty"]').exists()).toBe(true)
+  })
+
+  it('disables every Check now while one refresh is in flight', async () => {
+    const other: UrlWatch = {
+      ...watch,
+      id: 4,
+      url: 'https://example.com/other',
+      title: 'Other',
+    }
+    mockList.mockResolvedValue([watch, other])
+    let finishRefresh: (value: {
+      watch: UrlWatch
+      compare: { status: string; diffText: string }
+    }) => void = () => undefined
+    mockRefresh.mockReturnValue(
+      new Promise((resolve) => {
+        finishRefresh = resolve
+      })
+    )
+
+    const wrapper = await mountPanel()
+    const buttons = wrapper.findAll('[data-testid="url-watch-check"]')
+    expect(buttons).toHaveLength(2)
+
+    await buttons[0].trigger('click')
+    await flushPromises()
+
+    expect(buttons[0].attributes('disabled')).toBeDefined()
+    expect(buttons[1].attributes('disabled')).toBeDefined()
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+
+    await buttons[1].trigger('click')
+    await flushPromises()
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+
+    finishRefresh({ watch, compare: { status: 'unchanged', diffText: '' } })
+    await flushPromises()
+    expect(buttons[0].attributes('disabled')).toBeUndefined()
+    expect(buttons[1].attributes('disabled')).toBeUndefined()
   })
 })

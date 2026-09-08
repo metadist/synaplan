@@ -6,12 +6,15 @@ namespace App\Service\UrlWatch;
 
 /**
  * Line-based unified-ish diff. No composer dependency.
- * Input is capped so LCS stays cheap on a long page.
+ *
+ * Input is capped so LCS stays cheap on a long page. The DP table is one
+ * packed array (not n nested PHP arrays) — at 400×400 that is ~160k ints,
+ * not a 1500×1500 nest that can OOM a worker.
  */
 final readonly class TextDiff
 {
     public const MAX_DIFF_LINES = 200;
-    public const MAX_INPUT_LINES = 1500;
+    public const MAX_INPUT_LINES = 400;
 
     public function unified(string $old, string $new, int $maxLines = self::MAX_DIFF_LINES): string
     {
@@ -59,12 +62,15 @@ final readonly class TextDiff
     {
         $n = count($a);
         $m = count($b);
-        $dp = array_fill(0, $n + 1, array_fill(0, $m + 1, 0));
+        $stride = $m + 1;
+        $dp = array_fill(0, ($n + 1) * $stride, 0);
         for ($i = $n - 1; $i >= 0; --$i) {
+            $row = $i * $stride;
+            $next = $row + $stride;
             for ($j = $m - 1; $j >= 0; --$j) {
-                $dp[$i][$j] = $a[$i] === $b[$j]
-                    ? $dp[$i + 1][$j + 1] + 1
-                    : max($dp[$i + 1][$j], $dp[$i][$j + 1]);
+                $dp[$row + $j] = $a[$i] === $b[$j]
+                    ? $dp[$next + $j + 1] + 1
+                    : max($dp[$next + $j], $dp[$row + $j + 1]);
             }
         }
 
@@ -76,7 +82,7 @@ final readonly class TextDiff
                 $ops[] = '  '.$a[$i];
                 ++$i;
                 ++$j;
-            } elseif ($dp[$i + 1][$j] >= $dp[$i][$j + 1]) {
+            } elseif ($dp[($i + 1) * $stride + $j] >= $dp[$i * $stride + $j + 1]) {
                 $ops[] = '- '.$a[$i];
                 ++$i;
             } else {
