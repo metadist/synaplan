@@ -6,8 +6,10 @@ import type { TaskPlanState } from '@/stores/history'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 
-const { mockSavedTasksEnabled } = vi.hoisted(() => ({
+const { mockSavedTasksEnabled, mockDialogPrompt, mockCreatePrompt } = vi.hoisted(() => ({
   mockSavedTasksEnabled: vi.fn(() => false),
+  mockDialogPrompt: vi.fn(),
+  mockCreatePrompt: vi.fn(),
 }))
 
 vi.mock('@/composables/useSavedTasksFeature', () => ({
@@ -15,7 +17,15 @@ vi.mock('@/composables/useSavedTasksFeature', () => ({
 }))
 
 vi.mock('@/composables/useDialog', () => ({
-  useDialog: () => ({ prompt: vi.fn() }),
+  useDialog: () => ({ prompt: mockDialogPrompt }),
+}))
+
+vi.mock('@/services/api/promptsApi', () => ({
+  promptsApi: { createPrompt: (...args: unknown[]) => mockCreatePrompt(...args) },
+}))
+
+vi.mock('@/services/api/savedTasksApi', () => ({
+  savedTasksApi: { create: vi.fn().mockResolvedValue({ id: 1 }) },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
@@ -74,6 +84,8 @@ describe('TaskPlanBubble', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockSavedTasksEnabled.mockReturnValue(false)
+    mockDialogPrompt.mockReset()
+    mockCreatePrompt.mockReset()
   })
   it('renders one card per task node', () => {
     const wrapper = mount(TaskPlanBubble, {
@@ -539,6 +551,33 @@ describe('TaskPlanBubble', () => {
     })
 
     expect(wrapper.find('[data-testid="btn-schedule-plan"]').exists()).toBe(true)
+  })
+
+  it('enables URL prefetch when the saved instruction contains a markdown link', async () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    mockDialogPrompt.mockResolvedValue('Daily brief')
+    mockCreatePrompt.mockResolvedValue({ id: 9 })
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n1',
+          cards: [{ nodeId: 'n1', capability: 'url_fetch', kind: 'search', state: 'done' }],
+        },
+        scheduleSource: 'Check and summarize [the page](https://example.com/news)',
+      },
+      ...mountOptions,
+    })
+
+    await wrapper.find('[data-testid="btn-schedule-plan"]').trigger('click')
+    await vi.waitFor(() => expect(mockCreatePrompt).toHaveBeenCalled())
+
+    expect(mockCreatePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'Check and summarize [the page](https://example.com/news)',
+        metadata: expect.objectContaining({ tool_url_screenshot: true }),
+      })
+    )
   })
 
   it('hides the clock while the plan is still running', () => {

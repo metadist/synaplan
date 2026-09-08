@@ -47,6 +47,7 @@ final class SavedTaskPlanFactory
             $id = (string) $node['id'];
             $capability = (string) $node['capability'];
             $params = is_array($node['params'] ?? null) ? $node['params'] : [];
+            $inputs = is_array($node['inputs'] ?? null) ? $node['inputs'] : [];
             if (Capability::Chat->value === $capability && !isset($params['topic_id']) && isset($graph['prompt_topic'])) {
                 $params['topic_id'] = $graph['prompt_topic'];
             }
@@ -57,6 +58,7 @@ final class SavedTaskPlanFactory
                 'id' => $id,
                 'capability' => $capability,
                 'depends_on' => array_values(array_filter($node['depends_on'] ?? [], 'is_string')),
+                'inputs' => $inputs,
                 'params' => $params,
             ];
             if (Capability::ComposeReply->value === $capability) {

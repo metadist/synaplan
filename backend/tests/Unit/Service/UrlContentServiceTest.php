@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Service\Security\SsrfGuard;
 use App\Service\UrlContentService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -128,6 +129,62 @@ HTML;
         self::assertTrue($result->success);
         self::assertStringContainsString('Hydrogen for fleets', $result->extractedText);
         self::assertStringContainsString('tank infrastructure', $result->extractedText);
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('markdownUrlProvider')]
+    public function testExtractUrlsReadsMarkdownAndBareForms(string $message, array $expected): void
+    {
+        self::assertSame($expected, $this->service([])->extractUrls($message));
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: list<string>}>
+     */
+    public static function markdownUrlProvider(): iterable
+    {
+        yield 'bare url' => [
+            'summarize https://example.com/article and keep it short',
+            ['https://example.com/article'],
+        ];
+        yield 'markdown link' => [
+            'Check and read [this page](https://example.com/news) then summarize',
+            ['https://example.com/news'],
+        ];
+        yield 'markdown link with wikipedia parens' => [
+            'Read [Foo](https://en.wikipedia.org/wiki/Foo_(bar)) please',
+            ['https://en.wikipedia.org/wiki/Foo_(bar)'],
+        ];
+        yield 'bare wikipedia parens' => [
+            'https://en.wikipedia.org/wiki/Foo_(bar)',
+            ['https://en.wikipedia.org/wiki/Foo_(bar)'],
+        ];
+        yield 'gfm autolink' => [
+            'Load <https://example.com/doc> and summarize',
+            ['https://example.com/doc'],
+        ];
+        yield 'bold-wrapped url from prompt toolbar' => [
+            'Please read **https://example.com/a** now',
+            ['https://example.com/a'],
+        ];
+        yield 'html href after formatter round-trip' => [
+            'See <a href="https://example.com/href">the article</a>',
+            ['https://example.com/href'],
+        ];
+        yield 'html entity encoded slashes' => [
+            'summarize https:&#x2F;&#x2F;example.com/encoded',
+            ['https://example.com/encoded'],
+        ];
+        yield 'trailing sentence punctuation' => [
+            'See https://example.com/end.',
+            ['https://example.com/end'],
+        ];
+        yield 'no url' => [
+            'just summarize my notes',
+            [],
+        ];
     }
 
     /**

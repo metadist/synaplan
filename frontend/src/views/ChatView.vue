@@ -556,6 +556,7 @@ import { buildUploadUrl, isAudioFileType } from '@/utils/mediaTypes'
 import { isChannelSource } from '@/utils/channelSource'
 import { looksLikeFileGenerationEnvelope } from '@/utils/fileGenerationEnvelope'
 import { stripPastedBlocks } from '@/utils/pastedContent'
+import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
 import { httpClient } from '@/services/api/httpClient'
@@ -1547,11 +1548,7 @@ const userTextBefore = (messageId: string | number): string => {
   const idx = list.findIndex((row) => row.id === messageId)
   for (let i = idx - 1; i >= 0; i--) {
     if (list[i].role !== 'user') continue
-    return list[i].parts
-      .filter((part) => part.type === 'text' && typeof part.content === 'string')
-      .map((part) => part.content)
-      .join('\n')
-      .trim()
+    return scheduleSourceFromParts(list[i].parts)
   }
   return ''
 }

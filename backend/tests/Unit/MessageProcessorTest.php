@@ -845,4 +845,73 @@ class MessageProcessorTest extends TestCase
 
         $this->processor->process($message);
     }
+
+    public function testSavedTaskPrefetchesMarkdownWrappedUrlWithoutScreenshotFlag(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('Check and summarize [the page](https://example.com/news)');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->expects($this->once())
+            ->method('extractUrls')
+            ->with('Check and summarize [the page](https://example.com/news)')
+            ->willReturn(['https://example.com/news']);
+        $urlContent->expects($this->once())
+            ->method('fetchMultiple')
+            ->with(['https://example.com/news'])
+            ->willReturn([]);
+        $urlContent->expects($this->never())->method('formatForPrompt');
+
+        $processor = new MessageProcessor(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $urlContent,
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+        );
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->expects($this->never())->method('classify');
+        $this->promptService->method('getPromptWithMetadata')->willReturn([
+            'prompt' => 'saved instruction',
+            'metadata' => ['tool_files' => true, 'tool_mcp' => false],
+        ]);
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame('saved_task', $classification['source'] ?? null);
+
+                return [
+                    'content' => 'Summary',
+                    'metadata' => ['provider' => 'test', 'model' => 'test'],
+                ];
+            });
+
+        $result = $processor->process($message, [
+            'fixed_task_prompt' => 'saved-123',
+            'saved_task' => true,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
 }
