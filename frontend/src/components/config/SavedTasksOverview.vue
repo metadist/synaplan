@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
 import PageHeader from '@/components/PageHeader.vue'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
+import UrlWatchPanel from '@/components/config/UrlWatchPanel.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
@@ -138,5 +139,7 @@ onMounted(() => {
         </li>
       </ul>
     </template>
+
+    <UrlWatchPanel />
   </div>
 </template>

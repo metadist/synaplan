@@ -51,6 +51,7 @@ const mountPage = async () => {
         Icon: true,
         RouterLink: { template: '<a><slot /></a>', props: ['to'] },
         SavedTaskCard: { template: '<div data-testid="saved-task-card" />', props: ['task'] },
+        UrlWatchPanel: { template: '<div data-testid="url-watch-panel" />' },
       },
     },
   })
@@ -94,6 +95,7 @@ describe('SavedTasksOverview', () => {
             template:
               '<button type="button" data-testid="emit-deleted" @click="$emit(\'deleted\', task.id)" />',
           },
+          UrlWatchPanel: { template: '<div data-testid="url-watch-panel" />' },
         },
       },
     })

@@ -7,7 +7,7 @@ Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Ports & refactor | `synaplan/` `feat/wave3-ai-plugs-s1` | in progress | `PL1`–`PL8`: ports, registries, `PLUGS` seeder, Brave gateway, extra-extractor hook. FileProcessor built-in strategies unchanged. |
+| S1 Ports & refactor | `synaplan/` `main` (#1750) | done | `PL1`–`PL8`: ports, registries, `PLUGS` seeder, Brave gateway, extra-extractor hook. FileProcessor built-in strategies unchanged. |
 | S2 Docling | — | planned | Lands as a tagged extra extractor (`docling`) |
 | S3 Web search providers | — | planned | SearXNG (+ later Tavily/Exa/…) on `WebSearchRegistry` |
 | S4 Rerank | — | planned | Port exists; `RERANK.ENABLED=0` |
