@@ -1,17 +1,16 @@
 # Status — AI Plugs
 
 Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
-[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03; awaiting technical plan review
-before the first sprint starts.**
+[`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) ticked 2026-09-03.**
 
 ## Steps
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Ports & refactor | — | planned | |
-| S2 Docling | — | planned | |
-| S3 Web search providers | — | planned | |
-| S4 Rerank | — | planned | |
+| S1 Ports & refactor | `synaplan/` `feat/wave3-ai-plugs-s1` | in progress | `PL1`–`PL8`: ports, registries, `PLUGS` seeder, Brave gateway, extra-extractor hook. FileProcessor built-in strategies unchanged. |
+| S2 Docling | — | planned | Lands as a tagged extra extractor (`docling`) |
+| S3 Web search providers | — | planned | SearXNG (+ later Tavily/Exa/…) on `WebSearchRegistry` |
+| S4 Rerank | — | planned | Port exists; `RERANK.ENABLED=0` |
 | S5 Model import | — | planned | |
 | S6 Plugin adapters | — | planned | |
 
@@ -24,6 +23,7 @@ before the first sprint starts.**
 | 2026-09-03 | Open questions resolved: Perplexity = search adapter (answer capability) **and** optional chat provider; extraction chain instance-only; `TIKA_*` env bootstrap-only; `LlmReranker` included, off; capability probe opt-in. |
 | 2026-09-03 | S5 registers the `model_preferences` bundle section with the track-2 registry (roadmap §8.1). |
 | 2026-09-07 | **UX contract.** J-PL-1…3: each admin tab leads with a sentence, health, and Test that shows a human result. A down sidecar never fails an upload. |
+| 2026-09-07 | **S1 implementation.** FileProcessor is **not** rewritten as a full chain runner in S1 — existing `FileProcessor*Test` constructors stay valid. Built-in strategies remain inside FileProcessor. `PlugConfigService::extraExtractorKeys()` is the S2 unlock (empty on the seeded chains). The six Brave callers go through `WebSearchGateway`. `MessagePreProcessor` still talks to `TikaClient` (allow-listed in `PlugBoundaryTest`). No UI, no new env var, no migration. |
 
 ## Review log
 
@@ -36,3 +36,8 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-07 (UX contract):** Operate is still a user-flow. See
 [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.3.
+
+**2026-09-07 (S1 implementation):** Wave 3 starts here. Ports live under
+`backend/src/Plug/`. Seeded `PLUGS` defaults match sprint §2.3. Golden corpus
+covers native text (md/csv/html); recorded Tika/vision/STT responses wait for
+S2. Brave fixtures lock the legacy array + AI text. Snapshots are not touched.

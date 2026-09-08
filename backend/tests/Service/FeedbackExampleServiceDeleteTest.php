@@ -17,6 +17,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -67,7 +68,7 @@ final class FeedbackExampleServiceDeleteTest extends TestCase
             $this->rateLimitService,
             $this->memoryService,
             $this->vectorSearchService,
-            $this->braveSearchService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
             $this->promptRepository,
             $this->logger,
             $this->feedbackConfig,

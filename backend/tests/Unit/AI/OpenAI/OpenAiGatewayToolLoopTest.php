@@ -28,7 +28,7 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         $search = $this->createMock(WebSearchTool::class);
         $search->method('isAvailable')->willReturn(true);
         $search->method('declaration')->willReturn((new WebSearchTool(
-            $this->createMock(\App\Service\Search\BraveSearchService::class),
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
             new NullLogger(),
         ))->declaration());
         $search->method('execute')->willReturn([
@@ -161,7 +161,7 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         $search = $this->createMock(WebSearchTool::class);
         $search->method('isAvailable')->willReturn(true);
         $search->method('declaration')->willReturn((new WebSearchTool(
-            $this->createMock(\App\Service\Search\BraveSearchService::class),
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
             new NullLogger(),
         ))->declaration());
         $search->expects(self::once())->method('execute')->willReturn([
@@ -216,7 +216,7 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         $search = $this->createMock(WebSearchTool::class);
         $search->method('isAvailable')->willReturn(true);
         $search->method('declaration')->willReturn((new WebSearchTool(
-            $this->createMock(\App\Service\Search\BraveSearchService::class),
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
             new NullLogger(),
         ))->declaration());
         $search->method('execute')->willReturn([

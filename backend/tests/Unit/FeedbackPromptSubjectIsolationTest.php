@@ -18,6 +18,7 @@ use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UserMemoryService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -91,7 +92,7 @@ final class FeedbackPromptSubjectIsolationTest extends TestCase
             $this->createMock(RateLimitService::class),
             $memoryService,
             $this->createMock(VectorSearchService::class),
-            $this->createMock(BraveSearchService::class),
+            WebSearchGatewayFactory::fromBrave($this->createMock(BraveSearchService::class)),
             $this->createMock(PromptRepository::class),
             $this->createMock(LoggerInterface::class),
             $feedbackConfig,

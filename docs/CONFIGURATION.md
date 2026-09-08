@@ -681,6 +681,37 @@ per IP per hour. See [Linked platforms](ADMIN.md#linked-platforms).
 
 ---
 
+## AI plugs (`PLUGS`)
+
+Instance-wide extraction, web-search and rerank settings (`BCONFIG` group
+`PLUGS`, owner 0). Seeded to reproduce today's FileProcessor order and
+Brave-only search. Changing a seeder value does **not** propagate — ship a
+migration to roll out a new default.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `EXTRACTION.CHAIN.text` | `native` | Plain-text / markdown / csv / html |
+| `EXTRACTION.CHAIN.document` | `structured_office,office_convert,tika,pdf_vision` | Office + PDF path |
+| `EXTRACTION.CHAIN.image` | `vision` | Vision describe / OCR |
+| `EXTRACTION.CHAIN.audio` | `stt_cloud,whisper_local` | When a cloud STT provider is configured |
+| `EXTRACTION.CHAIN.audio_no_cloud` | `whisper_local,stt_cloud` | Local Whisper first |
+| `EXTRACTION.CHAIN.video` | `video_analysis` | Transcript + key-frame describe |
+| `EXTRACTION.QUALITY.min_length` | `10` | PDF quality gate (bootstrap from `TIKA_MIN_LENGTH`) |
+| `EXTRACTION.QUALITY.min_entropy` | `3.0` | PDF quality gate (bootstrap from `TIKA_MIN_ENTROPY`) |
+| `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter. Per-user override allowed |
+| `WEB_SEARCH.FALLBACK` | _(empty)_ | Unused until a second provider ships |
+| `RERANK.ENABLED` | `0` | Off. Eval-gated; no adapter in this release |
+| `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` before rerank |
+| `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this |
+
+Unknown chain keys are skipped. Keys that FileProcessor does not already
+implement (for example a future `docling`) run first, then the built-in
+strategies. A down extra adapter never fails an upload.
+
+See [AI plugs](ADMIN.md#ai-plugs-s1).
+
+---
+
 ## All Environment Variables
 
 See `backend/.env.example` for the complete list with descriptions.

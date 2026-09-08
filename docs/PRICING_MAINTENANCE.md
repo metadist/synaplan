@@ -152,9 +152,9 @@ TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat` (BID 336) |
+| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat` (BID 336) |
 
-Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. Flash-0731 is the same-family successor at the same price; V4 Pro is still live but is a different (and much more expensive) tier.
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. Flash-0731 is the same-family successor at the same price; V4 Pro is still live but is a different (and much more expensive) tier. BID 335 is not a `ProviderDefaultsService` recommendation.
 
 ## Maintenance links
 

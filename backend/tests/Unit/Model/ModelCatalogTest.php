@@ -617,12 +617,6 @@ class ModelCatalogTest extends TestCase
         $this->assertCount(1, $qwenVision);
         $this->assertCount(1, $gptOss);
 
-        $this->assertSame(335, $v4Flash[0]['id']);
-        $this->assertSame(0, $v4Flash[0]['active']);
-        $this->assertSame(0, $v4Flash[0]['selectable']);
-        $this->assertTrue(ModelCatalog::isRetired(335));
-        $this->assertSame(336, ModelCatalog::successorBid(335));
-
         $this->assertSame(331, $glm53[0]['id']);
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
         $this->assertSame('zai-org/GLM-5.3', $glm53[0]['providerId']);
@@ -630,7 +624,14 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('zai-org/GLM-5.3-Flash', $glm53FlashVision[0]['providerId']);
         $this->assertSame('tngtech/DeepSeek-TNG-R1T2-Chimera', $chimera[0]['providerId']);
         $this->assertSame('deepseek-ai/DeepSeek-V4-Flash', $v4Flash[0]['providerId']);
+        $this->assertSame(335, $v4Flash[0]['id']);
+        $this->assertSame(0, $v4Flash[0]['active']);
+        $this->assertSame(0, $v4Flash[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(335));
+        $this->assertSame(336, ModelCatalog::successorBid(335));
         $this->assertSame('deepseek-ai/DeepSeek-V4-Flash-0731', $v4Flash0731[0]['providerId']);
+        $this->assertSame(1, $v4Flash0731[0]['active']);
+        $this->assertSame(1, $v4Flash0731[0]['selectable']);
         $this->assertSame('deepseek-ai/DeepSeek-V4-Pro-0813', $v4Pro[0]['providerId']);
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $qwenChat[0]['providerId']);
         $this->assertSame('openai/gpt-oss-120b', $gptOss[0]['providerId']);

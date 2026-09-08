@@ -324,7 +324,7 @@ class ModelCatalog
         335 => [
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
             'retiredOn' => '2026-09-08',
-            'successor' => 'trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat',
+            'successor' => 'trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat',
             'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; migrate to DeepSeek V4 Flash 0731.',
         ],
     ];
@@ -3745,7 +3745,8 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Flash',
             'tag' => 'chat',
-            // Retired: TrustedTokens dropped the undated V4 Flash id on 2026-09-08.
+            // Retired: TrustedTokens dropped the undated V4 Flash id on 2026-09-08
+            // (absent from https://trustedtokens.eu/api/billing/models).
             // See ModelCatalog::RETIREMENTS[335].
             'selectable' => 0,
             'active' => 0,

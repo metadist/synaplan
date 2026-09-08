@@ -36,6 +36,7 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
 use App\Service\Search\BraveSearchService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -993,7 +994,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->method('generate')->willReturn('mars news');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'latest mars news']);
 
         $result = $runner->run($node, $this->context($this->message('latest mars news')));
@@ -1009,7 +1010,7 @@ final class RunnersTest extends TestCase
         $brave = $this->createMock(BraveSearchService::class);
         $brave->method('isEnabled')->willReturn(false);
 
-        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($this->createMock(SearchQueryGenerator::class), WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'anything']);
 
         $result = $runner->run($node, $this->context($this->message('anything')));
@@ -1030,7 +1031,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->expects(self::never())->method('generate');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
 
         $context = new NodeContext(
@@ -1059,7 +1060,7 @@ final class RunnersTest extends TestCase
         $queryGen = $this->createMock(SearchQueryGenerator::class);
         $queryGen->method('generate')->willReturn('rover landing');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class));
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class));
         // Planner narrowed this node to a sub-aspect of the request.
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'only the rover landing part']);
 
@@ -1091,7 +1092,7 @@ final class RunnersTest extends TestCase
         $repo = $this->createMock(SearchResultRepository::class);
         $repo->expects(self::once())->method('saveSearchResults');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class), $repo);
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => 'AI breakthrough']);
 
         $result = $runner->run($node, $this->context($this->message('AI breakthrough')));
@@ -1114,7 +1115,7 @@ final class RunnersTest extends TestCase
         $repo = $this->createMock(SearchResultRepository::class);
         $repo->expects(self::never())->method('saveSearchResults');
 
-        $runner = new WebSearchRunner($queryGen, $brave, $this->createMock(LoggerInterface::class), $repo);
+        $runner = new WebSearchRunner($queryGen, WebSearchGatewayFactory::fromBrave($brave), $this->createMock(LoggerInterface::class), $repo);
         $node = new TaskNode('n1', Capability::WebSearch, [], ['query' => '$message.text']);
 
         $context = new NodeContext(
