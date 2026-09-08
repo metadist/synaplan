@@ -4899,6 +4899,8 @@
     "filterPlugins": "Eklentilerden",
     "searchPlaceholder": "Asistan ara",
     "talkingTo": "{name} ile konuşuluyor",
+    "emptyHint": "Bu sohbet {name} kullanıyor.",
+    "suggested": "Bunlardan birini deneyin",
     "save": "Kaydet",
     "saving": "Kaydediliyor…",
     "saved": "Kaydedildi",

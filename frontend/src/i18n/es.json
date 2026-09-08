@@ -4898,6 +4898,8 @@
     "filterPlugins": "De plugins",
     "searchPlaceholder": "Buscar asistentes",
     "talkingTo": "Hablando con {name}",
+    "emptyHint": "Este chat usa {name}.",
+    "suggested": "Prueba una de estas",
     "save": "Guardar",
     "saving": "Guardando…",
     "saved": "Guardado",
