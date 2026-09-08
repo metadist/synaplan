@@ -88,5 +88,11 @@ test.describe('@ci Saved Task roundtrip', () => {
       await card.locator(TASKS.viewRuns).click()
       await expect(card.locator(TASKS.runsList)).toBeVisible({ timeout: TIMEOUTS.SHORT })
     })
+
+    await test.step('Act: delete the task from the Saved Tasks page', async () => {
+      await card.locator(TASKS.delete).click()
+      await page.locator(selectors.dialog.confirmBtn).click()
+      await expect(card).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })
+    })
   })
 })

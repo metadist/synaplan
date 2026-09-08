@@ -428,6 +428,7 @@
             class="mb-4"
             :task="currentSavedTask"
             @updated="onSavedTaskUpdated"
+            @deleted="onSavedTaskDeleted"
           />
 
           <!-- Tab nav -->
@@ -1326,6 +1327,10 @@ const loadSavedTasks = async () => {
 
 const onSavedTaskUpdated = (task: SavedTask) => {
   savedTasks.value = savedTasks.value.map((row) => (row.id === task.id ? task : row))
+}
+
+const onSavedTaskDeleted = (id: number) => {
+  savedTasks.value = savedTasks.value.filter((row) => row.id !== id)
 }
 
 const onSaveAsTask = async () => {

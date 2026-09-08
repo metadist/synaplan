@@ -244,7 +244,16 @@ final class SavedTaskController extends AbstractController
         summary: 'Delete a Saved Task',
         tags: ['Saved Tasks'],
         responses: [
-            new OA\Response(response: 200, description: 'Deleted'),
+            new OA\Response(
+                response: 200,
+                description: 'Deleted',
+                content: new OA\JsonContent(
+                    required: ['success'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                    ]
+                )
+            ),
             new OA\Response(response: 404, description: 'Not found'),
         ]
     )]

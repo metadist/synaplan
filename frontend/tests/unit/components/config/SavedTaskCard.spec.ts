@@ -261,6 +261,7 @@ describe('SavedTaskCard', () => {
     expect(mockConfirm).toHaveBeenCalledWith(
       expect.objectContaining({
         title: 'Delete',
+        confirmText: 'Delete',
         danger: true,
       })
     )

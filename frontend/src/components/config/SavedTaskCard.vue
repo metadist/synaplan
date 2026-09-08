@@ -212,6 +212,7 @@ const onDelete = async () => {
   const ok = await dialog.confirm({
     title: t('config.savedTasks.delete'),
     message: t('config.savedTasks.deleteConfirm', { name: props.task.name }),
+    confirmText: t('config.savedTasks.delete'),
     danger: true,
   })
   if (!ok) return

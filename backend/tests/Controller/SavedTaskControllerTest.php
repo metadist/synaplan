@@ -29,6 +29,40 @@ final class SavedTaskControllerTest extends WebTestCase
         $this->em = static::getContainer()->get('doctrine')->getManager();
     }
 
+    public function testOwnerCanDeleteTaskAndRuns(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('task-del-owner@synaplan.internal');
+        $prompt = $this->createPrompt((int) $owner->getId(), 'task-del', 'Delete Me');
+        $task = $this->createTask((int) $owner->getId(), (int) $prompt->getId(), 'Delete Me');
+        $taskId = $task->getId();
+        self::assertNotNull($taskId);
+        $this->authenticateClient($this->client, $owner);
+
+        $this->client->request('DELETE', '/api/v1/saved-tasks/'.$taskId);
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertTrue($this->json()['success'] ?? false);
+        $this->em->clear();
+        self::assertNull($this->em->find(SavedTask::class, $taskId));
+    }
+
+    public function testForeignTaskDeleteIs404(): void
+    {
+        $this->enableSharing();
+        $owner = $this->createUser('task-del-priv-owner@synaplan.internal');
+        $other = $this->createUser('task-del-priv-other@synaplan.internal');
+        $prompt = $this->createPrompt((int) $owner->getId(), 'task-del-priv', 'Private delete');
+        $task = $this->createTask((int) $owner->getId(), (int) $prompt->getId(), 'Private delete');
+        $this->authenticateClient($this->client, $other);
+
+        $this->client->request('DELETE', '/api/v1/saved-tasks/'.$task->getId());
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+        $this->em->clear();
+        self::assertInstanceOf(SavedTask::class, $this->em->find(SavedTask::class, $task->getId()));
+    }
+
     public function testForeignTaskIs404(): void
     {
         $this->enableSharing();

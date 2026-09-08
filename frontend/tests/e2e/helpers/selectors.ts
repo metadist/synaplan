@@ -509,6 +509,7 @@ export const selectors = {
     /** One card per task; rendered on /channels/tasks and inline on the prompt editor */
     card: '[data-testid="saved-task-card"]',
     runNow: '[data-testid="btn-run-now"]',
+    delete: '[data-testid="btn-delete-saved-task"]',
     /** Only rendered once the task has a chat (i.e. after it has run at least once) */
     showResults: '[data-testid="btn-show-results"]',
     viewRuns: '[data-testid="btn-view-runs"]',
