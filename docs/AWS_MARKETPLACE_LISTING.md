@@ -141,7 +141,8 @@ meant to verify has already been built.
 Each step is cheap, and each one catches what the next would otherwise catch
 later and slower.
 
-1. **Build the AMI.** Push a release tag; the workflow builds x86_64 in
+1. **Build the AMI.** After the release tag's CI run is green, `aws-ami.yml`
+   starts from that `workflow_run` and builds x86_64 in
    us-east-1, verifies its snapshot is unencrypted, shares the source AMI with
    the Marketplace ingestion account, then launches it through
    `synaplan-new-vpc.yaml`, runs the smoke test over Session Manager, and

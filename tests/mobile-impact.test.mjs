@@ -176,9 +176,12 @@ test('release and classification tooling does not trigger an app release', () =>
   const toolingPaths = [
     '.github/workflows/ci.yml',
     '.github/workflows/release-tag.yml',
+    '.github/workflows/aws-ami.yml',
     '.github/mobile-impact-policy.json',
     'scripts/next-release-tag.mjs',
-    'tests/next-release-tag.test.mjs'
+    'scripts/ci-change-scope.mjs',
+    'tests/next-release-tag.test.mjs',
+    'tests/ci-change-scope.test.mjs'
   ]
 
   for (const path of toolingPaths) {

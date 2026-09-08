@@ -9,7 +9,14 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
+# Three run modes (scripts/ci-change-scope.mjs), fail-closed to `heavy`:
+#   heavy   — application change: full tests, and on main/tags the publish path
+#   thin    — catalog-pin-only: templates + lint, no image/E2E/republish
+#   promote — plain release tag whose main CI already published ci-<sha>-*:
+#             retag those images, do not rebuild or retest the same tree
+#
 # Superseded runs on the same PR just burn runner capacity, which is shared
 # across the organization (the plan allows 60 concurrent standard-runner jobs
 # and one run peaks at ~7). Push/tag runs get a unique group (run_id) so main
@@ -24,6 +31,100 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  change-scope:
+    name: Classify Change Scope
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.classify.outputs.mode }}
+      reason: ${{ steps.classify.outputs.reason }}
+      app-version: ${{ steps.version.outputs.version }}
+      source_run_id: ${{ steps.classify.outputs.source_run_id }}
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-tags: true
+
+      - name: Classify the run
+        id: classify
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          files=""
+          can_promote=false
+          source_run_id=""
+
+          if [[ "$REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            source_run_id="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&status=success&per_page=100" |
+                jq -r --arg sha "$SHA" --arg branch "$DEFAULT_BRANCH" \
+                  '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha and .head_branch == $branch)]
+                    | first | .id // empty'
+            )"
+            if [ -n "$source_run_id" ]; then
+              amd64="${REGISTRY_IMAGE}:ci-${SHA}-amd64"
+              arm64="${REGISTRY_IMAGE}:ci-${SHA}-arm64"
+              if docker manifest inspect "$amd64" >/dev/null 2>&1 \
+                && docker manifest inspect "$arm64" >/dev/null 2>&1; then
+                can_promote=true
+              else
+                echo "Main CI ${source_run_id} is green but ${amd64} / ${arm64} are not in the registry yet; this run will rebuild."
+              fi
+            fi
+          elif [ "$EVENT_NAME" = pull_request ]; then
+            files="$(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
+                --jq '.[].filename'
+            )"
+          elif [ "$EVENT_NAME" = push ]; then
+            if [[ "${BEFORE:-}" =~ ^0+$ ]] || [ -z "${BEFORE:-}" ]; then
+              files="__unknown__"
+            elif ! files="$(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${SHA}" \
+                --jq '.files[].filename'
+            )"; then
+              files="__unknown__"
+            fi
+          else
+            files="__unknown__"
+          fi
+
+          result="$(
+            printf '%s\n' "$files" | node scripts/ci-change-scope.mjs \
+              --event "$EVENT_NAME" \
+              --ref "$REF" \
+              --can-promote "$can_promote" \
+              --files-from -
+          )"
+          mode="$(printf '%s\n' "$result" | sed -n 's/^mode=//p' | head -n1)"
+          reason="$(printf '%s\n' "$result" | sed -n 's/^reason=//p' | head -n1)"
+          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
+          echo "reason=${reason}" >> "$GITHUB_OUTPUT"
+          echo "source_run_id=${source_run_id}" >> "$GITHUB_OUTPUT"
+          echo "CI change scope: ${mode} — ${reason}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve application version
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force 2>/dev/null || true
+          version="$(node scripts/resolve-app-version.mjs --ref "$GITHUB_REF_NAME")"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "Application version for this run: ${version}"
+
   lint:
     name: PHP Code Formatting
     runs-on: ubuntu-latest
@@ -131,6 +232,8 @@ jobs:
     # ~minute 7) and PHPUnit is single-process anyway, so more cores would not
     # shorten the run. Revisit if this job ever becomes the longest one.
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.mode == 'heavy'
 
     env:
       DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -289,14 +392,12 @@ jobs:
 
   frontend-build:
     name: Frontend Build
-    # Head of the critical path (frontend-build → docker-build → e2e), so it
-    # starts at t=0 with no `needs`: it dumps the OpenAPI spec itself (PHP
-    # setup costs ~35s from caches) instead of waiting for a separate job —
-    # a mid-run job hop costs runner-provisioning latency. The spec is
-    # uploaded as the `openapi-spec` artifact for frontend-checks and
-    # mobile-release-artifacts.yml. nelmio:apidoc:dump compiles the container
-    # but never touches the DB (Doctrine connects lazily), so no MariaDB
-    # service is needed here.
+    # Head of the critical path (frontend-build → docker-build → e2e). It waits
+    # only for change-scope (~15s) so pin-only and promote runs can skip it.
+    # The spec is uploaded as the `openapi-spec` artifact for frontend-checks
+    # and mobile-release-artifacts.yml. nelmio:apidoc:dump compiles the
+    # container but never touches the DB (Doctrine connects lazily), so no
+    # MariaDB service is needed here.
     #
     # Free runner, and it must stay one. This was the last job on the paid
     # 16-core pool until the move was measured against it, job for job:
@@ -314,6 +415,8 @@ jobs:
     # move this back to `ubuntu-latest-m` without re-measuring those three
     # numbers first.
     runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.mode == 'heavy'
 
     steps:
       - name: Checkout
@@ -559,16 +662,16 @@ jobs:
   docker-build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [frontend-build]
+    needs: [change-scope, frontend-build]
+    if: needs.change-scope.outputs.mode == 'heavy'
     outputs:
       image-tags: ${{ steps.meta.outputs.tags }}
       image-labels: ${{ steps.meta.outputs.labels }}
-      # The version baked into the image this job builds and every downstream
-      # job publishes. Resolved once, here, so the amd64 image, the arm64
-      # image and the version advertised to deployments can never disagree —
-      # independent resolutions would drift the moment a tag lands between
-      # them.
-      app-version: ${{ steps.app-version.outputs.version }}
+      # Resolved once by change-scope so the amd64 image, the overlapping
+      # arm64 build and the version advertised to deployments can never
+      # disagree — independent resolutions would drift the moment a tag
+      # lands between them.
+      app-version: ${{ needs.change-scope.outputs.app-version }}
 
     steps:
       - name: Checkout
@@ -604,20 +707,6 @@ jobs:
             # For PRs, tag with PR number
             type=ref,event=pr
 
-      # metadata-action's version follows the first image tag. On main that is
-      # `latest`, which must never become APP_VERSION — the sidebar would show
-      # that word to every user. Resolve a SemVer (or `dev`) instead.
-      - name: Resolve application version
-        id: app-version
-        env:
-          META_VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          set -euo pipefail
-          git fetch --tags --force 2>/dev/null || true
-          version="$(node scripts/resolve-app-version.mjs --meta "$META_VERSION" --ref "$GITHUB_REF_NAME")"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "Application version for this image: ${version} (metadata was ${META_VERSION:-empty})"
-
       - name: Build Docker image
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
@@ -628,7 +717,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            APP_VERSION=${{ steps.app-version.outputs.version }}
+            APP_VERSION=${{ needs.change-scope.outputs.app-version }}
           # Scoped per architecture: the arm64 build in docker-push-arm64 has
           # entirely different layers, and sharing one scope means the two
           # builds evict each other from the 10 GB Actions cache.
@@ -914,7 +1003,7 @@ jobs:
     name: Notify flaky E2E (Discord)
     runs-on: ubuntu-latest
     needs: [e2e]
-    if: always() && needs.e2e.result != 'cancelled'
+    if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
     steps:
       - name: Download Playwright reports
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -1084,10 +1173,30 @@ jobs:
     # the released image the tested one. Nothing is built here, which is why
     # the job needs neither a checkout nor the frontend artifacts.
     #
-    # Runs in parallel with docker-push-arm64; docker-manifest joins the two.
-    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
-    # Only publish green main pushes and release tags.
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    # On a promote tag the tar is already in GHCR as ci-<sha>-amd64 from the
+    # main run; this job only inspects it. `always()` is required so a skipped
+    # docker-build on that path does not skip the inspect.
+    needs: [change-scope, lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      needs.change-scope.result == 'success' &&
+      needs.change-scope.outputs.mode != 'thin' &&
+      (
+        needs.change-scope.outputs.mode == 'promote' ||
+        (
+          needs.lint.result == 'success' &&
+          needs.mobile-tooling.result == 'success' &&
+          needs.backend.result == 'success' &&
+          needs.frontend-build.result == 'success' &&
+          needs.frontend-checks.result == 'success' &&
+          needs.docker-build.result == 'success' &&
+          needs.e2e.result == 'success' &&
+          needs.e2e-visual.result == 'success'
+        )
+      )
     permissions:
       contents: read
       packages: write
@@ -1095,16 +1204,10 @@ jobs:
       # Digest-pinned reference to the temporary tag, consumed by
       # docker-manifest so the release manifest can only ever be built from
       # the image this job actually pushed.
-      ref: ${{ steps.amd64.outputs.ref }}
-      digest: ${{ steps.amd64.outputs.digest }}
+      ref: ${{ steps.amd64.outputs.ref || steps.amd64-promote.outputs.ref }}
+      digest: ${{ steps.amd64.outputs.digest || steps.amd64-promote.outputs.digest }}
 
     steps:
-      - name: Download tested amd64 image artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: docker-image
-          path: /tmp
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
@@ -1115,7 +1218,34 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Reuse the already-tested amd64 image
+        if: needs.change-scope.outputs.mode == 'promote'
+        id: amd64-promote
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          temporary_tag="${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-amd64"
+          digest="$(
+            docker buildx imagetools inspect "$temporary_tag" \
+              --format '{{ .Manifest.Digest }}'
+          )"
+          [ -n "$digest" ] || {
+            echo "::error::${temporary_tag} has no digest"
+            exit 1
+          }
+          echo "ref=${temporary_tag}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Download tested amd64 image artifact
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: docker-image
+          path: /tmp
+
       - name: Push the tested amd64 image
+        if: needs.change-scope.outputs.mode != 'promote'
         id: amd64
         env:
           TESTED_IMAGE_TAGS: ${{ needs.docker-build.outputs.image-tags }}
@@ -1148,37 +1278,30 @@ jobs:
     # These runners are free and unlimited for PUBLIC repositories only. If
     # this repository ever becomes private the label stops resolving and the
     # job queues indefinitely — switch to an arm64 larger runner then.
+    #
+    # Starts next to E2E, not after it: E2E tests the amd64 tar only, so
+    # waiting for it before building arm64 just added the E2E tail to the
+    # publish path. docker-manifest still waits for E2E plus both arches
+    # before moving any release tag.
     runs-on: ubuntu-24.04-arm
-    # The same gates and the same publish condition as the amd64 job: arm64 is
-    # still built only once every check is green, and only for main pushes and
-    # release tags.
-    needs: [lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    needs: [change-scope, frontend-build]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      needs.change-scope.result == 'success' &&
+      (
+        (needs.change-scope.outputs.mode == 'heavy' && needs.frontend-build.result == 'success') ||
+        needs.change-scope.outputs.mode == 'promote'
+      )
     permissions:
       contents: read
       packages: write
     outputs:
-      digest: ${{ steps.arm64.outputs.digest }}
+      digest: ${{ steps.arm64.outputs.digest || steps.arm64-promote.outputs.digest }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      # The Dockerfile COPYs both into the image. They are plain JS/CSS and
-      # therefore architecture independent, so the arm64 image ships exactly
-      # the assets the amd64 image was tested with instead of a second build.
-      - name: Download frontend build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: frontend-dist
-          path: frontend/dist/
-
-      - name: Download widget build artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: widget-dist
-          path: frontend/dist-widget/
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
@@ -1189,9 +1312,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Reuse the already-built arm64 image
+        if: needs.change-scope.outputs.mode == 'promote'
+        id: arm64-promote
+        env:
+          REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          digest="$(
+            docker buildx imagetools inspect "${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-arm64" \
+              --format '{{ .Manifest.Digest }}'
+          )"
+          [ -n "$digest" ] || {
+            echo "::error::${REGISTRY_IMAGE}:ci-${GITHUB_SHA}-arm64 has no digest"
+            exit 1
+          }
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The Dockerfile COPYs both into the image. They are plain JS/CSS and
+      # therefore architecture independent, so the arm64 image ships exactly
+      # the assets the amd64 image was tested with instead of a second build.
+      - name: Download frontend build artifact
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Download widget build artifact
+        if: needs.change-scope.outputs.mode != 'promote'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: widget-dist
+          path: frontend/dist-widget/
+
       # Only the labels are consumed here — the release tags are applied by
       # docker-manifest, which is the one job allowed to move them.
       - name: Extract release metadata
+        if: needs.change-scope.outputs.mode != 'promote'
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
@@ -1207,6 +1369,7 @@ jobs:
             type=semver,pattern={{major}}
 
       - name: Build and push arm64 image
+        if: needs.change-scope.outputs.mode != 'promote'
         id: arm64
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
@@ -1218,10 +1381,10 @@ jobs:
           provenance: false
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:ci-${{ github.sha }}-arm64
           labels: ${{ steps.meta.outputs.labels }}
-          # Resolved once by docker-build, so both architectures report the
+          # Resolved once by change-scope, so both architectures report the
           # same APP_VERSION even if a tag lands mid-run.
           build-args: |
-            APP_VERSION=${{ needs.docker-build.outputs.app-version }}
+            APP_VERSION=${{ needs.change-scope.outputs.app-version }}
           # Separate scope from the amd64 build: the layer sets share nothing,
           # so one scope would just evict the other from the 10 GB cache.
           cache-from: type=gha,scope=arm64
@@ -1234,16 +1397,39 @@ jobs:
     # tags. This is the only job that moves a release tag, and it is also the
     # one that proves the result: the verification below refuses any tag that
     # does not resolve to exactly the two digests published above.
-    needs: [docker-build, docker-push-amd64, docker-push-arm64]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    #
+    # Waits for E2E even though arm64 started next to it: a failed test must
+    # not move latest or a version tag. `always()` lets promote run when
+    # docker-build / e2e were skipped.
+    needs: [change-scope, docker-build, docker-push-amd64, docker-push-arm64, lint, mobile-tooling, backend, frontend-checks, e2e, e2e-visual]
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
+      needs.change-scope.result == 'success' &&
+      needs.docker-push-amd64.result == 'success' &&
+      needs.docker-push-arm64.result == 'success' &&
+      (
+        needs.change-scope.outputs.mode == 'promote' ||
+        (
+          needs.lint.result == 'success' &&
+          needs.mobile-tooling.result == 'success' &&
+          needs.backend.result == 'success' &&
+          needs.frontend-checks.result == 'success' &&
+          needs.docker-build.result == 'success' &&
+          needs.e2e.result == 'success' &&
+          needs.e2e-visual.result == 'success'
+        )
+      )
     permissions:
       contents: read
       packages: write
     outputs:
-      # The version release-manifest advertises. Resolved by docker-build and
+      # The version release-manifest advertises. Resolved by change-scope and
       # baked into both images, so the manifest can only ever name the version
       # that was actually published — never the mutable `latest` tag.
-      version: ${{ needs.docker-build.outputs.app-version }}
+      version: ${{ needs.docker-build.outputs.app-version || needs.change-scope.outputs.app-version }}
       # Multi-arch manifest digest of the tags that were just published and
       # verified. The Umbrel package pins tag@digest; the release-version-pin
       # job writes this value into deploy/umbrel/ so a new store submission
@@ -1389,8 +1575,15 @@ jobs:
     # point where advertising the version is honest.
     needs: [docker-manifest]
     # Release tags only. A main push publishes `latest`, which is not a release,
-    # and a pull request publishes nothing at all.
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    # and a pull request publishes nothing at all. `always()` lets this job
+    # run after a promote, where docker-manifest itself used `always()` to
+    # survive skipped test jobs.
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.docker-manifest.result == 'success'
     permissions:
       # The only write privilege in this workflow, and only for the push below.
       contents: write
@@ -1492,7 +1685,12 @@ jobs:
     # which is what docker-manifest guarantees. Umbrel also needs the digest of
     # that image.
     needs: [docker-manifest]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      always() &&
+      !cancelled() &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.docker-manifest.result == 'success'
     permissions:
       contents: write
       pull-requests: write
@@ -1756,7 +1954,8 @@ jobs:
   cloudflare-check:
     name: Cloudflare Worker Check
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    needs: [change-scope]
+    if: github.event_name == 'pull_request' && needs.change-scope.outputs.mode == 'heavy'
 
     steps:
       - name: Checkout
@@ -1777,36 +1976,123 @@ jobs:
         working-directory: cloudflare
         run: npx wrangler deploy --env production --dry-run --outdir dist
 
+  openapi-promote:
+    name: Carry OpenAPI Spec Forward
+    runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.mode == 'promote'
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      # mobile-release-artifacts.yml downloads openapi-spec from a successful
+      # CI run for this SHA. A promote run is newer than the main run and
+      # would otherwise be picked first while carrying no artifact.
+      - name: Download the main-run OpenAPI spec
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: openapi-spec
+          run-id: ${{ needs.change-scope.outputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/openapi
+
+      - name: Re-upload for this run
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: openapi-spec
+          path: /tmp/openapi/openapi-spec.json
+          retention-days: 1
+
   # Gate job that depends on all checks - only this needs to be required in branch protection
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
-        if: |
-          !cancelled() && (
-            needs.lint.result != 'success' ||
-            needs.deployment-templates.result != 'success' ||
-            needs.mobile-tooling.result != 'success' ||
-            needs.backend.result != 'success' ||
-            needs.frontend-build.result != 'success' ||
-            needs.frontend-checks.result != 'success' ||
-            needs.docker-build.result != 'success' ||
-            needs.e2e.result != 'success' ||
-            needs.e2e-visual.result != 'success' ||
-            (needs.docker-push-amd64.result != 'success' && needs.docker-push-amd64.result != 'skipped') ||
-            (needs.docker-push-arm64.result != 'success' && needs.docker-push-arm64.result != 'skipped') ||
-            (needs.docker-manifest.result != 'success' && needs.docker-manifest.result != 'skipped') ||
-            (needs.release-manifest.result != 'success' && needs.release-manifest.result != 'skipped') ||
-            (needs.release-version-pin.result != 'success' && needs.release-version-pin.result != 'skipped') ||
-            (needs.cloudflare-deploy.result != 'success' && needs.cloudflare-deploy.result != 'skipped') ||
-            (needs.cloudflare-check.result != 'success' && needs.cloudflare-check.result != 'skipped')
-          )
+        if: ${{ !cancelled() }}
+        env:
+          MODE: ${{ needs.change-scope.outputs.mode }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          CHANGE_SCOPE: ${{ needs.change-scope.result }}
+          LINT: ${{ needs.lint.result }}
+          TEMPLATES: ${{ needs.deployment-templates.result }}
+          MOBILE: ${{ needs.mobile-tooling.result }}
+          BACKEND: ${{ needs.backend.result }}
+          FRONTEND_BUILD: ${{ needs.frontend-build.result }}
+          FRONTEND_CHECKS: ${{ needs.frontend-checks.result }}
+          DOCKER_BUILD: ${{ needs.docker-build.result }}
+          E2E: ${{ needs.e2e.result }}
+          E2E_VISUAL: ${{ needs.e2e-visual.result }}
+          PUSH_AMD64: ${{ needs.docker-push-amd64.result }}
+          PUSH_ARM64: ${{ needs.docker-push-arm64.result }}
+          MANIFEST: ${{ needs.docker-manifest.result }}
+          REL_MANIFEST: ${{ needs.release-manifest.result }}
+          REL_PIN: ${{ needs.release-version-pin.result }}
+          CF_DEPLOY: ${{ needs.cloudflare-deploy.result }}
+          CF_CHECK: ${{ needs.cloudflare-check.result }}
+          OPENAPI: ${{ needs.openapi-promote.result }}
         run: |
-          echo "One or more checks failed, were cancelled, or were skipped"
-          exit 1
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+          require() { [ "$2" = success ] || fail "$1 was $2, expected success"; }
+          allow_skip() { [ "$2" = success ] || [ "$2" = skipped ] || fail "$1 was $2, expected success or skipped"; }
+
+          require "Classify Change Scope" "$CHANGE_SCOPE"
+          require "PHP Code Formatting" "$LINT"
+          require "Deployment Templates (AWS)" "$TEMPLATES"
+          require "Mobile Release Tooling" "$MOBILE"
+
+          allow_skip "Backend (PHP/Symfony)" "$BACKEND"
+          allow_skip "Frontend Build" "$FRONTEND_BUILD"
+          allow_skip "Frontend (Vue/TypeScript)" "$FRONTEND_CHECKS"
+          allow_skip "Build Docker Image" "$DOCKER_BUILD"
+          allow_skip "E2E Tests" "$E2E"
+          allow_skip "E2E Visual Snapshots" "$E2E_VISUAL"
+          allow_skip "Publish amd64 Image" "$PUSH_AMD64"
+          allow_skip "Publish arm64 Image" "$PUSH_ARM64"
+          allow_skip "Publish Multi-Arch Manifest" "$MANIFEST"
+          allow_skip "Publish Release Manifest" "$REL_MANIFEST"
+          allow_skip "Update the Default Release Version" "$REL_PIN"
+          allow_skip "Deploy Cloudflare Worker" "$CF_DEPLOY"
+          allow_skip "Cloudflare Worker Check" "$CF_CHECK"
+          allow_skip "Carry OpenAPI Spec Forward" "$OPENAPI"
+
+          case "$MODE" in
+            heavy)
+              require "Backend (PHP/Symfony)" "$BACKEND"
+              require "Frontend Build" "$FRONTEND_BUILD"
+              require "Frontend (Vue/TypeScript)" "$FRONTEND_CHECKS"
+              require "Build Docker Image" "$DOCKER_BUILD"
+              require "E2E Tests" "$E2E"
+              require "E2E Visual Snapshots" "$E2E_VISUAL"
+              if [ "$EVENT" = push ] && { [ "$REF" = refs/heads/main ] || [[ "$REF" == refs/tags/* ]]; }; then
+                require "Publish amd64 Image" "$PUSH_AMD64"
+                require "Publish arm64 Image" "$PUSH_ARM64"
+                require "Publish Multi-Arch Manifest" "$MANIFEST"
+                require "Deploy Cloudflare Worker" "$CF_DEPLOY"
+              fi
+              if [ "$EVENT" = pull_request ]; then
+                require "Cloudflare Worker Check" "$CF_CHECK"
+              fi
+              ;;
+            thin)
+              ;;
+            promote)
+              require "Publish amd64 Image" "$PUSH_AMD64"
+              require "Publish arm64 Image" "$PUSH_ARM64"
+              require "Publish Multi-Arch Manifest" "$MANIFEST"
+              require "Publish Release Manifest" "$REL_MANIFEST"
+              require "Update the Default Release Version" "$REL_PIN"
+              require "Carry OpenAPI Spec Forward" "$OPENAPI"
+              ;;
+            *)
+              fail "unknown CI change scope '${MODE}'"
+              ;;
+          esac
 
       - name: All checks passed
+        if: ${{ !cancelled() }}
         run: echo "All checks passed!"
