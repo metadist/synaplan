@@ -315,6 +315,16 @@ class ModelCatalog
             'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
             'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
         ],
+
+        // --- 2026-09-08 (TrustedTokens dropped the unversioned V4 Flash alias) ---
+        // Confirmed gone from https://trustedtokens.eu/api/billing/models.
+        // The dated Flash snapshot (0731) and V4 Pro remain in that catalog.
+        335 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
+            'retiredOn' => '2026-09-08',
+            'successor' => 'trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat',
+            'reason' => 'TrustedTokens no longer serves DeepSeek-V4-Flash; the dated Flash 0731 snapshot remains.',
+        ],
     ];
 
     /**
@@ -3731,8 +3741,11 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens no longer serves this unversioned alias
+            // (absent from https://trustedtokens.eu/api/billing/models on
+            // 2026-09-08). See ModelCatalog::RETIREMENTS[335].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',
