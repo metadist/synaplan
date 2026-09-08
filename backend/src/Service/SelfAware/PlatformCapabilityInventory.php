@@ -6,6 +6,7 @@ namespace App\Service\SelfAware;
 
 use App\AI\Credential\ChatReadinessService;
 use App\Entity\User;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ConnectionRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -19,7 +20,6 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Plugin\PluginManager;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\SavedTask\SavedTaskConfig;
-use App\Service\Search\BraveSearchService;
 use App\Service\Update\UpdateStatusService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -92,7 +92,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         private ChatReadinessService $chatReadiness,
         private ModelConfigService $modelConfig,
         private VectorStorageFacade $vectorStorage,
-        private BraveSearchService $braveSearch,
+        private WebSearchGateway $webSearch,
         private MultitaskRoutingConfig $routingConfig,
         private MailerConfig $mailerConfig,
         private SavedTaskConfig $savedTaskConfig,
@@ -194,7 +194,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'System Config → AI Models → SOUND2TEXT',
             'using-synaplan',
         );
-        $webSearchOn = $this->braveSearch->isEnabled();
+        $webSearchOn = $this->webSearch->isEnabled();
         $facts[] = $this->fact(
             'web_search',
             'Web search',

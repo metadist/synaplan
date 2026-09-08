@@ -149,6 +149,6 @@ owner's name. **Can view** alone never adds chunks to a search.
 - **Embedding Model**: bge-m3 (1024 dimensions)
 - **Vector Storage**: MariaDB 11.8 native VECTOR type
 - **Similarity**: VEC_DISTANCE_COSINE function
-- **Text Extraction**: Apache Tika
+- **Text Extraction**: Apache Tika (and future chain adapters via `PLUGS`; see [CONFIGURATION.md](CONFIGURATION.md#ai-plugs-plugs))
 - **OCR**: Tesseract (via Tika)
 - **Audio**: Whisper.cpp with FFmpeg

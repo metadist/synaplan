@@ -1,0 +1,22 @@
+{
+    "files": [
+        {
+            "file": "files/sample.md",
+            "mime": "text/markdown",
+            "strategy": "native_text",
+            "sha256": "c77328224f4ad91d5a976dc92fe7bfdc75b23ea1aafeb3e1680e6eb877828a80"
+        },
+        {
+            "file": "files/sample.csv",
+            "mime": "text/csv",
+            "strategy": "native_text",
+            "sha256": "1748693a7037a1d07a34b43cf8949fe7d8d08c930c6279a3b6bd9089c55400af"
+        },
+        {
+            "file": "files/sample.html",
+            "mime": "text/html",
+            "strategy": "native_text",
+            "sha256": "e903f853ddfdfd9d24d7e532518b94a18e3ded52a47b63d209bebec9bc8fbccb"
+        }
+    ]
+}

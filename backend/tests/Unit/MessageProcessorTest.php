@@ -23,6 +23,7 @@ use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
 use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -64,7 +65,7 @@ class MessageProcessorTest extends TestCase
             $this->router,
             $this->modelConfigService,
             $this->promptService,
-            $this->braveSearchService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
             $this->searchQueryGenerator,
             $this->createMock(AttachmentSearchContextResolver::class),
             $this->createMock(UrlContentService::class),

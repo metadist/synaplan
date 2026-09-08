@@ -11,6 +11,7 @@ use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
@@ -30,7 +31,6 @@ use App\Service\MarketingNews\MarketingNewsConfig;
 use App\Service\ModelConfigService;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
-use App\Service\Search\BraveSearchService;
 use App\Service\Setup\SetupStateService;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
@@ -69,7 +69,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(BraveSearchService::class),
+            $this->createStub(WebSearchGateway::class),
             $this->createStub(WhisperService::class),
             $this->createStub(PluginManager::class),
             $this->createStub(BillingService::class),

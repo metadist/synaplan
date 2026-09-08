@@ -662,6 +662,20 @@ Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
 (`--flag-off` proves the 404 contract). Endpoint reference:
 [Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
 
+### AI plugs (S1)
+
+Extraction, web search and rerank now go through `App\Plug\` registries.
+Nothing user-visible changes: FileProcessor still runs today's built-in
+strategies (native → Tika → vision → STT), and web search still uses Brave
+when `BRAVE_SEARCH_API_KEY` is set. The `PLUGS` BCONFIG group is seeded with
+those defaults. `WEB_SEARCH.PROVIDER` may be overridden per user; everything
+else is instance-wide. Rerank stays off (`RERANK.ENABLED=0`).
+
+A later adapter (Docling, SearXNG, …) is added as a tagged class. Keys that
+FileProcessor does not already implement run first and fall through if they
+fail, so a down sidecar never blocks an upload. Settings table:
+[CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
+
 ---
 
 ## Troubleshooting

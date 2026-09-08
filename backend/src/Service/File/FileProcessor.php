@@ -4,6 +4,9 @@ namespace App\Service\File;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Plug\Extraction\ExtractionRegistry;
+use App\Plug\Extraction\ExtractionRequest;
+use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
 use App\Service\WhisperService;
@@ -123,6 +126,8 @@ final readonly class FileProcessor
         private string $ffmpegBinary = '/usr/bin/ffmpeg',
         private ?OfficeConverterClient $officeConverter = null,
         private ?StructuredTextExtractor $structuredTextExtractor = null,
+        private ?ExtractionRegistry $extractionRegistry = null,
+        private ?PlugConfigService $plugConfig = null,
     ) {
     }
 
@@ -156,6 +161,11 @@ final readonly class FileProcessor
 
         $this->logger->info('FileProcessor: Starting extraction', $meta);
 
+        $extra = $this->tryExtraExtractors($absolutePath, $relativePath, $mime, $ext, $userId, $describe);
+        if (null !== $extra) {
+            return $extra;
+        }
+
         $convertedTmp = $this->convertLegacyOffice($absolutePath, $ext);
         if (null !== $convertedTmp) {
             $absolutePath = $convertedTmp;
@@ -178,6 +188,91 @@ final readonly class FileProcessor
                 @unlink($convertedTmp);
             }
         }
+    }
+
+    /**
+     * Run extraction adapters whose keys are not FileProcessor built-ins.
+     * Empty in S1 (seeded chains only list built-in keys). S2 Docling lands here.
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function tryExtraExtractors(
+        string $absolutePath,
+        string $relativePath,
+        string $mime,
+        string $ext,
+        ?int $userId,
+        bool $describe,
+    ): ?array {
+        if (null === $this->extractionRegistry || null === $this->plugConfig) {
+            return null;
+        }
+
+        $family = $this->detectFamily($mime, $ext);
+        $hasCloudStt = 'audio' === $family && $this->aiFacade->hasConfiguredSttProvider($userId);
+
+        foreach ($this->plugConfig->extraExtractorKeys($family, $hasCloudStt) as $key) {
+            $adapter = $this->extractionRegistry->byKey($key);
+            if (null === $adapter) {
+                $this->logger->info('FileProcessor: skipping unknown extra extractor', [
+                    'key' => $key,
+                    'family' => $family,
+                ]);
+                continue;
+            }
+
+            $request = new ExtractionRequest(
+                $absolutePath,
+                $relativePath,
+                $mime,
+                $ext,
+                $userId,
+                $describe,
+                $family,
+            );
+            if (!$adapter->supports($request)) {
+                continue;
+            }
+
+            try {
+                $result = $adapter->extract($request);
+            } catch (\Throwable $e) {
+                $this->logger->warning('FileProcessor: extra extractor failed, falling through', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+
+            if ($result->hasText()) {
+                $this->logger->info('FileProcessor: extra extractor succeeded', [
+                    'key' => $key,
+                    'strategy' => $result->strategy,
+                ]);
+
+                return $result->toLegacyPair();
+            }
+        }
+
+        return null;
+    }
+
+    private function detectFamily(string $mime, string $ext): string
+    {
+        if ($this->isPlainTextMime($mime)) {
+            return 'text';
+        }
+        if ($this->isImageMime($mime)) {
+            return 'image';
+        }
+        if ($this->isVideo($ext)) {
+            return 'video';
+        }
+        if ($this->isTranscribableMedia($ext)) {
+            return 'audio';
+        }
+
+        return 'document';
     }
 
     /**

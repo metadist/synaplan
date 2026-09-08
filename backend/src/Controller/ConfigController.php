@@ -11,6 +11,7 @@ use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
@@ -37,7 +38,6 @@ use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
-use App\Service\Search\BraveSearchService;
 use App\Service\SelfAware\CapabilityInventory;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Setup\SetupStateService;
@@ -64,7 +64,7 @@ class ConfigController extends AbstractController
         private ConfigRepository $configRepository,
         private ModelRepository $modelRepository,
         private ProviderRegistry $providerRegistry,
-        private BraveSearchService $braveSearchService,
+        private WebSearchGateway $webSearch,
         private WhisperService $whisperService,
         private PluginManager $pluginManager,
         private BillingService $billingService,
@@ -2117,7 +2117,7 @@ class ConfigController extends AbstractController
         // ========== AI Features ==========
 
         // Web Search (Brave API)
-        $braveEnabled = $this->braveSearchService->isEnabled();
+        $braveEnabled = $this->webSearch->isEnabled();
         $features['web-search'] = [
             'id' => 'web-search',
             'category' => 'AI Features',
