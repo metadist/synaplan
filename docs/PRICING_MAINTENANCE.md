@@ -146,6 +146,16 @@ Google deprecated all three Imagen 4 IDs on 2026-06-15 and **hard-shut them down
 
 Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. Nano Banana 2 (`gemini-3.1-flash-image-preview`, BID 190) is already the seeded `DEFAULTMODEL.TEXT2PIC`/`PIC2PIC`, so no default binding is orphaned; all three tiers point at it because we do not carry the flat `gemini-3.1-flash-image` / `gemini-3-pro-image` variants Google's migration table names per tier. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
 
+### TrustedTokens DeepSeek V4 Flash shutdown (2026-09-08)
+
+TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed it Gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08; the dated Flash-0731 snapshot and V4 Pro remain in that catalog.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat` (BID 336) |
+
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 335, so nothing is orphaned. Flash-0731 is the same-family successor at the same price; V4 Pro is still live but is a different (and much more expensive) tier.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
@@ -182,7 +192,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | Higgsfield | ⚠️ NOT publicly verifiable — see below | dashboard only |
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
-| **TrustedTokens** | ✅ verified 2026-08-29 | https://trustedtokens.eu/api/billing/models |
+| **TrustedTokens** | ✅ verified 2026-09-08 (V4 Flash retired) | https://trustedtokens.eu/api/billing/models |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
@@ -222,7 +232,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **The realtime Speech-to-Speech API is deliberately not wired up.** It bills per session minute ($0.05/min, plus $0.004 per text input message) over a WebSocket, and this application has no realtime-voice capability to attach it to. Adding it would need a new capability, a new pricing mode, and session-duration metering.
 - **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
-### TrustedTokens (verified 2026-08-29)
+### TrustedTokens (verified 2026-09-08)
 
 German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`). Per-token rates come from the public billing catalog (not the JS-rendered marketing page); subscription plans (€50 / €200 / €2,000) are prepaid usage credits that draw down against these rates. Catalog stores **USD per 1M tokens** (same unit as every other cloud provider). Cache-read rates are authored in `json.cache_read_price_per_1M`.
 
@@ -232,7 +242,7 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | 331 | `zai-org/GLM-5.3` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 1M |
 | 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
 | 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
-| 335 | `deepseek-ai/DeepSeek-V4-Flash` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
+| 335 | `deepseek-ai/DeepSeek-V4-Flash` | retired 2026-09-08 — see [TrustedTokens DeepSeek V4 Flash shutdown](#trustedtokens-deepseek-v4-flash-shutdown-2026-09-08) | — | — |
 | 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
 | 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | $2.25 / $6.75 | $2.25 / $6.75 (cache $0.45) | 200k |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |

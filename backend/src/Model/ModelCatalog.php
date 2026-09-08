@@ -315,6 +315,18 @@ class ModelCatalog
             'successor' => 'google:gemini-3.1-flash-image-preview:text2pic',
             'reason' => 'Shut down by Google on 2026-08-17; migrate to Nano Banana (gemini-3.1-flash-image).',
         ],
+
+        // --- 2026-09-08 (TrustedTokens dropped the undated V4 Flash id) ---
+        // Confirmed gone against https://trustedtokens.eu/api/billing/models
+        // on 2026-09-08. The dated Flash-0731 snapshot (BID 336) is still
+        // served at the same price and is the same-family successor; V4 Pro
+        // is still live but is a different (and much more expensive) tier.
+        335 => [
+            'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
+            'retiredOn' => '2026-09-08',
+            'successor' => 'trustedtokens:deepseek-ai/deepseek-v4-flash-0731:chat',
+            'reason' => 'TrustedTokens no longer serves deepseek-ai/DeepSeek-V4-Flash; migrate to DeepSeek V4 Flash 0731.',
+        ],
     ];
 
     /**
@@ -3504,6 +3516,8 @@ class ModelCatalog
         // Not covered by LiteLLM sync — verify manually against that endpoint.
         // GLM-5.3 / GLM-5.3-Flash / DeepSeek V4 + Chimera added 2026-08-29
         // (BIDs 331–337). Existing 309–312 prices unchanged vs the 07-27 snapshot.
+        // BID 335 (DeepSeek-V4-Flash) dropped by TrustedTokens on 2026-09-08;
+        // see ModelCatalog::RETIREMENTS[335]. Flash-0731 and V4 Pro remain.
         [
             'id' => 309,
             'service' => 'TrustedTokens',
@@ -3731,8 +3745,10 @@ class ModelCatalog
             'service' => 'TrustedTokens',
             'name' => 'DeepSeek V4 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens dropped the undated V4 Flash id on 2026-09-08.
+            // See ModelCatalog::RETIREMENTS[335].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'deepseek-ai/DeepSeek-V4-Flash',
             'priceIn' => 0.15,
             'inUnit' => 'per1M',

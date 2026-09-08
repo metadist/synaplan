@@ -587,7 +587,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * TrustedTokens (TNG, Germany) — chat + vision rows from
-     * https://trustedtokens.eu/api/billing/models (snapshot 2026-08-29).
+     * https://trustedtokens.eu/api/billing/models (snapshot 2026-08-29;
+     * DeepSeek V4 Flash retired 2026-09-08).
      * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
@@ -615,6 +616,12 @@ class ModelCatalogTest extends TestCase
         $this->assertCount(1, $qwenChat);
         $this->assertCount(1, $qwenVision);
         $this->assertCount(1, $gptOss);
+
+        $this->assertSame(335, $v4Flash[0]['id']);
+        $this->assertSame(0, $v4Flash[0]['active']);
+        $this->assertSame(0, $v4Flash[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(335));
+        $this->assertSame(336, ModelCatalog::successorBid(335));
 
         $this->assertSame(331, $glm53[0]['id']);
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
