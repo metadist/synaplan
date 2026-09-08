@@ -587,7 +587,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * TrustedTokens (TNG, Germany) — chat + vision rows from
-     * https://trustedtokens.eu/api/billing/models (snapshot 2026-08-29).
+     * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-08;
+     * prices unchanged from the 2026-08-29 snapshot except BID 335 retired).
      * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
