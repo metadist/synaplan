@@ -2935,7 +2935,8 @@
     "title": "KI-Infrastruktur",
     "tabs": {
       "models": "Modelle & Schlüssel",
-      "extraction": "Extraktion"
+      "extraction": "Extraktion",
+      "webSearch": "Websuche"
     },
     "description": "Verbinde einen KI-Anbieter, damit dein Team chatten kann. Schlüssel werden verschlüsselt auf deinem Server gespeichert und gelten sofort — kein Neustart nötig.",
     "statusReadyTitle": "Deine KI ist bereit",
@@ -3028,6 +3029,42 @@
         "unknown": "unbekannter Adapter",
         "skipped": "übersprungen"
       }
+    },
+    "webSearch": {
+      "lead": "Wählen Sie, wer im Web für den Chat sucht. Die nächste Suche nutzt den neuen Anbieter — ohne Neustart. Die Testabfrage zeigt Titel, damit Sie sehen, dass es funktioniert.",
+      "docs": "Dokumentation",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "capabilities": "Fähigkeiten",
+      "capability": {
+        "freshness": "Aktualität",
+        "country": "Land",
+        "language": "Sprache",
+        "siteFilter": "Seitenfilter",
+        "fullContent": "Volltext",
+        "answer": "Antwort"
+      },
+      "sovereignty": {
+        "selfHosted": "selbst gehostet",
+        "eu": "EU",
+        "usCloud": "US-Cloud"
+      },
+      "apiKey": "API-Schlüssel",
+      "apiKeyPlaceholder": "API-Schlüssel einfügen",
+      "saveKey": "Schlüssel speichern",
+      "keySaved": "Schlüssel gespeichert. Die nächste Suche kann ihn nutzen.",
+      "fallback": "Ersatzanbieter",
+      "fallbackNone": "Kein Ersatz",
+      "allowUsers": "Benutzer dürfen ihren eigenen Anbieter wählen",
+      "save": "Websuche speichern",
+      "saved": "Websuche gespeichert. Die nächste Chat-Suche nutzt die neuen Einstellungen.",
+      "saveFailed": "Die Websuche-Einstellungen konnten nicht gespeichert werden",
+      "loadFailed": "Websuche-Einstellungen konnten nicht geladen werden",
+      "testTitle": "Testabfrage",
+      "testHint": "Führen Sie eine kurze Abfrage aus. Sie sehen bis zu fünf Titel des aktiven Anbieters.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Testabfrage",
+      "testing": "Test läuft…"
     }
   },
   "providerHelp": {
@@ -3065,6 +3102,10 @@
     "xai": {
       "title": "xAI-API-Schlüssel",
       "message": "Erstelle einen API-Schlüssel in der xAI-Konsole und füge ihn hier ein, um Grok-Modelle zu nutzen."
+    },
+    "perplexity": {
+      "title": "Perplexity-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel in deinem Perplexity-Konto und füge ihn hier ein, um Sonar-Modelle zu nutzen. Derselbe Schlüssel gilt für die Websuche, wenn du Perplexity auf dem Tab Websuche wählst."
     },
     "ollama": {
       "title": "Lokale KI mit Ollama",
@@ -3600,6 +3641,13 @@
     "language": {
       "title": "Sprache",
       "description": "Wählen Sie die Sprache der Benutzeroberfläche"
+    },
+    "webSearch": {
+      "title": "Websuche",
+      "description": "Nutzen Sie einen anderen Suchanbieter als den, den Ihre Administration für alle festgelegt hat.",
+      "useMyOwn": "Meine eigene Suche verwenden",
+      "saved": "Ihr Suchanbieter wurde gespeichert.",
+      "saveFailed": "Ihr Suchanbieter konnte nicht gespeichert werden"
     },
     "account": {
       "title": "Konto",

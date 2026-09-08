@@ -24,6 +24,7 @@ final class WebSearchRegistryTest extends TestCase
         $searx = $this->provider('searxng', available: false);
         $gateway = new WebSearchGateway($this->registry([
             [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'brave'],
+            [0, PlugConfigService::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, '1'],
             [42, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'searxng'],
         ], [$brave, $searx]));
 

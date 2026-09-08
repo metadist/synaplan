@@ -28,6 +28,9 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertSame(['pdf'], $service->qualityApplyTo());
         $this->assertSame('brave', $service->webSearchProvider(null));
         $this->assertSame('', $service->webSearchFallback());
+        $this->assertFalse($service->isWebSearchUserOverrideAllowed());
+        $this->assertSame(8000, $service->webSearchTimeoutMs());
+        $this->assertSame(4000, $service->webSearchMaxContentChars());
         $this->assertFalse($service->isRerankEnabled());
         $this->assertSame(4, $service->rerankCandidatesMultiplier());
         $this->assertSame(800, $service->rerankLatencyBudgetMs());
@@ -35,7 +38,7 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertSame([], $service->extraExtractorKeys('text'));
     }
 
-    public function testPerUserWebSearchProviderWinsOverGlobal(): void
+    public function testPerUserWebSearchProviderIsIgnoredWhenOverrideIsOff(): void
     {
         $service = new PlugConfigService($this->repo([
             [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'brave'],
@@ -44,8 +47,31 @@ final class PlugConfigServiceTest extends TestCase
 
         $this->assertSame('brave', $service->webSearchProvider(null));
         $this->assertSame('brave', $service->webSearchProvider(0));
+        $this->assertSame('brave', $service->webSearchProvider(42));
+        $this->assertSame('brave', $service->webSearchProvider(7));
+    }
+
+    public function testPerUserWebSearchProviderWinsOverGlobalWhenAllowed(): void
+    {
+        $service = new PlugConfigService($this->repo([
+            [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'brave'],
+            [0, PlugConfigService::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, '1'],
+            [42, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'searxng'],
+        ]));
+
+        $this->assertSame('brave', $service->webSearchProvider(null));
+        $this->assertSame('brave', $service->webSearchProvider(0));
         $this->assertSame('searxng', $service->webSearchProvider(42));
         $this->assertSame('brave', $service->webSearchProvider(7));
+    }
+
+    public function testUnknownWebSearchProviderFallsBackToBrave(): void
+    {
+        $service = new PlugConfigService($this->repo([
+            [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'not-a-provider'],
+        ]));
+
+        $this->assertSame('brave', $service->webSearchProvider(null));
     }
 
     public function testExtraExtractorKeysAreKeysNotInTheBuiltinList(): void

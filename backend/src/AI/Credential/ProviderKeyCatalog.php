@@ -122,6 +122,18 @@ final class ProviderKeyCatalog
                 'headers' => ['Authorization' => 'Bearer {key}'],
             ],
         ],
+        'perplexity' => [
+            'displayName' => 'Perplexity',
+            'envVar' => 'PERPLEXITY_API_KEY',
+            'consoleUrl' => 'https://www.perplexity.ai/account/api',
+            'freeTier' => false,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://api.perplexity.ai/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
     ];
 
     /**

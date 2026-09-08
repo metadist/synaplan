@@ -137,6 +137,9 @@ final readonly class ProviderDefaultsService
             // bound to instead of being rebound to a dead model on every
             // container start by `app:provider:apply-defaults --auto` (#1514).
         ],
+        'perplexity' => [
+            'CHAT' => 'perplexity:sonar:chat',
+        ],
         // Local Ollama — last resort when a chat-capable model is already present.
         // providerId "gpt-oss:120b" normalises to "gpt-oss-120b" in ModelCatalog keys.
         // gpt-oss:20b, not the 120b sibling: 20b is what

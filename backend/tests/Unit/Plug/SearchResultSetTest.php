@@ -43,4 +43,21 @@ final class SearchResultSetTest extends TestCase
         $this->assertStringContainsString("URL: \n", $text);
         $this->assertStringContainsString('Description: No title or url on this hit', $text);
     }
+
+    public function testFormatForAiOmitsAnswerWhenWantAnswerIsFalse(): void
+    {
+        $set = SearchResultSet::fromResults(
+            'cats',
+            [],
+            ['total' => 0],
+            new \App\Plug\WebSearch\ProviderAnswer('Cats are mammals.'),
+        );
+
+        $without = $set->formatForAi(false);
+        $with = $set->formatForAi(true);
+
+        $this->assertStringNotContainsString('Answer:', $without);
+        $this->assertStringContainsString('Answer:', $with);
+        $this->assertStringContainsString('Cats are mammals.', $with);
+    }
 }

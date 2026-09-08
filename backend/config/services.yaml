@@ -79,6 +79,10 @@ parameters:
     env(TRUSTEDTOKENS_API_KEY): ''
     # xAI (Grok chat/vision, Grok Imagine image/video, Grok voice TTS/STT).
     env(XAI_API_KEY): ''
+    env(PERPLEXITY_API_KEY): ''
+    env(TAVILY_API_KEY): ''
+    env(EXA_API_KEY): ''
+    env(FIRECRAWL_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
     env(GMAIL_USERNAME): ''
@@ -145,6 +149,8 @@ parameters:
     env(DOCLING_BASE_URL): ''
     env(DOCLING_TIMEOUT_MS): '120000'
     env(DOCLING_MAX_BYTES): '52428800'
+    # SearXNG sidecar. Empty = off (OSS / fresh-install default).
+    env(SEARXNG_BASE_URL): ''
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
@@ -321,6 +327,14 @@ services:
                 trustedtokens: '%env(TRUSTEDTOKENS_API_KEY)%'
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
+                perplexity: '%env(PERPLEXITY_API_KEY)%'
+
+    App\Plug\PlugKeyStore:
+        arguments:
+            $envKeys:
+                tavily: '%env(TAVILY_API_KEY)%'
+                exa: '%env(EXA_API_KEY)%'
+                firecrawl: '%env(FIRECRAWL_API_KEY)%'
 
     # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
     App\Service\LocalAi\LocalAiDownloadStatusService:
@@ -400,6 +414,12 @@ services:
             - { name: 'app.ai.video_generation' }
             - { name: 'app.ai.text_to_speech' }
             - { name: 'app.ai.speech_to_text' }
+
+    App\AI\Provider\PerplexityProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+        tags:
+            - { name: 'app.ai.chat' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -1023,6 +1043,10 @@ services:
         arguments:
             $baseUrl: '%env(DOCLING_BASE_URL)%'
             $timeoutMs: '%env(int:DOCLING_TIMEOUT_MS)%'
+
+    App\Plug\WebSearch\Client\SearxngClient:
+        arguments:
+            $baseUrl: '%env(SEARXNG_BASE_URL)%'
 
     App\Plug\Extraction\Adapter\DoclingExtractor:
         arguments:

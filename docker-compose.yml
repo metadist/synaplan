@@ -313,6 +313,7 @@ services:
       # off outside compose. A down sidecar is unavailable, never a failed upload.
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       # Collabora CODE convert-to. Local default is the compose service name.
       # Override with OFFICE_CONVERT_URL for an external CODE, or set
       # OFFICE_CONVERT_URL=disabled to turn the engine off. The sidecar still
@@ -492,6 +493,7 @@ services:
       TIKA_BASE_URL: http://tika:9998
       DOCLING_BASE_URL: ${DOCLING_BASE_URL:-http://docling:5001}
       DOCLING_TIMEOUT_MS: ${DOCLING_TIMEOUT_MS:-120000}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       AI_DEFAULT_PROVIDER: ollama
@@ -844,6 +846,22 @@ services:
       timeout: 10s
       retries: 5
       start_period: 120s
+    networks:
+      - synaplan-network
+
+  # Optional SearXNG meta search — enable with: docker compose --profile searxng up -d
+  # No published host port (JSON API is only on the compose network). No mem_limit
+  # (cgroup limits break some sandboxes). Pin includes the multi-arch digest.
+  searxng:
+    image: searxng/searxng:2026.8.22-9fea41204@sha256:11a9b34cdc0b1ec2b991470a2762ecb5a1a531898289fb51dcd015260450729e
+    container_name: synaplan-searxng
+    profiles: [searxng]
+    restart: unless-stopped
+    volumes:
+      - ./_devextras/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-synaplan-dev-searxng-secret-change-me}
     networks:
       - synaplan-network
 

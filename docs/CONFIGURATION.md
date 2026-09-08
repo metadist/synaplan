@@ -699,8 +699,11 @@ migration to roll out a new default.
 | `EXTRACTION.QUALITY.min_length` | `10` | PDF quality gate (bootstrap from `TIKA_MIN_LENGTH`) |
 | `EXTRACTION.QUALITY.min_entropy` | `3.0` | PDF quality gate (bootstrap from `TIKA_MIN_ENTROPY`) |
 | `EXTRACTION.QUALITY.apply_to` | `pdf` | Families / extensions the quality gate runs on |
-| `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter. Per-user override allowed |
-| `WEB_SEARCH.FALLBACK` | _(empty)_ | Unused until a second provider ships |
+| `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter (`brave`, `searxng`, `tavily`, `exa`, `firecrawl`, `perplexity`) |
+| `WEB_SEARCH.FALLBACK` | _(empty)_ | One-shot fallback when the active provider is down or errors |
+| `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
+| `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |
+| `WEB_SEARCH.MAX_CONTENT_CHARS` | `4000` | Truncate full-page text (`tavily`, `exa`, `firecrawl`) |
 | `RERANK.ENABLED` | `0` | Off. Eval-gated; no adapter in this release |
 | `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` before rerank |
 | `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this |
@@ -720,7 +723,25 @@ configuration → Processing → Docling** (URL, timeout, max bytes, then
 **Test connection**). Markdown from Docling is chunked heading-aware
 (tables stay together; oversized tables repeat the header row).
 
-See [AI plugs](ADMIN.md#ai-plugs-s1).
+Web search providers (admin picker on **Operate → AI infrastructure →
+Web search**):
+
+| Key | Sovereignty | Capabilities | Key / URL |
+| --- | ----------- | ------------ | --------- |
+| `brave` | US cloud | freshness, country, language | `BRAVE_SEARCH_API_KEY` (existing) |
+| `searxng` | self-hosted | freshness, language, site filter | `SEARXNG_BASE_URL` (empty = off) |
+| `tavily` | US cloud | freshness, full content, answer | `TAVILY_API_KEY` or **plug_keys** |
+| `exa` | US cloud | freshness, site filter, full content | `EXA_API_KEY` or **plug_keys** |
+| `firecrawl` | US cloud | full content | `FIRECRAWL_API_KEY` or **plug_keys** |
+| `perplexity` | US cloud | freshness, answer | `PERPLEXITY_API_KEY` (shared with chat) |
+
+`SEARXNG_BASE_URL` empty = off. Compose injects `http://searxng:8080`
+when the backend starts; enable the sidecar with
+`docker compose --profile searxng up -d` (no host port). Cloud keys
+saved in the UI win over the env bootstrap. Health is “URL or key
+present”, not a live probe — **Test query** is the live call.
+
+See [AI plugs](ADMIN.md#ai-plugs-s1-s3).
 
 ---
 

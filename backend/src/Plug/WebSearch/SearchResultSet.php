@@ -22,6 +22,7 @@ final readonly class SearchResultSet
         public array $results,
         public array $meta,
         public array $legacy,
+        public ?ProviderAnswer $answer = null,
     ) {
     }
 
@@ -48,6 +49,49 @@ final readonly class SearchResultSet
     }
 
     /**
+     * @param list<SearchResult>   $results
+     * @param array<string, mixed> $meta
+     */
+    public static function fromResults(string $query, array $results, array $meta = [], ?ProviderAnswer $answer = null): self
+    {
+        $legacyRows = [];
+        foreach ($results as $result) {
+            $legacyRows[] = $result->toLegacyRow();
+        }
+
+        $legacy = [
+            'query' => $query,
+            'results' => $legacyRows,
+            'query_metadata' => $meta,
+        ];
+
+        return new self($query, $legacyRows, $meta, $legacy, $answer);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    public static function empty(string $query, array $meta = []): self
+    {
+        return self::fromResults($query, [], $meta);
+    }
+
+    /**
+     * @param array<string, mixed> $extra
+     */
+    public function withMeta(array $extra): self
+    {
+        $meta = array_merge($this->meta, $extra);
+        $legacy = $this->legacy;
+        $existing = isset($legacy['query_metadata']) && \is_array($legacy['query_metadata'])
+            ? $legacy['query_metadata']
+            : [];
+        $legacy['query_metadata'] = array_merge($existing, $meta);
+
+        return new self($this->query, $this->results, $meta, $legacy, $this->answer);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toLegacyArray(): array
@@ -59,15 +103,22 @@ final readonly class SearchResultSet
      * Byte-identical to BraveSearchService::formatResultsForAI() for a complete
      * Brave payload. Missing provider-neutral keys fall back instead of
      * triggering undefined-index warnings.
+     *
+     * The answer block is printed only when `$wantAnswer` is true (C1).
      */
-    public function formatForAi(): string
+    public function formatForAi(bool $wantAnswer = false): string
     {
         $legacy = $this->legacy;
         $results = isset($legacy['results']) && \is_array($legacy['results'])
             ? $legacy['results']
             : $this->results;
         if ([] === $results) {
-            return 'No search results found for query: '.($legacy['query'] ?? 'unknown');
+            $empty = 'No search results found for query: '.($legacy['query'] ?? 'unknown');
+            if ($wantAnswer && null !== $this->answer && '' !== trim($this->answer->text)) {
+                return "Answer:\n".$this->answer->text."\n\n".$empty;
+            }
+
+            return $empty;
         }
 
         $query = \is_string($legacy['query'] ?? null) ? $legacy['query'] : $this->query;
@@ -103,6 +154,10 @@ final readonly class SearchResultSet
             }
 
             $formatted .= "\n";
+        }
+
+        if ($wantAnswer && null !== $this->answer && '' !== trim($this->answer->text)) {
+            return "Answer:\n".$this->answer->text."\n\n".$formatted;
         }
 
         return $formatted;

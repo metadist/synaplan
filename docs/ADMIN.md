@@ -662,7 +662,7 @@ Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
 (`--flag-off` proves the 404 contract). Endpoint reference:
 [Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
 
-### AI plugs (S1–S2)
+### AI plugs (S1–S3)
 
 Extraction, web search and rerank go through `App\Plug\` registries.
 FileProcessor still runs today's built-in strategies (native → Tika →
@@ -670,17 +670,23 @@ vision → STT). Extra adapters whose keys are not built-in (today:
 `docling`) run first when an admin adds them to a family chain, and fall
 through if they fail, so a down sidecar never blocks an upload.
 
-Web search still uses Brave when `BRAVE_SEARCH_API_KEY` is set.
-`WEB_SEARCH.PROVIDER` may be overridden per user; everything else is
-instance-wide. Rerank stays off (`RERANK.ENABLED=0`).
+Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
+picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
+**Operate → AI infrastructure → Web search**, plus an optional
+fallback. The next chat search uses the new provider with no restart.
+**Test query** shows up to five titles. Per-user override is
+**Settings → Use my own search**, only when
+`WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`. Rerank stays off
+(`RERANK.ENABLED=0`).
 
-The Operate page is now **AI infrastructure** (`/admin/setup`). The
+The Operate page is **AI infrastructure** (`/admin/setup`). The
 **Extraction** tab shows adapter health, lets an admin reorder a family
 chain, and offers **Test with a file**. Tika and Docling have the same
 sidecar controls: a connection test on that tab, and URL / timeout
 (plus Docling max file size) under **System configuration →
-Processing**. Models & keys is the previous provider-key UI. Web
-search and rerank tabs land in later sprints.
+Processing**. Models & keys is the previous provider-key UI and now
+includes Perplexity as an optional chat provider. The **Web search**
+tab is the provider picker. The rerank tab lands in a later sprint.
 
 Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 
