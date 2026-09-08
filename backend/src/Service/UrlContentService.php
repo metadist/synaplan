@@ -141,7 +141,7 @@ final readonly class UrlContentService
             return [];
         }
 
-        return array_values($matches[1]);
+        return $matches[1];
     }
 
     /**

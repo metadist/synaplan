@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Service\Security\SsrfGuard;
 use App\Service\UrlContentService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -131,8 +132,9 @@ HTML;
     }
 
     /**
-     * @dataProvider markdownUrlProvider
+     * @param list<string> $expected
      */
+    #[DataProvider('markdownUrlProvider')]
     public function testExtractUrlsReadsMarkdownAndBareForms(string $message, array $expected): void
     {
         self::assertSame($expected, $this->service([])->extractUrls($message));

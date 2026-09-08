@@ -505,7 +505,7 @@ final readonly class MessageProcessor
             // Step 2.9: Rolling conversation summary (read-only on the hot path).
             [$options, $conversationHistory] = $this->applyRollingSummary(
                 $message,
-                $classification ?? [],
+                $classification,
                 $options,
                 $conversationHistory,
                 $perfTimer,
@@ -835,11 +835,12 @@ final readonly class MessageProcessor
                 $this->maybeShadowPlan($message, $conversationHistory);
             }
 
+            $promptMetadata = [];
             if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
                 $promptMetadata = $classification['prompt_metadata'];
             }
 
-            if (empty($promptMetadata) && !empty($classification['topic'])) {
+            if ([] === $promptMetadata && !empty($classification['topic'])) {
                 $promptData = $this->promptService->getPromptWithMetadata($classification['topic'], $message->getUserId());
                 if ($promptData) {
                     $promptMetadata = $promptData['metadata'] ?? [];
