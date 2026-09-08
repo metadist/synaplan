@@ -76,6 +76,7 @@ jobs:
       (
         github.event.workflow_run.conclusion == 'success' &&
         github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
         startsWith(github.event.workflow_run.head_branch, 'v')
       )
     outputs:
@@ -84,11 +85,9 @@ jobs:
       configured: ${{ steps.credentials.outputs.configured }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-
+      # No checkout: version and architecture come from the event, and the
+      # image wait talks to GHCR. Checking out workflow_run.head_sha here
+      # would be the privileged untrusted-checkout CodeQL flags.
       - name: Resolve version and architectures
         id: version
         env:
@@ -182,10 +181,14 @@ jobs:
         architecture: ${{ fromJSON(needs.resolve.outputs.matrix) }}
 
     steps:
+      # Default-branch checkout (github.sha on workflow_run). The baked
+      # application is the already-published version tag, not this tree;
+      # Packer and firstboot come from the trusted default branch. Do not
+      # pin ref to workflow_run.head_sha — that is untrusted-checkout.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       - name: Assume the build role
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
@@ -334,7 +337,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
 
       - name: Assume the build role
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
