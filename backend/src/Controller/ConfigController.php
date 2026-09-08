@@ -2275,6 +2275,25 @@ class ConfigController extends AbstractController
             'version' => $tikaVersion,
         ];
 
+        // Docling (optional document extraction sidecar)
+        $doclingUrl = trim((string) ($_ENV['DOCLING_BASE_URL'] ?? ''));
+        $doclingConfigured = '' !== $doclingUrl && 'disabled' !== strtolower($doclingUrl);
+        $doclingHealthy = $doclingConfigured && $this->checkServiceHealth(rtrim($doclingUrl, '/').'/health');
+        $features['docling'] = [
+            'id' => 'docling',
+            'category' => 'Processing Services',
+            'name' => 'Docling',
+            'enabled' => $doclingConfigured,
+            'status' => $doclingConfigured ? ($doclingHealthy ? 'healthy' : 'unhealthy') : 'disabled',
+            'message' => $doclingConfigured
+                ? ($doclingHealthy
+                    ? 'Document extraction sidecar is running'
+                    : 'Docling is not responding at DOCLING_BASE_URL')
+                : 'Optional. Set DOCLING_BASE_URL and start the docling Compose profile',
+            'setup_required' => !$doclingConfigured,
+            'url' => $doclingConfigured ? $doclingUrl : '',
+        ];
+
         // Collabora CODE convert-to (optional office engine)
         $officeUrl = $this->officeConvertUrl();
         $officeConfigured = $this->isOfficeConvertConfigured();

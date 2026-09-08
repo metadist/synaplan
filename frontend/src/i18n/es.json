@@ -1210,6 +1210,13 @@
       "addPlaceholder": "Añadir un adaptador…",
       "healthAvailable": "disponible",
       "healthUnavailable": "no disponible",
+      "testSidecar": {
+        "tika": "Probar Tika",
+        "docling": "Probar Docling"
+      },
+      "testingSidecar": "Probando…",
+      "sidecarSettings": "La URL, el tiempo de espera y la prueba de conexión de Tika y Docling están en Configuración del sistema → Procesamiento.",
+      "sidecarSettingsLink": "Abrir ajustes de procesamiento",
       "testTitle": "Probar con un archivo",
       "testHint": "Suba un ejemplo. Verá qué adaptador ganó y por qué los demás no.",
       "testButton": "Probar con un archivo",

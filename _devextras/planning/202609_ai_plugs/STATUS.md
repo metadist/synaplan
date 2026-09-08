@@ -25,6 +25,7 @@ Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-07 | **UX contract.** J-PL-1…3: each admin tab leads with a sentence, health, and Test that shows a human result. A down sidecar never fails an upload. |
 | 2026-09-07 | **S1 implementation.** FileProcessor is **not** rewritten as a full chain runner in S1 — existing `FileProcessor*Test` constructors stay valid. Built-in strategies remain inside FileProcessor. `PlugConfigService::extraExtractorKeys()` is the S2 unlock (empty on the seeded chains). The six Brave callers go through `WebSearchGateway`. `MessagePreProcessor` still talks to `TikaClient` (allow-listed in `PlugBoundaryTest`). No UI, no new env var, no migration. |
 | 2026-09-08 | **S2 implementation.** Docling is a tagged extra extractor; FileProcessor is still not a full chain runner. Quality gate generalizes Tika's PDF `isLowQuality()` and is applied to extras. Markdown chunking is opt-in via `meta.markdown`. Compose profile `docling` uses the CPU image `docling-serve-cpu:v1.32.0` (no `mem_limit` in dev). `DOCLING_BASE_URL` empty = off. |
+| 2026-09-08 | **S2 admin parity.** Docling has the same System configuration → Processing fields and connection test as Tika (`DOCLING_BASE_URL`, timeout, max bytes). Feature status lists Docling like Collabora (disabled when the URL is empty). |
 
 ## Review log
 

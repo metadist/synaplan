@@ -77,7 +77,8 @@ PDFs with tables and two-column layouts extract more cleanly when the
 leave that empty in `.env` to keep Docling off. A down sidecar never fails
 an upload — Tika stays the fallback. Enable Docling in
 **Operate → AI infrastructure → Extraction** (add `docling` to the
-document chain), then:
+document chain). URL, timeout and **Test connection** match Tika under
+**System configuration → Processing → Docling**. Then:
 
 ```bash
 docker compose --profile docling up -d

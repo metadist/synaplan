@@ -18,29 +18,7 @@
     </div>
 
     <template v-else>
-      <div class="flex flex-wrap gap-2 mb-6">
-        <span
-          v-for="adapter in adapters"
-          :key="adapter.key"
-          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs surface-card border border-light-border/30 dark:border-dark-border/20"
-          :data-testid="`extraction-health-${adapter.key}`"
-        >
-          <span
-            class="w-2 h-2 rounded-full"
-            :class="
-              adapter.health.available ? 'bg-[var(--status-success)]' : 'bg-[var(--status-warning)]'
-            "
-          />
-          <span class="txt-primary">{{ adapter.label }}</span>
-          <span class="txt-secondary">
-            {{
-              adapter.health.available
-                ? $t('aiInfra.extraction.healthAvailable')
-                : $t('aiInfra.extraction.healthUnavailable')
-            }}
-          </span>
-        </span>
-      </div>
+      <ExtractionSidecarPanel :adapters="adapters" />
 
       <div v-for="family in families" :key="family" class="surface-card rounded-lg p-4 mb-4">
         <h3 class="text-sm font-semibold txt-primary mb-3">
@@ -157,6 +135,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useNotification } from '@/composables/useNotification'
+import ExtractionSidecarPanel from '@/components/admin/plugs/ExtractionSidecarPanel.vue'
 import {
   getExtractionStatus,
   saveExtractionChains,

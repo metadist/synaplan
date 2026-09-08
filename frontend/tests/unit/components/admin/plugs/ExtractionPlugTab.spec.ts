@@ -17,6 +17,10 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
 }))
 
+vi.mock('@/services/api/adminConfigApi', () => ({
+  testConnection: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+}))
+
 describe('ExtractionPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -52,13 +56,22 @@ describe('ExtractionPlugTab', () => {
   it('shows the lead sentence, health pills and the test button', async () => {
     const wrapper = mount(ExtractionPlugTab, {
       global: {
-        stubs: { Icon: true },
+        stubs: {
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        },
       },
     })
     await flushPromises()
 
     expect(wrapper.text()).toContain('Choose how documents are turned into text')
     expect(wrapper.get('[data-testid="extraction-health-docling"]').text()).toContain('Docling')
+    expect(wrapper.get('[data-testid="extraction-health-docling"]').text()).toContain('down')
+    expect(wrapper.get('[data-testid="extraction-test-docling"]').text()).toContain('Test Docling')
+    expect(wrapper.get('[data-testid="extraction-test-tika"]').text()).toContain('Test Tika')
+    expect(wrapper.get('[data-testid="extraction-sidecar-settings"]').text()).toContain(
+      'Open Processing settings'
+    )
     expect(wrapper.get('[data-testid="extraction-test-button"]').text()).toContain(
       'Test with a file'
     )

@@ -19,7 +19,7 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
 }))
 
-function mountView() {
+async function mountView(path = '/admin/setup') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -28,7 +28,9 @@ function mountView() {
       { path: '/ai/models', component: { template: '<div />' } },
     ],
   })
-  return mount(ProviderSetupView, {
+  await router.push(path)
+  await router.isReady()
+  const wrapper = mount(ProviderSetupView, {
     global: {
       plugins: [router],
       stubs: {
@@ -42,6 +44,7 @@ function mountView() {
       },
     },
   })
+  return { wrapper, router }
 }
 
 describe('ProviderSetupView own-service link', () => {
@@ -50,7 +53,7 @@ describe('ProviderSetupView own-service link', () => {
   })
 
   it('links to the Edit models tab on /ai/models', async () => {
-    const wrapper = mountView()
+    const { wrapper } = await mountView()
     await flushPromises()
 
     const link = wrapper.get('[data-testid="setup-own-service"]')
@@ -59,12 +62,25 @@ describe('ProviderSetupView own-service link', () => {
   })
 
   it('shows Models and Extraction tabs and hides later plug tabs', async () => {
-    const wrapper = mountView()
+    const { wrapper } = await mountView()
     await flushPromises()
 
     expect(wrapper.get('[data-testid="admin-setup-tab-models"]').text()).toContain('Models')
     expect(wrapper.get('[data-testid="admin-setup-tab-extraction"]').text()).toContain('Extraction')
     expect(wrapper.find('[data-testid="admin-setup-tab-web-search"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="admin-setup-tab-rerank"]').exists()).toBe(false)
+  })
+
+  it('keeps other query params when switching tabs', async () => {
+    const { wrapper, router } = await mountView('/admin/setup?connected=1')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="admin-setup-tab-extraction"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ connected: '1', tab: 'extraction' })
+
+    await wrapper.get('[data-testid="admin-setup-tab-models"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ connected: '1' })
   })
 })

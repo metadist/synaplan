@@ -1210,6 +1210,13 @@
       "addPlaceholder": "Bir bağdaştırıcı ekle…",
       "healthAvailable": "kullanılabilir",
       "healthUnavailable": "kullanılamıyor",
+      "testSidecar": {
+        "tika": "Tika’yı dene",
+        "docling": "Docling’i dene"
+      },
+      "testingSidecar": "Deneniyor…",
+      "sidecarSettings": "Tika ve Docling için URL, zaman aşımı ve bağlantı testi Sistem yapılandırması → İşleme altında.",
+      "sidecarSettingsLink": "İşleme ayarlarını aç",
       "testTitle": "Bir dosyayla dene",
       "testHint": "Bir örnek yükleyin. Hangi bağdaştırıcının kazandığını ve diğerlerinin neden kaybettiğini görürsünüz.",
       "testButton": "Bir dosyayla dene",

@@ -54,8 +54,15 @@ const tabs = computed<TabNavItem[]>(() => [
 ])
 
 watch(activeTab, (id) => {
-  if (route.query.tab === id || (id === 'models' && !route.query.tab)) return
-  void router.replace({ query: id === 'models' ? {} : { tab: id } })
+  const tab = route.query.tab
+  if (tab === id || (id === 'models' && (tab === undefined || tab === ''))) return
+  const query = { ...route.query }
+  if (id === 'models') {
+    delete query.tab
+  } else {
+    query.tab = id
+  }
+  void router.replace({ query })
 })
 
 watch(

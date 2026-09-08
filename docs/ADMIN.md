@@ -676,8 +676,11 @@ instance-wide. Rerank stays off (`RERANK.ENABLED=0`).
 
 The Operate page is now **AI infrastructure** (`/admin/setup`). The
 **Extraction** tab shows adapter health, lets an admin reorder a family
-chain, and offers **Test with a file**. Models & keys is the previous
-provider-key UI. Web search and rerank tabs land in later sprints.
+chain, and offers **Test with a file**. Tika and Docling have the same
+sidecar controls: a connection test on that tab, and URL / timeout
+(plus Docling max file size) under **System configuration →
+Processing**. Models & keys is the previous provider-key UI. Web
+search and rerank tabs land in later sprints.
 
 Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 

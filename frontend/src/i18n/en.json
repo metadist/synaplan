@@ -2905,6 +2905,13 @@
       "addPlaceholder": "Add an adapter…",
       "healthAvailable": "available",
       "healthUnavailable": "unavailable",
+      "testSidecar": {
+        "tika": "Test Tika",
+        "docling": "Test Docling"
+      },
+      "testingSidecar": "Testing…",
+      "sidecarSettings": "URL, timeout and a connection test for Tika and Docling live under System configuration → Processing.",
+      "sidecarSettingsLink": "Open Processing settings",
       "testTitle": "Test with a file",
       "testHint": "Upload a sample. You will see which adapter won and why the others did not.",
       "testButton": "Test with a file",

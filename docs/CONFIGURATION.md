@@ -715,8 +715,10 @@ AI infrastructure → Extraction**.
 Compose profile (`docker compose --profile docling up -d`). The CPU
 image needs about 4 GB during OCR; there is no `mem_limit` in dev.
 `DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
-to 50 MB. Markdown from Docling is chunked heading-aware (tables stay
-together; oversized tables repeat the header row).
+to 50 MB. Admins edit those the same way as Tika: **System
+configuration → Processing → Docling** (URL, timeout, max bytes, then
+**Test connection**). Markdown from Docling is chunked heading-aware
+(tables stay together; oversized tables repeat the header row).
 
 See [AI plugs](ADMIN.md#ai-plugs-s1).
 

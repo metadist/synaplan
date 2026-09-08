@@ -208,10 +208,10 @@ final class AdminSystemConfigController extends AbstractController
     )]
     #[OA\Parameter(
         name: 'service',
-        description: 'Service to test (ollama, tika, qdrant, mailer)',
+        description: 'Service to test (ollama, tika, docling, qdrant, mailer)',
         in: 'path',
         required: true,
-        schema: new OA\Schema(type: 'string', enum: ['ollama', 'tika', 'qdrant', 'mailer'])
+        schema: new OA\Schema(type: 'string', enum: ['ollama', 'tika', 'docling', 'qdrant', 'mailer'])
     )]
     #[OA\Response(
         response: 200,

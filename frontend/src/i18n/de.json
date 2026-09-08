@@ -2999,6 +2999,13 @@
       "addPlaceholder": "Adapter hinzufügen…",
       "healthAvailable": "verfügbar",
       "healthUnavailable": "nicht verfügbar",
+      "testSidecar": {
+        "tika": "Tika testen",
+        "docling": "Docling testen"
+      },
+      "testingSidecar": "Test läuft…",
+      "sidecarSettings": "URL, Timeout und der Verbindungstest für Tika und Docling liegen unter Systemkonfiguration → Verarbeitung.",
+      "sidecarSettingsLink": "Verarbeitungseinstellungen öffnen",
       "testTitle": "Mit einer Datei testen",
       "testHint": "Laden Sie eine Beispieldatei hoch. Sie sehen, welcher Adapter gewonnen hat und warum die anderen nicht.",
       "testButton": "Mit einer Datei testen",

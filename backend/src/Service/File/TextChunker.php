@@ -189,7 +189,14 @@ final readonly class TextChunker
         }
         $content = '' !== $prefix ? $prefix."\n\n".$trimmed : $trimmed;
         if (strlen($content) < $this->minChunkSize && [] !== $chunks) {
-            return;
+            $last = count($chunks) - 1;
+            $merged = $chunks[$last]['content']."\n\n".$content;
+            if (strlen($merged) <= $this->maxChunkSize) {
+                $chunks[$last]['content'] = $merged;
+                $chunks[$last]['end_line'] = $endLine;
+
+                return;
+            }
         }
         $chunks[] = [
             'content' => $content,

@@ -58,15 +58,30 @@ MD;
         }
     }
 
+    public function testShortHeadingSectionIsMergedNotDropped(): void
+    {
+        $chunker = new TextChunker(maxChunkSize: 400, overlapSize: 20, minChunkSize: 80);
+        $markdown = <<<'MD'
+# Report
+## Long
+This section has enough text to become its own chunk because it is well above the minimum size.
+## Short
+OK.
+MD;
+        $chunks = $chunker->chunkifyMarkdown($markdown);
+        $all = implode("\n", array_column($chunks, 'content'));
+
+        self::assertNotEmpty($chunks);
+        self::assertStringContainsString('OK.', $all);
+    }
+
     public function testPlainChunkifyPathIsUnchanged(): void
     {
         $chunker = new TextChunker(maxChunkSize: 80, overlapSize: 10, minChunkSize: 20);
         $text = "alpha line one\nbeta line two\ngamma line three\ndelta line four\nepsilon line five";
 
-        self::assertSame(
-            $chunker->chunkify($text),
-            $chunker->chunkify($text),
-        );
+        $plain = $chunker->chunkify($text);
+        self::assertNotEmpty($plain);
         self::assertSame(
             [
                 ['content' => 'alpha line one', 'start_line' => 0, 'end_line' => 0],

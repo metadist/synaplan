@@ -234,7 +234,7 @@ const currentSections = computed(() => {
 // Service test mapping (multiple services per tab are tested sequentially)
 const testableServices: Record<string, string[]> = {
   ai: ['ollama', 'piper'],
-  processing: ['tika'],
+  processing: ['tika', 'docling'],
   vectordb: ['qdrant'],
   email: ['mailer'],
 }

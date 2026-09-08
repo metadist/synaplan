@@ -100,7 +100,7 @@ Extract content from:
 
 | Format | Engine |
 |--------|--------|
-| PDF, Word, Excel, PowerPoint | Apache Tika |
+| PDF, Word, Excel, PowerPoint | Apache Tika (optional Docling for tables and headings) |
 | Images (PNG, JPEG, etc.) | Tesseract OCR |
 | Audio (MP3, WAV, etc.) | Whisper.cpp |
 
