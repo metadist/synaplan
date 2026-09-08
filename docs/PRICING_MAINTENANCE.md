@@ -146,6 +146,16 @@ Google deprecated all three Imagen 4 IDs on 2026-06-15 and **hard-shut them down
 
 Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. Nano Banana 2 (`gemini-3.1-flash-image-preview`, BID 190) is already the seeded `DEFAULTMODEL.TEXT2PIC`/`PIC2PIC`, so no default binding is orphaned; all three tiers point at it because we do not carry the flat `gemini-3.1-flash-image` / `gemini-3-pro-image` variants Google's migration table names per tier. Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) is the authority for the shutdown date.
 
+### TrustedTokens DeepSeek V4 Flash retirement (2026-09-08)
+
+TrustedTokens dropped the unversioned `deepseek-ai/DeepSeek-V4-Flash` alias from https://trustedtokens.eu/api/billing/models. The dated Flash snapshot (`deepseek-ai/DeepSeek-V4-Flash-0731`) and V4 Pro remain. BID 335 is not a `ProviderDefaultsService` recommendation, so no default binding is orphaned.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 335 | DeepSeek V4 Flash | `deepseek-ai/DeepSeek-V4-Flash` | `trustedtokens:deepseek-ai/DeepSeek-V4-Flash-0731:chat` (BID 336) |
+
+Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog row carries `active = selectable = 0`, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install.
+
 ## Maintenance links
 
 **Official provider price pages** (use these first — step 2 of the playbook):
@@ -232,7 +242,7 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | 331 | `zai-org/GLM-5.3` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 1M |
 | 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
 | 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |
-| 335 | `deepseek-ai/DeepSeek-V4-Flash` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
+| 335 | `deepseek-ai/DeepSeek-V4-Flash` | $0.15 / $0.30 | **retired 2026-09-08** — unversioned alias gone; successor BID 336 | 400k |
 | 336 | `deepseek-ai/DeepSeek-V4-Flash-0731` | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 400k |
 | 337 | `deepseek-ai/DeepSeek-V4-Pro-0813` | $2.25 / $6.75 | $2.25 / $6.75 (cache $0.45) | 200k |
 | 310 / 311 | `Qwen/Qwen3.6-35B-A3B-FP8` (chat + vision) | $0.25 / $1.50 | $0.25 / $1.50 (cache $0.05) | 262k |
