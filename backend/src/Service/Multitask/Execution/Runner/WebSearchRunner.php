@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\SearchResultRepository;
 use App\Service\Message\SearchQueryGenerator;
 use App\Service\Multitask\Execution\NodeContext;
@@ -12,16 +13,15 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
-use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
 /**
  * `web_search` runner — reuses the existing {@see SearchQueryGenerator} (to turn
- * the request into an optimized query) + {@see BraveSearchService} (the live web
+ * the request into an optimized query) + {@see WebSearchGateway} (the live web
  * search) instead of adding new search code.
  *
  * The node output is the formatted, source-cited results block
- * ({@see BraveSearchService::formatResultsForAI()}). A downstream `chat`/
+ * ({@see WebSearchGateway::formatResultsForAI()}). A downstream `chat`/
  * `summarize` node typically consumes `$nX.text` to write the final answer; when
  * web_search is the reply node, the user sees the result list directly. The raw
  * structured results also ride in metadata for any later consumer.
@@ -30,7 +30,7 @@ final readonly class WebSearchRunner implements TaskRunner
 {
     public function __construct(
         private SearchQueryGenerator $queryGenerator,
-        private BraveSearchService $braveSearch,
+        private WebSearchGateway $webSearch,
         private LoggerInterface $logger,
         private ?SearchResultRepository $searchResultRepository = null,
     ) {
@@ -53,7 +53,7 @@ final readonly class WebSearchRunner implements TaskRunner
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
     {
-        if (!$this->braveSearch->isEnabled()) {
+        if (!$this->webSearch->isEnabled($context->userId)) {
             return NodeResult::failed('web search is not configured');
         }
 
@@ -79,7 +79,7 @@ final readonly class WebSearchRunner implements TaskRunner
                 'query' => $preFetched['query'] ?? null,
             ]);
 
-            return NodeResult::ok($this->braveSearch->formatResultsForAI($preFetched), [], [
+            return NodeResult::ok($this->webSearch->formatResultsForAI($preFetched), [], [
                 'web_search' => true,
                 'query' => is_string($preFetched['query'] ?? null) ? $preFetched['query'] : '',
                 'search_results' => $preFetched,
@@ -98,10 +98,10 @@ final readonly class WebSearchRunner implements TaskRunner
         $query = $this->queryGenerator->generate($request, $context->userId);
 
         try {
-            $results = $this->braveSearch->search($query, [
+            $results = $this->webSearch->search($query, [
                 'search_lang' => $language,
                 'country' => $language,
-            ]);
+            ], $context->userId);
         } catch (\Throwable $e) {
             $this->logger->warning('WebSearchRunner: search failed', [
                 'error' => $e->getMessage(),
@@ -110,7 +110,7 @@ final readonly class WebSearchRunner implements TaskRunner
             return NodeResult::failed('web_search failed: '.$e->getMessage());
         }
 
-        $text = $this->braveSearch->formatResultsForAI($results);
+        $text = $this->webSearch->formatResultsForAI($results);
 
         // Persist the structured results to the DB so MessageApiFormatter can
         // build the Sources dropdown on reload — mirrors what MessageProcessor

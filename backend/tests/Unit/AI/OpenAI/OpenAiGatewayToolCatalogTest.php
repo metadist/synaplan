@@ -123,7 +123,7 @@ final class OpenAiGatewayToolCatalogTest extends TestCase
         $search = $this->createMock(WebSearchTool::class);
         $search->method('isAvailable')->willReturn($searchAvailable);
         $search->method('declaration')->willReturn((new WebSearchTool(
-            $this->createMock(\App\Service\Search\BraveSearchService::class),
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
             new \Psr\Log\NullLogger(),
         ))->declaration());
         $gw = $this->createMock(MessagesGatewayConfig::class);

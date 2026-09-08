@@ -10,10 +10,10 @@ use App\AI\StructuredOutput\Schema\SourceSummariesSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\DTO\UserMemoryDTO;
 use App\Entity\User;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\PromptRepository;
 use App\Service\Exception\MemoryServiceUnavailableException;
 use App\Service\RAG\VectorSearchService;
-use App\Service\Search\BraveSearchService;
 use Psr\Log\LoggerInterface;
 
 final readonly class FeedbackExampleService
@@ -29,7 +29,7 @@ final readonly class FeedbackExampleService
         private RateLimitService $rateLimitService,
         private UserMemoryService $memoryService,
         private VectorSearchService $vectorSearchService,
-        private BraveSearchService $braveSearchService,
+        private WebSearchGateway $webSearch,
         private PromptRepository $promptRepository,
         private LoggerInterface $logger,
         private FeedbackConfigService $feedbackConfig,
@@ -1061,7 +1061,7 @@ PROMPT;
      */
     public function webResearchSources(User $user, string $claimText): array
     {
-        if (!$this->braveSearchService->isEnabled()) {
+        if (!$this->webSearch->isEnabled($user->getId())) {
             $this->logger->info('FeedbackExampleService: Brave Search not enabled');
 
             return ['sources' => []];
@@ -1072,9 +1072,9 @@ PROMPT;
         ]);
 
         try {
-            $searchResults = $this->braveSearchService->search($claimText, [
+            $searchResults = $this->webSearch->search($claimText, [
                 'count' => self::MAX_WEB_RESULTS,
-            ]);
+            ], $user->getId());
         } catch (\Throwable $e) {
             $this->logger->warning('FeedbackExampleService: Brave Search failed', [
                 'error' => $e->getMessage(),

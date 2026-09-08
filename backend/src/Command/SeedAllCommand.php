@@ -23,6 +23,7 @@ use App\Seed\ModelSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\NativeToolRoutingConfigSeeder;
 use App\Seed\PlatformLinksConfigSeeder;
+use App\Seed\PlugsConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SavedTaskConfigSeeder;
@@ -70,7 +71,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
  *  21. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
  *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — default OFF)
- *  23. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  23. plugs         (BCONFIG: PLUGS extraction/search/rerank defaults, ownerId=0)
+ *  24. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -109,6 +111,7 @@ final class SeedAllCommand extends Command
         private readonly EmbeddingRouterConfigSeeder $embeddingRouterConfigSeeder,
         private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
         private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
+        private readonly PlugsConfigSeeder $plugsConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -143,7 +146,8 @@ final class SeedAllCommand extends Command
             "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
             "  21. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
             "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — default OFF)\n".
-            "  23. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  23. plugs defaults             (BCONFIG, group=PLUGS, ownerId=0 — today's FileProcessor + Brave)\n".
+            "  24. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
@@ -180,6 +184,7 @@ final class SeedAllCommand extends Command
             ['embedding-router', fn (): SeedResult => $this->embeddingRouterConfigSeeder->seed()],
             ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
             ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
+            ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

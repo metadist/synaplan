@@ -222,6 +222,12 @@ services:
             tags: ['app.document_tool']
         App\Service\Iam\ResourceKind\ShareableResourceKindInterface:
             tags: ['app.iam.resource_kind']
+        App\Plug\Extraction\ContentExtractorInterface:
+            tags: ['app.plug.extractor']
+        App\Plug\WebSearch\WebSearchProviderInterface:
+            tags: ['app.plug.web_search']
+        App\Plug\Rerank\RerankProviderInterface:
+            tags: ['app.plug.rerank']
 
     App\:
         resource: '../src/'
@@ -587,6 +593,11 @@ services:
             $braveSearchCount: '%env(int:BRAVE_SEARCH_COUNT)%'
             $braveSearchCountry: '%env(BRAVE_SEARCH_COUNTRY)%'
             $braveSearchLang: '%env(BRAVE_SEARCH_SEARCH_LANG)%'
+
+    # Callers use the gateway; $override is a unit-test seam (never autowired).
+    App\Plug\WebSearch\WebSearchGateway:
+        arguments:
+            $override: null
 
     # Discord Webhook Notification Service
     App\Service\DiscordNotificationService:

@@ -7,7 +7,12 @@ use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Service for interacting with Brave Search API
+ * HTTP client for the Brave Search API.
+ *
+ * @internal Callers use {@see \App\Plug\WebSearch\WebSearchGateway}. This class
+ *           stays the Brave transport; {@see \App\Plug\WebSearch\Adapter\BraveSearchAdapter}
+ *           is the plug.
+ *
  * Documentation: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started.
  */
 final readonly class BraveSearchService

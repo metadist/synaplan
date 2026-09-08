@@ -3,6 +3,7 @@
 namespace App\Service\Message;
 
 use App\Entity\Message;
+use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
@@ -16,7 +17,6 @@ use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
 use App\Service\Runtime\RuntimeProfile;
-use App\Service\Search\BraveSearchService;
 use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
 
@@ -54,7 +54,7 @@ final readonly class MessageProcessor
         private InferenceRouter $router,
         private ModelConfigService $modelConfigService,
         private PromptService $promptService,
-        private BraveSearchService $braveSearchService,
+        private WebSearchGateway $webSearch,
         private SearchQueryGenerator $searchQueryGenerator,
         private AttachmentSearchContextResolver $attachmentContextResolver,
         private UrlContentService $urlContentService,
@@ -380,7 +380,7 @@ final readonly class MessageProcessor
 
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
-            $braveEnabled = $this->braveSearchService->isEnabled();
+            $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
             $this->logger->info('MessageProcessor: Web search decision', [
                 'message_id' => $message->getId(),
                 'should_search' => $shouldSearch,
@@ -453,10 +453,10 @@ final readonly class MessageProcessor
                     // search_lang (ISO 639-1) + country; BraveSearchService also
                     // derives ui_lang (e.g. de → de-DE) for response metadata.
                     $perfTimer->start('search_brave');
-                    $searchResults = $this->braveSearchService->search($searchQuery, [
+                    $searchResults = $this->webSearch->search($searchQuery, [
                         'country' => $country,
                         'search_lang' => $language,
-                    ]);
+                    ], $message->getUserId());
                     $perfTimer->stop('search_brave');
 
                     // Save search results to database
@@ -875,7 +875,7 @@ final readonly class MessageProcessor
             $needsAttachmentContext = $shouldSearch && $message->hasFiles()
                 && WebSearchTopicPolicy::refersToAttachment($messageText);
 
-            $braveEnabled = $this->braveSearchService->isEnabled();
+            $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
             $this->logger->info('MessageProcessor: Web search decision', [
                 'message_id' => $message->getId(),
                 'should_search' => $shouldSearch,
@@ -936,10 +936,10 @@ final readonly class MessageProcessor
                         'message_id' => $message->getId(),
                     ]);
 
-                    $searchResults = $this->braveSearchService->search($searchQuery, [
+                    $searchResults = $this->webSearch->search($searchQuery, [
                         'country' => $country,
                         'search_lang' => $language,
-                    ]);
+                    ], $message->getUserId());
 
                     if ($searchResults && !empty($searchResults['results'])) {
                         // Incognito: see processStream() — results stay in-memory.

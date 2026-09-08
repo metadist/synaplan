@@ -23,6 +23,7 @@ use App\Service\Search\BraveSearchService;
 use App\Service\SelfAware\CapabilityState;
 use App\Service\SelfAware\PlatformCapabilityInventory;
 use App\Service\Update\UpdateStatusService;
+use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\TestCase;
 
 final class PlatformCapabilityInventoryTest extends TestCase
@@ -204,7 +205,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
             $chatReadiness,
             $modelConfig,
             $vectorStorage,
-            $braveSearch,
+            WebSearchGatewayFactory::fromBrave($braveSearch),
             $routing,
             $mailer,
             $savedTasks,
