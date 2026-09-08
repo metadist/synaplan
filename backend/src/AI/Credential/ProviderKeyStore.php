@@ -57,6 +57,7 @@ final class ProviderKeyStore
         'trustedtokens',
         'huggingface',
         'xai',
+        'perplexity',
     ];
 
     private const MEMO_TTL_SECONDS = 15;

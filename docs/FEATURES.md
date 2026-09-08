@@ -9,10 +9,11 @@ Everything Synaplan can do.
 Multi-provider AI conversations:
 
 - **Local**: Ollama (gpt-oss, llama, mistral, etc.)
-- **Cloud**: OpenAI, Anthropic, Groq, Google Gemini
+- **Cloud**: OpenAI, Anthropic, Groq, Google Gemini, Perplexity
 - **Switching**: Change models per conversation
 - **Context**: Maintains conversation history
 - **Streaming**: Token-by-token responses over SSE
+- **Web search**: Admin picks Brave, SearXNG (self-hosted), Tavily, Exa, Firecrawl or Perplexity; optional fallback; users may pick their own provider when allowed. Next chat search uses the new provider with no restart.
 
 ## Multi-Task Routing
 

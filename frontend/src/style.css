@@ -1149,6 +1149,47 @@
     box-shadow: inset 0 0 0 2px rgba(107, 143, 214, 0.35);
   }
 
+  /* Static sovereignty badges (not clickable — do not use .pill) */
+  .sovereignty-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .sovereignty-badge--self-hosted {
+    color: #166534;
+    background: rgba(22, 101, 52, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(22, 101, 52, 0.25);
+  }
+  .dark .sovereignty-badge--self-hosted {
+    color: #86efac;
+    background: rgba(22, 101, 52, 0.25);
+    box-shadow: inset 0 0 0 1px rgba(134, 239, 172, 0.3);
+  }
+  .sovereignty-badge--eu {
+    color: #1e3a8a;
+    background: rgba(30, 58, 138, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(30, 58, 138, 0.25);
+  }
+  .dark .sovereignty-badge--eu {
+    color: #93c5fd;
+    background: rgba(30, 58, 138, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(147, 197, 253, 0.3);
+  }
+  .sovereignty-badge--us-cloud {
+    color: #9a3412;
+    background: rgba(154, 52, 18, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(154, 52, 18, 0.25);
+  }
+  .dark .sovereignty-badge--us-cloud {
+    color: #fdba74;
+    background: rgba(154, 52, 18, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(253, 186, 116, 0.3);
+  }
+
   .pill--loading {
     position: relative;
     pointer-events: none;

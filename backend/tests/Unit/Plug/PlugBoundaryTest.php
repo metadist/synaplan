@@ -47,6 +47,28 @@ final class PlugBoundaryTest extends TestCase
     }
 
     /**
+     * @return list<string>
+     */
+    public static function webSearchClientUseStatements(): array
+    {
+        return [
+            'use App\\Plug\\WebSearch\\Client\\SearxngClient',
+            'use App\\Plug\\WebSearch\\Client\\TavilyClient',
+            'use App\\Plug\\WebSearch\\Client\\ExaClient',
+            'use App\\Plug\\WebSearch\\Client\\FirecrawlClient',
+            'use App\\Plug\\WebSearch\\Client\\PerplexitySearchClient',
+        ];
+    }
+
+    public function testWebSearchClientsAreNotImportedOutsideThePlugBoundary(): void
+    {
+        foreach (self::webSearchClientUseStatements() as $needle) {
+            $violations = $this->scan($needle, ['/Plug/']);
+            $this->assertSame([], $violations, $needle." imports outside the plug boundary:\n".implode("\n", $violations));
+        }
+    }
+
+    /**
      * @param list<string> $allowedPathFragments
      *
      * @return list<string>

@@ -2841,7 +2841,8 @@
     "title": "Infrastructure IA",
     "tabs": {
       "models": "Modèles et clés",
-      "extraction": "Extraction"
+      "extraction": "Extraction",
+      "webSearch": "Recherche web"
     },
     "description": "Connectez un fournisseur IA pour que votre équipe puisse discuter. Les clés sont stockées chiffrées sur votre serveur et prennent effet immédiatement — aucun redémarrage n’est nécessaire.",
     "statusReadyTitle": "Votre IA est prête",
@@ -2934,6 +2935,42 @@
         "unknown": "adaptateur inconnu",
         "skipped": "ignoré"
       }
+    },
+    "webSearch": {
+      "lead": "Choisissez qui interroge le web pour le chat. La prochaine recherche utilise le nouveau fournisseur, sans redémarrage. La requête de test affiche des titres pour confirmer que cela fonctionne.",
+      "docs": "Documentation",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "capabilities": "Capacités",
+      "capability": {
+        "freshness": "Fraîcheur",
+        "country": "Pays",
+        "language": "Langue",
+        "siteFilter": "Filtre de site",
+        "fullContent": "Texte intégral",
+        "answer": "Réponse"
+      },
+      "sovereignty": {
+        "selfHosted": "auto-hébergé",
+        "eu": "UE",
+        "usCloud": "cloud US"
+      },
+      "apiKey": "Clé API",
+      "apiKeyPlaceholder": "Collez une clé API",
+      "saveKey": "Enregistrer la clé",
+      "keySaved": "Clé enregistrée. La prochaine recherche peut l’utiliser.",
+      "fallback": "Fournisseur de secours",
+      "fallbackNone": "Aucun secours",
+      "allowUsers": "Autoriser les utilisateurs à choisir leur fournisseur",
+      "save": "Enregistrer la recherche web",
+      "saved": "Paramètres de recherche web enregistrés. Le prochain chat les utilise.",
+      "saveFailed": "Les paramètres de recherche web n’ont pas pu être enregistrés",
+      "loadFailed": "Impossible de charger les paramètres de recherche web",
+      "testTitle": "Requête de test",
+      "testHint": "Lancez une courte requête. Vous verrez jusqu’à cinq titres du fournisseur actif.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Requête de test",
+      "testing": "Test…"
     }
   },
   "providerHelp": {
@@ -2971,6 +3008,10 @@
     "xai": {
       "title": "Clé API xAI",
       "message": "Créez une clé API dans la console xAI, puis collez-la ici pour utiliser les modèles Grok."
+    },
+    "perplexity": {
+      "title": "Clé API Perplexity",
+      "message": "Créez une clé API dans votre compte Perplexity, puis collez-la ici pour utiliser les modèles Sonar. La même clé sert à la recherche web si vous choisissez Perplexity dans l’onglet Recherche web."
     },
     "ollama": {
       "title": "IA locale avec Ollama",
@@ -4638,6 +4679,13 @@
     "language": {
       "title": "Langue",
       "description": "Choisissez la langue utilisée dans toute l’interface"
+    },
+    "webSearch": {
+      "title": "Recherche web",
+      "description": "Utilisez un autre fournisseur de recherche que celui défini par votre administrateur pour tout le monde.",
+      "useMyOwn": "Utiliser ma propre recherche",
+      "saved": "Votre fournisseur de recherche a été enregistré.",
+      "saveFailed": "Votre fournisseur de recherche n’a pas pu être enregistré"
     },
     "account": {
       "title": "Compte",

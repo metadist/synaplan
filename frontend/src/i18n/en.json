@@ -2841,7 +2841,8 @@
     "title": "AI infrastructure",
     "tabs": {
       "models": "Models & keys",
-      "extraction": "Extraction"
+      "extraction": "Extraction",
+      "webSearch": "Web search"
     },
     "description": "Connect an AI provider so your team can chat. Keys are stored encrypted on your server and take effect immediately — no restart needed.",
     "statusReadyTitle": "Your AI is ready",
@@ -2934,6 +2935,42 @@
         "unknown": "unknown adapter",
         "skipped": "skipped"
       }
+    },
+    "webSearch": {
+      "lead": "Choose who looks up the web for chat. The next search uses the new provider — no restart. Test query shows titles so you can see it working.",
+      "docs": "Documentation",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "capabilities": "Capabilities",
+      "capability": {
+        "freshness": "Freshness",
+        "country": "Country",
+        "language": "Language",
+        "siteFilter": "Site filter",
+        "fullContent": "Full page text",
+        "answer": "Answer"
+      },
+      "sovereignty": {
+        "selfHosted": "self-hosted",
+        "eu": "EU",
+        "usCloud": "US cloud"
+      },
+      "apiKey": "API key",
+      "apiKeyPlaceholder": "Paste an API key",
+      "saveKey": "Save key",
+      "keySaved": "Key saved. The next search can use it.",
+      "fallback": "Fallback provider",
+      "fallbackNone": "No fallback",
+      "allowUsers": "Allow users to choose their provider",
+      "save": "Save web search",
+      "saved": "Web search settings saved. The next chat search uses them.",
+      "saveFailed": "Web search settings could not be saved",
+      "loadFailed": "Could not load web search settings",
+      "testTitle": "Test query",
+      "testHint": "Run a short query. You will see up to five titles from the active provider.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Test query",
+      "testing": "Testing…"
     }
   },
   "providerHelp": {
@@ -2971,6 +3008,10 @@
     "xai": {
       "title": "xAI API key",
       "message": "Create an API key in the xAI console, then paste it here to use Grok models."
+    },
+    "perplexity": {
+      "title": "Perplexity API key",
+      "message": "Create an API key in your Perplexity account, then paste it here to use Sonar models. The same key is used for web search if you pick Perplexity on the Web search tab."
     },
     "ollama": {
       "title": "Local AI with Ollama",
@@ -4638,6 +4679,13 @@
     "language": {
       "title": "Language",
       "description": "Pick the language used across the interface"
+    },
+    "webSearch": {
+      "title": "Web search",
+      "description": "Use a different search provider than the one your administrator set for everyone.",
+      "useMyOwn": "Use my own search",
+      "saved": "Your search provider was saved.",
+      "saveFailed": "Your search provider could not be saved"
     },
     "account": {
       "title": "Account",

@@ -40,12 +40,15 @@ final readonly class WebSearchGateway
      */
     public function search(string $query, array $options = [], ?int $userId = null): array
     {
-        $active = $this->resolve($userId);
-        if (null === $active) {
-            throw new \RuntimeException('Web search is not enabled or configured');
+        if ($this->override instanceof WebSearchProviderInterface) {
+            return $this->override->search(WebSearchQuery::fromLegacy($query, $options))->toLegacyArray();
         }
 
-        return $active->search(WebSearchQuery::fromLegacy($query, $options))->toLegacyArray();
+        if (null !== $this->registry) {
+            return $this->registry->search(WebSearchQuery::fromLegacy($query, $options), $userId)->toLegacyArray();
+        }
+
+        throw new \RuntimeException('Web search is not enabled or configured');
     }
 
     /**

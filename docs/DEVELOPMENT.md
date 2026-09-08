@@ -88,6 +88,23 @@ The CPU image is about 4.4 GB and needs a few GB of RAM during OCR. There
 is no `mem_limit` in this compose file (cgroup limits break some
 sandboxes). GPU variants belong in `synaplan-platform`.
 
+### SearXNG web search (optional)
+
+Chat can use a **self-hosted SearXNG** instead of Brave. It is **off by
+default** (`profiles: [searxng]`). Compose sets
+`SEARXNG_BASE_URL=http://searxng:8080`; leave that empty in `.env` to
+keep SearXNG off. Health is “URL set”, not a live probe — a down
+sidecar fails that provider and the configured fallback (or an empty
+result set) is used. Enable SearXNG in
+**Operate → AI infrastructure → Web search**. Then:
+
+```bash
+docker compose --profile searxng up -d
+```
+
+There is no published host port. JSON search is on in the tracked
+`_devextras/searxng/settings.yml` (upstream defaults it off).
+
 #### Troubleshooting stuck media jobs
 
 The chat bubble for an async video shows `Auftrag läuft noch / Job still running` indefinitely:
@@ -280,6 +297,7 @@ make test    # Run tests
 | Ollama | http://localhost:11435 |
 | Collabora CODE (profile `office`, no published port) | `http://collabora:9980` on the compose network |
 | Docling (profile `docling`, no published port) | `http://docling:5001` on the compose network |
+| SearXNG (profile `searxng`, no published port) | `http://searxng:8080` on the compose network |
 
 ### GPU Support for Local AI Models
 

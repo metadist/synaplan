@@ -1146,7 +1146,8 @@
     "title": "AI altyapısı",
     "tabs": {
       "models": "Modeller ve anahtarlar",
-      "extraction": "Çıkarım"
+      "extraction": "Çıkarım",
+      "webSearch": "Web araması"
     },
     "description": "Ekibinizin sohbet edebilmesi için bir AI sağlayıcısı bağlayın. Anahtarlar sunucunuzda şifrelenmiş olarak saklanır ve anında geçerli olur — yeniden başlatma gerekmez.",
     "statusReadyTitle": "AI'nız hazır",
@@ -1239,6 +1240,42 @@
         "unknown": "bilinmeyen bağdaştırıcı",
         "skipped": "atlandı"
       }
+    },
+    "webSearch": {
+      "lead": "Sohbet için webde kimin arayacağını seçin. Sonraki arama yeni sağlayıcıyı kullanır, yeniden başlatma gerekmez. Test sorgusu başlıkları gösterir, böylece çalıştığını görürsünüz.",
+      "docs": "Belgeler",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "capabilities": "Yetenekler",
+      "capability": {
+        "freshness": "Tazelik",
+        "country": "Ülke",
+        "language": "Dil",
+        "siteFilter": "Site filtresi",
+        "fullContent": "Tam sayfa metni",
+        "answer": "Yanıt"
+      },
+      "sovereignty": {
+        "selfHosted": "kendi barındırmanız",
+        "eu": "AB",
+        "usCloud": "ABD bulutu"
+      },
+      "apiKey": "API anahtarı",
+      "apiKeyPlaceholder": "Bir API anahtarı yapıştırın",
+      "saveKey": "Anahtarı kaydet",
+      "keySaved": "Anahtar kaydedildi. Sonraki arama bunu kullanabilir.",
+      "fallback": "Yedek sağlayıcı",
+      "fallbackNone": "Yedek yok",
+      "allowUsers": "Kullanıcıların kendi sağlayıcılarını seçmesine izin ver",
+      "save": "Web aramasını kaydet",
+      "saved": "Web araması ayarları kaydedildi. Sonraki sohbet araması bunları kullanır.",
+      "saveFailed": "Web araması ayarları kaydedilemedi",
+      "loadFailed": "Web araması ayarları yüklenemedi",
+      "testTitle": "Test sorgusu",
+      "testHint": "Kısa bir sorgu çalıştırın. Etkin sağlayıcıdan en fazla beş başlık görürsünüz.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Test sorgusu",
+      "testing": "Test ediliyor…"
     }
   },
   "providerHelp": {
@@ -1276,6 +1313,10 @@
     "xai": {
       "title": "xAI API anahtarı",
       "message": "xAI konsolunda bir API anahtarı oluşturun ve Grok modellerini kullanmak için buraya yapıştırın."
+    },
+    "perplexity": {
+      "title": "Perplexity API anahtarı",
+      "message": "Perplexity hesabınızda bir API anahtarı oluşturun ve Sonar modellerini kullanmak için buraya yapıştırın. Web araması sekmesinde Perplexity seçerseniz aynı anahtar web araması için de kullanılır."
     },
     "ollama": {
       "title": "Ollama ile yerel AI",
@@ -2359,6 +2400,13 @@
     "language": {
       "title": "Dil",
       "description": "Arayüz dilini seçin"
+    },
+    "webSearch": {
+      "title": "Web araması",
+      "description": "Yöneticinizin herkes için ayarladığı arama sağlayıcısından farklı birini kullanın.",
+      "useMyOwn": "Kendi aramamı kullan",
+      "saved": "Arama sağlayıcınız kaydedildi.",
+      "saveFailed": "Arama sağlayıcınız kaydedilemedi"
     },
     "account": {
       "title": "Hesap",

@@ -30,4 +30,79 @@ final readonly class WebSearchCapabilities
             answer: false,
         );
     }
+
+    public static function searxng(): self
+    {
+        return new self(
+            freshness: true,
+            country: false,
+            language: true,
+            siteFilter: true,
+            fullContent: false,
+            answer: false,
+        );
+    }
+
+    public static function tavily(): self
+    {
+        return new self(
+            freshness: true,
+            country: false,
+            language: false,
+            siteFilter: false,
+            fullContent: true,
+            answer: true,
+        );
+    }
+
+    public static function exa(): self
+    {
+        return new self(
+            freshness: true,
+            country: false,
+            language: false,
+            siteFilter: true,
+            fullContent: true,
+            answer: false,
+        );
+    }
+
+    public static function firecrawl(): self
+    {
+        return new self(
+            freshness: false,
+            country: false,
+            language: false,
+            siteFilter: false,
+            fullContent: true,
+            answer: false,
+        );
+    }
+
+    public static function perplexity(): self
+    {
+        return new self(
+            freshness: true,
+            country: false,
+            language: false,
+            siteFilter: false,
+            fullContent: false,
+            answer: true,
+        );
+    }
+
+    /**
+     * @return array{freshness: bool, country: bool, language: bool, siteFilter: bool, fullContent: bool, answer: bool}
+     */
+    public function toArray(): array
+    {
+        return [
+            'freshness' => $this->freshness,
+            'country' => $this->country,
+            'language' => $this->language,
+            'siteFilter' => $this->siteFilter,
+            'fullContent' => $this->fullContent,
+            'answer' => $this->answer,
+        ];
+    }
 }

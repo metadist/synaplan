@@ -17,6 +17,7 @@
 
       <ModelsAndKeysTab v-if="activeTab === 'models'" />
       <ExtractionPlugTab v-else-if="activeTab === 'extraction'" />
+      <WebSearchPlugTab v-else-if="activeTab === 'web-search'" />
     </div>
   </MainLayout>
 </template>
@@ -30,12 +31,16 @@ import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import ExtractionPlugTab from '@/components/admin/plugs/ExtractionPlugTab.vue'
 import ModelsAndKeysTab from '@/components/admin/plugs/ModelsAndKeysTab.vue'
+import WebSearchPlugTab from '@/components/admin/plugs/WebSearchPlugTab.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
-const tabFromQuery = (): string => (route.query.tab === 'extraction' ? 'extraction' : 'models')
+const tabFromQuery = (): string => {
+  const tab = route.query.tab
+  return tab === 'extraction' || tab === 'web-search' ? tab : 'models'
+}
 const activeTab = ref(tabFromQuery())
 
 const tabs = computed<TabNavItem[]>(() => [
@@ -50,6 +55,12 @@ const tabs = computed<TabNavItem[]>(() => [
     label: t('adminSetup.tabs.extraction'),
     icon: 'mdi:file-document-outline',
     testid: 'admin-setup-tab-extraction',
+  },
+  {
+    id: 'web-search',
+    label: t('adminSetup.tabs.webSearch'),
+    icon: 'mdi:web',
+    testid: 'admin-setup-tab-web-search',
   },
 ])
 

@@ -17,14 +17,15 @@ final readonly class WebSearchQuery
     public function __construct(
         public string $query,
         public array $options = [],
+        public bool $wantAnswer = false,
     ) {
     }
 
     /**
      * @param SearchOptions $options
      */
-    public static function fromLegacy(string $query, array $options = []): self
+    public static function fromLegacy(string $query, array $options = [], bool $wantAnswer = false): self
     {
-        return new self($query, $options);
+        return new self($query, $options, $wantAnswer);
     }
 }

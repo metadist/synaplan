@@ -1146,7 +1146,8 @@
     "title": "Infraestructura de IA",
     "tabs": {
       "models": "Modelos y claves",
-      "extraction": "Extracción"
+      "extraction": "Extracción",
+      "webSearch": "Búsqueda web"
     },
     "description": "Conecta un proveedor de IA para que tu equipo pueda chatear. Las claves se guardan cifradas en tu servidor y se aplican al instante — sin reiniciar.",
     "statusReadyTitle": "Tu IA está lista",
@@ -1239,6 +1240,42 @@
         "unknown": "adaptador desconocido",
         "skipped": "omitido"
       }
+    },
+    "webSearch": {
+      "lead": "Elija quién busca en la web para el chat. La siguiente búsqueda usa el nuevo proveedor, sin reiniciar. La consulta de prueba muestra títulos para que vea que funciona.",
+      "docs": "Documentación",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "no disponible",
+      "capabilities": "Capacidades",
+      "capability": {
+        "freshness": "Actualidad",
+        "country": "País",
+        "language": "Idioma",
+        "siteFilter": "Filtro de sitio",
+        "fullContent": "Texto completo",
+        "answer": "Respuesta"
+      },
+      "sovereignty": {
+        "selfHosted": "autohospedado",
+        "eu": "UE",
+        "usCloud": "nube de EE. UU."
+      },
+      "apiKey": "Clave API",
+      "apiKeyPlaceholder": "Pegue una clave API",
+      "saveKey": "Guardar clave",
+      "keySaved": "Clave guardada. La siguiente búsqueda puede usarla.",
+      "fallback": "Proveedor de reserva",
+      "fallbackNone": "Sin reserva",
+      "allowUsers": "Permitir que los usuarios elijan su proveedor",
+      "save": "Guardar búsqueda web",
+      "saved": "Ajustes de búsqueda web guardados. El siguiente chat los usará.",
+      "saveFailed": "No se pudieron guardar los ajustes de búsqueda web",
+      "loadFailed": "No se pudieron cargar los ajustes de búsqueda web",
+      "testTitle": "Consulta de prueba",
+      "testHint": "Ejecute una consulta breve. Verá hasta cinco títulos del proveedor activo.",
+      "testPlaceholder": "synaplan open source",
+      "testButton": "Consulta de prueba",
+      "testing": "Probando…"
     }
   },
   "providerHelp": {
@@ -1276,6 +1313,10 @@
     "xai": {
       "title": "Clave API de xAI",
       "message": "Crea una clave API en la consola de xAI y pégala aquí para usar los modelos Grok."
+    },
+    "perplexity": {
+      "title": "Clave API de Perplexity",
+      "message": "Crea una clave API en tu cuenta de Perplexity y pégala aquí para usar los modelos Sonar. La misma clave sirve para la búsqueda web si eliges Perplexity en la pestaña Búsqueda web."
     },
     "ollama": {
       "title": "IA local con Ollama",
@@ -2358,6 +2399,13 @@
     "language": {
       "title": "Idioma",
       "description": "Elige el idioma de la interfaz"
+    },
+    "webSearch": {
+      "title": "Búsqueda web",
+      "description": "Usa un proveedor de búsqueda distinto del que su administrador definió para todos.",
+      "useMyOwn": "Usar mi propia búsqueda",
+      "saved": "Se guardó su proveedor de búsqueda.",
+      "saveFailed": "No se pudo guardar su proveedor de búsqueda"
     },
     "account": {
       "title": "Cuenta",

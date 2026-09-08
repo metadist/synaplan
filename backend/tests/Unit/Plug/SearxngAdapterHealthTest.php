@@ -1,0 +1,136 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Unit\Plug;
+
+use App\Plug\PlugConfigService;
+use App\Plug\PlugDescriptor;
+use App\Plug\PlugHealth;
+use App\Plug\WebSearch\Adapter\SearxngAdapter;
+use App\Plug\WebSearch\Client\SearxngClient;
+use App\Plug\WebSearch\SearchResultSet;
+use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchFallbackMetrics;
+use App\Plug\WebSearch\WebSearchProviderInterface;
+use App\Plug\WebSearch\WebSearchQuery;
+use App\Plug\WebSearch\WebSearchRegistry;
+use App\Repository\ConfigRepository;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\MockHttpClient;
+
+final class SearxngAdapterHealthTest extends TestCase
+{
+    public function testEmptyBaseUrlIsUnavailable(): void
+    {
+        $adapter = new SearxngAdapter(new SearxngClient(
+            new MockHttpClient(),
+            new PlugConfigService($this->repo([])),
+            '',
+        ));
+
+        $this->assertFalse($adapter->health()->available);
+        $this->assertStringContainsString('SEARXNG_BASE_URL', (string) $adapter->health()->reason);
+    }
+
+    public function testEmptyUrlFallsBackOrReturnsEmptySet(): void
+    {
+        $searx = new SearxngAdapter(new SearxngClient(
+            new MockHttpClient(),
+            new PlugConfigService($this->repo([])),
+            '',
+        ));
+        $brave = $this->provider('brave', available: true, results: [
+            ['title' => 'Fallback hit', 'url' => 'https://example.test'],
+        ]);
+
+        $withFallback = new WebSearchRegistry(
+            [$searx, $brave],
+            new PlugConfigService($this->repo([
+                [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'searxng'],
+                [0, PlugConfigService::KEY_WEB_SEARCH_FALLBACK, 'brave'],
+            ])),
+            new WebSearchFallbackMetrics(new NullLogger()),
+        );
+        $set = $withFallback->search(new WebSearchQuery('synaplan'));
+        $this->assertSame('Fallback hit', $set->results[0]['title'] ?? null);
+        $this->assertSame('searxng', $set->meta['fellBackFrom'] ?? null);
+
+        $noFallback = new WebSearchRegistry(
+            [$searx],
+            new PlugConfigService($this->repo([
+                [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'searxng'],
+            ])),
+        );
+        $empty = $noFallback->search(new WebSearchQuery('synaplan'));
+        $this->assertSame([], $empty->results);
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: string}> $rows
+     */
+    private function repo(array $rows): ConfigRepository
+    {
+        $map = [];
+        foreach ($rows as [$ownerId, $setting, $value]) {
+            $map[$ownerId][PlugConfigService::CONFIG_GROUP][$setting] = $value;
+        }
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->method('getValue')->willReturnCallback(
+            static function (int $ownerId, string $group, string $setting) use ($map): ?string {
+                return $map[$ownerId][$group][$setting] ?? null;
+            },
+        );
+
+        return $repo;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $results
+     */
+    private function provider(string $key, bool $available, array $results): WebSearchProviderInterface
+    {
+        return new class($key, $available, $results) implements WebSearchProviderInterface {
+            /**
+             * @param list<array<string, mixed>> $results
+             */
+            public function __construct(
+                private string $providerKey,
+                private bool $available,
+                private array $results,
+            ) {
+            }
+
+            public function key(): string
+            {
+                return $this->providerKey;
+            }
+
+            public function descriptor(): PlugDescriptor
+            {
+                return new PlugDescriptor($this->providerKey, $this->providerKey, '', [], 'test');
+            }
+
+            public function capabilities(): WebSearchCapabilities
+            {
+                return WebSearchCapabilities::brave();
+            }
+
+            public function search(WebSearchQuery $query): SearchResultSet
+            {
+                return SearchResultSet::fromLegacyArray([
+                    'query' => $query->query,
+                    'results' => $this->results,
+                ]);
+            }
+
+            public function health(): PlugHealth
+            {
+                return $this->available
+                    ? PlugHealth::available()
+                    : PlugHealth::unavailable($this->providerKey.' unavailable');
+            }
+        };
+    }
+}

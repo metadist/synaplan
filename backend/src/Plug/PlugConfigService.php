@@ -30,6 +30,9 @@ final readonly class PlugConfigService
     public const KEY_QUALITY_APPLY_TO = 'EXTRACTION.QUALITY.apply_to';
     public const KEY_WEB_SEARCH_PROVIDER = 'WEB_SEARCH.PROVIDER';
     public const KEY_WEB_SEARCH_FALLBACK = 'WEB_SEARCH.FALLBACK';
+    public const KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED = 'WEB_SEARCH.USER_OVERRIDE_ALLOWED';
+    public const KEY_WEB_SEARCH_TIMEOUT_MS = 'WEB_SEARCH.TIMEOUT_MS';
+    public const KEY_WEB_SEARCH_MAX_CONTENT_CHARS = 'WEB_SEARCH.MAX_CONTENT_CHARS';
     public const KEY_RERANK_ENABLED = 'RERANK.ENABLED';
     public const KEY_RERANK_CANDIDATES_MULTIPLIER = 'RERANK.CANDIDATES_MULTIPLIER';
     public const KEY_RERANK_LATENCY_BUDGET_MS = 'RERANK.LATENCY_BUDGET_MS';
@@ -47,6 +50,20 @@ final readonly class PlugConfigService
     /** @var list<string> */
     public const FAMILIES = ['text', 'document', 'image', 'audio', 'audio_no_cloud', 'video'];
     public const DEFAULT_WEB_SEARCH_PROVIDER = 'brave';
+    public const DEFAULT_WEB_SEARCH_TIMEOUT_MS = 8000;
+    public const DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS = 4000;
+    public const DEFAULT_WEB_SEARCH_USER_OVERRIDE_ALLOWED = false;
+
+    /** @var list<string> */
+    public const WEB_SEARCH_PROVIDERS = [
+        'brave',
+        'searxng',
+        'tavily',
+        'exa',
+        'firecrawl',
+        'perplexity',
+    ];
+
     public const DEFAULT_RERANK_ENABLED = false;
     public const DEFAULT_RERANK_MULTIPLIER = 4;
     public const DEFAULT_RERANK_LATENCY_MS = 800;
@@ -222,19 +239,111 @@ final readonly class PlugConfigService
 
     public function webSearchProvider(?int $userId): string
     {
-        if (null !== $userId && $userId > 0) {
+        $global = $this->normalizeProviderKey(
+            $this->readGlobal(self::KEY_WEB_SEARCH_PROVIDER, self::DEFAULT_WEB_SEARCH_PROVIDER),
+            self::DEFAULT_WEB_SEARCH_PROVIDER,
+        );
+
+        if (null !== $userId && $userId > 0 && $this->isWebSearchUserOverrideAllowed()) {
             $perUser = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_PROVIDER);
             if (null !== $perUser && '' !== trim($perUser)) {
-                return strtolower(trim($perUser));
+                $normalized = $this->normalizeProviderKey(strtolower(trim($perUser)), '');
+                if ('' !== $normalized) {
+                    return $normalized;
+                }
             }
         }
 
-        return strtolower($this->readGlobal(self::KEY_WEB_SEARCH_PROVIDER, self::DEFAULT_WEB_SEARCH_PROVIDER));
+        return $global;
     }
 
     public function webSearchFallback(): string
     {
-        return strtolower($this->readGlobal(self::KEY_WEB_SEARCH_FALLBACK, ''));
+        return $this->normalizeProviderKey($this->readGlobal(self::KEY_WEB_SEARCH_FALLBACK, ''), '');
+    }
+
+    public function isWebSearchUserOverrideAllowed(): bool
+    {
+        $raw = $this->readGlobal(self::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, '0');
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_WEB_SEARCH_USER_OVERRIDE_ALLOWED;
+    }
+
+    public function webSearchTimeoutMs(): int
+    {
+        return $this->readInt(self::KEY_WEB_SEARCH_TIMEOUT_MS, self::DEFAULT_WEB_SEARCH_TIMEOUT_MS);
+    }
+
+    public function webSearchMaxContentChars(): int
+    {
+        return $this->readInt(self::KEY_WEB_SEARCH_MAX_CONTENT_CHARS, self::DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS);
+    }
+
+    /**
+     * Persist the instance-wide web-search selection. Unknown keys → InvalidArgumentException.
+     */
+    public function setWebSearch(string $active, string $fallback, bool $userOverrideAllowed): void
+    {
+        $activeKey = $this->requireKnownProvider($active);
+        $fallbackKey = '' === trim($fallback) ? '' : $this->requireKnownProvider($fallback);
+
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_PROVIDER, $activeKey);
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_FALLBACK, $fallbackKey);
+        $this->configRepository->setValue(
+            0,
+            self::CONFIG_GROUP,
+            self::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED,
+            $userOverrideAllowed ? '1' : '0',
+        );
+    }
+
+    /**
+     * Per-user override. `null` clears the row. Forbidden unless override is allowed.
+     */
+    public function setUserWebSearchProvider(int $userId, ?string $provider): void
+    {
+        if ($userId <= 0) {
+            throw new \InvalidArgumentException('A positive user id is required');
+        }
+        if (!$this->isWebSearchUserOverrideAllowed()) {
+            throw new \DomainException('User web search override is not allowed');
+        }
+
+        if (null === $provider || '' === trim($provider)) {
+            $this->configRepository->deleteValue($userId, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_PROVIDER);
+
+            return;
+        }
+
+        $this->configRepository->setValue(
+            $userId,
+            self::CONFIG_GROUP,
+            self::KEY_WEB_SEARCH_PROVIDER,
+            $this->requireKnownProvider($provider),
+        );
+    }
+
+    public function requireKnownProvider(string $key): string
+    {
+        $normalized = strtolower(trim($key));
+        if (!\in_array($normalized, self::WEB_SEARCH_PROVIDERS, true)) {
+            throw new \InvalidArgumentException('Unknown web search provider: '.$normalized);
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeProviderKey(string $key, string $fallback): string
+    {
+        $normalized = strtolower(trim($key));
+        if ('' === $normalized) {
+            return $fallback;
+        }
+        if (!\in_array($normalized, self::WEB_SEARCH_PROVIDERS, true)) {
+            return $fallback;
+        }
+
+        return $normalized;
     }
 
     public function isRerankEnabled(): bool

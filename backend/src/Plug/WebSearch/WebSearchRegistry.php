@@ -9,8 +9,8 @@ use App\Plug\PlugDescriptor;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
- * Tagged `app.plug.web_search` adapters. `active()` is the configured
- * provider (Brave today); `fallback()` is empty until S3.
+ * Tagged `app.plug.web_search` adapters. `active()` is the first healthy
+ * configured provider; `search()` tries that key then a one-shot fallback.
  */
 final class WebSearchRegistry
 {
@@ -24,6 +24,7 @@ final class WebSearchRegistry
         #[AutowireIterator('app.plug.web_search')]
         iterable $providers,
         private readonly PlugConfigService $config,
+        private readonly WebSearchFallbackMetrics $fallbackMetrics = new WebSearchFallbackMetrics(new \Psr\Log\NullLogger()),
     ) {
         foreach ($providers as $provider) {
             $this->byKey[$provider->key()] = $provider;
@@ -79,5 +80,62 @@ final class WebSearchRegistry
         }
 
         return null;
+    }
+
+    /**
+     * Run the configured provider, then a different fallback once.
+     * Failures become an empty set — callers never see the exception (C7).
+     */
+    public function search(WebSearchQuery $query, ?int $userId = null): SearchResultSet
+    {
+        $activeKey = $this->config->webSearchProvider($userId);
+        $primary = $this->byKey[$activeKey] ?? null;
+        $primarySet = $this->trySearch($primary, $query, $activeKey);
+        if (null !== $primarySet) {
+            return $primarySet;
+        }
+
+        $fallbackKey = $this->config->webSearchFallback();
+        if ('' === $fallbackKey || $fallbackKey === $activeKey) {
+            return SearchResultSet::empty($query->query, ['provider' => $activeKey]);
+        }
+
+        $fallback = $this->byKey[$fallbackKey] ?? null;
+        $fallbackSet = $this->trySearch($fallback, $query, $fallbackKey);
+        if (null !== $fallbackSet) {
+            $this->fallbackMetrics->increment($activeKey, $fallbackKey);
+
+            return $fallbackSet->withMeta(['fellBackFrom' => $activeKey]);
+        }
+
+        return SearchResultSet::empty($query->query, [
+            'provider' => $activeKey,
+            'fellBackFrom' => $activeKey,
+        ]);
+    }
+
+    public function fallbackMetrics(): WebSearchFallbackMetrics
+    {
+        return $this->fallbackMetrics;
+    }
+
+    private function trySearch(?WebSearchProviderInterface $provider, WebSearchQuery $query, string $key): ?SearchResultSet
+    {
+        if (null === $provider || !$provider->health()->available) {
+            return null;
+        }
+
+        $started = hrtime(true);
+        try {
+            $set = $provider->search($query);
+            $latencyMs = (int) ((hrtime(true) - $started) / 1_000_000);
+
+            return $set->withMeta([
+                'provider' => $key,
+                'latencyMs' => $latencyMs,
+            ]);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

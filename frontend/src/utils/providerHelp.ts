@@ -12,6 +12,7 @@ export type ProviderHelpId =
   | 'trustedtokens'
   | 'huggingface'
   | 'xai'
+  | 'perplexity'
   | 'ollama'
 
 export interface ProviderHelpMeta {
@@ -31,6 +32,7 @@ const BY_PROVIDER: Record<string, ProviderHelpMeta> = {
   trustedtokens: { id: 'trustedtokens', url: 'https://trustedtokens.eu/' },
   huggingface: { id: 'huggingface', url: 'https://huggingface.co/settings/tokens' },
   xai: { id: 'xai', url: 'https://console.x.ai/' },
+  perplexity: { id: 'perplexity', url: 'https://www.perplexity.ai/account/api' },
   ollama: { id: 'ollama', url: 'https://ollama.com/download', isDownload: true },
 }
 
@@ -44,6 +46,7 @@ const BY_ENV_VAR: Record<string, ProviderHelpMeta> = {
   TRUSTEDTOKENS_API_KEY: BY_PROVIDER.trustedtokens,
   HUGGINGFACE_API_KEY: BY_PROVIDER.huggingface,
   XAI_API_KEY: BY_PROVIDER.xai,
+  PERPLEXITY_API_KEY: BY_PROVIDER.perplexity,
   OLLAMA_BASE_URL: BY_PROVIDER.ollama,
 }
 
