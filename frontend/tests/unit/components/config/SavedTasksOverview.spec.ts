@@ -100,6 +100,6 @@ describe('SavedTasksOverview', () => {
     await flushPromises()
     await wrapper.get('[data-testid="emit-deleted"]').trigger('click')
     expect(wrapper.find('[data-testid="emit-deleted"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="saved-tasks-empty"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="saved-tasks-empty"]').exists()).toBe(true)
   })
 })
