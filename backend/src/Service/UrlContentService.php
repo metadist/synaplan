@@ -48,22 +48,130 @@ final readonly class UrlContentService
     }
 
     /**
-     * Extract URLs from a message text.
+     * Extract http(s) URLs from a message or planner input.
+     *
+     * Handles the shapes a Saved Task / prompt editor actually stores:
+     * bare URLs, markdown links `[label](url)`, GFM autolinks `<url>`,
+     * HTML `href="url"`, and emphasis wrappers (`**url**`) from the
+     * prompt markdown toolbar. Decode HTML entities first so a
+     * formatter round-trip cannot hide `https://`.
      *
      * @return string[]
      */
     public function extractUrls(string $message): array
     {
-        preg_match_all(
-            '/https?:\/\/[^\s<>"{}|\\\\^`\[\]]+/i',
-            $message,
-            $matches
-        );
+        $decoded = html_entity_decode($message, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $urls = array_unique($matches[0]);
+        $candidates = [];
+        foreach ($this->extractMarkdownLinkUrls($decoded) as $url) {
+            $candidates[] = $url;
+        }
+        foreach ($this->extractHrefUrls($decoded) as $url) {
+            $candidates[] = $url;
+        }
+        if (preg_match_all('/https?:\/\/[^\s<>"{}|\\\\^`\[\]]+/i', $decoded, $matches)) {
+            foreach ($matches[0] as $url) {
+                $candidates[] = $url;
+            }
+        }
 
-        // Clean trailing punctuation that's likely not part of the URL
-        return array_values(array_map(static fn (string $url): string => rtrim($url, '.,;:!?)'), $urls));
+        $urls = [];
+        foreach ($candidates as $raw) {
+            $normalized = $this->normalizeExtractedUrl($raw);
+            if (null !== $normalized) {
+                $urls[$normalized] = $normalized;
+            }
+        }
+
+        return array_values($urls);
+    }
+
+    /**
+     * Markdown `[label](url)` / `![alt](url)` and GFM `<https://…>` autolinks.
+     * Nested parentheses in the destination (Wikipedia `Foo_(bar)`) are kept.
+     *
+     * @return list<string>
+     */
+    private function extractMarkdownLinkUrls(string $message): array
+    {
+        $urls = [];
+        $length = \strlen($message);
+        $offset = 0;
+        while ($offset < $length) {
+            $pos = stripos($message, '](http', $offset);
+            if (false === $pos) {
+                break;
+            }
+            $start = $pos + 2;
+            $depth = 0;
+            $end = $start;
+            while ($end < $length) {
+                $ch = $message[$end];
+                if ('(' === $ch) {
+                    ++$depth;
+                } elseif (')' === $ch) {
+                    if (0 === $depth) {
+                        break;
+                    }
+                    --$depth;
+                } elseif (ctype_space($ch)) {
+                    break;
+                }
+                ++$end;
+            }
+            $urls[] = substr($message, $start, $end - $start);
+            $offset = $end + 1;
+        }
+
+        if (preg_match_all('/<(https?:\/\/[^>\s]+)>/i', $message, $auto)) {
+            foreach ($auto[1] as $url) {
+                $urls[] = $url;
+            }
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function extractHrefUrls(string $message): array
+    {
+        if (!preg_match_all('/\bhref\s*=\s*["\'](https?:\/\/[^"\']+)["\']/i', $message, $matches)) {
+            return [];
+        }
+
+        return array_values($matches[1]);
+    }
+
+    /**
+     * Strip trailing sentence punctuation and markdown emphasis without
+     * eating a balanced closing `)` that is part of the path.
+     */
+    private function normalizeExtractedUrl(string $url): ?string
+    {
+        $url = trim($url);
+        $url = rtrim($url, '.,;:!?');
+        $url = rtrim($url, '*_~`');
+
+        while (str_ends_with($url, ')')) {
+            $open = substr_count($url, '(');
+            $close = substr_count($url, ')');
+            if ($close <= $open) {
+                break;
+            }
+            $url = substr($url, 0, -1);
+        }
+
+        $parts = parse_url($url);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+        if (!\in_array(strtolower((string) $parts['scheme']), ['http', 'https'], true)) {
+            return null;
+        }
+
+        return $url;
     }
 
     /**

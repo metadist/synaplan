@@ -238,6 +238,24 @@ final class UrlFetchRunnerTest extends TestCase
         self::assertStringContainsString('plain body', (string) $result->text);
     }
 
+    public function testExtractsUrlFromMarkdownLinkInPlannerInput(): void
+    {
+        $html = '<html><head><title>News</title></head><body>markdown fetched body</body></html>';
+        $runner = $this->runner([
+            new MockResponse('', ['http_code' => 404]),
+            new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
+        ]);
+
+        $result = $runner->run(
+            $this->node(['urls' => '[the article](https://example.com/md)']),
+            $this->context('summarize [the article](https://example.com/md)'),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(['https://example.com/md'], $result->metadata['urls']);
+        self::assertStringContainsString('markdown fetched body', (string) $result->text);
+    }
+
     public function testHttpErrorFailsTheNodeInIsolation(): void
     {
         $runner = $this->runner([

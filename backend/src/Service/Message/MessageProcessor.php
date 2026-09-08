@@ -499,21 +499,8 @@ final readonly class MessageProcessor
                 }
             }
 
-            // Step 2.7: URL Content Extraction (if tool_url_screenshot enabled)
-            if ($promptMetadata['tool_url_screenshot'] ?? false) {
-                $urls = $this->urlContentService->extractUrls($message->getText());
-                if (!empty($urls)) {
-                    $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
-
-                    $urlContentResults = $this->urlContentService->fetchMultiple($urls);
-                    $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
-
-                    if ($successCount > 0) {
-                        $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
-                        $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
-                    }
-                }
-            }
+            // Step 2.7: URL Content Extraction (prompt tool or Saved Task rerun)
+            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
 
             // Step 2.9: Rolling conversation summary (read-only on the hot path).
             [$options, $conversationHistory] = $this->applyRollingSummary(
@@ -981,21 +968,8 @@ final readonly class MessageProcessor
                 $classification['search_results'] = $searchResults;
             }
 
-            // Step 2.7: URL Content Extraction (if tool_url_screenshot enabled)
-            if (!empty($promptMetadata['tool_url_screenshot'])) {
-                $urls = $this->urlContentService->extractUrls($message->getText());
-                if (!empty($urls)) {
-                    $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
-
-                    $urlContentResults = $this->urlContentService->fetchMultiple($urls);
-                    $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
-
-                    if ($successCount > 0) {
-                        $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
-                        $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
-                    }
-                }
-            }
+            // Step 2.7: URL Content Extraction (prompt tool or Saved Task rerun)
+            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
 
             // Step 2.9: Rolling conversation summary — the same read-only
             // injection as processStream(), so email / MCP / webhook turns get
@@ -1176,6 +1150,45 @@ final readonly class MessageProcessor
      * so the log line directly explains the decision without a reader
      * having to consult two services.
      */
+    /**
+     * Prefetch named URLs into classification['url_content'] so ChatHandler
+     * (and UrlFetchRunner reuse) can read the page.
+     *
+     * The prompt flag `tool_url_screenshot` is the existing opt-in. Saved Task
+     * reruns also fetch: they pin a user instruction that often wraps the URL
+     * in markdown (`[label](url)`, `**url**`) and skip the sorter, so the
+     * planner can miss `url_fetch` and the page would never be loaded.
+     *
+     * @param array<string, mixed> $promptMetadata
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
+    {
+        $savedTask = 'saved_task' === ($classification['source'] ?? null);
+        if (!$savedTask && empty($promptMetadata['tool_url_screenshot'])) {
+            return $classification;
+        }
+
+        $urls = $this->urlContentService->extractUrls((string) $message->getText());
+        if ([] === $urls) {
+            return $classification;
+        }
+
+        $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
+
+        $urlContentResults = $this->urlContentService->fetchMultiple($urls);
+        $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
+
+        if ($successCount > 0) {
+            $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+            $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
+        }
+
+        return $classification;
+    }
+
     private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
     {
         if (!$shouldSearch) {

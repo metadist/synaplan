@@ -7,6 +7,7 @@ import type { TaskPlanState } from '@/stores/history'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
+import { instructionHasUrl } from '@/utils/scheduleSource'
 import { promptsApi } from '@/services/api/promptsApi'
 import { savedTasksApi } from '@/services/api/savedTasksApi'
 import TaskCard from '@/components/multitask/TaskCard.vue'
@@ -61,7 +62,15 @@ const onSchedule = async () => {
       shortDescription: name.trim(),
       prompt: instruction,
       language: locale.value || 'en',
-      metadata: { tool_files: true, tool_mcp: false },
+      metadata: {
+        tool_files: true,
+        tool_mcp: false,
+        // Prefetch named pages on rerun. The prompt editor's markdown
+        // toolbar wraps URLs as `[label](url)` / `**url**`; without this
+        // flag a later "Run now" skipped fetch unless the planner re-emitted
+        // url_fetch.
+        tool_url_screenshot: instructionHasUrl(instruction),
+      },
     })
     await savedTasksApi.create(prompt.id, name.trim())
     success(t('config.savedTasks.scheduledFromChat'))
