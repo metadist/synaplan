@@ -1145,13 +1145,6 @@ final readonly class MessageProcessor
     }
 
     /**
-     * Human-readable reason for the consolidated web-search decision log.
-     *
-     * Mirrors the precedence in {@see WebSearchTopicPolicy::shouldSearch()}
-     * so the log line directly explains the decision without a reader
-     * having to consult two services.
-     */
-    /**
      * Prefetch named URLs into classification['url_content'] so ChatHandler
      * (and UrlFetchRunner reuse) can read the page.
      *
@@ -1190,6 +1183,13 @@ final readonly class MessageProcessor
         return $classification;
     }
 
+    /**
+     * Human-readable reason for the consolidated web-search decision log.
+     *
+     * Mirrors the precedence in {@see WebSearchTopicPolicy::shouldSearch()}
+     * so the log line directly explains the decision without a reader
+     * having to consult two services.
+     */
     private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
     {
         if (!$shouldSearch) {
