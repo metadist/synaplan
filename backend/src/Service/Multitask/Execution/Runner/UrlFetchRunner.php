@@ -13,6 +13,8 @@ use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\UrlContentResult;
 use App\Service\UrlContentService;
+use App\Service\UrlWatch\UrlWatchCompareResult;
+use App\Service\UrlWatch\UrlWatchService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -40,6 +42,7 @@ final readonly class UrlFetchRunner implements TaskRunner
         private UrlContentService $urlContentService,
         private MultitaskRoutingConfig $routingConfig,
         private LoggerInterface $logger,
+        private ?UrlWatchService $urlWatchService = null,
     ) {
     }
 
@@ -56,7 +59,7 @@ final readonly class UrlFetchRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::UrlFetch,
-                'Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Use when the answer depends on that page\'s content; prefer web_search when no concrete URL is given.',
+                'Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Set inputs.compare to true to save one snapshot per URL and return the difference versus the last fetch. Use when the answer depends on that page\'s content; prefer web_search when no concrete URL is given.',
                 enabledFlag: MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
                 // Validated in plan-09 S2 verification — rollout default ON
                 // (S6). Operators can still disable via BCONFIG.
@@ -83,10 +86,13 @@ final readonly class UrlFetchRunner implements TaskRunner
             return NodeResult::failed('no URL found to fetch');
         }
 
+        $compare = $this->wantsCompare($node, $context);
+
         // Reuse step 2.7's fetch when it already ran for this turn and this
         // node has no narrower URL selection than the message itself.
+        // Compare mode must fetch + snapshot, so it never reuses the pre-fetch.
         $preFetched = $context->classification['url_content'] ?? null;
-        if (is_string($preFetched) && '' !== trim($preFetched)
+        if (!$compare && is_string($preFetched) && '' !== trim($preFetched)
             && $urls === $this->urlContentService->extractUrls((string) $context->message->getText())) {
             $this->logger->info('UrlFetchRunner: reusing pre-fetched URL content (step 2.7)');
 
@@ -110,6 +116,11 @@ final readonly class UrlFetchRunner implements TaskRunner
             return NodeResult::failed('could not read the page: '.$firstError);
         }
 
+        $watchService = $this->urlWatchService;
+        if ($compare && null !== $watchService && null !== $context->userId) {
+            return $this->compareAndSave($watchService, $successful, $urls, $context->userId);
+        }
+
         $text = $this->urlContentService->formatForPrompt($successful);
         if (mb_strlen($text) > self::MAX_OUTPUT_CHARS) {
             $text = mb_substr($text, 0, self::MAX_OUTPUT_CHARS).'…';
@@ -127,6 +138,62 @@ final readonly class UrlFetchRunner implements TaskRunner
             'urls' => $urls,
             'titles' => array_map(static fn (UrlContentResult $r): string => $r->title, $successful),
         ]);
+    }
+
+    /**
+     * @param list<UrlContentResult> $successful
+     * @param list<string>           $urls
+     */
+    private function compareAndSave(UrlWatchService $watchService, array $successful, array $urls, int $userId): NodeResult
+    {
+        $parts = [];
+        $statuses = [];
+        foreach ($successful as $result) {
+            $compare = $watchService->remember(
+                $userId,
+                $result->url,
+                $result->title,
+                $result->extractedText,
+            );
+            $parts[] = $compare->promptText;
+            $statuses[] = $compare->status;
+        }
+
+        $text = implode("\n\n", $parts);
+        if (mb_strlen($text) > self::MAX_OUTPUT_CHARS) {
+            $text = mb_substr($text, 0, self::MAX_OUTPUT_CHARS).'…';
+        }
+
+        $this->logger->info('UrlFetchRunner: compared URL watch', [
+            'requested' => count($urls),
+            'successful' => count($successful),
+            'statuses' => $statuses,
+        ]);
+
+        return NodeResult::ok($text, [], [
+            'url_fetch' => true,
+            'url_watch_compare' => true,
+            'compare_status' => $statuses[0] ?? UrlWatchCompareResult::FIRST,
+            'query' => implode(', ', $this->hostnames($urls)),
+            'urls' => $urls,
+            'titles' => array_map(static fn (UrlContentResult $r): string => $r->title, $successful),
+        ]);
+    }
+
+    private function wantsCompare(TaskNode $node, NodeContext $context): bool
+    {
+        $inputs = $context->resolveInputs($node);
+        $flag = $inputs['compare'] ?? false;
+        if (true === $flag || 1 === $flag || '1' === $flag || 'true' === $flag) {
+            return true;
+        }
+
+        $text = (string) $context->message->getText();
+
+        return 1 === preg_match(
+            '/\b(compare|compared|comparing|difference|differences|vorherig\w*|vergleich\w*|unterschied\w*|letzte version|last (version|fetch|saved)|previously saved|saved version)\b/iu',
+            $text,
+        );
     }
 
     /**

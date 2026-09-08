@@ -807,6 +807,15 @@ Allowed topic keys: [KEYLIST]
    mention the question does not depend on, and prefer `web_search` when no
    concrete URL is given. Only use `url_fetch` if it appears in the
    capability list above.
+9b2. The user asks to SAVE a URL and COMPARE it to a previous fetch, and/or
+   mail the differences ("get this URL and save the details, compare it to
+   a previously saved version and mail me the differences", "watch this
+   page and email me what changed") → `url_fetch` with `inputs.urls` AND
+   `inputs.compare: true`. The url_fetch node output IS the difference
+   (or "no changes" / "first save") — do NOT add a chat/summarize node
+   that invents a diff. If they also asked to be mailed, add `email_me`
+   that consumes `$nX.text` from that url_fetch. Only use `url_fetch` if
+   it appears in the capability list above.
 9c. The request needs data from one of the user's CONNECTED systems and the
    capability list above shows `mcp_fetch` with available connections
    ("look up customer X in our CRM", "check the wiki for the onboarding
@@ -1079,6 +1088,24 @@ User: "Fasse mir diese Seite zusammen: https://example.com/artikel"
 
 The page content is FETCHED (`url_fetch`) and the summary consumes `$n1.text` —
 never answer about a URL's content from memory or invent what the page says.
+
+### Watch a URL and mail the differences
+User: "get https://example.com/news and save the details, compare it to a previously saved version and mail me the differences"
+
+{
+  "version": 1,
+  "language": "en",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "url_fetch", "inputs": { "urls": "https://example.com/news", "compare": true } },
+    { "id": "n2", "capability": "email_me", "depends_on": ["n1"], "inputs": { "text": "$n1.text" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n1","n2"], "inputs": { "text": "$n1.text" } }
+  ]
+}
+
+`inputs.compare: true` makes url_fetch save one snapshot per URL and return
+the difference. email_me sends that same `$n1.text`. Do not invent a diff
+in a chat node.
 
 ### Pull data from a connected system, then answer (mcp_fetch)
 User: "Look up the customer Acme GmbH in our CRM and summarize their last order."

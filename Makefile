@@ -1,4 +1,4 @@
-.PHONY: help lint format test build deps audit test-stack-build
+.PHONY: help lint format test build deps audit test-stack-build ci-local
 
 help: ## Show this help
 	@echo "Common commands (runs in backend and/or frontend as appropriate):"
@@ -19,6 +19,12 @@ format: ## Fix code formatting (backend + frontend)
 test: ## Run all tests (backend + frontend unit tests)
 	$(MAKE) -C backend test
 	$(MAKE) -C frontend test
+
+ci-local: ## Unit/static CI mirror (lint, phpstan, tests, vue-tsc). Not E2E — run make test-e2e before push.
+	$(MAKE) lint
+	$(MAKE) -C backend phpstan
+	$(MAKE) test
+	docker compose exec -T frontend npm run check:types
 
 # Restart Vite first so a stale optimize-deps cache can't serve 504s (blank app
 # -> openApp timeout), then wait until it actually re-serves a core module —
