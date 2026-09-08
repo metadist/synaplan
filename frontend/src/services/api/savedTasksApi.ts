@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
 import {
+  DeleteApiSavedTasksDeleteResponseSchema,
   GetApiSavedTasksListResponseSchema,
   GetApiSavedTasksRunsResponseSchema,
   PatchApiSavedTasksUpdateResponseSchema,
@@ -166,7 +167,10 @@ export const savedTasksApi = {
   },
 
   async remove(id: number): Promise<void> {
-    await httpClient(`/api/v1/saved-tasks/${id}`, { method: 'DELETE' })
+    await httpClient(`/api/v1/saved-tasks/${id}`, {
+      method: 'DELETE',
+      schema: DeleteApiSavedTasksDeleteResponseSchema,
+    })
   },
 
   async resume(id: number): Promise<SavedTask> {

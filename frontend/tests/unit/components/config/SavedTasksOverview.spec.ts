@@ -81,4 +81,25 @@ describe('SavedTasksOverview', () => {
     const wrapper = await mountPage()
     expect(wrapper.find('[data-testid="btn-shared-with-me"]').exists()).toBe(false)
   })
+
+  it('removes a card when the child emits deleted', async () => {
+    mockList.mockResolvedValue([task])
+    const wrapper = mount(SavedTasksOverview, {
+      global: {
+        stubs: {
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+          SavedTaskCard: {
+            props: ['task'],
+            template:
+              '<button type="button" data-testid="emit-deleted" @click="$emit(\'deleted\', task.id)" />',
+          },
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="emit-deleted"]').trigger('click')
+    expect(wrapper.find('[data-testid="emit-deleted"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="saved-tasks-empty"]').exists()).toBe(true)
+  })
 })
