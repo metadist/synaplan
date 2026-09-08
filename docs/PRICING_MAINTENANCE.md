@@ -148,7 +148,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the three 
 
 ### TrustedTokens DeepSeek V4 Flash shutdown (2026-09-08)
 
-TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed it Gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08; the dated Flash-0731 snapshot and V4 Pro remain in that catalog.
+TrustedTokens dropped the undated `deepseek-ai/DeepSeek-V4-Flash` id. The hourly health check confirmed the model is gone against `https://trustedtokens.eu/api/billing/models` on 2026-09-08; the dated Flash-0731 snapshot and V4 Pro remain in that catalog.
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
