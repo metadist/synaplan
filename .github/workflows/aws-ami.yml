@@ -10,13 +10,15 @@ name: AWS Marketplace AMI
 # for building a Graviton image to test outside Marketplace.
 #
 # Not part of CI: it costs EC2 instance hours and it may only ever bake a
-# release whose container images are already published and verified. Release
-# tags therefore trigger it, and it waits for the images to exist before Packer
-# starts. Run it by hand to rebuild an older release, or to try a change without
-# tagging — from any branch of this repository, so a deployment fix can be built
-# and verified from its pull request before it is merged. The AWS trust policy
-# allows that because the jobs below declare the ami-build environment; see
-# deploy/aws/cloudformation/marketplace-roles.yaml.
+# release whose container images are already published and verified. It starts
+# from CI's `workflow_run` once a plain release tag's own CI run is green —
+# images exist then, so there is no minute-by-minute poll, and the check suite
+# is not attached to the tag SHA (workflow_run executes against the default
+# branch). Run it by hand to rebuild an older release, or to try a change
+# without tagging — from any branch of this repository, so a deployment fix
+# can be built and verified from its pull request before it is merged. The
+# AWS trust policy allows that because the jobs below declare the ami-build
+# environment; see deploy/aws/cloudformation/marketplace-roles.yaml.
 #
 # Nothing here offers a version to the listing. It marks an image whose release
 # passed the smoke test, and marketplace-versions.yml offers what is marked —
@@ -26,8 +28,9 @@ name: AWS Marketplace AMI
 # no long-lived AWS keys in this repository, and there must never be.
 
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -50,7 +53,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: aws-ami-${{ github.ref }}
+  group: aws-ami-${{ github.event.workflow_run.head_branch || inputs.version || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -64,6 +67,17 @@ jobs:
   resolve:
     name: Resolve the release
     runs-on: ubuntu-latest
+    # Every CI completion reaches the workflow_run trigger. Only a green push
+    # whose head_branch is a release tag is a release; everything else (PRs,
+    # pin merges, a red tag run) is a no-op so this workflow does not bake
+    # an image nobody published.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        startsWith(github.event.workflow_run.head_branch, 'v')
+      )
     outputs:
       version: ${{ steps.version.outputs.version }}
       matrix: ${{ steps.version.outputs.matrix }}
@@ -72,17 +86,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve version and architectures
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
           INPUT_ARCHITECTURE: ${{ inputs.architecture || 'x86_64' }}
+          WORKFLOW_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
 
-          if [ "$GITHUB_EVENT_NAME" = push ]; then
-            version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            version="${WORKFLOW_BRANCH#v}"
           else
             version="${INPUT_VERSION#v}"
           fi
@@ -123,23 +140,22 @@ jobs:
               tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
-      # Packer bakes these images into the AMI. A release tag reaches this
-      # workflow the moment it is pushed, while CI is still building and pushing
-      # them, so waiting is the difference between a correct AMI and a failed —
-      # or worse, a stale — build.
+      # workflow_run fires after the tag's CI is green, so the version tag is
+      # already in GHCR. A short retry covers registry propagation; the old
+      # 60×60s poll was for starting on the tag push itself.
       - name: Wait for the published container images
         if: steps.version.outputs.version != '' && steps.credentials.outputs.configured == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 12); do
             if docker manifest inspect "${IMAGE_REPOSITORY}:${VERSION}" >/dev/null 2>&1; then
               echo "${IMAGE_REPOSITORY}:${VERSION} is published."
               exit 0
             fi
             echo "Attempt ${attempt}: ${IMAGE_REPOSITORY}:${VERSION} is not published yet; waiting."
-            sleep 60
+            sleep 10
           done
           echo "::error::${IMAGE_REPOSITORY}:${VERSION} was never published; refusing to bake an AMI without it."
           exit 1
@@ -168,6 +184,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Assume the build role
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
@@ -315,6 +333,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Assume the build role
         uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
@@ -517,7 +537,8 @@ jobs:
       - name: Mark the release as smoke-tested
         if: >-
           success() &&
-          (startsWith(github.ref, 'refs/tags/') ||
+          (github.event_name == 'workflow_run' ||
+           startsWith(github.ref, 'refs/tags/') ||
            github.ref_name == github.event.repository.default_branch)
         env:
           VERSION: ${{ needs.resolve.outputs.version }}

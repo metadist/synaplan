@@ -64,14 +64,27 @@ jobs:
           # The API filters on head_sha, but it ignores an unknown query
           # parameter silently, which would widen this to "any green CI run".
           # The commit is therefore matched again on the returned run.
-          run_id="$(
+          run_id=""
+          while IFS= read -r candidate; do
+            [ -n "$candidate" ] || continue
+            artifact_id="$(
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate}/artifacts" \
+                --jq '.artifacts[] | select(.name == "openapi-spec" and .expired == false) | .id' |
+                head -n 1
+            )"
+            if [ -n "$artifact_id" ]; then
+              run_id="$candidate"
+              echo "artifact_id=${artifact_id}" >> "$GITHUB_OUTPUT"
+              break
+            fi
+          done < <(
             gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" |
               jq -r --arg sha "$RELEASE_SHA" \
                 '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)]
-                  | first | .id // empty'
-          )"
+                  | .[].id'
+          )
           if [ -z "$run_id" ]; then
-            echo "::error::No successful CI run exists for ${RELEASE_SHA} — refusing to release an unverified commit."
+            echo "::error::No successful CI run with an unexpired openapi-spec artifact exists for ${RELEASE_SHA} — refusing to release an unverified commit."
             exit 1
           fi
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
@@ -79,20 +92,11 @@ jobs:
       - name: Download commit-matching OpenAPI artifact
         env:
           GH_TOKEN: ${{ github.token }}
-          RUN_ID: ${{ steps.ci-run.outputs.run_id }}
+          ARTIFACT_ID: ${{ steps.ci-run.outputs.artifact_id }}
         run: |
           set -euo pipefail
           mkdir -p mobile-release
-          artifact_id="$(
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" \
-              --jq '.artifacts[] | select(.name == "openapi-spec" and .expired == false) | .id' |
-              head -n 1
-          )"
-          if [ -z "$artifact_id" ]; then
-            echo "::error::The CI run for ${RELEASE_SHA} carries no unexpired openapi-spec artifact. Re-run CI for this commit and publish the release again."
-            exit 1
-          fi
-          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}/zip" > /tmp/openapi.zip
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" > /tmp/openapi.zip
           unzip -q /tmp/openapi.zip -d mobile-release
           test -s mobile-release/openapi-spec.json
 
