@@ -31,6 +31,9 @@ class ModelHealth
     /** Recorded from a free provider catalog lookup. */
     public const SOURCE_PROBE = 'probe';
 
+    /** Verdict came from re-listing an import source's models (S5 re-check). */
+    public const SOURCE_LISTING = 'listing';
+
     /** Recorded from a real user request that happened anyway. */
     public const SOURCE_TRAFFIC = 'traffic';
 

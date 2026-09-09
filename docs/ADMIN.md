@@ -662,7 +662,7 @@ Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
 (`--flag-off` proves the 404 contract). Endpoint reference:
 [Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
 
-### AI plugs (S1–S4)
+### AI plugs (S1–S5)
 
 Extraction, web search and rerank go through `App\Plug\` registries.
 FileProcessor still runs today's built-in strategies (native → Tika →
@@ -685,6 +685,22 @@ rerank model (TEI / Jina / Cohere / Voyage), set how many extra
 snippets to fetch and the millisecond budget, optionally allow the
 summary model as a costly fallback, and run **Test order** on sample
 snippets. Chat search is unchanged while rerank is off.
+
+Importing models saves typing each row by hand. On **Models & keys**,
+an OpenAI-compatible endpoint card has **Import models** and the local
+AI card has **Import pulled models**. The preview lists what the
+endpoint offers with a guessed capability tag you can edit, and an
+**already added** badge for rows the catalog has. **Import** creates
+only the new rows; running it again says nothing changed, and it never
+touches a model you switched off or made a default. The optional
+**Check what each model can do** box sends two tiny requests per model
+(one chat, one embeddings) and refines the guess — it uses a little
+credit, so it is off by default. The scheduled model health check also
+re-lists each import source: a model the endpoint no longer offers is
+marked **not offered by endpoint** and (only when auto-disable is on)
+switched off; it recovers by itself when the endpoint lists it again.
+An **unreachable** endpoint marks nothing, so a brief outage never
+retires a model. Native Ollama is not capability-probed this way.
 
 The Operate page is **AI infrastructure** (`/admin/setup`). The
 **Extraction** tab shows adapter health, lets an admin reorder a family

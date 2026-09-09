@@ -298,6 +298,23 @@ the model selector, the Statistics page, and the per-tier budgets. Adding a mode
 one, or changing a price is a catalog + migration job — see
 [PRICING_MAINTENANCE.md](PRICING_MAINTENANCE.md).
 
+### Importing models from an endpoint
+
+An admin can import the models an OpenAI-compatible endpoint (vLLM, LiteLLM, TGI, …) or the
+local Ollama already offers instead of adding each by hand — see
+[ADMIN.md — AI plugs](ADMIN.md#ai-plugs-s1s5). Notes that affect configuration:
+
+- **No flag, no new env var.** Import is an admin action; new rows are created selectable and
+  active with no default binding, so nothing routes to them until you pick them.
+- **Idempotent.** Re-importing only refreshes a `lastSeenAt` timestamp; operator toggles
+  (selectable / active / default) and prices are never overwritten.
+- **Capability probe cost.** The opt-in probe sends two tiny requests per model (one
+  `chat/completions` with `max_tokens: 1`, one `embeddings` with a one-word input), capped at
+  50 models per preview. It is off by default and never runs for native Ollama.
+- **Scheduled re-check.** `app:model:health-check` re-lists each import source. A model missing
+  from a **successful** listing is recorded offline (`not offered by endpoint`) and soft-disabled
+  only when `MODELHEALTH.AUTO_DISABLE_ENABLED=1`; an **unreachable** endpoint changes nothing.
+
 ---
 
 ## Database

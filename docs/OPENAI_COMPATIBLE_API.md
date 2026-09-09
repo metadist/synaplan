@@ -362,6 +362,11 @@ Returns all available models in OpenAI format. An additive `capabilities`
 array is present only when **both** tool-calling gates pass (the chat
 provider implements tool calling and the catalog row has `tool_use`).
 
+> This lists the models Synaplan **serves**. To go the other way and pull the
+> models an upstream OpenAI-compatible endpoint or Ollama offers **into** the
+> catalog, an admin uses model import — see
+> [ADMIN.md — AI plugs](ADMIN.md#ai-plugs-s1s5).
+
 **Response:**
 
 ```json

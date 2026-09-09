@@ -2891,6 +2891,26 @@
     }
   },
   "aiInfra": {
+    "modelImport": {
+      "title": "Import models",
+      "importModels": "Import models",
+      "importPulled": "Import pulled models",
+      "unreachable": "This endpoint did not answer. Check it under Test, then try again.",
+      "empty": "This endpoint offers no models to import.",
+      "selectAllNew": "Select all new",
+      "probeLabel": "Check what each model can do (uses a little credit)",
+      "colModel": "Model",
+      "colTags": "Capabilities",
+      "colStatus": "Status",
+      "exists": "Already added",
+      "new": "New",
+      "tagsHint": "Allowed capabilities: {tags}. Separate several with commas.",
+      "apply": "Import {count}",
+      "applying": "Importing…",
+      "applied": "Imported {created} model row(s), skipped {skipped} already present.",
+      "applyFailed": "The models could not be imported.",
+      "noValidTags": "Give each selected model at least one valid capability."
+    },
     "extraction": {
       "lead": "Choose how documents are turned into text. Docling keeps tables and headings; if it is not running, Tika is used instead and uploads never fail.",
       "family": {

@@ -94,9 +94,26 @@
             />
           </div>
           <p class="text-sm txt-secondary mt-1">{{ $t('adminSetup.localAi.description') }}</p>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-3 inline-flex items-center gap-2"
+            data-testid="ollama-import-models"
+            @click="importOllama = true"
+          >
+            <Icon icon="mdi:download-outline" class="w-4 h-4" aria-hidden="true" />
+            {{ $t('aiInfra.modelImport.importPulled') }}
+          </button>
         </div>
       </div>
     </template>
+
+    <ModelImportDialog
+      v-if="importOllama"
+      source="ollama"
+      :label="$t('adminSetup.localAi.title')"
+      @close="importOllama = false"
+      @applied="refresh"
+    />
   </div>
 </template>
 
@@ -107,6 +124,7 @@ import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ProviderHelpHint from '@/components/admin/ProviderHelpHint.vue'
 import ProviderKeyCard from '@/components/admin/ProviderKeyCard.vue'
+import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
 import { useNotification } from '@/composables/useNotification'
 import { useConfigStore } from '@/stores/config'
@@ -120,6 +138,7 @@ const loading = ref(true)
 const loadFailed = ref(false)
 const providers = ref<ProviderKeyStatus[]>([])
 const defaultChatProvider = ref('')
+const importOllama = ref(false)
 
 const chatReady = computed(() => config.setup.chatReady)
 

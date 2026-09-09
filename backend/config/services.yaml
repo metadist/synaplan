@@ -519,6 +519,10 @@ services:
         arguments:
             $probes: !tagged_iterator app.model_list_probe
 
+    # The scheduled re-check discovers imported models through this port; the
+    # concrete discovery service is the only implementation.
+    App\AI\Import\ModelDiscovererInterface: '@App\AI\Import\ModelDiscoveryService'
+
     # Generic "OpenAI Compatible" provider (LocalAI, vLLM, LiteLLM, Ollama /v1,
     # …). Endpoints are configured at runtime and stored encrypted in BCONFIG
     # via OpenAiCompatibleEndpointRegistry — there are no env credentials.

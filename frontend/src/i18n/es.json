@@ -1195,6 +1195,26 @@
     }
   },
   "aiInfra": {
+    "modelImport": {
+      "title": "Importar modelos",
+      "importModels": "Importar modelos",
+      "importPulled": "Importar modelos descargados",
+      "unreachable": "Este endpoint no respondió. Compruébalo en Probar e inténtalo de nuevo.",
+      "empty": "Este endpoint no ofrece modelos para importar.",
+      "selectAllNew": "Seleccionar todos los nuevos",
+      "probeLabel": "Comprobar qué puede hacer cada modelo (consume un poco de crédito)",
+      "colModel": "Modelo",
+      "colTags": "Capacidades",
+      "colStatus": "Estado",
+      "exists": "Ya añadido",
+      "new": "Nuevo",
+      "tagsHint": "Capacidades permitidas: {tags}. Separa varias con comas.",
+      "apply": "Importar {count}",
+      "applying": "Importando…",
+      "applied": "Se importaron {created} fila(s) de modelo, se omitieron {skipped} ya presentes.",
+      "applyFailed": "No se pudieron importar los modelos.",
+      "noValidTags": "Da a cada modelo seleccionado al menos una capacidad válida."
+    },
     "extraction": {
       "lead": "Elija cómo se convierte un documento en texto. Docling conserva tablas y títulos; si no está en marcha, se usa Tika y la carga nunca falla.",
       "family": {

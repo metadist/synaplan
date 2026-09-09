@@ -2891,6 +2891,26 @@
     }
   },
   "aiInfra": {
+    "modelImport": {
+      "title": "Importer des modèles",
+      "importModels": "Importer des modèles",
+      "importPulled": "Importer les modèles téléchargés",
+      "unreachable": "Ce point de terminaison n'a pas répondu. Vérifiez-le via Tester, puis réessayez.",
+      "empty": "Ce point de terminaison n'offre aucun modèle à importer.",
+      "selectAllNew": "Tout sélectionner (nouveaux)",
+      "probeLabel": "Vérifier ce que chaque modèle sait faire (consomme un peu de crédit)",
+      "colModel": "Modèle",
+      "colTags": "Capacités",
+      "colStatus": "Statut",
+      "exists": "Déjà ajouté",
+      "new": "Nouveau",
+      "tagsHint": "Capacités autorisées : {tags}. Séparez-les par des virgules.",
+      "apply": "Importer {count}",
+      "applying": "Importation…",
+      "applied": "{created} ligne(s) de modèle importée(s), {skipped} déjà présente(s) ignorée(s).",
+      "applyFailed": "Les modèles n'ont pas pu être importés.",
+      "noValidTags": "Donnez à chaque modèle sélectionné au moins une capacité valide."
+    },
     "extraction": {
       "lead": "Choisissez comment un document devient du texte. Docling conserve les tableaux et les titres ; s’il n’est pas lancé, Tika prend le relais et l’envoi n’échoue jamais.",
       "family": {
