@@ -516,7 +516,7 @@ Resources:
     Type: AWS::DLM::LifecyclePolicy
     Condition: WantsDailySnapshots
     Properties:
-      Description: !Sub 'Daily snapshots of the Synaplan data volume (${AWS::StackName})'
+      Description: !Sub 'Daily snapshots of the Synaplan data volume - ${AWS::StackName}'
       State: ENABLED
       ExecutionRoleArn: !GetAtt SnapshotRole.Arn
       PolicyDetails:
