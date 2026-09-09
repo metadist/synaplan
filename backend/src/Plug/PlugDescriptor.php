@@ -11,6 +11,7 @@ final readonly class PlugDescriptor
 {
     /**
      * @param list<string> $requiredSettings BCONFIG keys this adapter reads
+     * @param string|null  $pluginId         id of the plugin that ships this adapter, or null for a core adapter
      */
     public function __construct(
         public string $key,
@@ -18,6 +19,7 @@ final readonly class PlugDescriptor
         public string $docsUrl,
         public array $requiredSettings,
         public string $sovereignty,
+        public ?string $pluginId = null,
     ) {
     }
 }

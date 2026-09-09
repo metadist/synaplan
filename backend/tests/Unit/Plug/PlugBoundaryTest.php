@@ -75,6 +75,18 @@ final class PlugBoundaryTest extends TestCase
     }
 
     /**
+     * A reference plugin lives entirely under plugins/; its identifiers must
+     * never leak into core (the whole point of the plug-adapter mechanism).
+     */
+    public function testReferencePluginIdentifiersStayOutOfCore(): void
+    {
+        foreach (['serper', 'Serper'] as $needle) {
+            $violations = $this->scan($needle, []);
+            $this->assertSame([], $violations, "'".$needle."' must not appear in backend/src:\n".implode("\n", $violations));
+        }
+    }
+
+    /**
      * @param list<string> $allowedPathFragments
      *
      * @return list<string>

@@ -3,6 +3,10 @@
 namespace App;
 
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
+use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
+use App\Plug\Extraction\ContentExtractorInterface;
+use App\Plug\Rerank\RerankProviderInterface;
+use App\Plug\WebSearch\WebSearchProviderInterface;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -18,13 +22,17 @@ class Kernel extends BaseKernel
 
     protected function configureContainer(ContainerConfigurator $container): void
     {
-        $container->import('../config/{packages}/*.yaml');
-        $container->import('../config/{packages}/'.$this->environment.'/*.yaml');
+        // Absolute config dir (not '../config') so a test kernel subclass living
+        // in another directory still imports backend/config — __DIR__ here is
+        // always backend/src regardless of the runtime subclass.
+        $configDir = \dirname(__DIR__).'/config';
+        $container->import($configDir.'/{packages}/*.yaml');
+        $container->import($configDir.'/{packages}/'.$this->environment.'/*.yaml');
 
-        if (is_file(\dirname(__DIR__).'/config/services.yaml')) {
-            $container->import('../config/services.yaml');
-            $container->import('../config/{services}_'.$this->environment.'.yaml');
-        } elseif (is_file($path = \dirname(__DIR__).'/config/services.php')) {
+        if (is_file($configDir.'/services.yaml')) {
+            $container->import($configDir.'/services.yaml');
+            $container->import($configDir.'/{services}_'.$this->environment.'.yaml');
+        } elseif (is_file($path = $configDir.'/services.php')) {
             (require $path)($container->withPath($path), $this);
         }
 
@@ -39,11 +47,50 @@ class Kernel extends BaseKernel
         }
 
         $this->loadPluginServices($container);
+
+        // Keys a plugin declared in provides.plugs, so PlugKeyStore lets a
+        // plugin adapter store and read its secret. Always set (default []) so
+        // services.yaml can bind %plug.plugin_keys% unconditionally.
+        $container->parameters()->set('plug.plugin_keys', $this->collectPluginPlugKeys());
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectPluginPlugKeys(): array
+    {
+        $keys = [];
+        foreach ($this->getPlugins() as $plugin) {
+            $manifestPath = $plugin['dir'].'/manifest.json';
+            $raw = is_file($manifestPath) ? file_get_contents($manifestPath) : false;
+            $data = false === $raw ? null : json_decode($raw, true);
+            if (!is_array($data)) {
+                continue;
+            }
+            $plugs = $data['provides']['plugs'] ?? null;
+            if (!is_array($plugs)) {
+                continue;
+            }
+            foreach ($plugs as $plug) {
+                if (is_array($plug) && is_string($plug['key'] ?? null) && '' !== $plug['key']) {
+                    $keys[strtolower($plug['key'])] = true;
+                }
+            }
+        }
+
+        return array_keys($keys);
     }
 
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
+
+        // Tag plug adapters container-wide so plugin-provided adapters (loaded
+        // via the fluent API, outside services.yaml's _instanceof scope) reach
+        // their registry exactly like the core adapters do.
+        $container->registerForAutoconfiguration(ContentExtractorInterface::class)->addTag('app.plug.extractor');
+        $container->registerForAutoconfiguration(WebSearchProviderInterface::class)->addTag('app.plug.web_search');
+        $container->registerForAutoconfiguration(RerankProviderInterface::class)->addTag('app.plug.rerank');
 
         // Nested-transaction savepoints are required by dama/doctrine-test-bundle
         // on MariaDB/MySQL. We register the compiler pass conditionally because
@@ -53,16 +100,22 @@ class Kernel extends BaseKernel
         if ('test' === $this->environment) {
             $container->addCompilerPass(new EnableTestSavepointsPass());
         }
+
+        // A plugin class that implements a plug interface is tagged app.plug.*
+        // by autoconfiguration; this pass refuses one the manifest did not
+        // declare in provides.plugs, so contributing an adapter is explicit.
+        $container->addCompilerPass(new PlugDeclarationCheckPass($this->getPlugins()));
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
-        $routes->import('../config/{routes}/'.$this->environment.'/*.yaml');
-        $routes->import('../config/{routes}/*.yaml');
+        $configDir = \dirname(__DIR__).'/config';
+        $routes->import($configDir.'/{routes}/'.$this->environment.'/*.yaml');
+        $routes->import($configDir.'/{routes}/*.yaml');
 
-        if (is_file(\dirname(__DIR__).'/config/routes.yaml')) {
-            $routes->import('../config/routes.yaml');
-        } elseif (is_file($path = \dirname(__DIR__).'/config/routes.php')) {
+        if (is_file($configDir.'/routes.yaml')) {
+            $routes->import($configDir.'/routes.yaml');
+        } elseif (is_file($path = $configDir.'/routes.php')) {
             (require $path)($routes->withPath($path), $this);
         }
 
@@ -157,6 +210,13 @@ class Kernel extends BaseKernel
 
     private function resolvePluginsDir(): ?string
     {
+        // Test-only override so a suite can boot against a fixture plugin
+        // directory without touching the real /plugins mount.
+        $override = getenv('PLUGINS_DIR');
+        if (is_string($override) && '' !== $override && is_dir($override)) {
+            return $override;
+        }
+
         if (is_dir('/plugins')) {
             return '/plugins';
         }

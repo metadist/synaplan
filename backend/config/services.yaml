@@ -235,12 +235,11 @@ services:
             tags: ['app.document_tool']
         App\Service\Iam\ResourceKind\ShareableResourceKindInterface:
             tags: ['app.iam.resource_kind']
-        App\Plug\Extraction\ContentExtractorInterface:
-            tags: ['app.plug.extractor']
-        App\Plug\WebSearch\WebSearchProviderInterface:
-            tags: ['app.plug.web_search']
-        App\Plug\Rerank\RerankProviderInterface:
-            tags: ['app.plug.rerank']
+        # Plug adapter interfaces (extractor / web_search / rerank) are tagged
+        # via registerForAutoconfiguration in App\Kernel::build() instead of here:
+        # _instanceof is file-scoped and never reaches plugin services loaded
+        # through the fluent API, so a plugin adapter would otherwise be invisible
+        # to its registry. Autoconfiguration applies container-wide (core + plugins).
 
     App\:
         resource: '../src/'
@@ -341,6 +340,8 @@ services:
                 jina: '%env(JINA_API_KEY)%'
                 cohere: '%env(COHERE_API_KEY)%'
                 voyage: '%env(VOYAGE_API_KEY)%'
+            # Keys plugins declare in provides.plugs (set by App\Kernel).
+            $pluginProviders: '%plug.plugin_keys%'
 
     # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
     App\Service\LocalAi\LocalAiDownloadStatusService:

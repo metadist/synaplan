@@ -27,6 +27,9 @@ final class WebSearchRegistry
         private readonly WebSearchFallbackMetrics $fallbackMetrics = new WebSearchFallbackMetrics(new \Psr\Log\NullLogger()),
     ) {
         foreach ($providers as $provider) {
+            if (isset($this->byKey[$provider->key()])) {
+                throw new \App\Plug\DuplicatePlugKeyException('web_search', $provider->key());
+            }
             $this->byKey[$provider->key()] = $provider;
         }
     }

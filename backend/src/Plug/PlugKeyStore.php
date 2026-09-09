@@ -40,25 +40,39 @@ final class PlugKeyStore
     private array $memo = [];
 
     /**
-     * @param array<string, string|null> $envKeys provider => env bootstrap value
+     * @param array<string, string|null> $envKeys         provider => env bootstrap value
+     * @param list<string>               $pluginProviders keys declared by plugin provides.plugs adapters
      */
     public function __construct(
         private readonly ConfigRepository $configRepository,
         private readonly EncryptionService $encryption,
         private readonly LoggerInterface $logger,
         private readonly array $envKeys = [],
+        private readonly array $pluginProviders = [],
     ) {
     }
 
+    /** Built-in plug providers only. */
     public static function isSupported(string $provider): bool
     {
         return in_array($provider, self::SUPPORTED_PROVIDERS, true);
     }
 
+    /**
+     * Built-in providers plus any key a discovered plugin declared — so a
+     * plugin adapter can store and read its secret through the same store.
+     */
+    public function supports(string $provider): bool
+    {
+        $provider = strtolower(trim($provider));
+
+        return self::isSupported($provider) || in_array($provider, $this->pluginProviders, true);
+    }
+
     public function getKey(string $provider): ?string
     {
         $provider = strtolower(trim($provider));
-        if (!self::isSupported($provider)) {
+        if (!$this->supports($provider)) {
             return null;
         }
 
@@ -76,8 +90,8 @@ final class PlugKeyStore
     public function saveKey(string $provider, string $key, string $origin = self::ORIGIN_UI): void
     {
         $provider = strtolower(trim($provider));
-        if (!self::isSupported($provider)) {
-            throw new \InvalidArgumentException(sprintf('Unknown plug key provider "%s". Supported: %s.', $provider, implode(', ', self::SUPPORTED_PROVIDERS)));
+        if (!$this->supports($provider)) {
+            throw new \InvalidArgumentException(sprintf('Unknown plug key provider "%s". Supported: %s.', $provider, implode(', ', [...self::SUPPORTED_PROVIDERS, ...$this->pluginProviders])));
         }
 
         $key = trim($key);
