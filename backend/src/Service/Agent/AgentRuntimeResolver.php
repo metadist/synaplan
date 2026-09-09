@@ -22,6 +22,7 @@ use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotPublishedException;
 use App\Service\Iam\Permission;
 use App\Service\ModelConfigService;
+use App\Service\RAG\RagScopeResolver;
 use App\Service\Runtime\RuntimeProfile;
 
 /**
@@ -42,6 +43,7 @@ final readonly class AgentRuntimeResolver
         private AgentDefinitionValidator $validator,
         private AgentAccess $access,
         private MessageMetaRepository $messageMeta,
+        private RagScopeResolver $ragScopeResolver,
     ) {
     }
 
@@ -112,7 +114,21 @@ final readonly class AgentRuntimeResolver
         $notes = [];
         $modelIds = $this->resolveModels($definition, (int) $user->getId(), $notes);
 
-        $ragScopes = AgentKnowledgeFolders::scopes($agent, $definition);
+        // An assistant carries its OWNER's knowledge. A declared foreign folder
+        // is searched only while the owner may still use it — folders the owner
+        // has since lost access to are dropped (never escalated), so an assistant
+        // can never widen what its owner is allowed to read (C6).
+        $ownerId = $agent->getOwnerId();
+        $ragScopes = [];
+        foreach (AgentKnowledgeFolders::scopes($agent, $definition) as $scope) {
+            if ($scope['ownerId'] === $ownerId
+                || $this->ragScopeResolver->canUse($ownerId, $scope['ownerId'], $scope['groupKey'])
+            ) {
+                $ragScopes[] = $scope;
+                continue;
+            }
+            $notes[] = 'scope_dropped:'.$scope['ownerId'].':'.$scope['groupKey'];
+        }
 
         $tools = $definition->tools();
         $toolFlags = [
@@ -148,6 +164,7 @@ final readonly class AgentRuntimeResolver
             ragLimit: $definition->ragLimit(),
             ragMinScore: $definition->ragMinScore(),
             viewerId: (int) $user->getId(),
+            includeUserFiles: $definition->includeUserFiles(),
         );
     }
 

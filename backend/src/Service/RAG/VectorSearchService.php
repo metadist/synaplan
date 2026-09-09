@@ -71,18 +71,30 @@ final readonly class VectorSearchService
         int $limit = 10,
         float $minScore = 0.3,
         ?string $queryText = null,
+        ?array $explicitScopes = null,
     ): array {
         if (empty($vector)) {
             return [];
         }
 
+        // An assistant with no knowledge scopes (own folder off, no folders,
+        // own files not included) searches nothing. Return early rather than
+        // build an empty-scope query, which would raise EmptyRagScopeException
+        // and log a warning on every turn.
+        if (null !== $explicitScopes && [] === $explicitScopes) {
+            return [];
+        }
+
         try {
-            $scopes = $this->ragScopeResolver->resolve($userId, $groupKey);
+            // An assistant chat passes the exact scopes its runtime resolved
+            // (owner folders it may still use); otherwise expand the viewer's
+            // own IAM grants. The two are never mixed.
+            $scopes = $explicitScopes ?? $this->ragScopeResolver->resolve($userId, $groupKey);
             $storageLimit = $this->rerankStage->storageLimit($limit, $queryText);
             $searchQuery = new SearchQuery(
                 userId: $userId,
                 vector: $this->normalizeQueryVector(array_map('floatval', $vector)),
-                groupKey: $groupKey,
+                groupKey: null !== $explicitScopes ? null : $groupKey,
                 limit: $storageLimit,
                 minScore: $minScore,
                 scopes: $scopes,
@@ -151,6 +163,7 @@ final readonly class VectorSearchService
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?array $explicitScopes = null,
     ): array {
         // 1. Get embedding model from DB
         $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
@@ -213,6 +226,7 @@ final readonly class VectorSearchService
             $limit,
             $minScore,
             $query,
+            $explicitScopes,
         );
     }
 
