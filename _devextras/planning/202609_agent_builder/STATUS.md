@@ -107,3 +107,18 @@ widget page / Channels page. Now each event touches only the entity it
 names: enabled binds, disabled unbinds *only if this agent holds it*, absent
 leaves it alone. One failing trigger is logged and skipped so a committed
 publish cannot turn into a 500. Covered by `AgentTriggerMaterializerTest`.
+**2026-09-09 (review decision — prompt metadata is translated, not copied):**
+the prompts section exported `loadMetadataForPrompt()` verbatim, which carries
+`aiModel` (a `BMODELS` id) and `mcp_servers` (server ids). Both are meaningful
+only in the exporting install, so an import pinned the prompt to whatever row
+held that id here. The bundle now carries a portable `aiModelKey`
+(`service:providerId:tag`, dropped when it is not in the catalog) and no MCP
+ids at all; import resolves the key back to a local id and ignores a raw
+`aiModel` from a foreign bundle. Same translation the agents section already
+did for `models` / `mcpServers`. Covered by `PromptBundleSectionMetaTest`.
+
+**2026-09-09 (review follow-up):** `/agents/{id}/export` and `/agents/import`
+had grown a second, unguarded copy of the bundle request handling. Both routes
+now share `BundleRequestParser` (size checked before decode) and the export /
+import rate limits, and per-agent export refuses a shared or unpublished
+assistant instead of returning an empty bundle.
