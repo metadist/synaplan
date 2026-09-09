@@ -2985,6 +2985,26 @@
     }
   },
   "aiInfra": {
+    "modelImport": {
+      "title": "Modelle importieren",
+      "importModels": "Modelle importieren",
+      "importPulled": "Geladene Modelle importieren",
+      "unreachable": "Dieser Endpunkt hat nicht geantwortet. Prüfe ihn unter „Test“ und versuche es erneut.",
+      "empty": "Dieser Endpunkt bietet keine Modelle zum Import.",
+      "selectAllNew": "Alle neuen auswählen",
+      "probeLabel": "Prüfen, was jedes Modell kann (verbraucht etwas Guthaben)",
+      "colModel": "Modell",
+      "colTags": "Fähigkeiten",
+      "colStatus": "Status",
+      "exists": "Bereits hinzugefügt",
+      "new": "Neu",
+      "tagsHint": "Erlaubte Fähigkeiten: {tags}. Mehrere mit Komma trennen.",
+      "apply": "{count} importieren",
+      "applying": "Wird importiert…",
+      "applied": "{created} Modellzeile(n) importiert, {skipped} bereits vorhanden übersprungen.",
+      "applyFailed": "Die Modelle konnten nicht importiert werden.",
+      "noValidTags": "Gib jedem ausgewählten Modell mindestens eine gültige Fähigkeit."
+    },
     "extraction": {
       "lead": "Legen Sie fest, wie Dokumente zu Text werden. Docling erhält Tabellen und Überschriften; wenn es nicht läuft, übernimmt Tika — Uploads schlagen nie fehl.",
       "family": {

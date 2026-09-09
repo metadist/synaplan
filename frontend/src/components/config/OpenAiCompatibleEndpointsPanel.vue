@@ -278,6 +278,14 @@
                 </button>
                 <button
                   type="button"
+                  class="px-3 py-1 rounded-lg border border-light-border/30 dark:border-dark-border/20 txt-secondary text-xs font-medium hover:txt-primary hover:border-[var(--brand)]/50 transition"
+                  :data-testid="`openai-endpoint-import-${ep.name}`"
+                  @click="openImport(ep)"
+                >
+                  {{ t('aiInfra.modelImport.importModels') }}
+                </button>
+                <button
+                  type="button"
                   class="px-3 py-1 rounded-lg border border-red-500/40 text-red-500 text-xs font-medium hover:bg-red-500/10 transition"
                   :disabled="rowDeletingName === ep.name"
                   @click="remove(ep)"
@@ -301,6 +309,14 @@
         </tbody>
       </table>
     </div>
+
+    <ModelImportDialog
+      v-if="importSource"
+      :source="importSource"
+      :label="importLabel"
+      @close="importSource = null"
+      @applied="load"
+    />
   </div>
 </template>
 
@@ -314,6 +330,7 @@ import {
   type OpenAiEndpoint,
   type OpenAiEndpointTestResponse,
 } from '@/services/api/adminOpenAiEndpointsApi'
+import ModelImportDialog from '@/components/admin/plugs/ModelImportDialog.vue'
 
 type AuthType = 'none' | 'bearer' | 'header'
 
@@ -332,6 +349,13 @@ const rowTestingName = ref<string | null>(null)
 const rowDeletingName = ref<string | null>(null)
 const formTestResult = ref<OpenAiEndpointTestResponse | null>(null)
 const rowTestResult = reactive<Record<string, OpenAiEndpointTestResponse>>({})
+const importSource = ref<string | null>(null)
+const importLabel = ref('')
+
+function openImport(ep: OpenAiEndpoint): void {
+  importLabel.value = ep.label || ep.name
+  importSource.value = `openai_compatible:${ep.name}`
+}
 
 interface EndpointForm {
   name: string

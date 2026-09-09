@@ -1,5 +1,14 @@
+import type { z } from 'zod'
+import {
+  PostAdminModelsImportEndpointApplyResponseSchema,
+  PostAdminModelsImportEndpointPreviewResponseSchema,
+} from '@/generated/api-schemas'
 import type { ModelUnavailableReason } from '@/types/ai-models'
 import { httpClient } from './httpClient'
+
+export type ModelImportPreview = z.infer<typeof PostAdminModelsImportEndpointPreviewResponseSchema>
+export type ModelImportPreviewRow = ModelImportPreview['rows'][number]
+export type ModelImportApplyResult = z.infer<typeof PostAdminModelsImportEndpointApplyResponseSchema>
 
 export interface AdminModel {
   id: number
@@ -113,6 +122,24 @@ export const adminModelsApi = {
     return httpClient<AdminImportApplyResponse>('/api/v1/admin/models/import/apply', {
       method: 'POST',
       body: JSON.stringify(req),
+    })
+  },
+  // Import models an OpenAI-compatible endpoint or Ollama already offers.
+  importEndpointPreview: async (source: string, probe: boolean): Promise<ModelImportPreview> => {
+    return httpClient('/api/v1/admin/models/import/endpoint/preview', {
+      method: 'POST',
+      body: JSON.stringify({ source, probe }),
+      schema: PostAdminModelsImportEndpointPreviewResponseSchema,
+    })
+  },
+  importEndpointApply: async (
+    source: string,
+    rows: { providerId: string; name: string; tags: string[] }[]
+  ): Promise<ModelImportApplyResult> => {
+    return httpClient('/api/v1/admin/models/import/endpoint/apply', {
+      method: 'POST',
+      body: JSON.stringify({ source, rows }),
+      schema: PostAdminModelsImportEndpointApplyResponseSchema,
     })
   },
 }

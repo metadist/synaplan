@@ -1195,6 +1195,26 @@
     }
   },
   "aiInfra": {
+    "modelImport": {
+      "title": "Modelleri içe aktar",
+      "importModels": "Modelleri içe aktar",
+      "importPulled": "İndirilen modelleri içe aktar",
+      "unreachable": "Bu uç nokta yanıt vermedi. Test bölümünden kontrol edip tekrar deneyin.",
+      "empty": "Bu uç nokta içe aktarılacak model sunmuyor.",
+      "selectAllNew": "Tüm yenileri seç",
+      "probeLabel": "Her modelin ne yapabildiğini kontrol et (biraz kredi harcar)",
+      "colModel": "Model",
+      "colTags": "Yetenekler",
+      "colStatus": "Durum",
+      "exists": "Zaten eklendi",
+      "new": "Yeni",
+      "tagsHint": "İzin verilen yetenekler: {tags}. Birden fazlasını virgülle ayırın.",
+      "apply": "{count} içe aktar",
+      "applying": "İçe aktarılıyor…",
+      "applied": "{created} model satırı içe aktarıldı, {skipped} zaten mevcut olan atlandı.",
+      "applyFailed": "Modeller içe aktarılamadı.",
+      "noValidTags": "Seçili her modele en az bir geçerli yetenek verin."
+    },
     "extraction": {
       "lead": "Belgelerin nasıl metne dönüşeceğini seçin. Docling tabloları ve başlıkları korur; çalışmıyorsa Tika kullanılır ve yükleme asla başarısız olmaz.",
       "family": {
