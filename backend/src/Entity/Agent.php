@@ -21,6 +21,7 @@ class Agent
     public const SOURCE_MANUAL = 'manual';
     public const SOURCE_IMPORT = 'import';
     public const SOURCE_SYSTEM = 'system';
+    public const SOURCE_PLUGIN_PREFIX = 'plugin:';
 
     /**
      * Topic prefix of the BPROMPTS row that carries an assistant's instructions.
@@ -249,6 +250,11 @@ class Agent
         $this->touch();
 
         return $this;
+    }
+
+    public static function sourceForPlugin(string $pluginId): string
+    {
+        return self::SOURCE_PLUGIN_PREFIX.$pluginId;
     }
 
     public function isRoutable(): bool

@@ -167,6 +167,37 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Copy assistant Advanced settings (creativity, length, response format)
+     * onto the generation call. Unsupported structured output is ignored.
+     *
+     * @param array<string, mixed> $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function applyProfileGenerationOptions(array $aiOptions, ?RuntimeProfile $profile, int $userId): array
+    {
+        if (!$profile instanceof RuntimeProfile) {
+            return $aiOptions;
+        }
+
+        $params = $profile->parameters;
+        if (isset($params['temperature']) && is_numeric($params['temperature'])) {
+            $aiOptions['temperature'] = max(0.0, min(2.0, (float) $params['temperature']));
+        }
+        if (isset($params['maxTokens']) && is_numeric($params['maxTokens'])) {
+            $requested = max(1, (int) $params['maxTokens']);
+            $existing = $aiOptions['max_tokens'] ?? null;
+            $aiOptions['max_tokens'] = is_int($existing) && $existing > 0 ? min($existing, $requested) : $requested;
+        }
+        $schema = $params['responseSchema'] ?? null;
+        if (is_array($schema) && !array_is_list($schema) && $this->structuredOutputConfig->isEnabled($userId)) {
+            $aiOptions['structured_output'] = $schema;
+        }
+
+        return $aiOptions;
+    }
+
+    /**
      * RAG scope for this turn: an explicit caller scope (widget / API
      * `rag_group_key`) wins, then the RuntimeProfile, then the defaults.
      *
@@ -828,6 +859,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (!empty($tokenLimits)) {
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
+
+        $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
 
         $documentEdit = $this->tryDocumentToolsEdit(
             $topic,
@@ -1559,6 +1592,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         if (!empty($tokenLimits)) {
             $aiOptions['max_tokens'] = min($tokenLimits);
         }
+
+        $aiOptions = $this->applyProfileGenerationOptions($aiOptions, $profile, $message->getUserId());
 
         $this->logger->info('ChatHandler: Calling AiFacade chatStream', [
             'provider' => $provider,

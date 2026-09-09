@@ -27,6 +27,7 @@ use App\Service\PromptService;
 use App\Service\RateLimitService;
 use App\Service\SlackNotificationService;
 use App\Service\UrlContentService;
+use App\Service\Widget\WidgetAgentRuntime;
 use App\Service\WidgetRealtimeBroadcaster;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
@@ -75,6 +76,7 @@ class WidgetPublicController extends AbstractController
         private ChatRunService $chatRunService,
         private string $uploadDir,
         private ChatErrorPresenter $chatErrorPresenter,
+        private ?WidgetAgentRuntime $widgetAgentRuntime = null,
     ) {
     }
 
@@ -776,6 +778,9 @@ class WidgetPublicController extends AbstractController
                 'widget_model_id' => $widgetModelId,
                 'api_context' => $apiContext,
             ];
+            if (null !== $this->widgetAgentRuntime) {
+                $processingOptions = $this->widgetAgentRuntime->apply($widget, $owner, $processingOptions);
+            }
 
             $response = new StreamedResponse(function () use (
                 $incomingMessage,

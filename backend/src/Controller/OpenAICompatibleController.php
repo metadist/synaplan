@@ -13,6 +13,7 @@ use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AssistantAliasResolver;
 use App\Service\Api\OpenAiChatCompletionRequest;
 use App\Service\Api\OpenAiChatCompletionRequestException;
 use App\Service\Api\OpenAiChatCompletionResponder;
@@ -52,6 +53,7 @@ class OpenAICompatibleController extends AbstractController
         private LoggerInterface $logger,
         private OpenAiToolCallingGate $toolCallingGate,
         private OpenAiGatewayToolLoop $toolLoop,
+        private ?AssistantAliasResolver $assistantAliases = null,
     ) {
     }
 
@@ -243,6 +245,9 @@ class OpenAICompatibleController extends AbstractController
             }
             $data[] = $row;
         }
+        foreach ($this->assistantAliases?->listAliases($user) ?? [] as $alias) {
+            $data[] = $alias;
+        }
 
         return new JsonResponse([
             'object' => 'list',
@@ -252,7 +257,26 @@ class OpenAICompatibleController extends AbstractController
 
     private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed): Response
     {
-        $resolvedModel = $this->resolveModel($parsed->model, $user->getId());
+        $messages = $parsed->messages;
+        if ($this->assistantAliases?->isAlias($parsed->model)) {
+            $alias = $this->assistantAliases->resolveAlias($user, (string) $parsed->model);
+            if (null === $alias) {
+                return $this->openAiError(
+                    sprintf('The model `%s` does not exist or is not available.', (string) $parsed->model),
+                    'invalid_request_error',
+                    'model_not_found',
+                    404,
+                );
+            }
+            $resolvedModel = null !== $alias['chatModel']
+                ? $this->resolvedFromEntity($alias['chatModel'])
+                : $this->resolveModel(null, $user->getId());
+            if ('' !== $alias['instruction']) {
+                array_unshift($messages, ['role' => 'system', 'content' => $alias['instruction']]);
+            }
+        } else {
+            $resolvedModel = $this->resolveModel($parsed->model, $user->getId());
+        }
         if (null === $resolvedModel) {
             return $this->openAiError(
                 null !== $parsed->model && '' !== $parsed->model
@@ -295,7 +319,7 @@ class OpenAICompatibleController extends AbstractController
             'model_resolved' => $resolvedModel['providerModelId'],
             'provider' => $resolvedModel['provider'],
             'stream' => $parsed->stream,
-            'messages_count' => count($parsed->messages),
+            'messages_count' => count($messages),
             'tools' => count($parsed->tools),
         ]);
 
@@ -304,10 +328,10 @@ class OpenAICompatibleController extends AbstractController
         $dbModelId = $resolvedModel['model_id'];
 
         if ($parsed->stream) {
-            return $this->handleStream($user, $parsed->messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+            return $this->handleStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
         }
 
-        return $this->handleNonStream($user, $parsed->messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
+        return $this->handleNonStream($user, $messages, $options, $completionId, $created, $resolvedModel['displayModel'], $dbModelId);
     }
 
     /**

@@ -17,6 +17,7 @@ use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
+use App\Service\Agent\Policy\LegacyFlagToolPolicy;
 use App\Service\ModelConfigService;
 use App\Service\RAG\RagScopeResolver;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -48,6 +49,7 @@ final class AgentRuntimeResolverTest extends TestCase
             $this->createMock(AgentAccess::class),
             $this->createMock(MessageMetaRepository::class),
             $ragScopeResolver,
+            new LegacyFlagToolPolicy(),
         );
     }
 

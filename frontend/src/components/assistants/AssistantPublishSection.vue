@@ -12,6 +12,20 @@
       </span>
     </div>
 
+    <label class="flex items-start gap-2">
+      <input
+        type="checkbox"
+        class="mt-1"
+        :checked="store.current?.routable ?? false"
+        data-testid="chk-routable"
+        @change="onRoutable(($event.target as HTMLInputElement).checked)"
+      />
+      <span>
+        <span class="txt-primary text-sm">{{ $t('assistants.routable') }}</span>
+        <span class="block txt-secondary text-sm">{{ $t('assistants.routableHint') }}</span>
+      </span>
+    </label>
+
     <label class="block">
       <span class="txt-secondary text-sm">{{ $t('assistants.changelog') }}</span>
       <textarea
@@ -116,6 +130,31 @@ const shareOpen = ref(false)
 const versions = ref<AgentVersionCard[]>([])
 const usage = ref<AgentUsage>({ byVersion: [], byDay: [] })
 
+function triggerNames(): string[] {
+  const draft = store.current?.draft
+  if (!draft) {
+    return []
+  }
+  const events = draft.triggers.events.map((event) => {
+    if (event.kind === 'mail') return t('assistants.triggers.kindMail')
+    if (event.kind === 'widget') return t('assistants.triggers.kindWidget')
+    if (event.kind === 'whatsapp') return t('assistants.triggers.kindWhatsapp')
+    return String(event.kind)
+  })
+  const schedules = draft.triggers.schedules.map(
+    (item) => item.name || t('assistants.triggers.schedule')
+  )
+  return [...events, ...schedules]
+}
+
+function onRoutable(value: boolean): void {
+  if (!store.current) {
+    return
+  }
+  store.current.routable = value
+  store.markDirty()
+}
+
 const resourceId = computed(() => String(store.current?.id ?? ''))
 const statusLabel = computed(() => {
   const status = store.current?.status
@@ -144,9 +183,13 @@ async function reload(): Promise<void> {
 async function onPublish(): Promise<void> {
   const id = store.current?.id
   if (id == null) return
+  const names = triggerNames()
   const ok = await confirm({
     title: t('assistants.publish'),
-    message: t('assistants.publishConfirm'),
+    message:
+      names.length > 0
+        ? t('assistants.publishConfirmWithTriggers', { names: names.join('\n · ') })
+        : t('assistants.publishConfirm'),
   })
   if (!ok) return
   publishing.value = true

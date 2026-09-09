@@ -31,6 +31,7 @@ final class ScheduleParser
             'interval' => $this->nextInterval($config, $nowUtc),
             'daily' => $this->nextDaily($config, $localNow),
             'weekly' => $this->nextWeekly($config, $localNow),
+            'cron' => $this->nextCron($config, $nowUtc, $tz),
             default => throw new \InvalidArgumentException('Unsupported schedule kind'),
         };
     }
@@ -86,6 +87,22 @@ final class ScheduleParser
         }
 
         throw new \InvalidArgumentException('Could not compute the next run');
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function nextCron(array $config, \DateTimeImmutable $nowUtc, \DateTimeZone $tz): \DateTimeImmutable
+    {
+        $expression = is_string($config['expression'] ?? null) ? $config['expression'] : '';
+        if ('' === $expression && is_string($config['cron'] ?? null)) {
+            $expression = $config['cron'];
+        }
+        if ('' === trim($expression)) {
+            throw new \InvalidArgumentException('Cron expression is missing');
+        }
+
+        return (new CronNextRun())->next($expression, $nowUtc, $tz);
     }
 
     /**

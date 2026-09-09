@@ -563,6 +563,16 @@
             </div>
           </div>
 
+          <div class="mt-4">
+            <ChannelAssistantSelect
+              v-model="dept.agentId"
+              :label="$t('mail.assistant')"
+              :none-label="$t('mail.assistantNone')"
+              :hint="$t('mail.assistantHint')"
+              :test-id="`select-dept-assistant-${dept.id}`"
+            />
+          </div>
+
           <div class="mt-4 pt-4 border-t border-light-border/20 dark:border-dark-border/10">
             <label class="flex items-center gap-2 cursor-pointer group">
               <input
@@ -752,6 +762,7 @@ import {
   PaperAirplaneIcon,
   FunnelIcon,
 } from '@heroicons/vue/24/outline'
+import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import type {
   MailConfig,
@@ -921,6 +932,7 @@ const addDepartment = () => {
       email: '',
       rules: '',
       isDefault: departments.value.length === 0,
+      agentId: null,
     })
   }
 }

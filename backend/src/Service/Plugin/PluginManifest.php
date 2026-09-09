@@ -21,6 +21,7 @@ final readonly class PluginManifest
      * @param array<int, array{command: string, endpoint: string, description: string}>                   $chatCommands  Slash-commands this plugin registers in the chat composer
      * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}> $resourceKinds Shareable kinds declared in provides.resourceKinds
      * @param list<array{port: string, class: string, key: string}>                                       $plugs         Plug adapters declared in provides.plugs
+     * @param list<string>                                                                                $agentPacks    Relative bundle globs declared in provides.agents
      */
     public function __construct(
         public string $name,
@@ -31,6 +32,7 @@ final readonly class PluginManifest
         public array $chatCommands = [],
         public array $resourceKinds = [],
         public array $plugs = [],
+        public array $agentPacks = [],
     ) {
     }
 
@@ -53,6 +55,7 @@ final readonly class PluginManifest
             self::normalizeChatCommands($data['chatCommands'] ?? []),
             self::normalizeResourceKinds($provides['resourceKinds'] ?? [], $name),
             self::normalizePlugs($provides['plugs'] ?? null, self::namespaceOf($data, $name)),
+            self::normalizeAgentPacks($provides['agents'] ?? null),
         );
     }
 
@@ -117,6 +120,39 @@ final readonly class PluginManifest
         }
 
         return $plugs;
+    }
+
+    /**
+     * Relative JSON globs such as `agents/*.json`. Reject path traversal.
+     *
+     * @return list<string>
+     */
+    private static function normalizeAgentPacks(mixed $raw): array
+    {
+        if (null === $raw) {
+            return [];
+        }
+        if (!is_array($raw)) {
+            throw new InvalidPluginManifestException('provides.agents', 'must be an array');
+        }
+
+        $packs = [];
+        foreach ($raw as $index => $entry) {
+            $field = sprintf('provides.agents[%s]', (string) $index);
+            if (!is_string($entry) || '' === trim($entry)) {
+                throw new InvalidPluginManifestException($field, 'must be a relative *.json glob');
+            }
+            $path = str_replace('\\', '/', trim($entry));
+            if (str_starts_with($path, '/') || str_contains($path, '..')) {
+                throw new InvalidPluginManifestException($field, 'must stay inside the plugin directory');
+            }
+            if (!str_ends_with($path, '.json')) {
+                throw new InvalidPluginManifestException($field, 'must end with .json');
+            }
+            $packs[] = $path;
+        }
+
+        return $packs;
     }
 
     /**

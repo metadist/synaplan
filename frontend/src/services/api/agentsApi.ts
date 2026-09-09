@@ -12,6 +12,7 @@ import {
   GetApiAgentsVersionsResponseSchema,
   GetApiAgentsVersionResponseSchema,
   GetApiAgentsUsageResponseSchema,
+  GetApiAgentsTriggersResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
@@ -76,6 +77,12 @@ export type AgentVersionDetail = NonNullable<
 export type AgentUsage = {
   byVersion: NonNullable<z.infer<typeof GetApiAgentsUsageResponseSchema>['byVersion']>
   byDay: NonNullable<z.infer<typeof GetApiAgentsUsageResponseSchema>['byDay']>
+}
+
+export type AgentTriggers = {
+  savedTasksEnabled: boolean
+  availableKinds: string[]
+  rows: NonNullable<z.infer<typeof GetApiAgentsTriggersResponseSchema>['rows']>
 }
 
 export const agentsApi = {
@@ -176,6 +183,18 @@ export const agentsApi = {
     return {
       byVersion: data.byVersion ?? [],
       byDay: data.byDay ?? [],
+    }
+  },
+
+  async triggers(id: number): Promise<AgentTriggers> {
+    const data = await httpClient(`/api/v1/agents/${id}/triggers`, {
+      method: 'GET',
+      schema: GetApiAgentsTriggersResponseSchema,
+    })
+    return {
+      savedTasksEnabled: data.savedTasksEnabled ?? false,
+      availableKinds: data.availableKinds ?? [],
+      rows: data.rows ?? [],
     }
   },
 }

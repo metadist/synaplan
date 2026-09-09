@@ -11,6 +11,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
@@ -20,6 +21,7 @@ use App\Service\Multitask\Skill\SkillCatalog;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\SelfAwareConfig;
 use Psr\Log\LoggerInterface;
 
@@ -128,7 +130,8 @@ final readonly class TaskPlanner
             return $this->fallback($language, ['planner output was not valid JSON'], $modelId, $raw, $planningUsage);
         }
 
-        $errors = $this->validator->validate($decoded);
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
             $this->logger->info('TaskPlanner: plan failed validation, falling back', [
                 'errors' => $errors,
@@ -139,7 +142,7 @@ final readonly class TaskPlanner
 
         try {
             /** @var array<string, mixed> $decoded */
-            $plan = TaskPlan::fromArray($decoded, $this->validator);
+            $plan = TaskPlan::fromArray($decoded, $this->validator, $allowed);
         } catch (\Throwable $e) {
             return $this->fallback($language, ['plan build failed: '.$e->getMessage()], $modelId, $raw, $planningUsage);
         }
@@ -296,7 +299,9 @@ final readonly class TaskPlanner
         $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
         $topic = is_string($classification['topic'] ?? null) ? $classification['topic'] : '';
         if ('' === $topic) {
-            return [];
+            $allowed = $this->allowedCapabilitiesFromOptions($options);
+
+            return null !== $allowed ? ['allowedCapabilities' => $allowed] : [];
         }
 
         $topicMetadata = [];
@@ -312,7 +317,32 @@ final readonly class TaskPlanner
             ]);
         }
 
-        return ['topic' => $topic, 'topic_metadata' => $topicMetadata];
+        $context = ['topic' => $topic, 'topic_metadata' => $topicMetadata];
+        $allowed = $this->allowedCapabilitiesFromOptions($options);
+        if (null !== $allowed) {
+            $context['allowedCapabilities'] = $allowed;
+        }
+
+        return $context;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return list<string>|null
+     */
+    private function allowedCapabilitiesFromOptions(array $options): ?array
+    {
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        if (!$profile instanceof RuntimeProfile) {
+            return null;
+        }
+
+        return SkillPolicy::allowedCapabilities($profile);
     }
 
     /**

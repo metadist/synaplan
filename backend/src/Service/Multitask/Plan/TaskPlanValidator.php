@@ -26,11 +26,12 @@ final class TaskPlanValidator
     private const MAX_NODES = 24;
 
     /**
-     * @param mixed $payload decoded JSON (expected: associative array)
+     * @param mixed             $payload             decoded JSON (expected: associative array)
+     * @param list<string>|null $allowedCapabilities null = unrestricted; a step outside the list is `capability_not_allowed:{name}`
      *
      * @return list<string> validation errors (empty list == valid)
      */
-    public function validate(mixed $payload): array
+    public function validate(mixed $payload, ?array $allowedCapabilities = null): array
     {
         $errors = [];
 
@@ -79,6 +80,8 @@ final class TaskPlanValidator
             $capability = $node['capability'] ?? null;
             if (!is_string($capability) || !in_array($capability, $capabilities, true)) {
                 $errors[] = sprintf("%s.capability '%s' is not a known capability", $label, is_string($capability) ? $capability : gettype($capability));
+            } elseif (null !== $allowedCapabilities && !in_array($capability, $allowedCapabilities, true)) {
+                $errors[] = 'capability_not_allowed:'.$capability;
             }
 
             if (array_key_exists('depends_on', $node) && !$this->isListOfStrings($node['depends_on'])) {

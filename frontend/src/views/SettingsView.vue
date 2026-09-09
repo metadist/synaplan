@@ -104,6 +104,7 @@
           </div>
 
           <WebSearchProviderSetting v-if="authStore.isAuthenticated" />
+          <ExportImportPanel v-if="authStore.isAuthenticated" />
 
           <!-- Account Info (signed-in users only — a guest has nothing to show here) -->
           <div
@@ -150,6 +151,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import NativeServerControl from '@/components/NativeServerControl.vue'
 import WebSearchProviderSetting from '@/components/settings/WebSearchProviderSetting.vue'
+import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
 import { isNativeServerControlAvailable } from '@/services/api/nativeServer'
 import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/vue/24/outline'
 

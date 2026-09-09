@@ -202,6 +202,10 @@ final readonly class SavedTaskRunner
         if (!str_starts_with($prompt->getTopic(), self::CHAT_INSTRUCTION_TOPIC_PREFIX)) {
             $options['fixed_task_prompt'] = $prompt->getTopic();
         }
+        $agentId = (int) ($task->getTriggerConfig()['agentId'] ?? 0);
+        if ($agentId > 0) {
+            $options['agentId'] = $agentId;
+        }
 
         return $options;
     }

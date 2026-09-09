@@ -23,6 +23,7 @@ final readonly class AgentPublisher
         private AgentRepository $agents,
         private PromptRepository $prompts,
         private EntityManagerInterface $em,
+        private ?AgentTriggerMaterializer $materializer = null,
     ) {
     }
 
@@ -61,6 +62,8 @@ final readonly class AgentPublisher
             $agent->setStatus(Agent::STATUS_PUBLISHED);
             $this->agents->save($agent);
         });
+
+        $this->materializer?->sync($agent);
 
         return $version;
     }

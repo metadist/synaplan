@@ -100,6 +100,7 @@ export const useAgentsStore = defineStore('agents', () => {
         description: agent.description ?? null,
         icon: agent.icon,
         draft: agent.draft,
+        routable: agent.routable,
       })
       const local = current.value
       if (local && local.id === saved.id && dirty.value) {

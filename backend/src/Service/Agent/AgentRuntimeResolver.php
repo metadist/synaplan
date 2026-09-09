@@ -20,6 +20,7 @@ use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentArchivedException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotPublishedException;
+use App\Service\Agent\Policy\ToolPolicySourceInterface;
 use App\Service\Iam\Permission;
 use App\Service\ModelConfigService;
 use App\Service\RAG\RagScopeResolver;
@@ -44,6 +45,7 @@ final readonly class AgentRuntimeResolver
         private AgentAccess $access,
         private MessageMetaRepository $messageMeta,
         private RagScopeResolver $ragScopeResolver,
+        private ToolPolicySourceInterface $toolPolicy,
     ) {
     }
 
@@ -130,15 +132,7 @@ final readonly class AgentRuntimeResolver
             $notes[] = 'scope_dropped:'.$scope['ownerId'].':'.$scope['groupKey'];
         }
 
-        $tools = $definition->tools();
-        $toolFlags = [
-            'tool_internet' => (bool) ($tools['internet'] ?? true),
-            'tool_files' => (bool) ($tools['files'] ?? true),
-        ];
-        if (isset($tools['mcpServers']) && is_array($tools['mcpServers']) && [] !== $tools['mcpServers']) {
-            $toolFlags['tool_mcp'] = true;
-            $toolFlags['mcp_servers'] = $tools['mcpServers'];
-        }
+        $toolFlags = $this->toolPolicy->flagsFromDefinition($definition->tools());
 
         $skills = $definition->skills();
         $skillAllow = isset($skills['allow']) && is_array($skills['allow']) && [] !== $skills['allow']

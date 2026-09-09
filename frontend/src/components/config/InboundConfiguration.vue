@@ -27,6 +27,16 @@
           </div>
         </div>
       </div>
+      <div class="mt-4">
+        <ChannelAssistantSelect
+          :model-value="whatsappAgentId"
+          :label="$t('channels.whatsappAssistant')"
+          @update:model-value="saveWhatsappAssistant"
+          :none-label="$t('channels.whatsappAssistantNone')"
+          :hint="$t('channels.whatsappAssistantHint')"
+          test-id="select-whatsapp-assistant"
+        />
+      </div>
     </div>
 
     <PhoneVerification />
@@ -138,7 +148,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
+import { getWhatsAppAssistant, setWhatsAppAssistant } from '@/services/api/whatsappAssistantApi'
 import {
   mockWhatsAppChannels,
   mockAPIConfig,
@@ -171,6 +183,7 @@ const originalData = ref({
 })
 
 // Computed refs for template access
+const whatsappAgentId = ref<number | null>(null)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
   const channels: EmailChannel[] = [
@@ -219,7 +232,26 @@ const loadEmailKeyword = async () => {
 onMounted(async () => {
   cleanupGuard = setupNavigationGuard()
   await loadEmailKeyword()
+  try {
+    whatsappAgentId.value = await getWhatsAppAssistant()
+  } catch {
+    whatsappAgentId.value = null
+  }
 })
+
+// Saved on user interaction only — a watcher would also fire for the value
+// loaded on mount and greet the user with a save toast they never triggered.
+async function saveWhatsappAssistant(id: number | null): Promise<void> {
+  const previous = whatsappAgentId.value
+  whatsappAgentId.value = id
+  try {
+    await setWhatsAppAssistant(id)
+    success(t('channels.whatsappAssistantSaved'))
+  } catch {
+    whatsappAgentId.value = previous
+    error(t('channels.whatsappAssistantFailed'))
+  }
+}
 
 onUnmounted(() => {
   cleanupGuard?.()

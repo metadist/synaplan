@@ -22,8 +22,10 @@ final readonly class AgentConfig
 {
     public const CONFIG_GROUP = 'AGENTS';
     public const KEY_ENABLED = 'ENABLED';
+    public const KEY_ROUTABLE_ENABLED = 'ROUTABLE_ENABLED';
 
     private const DEFAULT_ENABLED = false;
+    private const DEFAULT_ROUTABLE_ENABLED = false;
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -34,6 +36,15 @@ final readonly class AgentConfig
     public function isEnabled(?int $userId): bool
     {
         return $this->resolveFlag(self::KEY_ENABLED, $userId, self::DEFAULT_ENABLED);
+    }
+
+    /**
+     * When off (the seeded default) the sorter never sees `agent:{slug}`
+     * topics, so existing routing snapshots stay byte-identical.
+     */
+    public function isRoutableEnabled(?int $userId): bool
+    {
+        return $this->resolveFlag(self::KEY_ROUTABLE_ENABLED, $userId, self::DEFAULT_ROUTABLE_ENABLED);
     }
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool

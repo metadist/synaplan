@@ -29,11 +29,16 @@ final class ClassificationPlanMapper
      * Wrap a classification array into a degenerate single-node plan.
      *
      * @param array<string, mixed> $classification
+     * @param list<string>|null    $allowedCapabilities capabilities the assistant may plan; a
+     *                                                  classification outside the list degrades to chat
      */
-    public function toSingleNodePlan(array $classification): TaskPlan
+    public function toSingleNodePlan(array $classification, ?array $allowedCapabilities = null): TaskPlan
     {
         $language = is_string($classification['language'] ?? null) ? $classification['language'] : 'en';
         $capability = $this->capabilityForClassification($classification);
+        if (null !== $allowedCapabilities && !in_array($capability->value, $allowedCapabilities, true)) {
+            $capability = Capability::Chat;
+        }
 
         return TaskPlan::fromArray([
             'version' => 1,
@@ -44,7 +49,7 @@ final class ClassificationPlanMapper
                 'capability' => $capability->value,
                 'params' => [self::CLASSIFICATION_KEY => $classification],
             ]],
-        ]);
+        ], null, $allowedCapabilities);
     }
 
     /**

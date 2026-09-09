@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BWIDGETID'], name: 'idx_widget_id')]
 #[ORM\Index(columns: ['BOWNERID'], name: 'idx_widget_owner')]
 #[ORM\Index(columns: ['BSTATUS'], name: 'idx_widget_status')]
+#[ORM\Index(columns: ['BAGENTID'], name: 'idx_widgets_agent')]
 class Widget
 {
     #[ORM\Id]
@@ -29,6 +30,9 @@ class Widget
 
     #[ORM\Column(name: 'BTASKPROMPT', length: 128)]
     private string $taskPromptTopic;
+
+    #[ORM\Column(name: 'BAGENTID', type: 'bigint', nullable: true)]
+    private ?int $agentId = null;
 
     #[ORM\Column(name: 'BNAME', length: 128)]
     private string $name;
@@ -108,6 +112,18 @@ class Widget
     public function setTaskPromptTopic(string $taskPromptTopic): self
     {
         $this->taskPromptTopic = $taskPromptTopic;
+
+        return $this;
+    }
+
+    public function getAgentId(): ?int
+    {
+        return $this->agentId;
+    }
+
+    public function setAgentId(?int $agentId): self
+    {
+        $this->agentId = $agentId;
 
         return $this;
     }

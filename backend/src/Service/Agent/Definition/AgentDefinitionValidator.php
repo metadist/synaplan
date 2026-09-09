@@ -336,28 +336,275 @@ final class AgentDefinitionValidator
         }
         $this->rejectUnknown(array_keys($triggers), self::TRIGGER_KEYS, 'triggers');
 
+        $seenIds = [];
         $events = [];
         if (isset($triggers['events'])) {
-            $events = $this->objectList($triggers['events'], 'triggers.events', self::EVENT_KEYS, function (array $item, string $path): void {
-                if (isset($item['kind']) && (!is_string($item['kind']) || !in_array($item['kind'], self::EVENT_KINDS, true))) {
-                    throw $this->fail($path.'.kind', 'unknown event kind');
-                }
-                if (isset($item['id']) && (!is_string($item['id']) || '' === $item['id'])) {
-                    throw $this->fail($path.'.id', 'id must be a non-empty string');
-                }
+            $raw = $this->objectList($triggers['events'], 'triggers.events', self::EVENT_KEYS, static function (array $_item, string $_path): void {
             });
+            foreach ($raw as $i => $item) {
+                $events[] = $this->normalizeEvent($item, 'triggers.events.'.$i, $seenIds);
+            }
         }
 
         $schedules = [];
         if (isset($triggers['schedules'])) {
-            $schedules = $this->objectList($triggers['schedules'], 'triggers.schedules', self::SCHEDULE_KEYS, function (array $item, string $path): void {
-                if (isset($item['id']) && (!is_string($item['id']) || '' === $item['id'])) {
-                    throw $this->fail($path.'.id', 'id must be a non-empty string');
-                }
+            $raw = $this->objectList($triggers['schedules'], 'triggers.schedules', self::SCHEDULE_KEYS, static function (array $_item, string $_path): void {
             });
+            foreach ($raw as $i => $item) {
+                $schedules[] = $this->normalizeSchedule($item, 'triggers.schedules.'.$i, $seenIds);
+            }
         }
 
         return ['events' => $events, 'schedules' => $schedules];
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @param array<string, true>  $seenIds
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeEvent(array $item, string $path, array &$seenIds): array
+    {
+        $id = $this->requireTriggerId($item['id'] ?? null, $path.'.id', $seenIds);
+        $kind = $item['kind'] ?? null;
+        if (!is_string($kind) || !in_array($kind, self::EVENT_KINDS, true)) {
+            throw $this->fail($path.'.kind', 'unknown event kind');
+        }
+
+        $out = [
+            'id' => $id,
+            'kind' => $kind,
+            'enabled' => !array_key_exists('enabled', $item) || (bool) $item['enabled'],
+        ];
+
+        if (isset($item['instruction'])) {
+            if (!is_string($item['instruction'])) {
+                throw $this->fail($path.'.instruction', 'instruction must be a string');
+            }
+            $out['instruction'] = $item['instruction'];
+        }
+
+        if ('mail' === $kind) {
+            $mailbox = $item['mailbox'] ?? null;
+            if (!is_string($mailbox) || 1 !== preg_match('/^\d+:\d+$/', $mailbox)) {
+                throw $this->fail($path.'.mailbox', 'mailbox must be "{ownerId}:{handlerId}"');
+            }
+            $out['mailbox'] = $mailbox;
+            $hasRule = isset($item['rule']);
+            $hasDepartment = isset($item['department']);
+            if ($hasRule && $hasDepartment) {
+                throw $this->fail($path, 'mail event cannot set both rule and department');
+            }
+            if ($hasDepartment) {
+                if (!is_string($item['department']) || '' === trim((string) $item['department'])) {
+                    throw $this->fail($path.'.department', 'department must be a non-empty string');
+                }
+                $out['department'] = trim((string) $item['department']);
+            } else {
+                $out['rule'] = $this->normalizeMailRule($item['rule'] ?? ['from' => [], 'contains' => [], 'match' => 'any'], $path.'.rule');
+            }
+        }
+
+        if ('widget' === $kind) {
+            $widget = $item['widget'] ?? null;
+            if (!is_string($widget) || 1 !== preg_match('/^\d+:[A-Za-z0-9_-]+$/', $widget)) {
+                throw $this->fail($path.'.widget', 'widget must be "{ownerId}:{widgetId}"');
+            }
+            $out['widget'] = $widget;
+            if (isset($item['widgetDefaults'])) {
+                if (!is_array($item['widgetDefaults']) || array_is_list($item['widgetDefaults'])) {
+                    throw $this->fail($path.'.widgetDefaults', 'widgetDefaults must be an object');
+                }
+                $out['widgetDefaults'] = $item['widgetDefaults'];
+            }
+        }
+
+        if ('whatsapp' === $kind && isset($item['number'])) {
+            if (!is_string($item['number'])) {
+                throw $this->fail($path.'.number', 'number must be a string');
+            }
+            $out['number'] = $item['number'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @param array<string, true>  $seenIds
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeSchedule(array $item, string $path, array &$seenIds): array
+    {
+        $id = $this->requireTriggerId($item['id'] ?? null, $path.'.id', $seenIds);
+        $name = $item['name'] ?? null;
+        if (!is_string($name) || '' === trim($name)) {
+            throw $this->fail($path.'.name', 'name is required');
+        }
+        $tz = $item['tz'] ?? null;
+        if (!is_string($tz) || '' === trim($tz)) {
+            throw $this->fail($path.'.tz', 'tz is required');
+        }
+        try {
+            new \DateTimeZone($tz);
+        } catch (\Exception) {
+            throw $this->fail($path.'.tz', 'unknown timezone');
+        }
+        $instruction = $item['instruction'] ?? null;
+        if (!is_string($instruction) || '' === trim($instruction)) {
+            throw $this->fail($path.'.instruction', 'schedule instruction is required');
+        }
+
+        $cron = isset($item['cron']) && is_string($item['cron']) ? trim($item['cron']) : '';
+        $every = isset($item['every']) && is_array($item['every']) ? $item['every'] : null;
+        if ('' === $cron && null === $every) {
+            throw $this->fail($path, 'schedule needs every or cron');
+        }
+        if (null !== $every) {
+            $cron = $this->everyToCron($every, $path.'.every');
+        }
+        if ($this->cronTooFrequent($cron)) {
+            throw $this->fail($path.'.cron', 'shortest interval is 15 minutes');
+        }
+
+        $out = [
+            'id' => $id,
+            'name' => trim($name),
+            'cron' => $cron,
+            'tz' => $tz,
+            'instruction' => trim($instruction),
+            'allowUnattended' => (bool) ($item['allowUnattended'] ?? false),
+            'enabled' => !array_key_exists('enabled', $item) || (bool) $item['enabled'],
+        ];
+        if (null !== $every) {
+            $out['every'] = $every;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, true> $seenIds
+     */
+    private function requireTriggerId(mixed $id, string $path, array &$seenIds): string
+    {
+        if (!is_string($id) || 1 !== preg_match('/^[a-z0-9-]{2,32}$/', $id)) {
+            throw $this->fail($path, 'id must match [a-z0-9-]{2,32}');
+        }
+        if (isset($seenIds[$id])) {
+            throw $this->fail($path, 'duplicate trigger id');
+        }
+        $seenIds[$id] = true;
+
+        return $id;
+    }
+
+    /**
+     * @return array{from: list<string>, contains: list<string>, match: 'any'|'all'}
+     */
+    private function normalizeMailRule(mixed $rule, string $path): array
+    {
+        if (!is_array($rule) || array_is_list($rule)) {
+            throw $this->fail($path, 'rule must be an object');
+        }
+        $match = $rule['match'] ?? 'any';
+        if (!in_array($match, ['any', 'all'], true)) {
+            throw $this->fail($path.'.match', 'match must be any or all');
+        }
+
+        return [
+            'from' => $this->stringList($rule['from'] ?? [], $path.'.from'),
+            'contains' => $this->stringList($rule['contains'] ?? [], $path.'.contains'),
+            'match' => $match,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $every
+     */
+    private function everyToCron(array $every, string $path): string
+    {
+        $unit = $every['unit'] ?? null;
+        if (!is_string($unit) || !in_array($unit, ['hour', 'day', 'weekday', 'week', 'month'], true)) {
+            throw $this->fail($path.'.unit', 'unit must be hour, day, weekday, week or month');
+        }
+        $at = is_string($every['at'] ?? null) ? $every['at'] : '08:00';
+        if (1 !== preg_match('/^(\d{2}):(\d{2})$/', $at, $m)) {
+            throw $this->fail($path.'.at', 'time must be HH:MM');
+        }
+        $hour = (int) $m[1];
+        $minute = (int) $m[2];
+        if ($hour > 23 || $minute > 59) {
+            throw $this->fail($path.'.at', 'time must be HH:MM');
+        }
+        $on = is_string($every['on'] ?? null) ? strtolower($every['on']) : '';
+
+        return match ($unit) {
+            'hour' => sprintf('%d * * * *', $minute),
+            'day' => sprintf('%d %d * * *', $minute, $hour),
+            'weekday' => sprintf('%d %d * * 1-5', $minute, $hour),
+            'week' => sprintf('%d %d * * %d', $minute, $hour, $this->weekdayToCron($on, $path.'.on')),
+            'month' => sprintf('%d %d %d * *', $minute, $hour, $this->monthDay($on, $path.'.on')),
+        };
+    }
+
+    private function weekdayToCron(string $on, string $path): int
+    {
+        $map = [
+            'sun' => 0, 'sunday' => 0, '0' => 0, '7' => 0,
+            'mon' => 1, 'monday' => 1, '1' => 1,
+            'tue' => 2, 'tuesday' => 2, '2' => 2,
+            'wed' => 3, 'wednesday' => 3, '3' => 3,
+            'thu' => 4, 'thursday' => 4, '4' => 4,
+            'fri' => 5, 'friday' => 5, '5' => 5,
+            'sat' => 6, 'saturday' => 6, '6' => 6,
+        ];
+        if ('' === $on) {
+            return 1;
+        }
+        if (!isset($map[$on])) {
+            throw $this->fail($path, 'unknown weekday');
+        }
+
+        return $map[$on];
+    }
+
+    private function monthDay(string $on, string $path): int
+    {
+        $day = '' === $on ? 1 : (int) $on;
+        if ($day < 1 || $day > 31) {
+            throw $this->fail($path, 'month day must be 1-31');
+        }
+
+        return $day;
+    }
+
+    private function cronTooFrequent(string $cron): bool
+    {
+        $parts = preg_split('/\s+/', trim($cron)) ?: [];
+        if (5 !== count($parts)) {
+            return true;
+        }
+        $minutes = $parts[0];
+        if ('*' === $minutes) {
+            return true;
+        }
+        if (1 === preg_match('#^\*/(\d+)$#', $minutes, $m)) {
+            return (int) $m[1] < 15;
+        }
+        if (str_contains($minutes, ',')) {
+            $vals = array_map(intval(...), explode(',', $minutes));
+            sort($vals);
+            for ($i = 1, $n = count($vals); $i < $n; ++$i) {
+                if ($vals[$i] - $vals[$i - 1] < 15) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

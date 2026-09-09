@@ -370,6 +370,10 @@ final readonly class MessageProcessor
             // question words (which would search "what is that").
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
+            $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
+            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
+                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
+            }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);
@@ -856,6 +860,10 @@ final readonly class MessageProcessor
 
             $searchResults = null;
             $topic = $classification['topic'] ?? 'general';
+            $profile = $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null;
+            if ($profile instanceof RuntimeProfile && array_key_exists('tool_internet', $profile->toolFlags)) {
+                $promptMetadata['tool_internet'] = (bool) $profile->toolFlags['tool_internet'];
+            }
             $promptToolInternet = $promptMetadata['tool_internet'] ?? null;
             $classifierVote = $classification['web_search'] ?? null;
             $userRequestedSearch = $this->userRequestedSearch($options);

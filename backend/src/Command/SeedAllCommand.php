@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Seed\AgentConfigSeeder;
 use App\Seed\BrandingConfigSeeder;
+use App\Seed\BundleConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\DesktopAgentConfigSeeder;
@@ -66,6 +67,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  17b. iam          (BCONFIG: IAM.* flags, ownerId=0 — default OFF)
  *  17c. agents       (BCONFIG: AGENTS.ENABLED, ownerId=0 — default OFF)
  *  17d. platform-links (BCONFIG: PLATFORM_LINKS.ENABLED, ownerId=0 — default OFF)
+ *  17e. bundle       (BCONFIG: BUNDLE.ENABLED, ownerId=0 — default OFF)
  *  18. self-aware    (BCONFIG: SELF_AWARE flags, ownerId=0 — default ON)
  *  19. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
  *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
@@ -105,6 +107,7 @@ final class SeedAllCommand extends Command
         private readonly DesktopAgentConfigSeeder $desktopAgentConfigSeeder,
         private readonly IamConfigSeeder $iamConfigSeeder,
         private readonly AgentConfigSeeder $agentConfigSeeder,
+        private readonly BundleConfigSeeder $bundleConfigSeeder,
         private readonly PlatformLinksConfigSeeder $platformLinksConfigSeeder,
         private readonly SelfAwareConfigSeeder $selfAwareConfigSeeder,
         private readonly StructuredOutputConfigSeeder $structuredOutputConfigSeeder,
@@ -141,6 +144,7 @@ final class SeedAllCommand extends Command
             "  17b. iam flags                 (BCONFIG, group=IAM, ownerId=0 — default OFF)\n".
             "  17c. agents flag               (BCONFIG, group=AGENTS, ownerId=0 — default OFF)\n".
             "  17d. platform-links flag       (BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default OFF)\n".
+            "  17e. bundle flag               (BCONFIG, group=BUNDLE, ownerId=0 — default OFF)\n".
             "  18. self-aware flags           (BCONFIG, group=SELF_AWARE, ownerId=0 — default ON)\n".
             "  19. structured-output flag     (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
             "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
@@ -178,6 +182,7 @@ final class SeedAllCommand extends Command
             ['desktop-agent', fn (): SeedResult => $this->desktopAgentConfigSeeder->seed()],
             ['iam', fn (): SeedResult => $this->iamConfigSeeder->seed()],
             ['agents', fn (): SeedResult => $this->agentConfigSeeder->seed()],
+            ['bundle', fn (): SeedResult => $this->bundleConfigSeeder->seed()],
             ['platform-links', fn (): SeedResult => $this->platformLinksConfigSeeder->seed()],
             ['self-aware', fn (): SeedResult => $this->selfAwareConfigSeeder->seed()],
             ['structured-output', fn (): SeedResult => $this->structuredOutputConfigSeeder->seed()],

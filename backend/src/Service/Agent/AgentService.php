@@ -36,6 +36,7 @@ final readonly class AgentService
         private AgentCascadeCleanup $cascade,
         private UserRepository $users,
         private AgentSerializer $serializer,
+        private ?AgentTriggerMaterializer $materializer = null,
     ) {
     }
 
@@ -148,6 +149,7 @@ final readonly class AgentService
     {
         $this->applyStatus($agent, Agent::STATUS_ARCHIVED);
         $this->agents->save($agent);
+        $this->materializer?->disable($agent);
 
         return $agent;
     }
@@ -266,6 +268,41 @@ final readonly class AgentService
             $agent->setIcon($source->getIcon());
         }
 
+        $this->agents->save($agent);
+
+        return $agent;
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     */
+    public function importDraft(
+        User $owner,
+        string $name,
+        string $preferredSlug,
+        array $draft,
+        ?string $instruction = null,
+        ?string $description = null,
+        ?string $icon = null,
+        string $source = Agent::SOURCE_IMPORT,
+    ): Agent {
+        $ownerId = (int) $owner->getId();
+        $definition = $this->validator->validate($draft);
+        $base = AgentSlugger::from($preferredSlug);
+        if ($this->agents->slugTaken($ownerId, $base)) {
+            $base = AgentSlugger::from($preferredSlug.'-imported');
+        }
+        $slug = $this->uniqueSlug($ownerId, $base);
+        $promptId = $this->createInstructionPrompt($ownerId, $slug, $name, $instruction);
+        $agent = new Agent($ownerId, $promptId, $slug, $name, $definition->toArray());
+        $agent->setSource('' !== $source ? $source : Agent::SOURCE_IMPORT);
+        if (null !== $description && '' !== trim($description)) {
+            $agent->setDescription(trim($description));
+        }
+        if (null !== $icon && '' !== $icon) {
+            $this->assertIcon($icon);
+            $agent->setIcon($icon);
+        }
         $this->agents->save($agent);
 
         return $agent;
@@ -407,5 +444,22 @@ final readonly class AgentService
         }
 
         return self::DEFAULT_INSTRUCTION;
+    }
+
+    /**
+     * Published, routable assistants this user may use.
+     *
+     * @return list<Agent>
+     */
+    public function routableForUser(User $user): array
+    {
+        $out = [];
+        foreach ($this->agents->findPublishedRoutable() as $agent) {
+            if ($this->access->can($user, $agent, Permission::Use)) {
+                $out[] = $agent;
+            }
+        }
+
+        return $out;
     }
 }
