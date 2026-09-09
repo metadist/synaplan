@@ -8,7 +8,9 @@ import { httpClient } from './httpClient'
 
 export type ModelImportPreview = z.infer<typeof PostAdminModelsImportEndpointPreviewResponseSchema>
 export type ModelImportPreviewRow = ModelImportPreview['rows'][number]
-export type ModelImportApplyResult = z.infer<typeof PostAdminModelsImportEndpointApplyResponseSchema>
+export type ModelImportApplyResult = z.infer<
+  typeof PostAdminModelsImportEndpointApplyResponseSchema
+>
 
 export interface AdminModel {
   id: number

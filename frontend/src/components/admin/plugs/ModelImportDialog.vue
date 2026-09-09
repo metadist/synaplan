@@ -5,7 +5,9 @@
     @click.self="close"
   >
     <div class="surface-card rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="flex items-center justify-between p-5 border-b border-light-border/30 dark:border-dark-border/20">
+      <div
+        class="flex items-center justify-between p-5 border-b border-light-border/30 dark:border-dark-border/20"
+      >
         <div>
           <h2 class="text-lg font-semibold txt-primary">{{ $t('aiInfra.modelImport.title') }}</h2>
           <p class="text-sm txt-secondary mt-0.5">{{ label }}</p>
@@ -26,7 +28,11 @@
           <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
         </div>
 
-        <div v-else-if="!endpointOk" class="surface-card rounded-lg p-6 text-center" data-testid="model-import-unreachable">
+        <div
+          v-else-if="!endpointOk"
+          class="surface-card rounded-lg p-6 text-center"
+          data-testid="model-import-unreachable"
+        >
           <Icon icon="mdi:cloud-alert" class="w-8 h-8 mx-auto text-[var(--status-warning)]" />
           <p class="txt-secondary mt-3">{{ error || $t('aiInfra.modelImport.unreachable') }}</p>
           <button
@@ -119,14 +125,12 @@
                     </div>
                   </td>
                   <td class="py-2 px-2 align-top">
-                    <span
-                      v-if="row.exists"
-                      class="pill text-[10px] px-1.5 py-0.5 txt-secondary"
-                    >{{ $t('aiInfra.modelImport.exists') }}</span>
-                    <span
-                      v-else
-                      class="pill text-[10px] px-1.5 py-0.5 text-[var(--brand)]"
-                    >{{ $t('aiInfra.modelImport.new') }}</span>
+                    <span v-if="row.exists" class="pill text-[10px] px-1.5 py-0.5 txt-secondary">{{
+                      $t('aiInfra.modelImport.exists')
+                    }}</span>
+                    <span v-else class="pill text-[10px] px-1.5 py-0.5 text-[var(--brand)]">{{
+                      $t('aiInfra.modelImport.new')
+                    }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -140,7 +144,9 @@
         </template>
       </div>
 
-      <div class="flex items-center justify-end gap-2 p-5 border-t border-light-border/30 dark:border-dark-border/20">
+      <div
+        class="flex items-center justify-end gap-2 p-5 border-t border-light-border/30 dark:border-dark-border/20"
+      >
         <button
           type="button"
           class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
@@ -155,7 +161,11 @@
           data-testid="model-import-apply"
           @click="apply"
         >
-          {{ applying ? $t('aiInfra.modelImport.applying') : $t('aiInfra.modelImport.apply', { count: selectedCount }) }}
+          {{
+            applying
+              ? $t('aiInfra.modelImport.applying')
+              : $t('aiInfra.modelImport.apply', { count: selectedCount })
+          }}
         </button>
       </div>
     </div>

@@ -93,7 +93,9 @@ describe('ModelImportDialog', () => {
     await flushPromises()
 
     // Edit the new row's tags; an unknown tag must be dropped by the parser.
-    await wrapper.get('[data-testid="model-import-tags-Qwen/Qwen3-32B"]').setValue('chat, pic2text, bogus')
+    await wrapper
+      .get('[data-testid="model-import-tags-Qwen/Qwen3-32B"]')
+      .setValue('chat, pic2text, bogus')
     await wrapper.get('[data-testid="model-import-apply"]').trigger('click')
     await flushPromises()
 
