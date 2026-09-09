@@ -15,6 +15,21 @@
       imperative writes are safe and persistent.
     -->
     <div ref="contentRef" data-testid="message-text"></div>
+    <!--
+      Hover popups live in a body portal. The chat bubble uses overflow-x-auto
+      (which CSS treats as overflow-y:auto too) and V2 applies transform +
+      backdrop-filter on the row/bubble, so an in-flow absolute tooltip is
+      clipped by the DAG card / bubble border.
+    -->
+    <Teleport to="body">
+      <div
+        v-if="hoverTooltip"
+        ref="portalHostRef"
+        class="memory-tooltip-portal fixed z-[300] pointer-events-none"
+        :style="hoverTooltip.style"
+        data-testid="memory-tooltip-portal"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -53,6 +68,8 @@ const { theme } = useTheme()
 const configStore = useConfigStore()
 const { warning } = useNotification()
 const containerRef = ref<HTMLElement | null>(null)
+const hoverTooltip = ref<{ style: Record<string, string> } | null>(null)
+const portalHostRef = ref<HTMLElement | null>(null)
 // The element that holds the rendered markdown. Written imperatively via
 // `applyHtml` (morphdom), never via v-html — see the template comment.
 const contentRef = ref<HTMLElement | null>(null)
@@ -308,6 +325,69 @@ async function fetchMemoriesWithRetryBestEffort(): Promise<void> {
 
     void fetchMemoriesWithRetryBestEffort()
   }, delay)
+}
+
+function hideHoverTooltip(): void {
+  hoverTooltip.value = null
+}
+
+function fillPortal(source: Element): void {
+  const host = portalHostRef.value
+  if (!host) return
+  host.replaceChildren()
+  for (const child of Array.from(source.childNodes)) {
+    host.appendChild(child.cloneNode(true))
+  }
+}
+
+function positionHoverTooltip(wrapper: HTMLElement, tip: Element): void {
+  const rect = wrapper.getBoundingClientRect()
+  const centerX = rect.left + rect.width / 2
+  const gutter = 16
+  const viewportCap = Math.max(160, window.innerWidth - gutter * 2)
+  // Carry the source tooltip's wrapper-level styling: memory/feedback badges
+  // use whitespace-nowrap, message-ref tooltips whitespace-normal with an
+  // inline max-width:280px. Cloning only the children would drop both and let
+  // the portal wrap/size differently from the in-flow markup.
+  const tipStyle = window.getComputedStyle(tip)
+  const sourceMax = Number.parseFloat(tipStyle.maxWidth)
+  const maxWidth = Number.isFinite(sourceMax)
+    ? Math.min(sourceMax, viewportCap)
+    : Math.min(320, viewportCap)
+  const left = Math.min(
+    Math.max(centerX, gutter + maxWidth / 2),
+    window.innerWidth - gutter - maxWidth / 2
+  )
+  hoverTooltip.value = {
+    style: {
+      left: `${left}px`,
+      top: `${rect.top}px`,
+      transform: 'translate(-50%, calc(-100% - 8px))',
+      maxWidth: `${maxWidth}px`,
+      whiteSpace: tipStyle.whiteSpace,
+    },
+  }
+  void nextTick(() => fillPortal(tip))
+}
+
+function handleBadgePointerOver(event: PointerEvent): void {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const wrapper = target.closest<HTMLElement>('.memory-badge-wrapper')
+  if (!wrapper || !containerRef.value?.contains(wrapper)) return
+  const tip = wrapper.querySelector('.memory-tooltip')
+  if (!tip) return
+  positionHoverTooltip(wrapper, tip)
+}
+
+function handleBadgePointerOut(event: PointerEvent): void {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const wrapper = target.closest('.memory-badge-wrapper')
+  if (!wrapper || !containerRef.value?.contains(wrapper)) return
+  const related = event.relatedTarget
+  if (related instanceof Node && wrapper.contains(related)) return
+  hideHoverTooltip()
 }
 
 // Handle clicks on memory badges
@@ -999,11 +1079,17 @@ onBeforeUnmount(() => {
   clearSlowRetryTimer()
 
   // Remove event listeners to prevent memory leaks
+  hideHoverTooltip()
+  window.removeEventListener('scroll', hideHoverTooltip, true)
+  window.removeEventListener('resize', hideHoverTooltip)
+
   if (containerRef.value) {
     containerRef.value.removeEventListener('click', handleMemoryBadgeClick)
     containerRef.value.removeEventListener('click', handleFeedbackBadgeClick)
     containerRef.value.removeEventListener('click', handleMessageRefBadgeClick)
     containerRef.value.removeEventListener('click', handleSetupCtaClick)
+    containerRef.value.removeEventListener('pointerover', handleBadgePointerOver)
+    containerRef.value.removeEventListener('pointerout', handleBadgePointerOut)
   }
 })
 
@@ -1021,7 +1107,11 @@ onMounted(() => {
     containerRef.value.addEventListener('click', handleFeedbackBadgeClick)
     containerRef.value.addEventListener('click', handleMessageRefBadgeClick)
     containerRef.value.addEventListener('click', handleSetupCtaClick)
+    containerRef.value.addEventListener('pointerover', handleBadgePointerOver)
+    containerRef.value.addEventListener('pointerout', handleBadgePointerOut)
   }
+  window.addEventListener('scroll', hideHoverTooltip, true)
+  window.addEventListener('resize', hideHoverTooltip)
 
   // Fetch memories if needed
   void fetchMemoriesWithRetryBestEffort()
@@ -1159,6 +1249,11 @@ watch(
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+}
+
+/* In-flow tooltip is only the content source; the body portal paints it. */
+.markdown-content :deep(.memory-tooltip) {
+  display: none !important;
 }
 
 /* Demo-mode provider-setup CTA (see postProcessHtml). A <button>, not a

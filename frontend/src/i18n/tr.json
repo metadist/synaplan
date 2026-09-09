@@ -1147,7 +1147,8 @@
     "tabs": {
       "models": "Modeller ve anahtarlar",
       "extraction": "Çıkarım",
-      "webSearch": "Web araması"
+      "webSearch": "Web araması",
+      "rerank": "Yeniden sıralama"
     },
     "description": "Ekibinizin sohbet edebilmesi için bir AI sağlayıcısı bağlayın. Anahtarlar sunucunuzda şifrelenmiş olarak saklanır ve anında geçerli olur — yeniden başlatma gerekmez.",
     "statusReadyTitle": "AI'nız hazır",
@@ -1276,6 +1277,40 @@
       "testPlaceholder": "synaplan open source",
       "testButton": "Test sorgusu",
       "testing": "Test ediliyor…"
+    },
+    "rerank": {
+      "lead": "Arama birçok parçayı bulduktan sonra bir yeniden sıralayıcı en yararlı olanları öne alır. Bir test faydasını gösterene kadar kapalı bırakın. Kapalıyken sohbet değişmez.",
+      "enable": "Belge aramasında yeniden sıralamayı kullan",
+      "model": "Yeniden sıralama modeli",
+      "modelNone": "Model seçilmedi",
+      "multiplier": "Kaç ekstra parça getirilecek (2–10)",
+      "budgetMs": "Bu kadar milisaniyeden sonra vazgeç (100–5000)",
+      "llmFallback": "Yeniden sıralama modeli yoksa sohbet modelini kullan",
+      "llmFallbackHint": "Her aramada özet modelini kullanır ve daha pahalı olabilir. Ayrı bir yeniden sıralama modeli tercih edin.",
+      "healthAvailable": "kullanılabilir",
+      "healthUnavailable": "kullanılamıyor",
+      "apiKey": {
+        "jina": "Jina API anahtarı",
+        "cohere": "Cohere API anahtarı",
+        "voyage": "Voyage API anahtarı"
+      },
+      "apiKeyPlaceholder": "API anahtarı yapıştırın",
+      "saveKey": "Anahtarı kaydet",
+      "keySaved": "Anahtar kaydedildi. Sonraki yeniden sıralama bunu kullanabilir.",
+      "save": "Yeniden sıralamayı kaydet",
+      "saved": "Yeniden sıralama ayarları kaydedildi. Sonraki sohbet bunları kullanır.",
+      "saveFailed": "Yeniden sıralama ayarları kaydedilemedi",
+      "loadFailed": "Yeniden sıralama ayarları yüklenemedi",
+      "testTitle": "Örnek parçalarla test et",
+      "testHint": "Bir soru yazın ve her satıra bir parça koyun. Yeni sırayı görürsünüz, böylece çalıştığını kontrol edersiniz.",
+      "testQueryPlaceholder": "Fatura toplamı nedir?",
+      "testDocumentsPlaceholder": "Fatura toplamı 120 euro.\nMesai saatleri 9-17.",
+      "testButton": "Sırayı test et",
+      "testing": "Test ediliyor…",
+      "lastEval": {
+        "title": "Son ölçüm",
+        "line": "{date} tarihinde: doğru parça yeniden sıralama olmadan {recallOff}, onunla {recallOn}. En yavaş yanıtlar {p95Off} ms olmadan, {p95On} ms onunla."
+      }
     }
   },
   "providerHelp": {
@@ -3076,7 +3111,8 @@
         "img2vid": "Video Animasyonu (Görsel → Video)",
         "sound2text": "Konuşmadan Metne",
         "text2sound": "Metinden Konuşmaya",
-        "analyze": "Dosya Analizi"
+        "analyze": "Dosya Analizi",
+        "rerank": "Yeniden sıralama"
       },
       "admin": {
         "catalogSubtitle": "Sistem model kataloğunu arayın ve düzenleyin.",
@@ -4719,7 +4755,6 @@
       "linkedPlatforms": "Bağlı platformlar",
       "audit": "Kayıt"
     },
-    "usersMoved": "Kullanıcılar artık Kişiler sayfasında.",
     "openPeople": "Kişiler’i aç",
     "myGroups": {
       "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",

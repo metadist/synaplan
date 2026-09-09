@@ -4,6 +4,7 @@ namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Plug\Rerank\RerankStage;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\RAG\VectorStorage\DTO\SearchQuery;
@@ -42,6 +43,7 @@ final readonly class VectorSearchService
         private RagScopeResolver $ragScopeResolver,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private RerankStage $rerankStage,
     ) {
     }
 
@@ -52,11 +54,13 @@ final readonly class VectorSearchService
      * fans it out across memories + RAG + feedback searches. Skipping the
      * embedding round-trip here is the dominant TTFT win.
      *
-     * @param int               $userId   User ID for filtering
-     * @param array<int, float> $vector   Already-embedded query vector
-     * @param string|null       $groupKey Optional group filter
-     * @param int               $limit    Number of results (default: 10)
-     * @param float             $minScore Minimum similarity score (0-1, default: 0.3)
+     * @param int               $userId    User ID for filtering
+     * @param array<int, float> $vector    Already-embedded query vector
+     * @param string|null       $groupKey  Optional group filter
+     * @param int               $limit     Number of results (default: 10)
+     * @param float             $minScore  Minimum similarity score (0-1, default: 0.3)
+     * @param string|null       $queryText Original query; required for rerank. When
+     *                                     omitted, storage limit stays $limit (C5).
      *
      * @return array Top-K similar documents
      */
@@ -66,6 +70,7 @@ final readonly class VectorSearchService
         ?string $groupKey = null,
         int $limit = 10,
         float $minScore = 0.3,
+        ?string $queryText = null,
     ): array {
         if (empty($vector)) {
             return [];
@@ -73,11 +78,12 @@ final readonly class VectorSearchService
 
         try {
             $scopes = $this->ragScopeResolver->resolve($userId, $groupKey);
+            $storageLimit = $this->rerankStage->storageLimit($limit, $queryText);
             $searchQuery = new SearchQuery(
                 userId: $userId,
                 vector: $this->normalizeQueryVector(array_map('floatval', $vector)),
                 groupKey: $groupKey,
-                limit: $limit,
+                limit: $storageLimit,
                 minScore: $minScore,
                 scopes: $scopes,
             );
@@ -85,7 +91,7 @@ final readonly class VectorSearchService
             $results = $this->vectorStorage->search($searchQuery);
             $names = $this->ownerNames($results, $userId);
 
-            return array_map(static function ($result) use ($userId, $names): array {
+            $mapped = array_map(static function ($result) use ($userId, $names): array {
                 $ownerId = $result->ownerId ?? $userId;
                 $shared = $result->shared || $ownerId !== $userId;
 
@@ -106,6 +112,12 @@ final readonly class VectorSearchService
                     'shared' => $shared,
                 ];
             }, $results);
+
+            if (null !== $queryText && '' !== trim($queryText)) {
+                return $this->rerankStage->apply($queryText, $mapped, $limit);
+            }
+
+            return $mapped;
         } catch (\Throwable $e) {
             $this->logger->warning('VectorSearchService::semanticSearchByVector failed', [
                 'user_id' => $userId,
@@ -200,6 +212,7 @@ final readonly class VectorSearchService
             $groupKey,
             $limit,
             $minScore,
+            $query,
         );
     }
 

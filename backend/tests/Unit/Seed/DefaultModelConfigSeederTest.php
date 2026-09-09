@@ -65,6 +65,17 @@ final class DefaultModelConfigSeederTest extends TestCase
         $this->assertSame(['groq:openai/gpt-oss-120b:chat'], $sortKeys);
     }
 
+    public function testRerankHasNoSeededDefaultBinding(): void
+    {
+        $reflection = new \ReflectionClass(DefaultModelConfigSeeder::class);
+        $defaults = $reflection->getReflectionConstant('PROD_MODEL_DEFAULTS');
+        $this->assertNotFalse($defaults);
+        /** @var list<array{group: string, setting: string, modelKey: string}> $rows */
+        $rows = $defaults->getValue();
+        $settings = array_column($rows, 'setting');
+        $this->assertNotContains('RERANK', $settings);
+    }
+
     public function testResolveProdDefaultsIsPrivateStaticContract(): void
     {
         // Documents the contract on resolveProdDefaults() — it must be a private

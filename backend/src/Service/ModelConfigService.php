@@ -672,6 +672,13 @@ final readonly class ModelConfigService
             return false;
         }
 
+        // Rerank rows are not chat providers. Jina/Cohere/Voyage (and TEI
+        // /rerank) live outside ProviderRegistry; PlugKeyStore / the endpoint
+        // registry decide availability on the rerank path.
+        if ('rerank' === $model->getTag()) {
+            return true;
+        }
+
         $usable = $this->usableProviders();
 
         // An empty set means "cannot tell" (no providers registered at all),

@@ -83,6 +83,9 @@ parameters:
     env(TAVILY_API_KEY): ''
     env(EXA_API_KEY): ''
     env(FIRECRAWL_API_KEY): ''
+    env(JINA_API_KEY): ''
+    env(COHERE_API_KEY): ''
+    env(VOYAGE_API_KEY): ''
     env(BRAVE_SEARCH_API_KEY): ''
     env(DISCORD_WEBHOOK_URL): ''
     env(GMAIL_USERNAME): ''
@@ -335,6 +338,9 @@ services:
                 tavily: '%env(TAVILY_API_KEY)%'
                 exa: '%env(EXA_API_KEY)%'
                 firecrawl: '%env(FIRECRAWL_API_KEY)%'
+                jina: '%env(JINA_API_KEY)%'
+                cohere: '%env(COHERE_API_KEY)%'
+                voyage: '%env(VOYAGE_API_KEY)%'
 
     # Written by _docker/backend/docker-entrypoint.sh during AUTO_DOWNLOAD_MODELS pulls.
     App\Service\LocalAi\LocalAiDownloadStatusService:

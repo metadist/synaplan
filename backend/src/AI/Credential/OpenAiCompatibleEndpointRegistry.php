@@ -42,7 +42,7 @@ final class OpenAiCompatibleEndpointRegistry
     private const NAME_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,62}$/';
 
     /** Capabilities an endpoint may advertise (maps to BMODELS.BTAG values). */
-    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text'];
+    public const CAPABILITIES = ['chat', 'vectorize', 'pic2text', 'rerank'];
 
     public function __construct(
         private readonly ConfigRepository $configRepository,

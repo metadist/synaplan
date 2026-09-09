@@ -65,9 +65,10 @@ final readonly class ModelHealthOverview
             $service = ModelCatalog::normalizeProvider($model->getService());
             $byProvider[$service] ??= [
                 'name' => $service,
-                // A catalog entry for a provider this build does not register
-                // still has to show something, so the raw service is the fallback.
-                'displayName' => $displayNames[$service] ?? $model->getService(),
+                // Unregistered services (Jina/Cohere/Voyage rerank, …) are
+                // not in the provider registry. The heading must be the
+                // normalised key — matching $name — not BSERVICE casing.
+                'displayName' => $displayNames[$service] ?? $service,
                 'needsAttention' => 0,
                 'models' => [],
             ];

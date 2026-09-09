@@ -16,6 +16,8 @@ final readonly class RerankResult
      */
     public function __construct(
         public array $hits,
+        public string $provider = '',
+        public int $ms = 0,
     ) {
     }
 }

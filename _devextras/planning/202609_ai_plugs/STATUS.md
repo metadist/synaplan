@@ -9,8 +9,8 @@ Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | ------------- | ------------- | ----- | ----- |
 | S1 Ports & refactor | `synaplan/` `main` (#1750) | done | `PL1`–`PL8`: ports, registries, `PLUGS` seeder, Brave gateway, extra-extractor hook. FileProcessor built-in strategies unchanged. |
 | S2 Docling | `synaplan/` `main` (#1756) | done | `PL9`–`PL15`: Docling extra extractor, quality gate, markdown chunking, opt-in compose profile, Extraction tab |
-| S3 Web search providers | `synaplan/` `feat/wave3-ai-plugs-s3-web-search` | implemented | `PL16`–`PL24`: SearXNG + Tavily/Exa/Firecrawl/Perplexity adapters, Perplexity chat, Web search tab, Settings override |
-| S4 Rerank | — | planned | Port exists; `RERANK.ENABLED=0` |
+| S3 Web search providers | `synaplan/` `main` (#1758) | done | `PL16`–`PL24`: SearXNG + Tavily/Exa/Firecrawl/Perplexity adapters, Perplexity chat, Web search tab, Settings override |
+| S4 Rerank | `synaplan/` `feat/wave3-ai-plugs-s4-rerank` | implemented | `PL25`–`PL31`: catalog `rerank` rows, HTTP + LLM adapters, stage in VectorSearchService, eval command, Reranking tab. Default stays `0` (see `eval/baseline-default-off.md`). |
 | S5 Model import | — | planned | |
 | S6 Plugin adapters | — | planned | |
 
@@ -27,6 +27,7 @@ Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-08 | **S2 implementation.** Docling is a tagged extra extractor; FileProcessor is still not a full chain runner. Quality gate generalizes Tika's PDF `isLowQuality()` and is applied to extras. Markdown chunking is opt-in via `meta.markdown`. Compose profile `docling` uses the CPU image `docling-serve-cpu:v1.32.0` (no `mem_limit` in dev). `DOCLING_BASE_URL` empty = off. |
 | 2026-09-08 | **S2 admin parity.** Docling has the same System configuration → Processing fields and connection test as Tika (`DOCLING_BASE_URL`, timeout, max bytes). Feature status lists Docling like Collabora (disabled when the URL is empty). |
 | 2026-09-08 | **S3 implementation.** Five adapters behind `WebSearchRegistry::search()`. Brave stays the default. Per-user override is off (`USER_OVERRIDE_ALLOWED=0`). Fallback is one-shot. Perplexity chat is catalog-only (`BSELECTABLE=0`); no `DEFAULTMODEL` change. Compose profile `searxng` has no host port. |
+| 2026-09-09 | **S4 implementation.** Catalog rows 344–347 (`rerank` tag), `HttpRerankAdapter` + `LlmReranker`, `RerankStage` in `VectorSearchService` only when query text is present. C5: with `ENABLED=0` storage `limit` is exactly `k` and result arrays gain no `rerank` / `rerank_score` keys. Seeder default stays `0`; live eval is operator-run, not CI. |
 
 ## Review log
 
@@ -47,6 +48,8 @@ S2. Brave fixtures lock the legacy array + AI text. Snapshots are not touched.
 
 **2026-09-08 (S2 on main):** Docling Extraction tab shipped as #1756.
 
-**2026-09-08 (S3 implementation):** Web search tab + five adapters +
-Perplexity chat. `formatForAi(false)` stays byte-equal (C1). Empty
-SearXNG URL is unavailable, never an exception in MessageProcessor (C7).
+**2026-09-08 (S3 on main):** Web search tab shipped as #1758.
+
+**2026-09-09 (S4 implementation):** Reranking tab + HTTP/LLM adapters +
+eval harness. Default stays off (`eval/baseline-default-off.md`). The
+PR that flips `RERANK.ENABLED` to `1` must link a winning live report.

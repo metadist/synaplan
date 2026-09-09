@@ -662,7 +662,7 @@ Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
 (`--flag-off` proves the 404 contract). Endpoint reference:
 [Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
 
-### AI plugs (S1–S3)
+### AI plugs (S1–S4)
 
 Extraction, web search and rerank go through `App\Plug\` registries.
 FileProcessor still runs today's built-in strategies (native → Tika →
@@ -676,8 +676,15 @@ picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
 fallback. The next chat search uses the new provider with no restart.
 **Test query** shows up to five titles. Per-user override is
 **Settings → Use my own search**, only when
-`WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`. Rerank stays off
-(`RERANK.ENABLED=0`).
+`WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`.
+
+Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
+shows recall@5 up and p95 latency inside the budget. An admin turns it
+on under **Operate → AI infrastructure → Reranking**: pick a catalog
+rerank model (TEI / Jina / Cohere / Voyage), set how many extra
+snippets to fetch and the millisecond budget, optionally allow the
+summary model as a costly fallback, and run **Test order** on sample
+snippets. Chat search is unchanged while rerank is off.
 
 The Operate page is **AI infrastructure** (`/admin/setup`). The
 **Extraction** tab shows adapter health, lets an admin reorder a family
@@ -686,7 +693,8 @@ sidecar controls: a connection test on that tab, and URL / timeout
 (plus Docling max file size) under **System configuration →
 Processing**. Models & keys is the previous provider-key UI and now
 includes Perplexity as an optional chat provider. The **Web search**
-tab is the provider picker. The rerank tab lands in a later sprint.
+tab is the provider picker. The **Reranking** tab is the rerank
+settings and test.
 
 Settings table: [CONFIGURATION.md — AI plugs](CONFIGURATION.md#ai-plugs-plugs).
 

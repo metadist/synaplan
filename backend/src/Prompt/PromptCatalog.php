@@ -180,6 +180,12 @@ class PromptCatalog
                 'shortDescription' => 'Detect contradictions between a new feedback statement and existing memories or feedback.',
                 'prompt' => self::feedbackContradictionCheckPrompt(),
             ],
+            [
+                'topic' => 'tools:rerank_listwise',
+                'language' => 'en',
+                'shortDescription' => 'Reorder retrieved document snippets for a question. Returns a JSON array of candidate ids, best first.',
+                'prompt' => self::rerankListwisePrompt(),
+            ],
         ];
     }
 
@@ -2085,6 +2091,23 @@ A new statement only contradicts an existing item when they are about the SAME S
 - reason: one short sentence explaining the contradiction
 - If no contradictions exist, return: {"contradictions":[]}
 - Output ONLY the JSON. No markdown, no explanation, no other text.
+PROMPT;
+    }
+
+    private static function rerankListwisePrompt(): string
+    {
+        return <<<'PROMPT'
+You reorder retrieved document snippets for a user question.
+
+## Output
+Return ONLY a JSON array of candidate ids, best first. Example: ["12","4","9"]
+No markdown, no explanation, no other keys.
+
+## Rules
+- Use only ids from the candidate list. Never invent ids.
+- Put the snippet that best answers the question first.
+- If several snippets are equally useful, keep their original relative order.
+- If nothing is relevant, still return every id — worst last.
 PROMPT;
     }
 }

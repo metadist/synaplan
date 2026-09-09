@@ -1697,7 +1697,8 @@
         "img2vid": "Video-Animation (Bild → Video)",
         "sound2text": "Spracherkennung",
         "text2sound": "Sprachsynthese",
-        "analyze": "Textanalyse"
+        "analyze": "Textanalyse",
+        "rerank": "Neuordnung"
       },
       "chat": "Chat-Modell",
       "sorting": "Sortier-Modell",
@@ -2936,7 +2937,8 @@
     "tabs": {
       "models": "Modelle & Schlüssel",
       "extraction": "Extraktion",
-      "webSearch": "Websuche"
+      "webSearch": "Websuche",
+      "rerank": "Neuordnung"
     },
     "description": "Verbinde einen KI-Anbieter, damit dein Team chatten kann. Schlüssel werden verschlüsselt auf deinem Server gespeichert und gelten sofort — kein Neustart nötig.",
     "statusReadyTitle": "Deine KI ist bereit",
@@ -3065,6 +3067,40 @@
       "testPlaceholder": "synaplan open source",
       "testButton": "Testabfrage",
       "testing": "Test läuft…"
+    },
+    "rerank": {
+      "lead": "Nach der Suche rückt ein Neuordner die nützlichsten Textstellen nach vorne. Lass dies aus, bis ein Test zeigt, dass es hilft. Der Chat bleibt unverändert, solange es aus ist.",
+      "enable": "Neuordnung bei der Dokumentsuche verwenden",
+      "model": "Neuordnungsmodell",
+      "modelNone": "Kein Modell gewählt",
+      "multiplier": "Wie viele zusätzliche Textstellen geholt werden (2–10)",
+      "budgetMs": "Nach so vielen Millisekunden abbrechen (100–5000)",
+      "llmFallback": "Chat-Modell nutzen, wenn kein Neuordnungsmodell gesetzt ist",
+      "llmFallbackHint": "Das nutzt das Zusammenfassungsmodell bei jeder Suche und kann mehr kosten. Ein eigenes Neuordnungsmodell ist besser.",
+      "healthAvailable": "verfügbar",
+      "healthUnavailable": "nicht verfügbar",
+      "apiKey": {
+        "jina": "Jina-API-Schlüssel",
+        "cohere": "Cohere-API-Schlüssel",
+        "voyage": "Voyage-API-Schlüssel"
+      },
+      "apiKeyPlaceholder": "API-Schlüssel einfügen",
+      "saveKey": "Schlüssel speichern",
+      "keySaved": "Schlüssel gespeichert. Die nächste Neuordnung kann ihn nutzen.",
+      "save": "Neuordnung speichern",
+      "saved": "Neuordnung gespeichert. Der nächste Chat nutzt die Einstellungen.",
+      "saveFailed": "Die Neuordnung konnte nicht gespeichert werden",
+      "loadFailed": "Neuordnung konnte nicht geladen werden",
+      "testTitle": "Mit Beispieltexten testen",
+      "testHint": "Frage eingeben und pro Zeile einen Text. Sie sehen die neue Reihenfolge und können prüfen, ob es funktioniert.",
+      "testQueryPlaceholder": "Wie hoch ist die Rechnungssumme?",
+      "testDocumentsPlaceholder": "Die Rechnungssumme beträgt 120 Euro.\nBürozeiten sind 9 bis 17 Uhr.",
+      "testButton": "Reihenfolge testen",
+      "testing": "Test läuft…",
+      "lastEval": {
+        "title": "Letzte Messung",
+        "line": "Am {date}: richtige Stelle ohne Neuordnung {recallOff} der Fälle, mit {recallOn}. Langsamste Antworten {p95Off} ms ohne und {p95On} ms mit."
+      }
     }
   },
   "providerHelp": {
@@ -5638,7 +5674,6 @@
       "linkedPlatforms": "Verknüpfte Plattformen",
       "audit": "Protokoll"
     },
-    "usersMoved": "Benutzer finden Sie jetzt auf der Seite Personen.",
     "openPeople": "Personen öffnen",
     "myGroups": {
       "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",

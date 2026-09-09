@@ -522,6 +522,7 @@ export const selectors = {
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
     admin: '[data-testid="view-admin"]',
+    people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
   },
   dialog: {

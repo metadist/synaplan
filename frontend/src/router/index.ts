@@ -515,6 +515,11 @@ const router = createRouter({
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.admin' },
+      beforeEnter: (to) => {
+        if (to.query.tab === 'users') {
+          return { name: 'admin-people' }
+        }
+      },
     },
     {
       path: '/admin/features',

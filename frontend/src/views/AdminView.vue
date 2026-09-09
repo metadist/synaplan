@@ -143,25 +143,6 @@
           </div>
         </div>
 
-        <!-- Users tab: UsersTab owns data-testid="section-users" (Playwright strict). -->
-        <div v-if="activeTab === 'users'">
-          <div
-            v-if="iamGroupsEnabled"
-            class="surface-card rounded-lg p-8"
-            data-testid="section-users-moved"
-          >
-            <p class="txt-secondary mb-4">{{ $t('people.usersMoved') }}</p>
-            <router-link
-              to="/admin/people"
-              class="btn-primary px-6 py-2.5 rounded-lg inline-flex items-center gap-2"
-              data-testid="link-open-people"
-            >
-              {{ $t('people.openPeople') }}
-            </router-link>
-          </div>
-          <UsersTab v-else />
-        </div>
-
         <!-- Prompts Tab -->
         <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
           <div v-if="promptsLoading" class="text-center py-12">
@@ -500,8 +481,6 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
-import UsersTab from '@/components/people/UsersTab.vue'
-import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
 import {
@@ -532,7 +511,6 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
-const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 type TabId =
   'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
@@ -567,10 +545,15 @@ const tabNavItems = computed<TabNavItem[]>(() =>
     label: tab.label,
     icon: tab.icon,
     testid: `tab-${tab.id}`,
+    ...(tab.id === 'users' ? { to: '/admin/people' } : {}),
   }))
 )
 
 function onTabNavChange(id: string) {
+  // Users is a navigation link to People, not a panel on this page.
+  if (id === 'users') {
+    return
+  }
   activeTab.value = id as TabId
 }
 

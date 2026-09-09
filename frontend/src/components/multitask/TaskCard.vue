@@ -9,7 +9,11 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
 import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 
-const props = defineProps<{ card: TaskCard }>()
+const props = defineProps<{
+  card: TaskCard
+  /** Shared/guest views only — logged-in chat must keep memory hover popups. */
+  isReadonly?: boolean
+}>()
 
 const emit = defineEmits<{
   /** Retry a failed media step with another model (new turn via the Again path). */
@@ -171,7 +175,7 @@ const handleRetry = () => {
 
 <template>
   <div
-    class="task-card rounded-xl border p-3 transition-colors"
+    class="task-card rounded-xl border p-3 transition-colors overflow-visible"
     :class="{
       'task-card--pending': card.state === 'pending',
       'task-card--running': card.state === 'running',
@@ -334,7 +338,7 @@ const handleRetry = () => {
           v-if="isProseKind"
           :content="card.text"
           :is-streaming="card.state === 'running'"
-          readonly
+          :readonly="isReadonly"
         />
         <p v-else class="whitespace-pre-wrap">{{ card.text }}</p>
         <span v-if="card.state === 'running'" class="task-card__cursor" aria-hidden="true">▍</span>
@@ -363,8 +367,15 @@ const handleRetry = () => {
 
 <style scoped>
 .task-card {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
   background: var(--surface-card, rgba(127, 127, 127, 0.04));
   border-color: var(--border-color, rgba(127, 127, 127, 0.2));
+}
+.task-card:hover,
+.task-card:focus-within {
+  z-index: 20;
 }
 .task-card--running {
   border-color: var(--brand);
