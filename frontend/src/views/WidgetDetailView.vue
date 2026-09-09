@@ -1102,6 +1102,12 @@
                   </div>
                 </section>
 
+                <WidgetAssistantBinding
+                  v-if="widget"
+                  :widget="widget"
+                  @updated="onWidgetAssistantUpdated"
+                />
+
                 <!-- Expert: Prompt -->
                 <details class="group">
                   <summary
@@ -1257,6 +1263,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import SetupChatModal from '@/components/widgets/SetupChatModal.vue'
 import AdvancedWidgetConfig from '@/components/widgets/AdvancedWidgetConfig.vue'
+import WidgetAssistantBinding from '@/components/widgets/WidgetAssistantBinding.vue'
 import WidgetAiSetupPanel from '@/components/widgets/WidgetAiSetupPanel.vue'
 import FlowNodeEditor from '@/components/widgets/FlowNodeEditor.vue'
 import FilePicker from '@/components/widgets/FilePicker.vue'
@@ -1315,6 +1322,12 @@ const saving = ref(false)
 const autoSaveStatus = ref<'idle' | 'unsaved' | 'saving' | 'saved'>('idle')
 const dataReady = ref(false)
 const widget = ref<widgetsApi.Widget | null>(null)
+
+function onWidgetAssistantUpdated(agentId: number | null): void {
+  if (widget.value) {
+    widget.value = { ...widget.value, agentId }
+  }
+}
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 const sharedWidgetMeta = ref<IamSharedItem | null>(null)

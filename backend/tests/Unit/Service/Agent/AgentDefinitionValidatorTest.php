@@ -109,6 +109,68 @@ final class AgentDefinitionValidatorTest extends TestCase
         }
     }
 
+    public function testScheduleWithoutInstructionIsRejected(): void
+    {
+        $this->expectException(AgentDefinitionException::class);
+        $this->expectExceptionMessage('schedule instruction is required');
+
+        $this->validator->validate([
+            'schema' => 'agent.v1',
+            'triggers' => [
+                'events' => [],
+                'schedules' => [[
+                    'id' => 'weekly-review',
+                    'name' => 'Weekly',
+                    'tz' => 'Europe/Berlin',
+                    'every' => ['unit' => 'week', 'on' => 'monday', 'at' => '08:00'],
+                    'instruction' => '',
+                ]],
+            ],
+        ]);
+    }
+
+    public function testEveryWeekBecomesCron(): void
+    {
+        $validated = $this->validator->validate([
+            'schema' => 'agent.v1',
+            'triggers' => [
+                'events' => [],
+                'schedules' => [[
+                    'id' => 'weekly-review',
+                    'name' => 'Weekly',
+                    'tz' => 'Europe/Berlin',
+                    'every' => ['unit' => 'week', 'on' => 'monday', 'at' => '08:00'],
+                    'instruction' => 'Summarise last week',
+                ]],
+            ],
+        ]);
+
+        self::assertSame('0 8 * * 1', $validated->toArray()['triggers']['schedules'][0]['cron']);
+    }
+
+    public function testDuplicateTriggerIdIsRejected(): void
+    {
+        $this->expectException(AgentDefinitionException::class);
+        $this->expectExceptionMessage('duplicate trigger id');
+
+        $this->validator->validate([
+            'schema' => 'agent.v1',
+            'triggers' => [
+                'events' => [[
+                    'id' => 'same-id',
+                    'kind' => 'whatsapp',
+                ]],
+                'schedules' => [[
+                    'id' => 'same-id',
+                    'name' => 'Weekly',
+                    'tz' => 'UTC',
+                    'cron' => '0 8 * * 1',
+                    'instruction' => 'Do it',
+                ]],
+            ],
+        ]);
+    }
+
     public function testWrongSchemaIsRejected(): void
     {
         $this->expectException(AgentDefinitionException::class);

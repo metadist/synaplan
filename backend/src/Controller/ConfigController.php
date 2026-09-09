@@ -8,6 +8,7 @@ use App\AI\Credential\SecretValueGuard;
 use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\AiProviderDisclosure;
 use App\AI\Service\ProviderRegistry;
+use App\Bundle\BundleConfig;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
@@ -99,6 +100,7 @@ class ConfigController extends AbstractController
         private readonly ?CapabilityInventory $capabilityInventory = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?GroupPolicyService $groupPolicyService = null,
+        private readonly ?BundleConfig $bundleConfig = null,
     ) {
     }
 
@@ -187,6 +189,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'desktopAgentEnabled', type: 'boolean', example: false, description: 'When true, the Synaplan Desktop pairing surface (Channels → Desktop) and desktop job APIs are exposed. Off by default until the desktop client ships (server-first rollout).'),
                         new OA\Property(property: 'platformLinksEnabled', type: 'boolean', example: false, description: 'When true, partner instances can register and exchange a link code for a per-user API key. Off by default. The Outlook add-in connect path is not gated by this flag.'),
                         new OA\Property(property: 'agentsEnabled', type: 'boolean', example: false, description: 'When true, the Assistants CRUD API and stream agentId pin are available. Off by default until an operator enables Agent Builder.'),
+                        new OA\Property(property: 'bundleEnabled', type: 'boolean', example: false, description: 'When true, Settings shows Export & import. Off by default until an operator enables synaplan-bundle.v1.'),
                         new OA\Property(property: 'iamGroups', type: 'boolean', example: false, description: 'When true, Operate shows People and the group API is available. Off by default until an operator enables IAM groups.'),
                         new OA\Property(property: 'iamSharing', type: 'boolean', example: false, description: 'When true, owners can share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires iamGroups. Off by default.'),
                         new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
@@ -492,6 +495,7 @@ class ConfigController extends AbstractController
             'desktopAgentEnabled' => $this->desktopAgentConfig->isEnabled($user?->getId()),
             'platformLinksEnabled' => $this->platformLinksConfig->isEnabled($user?->getId()),
             'agentsEnabled' => $this->agentConfig->isEnabled($user?->getId()),
+            'bundleEnabled' => null !== $this->bundleConfig && $this->bundleConfig->isEnabled($user?->getId()),
             'iamGroups' => $this->iamConfig->isGroupsEnabled($user?->getId()),
             'iamSharing' => $this->iamConfig->isSharingEnabled($user?->getId()),
             'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),

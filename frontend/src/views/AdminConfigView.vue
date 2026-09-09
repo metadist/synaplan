@@ -9,6 +9,7 @@ import ConfigField from '@/components/admin/ConfigField.vue'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
+import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { useUpdatesStore } from '@/stores/updates'
@@ -553,6 +554,7 @@ onBeforeUnmount(() => {
 
         <!-- Release notice: informs and links to the guide, never updates anything -->
         <UpdatePanel v-if="updatesStore.canRead" class="mb-6" />
+        <ExportImportPanel scope="instance" class="mb-6" />
 
         <!-- Loading State -->
         <div v-if="loading" class="flex items-center justify-center py-20">

@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\SavedTaskRepository;
+use App\Service\SavedTask\InboundEmailFilter;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\SavedTaskRunner;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -35,7 +36,10 @@ final class SavedTasksProcessMailboxCommand extends Command
     {
         $this
             ->addArgument('accountId', InputArgument::REQUIRED, 'Inbound email handler id')
-            ->addOption('message', 'm', InputOption::VALUE_REQUIRED, 'Message text to run with', 'Look into my connected mailbox and extract meeting requests.');
+            ->addOption('message', 'm', InputOption::VALUE_REQUIRED, 'Message text to run with', 'Look into my connected mailbox and extract meeting requests.')
+            ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Envelope From for the filter', '')
+            ->addOption('subject', null, InputOption::VALUE_REQUIRED, 'Subject for the filter', '')
+            ->addOption('body', null, InputOption::VALUE_REQUIRED, 'Plain body for the filter', '');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -57,10 +61,18 @@ final class SavedTasksProcessMailboxCommand extends Command
         }
 
         $message = (string) $input->getOption('message');
+        $from = (string) $input->getOption('from');
+        $subject = (string) $input->getOption('subject');
+        $body = (string) $input->getOption('body');
+        $hasMailMeta = '' !== $from || '' !== $subject || '' !== $body;
         $ran = 0;
         foreach ($this->tasks->findEnabledInboundEmailTasks($ownerId, $accountId) as $task) {
             $id = $task->getId();
             if (null === $id) {
+                continue;
+            }
+            $filter = $task->getTriggerConfig()['filter'] ?? null;
+            if ($hasMailMeta && !InboundEmailFilter::matches(is_array($filter) ? $filter : null, $from, $subject, $body)) {
                 continue;
             }
             $this->runner->run($ownerId, $id, $message, 'inbound_email');

@@ -57,6 +57,55 @@ class AgentRepository extends ServiceEntityRepository
         return $this->findOneBy(['promptId' => $promptId, 'ownerId' => $ownerId]);
     }
 
+    public function findByOwnerSlugAndSource(int $ownerId, string $slug, string $source): ?Agent
+    {
+        $agent = $this->findOneBy(['ownerId' => $ownerId, 'slug' => $slug, 'source' => $source]);
+
+        return $agent instanceof Agent ? $agent : null;
+    }
+
+    /**
+     * @return list<Agent>
+     */
+    public function findByOwnerAndSource(int $ownerId, string $source): array
+    {
+        return $this->findBy(['ownerId' => $ownerId, 'source' => $source], ['id' => 'ASC']);
+    }
+
+    /**
+     * Published assistants the router may offer. Callers must still filter
+     * by {@see \App\Service\Iam\Permission::Use} for the viewing user.
+     *
+     * @return list<Agent>
+     */
+    public function findPublishedRoutable(): array
+    {
+        return $this->createQueryBuilder('a')
+            ->where('a.status = :status')
+            ->andWhere('a.routable = 1')
+            ->andWhere('a.publishedVersionId IS NOT NULL')
+            ->setParameter('status', Agent::STATUS_PUBLISHED)
+            ->orderBy('a.updated', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return list<Agent>
+     */
+    public function findPublishedBySlug(string $slug): array
+    {
+        return $this->createQueryBuilder('a')
+            ->where('a.slug = :slug')
+            ->andWhere('a.status = :status')
+            ->andWhere('a.publishedVersionId IS NOT NULL')
+            ->setParameter('slug', $slug)
+            ->setParameter('status', Agent::STATUS_PUBLISHED)
+            ->orderBy('a.updated', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function slugTaken(int $ownerId, string $slug, ?int $exceptId = null): bool
     {
         $qb = $this->createQueryBuilder('a')

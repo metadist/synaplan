@@ -9,9 +9,13 @@ use App\AI\StructuredOutput\JsonResponseDecoder;
 use App\AI\StructuredOutput\Schema\SortClassificationSchema;
 use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\AI\StructuredOutput\StructuredOutputRecovery;
+use App\Entity\Agent;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\PromptRepository;
+use App\Repository\UserRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentService;
 use App\Service\DiscordNotificationService;
 use App\Service\File\ConversationFile;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
@@ -132,6 +136,9 @@ final readonly class MessageSorter
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
         private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentService $agentService = null,
+        private ?UserRepository $users = null,
     ) {
     }
 
@@ -209,6 +216,7 @@ final readonly class MessageSorter
         // Get all available topics (exclude tools:* internal topics).
         $topics = $this->promptRepository->getAllTopics(0, $userId, excludeTools: true);
         $topicsWithDesc = $this->promptRepository->getTopicsWithDescriptions(0, '', $userId, excludeTools: true);
+        [$topics, $topicsWithDesc] = $this->appendRoutableAssistants($topics, $topicsWithDesc, $userId);
         if (null !== $this->selfAwareConfig && !$this->selfAwareConfig->isEnabled($userId)) {
             $topics = array_values(array_filter(
                 $topics,
@@ -216,7 +224,7 @@ final readonly class MessageSorter
             ));
             $topicsWithDesc = array_values(array_filter(
                 $topicsWithDesc,
-                static fn (array $item): bool => SelfAwareConfig::ROUTABLE_TOPIC !== ($item['topic'] ?? ''),
+                static fn (array $item): bool => SelfAwareConfig::ROUTABLE_TOPIC !== $item['topic'],
             ));
         }
 
@@ -606,6 +614,45 @@ final readonly class MessageSorter
         $budget -= mb_strlen($annotation);
 
         return $annotation;
+    }
+
+    /**
+     * When AGENTS.ROUTABLE_ENABLED is on, published routable assistants join
+     * the sorter topic list as `agent:{slug}`. Flag off leaves the lists
+     * identical so characterization snapshots stay stable.
+     *
+     * @param list<string>                                    $topics
+     * @param list<array{topic: string, description: string}> $topicsWithDesc
+     *
+     * @return array{0: list<string>, 1: list<array{topic: string, description: string}>}
+     */
+    private function appendRoutableAssistants(array $topics, array $topicsWithDesc, ?int $userId): array
+    {
+        if (null === $userId || null === $this->agentConfig || null === $this->agentService || null === $this->users) {
+            return [$topics, $topicsWithDesc];
+        }
+        if (!$this->agentConfig->isEnabled($userId) || !$this->agentConfig->isRoutableEnabled($userId)) {
+            return [$topics, $topicsWithDesc];
+        }
+
+        $user = $this->users->find($userId);
+        if (!$user instanceof User) {
+            return [$topics, $topicsWithDesc];
+        }
+
+        foreach ($this->agentService->routableForUser($user) as $agent) {
+            $topic = Agent::TOPIC_PREFIX.$agent->getSlug();
+            if (in_array($topic, $topics, true)) {
+                continue;
+            }
+            $topics[] = $topic;
+            $topicsWithDesc[] = [
+                'topic' => $topic,
+                'description' => $agent->getDescription() ?? $agent->getName(),
+            ];
+        }
+
+        return [$topics, $topicsWithDesc];
     }
 
     /**

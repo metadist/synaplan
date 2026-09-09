@@ -15,6 +15,7 @@ use App\Repository\PromptRepository;
 use App\Service\Agent\AgentAccess;
 use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
+use App\Service\Agent\Policy\LegacyFlagToolPolicy;
 use App\Service\ModelConfigService;
 use App\Service\RAG\RagScopeResolver;
 use PHPUnit\Framework\TestCase;
@@ -89,6 +90,7 @@ final class AgentRuntimeResolverScopesTest extends TestCase
             $this->createMock(AgentAccess::class),
             $this->createMock(MessageMetaRepository::class),
             $rag,
+            new LegacyFlagToolPolicy(),
         );
 
         $user = $this->createMock(User::class);

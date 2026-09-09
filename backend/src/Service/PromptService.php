@@ -40,6 +40,9 @@ final readonly class PromptService
         'tool_internet_search' => 'tool_internet',
     ];
 
+    /** Width of `BPROMPTS.BTOPIC`. */
+    private const MAX_TOPIC_LENGTH = 64;
+
     public function __construct(
         private PromptRepository $promptRepository,
         private PromptMetaRepository $promptMetaRepository,
@@ -269,5 +272,33 @@ final readonly class PromptService
         }
 
         return false;
+    }
+
+    public function createOwned(int $userId, string $topic, string $text, string $description): Prompt
+    {
+        $topic = trim($topic);
+        if ('' === $topic || strlen($topic) > self::MAX_TOPIC_LENGTH) {
+            throw new \InvalidArgumentException(sprintf('Prompt topic must be 1-%d characters, got "%s"', self::MAX_TOPIC_LENGTH, $topic));
+        }
+        $prompt = new Prompt();
+        $prompt->setOwnerId($userId);
+        $prompt->setLanguage('en');
+        $prompt->setTopic($topic);
+        $prompt->setShortDescription($description);
+        $prompt->setPrompt($text);
+        $this->em->persist($prompt);
+        $this->em->flush();
+
+        return $prompt;
+    }
+
+    public function overwriteOwned(Prompt $prompt, string $text, string $description): Prompt
+    {
+        $prompt->setPrompt($text);
+        $prompt->setShortDescription($description);
+        $this->em->persist($prompt);
+        $this->em->flush();
+
+        return $prompt;
     }
 }

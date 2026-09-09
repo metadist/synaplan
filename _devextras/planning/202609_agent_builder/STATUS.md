@@ -12,9 +12,9 @@ before the first sprint starts.**
 | S2 Builder & gallery | `feat/agent-builder-s2` / synaplan | done | AB9–AB13, AB15–AB17; AB14 helper deferred |
 | S3 Publish & versions | `feat/agent-builder-s3` / synaplan | done | AB18–AB25; IAM kind `agent` (BPROMPTS keeps `assistant`); share copy reuses assistant strings |
 | S3.5 Runtime / kind / schema refactor | `feat/agent-builder-s3-5-refactor` / synaplan | done | One `RuntimeProfile` seam; kind split settled; `agent.v1` is one OpenAPI artifact; agent deps required |
-| S4 Knowledge, tools, skills | — | planned | Parameters folded into Models → Advanced settings |
-| S5 Triggers: events & schedules | — | planned | J-AB-5, J-AB-7; was "Tasks & channels" until 2026-09-07 |
-| S6 Portability & packs | — | planned | adds `api` / `mcp` / `desktop` event kinds to the picker |
+| S4 Knowledge, tools, skills | `feat/wave3-finish` / synaplan | done on branch | AB26 on main; AB27–AB32 policy + builder tools/skills/advanced on this branch |
+| S5 Triggers: events & schedules | `feat/wave3-finish` / synaplan | done on branch | AB33–AB39: materializer, BAGENTID, mail filter, WhatsApp AGENTID, Triggers builder |
+| S6 Portability & packs | `feat/wave3-finish` / synaplan | done on branch | AB40–AB48 on this branch (`BUNDLE.ENABLED` off). AB46 `provides.agents` + hello-world pack. AB49 C7 unit/feature suites added (envelope, never-export/import, plugin installer, aliases, rate limit, flag-off). |
 
 ## Decisions
 
@@ -80,3 +80,30 @@ visible "runs as", Desktop absent from the assistant picture.
 **2026-09-07 (S3.5 refactor, rule 4):** a refactor sprint before S4 on
 the same seam. Decisions above. Next: S4 knowledge, tools, skills on
 top of the single runtime object and the typed `agent.v1` document.
+
+**2026-09-09 (S4–S6 implemented on `feat/wave3-finish`):** one branch.
+S4: `ToolPolicySourceInterface` (`LegacyFlagToolPolicy`,
+`RegistryToolPolicy`) + `SkillPolicy` feed `AgentRuntimeResolver`,
+`TaskPlanValidator`, `SkillCatalog`, `TaskPlanner`; builder gets knowledge
+folders, tools/skills, models advanced, publish-as-routable
+(`ROUTABLE_ENABLED` stays seeded `0`, snapshot not re-recorded). S5:
+`AgentTriggerMaterializer` turns schedules and mail rules into Saved Tasks
+and writes `widget` / `whatsapp` / department events to their channel
+entity; `BWIDGETS.BAGENTID` + `WidgetAgentRuntime`; `InboundEmailFilter`;
+`WHATSAPP/AGENTID` behind `WhatsAppAgentBinding`; `GET /agents/{id}/triggers`
++ `BuilderTriggers`; channel side gets `ChannelAssistantSelect` (widget
+wizard, mail departments, WhatsApp). S6: `synaplan-bundle.v1` (envelope
+validator, `agents` + `prompts` sections, never-export/import lists, rate
+limit, `BUNDLE.ENABLED` off) with Settings/Admin Export & import over
+generated Zod schemas; `assistant:<slug>` aliases + `list_assistants`;
+trigger kinds `api` / `mcp` / `desktop`; AB46 `provides.agents` packs via
+`PluginAgentInstaller` (hello-world pack).
+
+**2026-09-09 (review decision — channel bindings converge, never sweep):**
+the first materializer cut unbound every widget bound to the agent that the
+published definition did not list, and cleared the WhatsApp binding when no
+`whatsapp` event was enabled. That silently undid bindings made on the
+widget page / Channels page. Now each event touches only the entity it
+names: enabled binds, disabled unbinds *only if this agent holds it*, absent
+leaves it alone. One failing trigger is logged and skipped so a committed
+publish cannot turn into a 500. Covered by `AgentTriggerMaterializerTest`.

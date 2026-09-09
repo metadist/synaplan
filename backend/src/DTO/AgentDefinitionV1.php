@@ -101,7 +101,15 @@ use OpenApi\Attributes as OA;
                             new OA\Property(property: 'id', type: 'string'),
                             new OA\Property(property: 'kind', type: 'string', enum: ['mail', 'whatsapp', 'widget', 'api', 'mcp', 'desktop', 'webhook']),
                             new OA\Property(property: 'mailbox', type: 'string'),
-                            new OA\Property(property: 'rule', type: 'string'),
+                            new OA\Property(
+                                property: 'rule',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'from', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'contains', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'match', type: 'string', enum: ['any', 'all']),
+                                ],
+                            ),
                             new OA\Property(property: 'instruction', type: 'string'),
                             new OA\Property(property: 'widget', type: 'string'),
                             new OA\Property(property: 'widgetDefaults', type: 'object', additionalProperties: true),
@@ -119,7 +127,15 @@ use OpenApi\Attributes as OA;
                         properties: [
                             new OA\Property(property: 'id', type: 'string'),
                             new OA\Property(property: 'name', type: 'string'),
-                            new OA\Property(property: 'every', type: 'string'),
+                            new OA\Property(
+                                property: 'every',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'unit', type: 'string', enum: ['hour', 'day', 'weekday', 'week', 'month']),
+                                    new OA\Property(property: 'on', type: 'string'),
+                                    new OA\Property(property: 'at', type: 'string'),
+                                ],
+                            ),
                             new OA\Property(property: 'cron', type: 'string'),
                             new OA\Property(property: 'tz', type: 'string'),
                             new OA\Property(property: 'instruction', type: 'string'),

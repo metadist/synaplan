@@ -64,7 +64,11 @@ final class SkillCatalog
     public function renderCapabilityList(?int $userId = null, array $context = []): string
     {
         $lines = [];
+        $allowed = $context['allowedCapabilities'] ?? null;
         foreach (Capability::cases() as $capability) {
+            if (is_array($allowed) && !in_array($capability->value, $allowed, true)) {
+                continue;
+            }
             $descriptor = $this->byCapability[$capability->value] ?? null;
 
             // Flag-gated blocks (url_fetch, mcp_fetch, email_search …) are

@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Bundle\BundleConfig;
+use App\Bundle\BundleEnvelopeException;
+use App\Bundle\BundleExporter;
+use App\Bundle\BundleImporter;
+use App\Bundle\BundleScope;
+use App\Bundle\ImportOptions;
 use App\DTO\AgentDefinitionV1;
 use App\Entity\User;
 use App\Repository\AgentVersionRepository;
@@ -14,6 +20,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentPublisher;
 use App\Service\Agent\AgentSerializer;
 use App\Service\Agent\AgentService;
+use App\Service\Agent\AgentTriggerResolver;
 use App\Service\Agent\Exception\AgentDefinitionException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotDraftException;
@@ -41,6 +48,10 @@ final class AgentController extends AbstractController
         private AgentVersionRepository $versions,
         private UseLogRepository $useLogs,
         private UserRepository $users,
+        private ?AgentTriggerResolver $triggers = null,
+        private ?BundleConfig $bundleConfig = null,
+        private ?BundleExporter $bundleExporter = null,
+        private ?BundleImporter $bundleImporter = null,
     ) {
     }
 
@@ -679,6 +690,150 @@ final class AgentController extends AbstractController
         }
 
         return $this->json(['success' => true] + $this->useLogs->aggregateForAgent($id, $from, $to));
+    }
+
+    #[Route('/{id}/triggers', name: 'triggers', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/agents/{id}/triggers',
+        summary: 'Resolved trigger rows for the builder',
+        tags: ['Agents'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Trigger rows',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean'),
+                        new OA\Property(property: 'savedTasksEnabled', type: 'boolean'),
+                        new OA\Property(property: 'availableKinds', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(
+                            property: 'rows',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'string'),
+                                    new OA\Property(property: 'kind', type: 'string'),
+                                    new OA\Property(property: 'group', type: 'string'),
+                                    new OA\Property(property: 'what', type: 'string'),
+                                    new OA\Property(property: 'when', type: 'string'),
+                                    new OA\Property(property: 'does', type: 'string'),
+                                    new OA\Property(property: 'runsAs', type: 'string'),
+                                    new OA\Property(property: 'status', type: 'string'),
+                                    new OA\Property(property: 'savedTaskId', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'target', type: 'object', additionalProperties: true),
+                                    new OA\Property(property: 'lastRun', type: 'object', nullable: true, additionalProperties: true),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function triggers(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        if (null === $this->triggers) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            $agent = $this->access->require($user, $id, Permission::Edit);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true] + $this->triggers->resolve($agent, $user));
+    }
+
+    #[Route('/{id}/export', name: 'export', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/agents/{id}/export',
+        summary: 'Export one assistant as a synaplan-bundle.v1 document',
+        tags: ['Agents'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Bundle document'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function export(int $id, #[CurrentUser] ?User $user): Response
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled((int) $user->getId()) || null === $this->bundleExporter) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        try {
+            $agent = $this->access->require($user, $id, Permission::Read);
+        } catch (AgentNotAccessibleException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        $document = $this->bundleExporter->export(
+            (int) $user->getId(),
+            BundleScope::User,
+            ['prompts', 'agents'],
+            ['agents' => [$agent->getSlug()]],
+        );
+        $payload = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+
+        return new Response($payload, Response::HTTP_OK, [
+            'Content-Type' => 'application/json',
+            'Content-Disposition' => sprintf('attachment; filename="%s.synaplan-bundle.json"', $agent->getSlug()),
+        ]);
+    }
+
+    #[Route('/import', name: 'import', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/agents/import',
+        summary: 'Import assistants and instructions from a synaplan-bundle.v1 document',
+        tags: ['Agents'],
+        responses: [
+            new OA\Response(response: 200, description: 'Import result'),
+            new OA\Response(response: 400, description: 'Invalid bundle'),
+            new OA\Response(response: 404, description: 'Not found or feature disabled'),
+        ]
+    )]
+    public function import(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled((int) $user->getId()) || null === $this->bundleImporter) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        $content = $request->getContent();
+        $decoded = json_decode($content, true);
+        $json = $content;
+        $conflict = ImportOptions::CONFLICT_SKIP;
+        if (is_array($decoded) && isset($decoded['bundle']) && is_array($decoded['bundle'])) {
+            $json = json_encode($decoded['bundle'], JSON_THROW_ON_ERROR);
+            if (is_string($decoded['options']['conflict'] ?? null)) {
+                $conflict = $decoded['options']['conflict'];
+            }
+        }
+        try {
+            $results = $this->bundleImporter->apply($json, (int) $user->getId(), new ImportOptions($conflict));
+        } catch (BundleEnvelopeException $e) {
+            return $this->json(['error' => $e->getMessage(), 'path' => $e->path], Response::HTTP_BAD_REQUEST);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json(['success' => true, 'createsDrafts' => true, 'results' => $results]);
     }
 
     private function publisherName(int $userId): string

@@ -3,11 +3,17 @@
 namespace App\Service\Message;
 
 use App\AI\ToolCalling\ToolCallingCapability;
+use App\Entity\Agent;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\MessageMetaRepository;
+use App\Repository\UserRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentPinResolver;
+use App\Service\Agent\AgentRuntimeResolver;
+use App\Service\Agent\AgentService;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
@@ -86,6 +92,10 @@ final readonly class MessageClassifier
         private ?OfficeConverterClient $officeConverter = null,
         private ?DocumentToolsConfig $documentToolsConfig = null,
         private ?MultitaskRoutingConfig $multitaskConfig = null,
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentService $agentService = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
+        private ?UserRepository $users = null,
     ) {
     }
 
@@ -503,7 +513,7 @@ final readonly class MessageClassifier
             'raw_ai_response' => $result['raw_response'] ?? 'N/A',
         ]);
 
-        $classification = array_merge([
+        $classification = $this->attachRoutableAgent(array_merge([
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
@@ -521,7 +531,7 @@ final readonly class MessageClassifier
             // Usage taximeter: tokens/charged cost of the sorting call (null
             // when the fast path skipped the AI sorter or recording failed).
             'sorting_usage' => $result['sorting_usage'] ?? null,
-        ], $aiSortingDecision->toClassificationFields());
+        ], $aiSortingDecision->toClassificationFields()), $message);
 
         if ($overrideModelId) {
             $classification['override_model_id'] = $overrideModelId;
@@ -588,10 +598,6 @@ final readonly class MessageClassifier
     }
 
     /**
-     * Check for prompt override (Again function)
-     * Returns prompt ID if set, null otherwise.
-     */
-    /**
      * Pin the turn to an assistant when `agentId` is present and the flag is on.
      * Runs before the fast-path and before PROMPTID so a pinned chat never
      * becomes `general`. MessageSorter is never invoked on this path.
@@ -637,6 +643,76 @@ final readonly class MessageClassifier
         ], $decision->toClassificationFields());
     }
 
+    /**
+     * When the sorter returns `agent:{slug}` and the routable flag is on,
+     * attach the published assistant's RuntimeProfile. Flag off ⇒ no-op.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function attachRoutableAgent(array $classification, Message $message): array
+    {
+        if (null === $this->agentConfig || null === $this->agentService || null === $this->agentRuntimeResolver || null === $this->users) {
+            return $classification;
+        }
+
+        $userId = $message->getUserId();
+        if (!$this->agentConfig->isEnabled($userId) || !$this->agentConfig->isRoutableEnabled($userId)) {
+            return $classification;
+        }
+
+        $topic = (string) ($classification['topic'] ?? '');
+        if (!str_starts_with($topic, Agent::TOPIC_PREFIX)) {
+            return $classification;
+        }
+
+        $user = $this->users->find($userId);
+        if (!$user instanceof User) {
+            return $classification;
+        }
+
+        $slug = substr($topic, strlen(Agent::TOPIC_PREFIX));
+        foreach ($this->agentService->routableForUser($user) as $agent) {
+            if ($agent->getSlug() !== $slug || null === $agent->getId()) {
+                continue;
+            }
+            $chatId = $message->getChatId();
+            try {
+                $profile = $this->agentRuntimeResolver->resolve(
+                    $agent->getId(),
+                    $user,
+                    false,
+                    null !== $chatId && $chatId > 0 ? $chatId : null,
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('MessageClassifier: routable assistant could not be resolved, keeping sorter topic', [
+                    'message_id' => $message->getId(),
+                    'agent_id' => $agent->getId(),
+                    'topic' => $topic,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return $classification;
+            }
+            $classification['runtime_profile'] = $profile;
+            $classification['agent_id'] = $profile->agentId;
+            $classification['agent_version_id'] = $profile->agentVersionId;
+            $classification['prompt_id'] = $profile->promptId;
+            if (isset($profile->modelIds['chat']) && $profile->modelIds['chat']) {
+                $classification['model_id'] = $profile->modelIds['chat'];
+            }
+
+            return $classification;
+        }
+
+        return $classification;
+    }
+
+    /**
+     * Check for prompt override (Again function)
+     * Returns prompt ID if set, null otherwise.
+     */
     private function checkPromptOverride(?int $messageId): ?string
     {
         // Transient (incognito) messages are never persisted, so no PROMPTID

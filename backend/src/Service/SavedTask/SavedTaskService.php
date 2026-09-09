@@ -101,10 +101,61 @@ final readonly class SavedTaskService
     }
 
     /**
-     * @param int|null $sourceMessageId OUT message of the chat turn being
-     *                                  scheduled; its executed plan becomes
-     *                                  the task's graph so reruns replay it
+     * One Saved Task per assistant trigger id. Unlike {@see create()} this
+     * does not collapse to a single row per prompt — an assistant may own
+     * several schedules and mail rules.
+     *
+     * @param array<string, mixed> $data
      */
+    public function upsertAgentTrigger(
+        int $ownerId,
+        int $promptId,
+        string $name,
+        string $agentTrigger,
+        array $data,
+    ): SavedTask {
+        $this->assertUsablePrompt($promptId, $ownerId);
+        $existing = $this->findAgentTrigger($ownerId, $promptId, $agentTrigger);
+        if (!$existing instanceof SavedTask) {
+            $existing = new SavedTask($ownerId, $promptId, $name);
+            $this->tasks->save($existing);
+        }
+
+        $config = is_array($data['triggerConfig'] ?? null) ? $data['triggerConfig'] : [];
+        $config['agentTrigger'] = $agentTrigger;
+        $data['triggerConfig'] = $config;
+        $data['name'] = $name;
+
+        return $this->update($existing, $data);
+    }
+
+    public function findAgentTrigger(int $ownerId, int $promptId, string $agentTrigger): ?SavedTask
+    {
+        foreach ($this->tasks->findAllByPromptAndOwner($promptId, $ownerId) as $task) {
+            if (($task->getTriggerConfig()['agentTrigger'] ?? null) === $agentTrigger) {
+                return $task;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<SavedTask>
+     */
+    public function listAgentTriggers(int $ownerId, int $promptId): array
+    {
+        $out = [];
+        foreach ($this->tasks->findAllByPromptAndOwner($promptId, $ownerId) as $task) {
+            $key = $task->getTriggerConfig()['agentTrigger'] ?? null;
+            if (is_string($key) && '' !== $key) {
+                $out[] = $task;
+            }
+        }
+
+        return $out;
+    }
+
     public function create(int $ownerId, int $promptId, string $name, ?int $sourceMessageId = null): SavedTask
     {
         $this->assertUsablePrompt($promptId, $ownerId);

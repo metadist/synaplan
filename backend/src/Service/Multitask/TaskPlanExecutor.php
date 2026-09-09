@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\SavedTask;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
+use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Execution\DagExecutor;
@@ -15,6 +16,7 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\PerfTimer;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
 use App\Service\SavedTask\SavedTaskConfig;
 use Psr\Log\LoggerInterface;
@@ -337,7 +339,7 @@ final readonly class TaskPlanExecutor
         // decided. Do not send these to the planner or the analyzefile legacy
         // router — neither produces a real PDF.
         if ($deterministicFileIntent) {
-            return new TaskPlanResult($this->mapper->toSingleNodePlan($classification), fallback: false);
+            return new TaskPlanResult($this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification)), fallback: false);
         }
 
         $authored = $this->authoredSavedTaskPlan($message, $classification);
@@ -992,7 +994,7 @@ final readonly class TaskPlanExecutor
     private function effectiveClassification(array $classification): array
     {
         try {
-            $plan = $this->mapper->toSingleNodePlan($classification);
+            $plan = $this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification));
             $node = $plan->nodes[0] ?? null;
             $recovered = $node ? $this->mapper->classificationFromNode($node) : null;
 
@@ -1016,7 +1018,7 @@ final readonly class TaskPlanExecutor
             if (null === $messageId) {
                 return;
             }
-            $plan = $this->mapper->toSingleNodePlan($classification);
+            $plan = $this->mapper->toSingleNodePlan($classification, $this->allowedCapabilities($classification));
             $this->store->persist($messageId, $plan, null, $status);
         } catch (\Throwable $e) {
             $this->logger->warning('TaskPlanExecutor: failed to persist executed plan (ignored)', [
@@ -1024,5 +1026,20 @@ final readonly class TaskPlanExecutor
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     *
+     * @return list<string>|null
+     */
+    private function allowedCapabilities(array $classification): ?array
+    {
+        $profile = $classification['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            return null;
+        }
+
+        return SkillPolicy::allowedCapabilities($profile);
     }
 }

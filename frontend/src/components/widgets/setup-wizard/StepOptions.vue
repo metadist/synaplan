@@ -54,6 +54,14 @@
       </span>
     </label>
 
+    <ChannelAssistantSelect
+      v-model="agentId"
+      :label="$t('widgets.createWizard.options.assistantLabel')"
+      :none-label="$t('widgets.createWizard.options.assistantNone')"
+      :hint="$t('widgets.createWizard.options.assistantHint')"
+      test-id="select-wizard-assistant"
+    />
+
     <!-- Change later hint -->
     <p class="text-xs txt-secondary flex items-start gap-1.5">
       <Icon icon="heroicons:information-circle" class="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -64,8 +72,10 @@
 
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 
 const autoMessage = defineModel<string>('autoMessage', { required: true })
 const autoOpen = defineModel<boolean>('autoOpen', { required: true })
 const allowFileUpload = defineModel<boolean>('allowFileUpload', { required: true })
+const agentId = defineModel<number | null>('agentId', { required: true })
 </script>

@@ -27,6 +27,15 @@
           </div>
         </div>
       </div>
+      <div class="mt-4">
+        <ChannelAssistantSelect
+          v-model="whatsappAgentId"
+          :label="$t('channels.whatsappAssistant')"
+          :none-label="$t('channels.whatsappAssistantNone')"
+          :hint="$t('channels.whatsappAssistantHint')"
+          test-id="select-whatsapp-assistant"
+        />
+      </div>
     </div>
 
     <PhoneVerification />
@@ -128,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   DevicePhoneMobileIcon,
@@ -138,7 +147,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
+import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
+import { getWhatsAppAssistant, setWhatsAppAssistant } from '@/services/api/whatsappAssistantApi'
 import {
   mockWhatsAppChannels,
   mockAPIConfig,
@@ -171,6 +182,8 @@ const originalData = ref({
 })
 
 // Computed refs for template access
+const whatsappAgentId = ref<number | null>(null)
+const whatsappReady = ref(false)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
   const channels: EmailChannel[] = [
@@ -219,6 +232,24 @@ const loadEmailKeyword = async () => {
 onMounted(async () => {
   cleanupGuard = setupNavigationGuard()
   await loadEmailKeyword()
+  try {
+    whatsappAgentId.value = await getWhatsAppAssistant()
+  } catch {
+    whatsappAgentId.value = null
+  }
+  whatsappReady.value = true
+})
+
+watch(whatsappAgentId, async (id) => {
+  if (!whatsappReady.value) {
+    return
+  }
+  try {
+    await setWhatsAppAssistant(id)
+    success(t('channels.whatsappAssistantSaved'))
+  } catch {
+    error(t('channels.whatsappAssistantFailed'))
+  }
 })
 
 onUnmounted(() => {

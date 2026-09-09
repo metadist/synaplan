@@ -10,6 +10,7 @@ use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Realtime\Notifier\ChatActivityNotifier;
+use App\Service\Agent\AgentConfig;
 use App\Service\Digest\MessageReferenceResolver;
 use App\Service\File\FileProcessor;
 use App\Service\File\UserUploadPathBuilder;
@@ -17,6 +18,7 @@ use App\Service\Media\OutboundChannelMedia;
 use App\Service\Message\ChatErrorPresenter;
 use App\Service\Message\MessageProcessor;
 use App\Service\Usage\RecordedUsage;
+use App\Service\WhatsApp\WhatsAppAgentBinding;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -110,6 +112,8 @@ final class WhatsAppService
         private string $appUrl = '',
         ?string $whatsappGraphApiBaseUrl = null,
         private ?ChatActivityNotifier $chatActivityNotifier = null,
+        private ?WhatsAppAgentBinding $agentBinding = null,
+        private ?AgentConfig $agentConfig = null,
     ) {
         $this->accessToken = $whatsappAccessToken;
         $this->enabled = $whatsappEnabled;
@@ -858,6 +862,10 @@ final class WhatsAppService
         // For image messages WITHOUT caption, force image description mode
         // If there's a caption (user question), let the classifier route to chat for an answer
         $processingOptions = [];
+        $boundAgentId = $this->boundAgentId((int) $user->getId());
+        if (null !== $boundAgentId) {
+            $processingOptions['agentId'] = $boundAgentId;
+        }
         if ($isImageMessage) {
             $imageCaption = $dto->incomingMsg['image']['caption'] ?? null;
             if (empty($imageCaption)) {
@@ -2522,5 +2530,18 @@ final class WhatsAppService
         $separator = '' === trim($responseText) ? '' : "\n\n";
 
         return $responseText.$separator.'🔗 *Quellen:*'."\n".implode("\n\n", $entries);
+    }
+
+    /**
+     * The assistant this user's WhatsApp number is pinned to (the `whatsapp`
+     * event), or null when Agent Builder is off or nothing is bound.
+     */
+    private function boundAgentId(int $userId): ?int
+    {
+        if (null === $this->agentBinding || null === $this->agentConfig || !$this->agentConfig->isEnabled($userId)) {
+            return null;
+        }
+
+        return $this->agentBinding->get($userId);
     }
 }

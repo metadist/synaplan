@@ -24,6 +24,7 @@ final readonly class AgentConfigSeeder
     {
         $rows = [
             ['ownerId' => 0, 'group' => AgentConfig::CONFIG_GROUP, 'setting' => AgentConfig::KEY_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => AgentConfig::CONFIG_GROUP, 'setting' => AgentConfig::KEY_ROUTABLE_ENABLED, 'value' => '0'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'agent_config', $rows);

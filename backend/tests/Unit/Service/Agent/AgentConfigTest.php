@@ -26,6 +26,7 @@ final class AgentConfigTest extends TestCase
 
         self::assertFalse($this->config->isEnabled(42));
         self::assertFalse($this->config->isEnabled(null));
+        self::assertFalse($this->config->isRoutableEnabled(42));
     }
 
     public function testGlobalRowOverridesBuiltInDefault(): void

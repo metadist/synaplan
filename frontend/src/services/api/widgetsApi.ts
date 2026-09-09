@@ -18,6 +18,7 @@ export interface Widget {
   widgetId: string
   name: string
   taskPromptTopic: string
+  agentId?: number | null
   status: 'active' | 'inactive'
   config: WidgetConfig
   isActive: boolean
@@ -98,6 +99,7 @@ export interface WidgetConfig {
 export interface CreateWidgetRequest {
   name: string
   taskPromptTopic?: string
+  agentId?: number | null
   websiteUrl?: string
   config?: WidgetConfig
 }
@@ -111,6 +113,7 @@ export interface UpdateWidgetRequest {
   name?: string
   config?: WidgetConfig
   status?: 'active' | 'inactive'
+  agentId?: number | null
 }
 
 export interface EmbedCodeResponse {

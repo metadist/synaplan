@@ -10,6 +10,9 @@ use App\Message\CrawlWidgetUrlMessage;
 use App\Repository\PromptRepository;
 use App\Repository\ShareRepository;
 use App\Repository\WidgetRepository;
+use App\Service\Agent\AgentAccess;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\BillingService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Iam\AccessGate;
@@ -65,6 +68,8 @@ class WidgetController extends AbstractController
         private AccessGate $accessGate,
         private IamConfig $iamConfig,
         private ShareRepository $shareRepository,
+        private ?AgentAccess $agentAccess = null,
+        private ?AgentConfig $agentConfig = null,
     ) {
     }
 
@@ -117,6 +122,7 @@ class WidgetController extends AbstractController
                 'widgetId' => $widget->getWidgetId(),
                 'name' => $widget->getName(),
                 'taskPromptTopic' => $widget->getTaskPromptTopic(),
+                'agentId' => $widget->getAgentId(),
                 'status' => $widget->getStatus(),
                 'config' => $widget->getConfig(),
                 'allowedDomains' => $widget->getAllowedDomains(),
@@ -207,6 +213,10 @@ class WidgetController extends AbstractController
                 $data['websiteUrl'] ?? null
             );
 
+            if (array_key_exists('agentId', $data)) {
+                $this->bindWidgetAgent($user, $widget, $data['agentId']);
+            }
+
             $widget->syncAllowedDomainsFromConfig();
 
             return $this->json([
@@ -217,6 +227,7 @@ class WidgetController extends AbstractController
                     'widgetId' => $widget->getWidgetId(),
                     'name' => $widget->getName(),
                     'taskPromptTopic' => $widget->getTaskPromptTopic(),
+                    'agentId' => $widget->getAgentId(),
                     'status' => $widget->getStatus(),
                     'config' => $widget->getConfig(),
                     'allowedDomains' => $widget->getAllowedDomains(),
@@ -319,6 +330,7 @@ class WidgetController extends AbstractController
             'widgetId' => $widget->getWidgetId(),
             'name' => $widget->getName(),
             'taskPromptTopic' => $widget->getTaskPromptTopic(),
+            'agentId' => $widget->getAgentId(),
             'status' => $widget->getStatus(),
             'config' => $isOwner ? $widget->getConfig() : self::withoutSecrets($widget->getConfig()),
             'allowedDomains' => $widget->getAllowedDomains(),
@@ -384,12 +396,18 @@ class WidgetController extends AbstractController
                 $widget->setStatus($data['status']);
             }
 
+            if (array_key_exists('agentId', $data)) {
+                $this->bindWidgetAgent($user, $widget, $data['agentId']);
+            }
+
             $this->em->flush();
 
             return $this->json([
                 'success' => true,
                 'message' => 'Widget updated successfully',
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (\Exception $e) {
             $this->logger->error('Failed to update widget', [
                 'error' => $e->getMessage(),
@@ -1523,5 +1541,30 @@ class WidgetController extends AbstractController
         }
 
         return $granted->value;
+    }
+
+    private function bindWidgetAgent(User $user, Widget $widget, mixed $agentId): void
+    {
+        if (null === $agentId || '' === $agentId || 0 === $agentId) {
+            $this->widgetService->bindAgent($widget, null);
+
+            return;
+        }
+        $id = (int) $agentId;
+        if ($id < 1) {
+            throw new \InvalidArgumentException('agentId is invalid');
+        }
+        if (null === $this->agentConfig || !$this->agentConfig->isEnabled((int) $user->getId())) {
+            throw new \InvalidArgumentException('Assistants are not enabled');
+        }
+        if (null === $this->agentAccess) {
+            throw new \InvalidArgumentException('Assistants are not enabled');
+        }
+        try {
+            $this->agentAccess->require($user, $id, Permission::Use);
+        } catch (AgentNotAccessibleException) {
+            throw new \InvalidArgumentException('You cannot use this assistant');
+        }
+        $this->widgetService->bindAgent($widget, $id);
     }
 }

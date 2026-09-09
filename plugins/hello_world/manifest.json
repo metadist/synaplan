@@ -7,6 +7,9 @@
     "capabilities": ["chat", "ui_extension"],
     "config": {
         "greeting": "Hello from Native Plugin!"
+    },
+    "provides": {
+        "agents": ["agents/*.json"]
     }
 }
 

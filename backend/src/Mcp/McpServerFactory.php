@@ -15,6 +15,7 @@ use App\Repository\ChatRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Repository\MessageRepository;
 use App\Repository\PromptRepository;
+use App\Service\Agent\AssistantAliasResolver;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Desktop\DesktopJobContract;
@@ -91,6 +92,7 @@ final class McpServerFactory
         private readonly DesktopJobResultNotifier $desktopJobResultNotifier,
         private readonly LoggerInterface $logger,
         private readonly EventRingStore $eventRing,
+        private readonly ?AssistantAliasResolver $assistantAliases = null,
     ) {
     }
 
@@ -117,14 +119,14 @@ final class McpServerFactory
                 .'Use synaplan_chat for a full answer through Synaplan\'s pipeline; rag_search / '
                 .'rag_similar to retrieve document chunks; memory_search / memory_add to read and '
                 .'store long-term memories; file_ingest to add documents to the knowledge base; and '
-                .'list_chats / get_messages / list_prompts to browse conversations and task prompts. '
+                .'list_chats / get_messages / list_prompts / list_assistants to browse conversations, task prompts and assistants. '
                 .'Documents and memories are also available as resources, and task prompts as MCP '
                 .'prompts. Everything is scoped to the authenticated Synaplan account.',
             )
             ->setLogger($this->logger)
             ->setSession($this->sessionStore())
             ->addTool(
-                $this->chatHandler($user),
+                $this->chatHandler($user, $device),
                 'synaplan_chat',
                 'Synaplan chat',
                 'Send a message through Synaplan\'s full AI pipeline — intent classification, '
@@ -204,7 +206,21 @@ final class McpServerFactory
                 'List the user\'s available Synaplan task prompts (internal `tools:*` prompts excluded).',
                 new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
                 self::listPromptsSchema(),
-            )
+            );
+
+        if (null !== $this->assistantAliases) {
+            $builder->addTool(
+                $this->listAssistantsHandler($user, $device),
+                'list_assistants',
+                'List assistants',
+                'List assistants the authenticated user may use from a connected app. '
+                .'Each row includes slug, name, description, version and origin.',
+                new ToolAnnotations(readOnlyHint: true, openWorldHint: false),
+                self::listAssistantsSchema(),
+            );
+        }
+
+        $builder
             ->addResourceTemplate(
                 $this->fileResourceHandler($user),
                 'synaplan://file/{id}',
@@ -650,6 +666,37 @@ final class McpServerFactory
     }
 
     /**
+     * @return \Closure(): array<string, mixed>
+     */
+    private function listAssistantsHandler(User $user, ?DesktopDevice $device): \Closure
+    {
+        return function () use ($user, $device): array {
+            if (null === $this->assistantAliases) {
+                return ['total' => 0, 'assistants' => []];
+            }
+            $assistants = $this->assistantAliases->listAssistants($user, self::assistantEventKinds($device));
+
+            return ['total' => \count($assistants), 'assistants' => $assistants];
+        };
+    }
+
+    /**
+     * Event kinds an MCP session may address: `mcp` always, `desktop` only
+     * when the session belongs to a paired Synaplan Desktop device.
+     *
+     * @return list<string>
+     */
+    private static function assistantEventKinds(?DesktopDevice $device): array
+    {
+        $kinds = [AssistantAliasResolver::EVENT_MCP];
+        if ($device instanceof DesktopDevice) {
+            $kinds[] = AssistantAliasResolver::EVENT_DESKTOP;
+        }
+
+        return $kinds;
+    }
+
+    /**
      * Resource template handler for `synaplan://file/{id}` — returns the document's text.
      *
      * @return \Closure(string, string): string
@@ -692,13 +739,24 @@ final class McpServerFactory
     }
 
     /**
-     * @return \Closure(string, ?int): array<string, mixed>
+     * @return \Closure(string, ?int, string|int|null): array<string, mixed>
      */
-    private function chatHandler(User $user): \Closure
+    private function chatHandler(User $user, ?DesktopDevice $device): \Closure
     {
-        return function (string $message, ?int $chat_id = null) use ($user): array {
+        return function (string $message, ?int $chat_id = null, string|int|null $agentId = null) use ($user, $device): array {
             if (!($this->rateLimit->checkLimit($user, 'MESSAGES')['allowed'] ?? false)) {
                 throw new ToolCallException('Rate limit exceeded for chat messages.');
+            }
+
+            // Resolve the pin before anything is persisted so an unusable
+            // assistant yields a clear error instead of a stray chat turn.
+            $options = [];
+            if (null !== $agentId && '' !== (string) $agentId) {
+                $agent = $this->assistantAliases?->resolveUsable($user, $agentId, self::assistantEventKinds($device));
+                if (null === $agent?->getId()) {
+                    throw new ToolCallException(sprintf('Assistant "%s" is not available: it must be published, allow connected apps and be usable by you.', (string) $agentId));
+                }
+                $options['agentId'] = $agent->getId();
             }
 
             $userId = (int) $user->getId();
@@ -725,7 +783,7 @@ final class McpServerFactory
             $this->em->persist($incoming);
             $this->em->flush();
 
-            $result = $this->messageProcessor->process($incoming);
+            $result = $this->messageProcessor->process($incoming, $options);
 
             if (!($result['success'] ?? false)) {
                 throw new ToolCallException($result['error'] ?? 'Message processing failed.');
@@ -1158,8 +1216,26 @@ final class McpServerFactory
                     'description' => 'Optional existing chat id (from list_chats) to continue a '
                         .'conversation. Omit to start a new chat.',
                 ],
+                'agentId' => [
+                    'type' => ['string', 'integer', 'null'],
+                    'description' => 'Optional assistant id or slug (see list_assistants). Pins the reply '
+                        .'to that assistant; fails when it is not published, not usable by you, '
+                        .'or does not allow connected apps.',
+                ],
             ],
             'required' => ['message'],
+            'additionalProperties' => false,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function listAssistantsSchema(): array
+    {
+        return [
+            'type' => 'object',
+            'properties' => new \stdClass(),
             'additionalProperties' => false,
         ];
     }

@@ -19,6 +19,11 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
       clone: vi.fn(),
       remove: vi.fn(),
       list: vi.fn(),
+      triggers: vi.fn().mockResolvedValue({
+        savedTasksEnabled: true,
+        availableKinds: ['mail', 'widget', 'whatsapp'],
+        rows: [],
+      }),
     },
   }
 })
@@ -38,6 +43,22 @@ vi.mock('@/stores/aiConfig', () => ({
     models: {},
     loadModels: vi.fn(),
   }),
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({ user: { id: 4 } }),
+}))
+
+vi.mock('@/services/filesService', () => ({
+  getFileGroups: vi.fn().mockResolvedValue([]),
+}))
+
+vi.mock('@/services/api/iamApi', () => ({
+  iamApi: { listSharedWithMe: vi.fn().mockResolvedValue([]) },
+}))
+
+vi.mock('@/services/api/mcpServersApi', () => ({
+  mcpServersApi: { list: vi.fn().mockResolvedValue({ servers: [] }) },
 }))
 
 vi.mock('@/services/api/chatApi', () => ({
@@ -75,7 +96,7 @@ function mountBuilder() {
   const wrapper = mount(AssistantBuilder, {
     global: {
       plugins: [i18n],
-      stubs: { Icon: true, AssistantPublishSection: true },
+      stubs: { Icon: true, AssistantPublishSection: true, BuilderTriggers: true },
     },
   })
   return { wrapper, store }

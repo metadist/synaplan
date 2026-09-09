@@ -23,6 +23,8 @@
       <BuilderInstructions />
       <BuilderModels />
       <BuilderKnowledge />
+      <BuilderToolsSkills />
+      <BuilderTriggers />
       <AssistantPublishSection @deleted="emit('deleted')" />
     </div>
     <AssistantTestPanel />
@@ -37,6 +39,8 @@ import BuilderBasics from './BuilderBasics.vue'
 import BuilderInstructions from './BuilderInstructions.vue'
 import BuilderModels from './BuilderModels.vue'
 import BuilderKnowledge from './BuilderKnowledge.vue'
+import BuilderToolsSkills from './BuilderToolsSkills.vue'
+import BuilderTriggers from './BuilderTriggers.vue'
 import AssistantTestPanel from './AssistantTestPanel.vue'
 import AssistantPublishSection from './AssistantPublishSection.vue'
 
