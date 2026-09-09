@@ -145,6 +145,31 @@ final class ConfigControllerModelsTest extends WebTestCase
         }
     }
 
+    public function testRerankModelsNeverAppearInCapabilityPickers(): void
+    {
+        // Rerank models (Jina/Cohere/Voyage/TEI) are configured on the Reranking
+        // admin tab, never chosen from a capability dropdown. Historically the
+        // unhandled `rerank` tag fell into the grouping `default` arm and showed
+        // up under every capability — including VECTORIZE — flagged available
+        // even with no provider key, because Jina/Cohere/Voyage are unknown to
+        // the AI provider registry. Assert the full admin view is rerank-free.
+        $this->loginAs('admin@synaplan.com');
+        $data = $this->fetchModels('?includeUnavailable=1');
+
+        foreach (self::allRows($data) as $row) {
+            self::assertNotSame(
+                'RERANK',
+                strtoupper((string) $row['tag']),
+                sprintf('Rerank model "%s" (%s) must not appear in a capability picker.', $row['name'], $row['service'])
+            );
+            self::assertNotContains(
+                strtolower((string) $row['service']),
+                ['jina', 'cohere', 'voyage'],
+                sprintf('Rerank provider row "%s" leaked into the model picker.', $row['name'])
+            );
+        }
+    }
+
     public function testVisibleModelsBelongToAvailableProviders(): void
     {
         $this->loginAs('demo@synaplan.com');
