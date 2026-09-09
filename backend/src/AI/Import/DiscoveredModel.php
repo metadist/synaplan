@@ -13,8 +13,8 @@ namespace App\AI\Import;
 final readonly class DiscoveredModel
 {
     /**
-     * @param list<string>               $guessedTags one or more BMODELS.BTAG values
-     * @param array<string, string>|null $probe       per-capability probe result, or null when not probed
+     * @param list<string>              $guessedTags one or more BMODELS.BTAG values
+     * @param array<string, mixed>|null $probe       per-capability probe result, or null when not probed
      */
     public function __construct(
         public string $providerId,
@@ -27,6 +27,9 @@ final readonly class DiscoveredModel
     ) {
     }
 
+    /**
+     * @param array<string, mixed>|null $probe
+     */
     public function withProbe(?array $probe): self
     {
         return new self(
@@ -41,7 +44,7 @@ final readonly class DiscoveredModel
     }
 
     /**
-     * @return array{providerId: string, name: string, guessedTags: list<string>, exists: bool, sizeBytes: int|null, family: string|null, probe: array<string, string>|null}
+     * @return array{providerId: string, name: string, guessedTags: list<string>, exists: bool, sizeBytes: int|null, family: string|null, probe: array<string, mixed>|null}
      */
     public function toArray(): array
     {
