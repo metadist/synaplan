@@ -6,9 +6,12 @@ namespace App\Tests\Integration\Plug;
 
 use App\Plug\PlugKeyStore;
 use App\Plug\WebSearch\WebSearchQuery;
+use App\Repository\ConfigRepository;
+use App\Service\EncryptionService;
 use PHPUnit\Framework\TestCase;
 use Plugin\SerperSearch\Plug\SerperSearchAdapter;
 use Plugin\SerperSearch\Plug\SerperSearchResultMapper;
+use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -80,16 +83,19 @@ final class SerperSearchAdapterTest extends TestCase
 
     private function keyStore(?string $key): PlugKeyStore
     {
-        // BypassFinals (phpunit.xml.dist) makes the final PlugKeyStore mockable.
-        return new class($key) extends PlugKeyStore {
-            public function __construct(private readonly ?string $key)
-            {
-            }
+        // A real store wired to resolve the plugin key from its env slot, so the
+        // plugin-provider support path (pluginProviders => ['serper']) is exercised.
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturn(null);
+        $encryption = $this->createMock(EncryptionService::class);
+        $encryption->method('encrypt')->willReturnArgument(0);
 
-            public function getKey(string $provider): ?string
-            {
-                return $this->key;
-            }
-        };
+        return new PlugKeyStore(
+            $configRepository,
+            $encryption,
+            new NullLogger(),
+            null !== $key ? ['serper' => $key] : [],
+            ['serper'],
+        );
     }
 }
