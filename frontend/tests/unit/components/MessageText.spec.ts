@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageText from '@/components/MessageText.vue'
 
@@ -182,5 +182,29 @@ describe('MessageText first-run setup CTA', () => {
     } finally {
       window.removeEventListener('open-first-run-setup', onOpen)
     }
+  })
+
+  it('paints the memory hover popup on the document body so cards cannot clip it', async () => {
+    const wrapper = mount(MessageText, {
+      props: { content: 'Hello', readonly: true },
+      attachTo: document.body,
+    })
+
+    const host = messageTextEl(wrapper)
+    host.innerHTML =
+      '<span class="memory-badge-wrapper"><button type="button" class="memory-ref">Badge</button><span class="memory-tooltip"><span>Popup text</span></span></span>'
+
+    host
+      .querySelector('.memory-ref')
+      ?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }))
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+
+    const portal = document.querySelector('[data-testid="memory-tooltip-portal"]')
+    expect(portal).toBeTruthy()
+    expect(portal?.textContent).toContain('Popup text')
+    expect(portal?.classList.contains('fixed')).toBe(true)
+
+    wrapper.unmount()
   })
 })

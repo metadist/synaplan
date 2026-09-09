@@ -107,6 +107,7 @@ const onSchedule = async () => {
       v-for="card in plan.cards"
       :key="card.nodeId"
       :card="card"
+      :is-readonly="guest"
       @retry="emit('retryTask', $event)"
       @cancel="emit('cancelTask', $event)"
     />

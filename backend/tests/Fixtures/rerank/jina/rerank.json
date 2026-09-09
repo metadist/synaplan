@@ -1,0 +1,7 @@
+{
+  "results": [
+    {"index": 1, "relevance_score": 0.88},
+    {"index": 0, "relevance_score": 0.33},
+    {"index": 2, "relevance_score": 0.05}
+  ]
+}

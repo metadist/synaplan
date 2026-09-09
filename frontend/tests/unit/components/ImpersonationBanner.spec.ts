@@ -92,6 +92,7 @@ const buildRouter = () =>
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/admin', name: 'admin', component: { template: '<div />' } },
+      { path: '/admin/people', name: 'admin-people', component: { template: '<div />' } },
     ],
   })
 
@@ -172,8 +173,8 @@ describe('ImpersonationBanner', () => {
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
     expect(successMock).toHaveBeenCalledWith('Admin session restored.')
-    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin')
-    expect(wrapper.vm.$router.currentRoute.value.query).toEqual({ tab: 'users' })
+    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin-people')
+    expect(wrapper.vm.$router.currentRoute.value.path).toBe('/admin/people')
   })
 
   it('shows the server-supplied error when Exit fails', async () => {

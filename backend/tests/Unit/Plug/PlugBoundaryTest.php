@@ -68,6 +68,12 @@ final class PlugBoundaryTest extends TestCase
         }
     }
 
+    public function testRerankHttpClientIsNotImportedOutsideThePlugBoundary(): void
+    {
+        $violations = $this->scan('use App\\Plug\\Rerank\\Client\\HttpRerankClient', ['/Plug/']);
+        $this->assertSame([], $violations, "HttpRerankClient imports outside the plug boundary:\n".implode("\n", $violations));
+    }
+
     /**
      * @param list<string> $allowedPathFragments
      *

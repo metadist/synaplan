@@ -36,6 +36,9 @@ final readonly class PlugConfigService
     public const KEY_RERANK_ENABLED = 'RERANK.ENABLED';
     public const KEY_RERANK_CANDIDATES_MULTIPLIER = 'RERANK.CANDIDATES_MULTIPLIER';
     public const KEY_RERANK_LATENCY_BUDGET_MS = 'RERANK.LATENCY_BUDGET_MS';
+    public const KEY_RERANK_LLM_FALLBACK = 'RERANK.LLM_FALLBACK';
+    public const KEY_RERANK_MAX_CANDIDATE_CHARS = 'RERANK.MAX_CANDIDATE_CHARS';
+    public const KEY_RERANK_LAST_EVAL = 'RERANK.LAST_EVAL';
 
     public const DEFAULT_CHAIN_TEXT = 'native';
     public const DEFAULT_CHAIN_DOCUMENT = 'structured_office,office_convert,tika,pdf_vision';
@@ -67,6 +70,13 @@ final readonly class PlugConfigService
     public const DEFAULT_RERANK_ENABLED = false;
     public const DEFAULT_RERANK_MULTIPLIER = 4;
     public const DEFAULT_RERANK_LATENCY_MS = 800;
+    public const DEFAULT_RERANK_LLM_FALLBACK = false;
+    public const DEFAULT_RERANK_MAX_CANDIDATE_CHARS = 2000;
+    public const MIN_RERANK_MULTIPLIER = 2;
+    public const MAX_RERANK_MULTIPLIER = 10;
+    public const MIN_RERANK_LATENCY_MS = 100;
+    public const MAX_RERANK_LATENCY_MS = 5000;
+    public const MAX_RERANK_STORAGE_CANDIDATES = 100;
 
     /** Built-in extraction keys FileProcessor already implements. */
     public const BUILTIN_EXTRACTOR_KEYS = [
@@ -361,6 +371,83 @@ final readonly class PlugConfigService
     public function rerankLatencyBudgetMs(): int
     {
         return $this->readInt(self::KEY_RERANK_LATENCY_BUDGET_MS, self::DEFAULT_RERANK_LATENCY_MS);
+    }
+
+    public function isRerankLlmFallback(): bool
+    {
+        $raw = $this->readGlobal(self::KEY_RERANK_LLM_FALLBACK, '0');
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_RERANK_LLM_FALLBACK;
+    }
+
+    public function rerankMaxCandidateChars(): int
+    {
+        return $this->readInt(self::KEY_RERANK_MAX_CANDIDATE_CHARS, self::DEFAULT_RERANK_MAX_CANDIDATE_CHARS);
+    }
+
+    /**
+     * Persist instance-wide rerank settings. Does not write DEFAULTMODEL.RERANK.
+     */
+    public function setRerank(bool $enabled, int $multiplier, int $budgetMs, bool $llmFallback): void
+    {
+        if ($multiplier < self::MIN_RERANK_MULTIPLIER || $multiplier > self::MAX_RERANK_MULTIPLIER) {
+            throw new \InvalidArgumentException(sprintf('multiplier must be between %d and %d', self::MIN_RERANK_MULTIPLIER, self::MAX_RERANK_MULTIPLIER));
+        }
+        if ($budgetMs < self::MIN_RERANK_LATENCY_MS || $budgetMs > self::MAX_RERANK_LATENCY_MS) {
+            throw new \InvalidArgumentException(sprintf('budgetMs must be between %d and %d', self::MIN_RERANK_LATENCY_MS, self::MAX_RERANK_LATENCY_MS));
+        }
+
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_RERANK_ENABLED, $enabled ? '1' : '0');
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_RERANK_CANDIDATES_MULTIPLIER, (string) $multiplier);
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_RERANK_LATENCY_BUDGET_MS, (string) $budgetMs);
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_RERANK_LLM_FALLBACK, $llmFallback ? '1' : '0');
+    }
+
+    /**
+     * @return array{date: string, recallOff: float, recallOn: float, p95Off: float, p95On: float}|null
+     */
+    public function lastRerankEval(): ?array
+    {
+        $raw = $this->readGlobal(self::KEY_RERANK_LAST_EVAL, '');
+        if ('' === $raw) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (!\is_array($decoded)
+            || !\is_string($decoded['date'] ?? null)
+            || !is_numeric($decoded['recallOff'] ?? null)
+            || !is_numeric($decoded['recallOn'] ?? null)
+            || !is_numeric($decoded['p95Off'] ?? null)
+            || !is_numeric($decoded['p95On'] ?? null)
+        ) {
+            return null;
+        }
+
+        return [
+            'date' => $decoded['date'],
+            'recallOff' => (float) $decoded['recallOff'],
+            'recallOn' => (float) $decoded['recallOn'],
+            'p95Off' => (float) $decoded['p95Off'],
+            'p95On' => (float) $decoded['p95On'],
+        ];
+    }
+
+    /**
+     * @param array{date: string, recallOff: float, recallOn: float, p95Off: float, p95On: float} $report
+     */
+    public function setLastRerankEval(array $report): void
+    {
+        $this->configRepository->setValue(
+            0,
+            self::CONFIG_GROUP,
+            self::KEY_RERANK_LAST_EVAL,
+            json_encode($report, JSON_THROW_ON_ERROR),
+        );
     }
 
     private function readGlobal(string $setting, string $default): string

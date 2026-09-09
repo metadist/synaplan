@@ -2,8 +2,10 @@ import type { z } from 'zod'
 import {
   DeleteAdminPlugsKeysDeleteResponseSchema,
   GetAdminPlugsExtractionStatusResponseSchema,
+  GetAdminPlugsRerankStatusResponseSchema,
   GetAdminPlugsWebSearchStatusResponseSchema,
   PostAdminPlugsExtractionTestResponseSchema,
+  PostAdminPlugsRerankTestResponseSchema,
   PostAdminPlugsWebSearchTestResponseSchema,
   PutAdminPlugsKeysSaveResponseSchema,
 } from '@/generated/api-schemas'
@@ -13,6 +15,8 @@ export type ExtractionStatus = z.infer<typeof GetAdminPlugsExtractionStatusRespo
 export type ExtractionTestResult = z.infer<typeof PostAdminPlugsExtractionTestResponseSchema>
 export type WebSearchStatus = z.infer<typeof GetAdminPlugsWebSearchStatusResponseSchema>
 export type WebSearchTestResult = z.infer<typeof PostAdminPlugsWebSearchTestResponseSchema>
+export type RerankStatus = z.infer<typeof GetAdminPlugsRerankStatusResponseSchema>
+export type RerankTestResult = z.infer<typeof PostAdminPlugsRerankTestResponseSchema>
 export type PlugKeyStatus = z.infer<typeof PutAdminPlugsKeysSaveResponseSchema>
 
 export async function getExtractionStatus(): Promise<ExtractionStatus> {
@@ -56,6 +60,38 @@ export async function saveWebSearch(payload: {
     method: 'PUT',
     body: JSON.stringify(payload),
     schema: GetAdminPlugsWebSearchStatusResponseSchema,
+  })
+}
+
+export async function getRerankStatus(): Promise<RerankStatus> {
+  return httpClient('/api/v1/admin/plugs/rerank', {
+    schema: GetAdminPlugsRerankStatusResponseSchema,
+  })
+}
+
+export async function saveRerank(payload: {
+  enabled: boolean
+  modelKey: string | null
+  multiplier: number
+  budgetMs: number
+  llmFallback: boolean
+}): Promise<RerankStatus> {
+  return httpClient('/api/v1/admin/plugs/rerank', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    schema: GetAdminPlugsRerankStatusResponseSchema,
+  })
+}
+
+export async function testRerank(
+  query: string,
+  documents: string[],
+  modelKey: string | null
+): Promise<RerankTestResult> {
+  return httpClient('/api/v1/admin/plugs/rerank/test', {
+    method: 'POST',
+    body: JSON.stringify({ query, documents, modelKey }),
+    schema: PostAdminPlugsRerankTestResponseSchema,
   })
 }
 

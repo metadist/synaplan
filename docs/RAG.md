@@ -75,6 +75,38 @@ Type natural language queries. The system finds documents by meaning:
 - **Limit** - Max results to return
 - **Groups** - Filter by document groups
 
+### Reranking
+After embedding search, an optional rerank model can reorder a larger
+candidate set and keep the top `k`. It is **off** by default.
+
+1. Storage fetches `min(k × RERANK.CANDIDATES_MULTIPLIER, 100)` hits.
+2. The bound catalog model (TEI, Jina, Cohere or Voyage) scores them
+   within `RERANK.LATENCY_BUDGET_MS`.
+3. On success the top `k` are returned with an extra `rerank_score`.
+4. On timeout, HTTP error or empty output, the first `k` stay in
+   embedding order. Chat still answers.
+
+`RERANK.LLM_FALLBACK=1` uses the summary model only when **no** rerank
+model is bound — not when the HTTP call fails. Configure and test under
+**Operate → AI infrastructure → Reranking**.
+
+Compare off vs on against a user's vector store:
+
+```bash
+docker compose exec -T backend php bin/console app:rag:eval-rerank \
+  --user=<id> --k=5 --report=var/rerank-eval.md
+```
+
+The report lists recall@5, MRR, p50/p95 latency and fallback counts.
+The seeded default stays `0` until a live report shows recall@5 up and
+p95 inside the budget.
+
+The command needs an active adapter for the "on" pass: bind a rerank model
+(or enable the chat-model fallback) first, otherwise it exits with an error
+instead of recording an "on" run that equals "off". It temporarily sets
+`PLUGS.RERANK.ENABLED=1` while the "on" pass runs and restores the previous
+value afterwards — on a busy instance, run it off-peak.
+
 ---
 
 ## Sharing

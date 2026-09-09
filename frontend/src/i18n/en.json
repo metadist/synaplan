@@ -1572,7 +1572,8 @@
         "img2vid": "Video Animation (Image → Video)",
         "sound2text": "Speech-to-Text",
         "text2sound": "Text-to-Speech",
-        "analyze": "Text Analytics"
+        "analyze": "Text Analytics",
+        "rerank": "Reranking"
       },
       "chat": "Chat Model",
       "sorting": "Sorting Model",
@@ -2842,7 +2843,8 @@
     "tabs": {
       "models": "Models & keys",
       "extraction": "Extraction",
-      "webSearch": "Web search"
+      "webSearch": "Web search",
+      "rerank": "Reranking"
     },
     "description": "Connect an AI provider so your team can chat. Keys are stored encrypted on your server and take effect immediately — no restart needed.",
     "statusReadyTitle": "Your AI is ready",
@@ -2971,6 +2973,40 @@
       "testPlaceholder": "synaplan open source",
       "testButton": "Test query",
       "testing": "Testing…"
+    },
+    "rerank": {
+      "lead": "After search finds many snippets, a reranker puts the most useful ones first. Leave this off until a test shows it helps. Chat stays the same while it is off.",
+      "enable": "Use reranking on document search",
+      "model": "Rerank model",
+      "modelNone": "No model selected",
+      "multiplier": "How many extra snippets to fetch (2–10)",
+      "budgetMs": "Give up after this many milliseconds (100–5000)",
+      "llmFallback": "Use the chat model when no rerank model is set",
+      "llmFallbackHint": "This uses the summary model for every search and can cost more. Prefer a dedicated rerank model.",
+      "healthAvailable": "available",
+      "healthUnavailable": "unavailable",
+      "apiKey": {
+        "jina": "Jina API key",
+        "cohere": "Cohere API key",
+        "voyage": "Voyage API key"
+      },
+      "apiKeyPlaceholder": "Paste an API key",
+      "saveKey": "Save key",
+      "keySaved": "Key saved. The next rerank can use it.",
+      "save": "Save reranking",
+      "saved": "Reranking settings saved. The next chat uses them.",
+      "saveFailed": "Reranking settings could not be saved",
+      "loadFailed": "Could not load reranking settings",
+      "testTitle": "Test with sample snippets",
+      "testHint": "Type a question and one snippet per line. You will see the new order so you can check it is working.",
+      "testQueryPlaceholder": "What is the invoice total?",
+      "testDocumentsPlaceholder": "The invoice total is 120 euro.\nOffice hours are 9 to 5.",
+      "testButton": "Test order",
+      "testing": "Testing…",
+      "lastEval": {
+        "title": "Last measurement",
+        "line": "On {date}: found the right snippet {recallOff} of the time without reranking, {recallOn} with it. Slowest answers took {p95Off} ms without and {p95On} ms with."
+      }
     }
   },
   "providerHelp": {
@@ -5704,7 +5740,6 @@
       "linkedPlatforms": "Linked platforms",
       "audit": "Audit"
     },
-    "usersMoved": "Users now live on the People page.",
     "openPeople": "Open People",
     "myGroups": {
       "subtitle": "Groups you belong to on this instance.",

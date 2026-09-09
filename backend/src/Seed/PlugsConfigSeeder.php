@@ -53,6 +53,8 @@ final readonly class PlugsConfigSeeder
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_ENABLED, 'value' => '0'],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_CANDIDATES_MULTIPLIER, 'value' => (string) PlugConfigService::DEFAULT_RERANK_MULTIPLIER],
             ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_LATENCY_BUDGET_MS, 'value' => (string) PlugConfigService::DEFAULT_RERANK_LATENCY_MS],
+            ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_LLM_FALLBACK, 'value' => '0'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => PlugConfigService::KEY_RERANK_MAX_CANDIDATE_CHARS, 'value' => (string) PlugConfigService::DEFAULT_RERANK_MAX_CANDIDATE_CHARS],
         ];
     }
 }

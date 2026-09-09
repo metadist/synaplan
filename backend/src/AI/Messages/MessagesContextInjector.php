@@ -109,6 +109,7 @@ final readonly class MessagesContextInjector
                     null,
                     self::RAG_LIMIT,
                     0.3,
+                    $query,
                 );
                 $rag = $this->formatter->formatRagContext($ragHits);
             } catch (\Throwable $e) {

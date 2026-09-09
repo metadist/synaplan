@@ -34,6 +34,7 @@ final class PromptCatalogTest extends TestCase
         // accidentally be marked as routable. Indexer filters them by prefix.
         $this->assertContains('tools:sort', $topics);
         $this->assertContains('tools:enhance', $topics);
+        $this->assertContains('tools:rerank_listwise', $topics);
     }
 
     /**

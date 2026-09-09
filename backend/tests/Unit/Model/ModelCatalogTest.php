@@ -123,6 +123,48 @@ class ModelCatalogTest extends TestCase
         $this->assertCount(count(array_unique($ids)), $ids);
     }
 
+    public function testRerankRowsAreSeededUnselectableWithoutADefaultBinding(): void
+    {
+        $this->assertSame('rerank', ModelCatalog::CAPABILITY_TAGS['RERANK']);
+        $this->assertSame(344, ModelCatalog::findBidByKey('openaicompatible:baai/bge-reranker-v2-m3:rerank'));
+        $this->assertSame(345, ModelCatalog::findBidByKey('jina:jina-reranker-v2-base-multilingual:rerank'));
+        $this->assertSame(346, ModelCatalog::findBidByKey('cohere:rerank-v3.5:rerank'));
+        $this->assertSame(347, ModelCatalog::findBidByKey('voyage:rerank-2:rerank'));
+        foreach (ModelCatalog::all() as $row) {
+            if ('rerank' !== $row['tag']) {
+                continue;
+            }
+            $this->assertSame(0, $row['selectable']);
+            $this->assertSame(1, $row['active']);
+        }
+    }
+
+    public function testUpsertDoesNotOverwriteSelectableOnExistingRerankRow(): void
+    {
+        $model = null;
+        foreach (ModelCatalog::all() as $row) {
+            if ('rerank' === $row['tag']) {
+                $model = $row;
+                break;
+            }
+        }
+        $this->assertNotNull($model);
+
+        $connection = $this->createMock(Connection::class);
+        // @phpstan-ignore-next-line
+        $connection
+            ->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->logicalAnd(
+                    $this->stringContains('INSERT INTO BMODELS'),
+                    $this->logicalNot($this->stringContains('BSELECTABLE = VALUES(BSELECTABLE)'))
+                )
+            );
+
+        ModelCatalog::upsert($connection, $model);
+    }
+
     public function testUpsertCallsExecuteStatement(): void
     {
         $connection = $this->createMock(Connection::class);

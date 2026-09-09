@@ -1570,7 +1570,8 @@
         "img2vid": "Animation vidéo (image → vidéo)",
         "sound2text": "Parole vers texte",
         "text2sound": "Texte vers parole",
-        "analyze": "Analyse de texte"
+        "analyze": "Analyse de texte",
+        "rerank": "Réordonnancement"
       },
       "chat": "Modèle de chat",
       "sorting": "Modèle de tri",
@@ -2842,7 +2843,8 @@
     "tabs": {
       "models": "Modèles et clés",
       "extraction": "Extraction",
-      "webSearch": "Recherche web"
+      "webSearch": "Recherche web",
+      "rerank": "Réordonnancement"
     },
     "description": "Connectez un fournisseur IA pour que votre équipe puisse discuter. Les clés sont stockées chiffrées sur votre serveur et prennent effet immédiatement — aucun redémarrage n’est nécessaire.",
     "statusReadyTitle": "Votre IA est prête",
@@ -2971,6 +2973,40 @@
       "testPlaceholder": "synaplan open source",
       "testButton": "Requête de test",
       "testing": "Test…"
+    },
+    "rerank": {
+      "lead": "Après la recherche, un réordonnanceur place les extraits les plus utiles en premier. Laissez cette option désactivée tant qu’un test n’a pas montré qu’elle aide. Le chat ne change pas tant qu’elle est désactivée.",
+      "enable": "Utiliser le réordonnancement pour la recherche de documents",
+      "model": "Modèle de réordonnancement",
+      "modelNone": "Aucun modèle sélectionné",
+      "multiplier": "Combien d’extraits supplémentaires récupérer (2–10)",
+      "budgetMs": "Abandonner après ce nombre de millisecondes (100–5000)",
+      "llmFallback": "Utiliser le modèle de chat si aucun modèle de réordonnancement n’est défini",
+      "llmFallbackHint": "Cela utilise le modèle de résumé à chaque recherche et peut coûter plus cher. Préférez un modèle de réordonnancement dédié.",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "indisponible",
+      "apiKey": {
+        "jina": "Clé API Jina",
+        "cohere": "Clé API Cohere",
+        "voyage": "Clé API Voyage"
+      },
+      "apiKeyPlaceholder": "Coller une clé API",
+      "saveKey": "Enregistrer la clé",
+      "keySaved": "Clé enregistrée. Le prochain réordonnancement peut l’utiliser.",
+      "save": "Enregistrer le réordonnancement",
+      "saved": "Réordonnancement enregistré. Le prochain chat l’utilise.",
+      "saveFailed": "Les paramètres de réordonnancement n’ont pas pu être enregistrés",
+      "loadFailed": "Impossible de charger les paramètres de réordonnancement",
+      "testTitle": "Tester avec des extraits d’exemple",
+      "testHint": "Saisissez une question et un extrait par ligne. Vous verrez le nouvel ordre pour vérifier que cela fonctionne.",
+      "testQueryPlaceholder": "Quel est le total de la facture ?",
+      "testDocumentsPlaceholder": "Le total de la facture est de 120 euros.\nLes horaires de bureau sont de 9 h à 17 h.",
+      "testButton": "Tester l’ordre",
+      "testing": "Test…",
+      "lastEval": {
+        "title": "Dernière mesure",
+        "line": "Le {date} : extrait juste {recallOff} des fois sans réordonnancement, {recallOn} avec. Les réponses les plus lentes ont pris {p95Off} ms sans et {p95On} ms avec."
+      }
     }
   },
   "providerHelp": {
@@ -5704,7 +5740,6 @@
       "linkedPlatforms": "Plateformes liées",
       "audit": "Journal"
     },
-    "usersMoved": "Les utilisateurs se trouvent désormais sur la page Personnes.",
     "openPeople": "Ouvrir Personnes",
     "myGroups": {
       "subtitle": "Groupes auxquels vous appartenez sur cette instance.",

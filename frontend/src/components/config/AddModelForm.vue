@@ -165,6 +165,7 @@ const ALL_TAGS = [
   'img2vid',
   'sound2text',
   'text2sound',
+  'rerank',
 ]
 
 const endpoints = ref<OpenAiEndpoint[]>([])

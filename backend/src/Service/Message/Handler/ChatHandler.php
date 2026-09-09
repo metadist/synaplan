@@ -1046,7 +1046,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                         $sharedVector,
                         $ragGroupKey,
                         limit: $ragLimit,
-                        minScore: $ragMinScore
+                        minScore: $ragMinScore,
+                        queryText: (string) $message->getText(),
                     );
                 } else {
                     $ragResults = $this->vectorSearchService->semanticSearch(
@@ -1073,7 +1074,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                                 $sharedVector,
                                 $fallbackGroupKey,
                                 limit: $ragLimit,
-                                minScore: $ragMinScore
+                                minScore: $ragMinScore,
+                                queryText: (string) $message->getText(),
                             );
                         } else {
                             $ragResults = $this->vectorSearchService->semanticSearch(

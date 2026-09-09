@@ -1147,7 +1147,8 @@
     "tabs": {
       "models": "Modelos y claves",
       "extraction": "Extracción",
-      "webSearch": "Búsqueda web"
+      "webSearch": "Búsqueda web",
+      "rerank": "Reordenación"
     },
     "description": "Conecta un proveedor de IA para que tu equipo pueda chatear. Las claves se guardan cifradas en tu servidor y se aplican al instante — sin reiniciar.",
     "statusReadyTitle": "Tu IA está lista",
@@ -1276,6 +1277,40 @@
       "testPlaceholder": "synaplan open source",
       "testButton": "Consulta de prueba",
       "testing": "Probando…"
+    },
+    "rerank": {
+      "lead": "Tras la búsqueda, un reordenador pone primero los fragmentos más útiles. Déjalo apagado hasta que una prueba demuestre que ayuda. El chat no cambia mientras esté apagado.",
+      "enable": "Usar reordenación en la búsqueda de documentos",
+      "model": "Modelo de reordenación",
+      "modelNone": "Ningún modelo seleccionado",
+      "multiplier": "Cuántos fragmentos extra obtener (2–10)",
+      "budgetMs": "Abandonar después de estos milisegundos (100–5000)",
+      "llmFallback": "Usar el modelo de chat si no hay modelo de reordenación",
+      "llmFallbackHint": "Usa el modelo de resumen en cada búsqueda y puede costar más. Es mejor un modelo de reordenación dedicado.",
+      "healthAvailable": "disponible",
+      "healthUnavailable": "no disponible",
+      "apiKey": {
+        "jina": "Clave API de Jina",
+        "cohere": "Clave API de Cohere",
+        "voyage": "Clave API de Voyage"
+      },
+      "apiKeyPlaceholder": "Pegar una clave API",
+      "saveKey": "Guardar clave",
+      "keySaved": "Clave guardada. La próxima reordenación puede usarla.",
+      "save": "Guardar reordenación",
+      "saved": "Reordenación guardada. El próximo chat la usa.",
+      "saveFailed": "No se pudieron guardar los ajustes de reordenación",
+      "loadFailed": "No se pudieron cargar los ajustes de reordenación",
+      "testTitle": "Probar con fragmentos de ejemplo",
+      "testHint": "Escribe una pregunta y un fragmento por línea. Verás el nuevo orden para comprobar que funciona.",
+      "testQueryPlaceholder": "¿Cuál es el total de la factura?",
+      "testDocumentsPlaceholder": "El total de la factura es 120 euros.\nEl horario de oficina es de 9 a 17.",
+      "testButton": "Probar orden",
+      "testing": "Probando…",
+      "lastEval": {
+        "title": "Última medición",
+        "line": "El {date}: encontró el fragmento correcto {recallOff} de las veces sin reordenación, {recallOn} con ella. Las respuestas más lentas tardaron {p95Off} ms sin y {p95On} ms con."
+      }
     }
   },
   "providerHelp": {
@@ -3075,7 +3110,8 @@
         "img2vid": "Animación de Video (Imagen → Video)",
         "sound2text": "Voz a Texto",
         "text2sound": "Texto a Voz",
-        "analyze": "Análisis de Archivos"
+        "analyze": "Análisis de Archivos",
+        "rerank": "Reordenación"
       },
       "admin": {
         "catalogSubtitle": "Busca y edita el catálogo de modelos del sistema.",
@@ -4718,7 +4754,6 @@
       "linkedPlatforms": "Plataformas vinculadas",
       "audit": "Auditoría"
     },
-    "usersMoved": "Los usuarios están ahora en la página Personas.",
     "openPeople": "Abrir Personas",
     "myGroups": {
       "subtitle": "Grupos a los que pertenece en esta instancia.",

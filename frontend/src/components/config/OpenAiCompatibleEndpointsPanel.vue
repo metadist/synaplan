@@ -322,7 +322,7 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 
 const endpoints = ref<OpenAiEndpoint[]>([])
-const availableCapabilities = ref<string[]>(['chat', 'vectorize', 'pic2text'])
+const availableCapabilities = ref<string[]>(['chat', 'vectorize', 'pic2text', 'rerank'])
 const loading = ref(false)
 const saving = ref(false)
 const testingForm = ref(false)

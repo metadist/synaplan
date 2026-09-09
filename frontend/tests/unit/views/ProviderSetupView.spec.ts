@@ -41,6 +41,7 @@ async function mountView(path = '/admin/setup') {
         ProviderHelpHint: true,
         ExtractionPlugTab: { template: '<div data-testid="extraction-plug-tab-stub" />' },
         WebSearchPlugTab: { template: '<div data-testid="web-search-plug-tab-stub" />' },
+        RerankPlugTab: { template: '<div data-testid="rerank-plug-tab-stub" />' },
         Icon: true,
       },
     },
@@ -62,14 +63,14 @@ describe('ProviderSetupView own-service link', () => {
     expect(link.attributes('href')).toBe('/ai/models?tab=edit')
   })
 
-  it('shows Models, Extraction and Web search tabs and hides later plug tabs', async () => {
+  it('shows Models, Extraction, Web search and Reranking tabs', async () => {
     const { wrapper } = await mountView()
     await flushPromises()
 
     expect(wrapper.get('[data-testid="admin-setup-tab-models"]').text()).toContain('Models')
     expect(wrapper.get('[data-testid="admin-setup-tab-extraction"]').text()).toContain('Extraction')
     expect(wrapper.get('[data-testid="admin-setup-tab-web-search"]').text()).toContain('Web search')
-    expect(wrapper.find('[data-testid="admin-setup-tab-rerank"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="admin-setup-tab-rerank"]').text()).toContain('Reranking')
   })
 
   it('keeps other query params when switching tabs', async () => {
@@ -83,6 +84,11 @@ describe('ProviderSetupView own-service link', () => {
     await wrapper.get('[data-testid="admin-setup-tab-web-search"]').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.query).toEqual({ connected: '1', tab: 'web-search' })
+
+    await wrapper.get('[data-testid="admin-setup-tab-rerank"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query).toEqual({ connected: '1', tab: 'rerank' })
+    expect(wrapper.find('[data-testid="rerank-plug-tab-stub"]').exists()).toBe(true)
 
     await wrapper.get('[data-testid="admin-setup-tab-models"]').trigger('click')
     await flushPromises()

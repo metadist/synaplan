@@ -34,6 +34,8 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertFalse($service->isRerankEnabled());
         $this->assertSame(4, $service->rerankCandidatesMultiplier());
         $this->assertSame(800, $service->rerankLatencyBudgetMs());
+        $this->assertFalse($service->isRerankLlmFallback());
+        $this->assertSame(2000, $service->rerankMaxCandidateChars());
         $this->assertSame([], $service->extraExtractorKeys('document'));
         $this->assertSame([], $service->extraExtractorKeys('text'));
     }

@@ -6,11 +6,16 @@ namespace App\Plug\Rerank;
 
 use App\Plug\PlugConfigService;
 use App\Plug\PlugDescriptor;
+use App\Plug\Rerank\Adapter\HttpRerankAdapter;
+use App\Plug\Rerank\Adapter\LlmReranker;
+use App\Service\ModelConfigService;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
- * Tagged `app.plug.rerank` adapters. `active()` is null while
- * PLUGS.RERANK.ENABLED is 0 (S1 default — eval-gated, S4).
+ * Tagged `app.plug.rerank` adapters.
+ *
+ * `active()` is null while PLUGS.RERANK.ENABLED is 0, or when nothing is
+ * bound and LLM fallback is off.
  */
 final class RerankRegistry
 {
@@ -24,6 +29,7 @@ final class RerankRegistry
         #[AutowireIterator('app.plug.rerank')]
         iterable $providers,
         private readonly PlugConfigService $config,
+        private readonly ModelConfigService $modelConfig,
     ) {
         foreach ($providers as $provider) {
             $this->byKey[$provider->key()] = $provider;
@@ -62,9 +68,20 @@ final class RerankRegistry
             return null;
         }
 
-        foreach ($this->byKey as $provider) {
-            if ($provider->health()->available) {
-                return $provider;
+        $bound = $this->modelConfig->getDefaultModel('RERANK');
+        if (null !== $bound) {
+            $http = $this->byKey[HttpRerankAdapter::KEY] ?? null;
+            if (null !== $http && $http->health()->available) {
+                return $http;
+            }
+
+            return null;
+        }
+
+        if ($this->config->isRerankLlmFallback()) {
+            $llm = $this->byKey[LlmReranker::KEY] ?? null;
+            if (null !== $llm && $llm->health()->available) {
+                return $llm;
             }
         }
 

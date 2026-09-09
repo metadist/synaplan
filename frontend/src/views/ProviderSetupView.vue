@@ -18,6 +18,7 @@
       <ModelsAndKeysTab v-if="activeTab === 'models'" />
       <ExtractionPlugTab v-else-if="activeTab === 'extraction'" />
       <WebSearchPlugTab v-else-if="activeTab === 'web-search'" />
+      <RerankPlugTab v-else-if="activeTab === 'rerank'" />
     </div>
   </MainLayout>
 </template>
@@ -31,6 +32,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import ExtractionPlugTab from '@/components/admin/plugs/ExtractionPlugTab.vue'
 import ModelsAndKeysTab from '@/components/admin/plugs/ModelsAndKeysTab.vue'
+import RerankPlugTab from '@/components/admin/plugs/RerankPlugTab.vue'
 import WebSearchPlugTab from '@/components/admin/plugs/WebSearchPlugTab.vue'
 
 const { t } = useI18n()
@@ -39,7 +41,7 @@ const router = useRouter()
 
 const tabFromQuery = (): string => {
   const tab = route.query.tab
-  return tab === 'extraction' || tab === 'web-search' ? tab : 'models'
+  return tab === 'extraction' || tab === 'web-search' || tab === 'rerank' ? tab : 'models'
 }
 const activeTab = ref(tabFromQuery())
 
@@ -61,6 +63,12 @@ const tabs = computed<TabNavItem[]>(() => [
     label: t('adminSetup.tabs.webSearch'),
     icon: 'mdi:web',
     testid: 'admin-setup-tab-web-search',
+  },
+  {
+    id: 'rerank',
+    label: t('adminSetup.tabs.rerank'),
+    icon: 'mdi:sort-variant',
+    testid: 'admin-setup-tab-rerank',
   },
 ])
 

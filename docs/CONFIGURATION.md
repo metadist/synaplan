@@ -704,9 +704,11 @@ migration to roll out a new default.
 | `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
 | `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |
 | `WEB_SEARCH.MAX_CONTENT_CHARS` | `4000` | Truncate full-page text (`tavily`, `exa`, `firecrawl`) |
-| `RERANK.ENABLED` | `0` | Off. Eval-gated; no adapter in this release |
-| `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` before rerank |
-| `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this |
+| `RERANK.ENABLED` | `0` | Off until a live eval wins; chat search is unchanged while off |
+| `RERANK.CANDIDATES_MULTIPLIER` | `4` | Fetch `topK × multiplier` (capped at 100) before rerank |
+| `RERANK.LATENCY_BUDGET_MS` | `800` | Skip rerank if the adapter exceeds this; keep embedding order |
+| `RERANK.LLM_FALLBACK` | `0` | When `1` and no rerank model is bound, listwise-rank with the summary model |
+| `RERANK.MAX_CANDIDATE_CHARS` | `2000` | Truncate each candidate before the rerank call |
 
 Unknown chain keys are skipped. Keys that FileProcessor does not already
 implement (today: `docling`) run first, then the built-in strategies. A
@@ -741,7 +743,14 @@ when the backend starts; enable the sidecar with
 saved in the UI win over the env bootstrap. Health is “URL or key
 present”, not a live probe — **Test query** is the live call.
 
-See [AI plugs](ADMIN.md#ai-plugs-s1-s3).
+Rerank models are catalog rows with tag `rerank` (TEI
+`openaicompatible`, Jina, Cohere, Voyage). Bind one on
+**Operate → AI infrastructure → Reranking** (`DEFAULTMODEL.RERANK`).
+Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
+`VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
+OpenAI-compatible endpoint with the `rerank` capability. With rerank
+off, storage `limit` stays exactly `k`. See [RAG.md](RAG.md#reranking)
+and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
 
 ---
 

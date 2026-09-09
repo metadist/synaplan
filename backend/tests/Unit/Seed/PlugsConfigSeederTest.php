@@ -40,6 +40,8 @@ final class PlugsConfigSeederTest extends TestCase
             PlugConfigService::KEY_RERANK_ENABLED => '0',
             PlugConfigService::KEY_RERANK_CANDIDATES_MULTIPLIER => '4',
             PlugConfigService::KEY_RERANK_LATENCY_BUDGET_MS => '800',
+            PlugConfigService::KEY_RERANK_LLM_FALLBACK => '0',
+            PlugConfigService::KEY_RERANK_MAX_CANDIDATE_CHARS => '2000',
         ], $bySetting);
     }
 }
