@@ -744,7 +744,7 @@ final class TaskPlanExecutorTest extends TestCase
         $configRepo->method('getValue')->willReturn('true');
 
         $savedTasks = $this->createMock(SavedTaskRepository::class);
-        $savedTasks->method('findByIdAndOwner')->with(34, 9)->willReturn($task);
+        $savedTasks->expects(self::once())->method('findByIdAndOwner')->with(34, 9)->willReturn($task);
 
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
 

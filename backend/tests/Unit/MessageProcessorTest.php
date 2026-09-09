@@ -914,4 +914,48 @@ class MessageProcessorTest extends TestCase
 
         $this->assertTrue($result['success']);
     }
+
+    public function testChatSavedTaskRunGoesThroughTheSorterAndCarriesTheTaskId(): void
+    {
+        // A chat-saved task reruns without a fixed prompt: the AI sorter runs
+        // exactly like for the typed turn (web search vote, language, …) and
+        // the task id rides on the classification so the executor can replay
+        // the pinned steps.
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getText')->willReturn('Load https://example.com/ and mail me a summary');
+        $message->method('hasFiles')->willReturn(false);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->expects($this->once())->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => false,
+        ]);
+        $this->router
+            ->expects($this->once())
+            ->method('route')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertSame('ai_sorting', $classification['source'] ?? null);
+                $this->assertSame(42, $classification['saved_task_id'] ?? null);
+
+                return [
+                    'content' => 'Summary',
+                    'metadata' => ['provider' => 'test', 'model' => 'test'],
+                ];
+            });
+
+        $result = $this->processor->process($message, [
+            'saved_task' => true,
+            'saved_task_id' => 42,
+        ]);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(42, $result['classification']['saved_task_id'] ?? null);
+    }
 }
