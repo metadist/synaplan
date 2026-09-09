@@ -182,7 +182,10 @@ jobs:
       - name: Install cfn-lint
         run: |
           set -euo pipefail
-          pipx install cfn-lint
+          # Pinned: an unpinned install turns every cfn-lint release into an
+          # unannounced red main, because new rules fire on templates that
+          # nobody touched. Bump this deliberately.
+          pipx install 'cfn-lint==1.56.2'
           # pipx links into ~/.local/bin, which the runner does not necessarily
           # export to later steps.
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
