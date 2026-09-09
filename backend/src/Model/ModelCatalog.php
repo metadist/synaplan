@@ -4268,7 +4268,7 @@ class ModelCatalog
         ],
         [
             'id' => 345,
-            'service' => 'Jina',
+            'service' => 'jina',
             'name' => 'Jina Reranker v2 Multilingual',
             'tag' => 'rerank',
             'selectable' => 0,
@@ -4288,7 +4288,7 @@ class ModelCatalog
         ],
         [
             'id' => 346,
-            'service' => 'Cohere',
+            'service' => 'cohere',
             'name' => 'Cohere Rerank v3.5',
             'tag' => 'rerank',
             'selectable' => 0,
@@ -4308,7 +4308,7 @@ class ModelCatalog
         ],
         [
             'id' => 347,
-            'service' => 'Voyage',
+            'service' => 'voyage',
             'name' => 'Voyage Rerank 2',
             'tag' => 'rerank',
             'selectable' => 0,
