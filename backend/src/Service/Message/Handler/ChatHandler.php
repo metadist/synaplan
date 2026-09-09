@@ -49,6 +49,7 @@ use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\Prompt\TimeContextBuilder;
 use App\Service\PromptService;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\SelfAware\Docs\PlatformDocsRetriever;
@@ -191,6 +192,35 @@ final readonly class ChatHandler implements MessageHandlerInterface
             null !== $limit ? max(1, min(50, (int) $limit)) : 20,
             null !== $minScore ? max(0.0, min(1.0, (float) $minScore)) : 0.2,
         ];
+    }
+
+    /**
+     * Explicit RAG scopes for an assistant chat: exactly the folders the runtime
+     * resolved (already intersected with the owner's live grants in
+     * {@see \App\Service\Agent\AgentRuntimeResolver}), plus the talking user's
+     * own files only when the assistant opts in via `knowledge.includeUserFiles`.
+     *
+     * Returns null for a non-assistant turn, which keeps the viewer's normal
+     * IAM scope expansion. Returning an explicit (possibly empty) list makes an
+     * assistant search exactly its knowledge and nothing of the reader's — C6.
+     *
+     * @return list<RagScope>|null
+     */
+    private function agentRagScopes(?RuntimeProfile $profile, int $viewerId): ?array
+    {
+        if (!$profile instanceof RuntimeProfile || null === $profile->agentId) {
+            return null;
+        }
+
+        $scopes = [];
+        foreach ($profile->ragScopes as $scope) {
+            $scopes[] = new RagScope($scope['ownerId'], $scope['groupKey']);
+        }
+        if ($profile->includeUserFiles) {
+            $scopes[] = new RagScope($viewerId, null);
+        }
+
+        return $scopes;
     }
 
     /**
@@ -436,7 +466,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
-        $ragContext = $this->loadRagContext($message, $topic, $ragGroupKey, $ragLimit, $ragMinScore);
+        $ragContext = $this->loadRagContext(
+            $message,
+            $topic,
+            $ragGroupKey,
+            $ragLimit,
+            $ragMinScore,
+            $this->agentRagScopes($profile, $message->getUserId()),
+        );
 
         // Issue #615: the non-streaming path (email / generic webhook)
         // used to skip memory loading entirely, so memories never
@@ -1023,6 +1060,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $ragResultsCount = 0;
 
         [$ragGroupKey, $ragLimit, $ragMinScore] = $this->ragSettings($profile, $classification, $options);
+        $agentScopes = $this->agentRagScopes($profile, $message->getUserId());
 
         if (!$ragGroupKey && 'general' !== $topic) {
             $ragGroupKey = "TASKPROMPT:{$topic}";
@@ -1048,6 +1086,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                         limit: $ragLimit,
                         minScore: $ragMinScore,
                         queryText: (string) $message->getText(),
+                        explicitScopes: $agentScopes,
                     );
                 } else {
                     $ragResults = $this->vectorSearchService->semanticSearch(
@@ -1055,7 +1094,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                         $message->getUserId(),
                         $ragGroupKey,
                         limit: $ragLimit,
-                        minScore: $ragMinScore
+                        minScore: $ragMinScore,
+                        explicitScopes: $agentScopes,
                     );
                 }
                 $perfTimer->stop('rag');
@@ -1076,6 +1116,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
                                 limit: $ragLimit,
                                 minScore: $ragMinScore,
                                 queryText: (string) $message->getText(),
+                                explicitScopes: $agentScopes,
                             );
                         } else {
                             $ragResults = $this->vectorSearchService->semanticSearch(
@@ -1083,7 +1124,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                                 $message->getUserId(),
                                 $fallbackGroupKey,
                                 limit: $ragLimit,
-                                minScore: $ragMinScore
+                                minScore: $ragMinScore,
+                                explicitScopes: $agentScopes,
                             );
                         }
                         $perfTimer->stop('rag');
@@ -2070,6 +2112,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         ?string $groupKey = null,
         int $limit = 5,
         float $minScore = 0.3,
+        ?array $explicitScopes = null,
     ): string {
         if (empty($message->getText())) {
             $this->logger->debug('ChatHandler: Skipping RAG context (empty text)', [
@@ -2101,7 +2144,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $message->getUserId(),
                 $groupKey,
                 limit: $limit,
-                minScore: $minScore
+                minScore: $minScore,
+                explicitScopes: $explicitScopes,
             );
 
             error_log('🔍 ChatHandler: RAG search returned '.count($ragResults).' results');
@@ -2115,7 +2159,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
                         $message->getUserId(),
                         $fallbackGroupKey,
                         limit: $limit,
-                        minScore: $minScore
+                        minScore: $minScore,
+                        explicitScopes: $explicitScopes,
                     );
                     error_log('🔍 ChatHandler: RAG fallback returned '.count($ragResults).' results');
 

@@ -18,6 +18,7 @@ use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\ModelConfigService;
+use App\Service\RAG\RagScopeResolver;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -35,6 +36,8 @@ final class AgentRuntimeResolverTest extends TestCase
         $this->prompts = $this->createMock(PromptRepository::class);
         $this->models = $this->createMock(ModelRepository::class);
         $this->modelConfig = $this->createMock(ModelConfigService::class);
+        $ragScopeResolver = $this->createMock(RagScopeResolver::class);
+        $ragScopeResolver->method('canUse')->willReturn(true);
         $this->resolver = new AgentRuntimeResolver(
             $this->agents,
             $this->createMock(AgentVersionRepository::class),
@@ -44,6 +47,7 @@ final class AgentRuntimeResolverTest extends TestCase
             new AgentDefinitionValidator(),
             $this->createMock(AgentAccess::class),
             $this->createMock(MessageMetaRepository::class),
+            $ragScopeResolver,
         );
     }
 

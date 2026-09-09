@@ -31,6 +31,7 @@ final readonly class AgentDefinition
             'knowledge' => [
                 'ownFolder' => true,
                 'folders' => [],
+                'includeUserFiles' => false,
                 'ragLimit' => 8,
                 'ragMinScore' => 0.6,
             ],
@@ -92,6 +93,18 @@ final readonly class AgentDefinition
         }
 
         return array_values(array_filter($folders, static fn ($f): bool => is_string($f) && '' !== $f));
+    }
+
+    /**
+     * Whether the talking user's own files are searched alongside the
+     * assistant's folders. Off by default: an assistant is a recipe over its
+     * owner's knowledge, not a window into the reader's files.
+     */
+    public function includeUserFiles(): bool
+    {
+        $knowledge = $this->data['knowledge'] ?? [];
+
+        return is_array($knowledge) && true === ($knowledge['includeUserFiles'] ?? false);
     }
 
     public function ragLimit(): int

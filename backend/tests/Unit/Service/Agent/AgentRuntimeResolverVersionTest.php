@@ -20,6 +20,7 @@ use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentArchivedException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\ModelConfigService;
+use App\Service\RAG\RagScopeResolver;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -43,6 +44,9 @@ final class AgentRuntimeResolverVersionTest extends TestCase
         $prompt->setPrompt('Live draft text');
         $prompts->method('find')->willReturn($prompt);
 
+        $ragScopeResolver = $this->createMock(RagScopeResolver::class);
+        $ragScopeResolver->method('canUse')->willReturn(true);
+
         $this->resolver = new AgentRuntimeResolver(
             $this->agents,
             $this->versions,
@@ -52,6 +56,7 @@ final class AgentRuntimeResolverVersionTest extends TestCase
             new AgentDefinitionValidator(),
             $this->access,
             $this->metas,
+            $ragScopeResolver,
         );
     }
 

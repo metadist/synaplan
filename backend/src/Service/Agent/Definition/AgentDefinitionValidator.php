@@ -32,7 +32,7 @@ final class AgentDefinitionValidator
 
     public const MODEL_KEYS = ['chat', 'vision', 'vectorize'];
 
-    public const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'ragLimit', 'ragMinScore'];
+    public const KNOWLEDGE_KEYS = ['ownFolder', 'folders', 'includeUserFiles', 'ragLimit', 'ragMinScore'];
 
     public const TOOL_KEYS = ['internet', 'files', 'mcpServers', 'allow', 'deny'];
 
@@ -172,6 +172,12 @@ final class AgentDefinitionValidator
         }
         if (array_key_exists('folders', $knowledge)) {
             $out['folders'] = $this->stringList($knowledge['folders'], 'knowledge.folders', self::FOLDER_PATTERN);
+        }
+        if (array_key_exists('includeUserFiles', $knowledge)) {
+            if (!is_bool($knowledge['includeUserFiles'])) {
+                throw $this->fail('knowledge.includeUserFiles', 'knowledge.includeUserFiles must be a boolean');
+            }
+            $out['includeUserFiles'] = $knowledge['includeUserFiles'];
         }
         if (array_key_exists('ragLimit', $knowledge)) {
             if (!is_int($knowledge['ragLimit']) && !is_float($knowledge['ragLimit'])) {

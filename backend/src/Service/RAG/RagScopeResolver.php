@@ -84,6 +84,26 @@ final readonly class RagScopeResolver
         return $this->dedupe($scopes);
     }
 
+    /**
+     * May $userId currently search the knowledge folder ({$ownerId}, {$groupKey})?
+     *
+     * Own folders are always usable; a foreign folder needs a live "use" share
+     * (directly, or carried by a shared published assistant). Used by the agent
+     * runtime resolver to drop folders the assistant owner has since lost access
+     * to, so an assistant can never widen what its owner may read.
+     */
+    public function canUse(int $userId, int $ownerId, string $groupKey): bool
+    {
+        if ($ownerId === $userId) {
+            return true;
+        }
+        if (!$this->iamConfig->isSharingEnabled($userId)) {
+            return false;
+        }
+
+        return $this->canUseFolder($userId, $ownerId, $groupKey);
+    }
+
     public static function sharedPickerKey(int $ownerId, string $folder): string
     {
         return self::PICKER_PREFIX.$ownerId.':'.$folder;
