@@ -4,6 +4,9 @@ namespace App;
 
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
 use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
+use App\Plug\Extraction\ContentExtractorInterface;
+use App\Plug\Rerank\RerankProviderInterface;
+use App\Plug\WebSearch\WebSearchProviderInterface;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -81,6 +84,13 @@ class Kernel extends BaseKernel
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
+
+        // Tag plug adapters container-wide so plugin-provided adapters (loaded
+        // via the fluent API, outside services.yaml's _instanceof scope) reach
+        // their registry exactly like the core adapters do.
+        $container->registerForAutoconfiguration(ContentExtractorInterface::class)->addTag('app.plug.extractor');
+        $container->registerForAutoconfiguration(WebSearchProviderInterface::class)->addTag('app.plug.web_search');
+        $container->registerForAutoconfiguration(RerankProviderInterface::class)->addTag('app.plug.rerank');
 
         // Nested-transaction savepoints are required by dama/doctrine-test-bundle
         // on MariaDB/MySQL. We register the compiler pass conditionally because
