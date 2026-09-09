@@ -42,6 +42,7 @@ final readonly class WebSearchAdminService
                 'label' => $descriptor->label,
                 'docsUrl' => $descriptor->docsUrl,
                 'sovereignty' => $descriptor->sovereignty,
+                'pluginId' => $descriptor->pluginId,
                 'capabilities' => $adapter->capabilities()->toArray(),
                 'health' => [
                     'available' => $health->available,

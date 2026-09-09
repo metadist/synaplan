@@ -3,6 +3,7 @@
 namespace App;
 
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
+use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -53,6 +54,11 @@ class Kernel extends BaseKernel
         if ('test' === $this->environment) {
             $container->addCompilerPass(new EnableTestSavepointsPass());
         }
+
+        // A plugin class that implements a plug interface is tagged app.plug.*
+        // by autoconfiguration; this pass refuses one the manifest did not
+        // declare in provides.plugs, so contributing an adapter is explicit.
+        $container->addCompilerPass(new PlugDeclarationCheckPass($this->getPlugins()));
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void

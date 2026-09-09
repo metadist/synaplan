@@ -28,6 +28,9 @@ final class ExtractionRegistry
         private readonly LoggerInterface $logger,
     ) {
         foreach ($extractors as $extractor) {
+            if (isset($this->byKey[$extractor->key()])) {
+                throw new \App\Plug\DuplicatePlugKeyException('extraction', $extractor->key());
+            }
             $this->byKey[$extractor->key()] = $extractor;
         }
     }

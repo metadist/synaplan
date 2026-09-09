@@ -32,6 +32,9 @@ final class RerankRegistry
         private readonly ModelConfigService $modelConfig,
     ) {
         foreach ($providers as $provider) {
+            if (isset($this->byKey[$provider->key()])) {
+                throw new \App\Plug\DuplicatePlugKeyException('rerank', $provider->key());
+            }
             $this->byKey[$provider->key()] = $provider;
         }
     }

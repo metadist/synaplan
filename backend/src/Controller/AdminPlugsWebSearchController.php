@@ -40,12 +40,13 @@ final class AdminPlugsWebSearchController extends AbstractController
                     property: 'providers',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['key', 'label', 'docsUrl', 'sovereignty', 'capabilities', 'health', 'keyStatus'],
+                        required: ['key', 'label', 'docsUrl', 'sovereignty', 'pluginId', 'capabilities', 'health', 'keyStatus'],
                         properties: [
                             new OA\Property(property: 'key', type: 'string', example: 'brave'),
                             new OA\Property(property: 'label', type: 'string', example: 'Brave Search'),
                             new OA\Property(property: 'docsUrl', type: 'string', example: 'https://api-dashboard.search.brave.com/'),
                             new OA\Property(property: 'sovereignty', type: 'string', example: 'US cloud'),
+                            new OA\Property(property: 'pluginId', type: 'string', nullable: true, example: null),
                             new OA\Property(
                                 property: 'capabilities',
                                 required: ['freshness', 'country', 'language', 'siteFilter', 'fullContent', 'answer'],
