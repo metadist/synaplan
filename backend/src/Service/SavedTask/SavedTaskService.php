@@ -15,6 +15,7 @@ use App\Service\Iam\Exception\AssistantNotSharedException;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
+use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\Schedule\ScheduleParser;
 
@@ -27,6 +28,7 @@ final readonly class SavedTaskService
         private SavedTaskGraphValidator $graphValidator,
         private ScheduleParser $scheduleParser,
         private AccessGate $accessGate,
+        private SavedTaskGraphCapture $graphCapture,
     ) {
     }
 
@@ -84,8 +86,9 @@ final readonly class SavedTaskService
         }
 
         $copy = new SavedTask($userId, $source->getPromptId(), $source->getName());
-        $copy->setGraph($source->getGraph());
         $copy->setTrigger(SavedTask::TRIGGER_MANUAL, null);
+        $sourceGraph = $source->getGraph();
+        $copy->setGraph(null !== $sourceGraph ? $this->withTriggerType($sourceGraph, SavedTask::TRIGGER_MANUAL) : null);
         $copy->setAllowUnattended(false);
         $this->tasks->save($copy);
 
@@ -97,7 +100,12 @@ final readonly class SavedTaskService
         return $this->tasks->findByPromptAndOwner($promptId, $ownerId);
     }
 
-    public function create(int $ownerId, int $promptId, string $name): SavedTask
+    /**
+     * @param int|null $sourceMessageId OUT message of the chat turn being
+     *                                  scheduled; its executed plan becomes
+     *                                  the task's graph so reruns replay it
+     */
+    public function create(int $ownerId, int $promptId, string $name, ?int $sourceMessageId = null): SavedTask
     {
         $this->assertUsablePrompt($promptId, $ownerId);
         $existing = $this->tasks->findByPromptAndOwner($promptId, $ownerId);
@@ -106,6 +114,12 @@ final readonly class SavedTaskService
         }
 
         $task = new SavedTask($ownerId, $promptId, $name);
+        if (null !== $sourceMessageId && $sourceMessageId > 0) {
+            $graph = $this->graphCapture->fromMessage($sourceMessageId, $ownerId, $task->getTriggerType());
+            if (null !== $graph && [] === $this->graphValidator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig())) {
+                $task->setGraph($graph);
+            }
+        }
         $this->tasks->save($task);
 
         return $task;
@@ -130,6 +144,15 @@ final readonly class SavedTaskService
             $task->setTrigger($data['triggerType'], $config);
         } elseif (isset($data['triggerConfig']) && is_array($data['triggerConfig'])) {
             $task->setTrigger($task->getTriggerType(), $data['triggerConfig']);
+        }
+
+        // The graph carries the trigger it was authored for and the factory
+        // rejects a mismatch — silently, falling back to the planner. Switching
+        // "Run now" → "Every day" must keep the pinned steps, so follow along.
+        $graph = $task->getGraph();
+        if (!array_key_exists('graph', $data) && null !== $graph
+            && ($graph['trigger']['type'] ?? null) !== $task->getTriggerType()) {
+            $task->setGraph($this->withTriggerType($graph, $task->getTriggerType()));
         }
 
         if (array_key_exists('graph', $data)) {
@@ -176,6 +199,18 @@ final readonly class SavedTaskService
         $this->tasks->save($task);
 
         return $task;
+    }
+
+    /**
+     * @param array<string, mixed> $graph
+     *
+     * @return array<string, mixed>
+     */
+    private function withTriggerType(array $graph, string $triggerType): array
+    {
+        $graph['trigger'] = ['type' => $triggerType];
+
+        return $graph;
     }
 
     private function assertUsablePrompt(int $promptId, int $ownerId): void

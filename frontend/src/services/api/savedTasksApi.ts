@@ -117,10 +117,18 @@ export const savedTasksApi = {
     return (data.tasks ?? []).map((task) => asTask(task))
   },
 
-  async create(promptId: number, name: string): Promise<SavedTask> {
+  /**
+   * `sourceMessageId` is the assistant message whose executed plan the task
+   * should replay; without it a rerun asks the planner again.
+   */
+  async create(promptId: number, name: string, sourceMessageId?: number): Promise<SavedTask> {
     const data = await httpClient('/api/v1/saved-tasks', {
       method: 'POST',
-      body: JSON.stringify({ promptId, name }),
+      body: JSON.stringify({
+        promptId,
+        name,
+        ...(sourceMessageId ? { sourceMessageId } : {}),
+      }),
       schema: PostApiSavedTasksCreateResponseSchema,
     })
     return asTask(data.task)

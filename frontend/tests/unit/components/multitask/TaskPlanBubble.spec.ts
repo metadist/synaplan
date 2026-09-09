@@ -24,8 +24,9 @@ vi.mock('@/services/api/promptsApi', () => ({
   promptsApi: { createPrompt: (...args: unknown[]) => mockCreatePrompt(...args) },
 }))
 
+const mockCreateSavedTask = vi.fn().mockResolvedValue({ id: 1 })
 vi.mock('@/services/api/savedTasksApi', () => ({
-  savedTasksApi: { create: vi.fn().mockResolvedValue({ id: 1 }) },
+  savedTasksApi: { create: (...args: unknown[]) => mockCreateSavedTask(...args) },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
@@ -578,6 +579,36 @@ describe('TaskPlanBubble', () => {
         metadata: expect.objectContaining({ tool_url_screenshot: true }),
       })
     )
+  })
+
+  it('pins the executed plan by sending the assistant message id when saving', async () => {
+    mockSavedTasksEnabled.mockReturnValue(true)
+    mockDialogPrompt.mockResolvedValue('RioTinto')
+    mockCreatePrompt.mockResolvedValue({ id: 9 })
+    mockCreateSavedTask.mockClear()
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: {
+          active: false,
+          replyNode: 'n2',
+          cards: [
+            { nodeId: 'n1', capability: 'url_fetch', kind: 'search', state: 'done' },
+            { nodeId: 'n2', capability: 'chat', kind: 'text', state: 'done' },
+            { nodeId: 'n3', capability: 'email_me', kind: 'text', state: 'done' },
+          ],
+        },
+        scheduleSource: 'Look up the price on https://example.com/stock and mail it to me',
+        sourceMessageId: 4711,
+      },
+      ...mountOptions,
+    })
+
+    await wrapper.find('[data-testid="btn-schedule-plan"]').trigger('click')
+    await vi.waitFor(() => expect(mockCreateSavedTask).toHaveBeenCalled())
+
+    // Without the source message the backend cannot copy the executed steps
+    // into the task graph and a rerun degrades to a re-planned chat answer.
+    expect(mockCreateSavedTask).toHaveBeenCalledWith(9, 'RioTinto', 4711)
   })
 
   it('hides the clock while the plan is still running', () => {

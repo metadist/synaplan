@@ -97,10 +97,15 @@ final readonly class SavedTaskRunner
 
         try {
             $chat = $this->ensureChat($task, $user);
+            $now = time();
             $message = new Message();
             $message->setUserId($ownerId);
             $message->setChat($chat);
-            $message->setTrackingId(time());
+            $message->setTrackingId($now);
+            // Every channel stamps its own rows; without these the task chat
+            // rendered the run under "01.01.1970" (BUNIXTIMES defaults to 0).
+            $message->setUnixTimestamp($now);
+            $message->setDateTime(date('YmdHis', $now));
             $message->setProviderIndex('WEB');
             $message->setMessageType('WEB');
             $message->setTopic('CHAT');
@@ -204,10 +209,13 @@ final readonly class SavedTaskRunner
             ? $classification['language']
             : 'en';
 
+        $now = time();
         $out = new Message();
         $out->setUserId($incoming->getUserId());
         $out->setChat($chat);
         $out->setTrackingId($incoming->getTrackingId());
+        $out->setUnixTimestamp($now);
+        $out->setDateTime(date('YmdHis', $now));
         $out->setProviderIndex('WEB');
         $out->setMessageType('WEB');
         $out->setTopic('CHAT');

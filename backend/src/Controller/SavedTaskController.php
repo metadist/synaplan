@@ -107,6 +107,7 @@ final class SavedTaskController extends AbstractController
                 properties: [
                     new OA\Property(property: 'promptId', type: 'integer'),
                     new OA\Property(property: 'name', type: 'string'),
+                    new OA\Property(property: 'sourceMessageId', type: 'integer', nullable: true, description: 'Assistant message of the chat turn being scheduled. Its executed multi-step plan is stored as the task graph so reruns replay the same steps.'),
                 ]
             )
         ),
@@ -163,9 +164,10 @@ final class SavedTaskController extends AbstractController
         if ($promptId < 1 || '' === $name) {
             return $this->json(['error' => 'promptId and name are required'], Response::HTTP_BAD_REQUEST);
         }
+        $sourceMessageId = is_numeric($data['sourceMessageId'] ?? null) ? (int) $data['sourceMessageId'] : null;
 
         try {
-            $task = $this->service->create((int) $user->getId(), $promptId, $name);
+            $task = $this->service->create((int) $user->getId(), $promptId, $name, $sourceMessageId);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }

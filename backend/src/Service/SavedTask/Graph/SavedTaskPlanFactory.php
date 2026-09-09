@@ -66,6 +66,12 @@ final class SavedTaskPlanFactory
             }
         }
 
+        // A captured plan names its own reply node (the chat answer the user
+        // saw); an authored graph without one replies with the last step.
+        $declaredReply = $graph['reply_node'] ?? null;
+        if (is_string($declaredReply) && in_array($declaredReply, array_column($tasks, 'id'), true)) {
+            $reply = $declaredReply;
+        }
         $reply ??= (string) $tasks[array_key_last($tasks)]['id'];
 
         return TaskPlan::fromArray([

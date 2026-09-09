@@ -49,6 +49,14 @@ use Psr\Log\LoggerInterface;
 final readonly class TaskPlanExecutor
 {
     /**
+     * Handler-result metadata key carrying the executed plan definition
+     * ({@see TaskPlan::toArray()}). Channels persist it as message meta
+     * {@see self::PLAN_DEFINITION_META} on the OUT message.
+     */
+    public const PLAN_DEFINITION_KEY = 'task_plan_definition';
+    public const PLAN_DEFINITION_META = 'task_plan_definition';
+
+    /**
      * Capabilities that have NO legacy InferenceRouter equivalent and therefore
      * must run through the DAG even as a lone single node (see
      * {@see shouldUseLegacyRouter()}).
@@ -673,6 +681,11 @@ final readonly class TaskPlanExecutor
         if (null !== $plan->planningUsage) {
             $assembled['metadata']['planning_usage'] = $plan->planningUsage;
         }
+        // The full node definitions (inputs/params, not just the render cards)
+        // ride along so the channel can persist them on the OUT message. That
+        // is what "Schedule this" copies into a Saved Task graph — a rerun then
+        // replays exactly these steps instead of asking the planner again.
+        $assembled['metadata'][self::PLAN_DEFINITION_KEY] = $plan->plan->toArray();
 
         if (null !== $messageId) {
             try {

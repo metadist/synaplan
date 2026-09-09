@@ -219,6 +219,15 @@ final class SavedTaskRunnerTest extends TestCase
         $this->assertSame('Bild erstellt und in Nextcloud gespeichert.', $replies[0]->getText());
         $this->assertSame('/api/v1/files/uploads/01/cat.png', $replies[0]->getFilePath());
         $this->assertSame('de', $replies[0]->getLanguage());
+
+        // Both rows must carry a real timestamp — BUNIXTIMES defaults to 0 and
+        // the task chat rendered every run under "01.01.1970" without these.
+        $now = time();
+        foreach ([$captured, $replies[0]] as $row) {
+            $this->assertGreaterThan($now - 60, $row->getUnixTimestamp());
+            $this->assertLessThanOrEqual($now, $row->getUnixTimestamp());
+            $this->assertMatchesRegularExpression('/^\d{14}$/', $row->getDateTime());
+        }
     }
 
     private function setId(SavedTask $task, int $id): void

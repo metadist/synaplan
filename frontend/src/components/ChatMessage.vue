@@ -521,6 +521,7 @@
             v-if="displayTaskPlan && displayTaskPlan.cards.length > 0"
             :plan="displayTaskPlan"
             :schedule-source="scheduleSource"
+            :source-message-id="backendMessageId"
             :guest="isGuestMode"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
