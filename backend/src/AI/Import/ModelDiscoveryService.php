@@ -16,7 +16,7 @@ use App\Repository\ModelRepository;
  * `ok` flag so an unreachable endpoint is never confused with one that lists
  * nothing — the import applier and the scheduled re-check depend on that.
  */
-final readonly class ModelDiscoveryService
+final readonly class ModelDiscoveryService implements ModelDiscovererInterface
 {
     public const SOURCE_OLLAMA = 'ollama';
     public const OPENAI_COMPATIBLE_PREFIX = 'openai_compatible:';

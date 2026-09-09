@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\AI\Health\ImportedModelListingCheck;
 use App\AI\Health\ModelHealthConfig;
 use App\AI\Health\ModelHealthEvaluator;
 use App\AI\Health\ModelHealthState;
@@ -35,6 +36,7 @@ final class ModelHealthCheckCommand extends Command
     public function __construct(
         private readonly ModelHealthEvaluator $evaluator,
         private readonly ModelHealthConfig $config,
+        private readonly ImportedModelListingCheck $importedListingCheck,
     ) {
         parent::__construct();
     }
@@ -89,6 +91,17 @@ final class ModelHealthCheckCommand extends Command
         }
         foreach ($run->reEnabled() as $verdict) {
             $io->writeln(sprintf('  <info>re-enabled</info> %s (%s)', $verdict->modelName, $verdict->service));
+        }
+
+        $listing = $this->importedListingCheck->run($dryRun);
+        if ($listing['checkedSources'] > 0 || $listing['unreachable'] > 0) {
+            $io->writeln(sprintf(
+                '  <comment>import re-check</comment> %d source(s) listed, %d unreachable (skipped), %d marked offline, %d restored',
+                $listing['checkedSources'],
+                $listing['unreachable'],
+                $listing['markedOffline'],
+                $listing['restored'],
+            ));
         }
 
         $io->newLine();
