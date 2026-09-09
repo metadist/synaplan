@@ -77,6 +77,14 @@ final readonly class VectorSearchService
             return [];
         }
 
+        // An assistant with no knowledge scopes (own folder off, no folders,
+        // own files not included) searches nothing. Return early rather than
+        // build an empty-scope query, which would raise EmptyRagScopeException
+        // and log a warning on every turn.
+        if (null !== $explicitScopes && [] === $explicitScopes) {
+            return [];
+        }
+
         try {
             // An assistant chat passes the exact scopes its runtime resolved
             // (owner folders it may still use); otherwise expand the viewer's

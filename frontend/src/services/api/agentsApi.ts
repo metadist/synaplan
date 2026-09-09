@@ -26,7 +26,13 @@ export function emptyAgentDraft(): AgentDraft {
   return {
     schema: 'agent.v1',
     models: { chat: null, vision: null, vectorize: null },
-    knowledge: { ownFolder: true, folders: [], ragLimit: 8, ragMinScore: 0.6 },
+    knowledge: {
+      ownFolder: true,
+      folders: [],
+      includeUserFiles: false,
+      ragLimit: 8,
+      ragMinScore: 0.6,
+    },
     tools: { internet: true, files: true, mcpServers: [], allow: [], deny: [] },
     skills: { allow: [], deny: [] },
     parameters: { temperature: 0.7, maxTokens: 4000, language: 'auto', responseSchema: null },
