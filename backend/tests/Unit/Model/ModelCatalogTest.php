@@ -1013,6 +1013,28 @@ class ModelCatalogTest extends TestCase
      * upstream billing is actually token-based — which would re-introduce
      * the catastrophic-overbill class of bug Copilot flagged on PR #932.
      */
+    public function testGptImage25RowsShareCalculatorPrices(): void
+    {
+        $expectedTiers = [
+            'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+            'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+            'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+            'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+            'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+        ];
+
+        foreach (['gpt-image-2.5-flare' => 348, 'gpt-image-2.5-sunburst' => 349] as $providerId => $bid) {
+            $rows = ModelCatalog::find('openai:'.$providerId.':text2pic');
+            $this->assertCount(1, $rows, sprintf('Catalog must contain exactly one %s text2pic row.', $providerId));
+            $this->assertSame($bid, $rows[0]['id']);
+            $this->assertSame('per_image', $rows[0]['json']['pricing_mode'] ?? null);
+            $this->assertSame('perImage', $rows[0]['outUnit'] ?? null);
+            $this->assertEqualsWithDelta(0.01317, (float) ($rows[0]['priceOut'] ?? 0.0), 1e-9);
+            $this->assertSame($expectedTiers, $rows[0]['json']['quality_prices'] ?? null);
+            $this->assertContains('pic2pic', $rows[0]['json']['features'] ?? []);
+        }
+    }
+
     public function testImagenFourHasPerImagePricingMode(): void
     {
         $imagen = array_values(array_filter(

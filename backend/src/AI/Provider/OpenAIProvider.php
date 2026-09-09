@@ -1217,7 +1217,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
 
                 $quality = strtolower((string) $quality);
-                $allowedQualities = ['low', 'medium', 'high', 'auto'];
+                $allowedQualities = $this->allowedGptImageQualities($model);
                 if (!in_array($quality, $allowedQualities, true)) {
                     $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
                         'provided' => $options['quality'],
@@ -1374,7 +1374,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $requestBody = [
                 'model' => $responsesModel,
                 'input' => [['role' => 'user', 'content' => $contentParts]],
-                'tools' => [['type' => 'image_generation']],
+                // GPT Image 2.5 must be named on the tool; omitting `model`
+                // lets the Responses API pick a default that is not the
+                // catalog row the user selected.
+                'tools' => [['type' => 'image_generation', 'model' => $model]],
             ];
 
             $key = $this->resolveApiKey();
@@ -1437,6 +1440,23 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * Quality values the Images API accepts for this gpt-image model.
+     * GPT Image 2.5 adds `xhigh` / `max`; earlier rows only accept
+     * low / medium / high / auto. Sending a 2.5-only tier to gpt-image-1
+     * is a provider 400, so those stay off the older allow-list.
+     *
+     * @return list<string>
+     */
+    private function allowedGptImageQualities(string $model): array
+    {
+        if (str_starts_with($model, 'gpt-image-2.5')) {
+            return ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
+        }
+
+        return ['low', 'medium', 'high', 'auto'];
     }
 
     /**

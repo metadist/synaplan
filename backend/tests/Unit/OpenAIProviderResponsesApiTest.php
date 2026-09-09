@@ -860,6 +860,37 @@ class OpenAIProviderResponsesApiTest extends TestCase
         $this->assertTrue($method->invoke($provider, 'gpt-image-1'));
         $this->assertTrue($method->invoke($provider, 'gpt-image-1.5'));
         $this->assertTrue($method->invoke($provider, 'gpt-image-2'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-flare'));
+        $this->assertTrue($method->invoke($provider, 'gpt-image-2.5-sunburst'));
+    }
+
+    /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('gptImageQualityAllowListProvider')]
+    public function testGptImageQualityAllowListIsGatedByFamily(string $model, array $expected): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'allowedGptImageQualities');
+
+        $this->assertSame($expected, $method->invoke($provider, $model));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: list<string>}>
+     */
+    public static function gptImageQualityAllowListProvider(): array
+    {
+        $legacy = ['low', 'medium', 'high', 'auto'];
+        $image25 = ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
+
+        return [
+            'gpt-image-1' => ['gpt-image-1', $legacy],
+            'gpt-image-1.5' => ['gpt-image-1.5', $legacy],
+            'gpt-image-2' => ['gpt-image-2', $legacy],
+            'gpt-image-2.5-flare' => ['gpt-image-2.5-flare', $image25],
+            'gpt-image-2.5-sunburst' => ['gpt-image-2.5-sunburst', $image25],
+        ];
     }
 
     /**
@@ -893,10 +924,14 @@ class OpenAIProviderResponsesApiTest extends TestCase
             'gpt-image-1 text2pic' => ['gpt-image-1',   [],                  'gpt_image'],
             'gpt-image-1.5 text2pic' => ['gpt-image-1.5', [],                  'gpt_image'],
             'gpt-image-2 text2pic' => ['gpt-image-2',   [],                  'gpt_image'],
+            'gpt-image-2.5-flare text2pic' => ['gpt-image-2.5-flare', [],           'gpt_image'],
+            'gpt-image-2.5-sunburst text2pic' => ['gpt-image-2.5-sunburst', [],     'gpt_image'],
             // Pic2pic: gpt-image-* with reference images must use the Responses API
             'gpt-image-1 pic2pic' => ['gpt-image-1',   ['/tmp/ref1.png'],   'responses'],
             'gpt-image-1.5 pic2pic' => ['gpt-image-1.5', ['/tmp/ref1.png'],   'responses'],
             'gpt-image-2 pic2pic' => ['gpt-image-2',   ['/tmp/ref1.png'],   'responses'],
+            'gpt-image-2.5-flare pic2pic' => ['gpt-image-2.5-flare', ['/tmp/ref1.png'], 'responses'],
+            'gpt-image-2.5-sunburst pic2pic' => ['gpt-image-2.5-sunburst', ['/tmp/ref1.png'], 'responses'],
             // DALL-E stays on the legacy Images API client path
             'dall-e-3 text2pic' => ['dall-e-3',      [],                  'dalle'],
             'dall-e-2 text2pic' => ['dall-e-2',      [],                  'dalle'],

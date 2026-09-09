@@ -325,7 +325,7 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 | tts-1 / tts-1-hd | per_character | per_character | **checked** (same-mode) |
 | veo-3.1 / fast / lite | per_second | per_second | **checked** (same-mode) |
 | imagen-4.0 / fast / ultra | per_image | per_image | **checked** (same-mode) |
-| gpt-image-1 / 1.5 | per_image | per_token | mode-mismatch (manual) |
+| gpt-image-1 / 1.5 / 2.5-flare / 2.5-sunburst | per_image | per_token | mode-mismatch (manual) |
 | gemini-2.5/3.1-flash-image | per_image | per_token | mode-mismatch (manual) |
 | gemini-2.5-flash-preview-tts | per_character | per_token | mode-mismatch (manual) |
 
@@ -474,11 +474,15 @@ External speech-to-text (OpenAI/Groq Whisper, Mistral Voxtral) is billed on the 
 
 gpt-image bills a different per-image price per quality × size (e.g. gpt-image-1 low 1024² = $0.011, high 1024² = $0.167). The catalog encodes this as `json.quality_prices[quality][size]` with `default_quality`/`default_size` fall-backs; `CostCalculationService::calculateMediaCost()` picks the exact tier from the `quality`/`size` carried in `media_usage`. The generation handlers/services forward the requested quality+size; unknown/`auto` quality falls back to `default_quality`. Models without `quality_prices` keep their flat `priceOut` (no regression). Verified prices (per image):
 
-| Quality | gpt-image-1 1024² / portrait+landscape | gpt-image-1.5 1024² / portrait+landscape |
-| ------- | -------------------------------------- | ---------------------------------------- |
-| low | $0.011 / $0.016 | $0.009 / $0.013 |
-| medium | $0.042 / $0.063 | $0.034 / $0.05 |
-| high | $0.167 / $0.25 | $0.133 / $0.20 |
+| Quality | gpt-image-1 1024² / portrait+landscape | gpt-image-1.5 1024² / portrait+landscape | gpt-image-2.5 (both) 1024² / portrait+landscape |
+| ------- | -------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| low | $0.011 / $0.016 | $0.009 / $0.013 | $0.00588 / $0.00474 |
+| medium | $0.042 / $0.063 | $0.034 / $0.05 | $0.01317 / $0.01029 |
+| high | $0.167 / $0.25 | $0.133 / $0.20 | $0.05268 / $0.04116 |
+| xhigh | — | — | $0.09366 / $0.07377 |
+| max | — | — | $0.21072 / $0.16464 |
+
+GPT Image 2.5 Flare and Sunburst share OpenAI's token rates ($5/1M text in, $8/1M image in, $30/1M image out) and the same calculator token counts. `xhigh` / `max` are 2.5-only. Official source: [image generation guide](https://developers.openai.com/api/docs/guides/image-generation) calculator (output tokens × $30/1M; excludes prompt/input-image tokens).
 
 > Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by a data migration — see §"Production rollout to existing installs".
 

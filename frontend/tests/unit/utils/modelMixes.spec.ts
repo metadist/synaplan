@@ -101,6 +101,30 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.TEXT2PIC).toBeUndefined()
   })
 
+  it('prefers GPT Image 2.5 Flare over 1.5 when the installation serves both', () => {
+    const flare = model({
+      id: 348,
+      service: 'OpenAI',
+      providerId: 'gpt-image-2.5-flare',
+      name: 'GPT Image 2.5 Flare',
+    })
+    const image15 = model({
+      id: 151,
+      service: 'OpenAI',
+      providerId: 'gpt-image-1.5',
+      name: 'gpt-image-1.5',
+    })
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      TEXT2PIC: [image15, flare],
+      PIC2PIC: [image15, flare],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('openai'), models)
+
+    expect(resolved.defaults.TEXT2PIC).toBe(348)
+    expect(resolved.defaults.PIC2PIC).toBe(348)
+  })
+
   it('prefers GPT-6 Astra over GPT-5.6 Sol when the installation serves both', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [

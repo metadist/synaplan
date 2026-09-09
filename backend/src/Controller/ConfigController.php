@@ -888,6 +888,19 @@ class ConfigController extends AbstractController
                 continue;
             }
 
+            // Rerank models are configured exclusively on the Reranking admin
+            // tab (ProviderSetupView -> RerankPlugTab), never chosen from a
+            // per-capability model picker. They carry no picker capability, so
+            // without this guard the `default` switch arm below would scatter
+            // them across every dropdown (chat, embedding, ...). They are also
+            // seeded BSELECTABLE=0, and their cloud providers (Jina/Cohere/Voyage)
+            // are unknown to the AI provider registry, so modelAvailability()
+            // reports them available even when no API key is set. The Reranking
+            // tab computes their real availability from the plug key store.
+            if ('rerank' === strtolower($model->getTag())) {
+                continue;
+            }
+
             ['available' => $available, 'reason' => $unavailableReason] = $this->chatReadiness->modelAvailability($model->getService(), $model->getProviderId(), $availability);
             if (!$available && !$includeUnavailable) {
                 continue;
