@@ -17,6 +17,11 @@ const props = defineProps<{
   plan: TaskPlanState
   /** The user message that produced this plan — used when saving a task. */
   scheduleSource?: string
+  /**
+   * Backend id of the assistant message carrying this plan. Sent along when
+   * saving so the task pins the executed steps instead of re-planning.
+   */
+  sourceMessageId?: number
   guest?: boolean
 }>()
 
@@ -72,7 +77,7 @@ const onSchedule = async () => {
         tool_url_screenshot: instructionHasUrl(instruction),
       },
     })
-    await savedTasksApi.create(prompt.id, name.trim())
+    await savedTasksApi.create(prompt.id, name.trim(), props.sourceMessageId)
     success(t('config.savedTasks.scheduledFromChat'))
     await router.push('/channels/tasks')
   } catch {

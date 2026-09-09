@@ -18,6 +18,7 @@ use App\Repository\UserRepository;
 use App\Service\InternalEmailService;
 use App\Service\Media\GeneratedFileRegistrar;
 use App\Service\Message\MessageProcessor;
+use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,6 +30,13 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class SavedTaskRunner
 {
+    /**
+     * Topic prefix the chat's "Schedule this" gives the prompt it saves the
+     * instruction under (TaskPlanBubble.vue). Everything else is a Task Prompt
+     * the user authored as an assistant.
+     */
+    public const CHAT_INSTRUCTION_TOPIC_PREFIX = 'saved-';
+
     public function __construct(
         private SavedTaskConfig $config,
         private SavedTaskRepository $tasks,
@@ -97,10 +105,15 @@ final readonly class SavedTaskRunner
 
         try {
             $chat = $this->ensureChat($task, $user);
+            $now = time();
             $message = new Message();
             $message->setUserId($ownerId);
             $message->setChat($chat);
-            $message->setTrackingId(time());
+            $message->setTrackingId($now);
+            // Every channel stamps its own rows; without these the task chat
+            // rendered the run under "01.01.1970" (BUNIXTIMES defaults to 0).
+            $message->setUnixTimestamp($now);
+            $message->setDateTime(date('YmdHis', $now));
             $message->setProviderIndex('WEB');
             $message->setMessageType('WEB');
             $message->setTopic('CHAT');
@@ -110,18 +123,20 @@ final readonly class SavedTaskRunner
             $this->em->persist($message);
             $this->em->flush();
 
-            // `saved_task` marks the classification source so TaskPlanExecutor
-            // still PLANS the instruction (multi-step tasks like "make an image
-            // and save it to Nextcloud" must run their DAG, not degrade to chat).
-            $result = $this->processor->process($message, [
-                'fixed_task_prompt' => $prompt->getTopic(),
-                'saved_task' => true,
-            ]);
+            $result = $this->processor->process($message, $this->processorOptions($task, $prompt));
 
             $ok = !empty($result['success']);
             $messageId = $message->getId();
             $snapshot = null !== $messageId ? $this->planStore->loadCards($messageId) : [];
 
+            // Like the web stream: the IN row records what the sorter decided.
+            $classification = is_array($result['classification'] ?? null) ? $result['classification'] : [];
+            if (is_string($classification['topic'] ?? null) && '' !== $classification['topic']) {
+                $message->setTopic($classification['topic']);
+            }
+            if (is_string($classification['language'] ?? null) && '' !== $classification['language']) {
+                $message->setLanguage($classification['language']);
+            }
             $message->setStatus($ok ? 'complete' : 'failed');
             $this->em->flush();
 
@@ -159,6 +174,36 @@ final readonly class SavedTaskRunner
 
             return $this->fail($task, $run, 'The AI step could not complete. Nothing was sent or saved.');
         }
+    }
+
+    /**
+     * A run must behave like the turn the user typed, tool calls included.
+     *
+     * "Schedule this" saves the chat instruction under a `saved-*` prompt. Such
+     * a run goes through the AI sorter exactly like the original turn — web
+     * search vote, memories, language, multi-step vote — and TaskPlanExecutor
+     * replays the task's pinned steps by `saved_task_id`. Pinning the prompt
+     * as a fixed topic instead skipped the sorter, so the rerun lost the web
+     * search and memory lookups the manual request had.
+     *
+     * A task built on a real Task Prompt (an assistant) keeps the fixed topic:
+     * there the prompt IS the behaviour the user wants to run. `saved_task`
+     * keeps the run plannable (multi-step tasks must run their DAG, not
+     * degrade to chat).
+     *
+     * @return array<string, mixed>
+     */
+    private function processorOptions(SavedTask $task, Prompt $prompt): array
+    {
+        $options = [
+            'saved_task' => true,
+            'saved_task_id' => (int) $task->getId(),
+        ];
+        if (!str_starts_with($prompt->getTopic(), self::CHAT_INSTRUCTION_TOPIC_PREFIX)) {
+            $options['fixed_task_prompt'] = $prompt->getTopic();
+        }
+
+        return $options;
     }
 
     /**
@@ -204,10 +249,13 @@ final readonly class SavedTaskRunner
             ? $classification['language']
             : 'en';
 
+        $now = time();
         $out = new Message();
         $out->setUserId($incoming->getUserId());
         $out->setChat($chat);
         $out->setTrackingId($incoming->getTrackingId());
+        $out->setUnixTimestamp($now);
+        $out->setDateTime(date('YmdHis', $now));
         $out->setProviderIndex('WEB');
         $out->setMessageType('WEB');
         $out->setTopic('CHAT');
@@ -229,10 +277,72 @@ final readonly class SavedTaskRunner
         if (!empty($metadata['model'])) {
             $out->setMeta('ai_chat_model', (string) $metadata['model']);
         }
+        if (!empty($metadata['model_id'])) {
+            $out->setMeta('ai_chat_model_id', (string) $metadata['model_id']);
+        }
+        if (!empty($classification['sorting_model_name'])) {
+            $out->setMeta('ai_sorting_model', (string) $classification['sorting_model_name']);
+        }
+        $this->persistTaskPlanMeta($out, $metadata);
+        $this->persistWebSearchMeta($incoming, $out, $result, $metadata);
 
         $this->em->flush();
 
         $this->registerGeneratedFiles($out, $metadata);
+    }
+
+    /**
+     * Mirror StreamController: the Sources dropdown reads
+     * `web_search_query` / `web_search_results_count` from the message. The
+     * results themselves are already in BSEARCHRESULTS (saved by the
+     * processor or WebSearchRunner); without these metas the task chat showed
+     * the run without the sources the manual turn had.
+     *
+     * @param array<string, mixed> $result   processor result
+     * @param array<string, mixed> $metadata handler response metadata
+     */
+    private function persistWebSearchMeta(Message $incoming, Message $out, array $result, array $metadata): void
+    {
+        $searchResults = $result['search_results'] ?? ($metadata['search_results'] ?? null);
+        if (!is_array($searchResults) || !is_array($searchResults['results'] ?? null) || [] === $searchResults['results']) {
+            return;
+        }
+
+        $query = is_string($searchResults['query'] ?? null) ? $searchResults['query'] : '';
+        $count = (string) count($searchResults['results']);
+        foreach ([$incoming, $out] as $row) {
+            $row->setMeta('web_search_query', $query);
+            $row->setMeta('web_search_results_count', $count);
+        }
+    }
+
+    /**
+     * Mirror what the web stream persists for a DAG turn: the per-step render
+     * cards (`task_plan`), the multitask flag and the executed definition.
+     * Without these the task chat showed the run as a bare text answer even
+     * though every step ran — indistinguishable from a degraded chat reply,
+     * and "Schedule this" from the task chat could not pin the steps again.
+     *
+     * @param array<string, mixed> $metadata handler response metadata
+     */
+    private function persistTaskPlanMeta(Message $out, array $metadata): void
+    {
+        $render = $metadata['task_plan_render'] ?? null;
+        if (is_array($render) && is_array($render['cards'] ?? null) && [] !== $render['cards']) {
+            $encoded = json_encode($render, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+            if (false !== $encoded) {
+                $out->setMeta('multitask', '1');
+                $out->setMeta('task_plan', $encoded);
+            }
+        }
+
+        $definition = $metadata[TaskPlanExecutor::PLAN_DEFINITION_KEY] ?? null;
+        if (is_array($definition) && is_array($definition['tasks'] ?? null) && [] !== $definition['tasks']) {
+            $encoded = json_encode($definition, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+            if (false !== $encoded) {
+                $out->setMeta(TaskPlanExecutor::PLAN_DEFINITION_META, $encoded);
+            }
+        }
     }
 
     /**

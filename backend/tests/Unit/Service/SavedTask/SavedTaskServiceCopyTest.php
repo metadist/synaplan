@@ -14,6 +14,7 @@ use App\Service\Iam\AccessGate;
 use App\Service\Iam\Exception\AssistantNotSharedException;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
+use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\SavedTaskService;
 use App\Service\SavedTask\Schedule\ScheduleParser;
@@ -62,6 +63,7 @@ final class SavedTaskServiceCopyTest extends TestCase
             $this->createStub(SavedTaskGraphValidator::class),
             $this->createStub(ScheduleParser::class),
             $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
         );
 
         $copy = $service->copyForOwner($source, $user);
@@ -71,7 +73,9 @@ final class SavedTaskServiceCopyTest extends TestCase
         self::assertFalse($copy->allowsUnattended());
         self::assertNull($copy->getChatId());
         self::assertSame(3, $copy->getOwnerId());
-        self::assertSame(['nodes' => []], $copy->getGraph());
+        // The copied graph follows the reset trigger; a schedule-typed graph
+        // on a manual task would be rejected by the factory at run time.
+        self::assertSame(['nodes' => [], 'trigger' => ['type' => SavedTask::TRIGGER_MANUAL]], $copy->getGraph());
     }
 
     public function testCopyWithoutAssistantAccessThrowsConflict(): void
@@ -107,6 +111,7 @@ final class SavedTaskServiceCopyTest extends TestCase
             $this->createStub(SavedTaskGraphValidator::class),
             $this->createStub(ScheduleParser::class),
             $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
         );
 
         $this->expectException(AssistantNotSharedException::class);
@@ -134,6 +139,7 @@ final class SavedTaskServiceCopyTest extends TestCase
             $this->createStub(SavedTaskGraphValidator::class),
             $this->createStub(ScheduleParser::class),
             $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
         );
 
         $this->expectException(\App\Service\SavedTask\SavedTaskNotFoundException::class);

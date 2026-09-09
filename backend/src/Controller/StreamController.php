@@ -44,6 +44,7 @@ use App\Service\Message\ChatErrorView;
 use App\Service\Message\MessageForwardingService;
 use App\Service\Message\MessageProcessor;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\PerfTimer;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
@@ -1899,6 +1900,7 @@ class StreamController extends AbstractController
                         (string) json_encode($response['metadata']['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                     );
                 }
+                $this->persistTaskPlanDefinition($outgoingMessage, $response['metadata'] ?? []);
 
                 // Multi-task async media (DAG): image/video generation nodes create
                 // their MediaJob with the INCOMING user message id (the runner's
@@ -2833,6 +2835,7 @@ class StreamController extends AbstractController
                     (string) json_encode($metadata['task_plan_render'], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE)
                 );
             }
+            $this->persistTaskPlanDefinition($outgoingMessage, $metadata);
 
             // Mirror the streaming branch: rebind every async node job to the OUT
             // message, and give a job that already finished while bound to the IN
@@ -3234,6 +3237,30 @@ class StreamController extends AbstractController
         if (!empty($classification['sorting_model_id'])) {
             $message->setMeta('ai_sorting_model_id', (string) $classification['sorting_model_id']);
         }
+    }
+
+    /**
+     * Persist the executed DAG's node definitions (inputs/params, dependencies)
+     * on the OUT message. "Schedule this" turns them into the Saved Task's
+     * authored graph so a rerun replays the very steps the user saw work —
+     * without it a rerun re-plans from the instruction text and can degrade a
+     * `url_fetch → chat → email_me` turn into a single chat answer.
+     *
+     * @param array<string, mixed> $metadata handler-result metadata
+     */
+    private function persistTaskPlanDefinition(Message $message, array $metadata): void
+    {
+        $definition = $metadata[TaskPlanExecutor::PLAN_DEFINITION_KEY] ?? null;
+        if (!is_array($definition) || !is_array($definition['tasks'] ?? null) || [] === $definition['tasks']) {
+            return;
+        }
+
+        $encoded = json_encode($definition, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        if (false === $encoded) {
+            return;
+        }
+
+        $message->setMeta(TaskPlanExecutor::PLAN_DEFINITION_META, $encoded);
     }
 
     /**

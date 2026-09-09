@@ -335,6 +335,7 @@ final readonly class MessageProcessor
             if (isset($options['rag_min_score'])) {
                 $classification['rag_min_score'] = (float) $options['rag_min_score'];
             }
+            $classification = $this->tagSavedTaskRun($classification, $options);
 
             // Step 2.3: Load Prompt Metadata and apply tool restrictions
             $topic = $classification['topic'] ?? 'general';
@@ -834,6 +835,7 @@ final readonly class MessageProcessor
                 // Inert unless MULTITASK_SHADOW_MODE is on; never affects the turn.
                 $this->maybeShadowPlan($message, $conversationHistory);
             }
+            $classification = $this->tagSavedTaskRun($classification, $options);
 
             $promptMetadata = [];
             if (isset($classification['prompt_metadata']) && is_array($classification['prompt_metadata'])) {
@@ -1145,6 +1147,28 @@ final readonly class MessageProcessor
     }
 
     /**
+     * Mark a Saved Task run on the classification, whichever branch produced
+     * it. A chat-saved task runs through the AI sorter exactly like the turn
+     * the user typed (web-search vote, language, memories, multi-step vote),
+     * so the source is `ai_sorting`; the task id is what lets
+     * TaskPlanExecutor replay the task's pinned steps instead of re-planning.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function tagSavedTaskRun(array $classification, array $options): array
+    {
+        $taskId = $options['saved_task_id'] ?? null;
+        if (is_int($taskId) && $taskId > 0) {
+            $classification['saved_task_id'] = $taskId;
+        }
+
+        return $classification;
+    }
+
+    /**
      * Prefetch named URLs into classification['url_content'] so ChatHandler
      * (and UrlFetchRunner reuse) can read the page.
      *
@@ -1160,7 +1184,7 @@ final readonly class MessageProcessor
      */
     private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
     {
-        $savedTask = 'saved_task' === ($classification['source'] ?? null);
+        $savedTask = 'saved_task' === ($classification['source'] ?? null) || !empty($classification['saved_task_id']);
         if (!$savedTask && empty($promptMetadata['tool_url_screenshot'])) {
             return $classification;
         }
