@@ -120,7 +120,7 @@ final readonly class WebSearchAdminService
     public function saveKey(string $provider, string $key): array
     {
         $normalized = strtolower(trim($provider));
-        if (PlugKeyStore::isSupported($normalized)) {
+        if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->saveKey($normalized, $key);
 
             return $this->plugKeys->getStatus($normalized);
@@ -140,7 +140,7 @@ final readonly class WebSearchAdminService
     public function deleteKey(string $provider): array
     {
         $normalized = strtolower(trim($provider));
-        if (PlugKeyStore::isSupported($normalized)) {
+        if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->deleteKey($normalized);
 
             return $this->plugKeys->getStatus($normalized);
@@ -159,7 +159,7 @@ final readonly class WebSearchAdminService
      */
     private function keyStatus(string $provider): array
     {
-        if (PlugKeyStore::isSupported($provider)) {
+        if ($this->plugKeys->supports($provider)) {
             return $this->plugKeys->getStatus($provider);
         }
         if ('perplexity' === $provider) {
