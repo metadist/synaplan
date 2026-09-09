@@ -99,16 +99,21 @@ final class PlugDeclarationCheckPass implements CompilerPassInterface
     }
 
     /**
+     * The longest matching namespace prefix, so a class under a nested plugin
+     * namespace (`Plugin\Foo\Bar\`) is attributed to that plugin rather than a
+     * shorter ancestor prefix (`Plugin\Foo\`).
+     *
      * @param list<string> $prefixes
      */
     private function matchingPluginPrefix(string $class, array $prefixes): ?string
     {
+        $match = null;
         foreach ($prefixes as $prefix) {
-            if (str_starts_with($class, $prefix)) {
-                return $prefix;
+            if (str_starts_with($class, $prefix) && (null === $match || \strlen($prefix) > \strlen($match))) {
+                $match = $prefix;
             }
         }
 
-        return null;
+        return $match;
     }
 }

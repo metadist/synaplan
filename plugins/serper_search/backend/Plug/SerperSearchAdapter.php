@@ -7,7 +7,6 @@ namespace Plugin\SerperSearch\Plug;
 use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
 use App\Plug\PlugKeyStore;
-use App\Plug\WebSearch\SearchResult;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchOptionMapper;
@@ -20,9 +19,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Everything a third-party plug adapter needs and nothing a core class does:
  * it reaches Synaplan only through the web-search port (interface + DTOs) and
- * {@see PlugKeyStore}, declares itself in manifest.json `provides.plugs`, and
- * fails soft (an unavailable key or a bad response yields an empty set, never
- * an exception that breaks chat).
+ * {@see PlugKeyStore}, and declares itself in manifest.json `provides.plugs`.
+ * A missing key makes health() unavailable and search() return an empty set; a
+ * transient upstream failure (HTTP >= 400) throws, which
+ * {@see \App\Plug\WebSearch\WebSearchRegistry} catches to fall back to another
+ * provider — so a down provider never breaks chat, yet a recoverable error
+ * still triggers a retry rather than silently returning "no results".
  */
 final readonly class SerperSearchAdapter implements WebSearchProviderInterface
 {

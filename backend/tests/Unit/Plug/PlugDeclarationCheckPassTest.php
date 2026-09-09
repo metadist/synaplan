@@ -72,6 +72,35 @@ final class PlugDeclarationCheckPassTest extends TestCase
         $this->pass()->process($container);
     }
 
+    public function testNestedPluginNamespacesAttributeToTheLongestPrefix(): void
+    {
+        // Two plugins whose namespaces nest: Plugin\Foo and Plugin\Foo\Bar.
+        $outer = sys_get_temp_dir().'/plug-outer-'.uniqid();
+        $inner = sys_get_temp_dir().'/plug-inner-'.uniqid();
+        mkdir($outer, 0777, true);
+        mkdir($inner, 0777, true);
+        file_put_contents($outer.'/manifest.json', json_encode(['id' => 'foo', 'namespace' => 'Plugin\\Foo'], JSON_THROW_ON_ERROR));
+        file_put_contents($inner.'/manifest.json', json_encode(['id' => 'foo_bar', 'namespace' => 'Plugin\\Foo\\Bar'], JSON_THROW_ON_ERROR));
+
+        try {
+            $pass = new PlugDeclarationCheckPass([
+                ['dir' => $outer, 'namespace' => 'Plugin\\Foo'],
+                ['dir' => $inner, 'namespace' => 'Plugin\\Foo\\Bar'],
+            ]);
+            $container = $this->containerWithTaggedAdapter('app.plug.web_search', 'Plugin\\Foo\\Bar\\Adapter');
+
+            $this->expectException(\LogicException::class);
+            // The inner plugin (foo_bar) owns the class, not the ancestor foo.
+            $this->expectExceptionMessage('Plugin "foo_bar" registers Plugin\\Foo\\Bar\\Adapter');
+            $pass->process($container);
+        } finally {
+            @unlink($outer.'/manifest.json');
+            @unlink($inner.'/manifest.json');
+            @rmdir($outer);
+            @rmdir($inner);
+        }
+    }
+
     public function testCoreAdapterIsExempt(): void
     {
         $this->writeManifest(['id' => 'demo_search', 'namespace' => 'Plugin\\DemoSearch']);
