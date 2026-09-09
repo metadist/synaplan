@@ -40,7 +40,7 @@ final class PlugKeyStore
     private array $memo = [];
 
     /**
-     * @param array<string, string|null> $envKeys        provider => env bootstrap value
+     * @param array<string, string|null> $envKeys         provider => env bootstrap value
      * @param list<string>               $pluginProviders keys declared by plugin provides.plugs adapters
      */
     public function __construct(
