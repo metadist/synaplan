@@ -50,7 +50,9 @@ final class AdminAuditControllerTest extends WebTestCase
         $entry->setActorId((int) $admin->getId());
         $entry->setAction('platform_link.disconnected');
         $entry->setResourceKind('platform_link');
-        $entry->setResourceId('5');
+        // Unique resource id so we can pin the exact row we created.
+        $resourceId = 'empty-subject-'.uniqid('', true);
+        $entry->setResourceId($resourceId);
         $entry->setSubject([]);
         $this->em->persist($entry);
         $this->em->flush();
@@ -63,11 +65,14 @@ final class AdminAuditControllerTest extends WebTestCase
         // The wire form must be `"subject":null`, never `"subject":[]`.
         self::assertStringNotContainsString('"subject":[]', $raw);
         $payload = json_decode($raw, true);
+        self::assertIsArray($payload);
+        self::assertArrayHasKey('entries', $payload);
         $match = array_values(array_filter(
             $payload['entries'],
             static fn (array $e): bool => 'platform_link.disconnected' === $e['action']
+                && $resourceId === $e['resourceId']
         ));
-        self::assertNotEmpty($match);
+        self::assertCount(1, $match);
         self::assertNull($match[0]['subject']);
     }
 

@@ -128,11 +128,13 @@ final class AdminAuditController extends AbstractController
 
     /**
      * Guarantee the wire shape the schema promises (`subject: object|null`).
-     * A legacy row that stored an empty `[]` would otherwise serialize as a
-     * JSON array and fail the client's response validation; cast any non-empty
-     * value to an object so even a stray list is emitted as `{…}`.
+     * An empty or null subject collapses to null, so a legacy row that stored
+     * `[]` no longer serializes as a JSON array and fails the client's response
+     * validation. A well-formed subject is an associative map that stays a JSON
+     * object; a stray non-empty list is cast to an object with numeric string
+     * keys (`{"0": …}`) rather than being emitted as an array.
      *
-     * @param array<string, mixed>|null $subject
+     * @param array<array-key, mixed>|null $subject
      */
     private function normalizeSubject(?array $subject): ?object
     {
