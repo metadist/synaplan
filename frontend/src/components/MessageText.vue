@@ -344,7 +344,16 @@ function positionHoverTooltip(wrapper: HTMLElement, tip: Element): void {
   const rect = wrapper.getBoundingClientRect()
   const centerX = rect.left + rect.width / 2
   const gutter = 16
-  const maxWidth = Math.min(320, window.innerWidth - gutter * 2)
+  const viewportCap = Math.max(160, window.innerWidth - gutter * 2)
+  // Carry the source tooltip's wrapper-level styling: memory/feedback badges
+  // use whitespace-nowrap, message-ref tooltips whitespace-normal with an
+  // inline max-width:280px. Cloning only the children would drop both and let
+  // the portal wrap/size differently from the in-flow markup.
+  const tipStyle = window.getComputedStyle(tip)
+  const sourceMax = Number.parseFloat(tipStyle.maxWidth)
+  const maxWidth = Number.isFinite(sourceMax)
+    ? Math.min(sourceMax, viewportCap)
+    : Math.min(320, viewportCap)
   const left = Math.min(
     Math.max(centerX, gutter + maxWidth / 2),
     window.innerWidth - gutter - maxWidth / 2
@@ -355,6 +364,7 @@ function positionHoverTooltip(wrapper: HTMLElement, tip: Element): void {
       top: `${rect.top}px`,
       transform: 'translate(-50%, calc(-100% - 8px))',
       maxWidth: `${maxWidth}px`,
+      whiteSpace: tipStyle.whiteSpace,
     },
   }
   void nextTick(() => fillPortal(tip))

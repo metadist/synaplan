@@ -97,7 +97,7 @@ docker compose exec -T backend php bin/console app:rag:eval-rerank \
   --user=<id> --k=5 --report=var/rerank-eval.md
 ```
 
-The report lists recall@5, MRR, p50/p95 latency and fallback counts.
+The report lists recall@5, MRR and p50/p95 latency, off vs on.
 The seeded default stays `0` until a live report shows recall@5 up and
 p95 inside the budget.
 
