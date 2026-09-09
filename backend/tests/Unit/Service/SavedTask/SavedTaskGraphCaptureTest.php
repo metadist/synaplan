@@ -70,7 +70,7 @@ final class SavedTaskGraphCaptureTest extends TestCase
         $message->setMeta(TaskPlanExecutor::PLAN_DEFINITION_META, (string) json_encode(self::DEFINITION));
 
         $messages = $this->createMock(MessageRepository::class);
-        $messages->method('find')->with(4711)->willReturn($message);
+        $messages->method('find')->willReturnCallback(static fn (mixed $id): ?Message => 4711 === $id ? $message : null);
         $capture = new SavedTaskGraphCapture($messages);
 
         $own = $capture->fromMessage(4711, 9, 'manual');
