@@ -2,7 +2,7 @@
   <label v-if="visible" class="block" :data-testid="testId">
     <span class="txt-secondary text-sm">{{ label }}</span>
     <select
-      class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+      class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
       :disabled="disabled"
       :value="modelValue == null ? '' : String(modelValue)"
       @change="onChange"
@@ -17,7 +17,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 import { agentsApi, type GalleryCard } from '@/services/api/agentsApi'
 
@@ -50,16 +50,24 @@ const published = computed(() =>
   )
 )
 
-onMounted(async () => {
-  if (!visible.value) {
-    return
-  }
-  try {
-    cards.value = await agentsApi.gallery()
-  } catch {
-    cards.value = []
-  }
-})
+// The runtime config that carries the assistants flag can resolve after this
+// component mounts, so load on the flag turning on rather than on mount.
+watch(
+  visible,
+  async (on) => {
+    if (!on) {
+      cards.value = []
+
+      return
+    }
+    try {
+      cards.value = await agentsApi.gallery()
+    } catch {
+      cards.value = []
+    }
+  },
+  { immediate: true }
+)
 
 function onChange(event: Event): void {
   const raw = (event.target as HTMLSelectElement).value

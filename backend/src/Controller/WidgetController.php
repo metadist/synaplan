@@ -98,6 +98,7 @@ class WidgetController extends AbstractController
                             new OA\Property(property: 'widgetId', type: 'string', example: 'wdg_abc123...'),
                             new OA\Property(property: 'name', type: 'string'),
                             new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                            new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                             new OA\Property(property: 'status', type: 'string', enum: ['active', 'inactive']),
                             new OA\Property(property: 'config', type: 'object'),
                             new OA\Property(property: 'created', type: 'integer'),
@@ -161,6 +162,7 @@ class WidgetController extends AbstractController
                 new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
                 new OA\Property(property: 'websiteUrl', type: 'string', example: 'https://example.com', description: 'Website URL - domain will be added to allowed domains'),
                 new OA\Property(property: 'taskPromptTopic', type: 'string', example: 'customer-support', description: 'Optional - defaults to tools:widget-default'),
+                new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                 new OA\Property(property: 'config', type: 'object'),
             ]
         )
@@ -180,6 +182,7 @@ class WidgetController extends AbstractController
                         new OA\Property(property: 'widgetId', type: 'string', example: 'wdg_abc123...'),
                         new OA\Property(property: 'name', type: 'string'),
                         new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                        new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                         new OA\Property(property: 'status', type: 'string'),
                         new OA\Property(property: 'config', type: 'object'),
                         new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
@@ -277,6 +280,7 @@ class WidgetController extends AbstractController
                                 new OA\Property(property: 'widgetId', type: 'string'),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'taskPromptTopic', type: 'string'),
+                                new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
                                 new OA\Property(property: 'status', type: 'string'),
                                 new OA\Property(property: 'config', type: 'object'),
                                 new OA\Property(property: 'allowedDomains', type: 'array', items: new OA\Items(type: 'string')),
@@ -359,7 +363,18 @@ class WidgetController extends AbstractController
         path: '/api/v1/widgets/{widgetId}',
         summary: 'Update widget',
         security: [['Bearer' => []]],
-        tags: ['Widgets']
+        tags: ['Widgets'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', example: 'Support Chat'),
+                    new OA\Property(property: 'config', type: 'object'),
+                    new OA\Property(property: 'status', type: 'string', enum: ['active', 'inactive']),
+                    new OA\Property(property: 'agentId', type: 'integer', nullable: true, description: 'AI assistant bound to this chat widget, or null when the widget uses its task prompt'),
+                ]
+            )
+        )
     )]
     public function update(string $widgetId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {

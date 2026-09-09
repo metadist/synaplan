@@ -11,7 +11,9 @@ use App\Bundle\ImportOptions;
 use App\Bundle\SectionPreview;
 use App\Bundle\SectionResult;
 use App\Entity\Agent;
+use App\Entity\Model;
 use App\Model\ModelCatalog;
+use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Service\PromptService;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -19,9 +21,19 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.bundle.section')]
 final readonly class PromptBundleSection implements BundleSectionInterface
 {
+    /**
+     * Prompt metadata that must never cross an instance boundary: it points at
+     * rows that only exist in the source install.
+     */
+    private const INSTANCE_LOCAL_META = ['aiModel', 'mcp_servers'];
+
+    /** Portable replacement for the numeric `aiModel` BID. */
+    private const MODEL_KEY_META = 'aiModelKey';
+
     public function __construct(
         private PromptRepository $prompts,
         private PromptService $promptService,
+        private ModelRepository $models,
     ) {
     }
 
@@ -55,7 +67,7 @@ final readonly class PromptBundleSection implements BundleSectionInterface
                 'topic' => $topic,
                 'text' => $prompt->getPrompt(),
                 'description' => $prompt->getShortDescription(),
-                'meta' => $this->promptService->loadMetadataForPrompt((int) $prompt->getId()),
+                'meta' => $this->portableMeta($this->promptService->loadMetadataForPrompt((int) $prompt->getId())),
             ];
         }
 
@@ -76,10 +88,9 @@ final readonly class PromptBundleSection implements BundleSectionInterface
             if (null !== $existing && $existing->getOwnerId() === $userId) {
                 $rows[] = new ChecklistItem('conflict', $key, $topic);
             }
-            foreach ($this->modelKeysFromMeta(is_array($item['meta'] ?? null) ? $item['meta'] : []) as $capability => $modelKey) {
-                if (null === ModelCatalog::findBidByKey($modelKey)) {
-                    $rows[] = new ChecklistItem('needsModel', $key, $capability);
-                }
+            $modelKey = self::modelKeyFromMeta(is_array($item['meta'] ?? null) ? $item['meta'] : []);
+            if (null !== $modelKey && null === ModelCatalog::findBidByKey($modelKey)) {
+                $rows[] = new ChecklistItem('needsModel', $key, $modelKey);
             }
         }
 
@@ -113,7 +124,7 @@ final readonly class PromptBundleSection implements BundleSectionInterface
                 }
                 $prompt = $this->promptService->createOwned($userId, $topic, $text, $description);
                 $meta = is_array($item['meta'] ?? null) ? $item['meta'] : [];
-                $this->promptService->saveMetadataForPrompt($prompt, $this->filterResolvableMeta($meta));
+                $this->promptService->saveMetadataForPrompt($prompt, self::resolveMetaForImport($meta));
                 $created[] = $key;
             } catch (\Throwable $e) {
                 $failed[] = ['key' => $key, 'reason' => $e->getMessage()];
@@ -124,40 +135,81 @@ final readonly class PromptBundleSection implements BundleSectionInterface
     }
 
     /**
-     * @param array<string, mixed> $meta
+     * Rewrite metadata for export: the pinned model becomes a portable
+     * `service:providerId:tag` key, and every other instance-local reference
+     * (MCP server ids) is dropped rather than carried to a foreign install.
      *
-     * @return array<string, string>
-     */
-    private function modelKeysFromMeta(array $meta): array
-    {
-        $out = [];
-        foreach (['ai_chat', 'ai_quality', 'ai_cheap'] as $capability) {
-            $value = $meta[$capability] ?? null;
-            if (is_string($value) && str_contains($value, ':')) {
-                $out[$capability] = $value;
-            }
-        }
-
-        return $out;
-    }
-
-    /**
      * @param array<string, mixed> $meta
      *
      * @return array<string, mixed>
      */
-    private function filterResolvableMeta(array $meta): array
+    private function portableMeta(array $meta): array
     {
-        $out = [];
-        foreach ($meta as $key => $value) {
-            if (is_string($value) && str_contains($value, ':') && str_starts_with($key, 'ai_')) {
-                if (null === ModelCatalog::findBidByKey($value)) {
-                    continue;
-                }
-            }
-            $out[$key] = $value;
+        $modelKey = $this->modelKeyForBid($meta['aiModel'] ?? null);
+        foreach (self::INSTANCE_LOCAL_META as $key) {
+            unset($meta[$key]);
+        }
+        if (null !== $modelKey) {
+            $meta[self::MODEL_KEY_META] = $modelKey;
         }
 
-        return $out;
+        return $meta;
+    }
+
+    /**
+     * `service:providerId:tag` for a BMODELS id, or null when the model is
+     * gone or the key does not resolve back to exactly one catalog entry.
+     */
+    private function modelKeyForBid(mixed $bid): ?string
+    {
+        if (!is_int($bid) && !(is_string($bid) && is_numeric($bid))) {
+            return null;
+        }
+        $id = (int) $bid;
+        if ($id < 1) {
+            return null;
+        }
+        $model = $this->models->find($id);
+        if (!$model instanceof Model) {
+            return null;
+        }
+        $key = sprintf('%s:%s:%s', $model->getService(), $model->getProviderId(), $model->getTag());
+
+        return null === ModelCatalog::findBidByKey($key) ? null : $key;
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     */
+    private static function modelKeyFromMeta(array $meta): ?string
+    {
+        $key = $meta[self::MODEL_KEY_META] ?? null;
+
+        return is_string($key) && '' !== $key ? $key : null;
+    }
+
+    /**
+     * Mirror of {@see portableMeta} on the way in: resolve the portable model
+     * key against this install's catalog and drop it when unknown, so the
+     * prompt falls back to the default model instead of pointing at whatever
+     * BID the source instance happened to use.
+     *
+     * @param array<string, mixed> $meta
+     *
+     * @return array<string, mixed>
+     */
+    private static function resolveMetaForImport(array $meta): array
+    {
+        $modelKey = self::modelKeyFromMeta($meta);
+        unset($meta[self::MODEL_KEY_META]);
+        foreach (self::INSTANCE_LOCAL_META as $key) {
+            unset($meta[$key]);
+        }
+        $bid = null === $modelKey ? null : ModelCatalog::findBidByKey($modelKey);
+        if (null !== $bid) {
+            $meta['aiModel'] = $bid;
+        }
+
+        return $meta;
     }
 }

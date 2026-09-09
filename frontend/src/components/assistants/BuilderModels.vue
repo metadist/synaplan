@@ -54,11 +54,9 @@
           @change="patchParam('language', ($event.target as HTMLSelectElement).value)"
         >
           <option value="auto">{{ $t('assistants.languageAuto') }}</option>
-          <option value="en">English</option>
-          <option value="de">Deutsch</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
-          <option value="tr">Türkçe</option>
+          <option v-for="option in languageOptions" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
         </select>
       </label>
       <label class="block">
@@ -85,6 +83,7 @@ import { useI18n } from 'vue-i18n'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAgentsStore } from '@/stores/agents'
 import { emptyAgentDraft } from '@/services/api/agentsApi'
+import { languageOptions } from '@/i18n'
 import type { AIModel, Capability } from '@/types/ai-models'
 
 const { t } = useI18n()

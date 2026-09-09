@@ -8,9 +8,14 @@ use App\Bundle\BundleConfig;
 use App\Bundle\BundleEnvelopeException;
 use App\Bundle\BundleExporter;
 use App\Bundle\BundleImporter;
+use App\Bundle\BundleRateLimiter;
+use App\Bundle\BundleRequestParser;
 use App\Bundle\BundleScope;
-use App\Bundle\ImportOptions;
+use App\Bundle\BundleTooLargeException;
 use App\DTO\AgentDefinitionV1;
+use App\DTO\Bundle\BundleDocument;
+use App\DTO\Bundle\BundleError;
+use App\DTO\Bundle\BundleImportRequest;
 use App\Entity\User;
 use App\Repository\AgentVersionRepository;
 use App\Repository\UseLogRepository;
@@ -52,6 +57,8 @@ final class AgentController extends AbstractController
         private ?BundleConfig $bundleConfig = null,
         private ?BundleExporter $bundleExporter = null,
         private ?BundleImporter $bundleImporter = null,
+        private ?BundleRateLimiter $bundleRateLimiter = null,
+        private ?BundleRequestParser $bundleParser = null,
     ) {
     }
 
@@ -761,8 +768,13 @@ final class AgentController extends AbstractController
         tags: ['Agents'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
-            new OA\Response(response: 200, description: 'Bundle document'),
+            new OA\Response(
+                response: 200,
+                description: 'Bundle document (downloaded as a file)',
+                content: new OA\JsonContent(ref: new Model(type: BundleDocument::class))
+            ),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
+            new OA\Response(response: 429, description: 'Too many exports'),
         ]
     )]
     public function export(int $id, #[CurrentUser] ?User $user): Response
@@ -772,13 +784,25 @@ final class AgentController extends AbstractController
             return $denied;
         }
         \assert($user instanceof User);
-        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled((int) $user->getId()) || null === $this->bundleExporter) {
+        $userId = (int) $user->getId();
+        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled($userId) || null === $this->bundleExporter) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (null !== $this->bundleRateLimiter && !$this->bundleRateLimiter->consume($userId, BundleRateLimiter::ACTION_EXPORT)) {
+            return $this->json(['error' => 'Too many exports. Try again later.'], Response::HTTP_TOO_MANY_REQUESTS);
         }
         try {
             $agent = $this->access->require($user, $id, Permission::Read);
         } catch (AgentNotAccessibleException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        // The agents section only exports the caller's own published
+        // assistants, so anything else would hand back an empty bundle.
+        if ($agent->getOwnerId() !== $userId) {
+            return $this->json(['error' => 'You can only export your own assistants'], Response::HTTP_FORBIDDEN);
+        }
+        if (null === $agent->getPublishedVersionId()) {
+            return $this->json(['error' => 'Publish this assistant before exporting it'], Response::HTTP_BAD_REQUEST);
         }
         $document = $this->bundleExporter->export(
             (int) $user->getId(),
@@ -798,11 +822,51 @@ final class AgentController extends AbstractController
     #[OA\Post(
         path: '/api/v1/agents/import',
         summary: 'Import assistants and instructions from a synaplan-bundle.v1 document',
+        description: 'Convenience wrapper around the bundle import, restricted to the `agents` and `prompts` sections. Creates drafts owned by the caller.',
         tags: ['Agents'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: BundleImportRequest::class))
+        ),
         responses: [
-            new OA\Response(response: 200, description: 'Import result'),
-            new OA\Response(response: 400, description: 'Invalid bundle'),
+            new OA\Response(
+                response: 200,
+                description: 'Import result',
+                content: new OA\JsonContent(
+                    required: ['success', 'createsDrafts', 'results'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'createsDrafts', type: 'boolean', example: true),
+                        new OA\Property(
+                            property: 'results',
+                            type: 'array',
+                            items: new OA\Items(
+                                required: ['kind', 'created', 'skipped', 'failed'],
+                                properties: [
+                                    new OA\Property(property: 'kind', type: 'string', example: 'agents'),
+                                    new OA\Property(property: 'created', type: 'integer', example: 2),
+                                    new OA\Property(property: 'skipped', type: 'integer', example: 1),
+                                    new OA\Property(
+                                        property: 'failed',
+                                        type: 'array',
+                                        items: new OA\Items(
+                                            required: ['key', 'reason'],
+                                            properties: [
+                                                new OA\Property(property: 'key', type: 'string', example: 'contract-review'),
+                                                new OA\Property(property: 'reason', type: 'string', example: 'unknown model'),
+                                            ]
+                                        )
+                                    ),
+                                ]
+                            )
+                        ),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid bundle', content: new OA\JsonContent(ref: new Model(type: BundleError::class))),
             new OA\Response(response: 404, description: 'Not found or feature disabled'),
+            new OA\Response(response: 413, description: 'Bundle exceeds the size limit'),
+            new OA\Response(response: 429, description: 'Too many imports'),
         ]
     )]
     public function import(Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -812,21 +876,21 @@ final class AgentController extends AbstractController
             return $denied;
         }
         \assert($user instanceof User);
-        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled((int) $user->getId()) || null === $this->bundleImporter) {
+        $userId = (int) $user->getId();
+        if (null === $this->bundleConfig || !$this->bundleConfig->isEnabled($userId) || null === $this->bundleImporter || null === $this->bundleParser) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
-        $content = $request->getContent();
-        $decoded = json_decode($content, true);
-        $json = $content;
-        $conflict = ImportOptions::CONFLICT_SKIP;
-        if (is_array($decoded) && isset($decoded['bundle']) && is_array($decoded['bundle'])) {
-            $json = json_encode($decoded['bundle'], JSON_THROW_ON_ERROR);
-            if (is_string($decoded['options']['conflict'] ?? null)) {
-                $conflict = $decoded['options']['conflict'];
-            }
+        if (null !== $this->bundleRateLimiter && !$this->bundleRateLimiter->consume($userId, BundleRateLimiter::ACTION_IMPORT)) {
+            return $this->json(['error' => 'Too many imports. Try again later.'], Response::HTTP_TOO_MANY_REQUESTS);
         }
         try {
-            $results = $this->bundleImporter->apply($json, (int) $user->getId(), new ImportOptions($conflict));
+            $parsed = $this->bundleParser->parse($request->getContent());
+            $results = $this->bundleImporter->apply($parsed['bundle'], $userId, $parsed['options']);
+        } catch (BundleTooLargeException $e) {
+            return $this->json(
+                ['error' => sprintf('This file is larger than %d MB.', intdiv($e->maxBytes, 1024 * 1024))],
+                Response::HTTP_REQUEST_ENTITY_TOO_LARGE,
+            );
         } catch (BundleEnvelopeException $e) {
             return $this->json(['error' => $e->getMessage(), 'path' => $e->path], Response::HTTP_BAD_REQUEST);
         } catch (\InvalidArgumentException $e) {

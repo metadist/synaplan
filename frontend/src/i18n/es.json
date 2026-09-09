@@ -5193,7 +5193,7 @@
     "includeUserFiles": "También buscar en los archivos de la persona",
     "includeUserFilesHint": "Desactivado por defecto. La IA solo usa las carpetas de este asistente.",
     "sharedFolders": "Carpetas compartidas que la IA puede usar",
-    "sharedFoldersHint": "La IA puede usar la carpeta — solo carpetas que tú puedes usar.",
+    "sharedFoldersHint": "La IA también puede usar carpetas compartidas contigo: solo puedes añadir carpetas a las que tengas acceso.",
     "noSharedFolders": "Aún no hay carpetas extra",
     "addSharedFolder": "Añadir una carpeta compartida",
     "chooseFolder": "Elige una carpeta",

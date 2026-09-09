@@ -6179,7 +6179,7 @@
     "includeUserFiles": "Aussi chercher dans les fichiers de la personne",
     "includeUserFilesHint": "Désactivé par défaut. L’IA n’utilise alors que les dossiers de cet assistant.",
     "sharedFolders": "Dossiers partagés que l’IA peut utiliser",
-    "sharedFoldersHint": "L’IA peut utiliser le dossier — uniquement les dossiers que vous pouvez utiliser.",
+    "sharedFoldersHint": "L’IA peut aussi utiliser les dossiers partagés avec vous — vous ne pouvez ajouter que des dossiers auxquels vous avez accès.",
     "noSharedFolders": "Pas encore de dossiers supplémentaires",
     "addSharedFolder": "Ajouter un dossier partagé",
     "chooseFolder": "Choisir un dossier",

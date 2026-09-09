@@ -6113,7 +6113,7 @@
     "includeUserFiles": "Auch die eigenen Dateien der Person durchsuchen",
     "includeUserFilesHint": "Standardmäßig aus. Die KI nutzt dann nur die Ordner dieses Assistenten.",
     "sharedFolders": "Geteilte Ordner, die die KI nutzen darf",
-    "sharedFoldersHint": "Die KI darf den Ordner nutzen — nur Ordner, die du selbst nutzen kannst.",
+    "sharedFoldersHint": "Die KI darf auch mit dir geteilte Ordner nutzen — du kannst nur Ordner hinzufügen, auf die du Zugriff hast.",
     "noSharedFolders": "Noch keine zusätzlichen Ordner",
     "addSharedFolder": "Geteilten Ordner hinzufügen",
     "chooseFolder": "Ordner wählen",

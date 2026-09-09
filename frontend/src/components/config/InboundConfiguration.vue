@@ -29,8 +29,9 @@
       </div>
       <div class="mt-4">
         <ChannelAssistantSelect
-          v-model="whatsappAgentId"
+          :model-value="whatsappAgentId"
           :label="$t('channels.whatsappAssistant')"
+          @update:model-value="saveWhatsappAssistant"
           :none-label="$t('channels.whatsappAssistantNone')"
           :hint="$t('channels.whatsappAssistantHint')"
           test-id="select-whatsapp-assistant"
@@ -137,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   DevicePhoneMobileIcon,
@@ -183,7 +184,6 @@ const originalData = ref({
 
 // Computed refs for template access
 const whatsappAgentId = ref<number | null>(null)
-const whatsappReady = ref(false)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
   const channels: EmailChannel[] = [
@@ -237,20 +237,21 @@ onMounted(async () => {
   } catch {
     whatsappAgentId.value = null
   }
-  whatsappReady.value = true
 })
 
-watch(whatsappAgentId, async (id) => {
-  if (!whatsappReady.value) {
-    return
-  }
+// Saved on user interaction only — a watcher would also fire for the value
+// loaded on mount and greet the user with a save toast they never triggered.
+async function saveWhatsappAssistant(id: number | null): Promise<void> {
+  const previous = whatsappAgentId.value
+  whatsappAgentId.value = id
   try {
     await setWhatsAppAssistant(id)
     success(t('channels.whatsappAssistantSaved'))
   } catch {
+    whatsappAgentId.value = previous
     error(t('channels.whatsappAssistantFailed'))
   }
-})
+}
 
 onUnmounted(() => {
   cleanupGuard?.()

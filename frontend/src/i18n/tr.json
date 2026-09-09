@@ -5194,7 +5194,7 @@
     "includeUserFiles": "Kişinin kendi dosyalarını da ara",
     "includeUserFilesHint": "Varsayılan olarak kapalı. Yapay zeka yalnızca bu asistanın klasörlerini kullanır.",
     "sharedFolders": "Yapay zekanın kullanabileceği paylaşılan klasörler",
-    "sharedFoldersHint": "Yapay zeka klasörü kullanabilir — yalnızca sizin kullanabildiğiniz klasörler.",
+    "sharedFoldersHint": "Yapay zeka sizinle paylaşılan klasörleri de kullanabilir — yalnızca erişiminiz olan klasörleri ekleyebilirsiniz.",
     "noSharedFolders": "Henüz ek klasör yok",
     "addSharedFolder": "Paylaşılan klasör ekle",
     "chooseFolder": "Bir klasör seçin",

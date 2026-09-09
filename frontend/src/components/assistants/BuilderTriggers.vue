@@ -349,11 +349,27 @@ function sentenceForEvent(event: TriggerEvent): string {
   return t('assistants.triggers.sentenceEvent')
 }
 
+const WEEKDAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+] as const
+
+function weekdayLabel(day: string | undefined): string {
+  const known = WEEKDAYS.find((weekday) => weekday === day) ?? 'monday'
+
+  return t(`assistants.triggers.${known}`)
+}
+
 function sentenceForSchedule(item: TriggerSchedule): string {
   const every = item.every as { unit?: string; on?: string; at?: string } | undefined
   if (every?.unit === 'week') {
     return t('assistants.triggers.sentenceWeekly', {
-      day: every.on ?? 'monday',
+      day: weekdayLabel(every.on),
       at: every.at ?? '08:00',
     })
   }

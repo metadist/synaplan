@@ -10,8 +10,10 @@ use App\Bundle\BundleEnvelopeValidator;
 use App\Bundle\BundleExporter;
 use App\Bundle\BundleImporter;
 use App\Bundle\BundleRateLimiter;
+use App\Bundle\BundleRequestParser;
 use App\Bundle\BundleScope;
 use App\Bundle\BundleSectionRegistry;
+use App\Bundle\BundleTooLargeException;
 use App\Bundle\ImportOptions;
 use App\DTO\Bundle\BundleDocument;
 use App\DTO\Bundle\BundleError;
@@ -42,6 +44,7 @@ final class BundleController extends AbstractController
         private readonly BundleExporter $exporter,
         private readonly BundleImporter $importer,
         private readonly BundleRateLimiter $rateLimiter,
+        private readonly BundleRequestParser $parser,
     ) {
     }
 
@@ -315,10 +318,8 @@ final class BundleController extends AbstractController
         if ($parsed instanceof JsonResponse) {
             return $parsed;
         }
-        $rawConflict = $parsed['body']['options']['conflict'] ?? ImportOptions::CONFLICT_SKIP;
         try {
-            $options = new ImportOptions(is_string($rawConflict) ? $rawConflict : ImportOptions::CONFLICT_SKIP);
-            $results = $this->importer->apply($parsed['bundle'], $userId, $options);
+            $results = $this->importer->apply($parsed['bundle'], $userId, $parsed['options']);
         } catch (BundleEnvelopeException $e) {
             return $this->json(['error' => $e->getMessage(), 'path' => $e->path], Response::HTTP_BAD_REQUEST);
         } catch (\InvalidArgumentException $e) {
@@ -351,30 +352,23 @@ final class BundleController extends AbstractController
     }
 
     /**
-     * Accepts the bundle document itself or a wrapper `{ bundle, options }`.
-     * The envelope is handed to the importer re-encoded so the validator's
-     * byte / depth limits apply to exactly the document being imported.
-     *
-     * @return array{bundle: string, body: array<string, mixed>}|JsonResponse
+     * @return array{bundle: string, options: ImportOptions}|JsonResponse
      */
     private function parseBundleRequest(Request $request): array|JsonResponse
     {
-        $content = $request->getContent();
-        if (strlen($content) > BundleEnvelopeValidator::MAX_BYTES) {
+        try {
+            return $this->parser->parse($request->getContent());
+        } catch (BundleTooLargeException $e) {
             return $this->json(
-                ['error' => sprintf('This file is larger than %d MB.', intdiv(BundleEnvelopeValidator::MAX_BYTES, 1024 * 1024))],
+                ['error' => sprintf('This file is larger than %d MB.', intdiv($e->maxBytes, 1024 * 1024))],
                 Response::HTTP_REQUEST_ENTITY_TOO_LARGE,
             );
+        } catch (BundleEnvelopeException) {
+            return $this->json(['error' => 'Send a synaplan-bundle.v1 document.'], Response::HTTP_BAD_REQUEST);
+        } catch (\InvalidArgumentException $e) {
+            // Bad import option, e.g. an unknown conflict strategy.
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-        $body = $this->jsonBody($request);
-        if (isset($body['bundle']) && is_array($body['bundle'])) {
-            return ['bundle' => json_encode($body['bundle'], JSON_THROW_ON_ERROR), 'body' => $body];
-        }
-        if (isset($body['schema'])) {
-            return ['bundle' => $content, 'body' => []];
-        }
-
-        return $this->json(['error' => 'Send a synaplan-bundle.v1 document.'], Response::HTTP_BAD_REQUEST);
     }
 
     /**

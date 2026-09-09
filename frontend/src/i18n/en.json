@@ -6179,7 +6179,7 @@
     "includeUserFiles": "Also search the person's own files",
     "includeUserFilesHint": "Off by default. The AI then only uses this assistant's folders.",
     "sharedFolders": "Shared folders the AI may use",
-    "sharedFoldersHint": "The AI may use Ada's folder — only folders you can use.",
+    "sharedFoldersHint": "The AI may also use folders shared with you — you can only add folders you have access to.",
     "noSharedFolders": "No extra folders yet",
     "addSharedFolder": "Add a shared folder",
     "chooseFolder": "Choose a folder",
