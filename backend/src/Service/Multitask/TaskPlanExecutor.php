@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Multitask;
 
 use App\Entity\Message;
+use App\Entity\SavedTask;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
 use App\Service\Message\InferenceRouter;
@@ -426,11 +427,6 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
-        $topic = $classification['topic'] ?? null;
-        if (!is_string($topic) || '' === $topic) {
-            return null;
-        }
-
         try {
             $userId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         } catch (\Throwable) {
@@ -448,20 +444,7 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
-        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
-        if (null === $prompt || null === $prompt->getId()) {
-            return null;
-        }
-
-        // Chat turns pin authored steps only for chat-trigger tasks (typing the
-        // matching instruction re-runs the pinned steps). A Saved Task RUN
-        // (source=saved_task: manual "Run now", scheduler tick, inbound email)
-        // executes the task's own authored graph regardless of trigger type —
-        // falling back to the free-form planner could produce different steps
-        // than the user explicitly authored.
-        $task = 'saved_task' === ($classification['source'] ?? null)
-            ? $this->savedTasks->findEnabledGraphTaskForPrompt($prompt->getId(), $userId)
-            : $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
+        $task = $this->savedTaskForClassification($classification, $userId);
         if (null === $task || null === $task->getGraph()) {
             return null;
         }
@@ -485,6 +468,46 @@ final readonly class TaskPlanExecutor
         ]);
 
         return new TaskPlanResult($plan, fallback: false);
+    }
+
+    /**
+     * The Saved Task whose pinned steps this turn should replay, if any.
+     *
+     * A Saved Task RUN (manual "Run now", scheduler tick, inbound email) names
+     * its task directly via `saved_task_id` — the run goes through the AI
+     * sorter like a typed turn, so the classified topic (e.g. `general`) says
+     * nothing about the task. Legacy fixed-prompt runs (source=saved_task)
+     * and ordinary chat turns resolve through the prompt topic: a run picks
+     * the task's graph regardless of trigger type, a chat turn only pins the
+     * steps of a chat-trigger task (typing the matching instruction re-runs
+     * them).
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function savedTaskForClassification(array $classification, int $userId): ?SavedTask
+    {
+        \assert(null !== $this->savedTasks && null !== $this->prompts);
+
+        $taskId = $classification['saved_task_id'] ?? null;
+        if (is_int($taskId) && $taskId > 0) {
+            $task = $this->savedTasks->findByIdAndOwner($taskId, $userId);
+
+            return null !== $task && $task->isEnabled() ? $task : null;
+        }
+
+        $topic = $classification['topic'] ?? null;
+        if (!is_string($topic) || '' === $topic) {
+            return null;
+        }
+
+        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
+        if (null === $prompt || null === $prompt->getId()) {
+            return null;
+        }
+
+        return 'saved_task' === ($classification['source'] ?? null)
+            ? $this->savedTasks->findEnabledGraphTaskForPrompt($prompt->getId(), $userId)
+            : $this->savedTasks->findEnabledChatTaskForPrompt($prompt->getId(), $userId);
     }
 
     /**

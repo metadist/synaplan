@@ -672,6 +672,126 @@ final class TaskPlanExecutorTest extends TestCase
         self::assertSame('image', $result['metadata']['file']['type']);
     }
 
+    public function testAiSortedSavedTaskRunReplaysThePinnedStepsById(): void
+    {
+        // A chat-saved task reruns through the AI sorter like the turn the user
+        // typed, so the classified topic is a plain `general` — the task id on
+        // the classification is what selects the pinned steps.
+        $task = new \App\Entity\SavedTask(9, 4, 'Wochenreport');
+        $this->setTaskId($task, 33);
+        $task->setGraph([
+            'version' => 1,
+            'trigger' => ['type' => 'manual'],
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'url_fetch', 'params' => ['urls' => ['https://example.com']]],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'params' => []],
+            ],
+        ]);
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('true');
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->expects(self::never())->method('findByTopicAndUser');
+
+        $savedTasks = $this->createMock(SavedTaskRepository::class);
+        $savedTasks->expects(self::once())->method('findByIdAndOwner')->with(33, 9)->willReturn($task);
+        $savedTasks->expects(self::never())->method('findEnabledGraphTaskForPrompt');
+        $savedTasks->expects(self::never())->method('findEnabledChatTaskForPrompt');
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($configRepo),
+            $savedTasks,
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->planner->expects(self::never())->method('plan');
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Zusammenfassung.',
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'de', 'source' => 'ai_sorting', 'multi_step' => true, 'saved_task_id' => 33],
+        );
+
+        self::assertSame('Zusammenfassung.', $result['content']);
+    }
+
+    public function testAiSortedSavedTaskRunWithoutPinnedStepsPlansLikeATypedTurn(): void
+    {
+        // Legacy tasks saved before the plan was captured have no graph: the
+        // run must go through the planner exactly like the manual request did,
+        // not silently fall back to a bare chat answer.
+        $task = new \App\Entity\SavedTask(9, 4, 'Wochenreport');
+        $this->setTaskId($task, 34);
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('true');
+
+        $savedTasks = $this->createMock(SavedTaskRepository::class);
+        $savedTasks->method('findByIdAndOwner')->with(34, 9)->willReturn($task);
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($configRepo),
+            $savedTasks,
+            $this->createMock(PromptRepository::class),
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->planner->expects(self::once())->method('plan')->willReturn(new TaskPlanResult(TaskPlan::fromArray([
+            'version' => 1,
+            'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'url_fetch', 'params' => ['urls' => ['https://example.com']]],
+                ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'params' => []],
+            ],
+        ]), fallback: false));
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Geplant und ausgeführt.',
+            'node_statuses' => ['n1' => 'done', 'n2' => 'done'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'de', 'source' => 'ai_sorting', 'multi_step' => true, 'saved_task_id' => 34],
+        );
+
+        self::assertSame('Geplant und ausgeführt.', $result['content']);
+    }
+
+    private function setTaskId(\App\Entity\SavedTask $task, int $id): void
+    {
+        $ref = new \ReflectionProperty(\App\Entity\SavedTask::class, 'id');
+        $ref->setValue($task, $id);
+    }
+
     public function testSorterVoteOfASingleStepSkipsThePlanner(): void
     {
         // The whole point of the vote: on a one-step turn the planner
