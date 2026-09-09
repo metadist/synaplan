@@ -1798,6 +1798,95 @@ class ModelCatalog
                 'meta' => ['api' => 'responses'],
             ],
         ],
+        // GPT Image 2.5 (snapshot 2026-09-08). Official billing is per token
+        // ($5/1M text in, $8/1M image in, $30/1M image out — same rates as
+        // GPT Image 2). The image path does not capture usage tokens, so a
+        // per-token row would bill $0; we keep per_image and price each
+        // quality × size from OpenAI's GPT Image 2.5 output-token calculator
+        // (https://developers.openai.com/api/docs/guides/image-generation).
+        // Flare and Sunburst share the calculator; cost differs only if a
+        // request actually spends more tokens (higher quality / more retries).
+        [
+            'id' => 348,
+            'service' => 'OpenAI',
+            'name' => 'GPT Image 2.5 Flare',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-image-2.5-flare',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01317,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT Image 2.5 Flare - fastest high-quality everyday image generation and editing. Supports pic2pic via the Images and Responses APIs.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01317],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                // OpenAI GPT Image 2.5 calculator (output tokens × $30/1M).
+                // low 1024² = 196 tok / $0.00588; medium = 439 / $0.01317;
+                // high = 1756 / $0.05268; xhigh = 3122 / $0.09366;
+                // max = 7024 / $0.21072. Portrait and landscape share a
+                // token budget at each quality (158 / 343 / 1372 / 2459 / 5488).
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+                    'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+                    'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+                    'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+                    'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+                ],
+                'params' => ['model' => 'gpt-image-2.5-flare'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'api' => 'responses',
+                    'snapshot' => 'gpt-image-2.5-flare-2026-09-08',
+                    'image_output_price_per_1M' => 30,
+                    'image_input_price_per_1M' => 8,
+                    'text_input_price_per_1M' => 5,
+                ],
+            ],
+        ],
+        [
+            'id' => 349,
+            'service' => 'OpenAI',
+            'name' => 'GPT Image 2.5 Sunburst',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-image-2.5-sunburst',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01317,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT Image 2.5 Sunburst - most capable image generation and editing. Same token rates as Flare; pick this when editing precision matters more than latency.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01317],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+                    'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+                    'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+                    'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+                    'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+                ],
+                'params' => ['model' => 'gpt-image-2.5-sunburst'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'api' => 'responses',
+                    'snapshot' => 'gpt-image-2.5-sunburst-2026-09-08',
+                    'image_output_price_per_1M' => 30,
+                    'image_input_price_per_1M' => 8,
+                    'text_input_price_per_1M' => 5,
+                ],
+            ],
+        ],
         // ----------------------------------------------------------------
         // GPT-5.4 mini / nano (snapshot 2026-05-27, probed live before
         // seeding via https://developers.openai.com/api/docs/models).

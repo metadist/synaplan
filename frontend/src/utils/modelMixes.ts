@@ -75,8 +75,18 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
         openai('gpt-5.5'),
         openai('gpt-5.4'),
       ],
-      TEXT2PIC: [openai('gpt-image-1.5'), openai('gpt-image-1')],
-      PIC2PIC: [openai('gpt-image-1.5'), openai('gpt-image-1')],
+      TEXT2PIC: [
+        openai('gpt-image-2.5-flare'),
+        openai('gpt-image-2.5-sunburst'),
+        openai('gpt-image-1.5'),
+        openai('gpt-image-1'),
+      ],
+      PIC2PIC: [
+        openai('gpt-image-2.5-flare'),
+        openai('gpt-image-2.5-sunburst'),
+        openai('gpt-image-1.5'),
+        openai('gpt-image-1'),
+      ],
       TEXT2SOUND: [openai('tts-1-hd'), openai('tts-1')],
       // OpenAI has no video model; Grok Imagine is the mix's stand-in.
       TEXT2VID: [xai('grok-imagine-video')],

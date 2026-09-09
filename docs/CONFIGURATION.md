@@ -213,6 +213,14 @@ Get a free key at [console.groq.com](https://console.groq.com)
 OPENAI_API_KEY=sk-your_key_here
 ```
 
+Unlocks chat/vision (GPT-5.x / GPT-6) plus image generation. The catalog ships
+[`gpt-image-2.5-flare`](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)
+(everyday, lower latency) and
+[`gpt-image-2.5-sunburst`](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)
+(editing precision). Both bill the same token rates; Synaplan stores a
+per-image estimate by quality × size because the generation path does not
+capture usage tokens. Older `gpt-image-1` / `gpt-image-1.5` rows stay selectable.
+
 ### Anthropic (Claude)
 
 ```bash

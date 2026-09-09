@@ -225,9 +225,9 @@ final readonly class CostCalculationService
      *                                    When the model defines `json.resolution_prices`, the matching
      *                                    per-second price overrides `priceOut`. Falls back to default
      *                                    pricing when omitted or unknown.
-     * @param string|null $quality        Optional image quality tier (low|medium|high, or the legacy
-     *                                    standard/hd aliases). Used with $size to pick a per-image price
-     *                                    from `json.quality_prices` (e.g. gpt-image, #1315).
+     * @param string|null $quality        Optional image quality tier (low|medium|high|xhigh|max, or the
+     *                                    legacy standard/hd aliases). Used with $size to pick a per-image
+     *                                    price from `json.quality_prices` (e.g. gpt-image, #1315).
      * @param string|null $size           Optional image size (e.g. '1024x1024', '1024x1536'). Combined
      *                                    with $quality to look up the exact per-image tier price.
      */
@@ -431,15 +431,15 @@ final readonly class CostCalculationService
     }
 
     /**
-     * Map the app-level quality value onto OpenAI's low|medium|high tiers.
+     * Map the app-level quality value onto OpenAI's image-quality tiers.
      *
      * Mirrors the mapping in OpenAIProvider::generateImageWithGptImage1() so the
      * price we bill matches the quality actually requested from the provider:
-     * standard→medium, hd→high, low/medium/high pass through, and unknown
-     * values map to 'high' because the provider defaults them to 'high' before
-     * sending — billing anything cheaper would under-bill the actual request.
-     * Only 'auto' (OpenAI picks the tier, we can't know which) and null fall
-     * back to null so the caller applies the model's `default_quality`.
+     * standard→medium, hd→high, low/medium/high/xhigh/max pass through, and
+     * unknown values map to 'high' because the provider defaults them to 'high'
+     * before sending — billing anything cheaper would under-bill the actual
+     * request. Only 'auto' (OpenAI picks the tier, we can't know which) and
+     * null fall back to null so the caller applies the model's `default_quality`.
      */
     private function normaliseImageQuality(?string $quality): ?string
     {
@@ -450,7 +450,7 @@ final readonly class CostCalculationService
         return match (strtolower($quality)) {
             'standard' => 'medium',
             'hd' => 'high',
-            'low', 'medium', 'high' => strtolower($quality),
+            'low', 'medium', 'high', 'xhigh', 'max' => strtolower($quality),
             'auto' => null,
             default => 'high',
         };

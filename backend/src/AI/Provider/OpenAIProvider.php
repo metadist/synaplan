@@ -1217,7 +1217,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 }
 
                 $quality = strtolower((string) $quality);
-                $allowedQualities = ['low', 'medium', 'high', 'auto'];
+                // GPT Image 2.5 adds xhigh / max; earlier gpt-image models
+                // accept low / medium / high / auto. Unknown values must not
+                // silently fall through — OpenAI rejects them.
+                $allowedQualities = ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
                 if (!in_array($quality, $allowedQualities, true)) {
                     $this->logger->warning('OpenAI '.$model.': Unsupported quality value, defaulting to high', [
                         'provided' => $options['quality'],
@@ -1374,7 +1377,10 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             $requestBody = [
                 'model' => $responsesModel,
                 'input' => [['role' => 'user', 'content' => $contentParts]],
-                'tools' => [['type' => 'image_generation']],
+                // GPT Image 2.5 must be named on the tool; omitting `model`
+                // lets the Responses API pick a default that is not the
+                // catalog row the user selected.
+                'tools' => [['type' => 'image_generation', 'model' => $model]],
             ];
 
             $key = $this->resolveApiKey();

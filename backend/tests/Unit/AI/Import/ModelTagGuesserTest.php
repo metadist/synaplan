@@ -54,6 +54,8 @@ final class ModelTagGuesserTest extends TestCase
         yield 'sdxl' => ['stabilityai/sdxl-turbo', ['text2pic']];
         yield 'stable diffusion' => ['stable-diffusion-3.5', ['text2pic']];
         yield 'dall-e' => ['dall-e-3', ['text2pic']];
+        yield 'gpt-image 2.5 flare' => ['gpt-image-2.5-flare', ['text2pic']];
+        yield 'gpt-image 2.5 sunburst' => ['gpt-image-2.5-sunburst', ['text2pic']];
 
         // Vision chat -> chat + pic2text
         yield 'pixtral' => ['mistralai/Pixtral-12B-2409', ['chat', 'pic2text']];

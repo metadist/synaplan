@@ -28,7 +28,7 @@ final class ModelTagGuesser
         ['pattern' => '/embed|bge|e5-|minilm|nomic|arctic-embed|gte-|mxbai/i', 'tags' => ['vectorize']],
         ['pattern' => '/whisper|parakeet/i', 'tags' => ['sound2text']],
         ['pattern' => '/tts|speech|kokoro|orpheus/i', 'tags' => ['text2sound']],
-        ['pattern' => '/flux|stable-diffusion|sdxl|dall-e|dalle/i', 'tags' => ['text2pic']],
+        ['pattern' => '/flux|stable-diffusion|sdxl|dall-e|dalle|gpt-image/i', 'tags' => ['text2pic']],
         ['pattern' => '/vision|-vl\b|llava|pixtral|gemma-3|qwen.*vl/i', 'tags' => ['chat', 'pic2text']],
     ];
 
