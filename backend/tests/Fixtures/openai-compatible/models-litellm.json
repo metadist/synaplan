@@ -1,0 +1,9 @@
+{
+  "object": "list",
+  "data": [
+    { "id": "gpt-4o", "object": "model" },
+    { "id": "claude-sonnet-4", "object": "model" },
+    { "id": "text-embedding-3-large", "object": "model" },
+    { "id": "whisper-1", "object": "model" }
+  ]
+}

@@ -483,6 +483,43 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
         }
     }
 
+    /**
+     * List the models actually pulled on the server, with size and family.
+     *
+     * Uses the native `GET /api/tags` endpoint (richer than the OpenAI-style
+     * `/v1/models`): the model import preview shows size and family so an admin
+     * recognises what a bare tag like `qwen3:32b` is. Throws on transport
+     * failure so the caller can tell "unreachable" from "nothing pulled".
+     *
+     * @return list<array{name: string, size: int, family: string}>
+     */
+    public function listPulledModels(): array
+    {
+        $response = $this->httpClient->request('GET', rtrim($this->baseUrl, '/').'/api/tags', [
+            'timeout' => 10,
+        ]);
+        $body = $response->toArray(false);
+
+        $out = [];
+        foreach ($body['models'] ?? [] as $model) {
+            if (!is_array($model)) {
+                continue;
+            }
+            $name = $model['name'] ?? $model['model'] ?? '';
+            if (!is_string($name) || '' === $name) {
+                continue;
+            }
+            $family = $model['details']['family'] ?? '';
+            $out[] = [
+                'name' => $name,
+                'size' => is_numeric($model['size'] ?? null) ? (int) $model['size'] : 0,
+                'family' => is_string($family) ? $family : '',
+            ];
+        }
+
+        return $out;
+    }
+
     public function embed(string $text, array $options = []): array
     {
         if (!isset($options['model'])) {

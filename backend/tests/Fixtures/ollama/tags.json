@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "name": "qwen3:32b",
+      "model": "qwen3:32b",
+      "size": 20016839168,
+      "details": { "family": "qwen3", "parameter_size": "32.8B" }
+    },
+    {
+      "name": "bge-m3:latest",
+      "model": "bge-m3:latest",
+      "size": 1157466051,
+      "details": { "family": "bert" }
+    },
+    {
+      "name": "llava:13b",
+      "model": "llava:13b",
+      "size": 8018393600,
+      "details": { "family": "llama" }
+    }
+  ]
+}

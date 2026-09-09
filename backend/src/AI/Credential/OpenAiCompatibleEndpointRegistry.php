@@ -83,7 +83,56 @@ final class OpenAiCompatibleEndpointRegistry
             return ['ok' => false, 'error' => 'base_url must be a valid absolute URL'];
         }
 
-        $requestHeaders = $this->normalizeHeaders($headers);
+        $result = $this->fetchModelIds($baseUrl, $apiKey, $this->normalizeHeaders($headers));
+        if (!$result['ok']) {
+            $out = ['ok' => false, 'error' => $result['error'] ?? 'Upstream did not answer'];
+            if (isset($result['status'])) {
+                $out['status'] = $result['status'];
+            }
+
+            return $out;
+        }
+
+        return [
+            'ok' => true,
+            'status' => $result['status'] ?? 200,
+            'model_count' => count($result['ids']),
+            'sample' => array_slice($result['ids'], 0, 10),
+        ];
+    }
+
+    /**
+     * List the model ids a stored endpoint offers (GET {base}/models).
+     *
+     * Returns a result rather than throwing so callers can tell an unreachable
+     * endpoint (`ok = false`) apart from one that lists nothing (`ok = true`,
+     * empty `ids`) — the distinction the import re-check (S5) relies on.
+     *
+     * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
+     */
+    public function listModelIds(string $name): array
+    {
+        $endpoint = $this->getEndpoint($name);
+        if (null === $endpoint) {
+            return ['ok' => false, 'ids' => [], 'error' => 'Unknown endpoint: '.$name];
+        }
+
+        return $this->fetchModelIds($endpoint['base_url'], $endpoint['api_key'], $endpoint['headers']);
+    }
+
+    /**
+     * @param array<string, string> $headers
+     *
+     * @return array{ok: bool, ids: list<string>, status?: int, error?: string}
+     */
+    private function fetchModelIds(?string $baseUrl, ?string $apiKey, array $headers): array
+    {
+        $baseUrl = rtrim((string) $baseUrl, '/');
+        if ('' === $baseUrl || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
+            return ['ok' => false, 'ids' => [], 'error' => 'base_url must be a valid absolute URL'];
+        }
+
+        $requestHeaders = $headers;
         if (null !== $apiKey && '' !== $apiKey) {
             $requestHeaders['Authorization'] = 'Bearer '.$apiKey;
         }
@@ -94,27 +143,21 @@ final class OpenAiCompatibleEndpointRegistry
                 'timeout' => 10,
             ]);
             $status = $response->getStatusCode();
-            $body = $response->toArray(false);
-
             if ($status >= 400) {
-                return ['ok' => false, 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
+                return ['ok' => false, 'ids' => [], 'status' => $status, 'error' => 'Upstream returned HTTP '.$status];
             }
 
+            $body = $response->toArray(false);
             $ids = [];
             foreach ($body['data'] ?? [] as $item) {
-                if (isset($item['id']) && is_string($item['id'])) {
+                if (isset($item['id']) && is_string($item['id']) && '' !== $item['id']) {
                     $ids[] = $item['id'];
                 }
             }
 
-            return [
-                'ok' => true,
-                'status' => $status,
-                'model_count' => count($ids),
-                'sample' => array_slice($ids, 0, 10),
-            ];
+            return ['ok' => true, 'ids' => $ids, 'status' => $status];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'error' => $e->getMessage()];
+            return ['ok' => false, 'ids' => [], 'error' => $e->getMessage()];
         }
     }
 

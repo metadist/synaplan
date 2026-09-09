@@ -1,0 +1,10 @@
+{
+  "object": "list",
+  "data": [
+    { "id": "Qwen/Qwen3-32B", "object": "model", "owned_by": "vllm" },
+    { "id": "meta-llama/Llama-3.3-70B-Instruct", "object": "model", "owned_by": "vllm" },
+    { "id": "BAAI/bge-m3", "object": "model", "owned_by": "vllm" },
+    { "id": "BAAI/bge-reranker-v2-m3", "object": "model", "owned_by": "vllm" },
+    { "id": "mistralai/Pixtral-12B-2409", "object": "model", "owned_by": "vllm" }
+  ]
+}
