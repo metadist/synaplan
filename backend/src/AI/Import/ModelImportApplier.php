@@ -20,10 +20,16 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final readonly class ModelImportApplier
 {
-    /** Tags the importer may write; anything else in a request is ignored. */
+    /**
+     * Canonical BMODELS.BTAG values the importer may write; anything else in a
+     * request is ignored. Only tags that capability→tag resolution actually
+     * looks up belong here — `pic2pic` / `img2vid` are *features* on a
+     * `text2pic` / `text2vid` row (see {@see \App\Service\ModelConfigService}
+     * `$tagMap`), so writing them as tags would create never-selected rows.
+     */
     public const ALLOWED_TAGS = [
         'chat', 'vectorize', 'pic2text', 'rerank', 'sound2text',
-        'text2sound', 'text2pic', 'pic2pic', 'text2vid', 'img2vid', 'analyze',
+        'text2sound', 'text2pic', 'text2vid', 'analyze',
     ];
 
     private const MAX_PROVIDER_ID = 96;
@@ -91,8 +97,14 @@ final readonly class ModelImportApplier
         }
         if (str_starts_with($source, ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX)) {
             $name = strtolower(trim(substr($source, strlen(ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX))));
+            // An empty endpoint name would create OpenAICompatible rows without
+            // json.endpoint (unroutable in multi-endpoint installs) and a source
+            // that can never be re-listed. Reject it rather than write bad rows.
+            if ('' === $name) {
+                throw new UnknownImportSourceException('OpenAI-compatible import source is missing an endpoint name');
+            }
 
-            return [OpenAiCompatibleEndpointRegistry::SERVICE, '' !== $name ? $name : null];
+            return [OpenAiCompatibleEndpointRegistry::SERVICE, $name];
         }
 
         throw new UnknownImportSourceException('Unknown import source: '.$source);

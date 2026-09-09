@@ -194,9 +194,7 @@ const allowedTags = [
   'sound2text',
   'text2sound',
   'text2pic',
-  'pic2pic',
   'text2vid',
-  'img2vid',
   'analyze',
 ]
 

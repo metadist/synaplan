@@ -60,7 +60,23 @@ final readonly class ModelImportService
      */
     public function apply(string $source, array $rows): array
     {
+        // Apply is a direct call, unlike preview which discovers first — so
+        // re-check the endpoint here too, or a bogus source could create rows
+        // bound to an endpoint that does not exist.
+        $this->assertEndpointResolvable($source);
+
         return $this->applier->apply($source, $rows);
+    }
+
+    private function assertEndpointResolvable(string $source): void
+    {
+        if (!str_starts_with($source, ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX)) {
+            return;
+        }
+        $name = strtolower(trim(substr($source, strlen(ModelDiscoveryService::OPENAI_COMPATIBLE_PREFIX))));
+        if ('' === $name || null === $this->endpoints->getEndpoint($name)) {
+            throw new UnknownImportSourceException('Unknown OpenAI-compatible endpoint: '.$name);
+        }
     }
 
     /**

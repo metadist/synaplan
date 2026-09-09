@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\AI\Import;
 
 use App\AI\Import\ModelImportApplier;
+use App\AI\Import\UnknownImportSourceException;
 use App\Entity\Model;
 use App\Repository\ModelRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -79,6 +80,25 @@ final class ModelImportApplierTest extends KernelTestCase
         ]);
 
         self::assertSame(1, $result['created'], 'only the one valid, de-duplicated tag is created');
+    }
+
+    public function testCapabilityAliasTagsAreNotWritten(): void
+    {
+        // pic2pic / img2vid are features on a text2pic / text2vid row, not tags
+        // capability→tag resolution looks up — importing them must be a no-op.
+        $result = $this->applier->apply('ollama', [
+            ['providerId' => self::PROVIDER_ID, 'tags' => ['pic2pic', 'img2vid']],
+        ]);
+
+        self::assertSame(0, $result['created']);
+    }
+
+    public function testEmptyOpenAiEndpointNameIsRejected(): void
+    {
+        $this->expectException(UnknownImportSourceException::class);
+        $this->applier->apply('openai_compatible:', [
+            ['providerId' => self::PROVIDER_ID, 'tags' => ['chat']],
+        ]);
     }
 
     private function deleteTestRows(): void

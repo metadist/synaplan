@@ -80,6 +80,17 @@ final class AdminModelsImportEndpointControllerTest extends WebTestCase
         self::assertArrayHasKey('error', $body);
     }
 
+    public function testApplyUnknownEndpointIs404(): void
+    {
+        $this->loginAdmin();
+        $this->postJson('/api/v1/admin/models/import/endpoint/apply', [
+            'source' => 'openai_compatible:ghost',
+            'rows' => [['providerId' => self::PROVIDER_ID, 'tags' => ['chat']]],
+        ]);
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
     public function testApplyCreatesThenIdempotent(): void
     {
         $this->loginAdmin();
