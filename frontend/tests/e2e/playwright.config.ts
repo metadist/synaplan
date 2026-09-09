@@ -11,6 +11,10 @@ dotenv.config({ path: path.join(__dirname, '.env.local') })
 const n = process.env.E2E_WORKERS ? parseInt(process.env.E2E_WORKERS, 10) : 4
 export const WORKER_COUNT = Number.isInteger(n) && n >= 1 ? n : 4
 
+// Always headless unless someone opts in. Local default used to be headed,
+// which opened one Chromium window per worker (dozens on `make test-e2e`).
+const headed = ['1', 'true', 'yes'].includes((process.env.HEADED ?? '').toLowerCase())
+
 export default defineConfig({
   globalSetup: './global-setup.ts',
   testDir: 'tests',
@@ -20,7 +24,7 @@ export default defineConfig({
 
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',
-    headless: process.env.CI ? true : false,
+    headless: !headed,
     ignoreHTTPSErrors: true, // Keycloak uses self-signed cert in dev/test
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -45,7 +49,7 @@ export default defineConfig({
         launchOptions: {
           args: [
             '--disable-features=LocalNetworkAccessChecks',
-            ...(process.env.CI ? [] : ['--start-maximized']),
+            ...(headed ? ['--start-maximized'] : []),
           ],
         },
       },
@@ -55,7 +59,7 @@ export default defineConfig({
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
-        ...(process.env.CI ? {} : { launchOptions: { args: ['--start-maximized'] } }),
+        ...(headed ? { launchOptions: { args: ['--start-maximized'] } } : {}),
       },
       // Firefox is a focused cross-browser SMOKE, not a second full suite.
       // Only tests tagged @crossbrowser run here — the engine-divergent flows

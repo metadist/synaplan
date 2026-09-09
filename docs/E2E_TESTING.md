@@ -37,12 +37,18 @@ frontend/tests/e2e/
 ## Running Tests
 
 ```bash
-make -C frontend test-e2e                          # full suite
+make -C frontend test-e2e                          # full suite (headless)
 npx playwright test --grep "widget"                # single test by name
 npx playwright test tests/chat.spec.ts             # single file
+HEADED=1 make -C frontend test-e2e                 # opt-in: real browser windows
+npx playwright test --headed                       # same, Playwright CLI flag
 npx playwright test --ui                           # interactive UI mode
 npx playwright show-report                         # view last report
 ```
+
+Browsers stay **headless** locally and in CI. Four headed workers used to
+open a window each and flood the desktop. Watch a run only with `HEADED=1`
+or `--headed`.
 
 Against the local test stack (`docker compose -f docker-compose.test.yml up -d`):
 
