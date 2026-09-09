@@ -39,6 +39,43 @@ final class AdminAuditControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testEmptySubjectSerializesAsNullNotArray(): void
+    {
+        // A row whose subject was stored as an empty array (e.g. an early
+        // platform_link.disconnected) must not come back as a JSON array, or
+        // the client's `subject: object|null` validation rejects the response.
+        $this->setGroupsFlag('1');
+        $admin = $this->createAdmin('iam-audit-empty-subject@synaplan.internal');
+        $entry = new AuditLogEntry();
+        $entry->setActorId((int) $admin->getId());
+        $entry->setAction('platform_link.disconnected');
+        $entry->setResourceKind('platform_link');
+        // Unique resource id so we can pin the exact row we created.
+        $resourceId = 'empty-subject-'.uniqid('', true);
+        $entry->setResourceId($resourceId);
+        $entry->setSubject([]);
+        $this->em->persist($entry);
+        $this->em->flush();
+
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('GET', '/api/v1/admin/audit?limit=10');
+
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $raw = (string) $this->client->getResponse()->getContent();
+        // The wire form must be `"subject":null`, never `"subject":[]`.
+        self::assertStringNotContainsString('"subject":[]', $raw);
+        $payload = json_decode($raw, true);
+        self::assertIsArray($payload);
+        self::assertArrayHasKey('entries', $payload);
+        $match = array_values(array_filter(
+            $payload['entries'],
+            static fn (array $e): bool => 'platform_link.disconnected' === $e['action']
+                && $resourceId === $e['resourceId']
+        ));
+        self::assertCount(1, $match);
+        self::assertNull($match[0]['subject']);
+    }
+
     public function testListsMetadataOnlyNewestFirst(): void
     {
         $this->setGroupsFlag('1');

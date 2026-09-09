@@ -106,7 +106,7 @@ final class AdminAuditController extends AbstractController
                 'action' => $row->getAction(),
                 'kind' => $row->getResourceKind(),
                 'resourceId' => $row->getResourceId(),
-                'subject' => $row->getSubject(),
+                'subject' => $this->normalizeSubject($row->getSubject()),
                 'ip' => $row->getIp(),
                 'created' => $row->getCreated(),
             ];
@@ -124,6 +124,21 @@ final class AdminAuditController extends AbstractController
         $value = $request->query->get($key);
 
         return is_string($value) && '' !== $value ? $value : null;
+    }
+
+    /**
+     * Guarantee the wire shape the schema promises (`subject: object|null`).
+     * An empty or null subject collapses to null, so a legacy row that stored
+     * `[]` no longer serializes as a JSON array and fails the client's response
+     * validation. A well-formed subject is an associative map that stays a JSON
+     * object; a stray non-empty list is cast to an object with numeric string
+     * keys (`{"0": …}`) rather than being emitted as an array.
+     *
+     * @param array<array-key, mixed>|null $subject
+     */
+    private function normalizeSubject(?array $subject): ?object
+    {
+        return null === $subject || [] === $subject ? null : (object) $subject;
     }
 
     private function guard(?User $user): ?JsonResponse

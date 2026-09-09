@@ -30,7 +30,10 @@ final readonly class AuditLogWriter
         $entry->setAction($action);
         $entry->setResourceKind($resourceKind);
         $entry->setResourceId($resourceId);
-        $entry->setSubject($subject);
+        // An empty array is stored (and later JSON-encoded) as `[]`, not `{}`.
+        // The subject is a metadata object or nothing, so normalize empty to
+        // null — keeps the persisted shape consistent with the API contract.
+        $entry->setSubject([] === $subject ? null : $subject);
         $entry->setIp($ip);
 
         $this->auditLogEntryRepository->save($entry);
