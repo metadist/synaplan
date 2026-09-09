@@ -222,7 +222,7 @@ final readonly class PlatformLinkExchangeService
             'platform_link.disconnected',
             'platform_link',
             (string) $linkId,
-            [],
+            null,
             $ip,
         );
     }

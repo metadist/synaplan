@@ -106,7 +106,7 @@ final class AdminAuditController extends AbstractController
                 'action' => $row->getAction(),
                 'kind' => $row->getResourceKind(),
                 'resourceId' => $row->getResourceId(),
-                'subject' => $row->getSubject(),
+                'subject' => $this->normalizeSubject($row->getSubject()),
                 'ip' => $row->getIp(),
                 'created' => $row->getCreated(),
             ];
@@ -124,6 +124,19 @@ final class AdminAuditController extends AbstractController
         $value = $request->query->get($key);
 
         return is_string($value) && '' !== $value ? $value : null;
+    }
+
+    /**
+     * Guarantee the wire shape the schema promises (`subject: object|null`).
+     * A legacy row that stored an empty `[]` would otherwise serialize as a
+     * JSON array and fail the client's response validation; cast any non-empty
+     * value to an object so even a stray list is emitted as `{…}`.
+     *
+     * @param array<string, mixed>|null $subject
+     */
+    private function normalizeSubject(?array $subject): ?object
+    {
+        return null === $subject || [] === $subject ? null : (object) $subject;
     }
 
     private function guard(?User $user): ?JsonResponse
