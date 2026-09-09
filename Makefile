@@ -31,7 +31,7 @@ ci-local: ## Unit/static CI mirror (lint, phpstan, tests, vue-tsc). Not E2E — 
 # without the wait the first run races the optimize-deps rebuild and hits the
 # very blank-app it was meant to prevent. Costs a few seconds; skip both with
 # SKIP_FRONTEND_RESTART=1 when targeting a non-dev BASE_URL (e.g. :8001 stack).
-test-e2e: ## Run e2e tests (fast loop, dev stack :5173 or BASE_URL)
+test-e2e: ## Run e2e tests headless (fast loop, dev stack :5173 or BASE_URL). HEADED=1 to watch.
 	@[ -n "$(SKIP_FRONTEND_RESTART)" ] || { \
 		docker compose restart frontend; \
 		echo "Waiting for Vite to re-optimize deps on :5173 ..."; \

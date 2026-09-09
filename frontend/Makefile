@@ -31,7 +31,7 @@ generate-schemas: ## Generate Zod schemas from OpenAPI spec
 test: ## Run unit tests
 	docker compose -f ../docker-compose.yml exec -T frontend npm run test -- --run
 
-test-e2e: ## Run e2e tests
+test-e2e: ## Run e2e tests (headless; HEADED=1 to watch)
 	npm run test:e2e
 
 test-e2e-layout: ## Run layout UI guard on mobile viewport (inner dev loop)

@@ -138,6 +138,7 @@ Real failure modes that have caused red CI more than once:
 - **`make ci-local` ≠ green CI.** It does not run Playwright. A page that unit-tests green can still fail `saved-task-roundtrip` or layout. Run `make test-e2e` before push.
 - **GitHub E2E died before any test ran.** If every E2E job fails at `Unable to download artifact` (the `docker-image` tarball), that is Actions infra — re-run the workflow. Do not “fix” product code.
 - **Playwright runs on the host, not in the `frontend` container.** `docker compose exec frontend npm run test:e2e` talks to `localhost:8000` *inside* that container and gets `ECONNREFUSED`. Use `make test-e2e` (host `npm` + browsers). If `frontend/node_modules` is root-owned from the container install, `make -C frontend deps-host` as your user, or run the matching `mcr.microsoft.com/playwright:v1.62.1-noble` image with `--network host`.
+- **Playwright is headless by default** (`frontend/tests/e2e/playwright.config.ts`). Never set `HEADED=1` or pass `--headed` unless the user explicitly asks to watch the browser. Headed + 4 workers opens a window per worker.
 
 ### Mobile App Compatibility
 
