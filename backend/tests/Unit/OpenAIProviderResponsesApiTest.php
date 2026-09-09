@@ -865,6 +865,35 @@ class OpenAIProviderResponsesApiTest extends TestCase
     }
 
     /**
+     * @param list<string> $expected
+     */
+    #[DataProvider('gptImageQualityAllowListProvider')]
+    public function testGptImageQualityAllowListIsGatedByFamily(string $model, array $expected): void
+    {
+        $provider = $this->createProvider();
+        $method = new \ReflectionMethod($provider, 'allowedGptImageQualities');
+
+        $this->assertSame($expected, $method->invoke($provider, $model));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: list<string>}>
+     */
+    public static function gptImageQualityAllowListProvider(): array
+    {
+        $legacy = ['low', 'medium', 'high', 'auto'];
+        $image25 = ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
+
+        return [
+            'gpt-image-1' => ['gpt-image-1', $legacy],
+            'gpt-image-1.5' => ['gpt-image-1.5', $legacy],
+            'gpt-image-2' => ['gpt-image-2', $legacy],
+            'gpt-image-2.5-flare' => ['gpt-image-2.5-flare', $image25],
+            'gpt-image-2.5-sunburst' => ['gpt-image-2.5-sunburst', $image25],
+        ];
+    }
+
+    /**
      * Integration-level regression test for the `/pic` bug:
      * any `gpt-image-*` model (including the new `gpt-image-2`) must dispatch
      * to the Image Generations endpoint, NOT the legacy DALL-E client path.

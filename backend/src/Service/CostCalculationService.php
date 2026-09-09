@@ -407,10 +407,17 @@ final readonly class CostCalculationService
         }
 
         $resolvedQuality = $this->normaliseImageQuality($quality);
-        if (null === $resolvedQuality || !isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+        if (null === $resolvedQuality) {
+            // auto / unspecified → the model's authored default.
             $default = $json['default_quality'] ?? null;
             $resolvedQuality = is_string($default) && isset($tiers[$default])
                 ? $default
+                : (string) array_key_first($tiers);
+        } elseif (!isset($tiers[$resolvedQuality]) || !is_array($tiers[$resolvedQuality])) {
+            // A 2.5-only tier (xhigh/max) on gpt-image-1 / 1.5. The provider
+            // clamps that to high before calling OpenAI; bill the same tier.
+            $resolvedQuality = isset($tiers['high']) && is_array($tiers['high'])
+                ? 'high'
                 : (string) array_key_first($tiers);
         }
 

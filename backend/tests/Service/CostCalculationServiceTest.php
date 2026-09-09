@@ -324,6 +324,19 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.210720', $max->totalCost);
     }
 
+    public function testCalculateMediaCostImageXhighOnLegacyTiersBillsHigh(): void
+    {
+        // gpt-image-1 has no xhigh row. The provider clamps xhigh → high
+        // before calling OpenAI; billing must follow (not fall back to medium).
+        $model = $this->createModelMock(18, 'OpenAI', 0.0, 0.042, 'perImage', 'perImage', $this->gptImageJson());
+        $this->modelRepository->expects(self::any())->method('find')->with(18)->willReturn($model);
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateMediaCost(18, 0, 1.0, null, null, 'xhigh', '1024x1024');
+
+        $this->assertSame('0.167000', $result->totalCost);
+    }
+
     public function testCalculateMediaCostImageUnknownQualityBillsHigh(): void
     {
         // OpenAIProvider defaults unknown quality values to 'high' before
