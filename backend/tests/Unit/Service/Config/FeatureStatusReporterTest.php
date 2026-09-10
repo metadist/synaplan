@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Config;
 
 use App\AI\Service\ProviderRegistry;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\ModuleRegistry;
@@ -125,6 +126,17 @@ final class FeatureStatusReporterTest extends TestCase
         $this->assertArrayHasKey('ollama', $features);
     }
 
+    public function testProviderModelCountsUseTheServiceColumnAndNormalizeCasing(): void
+    {
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $features = $this->fullReporter()->build($user)['features'];
+
+        $this->assertSame(3, $features['openai']['models_available']);
+        $this->assertSame(1, $features['ollama']['models_available']);
+    }
+
     private function bareReporter(): FeatureStatusReporter
     {
         $this->setEnv('APP_ENV', 'test');
@@ -147,6 +159,7 @@ final class FeatureStatusReporterTest extends TestCase
 
         $models = $this->createStub(ModelRepository::class);
         $models->method('findBy')->willReturn([]);
+        $models->method('findAllActive')->willReturn([]);
 
         $providers = $this->createStub(ProviderRegistry::class);
         $providers->method('getProvidersMetadata')->willReturn([
@@ -204,12 +217,15 @@ final class FeatureStatusReporterTest extends TestCase
                 return [new \stdClass(), new \stdClass()];
             }
 
-            return match ($criteria['provider'] ?? null) {
-                'openai' => [new \stdClass(), new \stdClass(), new \stdClass()],
-                'ollama' => [new \stdClass()],
-                default => [],
-            };
+            return [];
         });
+        // Catalog casing ('OpenAI') must still count toward the registry key ('openai').
+        $models->method('findAllActive')->willReturn([
+            self::activeModel('OpenAI'),
+            self::activeModel('OpenAI'),
+            self::activeModel('OpenAI'),
+            self::activeModel('Ollama'),
+        ]);
 
         $providers = $this->createStub(ProviderRegistry::class);
         $providers->method('getProvidersMetadata')->willReturn([
@@ -266,6 +282,11 @@ final class FeatureStatusReporterTest extends TestCase
         }
 
         return new ModuleRegistry(new ServiceLocator($factories));
+    }
+
+    private static function activeModel(string $service): Model
+    {
+        return (new Model())->setService($service);
     }
 
     /**

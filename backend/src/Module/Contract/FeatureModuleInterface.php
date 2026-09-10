@@ -13,7 +13,8 @@ namespace App\Module\Contract;
  * answers, so adding an optional feature means adding one class and nothing
  * else (feature modules master plan §1, §4.1).
  *
- * Implementations are `final readonly`, live under `App\Module\…`, are tagged
+ * Implementations are `final` classes with readonly constructor properties,
+ * live under `App\Module\…`, are tagged
  * `app.feature_module` by autoconfiguration and MUST declare
  * `public const ID = '<id>'` with the same value `id()` returns; the
  * FeatureModuleTagPass indexes the registry by that constant and refuses

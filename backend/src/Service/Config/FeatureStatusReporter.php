@@ -6,6 +6,7 @@ namespace App\Service\Config;
 
 use App\AI\Service\ProviderRegistry;
 use App\Entity\User;
+use App\Model\ModelCatalog;
 use App\Module\Contract\ModuleStatus;
 use App\Module\ModuleRegistry;
 use App\Module\ModuleStatusPresenter;
@@ -97,6 +98,7 @@ final class FeatureStatusReporter
         // ========== AI Providers (Dynamic from ProviderRegistry) ==========
 
         $providersMetadata = $this->providerRegistry->getProvidersMetadata();
+        $activeModelsByProvider = $this->countActiveModelsByProvider();
 
         foreach ($providersMetadata as $providerName => $providerData) {
             // Skip the synthetic test provider outside local APP_ENV=dev.
@@ -104,17 +106,7 @@ final class FeatureStatusReporter
                 continue;
             }
 
-            // Get model count from database for this provider
-            $modelsCount = 0;
-            try {
-                $models = $this->modelRepository->findBy([
-                    'provider' => $providerName,
-                    'active' => true,
-                ]);
-                $modelsCount = count($models);
-            } catch (\Exception $e) {
-                // Ignore
-            }
+            $modelsCount = $activeModelsByProvider[ModelCatalog::normalizeProvider($providerName)] ?? 0;
 
             // Get URL for services that have one
             $url = null;
@@ -386,6 +378,26 @@ final class FeatureStatusReporter
             // Additive, module-centric view of the same page (master plan §4.1).
             'modules' => $this->modulePresenter->rows(),
         ];
+    }
+
+    /**
+     * Active model counts keyed by the same provider id the registry uses.
+     *
+     * BMODELS stores the provider on `service` (BSERVICE). There is no
+     * `provider` field — a `findBy(['provider' => …])` throws, and the old
+     * catch-all then reported `models_available: 0` for every provider.
+     *
+     * @return array<string, int>
+     */
+    private function countActiveModelsByProvider(): array
+    {
+        $counts = [];
+        foreach ($this->modelRepository->findAllActive() as $model) {
+            $key = ModelCatalog::normalizeProvider($model->getService());
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+
+        return $counts;
     }
 
     /**
