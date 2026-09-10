@@ -25,7 +25,6 @@
         "grpc/grpc": "^1.80",
         "hoels/app-store-server-library-php": "^2.0",
         "jumbojett/openid-connect-php": "^1.0.2",
-        "league/flysystem-aws-s3-v3": "^3.32.0",
         "lucianotonet/groq-php": "^1.3",
         "mcp/sdk": "^0.8.0",
         "nelmio/api-doc-bundle": ">=5.10.0",
@@ -115,6 +114,7 @@
             "@proto:generate",
             "@auto-scripts"
         ],
+        "pre-autoload-dump": "Google\\Task\\Composer::cleanup",
         "lint": "php-cs-fixer check --diff",
         "lint:fix": "php-cs-fixer fix",
         "phpstan": "phpstan analyse",
@@ -126,6 +126,9 @@
         "symfony/symfony": "*"
     },
     "extra": {
+        "google/apiclient-services": [
+            "AndroidPublisher"
+        ],
         "symfony": {
             "allow-contrib": false,
             "require": "8.1.*"
