@@ -121,7 +121,8 @@
       "frontend/.gitignore",
       "frontend/.prettierrc",
       "frontend/.prettierignore",
-      "frontend/eslint.config.js"
+      "frontend/eslint.config.js",
+      "sidecars/**"
     ]
   },
   "fallback": {

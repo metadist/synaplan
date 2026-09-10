@@ -24,6 +24,7 @@ use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
 
@@ -149,6 +150,15 @@ final readonly class SystemConfigService
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
                     'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
+                    'tools' => ['label' => 'Tools and approvals', 'fields' => [
+                        'TOOLS_REGISTRY_ENABLED',
+                        'TOOLS_APPROVALS_ENABLED',
+                        'TOOLS_CUSTOM_HTTP_ENABLED',
+                        'TOOLS_POLICY_READ',
+                        'TOOLS_POLICY_WRITE',
+                        'TOOLS_POLICY_DESTRUCTIVE',
+                        'TOOLS_APPROVAL_EXPIRY_HOURS',
+                    ]],
                     'conversation_summary' => ['label' => 'Rolling conversation summary', 'fields' => [
                         'CONVERSATION_SUMMARY_ENABLED',
                         'CONVERSATION_SUMMARY_TARGET_WINDOW_CHARS',
@@ -1238,6 +1248,72 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
                 'dbKey' => SavedTaskConfig::KEY_ENABLED,
+            ],
+            'TOOLS_REGISTRY_ENABLED' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'List every callable in one tool registry. Off restores the previous per-loop catalogs. Default on (kill switch).',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_REGISTRY_ENABLED,
+            ],
+            'TOOLS_APPROVALS_ENABLED' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Ask before write-class tools run, including in Saved Tasks. Off by default.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_APPROVALS_ENABLED,
+            ],
+            'TOOLS_CUSTOM_HTTP_ENABLED' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let users declare HTTP/OpenAPI tools on Connections. Off by default.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED,
+            ],
+            'TOOLS_POLICY_READ' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that only read data: auto, approve or block.',
+                'default' => 'auto',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_READ,
+            ],
+            'TOOLS_POLICY_WRITE' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that change something: auto, approve or block.',
+                'default' => 'approve',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_WRITE,
+            ],
+            'TOOLS_POLICY_DESTRUCTIVE' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
+                'sensitive' => false,
+                'description' => 'Default for tools that delete something: auto, approve or block.',
+                'default' => 'block',
+                'options' => ['auto', 'approve', 'block'],
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_POLICY_DESTRUCTIVE,
+            ],
+            'TOOLS_APPROVAL_EXPIRY_HOURS' => [
+                'tab' => 'routing', 'section' => 'tools', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hours a pending approval waits before it expires (1–720). Default 72.',
+                'default' => '72',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_APPROVAL_EXPIRY_HOURS,
             ],
             // === Routing — rolling conversation summary (database-backed) ===
             // BCONFIG group CONVERSATION_SUMMARY (ownerId=0), the rows

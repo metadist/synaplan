@@ -42,6 +42,7 @@ export interface SavedTask {
   summary: SavedTaskSummary
   /** First ~60 characters of the underlying instruction ("what runs"). */
   instructionPreview: string | null
+  waitingApprovalCount: number
 }
 
 export interface SavedTaskRun {
@@ -54,6 +55,7 @@ export interface SavedTaskRun {
   started: string | null
   finished: string | null
   created: number
+  waitingNode: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -88,6 +90,7 @@ function asTask(raw: RawTask | undefined): SavedTask {
       ),
     },
     instructionPreview: raw.instructionPreview ?? null,
+    waitingApprovalCount: raw.waitingApprovalCount ?? 0,
   }
 }
 
@@ -106,6 +109,7 @@ function asRun(raw: RawRun | undefined): SavedTaskRun {
     started: raw.started ?? null,
     finished: raw.finished ?? null,
     created: raw.created ?? 0,
+    waitingNode: raw.waitingNode ?? null,
   }
 }
 

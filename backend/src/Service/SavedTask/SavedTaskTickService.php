@@ -7,6 +7,7 @@ namespace App\Service\SavedTask;
 use App\Repository\ConfigRepository;
 use App\Repository\SavedTaskRepository;
 use App\Service\SavedTask\Schedule\ScheduleParser;
+use App\Service\Tool\ApprovalExpiryService;
 use Psr\Log\LoggerInterface;
 
 final readonly class SavedTaskTickService
@@ -18,6 +19,7 @@ final readonly class SavedTaskTickService
         private SavedTaskRunner $runner,
         private ScheduleParser $parser,
         private LoggerInterface $logger,
+        private ?ApprovalExpiryService $approvalExpiry = null,
     ) {
     }
 
@@ -36,6 +38,8 @@ final readonly class SavedTaskTickService
         $claimed = 0;
         $ran = 0;
         $failed = 0;
+
+        $this->approvalExpiry?->sweep($nowUtc);
 
         foreach ($this->tasks->findDueScheduled($limit, $nowUtc) as $task) {
             $expected = $task->getNextRunAt();

@@ -158,7 +158,8 @@
     "desktop": "Desktop",
     "setup": "Setup",
     "assistants": "Assistants",
-    "assistantBuilder": "Assistant"
+    "assistantBuilder": "Assistant",
+    "approvals": "Approvals"
   },
   "adminModelStatus": {
     "title": "Model Status",
@@ -764,7 +765,8 @@
     "groupTools": "Tools",
     "liveSupport": "Live support",
     "usage": "Usage",
-    "assistants": "Assistants"
+    "assistants": "Assistants",
+    "approvals": "Approvals"
   },
   "chatInput": {
     "placeholder": "Type your message...",
@@ -1983,7 +1985,8 @@
         "running": "Running",
         "completed": "Completed",
         "failed": "Failed",
-        "cancelled": "Cancelled"
+        "cancelled": "Cancelled",
+        "waiting_approval": "Waiting for approval"
       },
       "runTrigger": {
         "manual": "started by you",
@@ -2074,7 +2077,11 @@
           "calendar": "a calendar entry",
           "reply": "a reply in the chat"
         }
-      }
+      },
+      "waitingApproval": "Waiting for approval",
+      "waitingApprovalCount": "{count} run waiting for approval | {count} runs waiting for approval",
+      "approvalExpired": "Approval expired",
+      "rejectedBy": "Rejected by {name}"
     },
     "connections": {
       "title": "Connections",
@@ -4482,7 +4489,8 @@
       "done": "Done",
       "failed": "Failed",
       "skipped": "Skipped",
-      "cancelled": "Stopped"
+      "cancelled": "Stopped",
+      "waiting_approval": "Waiting for approval"
     },
     "kind": {
       "text": "Text",
@@ -6328,5 +6336,78 @@
       "conflict": "Already exists — will be skipped unless you replace it ({key})",
       "skipped": "Skipped ({key})"
     }
+  },
+  "approvals": {
+    "title": "Approvals",
+    "subtitle": "Things that wait for you before they happen.",
+    "pending": "Waiting",
+    "decided": "Decided",
+    "emptyPending": "Nothing needs your approval. Cards appear here when a saved task or a chat wants to change something.",
+    "emptyDecided": "No earlier decisions yet.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "alwaysAllow": "Always allow for this assistant",
+    "rejectReason": "Why are you rejecting this?",
+    "rejectReasonPlaceholder": "Optional note",
+    "expired": "This request expired",
+    "expiresInHours": "Expires in {hours} hour | Expires in {hours} hours",
+    "nothingCreatedYet": "Nothing has been created yet.",
+    "approvedToast": "Approved. It will continue.",
+    "rejectedToast": "Rejected.",
+    "decideFailed": "This could not be decided. Try again.",
+    "openContext": "Open where this came from",
+    "notify": "How you hear about new requests",
+    "notifyInstant": "Email me as soon as something waits",
+    "notifyDigest": "Send me a daily summary",
+    "notifySaved": "Notification preference saved.",
+    "blocked": "I cannot do that. An administrator has turned this off.",
+    "waitingForApproval": "Waiting for approval",
+    "status": {
+      "pending": "Waiting",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "expired": "Expired",
+      "executed": "Done",
+      "failed": "Failed"
+    }
+  },
+  "customTools": {
+    "title": "Custom tools",
+    "subtitle": "Call your own HTTP APIs from chat and saved tasks. Credentials stay on this server.",
+    "add": "Add a custom tool",
+    "edit": "Edit custom tool",
+    "import": "Import from OpenAPI",
+    "empty": "Nothing has been created yet. Add a tool to call an HTTP API, or import one from an OpenAPI description.",
+    "loading": "Loading custom tools…",
+    "name": "Name",
+    "titleLabel": "Title",
+    "description": "What it does",
+    "class": "What this tool does",
+    "classRead": "Reads data",
+    "classWrite": "Changes something",
+    "classDestructive": "Deletes something",
+    "method": "HTTP method",
+    "url": "URL",
+    "body": "Request body template",
+    "bodyInvalid": "The request body must be valid JSON.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Custom tool saved.",
+    "saveFailed": "The custom tool could not be saved.",
+    "delete": "Delete",
+    "deleteConfirm": "Delete the custom tool \"{name}\"? Calls that used it will stop working.",
+    "deleted": "Custom tool deleted.",
+    "deleteFailed": "The custom tool could not be deleted.",
+    "loadFailed": "Custom tools could not be loaded.",
+    "try": "Try it",
+    "tryHint": "Send a test call. Secrets are shown as *** and nothing is saved.",
+    "tryFailed": "The test call could not be sent.",
+    "importUrl": "OpenAPI URL",
+    "importDocument": "Or paste the OpenAPI document",
+    "baseUrl": "Base URL for imported tools",
+    "preview": "Preview operations",
+    "applyImport": "Import selected",
+    "imported": "Tools imported.",
+    "importFailed": "The OpenAPI description could not be imported."
   }
 }

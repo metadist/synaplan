@@ -10,6 +10,9 @@ use App\Service\Document\DocumentToolsConfig;
 use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolRegistry;
 use App\Service\Document\Tool\SetCellsTool;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -77,5 +80,34 @@ final class ChatToolLoopTest extends TestCase
         self::assertSame('Could not do that.', $result->content);
         self::assertFalse($session->hasMutations());
         self::assertFalse($session->operations[0]->ok);
+    }
+
+    public function testUnknownToolThrowsWhenRegistryIsEnabled(): void
+    {
+        $config = $this->createMock(DocumentToolsConfig::class);
+        $config->method('maxIterations')->willReturn(2);
+        $config->method('maxOpsPerTurn')->willReturn(4);
+
+        $facade = $this->createMock(AiFacade::class);
+        $facade->method('chat')->willReturn([
+            'content' => '',
+            'tool_calls' => [[
+                'id' => 'call_x',
+                'function' => ['name' => 'not_a_tool', 'arguments' => '{}'],
+            ]],
+        ]);
+
+        $toolsConfig = $this->createMock(ToolsConfig::class);
+        $toolsConfig->method('isRegistryEnabled')->willReturn(true);
+        $loop = new ChatToolLoop(
+            $facade,
+            new DocumentToolRegistry([]),
+            $config,
+            new NullLogger(),
+            new ToolRegistry([]),
+            $toolsConfig,
+        );
+        $this->expectException(ToolNotRegisteredException::class);
+        $loop->run([['role' => 'user', 'content' => 'x']], DocumentSession::empty('xlsx'), [], 1);
     }
 }

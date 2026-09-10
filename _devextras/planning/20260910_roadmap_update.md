@@ -9,10 +9,17 @@ Track directories, sprint files and
 **Owner:** product owner. **No Wave 5 implementation starts until the order
 in §1 is done through Intermezzo.**
 
-This update exists because Wave 3 closed, Wave 4 is already on a branch, two
-production bugs must ship before any further platform work, and the 2026-09-10
-research said the leaner architecture should land *before* Wave 5 adds more
-optional services.
+This update exists because Wave 3 closed, Wave 4 has since landed on `main`
+([#1774](https://github.com/metadist/synaplan/pull/1774)), two production bugs
+must still ship before Intermezzo, and the 2026-09-10 research said the leaner
+architecture should land *before* Wave 5 adds more optional services.
+
+The 2026-09-10 wave-state that Wave 4 wrote onto
+[`20260903_roadmap.md`](./20260903_roadmap.md) (W3 closed in #1769; W4
+tools/approvals S1–S4 + compute A0–A2 in progress) is superseded here: W4 is
+closed in this repo. Flags unchanged (`TOOLS.REGISTRY_ENABLED` on as
+kill-switch, `TOOLS.APPROVALS_ENABLED` and `TOOLS.CUSTOM_HTTP_ENABLED` off;
+compute sidecar not wired into PHP).
 
 ---
 
@@ -24,18 +31,17 @@ current row is met.
 | # | Name | What it is | Exit |
 | - | ---- | ---------- | ---- |
 | 1 | **Two bugfixes (first)** | E-mail formatting + chat memory. Production reports, not a new track. | A scheduled result mail renders as HTML. A chat still knows what was said about ten minutes ago. Both on `main`, covered by tests. |
-| 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2), already on [`cursor/wave4-tools-approval-compute-469d`](https://github.com/metadist/synaplan/tree/cursor/wave4-tools-approval-compute-469d). Test and bugfix **on that branch**. | Branch merged; flags as shipped (`TOOLS.REGISTRY_ENABLED` on as kill-switch, approvals and custom HTTP off; no PHP compute client yet). |
+| 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2). **Done** on `main` via [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10). | Merged. Flags as shipped (`TOOLS.REGISTRY_ENABLED` on as kill-switch, approvals and custom HTTP off; no PHP compute client yet). |
 | 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | S1–S4 of that plan done (S5 stays optional). A `minimal` CI variant proves absent modules stay absent. |
 | 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | Named in §7. Not started from this file. |
 
-**The two bugfixes are first.** They do not wait for Wave 4 review, Intermezzo
-ticks, or Wave 5 design. They can share the Wave 4 *product* release if the
-dates line up; they must still land (or be merge-ready on `main`) before the
-Wave 4 branch is treated as done.
+**The two bugfixes are still the next coding work.** Wave 4 merged to `main`
+first ([#1774](https://github.com/metadist/synaplan/pull/1774), 2026-09-10),
+so they no longer gate a Wave 4 merge. They still go before Intermezzo and
+Wave 5. They do not wait for Intermezzo ticks or Wave 5 design.
 
-Git merge order for the already-open branches: Wave 4 branch → this planning
-branch (`cursor/wave5-architecture-research-354f`). The bugfix PRs target
-`main` and can precede both.
+Git merge order: Wave 4 is on `main`; this planning branch merges onto that.
+Bugfix PRs still target `main` and can land at any time before Intermezzo.
 
 ---
 
@@ -44,7 +50,7 @@ branch (`cursor/wave5-architecture-research-354f`). The bugfix PRs target
 | Change | Decision |
 | ------ | -------- |
 | Wave 3 | Closed in this repo. Agent Builder S4–S6 on `main` via [#1769](https://github.com/metadist/synaplan/pull/1769). AI Plugs S1–S6 + URL watch on `main`. Leftover: `PL37` (`model_preferences` bundle section). More Nextcloud S2–S3 remain in partner repos. |
-| Wave 4 | Unchanged in *content*: track 4 S1–S4 + track 5 A0–A2. Already implemented on the Wave 4 branch (2026-09-10). The soon release is that branch **after** the two bugfixes. |
+| Wave 4 | Unchanged in *content*: track 4 S1–S4 + track 5 A0–A2. Merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10), before the two bugfixes. |
 | **Two bugfixes** | New. First work. Specified in §4. |
 | **Intermezzo** | New named release between Wave 4 and Wave 5 (the "4.5" slot). Not a new track number. Carries the lean-architecture findings so Wave 5 does not add more eager providers and hand-written feature-status blocks. |
 | Wave 5 | Same product intent as the 2026-09-03 Wave 5, plus the partner review in [`20260910-wave5-architecture-research/03_architecture_and_steps.txt`](./20260910-wave5-architecture-research/03_architecture_and_steps.txt). Starts only after Intermezzo. |
@@ -53,6 +59,16 @@ branch (`cursor/wave5-architecture-research-354f`). The bugfix PRs target
 
 Waves remain a capacity plan, not a calendar promise. A wave ends when its
 exit is met.
+
+**Wave state (2026-09-10, after #1774):**
+
+| Wave | State | Evidence |
+| ---- | ----- | -------- |
+| W1 | closed | IAM S0–S2 on `main` (#1708, #1713). |
+| W2 | closed | IAM S3–S5 + Agent Builder S1–S3.5 + More Nextcloud S1 (#1745). Flags stay off. |
+| W3 | closed in this repo | AI Plugs S1–S6 + URL watch + Agent Builder S4–S6 on `main` (#1769). Leftover: `PL37`. |
+| W4 | closed in this repo | Tools/Approval S1–S4 + Secure Compute A0–A2 on `main` ([#1774](https://github.com/metadist/synaplan/pull/1774)). Flags: `TOOLS.REGISTRY_ENABLED` on (kill switch), `TOOLS.APPROVALS_ENABLED` and `TOOLS.CUSTOM_HTTP_ENABLED` off. Compute sidecar is not wired into PHP (Phase B). |
+| W5 | not started | After Intermezzo. |
 
 ---
 
@@ -63,8 +79,8 @@ exit is met.
 | 1 | IAM | [`202609_iam/`](./202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX follow-up still open; not in this update. |
 | 2 | Agent Builder | [`202609_agent_builder/`](./202609_agent_builder/00_master_plan.md) | S1–S6 on `main`. Wave 5 may tighten publish-as-deployment (partner review). |
 | 3 | AI Plugs | [`202609_ai_plugs/`](./202609_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
-| 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 = Wave 4 branch. S5 (workflow builder + webhook) = Wave 5. |
-| 5 | Secure Compute | [`202609_secure_compute/`](./202609_secure_compute/00_master_plan.md) | A0–A2 = Wave 4 branch (`sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module (after Intermezzo). |
+| 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 (workflow builder + webhook) = Wave 5. |
+| 5 | Secure Compute | [`202609_secure_compute/`](./202609_secure_compute/00_master_plan.md) | A0–A2 on `main` (#1774, `sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module (after Intermezzo). |
 | 6 | More Nextcloud | [`202609_more_nextcloud/`](./202609_more_nextcloud/00_master_plan.md) | S1 on `main`. S2–S3 stay in partner repos; not a Wave 4/5 blocker. |
 
 Release classes still follow `.github/mobile-impact-policy.json`. No track
@@ -109,7 +125,7 @@ Markdown, not as HTML.
 5. Existing welcome / verification / reset templates are unchanged.
 
 **Out of scope:** redesign of mail layout, new digest product, Wave 4
-approval-digest copy (that ships on the Wave 4 branch and is checked there).
+approval-digest copy (already on `main` via #1774 and checked there).
 
 ### 4.2 Chat memory — the thread forgets what was said ~10 minutes ago
 
@@ -161,35 +177,31 @@ Qdrant user-memories, or Intermezzo module work.
 
 ---
 
-## 5. Wave 4 — soon release (after the two bugfixes)
+## 5. Wave 4 — on `main`
 
-**Branch:**
-[`cursor/wave4-tools-approval-compute-469d`](https://github.com/metadist/synaplan/tree/cursor/wave4-tools-approval-compute-469d)
-(one commit on top of `main` as of 2026-09-10, 215 files). Test and bugfix
-**there**. Do not re-implement Wave 4 on this planning branch.
+**Merged:** [#1774](https://github.com/metadist/synaplan/pull/1774)
+(2026-09-10), from
+[`cursor/wave4-tools-approval-compute-469d`](https://github.com/metadist/synaplan/tree/cursor/wave4-tools-approval-compute-469d).
+Do not re-implement Wave 4 on this planning branch. Track STATUS files on
+`main` are the implementation log; this file does not duplicate them.
 
-| Piece | State on the branch | Flags |
-| ----- | ------------------- | ----- |
+| Piece | State on `main` | Flags |
+| ----- | --------------- | ----- |
 | Tools S1 — registry | Implemented | `TOOLS.REGISTRY_ENABLED` on (kill-switch) |
 | Tools S2 — interactive approval | Implemented | `TOOLS.APPROVALS_ENABLED` off |
 | Tools S3 — unattended pause / resume | Implemented | same approvals flag |
 | Tools S4 — custom HTTP / OpenAPI tools | Implemented | `TOOLS.CUSTOM_HTTP_ENABLED` off |
 | Compute A0–A2 | Implemented in-repo as `sidecars/synaplan-compute` (Go, Python + Node images, hostile corpus, workspaces). PHP never mounts `docker.sock`. | No `COMPUTE.ENABLED` yet — Phase B is Wave 5 |
-| Tools S5 / Compute A3 + B1–B4 | Not on the branch | Wave 5 |
+| Tools S5 / Compute A3 + B1–B4 | Not shipped | Wave 5 |
 
-Wave 4 STATUS on that branch is the implementation log; this file does not
-duplicate it.
+**Wave 4 exit (code):** met by #1774. Approvals and custom HTTP remain
+default-off until their journeys (J-TL-1…5) are walked on a flag-on install.
+The compute sidecar is shippable as a binary / image and is **not** wired
+into PHP.
 
-**Wave 4 exit (release):**
-
-1. The two bugfixes (§4) are on `main` (or merge-ready and included in the
-   same release tag).
-2. Wave 4 branch reviewed, tested, hostile-script corpus green for the
-   sidecar, house gate green.
-3. Approvals and custom HTTP remain default-off until their journeys
-   (J-TL-1…5) are walked on a flag-on install.
-4. Compute sidecar is shippable as a binary / image; it is **not** wired
-   into PHP in this release.
+**Still open after Wave 4:** the two bugfixes in §4. They were meant to
+precede this merge; they remain the next coding work and still precede
+Intermezzo.
 
 ---
 
@@ -342,12 +354,13 @@ This file is the wave overview. It does not replace track STATUS.
 | - | -------- |
 | 1 | Archive `20260903_roadmap.md` under `20260903_roadmap/` and keep a stub at the old path so existing links work. |
 | 2 | **Two production bugfixes first** (§4): scheduled mail HTML, chat memory. Then Wave 4, then Intermezzo, then Wave 5. |
-| 3 | Wave 4 is the existing tools / approvals / compute-sidecar branch, tested and bugfixed there. Same product release as the two fixes if dates line up; the fixes still go first. |
+| 3 | Wave 4 is the tools / approvals / compute-sidecar work. It merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) on 2026-09-10, before the two bugfixes. |
 | 4 | Insert **Intermezzo** (not "Wave 6", not Wave 5) for feature modules and faster execution. Tick [`20260910-feature-modules/00_master_plan.md`](./20260910-feature-modules/00_master_plan.md) §0 before Intermezzo code. |
 | 5 | Wave 5 keeps Tools S5 + Compute A3/B1–B4 and absorbs the partner review's reliability / activation and complete-workflow ideas as §7.2–§7.3, to be ticked per track before the first Wave 5 PR. |
 | 6 | Do not implement Secure Compute as headless Desktop. Add **compute node** to vocabulary. Open ticks remain on the research §7. |
-| 7 | Git: merge Wave 4 branch, then this planning branch. Bugfix PRs target `main` and may precede both. |
+| 7 | Git: Wave 4 is on `main` (#1774). This planning branch merges onto that. Bugfix PRs target `main` and may land before Intermezzo. |
 | 8 | No Wave 5 and no Intermezzo implementation from this planning change. |
+| 9 | Conflict on `20260903_roadmap.md` vs Wave 4: keep the archive stub at that path; move the 2026-09-10 wave-state (W3 closed, W4 tools/compute) into this live plan and mark W4 closed via #1774. |
 
 ---
 
@@ -359,4 +372,4 @@ This file is the wave overview. It does not replace track STATUS.
 | [`202609_ux_user_flows.md`](./202609_ux_user_flows.md) | Binding UX |
 | [`20260910-wave5-architecture-research/`](./20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
 | [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record |
-| Wave 4 branch STATUS | Tools S1–S4 and compute A0–A2 as implemented |
+| Track 4 / 5 `STATUS.md` on `main` | Tools S1–S4 and compute A0–A2 as implemented (#1774) |

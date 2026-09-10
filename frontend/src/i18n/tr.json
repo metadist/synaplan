@@ -157,7 +157,8 @@
     "savedTasks": "Kayıtlı görevler",
     "setup": "Kurulum",
     "assistants": "Asistanlar",
-    "assistantBuilder": "Asistan"
+    "assistantBuilder": "Asistan",
+    "approvals": "Onaylar"
   },
   "adminModelStatus": {
     "title": "Model Durumu",
@@ -753,7 +754,8 @@
     "groupTools": "Araçlar",
     "liveSupport": "Canlı destek",
     "usage": "Kullanım",
-    "assistants": "Asistanlar"
+    "assistants": "Asistanlar",
+    "approvals": "Onaylar"
   },
   "guest": {
     "disabledTitle": "Misafir sohbeti kullanılamıyor",
@@ -2069,7 +2071,8 @@
       "done": "Tamamlandı",
       "failed": "Başarısız",
       "skipped": "Atlandı",
-      "cancelled": "Durduruldu"
+      "cancelled": "Durduruldu",
+      "waiting_approval": "Onay bekleniyor"
     },
     "kind": {
       "text": "Metin",
@@ -2866,7 +2869,8 @@
         "running": "Çalışıyor",
         "completed": "Tamamlandı",
         "failed": "Başarısız",
-        "cancelled": "İptal edildi"
+        "cancelled": "İptal edildi",
+        "waiting_approval": "Onay bekleniyor"
       },
       "runTrigger": {
         "manual": "senin tarafından başlatıldı",
@@ -2957,7 +2961,11 @@
           "calendar": "bir takvim girişi",
           "reply": "sohbette bir yanıt"
         }
-      }
+      },
+      "waitingApproval": "Onay bekleniyor",
+      "waitingApprovalCount": "{count} çalışma onay bekliyor",
+      "approvalExpired": "Onayın süresi doldu",
+      "rejectedBy": "{name} tarafından reddedildi"
     },
     "connections": {
       "title": "Bağlantılar",
@@ -5343,5 +5351,78 @@
       "conflict": "Zaten var — değiştirmezseniz atlanır ({key})",
       "skipped": "Atlandı ({key})"
     }
+  },
+  "approvals": {
+    "title": "Onaylar",
+    "subtitle": "Gerçekleşmeden önce seni bekleyen işlemler.",
+    "pending": "Bekliyor",
+    "decided": "Karar verilenler",
+    "emptyPending": "Onayını bekleyen bir şey yok. Kayıtlı bir görev veya sohbet bir şeyi değiştirmek istediğinde kartlar burada görünür.",
+    "emptyDecided": "Henüz önceki karar yok.",
+    "approve": "Onayla",
+    "reject": "Reddet",
+    "alwaysAllow": "Bu asistan için her zaman izin ver",
+    "rejectReason": "Bunu neden reddediyorsun?",
+    "rejectReasonPlaceholder": "İsteğe bağlı not",
+    "expired": "Bu istek süresi doldu",
+    "expiresInHours": "{hours} saat içinde süresi dolar",
+    "nothingCreatedYet": "Henüz hiçbir şey oluşturulmadı.",
+    "approvedToast": "Onaylandı. Devam edecek.",
+    "rejectedToast": "Reddedildi.",
+    "decideFailed": "Karar verilemedi. Lütfen tekrar dene.",
+    "openContext": "Nereden geldiğini aç",
+    "notify": "Yeni istekleri nasıl duyarsın",
+    "notifyInstant": "Bir şey bekler bekmez e-posta gönder",
+    "notifyDigest": "Günlük özet gönder",
+    "notifySaved": "Bildirim tercihi kaydedildi.",
+    "blocked": "Bunu yapamam. Bir yönetici bunu kapattı.",
+    "waitingForApproval": "Onay bekleniyor",
+    "status": {
+      "pending": "Bekliyor",
+      "approved": "Onaylandı",
+      "rejected": "Reddedildi",
+      "expired": "Süresi doldu",
+      "executed": "Tamamlandı",
+      "failed": "Başarısız"
+    }
+  },
+  "customTools": {
+    "title": "Özel araçlar",
+    "subtitle": "Sohbet ve kayıtlı görevlerden kendi HTTP API’lerini çağır. Kimlik bilgileri bu sunucuda kalır.",
+    "add": "Özel araç ekle",
+    "edit": "Özel aracı düzenle",
+    "import": "OpenAPI’den içe aktar",
+    "empty": "Henüz hiçbir şey oluşturulmadı. Bir HTTP API çağıran araç ekle veya bir OpenAPI açıklamasından içe aktar.",
+    "loading": "Özel araçlar yükleniyor…",
+    "name": "Ad",
+    "titleLabel": "Başlık",
+    "description": "Ne yapar",
+    "class": "Bu araç ne yapar",
+    "classRead": "Veri okur",
+    "classWrite": "Bir şeyi değiştirir",
+    "classDestructive": "Bir şeyi siler",
+    "method": "HTTP yöntemi",
+    "url": "URL",
+    "body": "İstek gövdesi şablonu",
+    "bodyInvalid": "İstek gövdesi geçerli JSON olmalıdır.",
+    "save": "Kaydet",
+    "cancel": "Vazgeç",
+    "saved": "Özel araç kaydedildi.",
+    "saveFailed": "Özel araç kaydedilemedi.",
+    "delete": "Sil",
+    "deleteConfirm": "\"{name}\" özel aracı silinsin mi? Bunu kullanan çağrılar çalışmayı durdurur.",
+    "deleted": "Özel araç silindi.",
+    "deleteFailed": "Özel araç silinemedi.",
+    "loadFailed": "Özel araçlar yüklenemedi.",
+    "try": "Dene",
+    "tryHint": "Bir deneme çağrısı gönder. Gizliler *** olarak gösterilir ve hiçbir şey kaydedilmez.",
+    "tryFailed": "Deneme çağrısı gönderilemedi.",
+    "importUrl": "OpenAPI URL’si",
+    "importDocument": "Veya OpenAPI belgesini yapıştır",
+    "baseUrl": "İçe aktarılan araçlar için temel URL",
+    "preview": "İşlemleri önizle",
+    "applyImport": "Seçilenleri içe aktar",
+    "imported": "Araçlar içe aktarıldı.",
+    "importFailed": "OpenAPI açıklaması içe aktarılamadı."
   }
 }

@@ -2,7 +2,7 @@
 
 **Intermezzo** release of
 [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
-(after the two bugfixes and Wave 4, before Wave 5). Plan of record:
+(after the two bugfixes; Wave 4 is on `main` via #1774; before Wave 5). Plan of record:
 [`00_master_plan.md`](./00_master_plan.md). **Decision checklist (§0) drafted
 2026-09-10 — awaiting the product owner's ticks; no code started.**
 
@@ -39,6 +39,7 @@
 | ---- | -------- |
 | 2026-09-10 | Initiative proposed by the research in `../20260910-wave5-architecture-research/02_conditional_module_loading.md`: runtime-gated declared modules instead of compile-time exclusion; vendor slimming first; CI `minimal`/`full` matrix as the proof. |
 | 2026-09-10 | Named **Intermezzo** in `../20260910_roadmap_update.md`: after the two production bugfixes and Wave 4, before Wave 5. Not a seventh track. |
+| 2026-09-10 | Wave 4 merged to `main` as #1774. Intermezzo still waits on the two bugfixes and on §0 ticks. |
 
 ## Review log
 

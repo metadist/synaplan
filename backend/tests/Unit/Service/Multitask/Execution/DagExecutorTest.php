@@ -150,6 +150,48 @@ final class DagExecutorTest extends TestCase
     }
 
     /**
+     * A write-class step pauses the plan; resume() must mark that node as
+     * approved so the runner skips the gate (otherwise a second approval would
+     * be opened and the run would pause forever), merge the approved arguments,
+     * and continue with the dependents.
+     */
+    public function testResumeMarksNodeApprovedMergesArgsAndContinues(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'mcp_action', 'params' => ['server_id' => 3, 'tool' => 'create']],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1'], 'inputs' => ['text' => '$n1.text']],
+            ],
+        ]);
+        $gateConsultations = 0;
+        $runner = $this->runner(function (TaskNode $node, NodeContext $ctx) use (&$gateConsultations): NodeResult {
+            if (Capability::McpAction === $node->capability) {
+                if (!$ctx->isApproved($node->id)) {
+                    ++$gateConsultations;
+
+                    return NodeResult::waitingApproval(42, ['title' => 'draft']);
+                }
+
+                return NodeResult::ok('created '.$node->params['title']);
+            }
+
+            return NodeResult::ok((string) $ctx->resolveInputs($node)['text']);
+        });
+        $executor = $this->executor($runner);
+        $context = $this->context();
+
+        $paused = $executor->execute($plan, $context);
+        self::assertSame('waiting_approval', $paused['node_statuses']['n1']);
+        self::assertSame(1, $gateConsultations);
+
+        $resumed = $executor->resume($plan, $context, 'n1', ['title' => 'final']);
+        self::assertSame(1, $gateConsultations, 'the gate must not be consulted again after approval');
+        self::assertSame(['n1' => 'done', 'n2' => 'done'], $resumed['node_statuses']);
+        self::assertSame('created final', $resumed['content']);
+    }
+
+    /**
      * Issue #1218: a media node another node depends on (here `file_analysis`
      * reads `$n1.file`) must be flagged for synchronous in-turn generation, so
      * the produced file is available to that dependent — an async detach could

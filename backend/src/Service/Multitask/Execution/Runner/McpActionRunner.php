@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\McpServerConfig;
+use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
+use App\Repository\UserRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpClientException;
@@ -18,6 +20,11 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\PromptService;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\ToolExecutionGate;
+use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -52,6 +59,9 @@ final readonly class McpActionRunner implements TaskRunner
         private MultitaskRoutingConfig $routingConfig,
         private PromptService $promptService,
         private LoggerInterface $logger,
+        private ?ToolExecutionGate $executionGate = null,
+        private ?ToolsConfig $toolsConfig = null,
+        private ?UserRepository $users = null,
     ) {
     }
 
@@ -117,6 +127,11 @@ final readonly class McpActionRunner implements TaskRunner
         }
 
         $arguments = $this->resolveArguments($node, $context);
+
+        $gated = $this->consultGate($context, $node, $serverId, $tool, $arguments);
+        if (null !== $gated) {
+            return $gated;
+        }
 
         try {
             $result = $this->client->callTool($server, $tool, $arguments);
@@ -357,5 +372,59 @@ final readonly class McpActionRunner implements TaskRunner
         $line = trim((string) preg_replace('/\s+/', ' ', $text));
 
         return mb_strlen($line) > 140 ? mb_substr($line, 0, 137).'…' : $line;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     */
+    private function consultGate(NodeContext $context, TaskNode $node, int $serverId, string $tool, array $arguments): ?NodeResult
+    {
+        $userId = $context->userId;
+        if (null === $userId || null === $this->executionGate || null === $this->toolsConfig || !$this->toolsConfig->isApprovalsEnabled($userId)) {
+            return null;
+        }
+        if ($context->isApproved($node->id)) {
+            return null;
+        }
+        $actor = $this->users?->find($userId);
+        if (!$actor instanceof User) {
+            return null;
+        }
+        $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
+        $unattended = true === ($context->options['saved_task'] ?? false);
+        $allowUnattended = true === ($context->options['allow_unattended'] ?? false);
+        $requestedBy = $runId > 0
+            ? sprintf('task_run:%d:%s', $runId, $node->id)
+            : 'chat:'.(int) $context->message->getId();
+        $name = sprintf('mcp:%d:%s', $serverId, $tool);
+        try {
+            $decision = $this->executionGate->inspect(
+                $userId,
+                $name,
+                $arguments,
+                $actor,
+                $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,
+                $requestedBy,
+                null,
+                $allowUnattended,
+            );
+        } catch (ToolNotRegisteredException $e) {
+            return NodeResult::failed($e->getMessage());
+        }
+        if (PolicyOutcome::Block === $decision['outcome']) {
+            return NodeResult::failed((string) $decision['refusal']);
+        }
+        if (PolicyOutcome::Approve === $decision['outcome'] && null !== $decision['approval']) {
+            $approval = $decision['approval'];
+
+            return NodeResult::waitingApproval((int) $approval->getId(), $arguments, [
+                'tool' => $approval->getTool(),
+                'preview' => $approval->getPreview(),
+                'expires_at' => $approval->getExpiresAt(),
+                'side_effect' => $approval->getSideEffect(),
+            ]);
+        }
+
+        return null;
     }
 }

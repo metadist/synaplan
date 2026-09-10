@@ -240,6 +240,7 @@ export const TASK_CARD_STATES = [
   'failed',
   'skipped',
   'cancelled',
+  'waiting_approval',
 ] as const
 export type TaskCardState = (typeof TASK_CARD_STATES)[number]
 

@@ -6,9 +6,10 @@ written against the verified state of the `main` checkout on 2026-09-10
 (see the "Evidence" sections; every number was measured, not estimated).
 
 **Live roadmap:** [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
-— two production bugfixes first, then Wave 4, then **Intermezzo** (this
-research's feature-modules plan), then Wave 5. The 2026-09-03 overview is
-archived at [`../20260903_roadmap/`](../20260903_roadmap/README.md).
+— Wave 4 is on `main` (#1774); next: two production bugfixes, then
+**Intermezzo** (this research's feature-modules plan), then Wave 5. The
+2026-09-03 overview is archived at
+[`../20260903_roadmap/`](../20260903_roadmap/README.md).
 
 | # | Question | Document | Verdict |
 | - | -------- | -------- | ------- |

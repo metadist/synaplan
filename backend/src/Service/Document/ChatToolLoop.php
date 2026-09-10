@@ -8,6 +8,9 @@ use App\AI\Service\AiFacade;
 use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolRegistry;
 use App\Service\Document\Tool\DocumentToolResult;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,6 +31,8 @@ final readonly class ChatToolLoop
         private DocumentToolRegistry $registry,
         private DocumentToolsConfig $config,
         private LoggerInterface $logger,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -47,6 +52,22 @@ final readonly class ChatToolLoop
         $maxIter = $this->config->maxIterations();
         $maxOps = $this->config->maxOpsPerTurn();
         $tools = $this->registry->declarationsFor($session->kind());
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && null !== $userId && $this->toolsConfig->isRegistryEnabled($userId)) {
+            $tools = [];
+            foreach ($this->toolRegistry->forUser($userId, ['documentKind' => $session->kind()]) as $descriptor) {
+                if ('document' !== $descriptor->source->value) {
+                    continue;
+                }
+                $tools[] = [
+                    'type' => 'function',
+                    'function' => [
+                        'name' => $descriptor->name,
+                        'description' => $descriptor->description,
+                        'parameters' => $descriptor->inputSchema,
+                    ],
+                ];
+            }
+        }
         $options['tools'] = $tools;
         $options['tool_choice'] = $options['tool_choice'] ?? 'auto';
 
@@ -84,6 +105,9 @@ final readonly class ChatToolLoop
                 }
                 $tool = $this->registry->get($name);
                 if (null === $tool || !in_array($session->kind(), $tool->appliesTo(), true)) {
+                    if (null !== $this->toolRegistry && null !== $this->toolsConfig && null !== $userId && $this->toolsConfig->isRegistryEnabled($userId)) {
+                        throw new ToolNotRegisteredException($name);
+                    }
                     $result = DocumentToolResult::error('Unknown tool '.$name, 'processing.documentStepUnknownTool', ['name' => $name]);
                 } else {
                     try {
