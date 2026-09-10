@@ -24,6 +24,7 @@ use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Vision\VisionModelResolver;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\NullLogger;
@@ -35,7 +36,17 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 final class MessagesGatewayDesktopPinTest extends TestCase
 {
-    public function testPinnedAssistantDoesNotReplaceBodyModel(): void
+    /**
+     * @return iterable<string, array{0: bool, 1: bool}>
+     */
+    public static function desktopPins(): iterable
+    {
+        yield 'agent and knowledge folder' => [true, false];
+        yield 'agent only' => [false, true];
+    }
+
+    #[DataProvider('desktopPins')]
+    public function testPinnedAssistantDoesNotReplaceBodyModel(bool $withRagFolder, bool $sessionBlockOff): void
     {
         $config = $this->createMock(MessagesGatewayConfig::class);
         $config->method('isEnabled')->willReturn(true);
@@ -118,11 +129,15 @@ final class MessagesGatewayDesktopPinTest extends TestCase
 
         $capturedProfile = null;
         $capturedModel = null;
+        $capturedOverride = null;
+        $capturedIncludeMemories = null;
         $contextInjector = $this->createMock(MessagesContextInjector::class);
         $contextInjector->expects($this->once())->method('inject')->willReturnCallback(
-            static function (array $requestBody, User $user, string $sessionKey, ?string $headerOverride, $desktop, $profile) use (&$capturedProfile, &$capturedModel): array {
+            static function (array $requestBody, User $user, string $sessionKey, ?string $headerOverride, $desktop, $profile, bool $includeMemories = true) use (&$capturedProfile, &$capturedModel, &$capturedOverride, &$capturedIncludeMemories): array {
                 $capturedProfile = $profile;
                 $capturedModel = $requestBody['model'] ?? null;
+                $capturedOverride = $headerOverride;
+                $capturedIncludeMemories = $includeMemories;
 
                 return ['body' => $requestBody, 'injected' => false, 'hash' => null];
             },
@@ -156,7 +171,9 @@ final class MessagesGatewayDesktopPinTest extends TestCase
             'messages' => [['role' => 'user', 'content' => 'hello']],
         ]));
         $request->headers->set(DesktopTurnOptions::HEADER_AGENT_ID, '12');
-        $request->headers->set(DesktopTurnOptions::HEADER_RAG_GROUP_KEY, 'DESKTOP:personal');
+        if ($withRagFolder) {
+            $request->headers->set(DesktopTurnOptions::HEADER_RAG_GROUP_KEY, 'DESKTOP:personal');
+        }
 
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(7);
@@ -172,5 +189,11 @@ final class MessagesGatewayDesktopPinTest extends TestCase
         $this->assertInstanceOf(RuntimeProfile::class, $capturedProfile);
         $this->assertSame(12, $capturedProfile->agentId);
         $this->assertSame(999, $capturedProfile->modelIds['CHAT']);
+        if ($sessionBlockOff) {
+            $this->assertSame('off', $capturedOverride);
+        } else {
+            $this->assertNotSame('off', $capturedOverride);
+        }
+        $this->assertFalse($capturedIncludeMemories);
     }
 }

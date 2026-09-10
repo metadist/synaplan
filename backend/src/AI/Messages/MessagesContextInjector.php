@@ -45,6 +45,10 @@ final readonly class MessagesContextInjector
      * Desktop headers pin an Assistant recipe and/or a knowledge folder. The
      * request body `model` is never rewritten here (C15).
      *
+     * `$includeMemories` is the ambient CONTEXT_INJECTION flag. An explicit
+     * desktop / recipe folder still searches RAG when the flag is off;
+     * workspace memories stay behind the flag.
+     *
      * @param array<string, mixed> $requestBody
      *
      * @return array{body: array<string, mixed>, injected: bool, hash: string|null}
@@ -56,6 +60,7 @@ final readonly class MessagesContextInjector
         ?string $headerOverride = null,
         ?DesktopTurnOptions $desktop = null,
         ?RuntimeProfile $profile = null,
+        bool $includeMemories = true,
     ): array {
         $desktop ??= DesktopTurnOptions::none();
         $injected = false;
@@ -69,7 +74,7 @@ final readonly class MessagesContextInjector
             return ['body' => $requestBody, 'injected' => $injected, 'hash' => null];
         }
 
-        $block = $this->sessionBlock($user, $sessionKey, $requestBody, $desktop, $profile);
+        $block = $this->sessionBlock($user, $sessionKey, $requestBody, $desktop, $profile, $includeMemories);
         if (null === $block || '' === $block) {
             return ['body' => $requestBody, 'injected' => $injected, 'hash' => null];
         }
@@ -92,6 +97,7 @@ final readonly class MessagesContextInjector
         array $requestBody,
         DesktopTurnOptions $desktop,
         ?RuntimeProfile $profile,
+        bool $includeMemories,
     ): ?string {
         $userId = (int) $user->getId();
         $cacheKey = self::CACHE_PREFIX.hash('sha256', implode(':', [
@@ -99,6 +105,7 @@ final readonly class MessagesContextInjector
             (string) $userId,
             $desktop->ragGroupKey ?? '',
             null !== $profile ? (string) ($profile->agentId ?? '') : '',
+            $includeMemories ? '1' : '0',
         ]));
         $item = $this->cache->getItem($cacheKey);
         if ($item->isHit()) {
@@ -150,25 +157,27 @@ final readonly class MessagesContextInjector
                 ]);
             }
 
-            try {
-                // Memory collection may use a pinned embedding model; fall back
-                // to a memory-specific embed when the shared VECTORIZE vector
-                // would be the wrong dimension.
-                $memoryEmbed = $this->userMemoryService->embedQueryForMemorySearch($userId, $query);
-                $memoryVector = null !== $memoryEmbed ? $memoryEmbed['embedding'] : $vector;
-                $memoryHits = $this->userMemoryService->searchMemoriesByVector(
-                    $userId,
-                    $memoryVector,
-                    null,
-                    self::MEMORY_LIMIT,
-                    $this->feedbackConfig->getMinChatMemoryScore(),
-                );
-                $memories = $this->formatter->formatMemoriesContext($memoryHits);
-            } catch (\Throwable $e) {
-                $this->logger->warning('MessagesContextInjector: memories failed', [
-                    'user_id' => $userId,
-                    'error' => $e->getMessage(),
-                ]);
+            if ($includeMemories) {
+                try {
+                    // Memory collection may use a pinned embedding model; fall back
+                    // to a memory-specific embed when the shared VECTORIZE vector
+                    // would be the wrong dimension.
+                    $memoryEmbed = $this->userMemoryService->embedQueryForMemorySearch($userId, $query);
+                    $memoryVector = null !== $memoryEmbed ? $memoryEmbed['embedding'] : $vector;
+                    $memoryHits = $this->userMemoryService->searchMemoriesByVector(
+                        $userId,
+                        $memoryVector,
+                        null,
+                        self::MEMORY_LIMIT,
+                        $this->feedbackConfig->getMinChatMemoryScore(),
+                    );
+                    $memories = $this->formatter->formatMemoriesContext($memoryHits);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('MessagesContextInjector: memories failed', [
+                        'user_id' => $userId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         }
 

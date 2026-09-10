@@ -308,14 +308,25 @@ final readonly class MessagesGateway
         }
         $desktop = DesktopTurnOptions::fromRequest($request);
         $profile = $this->resolveDesktopProfile($user, $desktop);
+        // Desktop headers are an explicit per-request pin, not a bypass of
+        // CONTEXT_INJECTION_ENABLED. Ambient memories stay behind that flag.
+        // An explicit knowledge folder (or recipe folders) still searches RAG
+        // when the flag is off — otherwise x-synaplan-rag-group-key is a no-op.
+        $explicitFolder = null !== $desktop->ragGroupKey
+            || (null !== $profile && [] !== $profile->ragScopes);
+        $wantSessionBlock = $injectContext || $explicitFolder;
+        if ('off' === strtolower((string) $contextOverride)) {
+            $wantSessionBlock = false;
+        }
         if ($injectContext || !$desktop->isEmpty()) {
             $injected = $this->contextInjector->inject(
                 $requestBody,
                 $user,
                 $sessionKey,
-                $contextOverride,
+                $wantSessionBlock ? $contextOverride : 'off',
                 $desktop,
                 $profile,
+                $injectContext,
             );
             $requestBody = $injected['body'];
             if ($injected['injected']) {

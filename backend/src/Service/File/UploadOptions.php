@@ -30,7 +30,6 @@ final readonly class UploadOptions
         public bool $overwrite = false,
         public bool $retainSource = true,
         public ?int $vectorizeModelId = null,
-        public ?int $analyzeModelId = null,
     ) {
     }
 

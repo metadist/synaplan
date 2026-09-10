@@ -157,6 +157,52 @@ final class MessagesContextInjectorTest extends TestCase
         $this->assertSame('project-chat-y', $result['body']['model']);
     }
 
+    public function testDesktopRagWithoutAmbientMemoriesSkipsMemorySearch(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $memory = $this->createMock(UserMemoryService::class);
+        $memory->method('embedUserQuery')->willReturn([
+            'embedding' => [0.1, 0.2],
+            'model_id' => 1,
+            'model_name' => 'bge',
+            'provider' => 'ollama',
+        ]);
+        $memory->expects($this->never())->method('embedQueryForMemorySearch');
+        $memory->expects($this->never())->method('searchMemoriesByVector');
+
+        $vector = $this->createMock(VectorSearchService::class);
+        $vector->expects($this->once())->method('semanticSearchByVector')->willReturn([]);
+
+        $item = $this->createMock(CacheItemInterface::class);
+        $item->method('isHit')->willReturn(false);
+        $item->method('set')->willReturnSelf();
+        $item->method('expiresAfter')->willReturnSelf();
+        $cache = $this->createMock(CacheItemPoolInterface::class);
+        $cache->method('getItem')->willReturn($item);
+        $cache->method('save')->willReturn(true);
+
+        $injector = new MessagesContextInjector(
+            $memory,
+            $vector,
+            new KnowledgeContextFormatter(),
+            $cache,
+            new NullLogger(),
+            $this->createFeedbackConfig(),
+        );
+
+        $injector->inject(
+            ['messages' => [['role' => 'user', 'content' => 'hello']]],
+            $user,
+            'sess-desktop-no-mem',
+            null,
+            new DesktopTurnOptions(null, 'DESKTOP:personal'),
+            null,
+            false,
+        );
+    }
+
     public function testHeaderOffSkipsInjection(): void
     {
         $user = $this->createMock(User::class);

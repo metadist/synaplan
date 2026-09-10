@@ -220,7 +220,7 @@ These routes are for Synaplan Desktop. They are not a public Assistants CRUD.
 | `GET` | `/v1/assistants` | Reader `publicView` list, including `models.chat` / `vision` / `vectorize`. `AGENTS.ENABLED` off → **404** with code `assistants_disabled` (not an empty list). |
 | `GET` | `/v1/assistants/{id}` | One runnable Assistant. Same 404 when the flag is off. |
 | `POST` | `/v1/messages` | Existing Anthropic SSE. Optional headers `x-synaplan-agent-id` and `x-synaplan-rag-group-key` (`DESKTOP:{projectId}`). The JSON `model` (provider id or catalog key) **always wins** over the Assistant recipe. |
-| `POST` | `/api/v1/files/upload` and `/api/v1/files/{id}/process` | Existing `desktop:files` surface plus optional `vectorize_model` / `analyze_model` catalog keys. Unknown or wrong-capability keys are **400**. Omitted keys keep the account default. `process_level=vectorize` still only indexes; `analyze_model` is validated now and used when analysis actually runs. |
+| `POST` | `/api/v1/files/upload` and `/api/v1/files/{id}/process` | Existing `desktop:files` surface plus optional `vectorize_model` / `analyze_model` catalog keys. Unknown or wrong-capability keys are **400**. Omitted `vectorize_model` keeps the account VECTORIZE default. `process_level=vectorize` only indexes — `analyze_model` is fail-closed validated so a bad DOCS binding is rejected, but it is **not** applied because that path does not run document analysis. |
 
 `GET /api/v1/config/models` stays `messages:*`. `GET /api/v1/agents*` stays
 `agents:*`. A paired key must not reach either.
