@@ -4803,7 +4803,11 @@
       "model": "model",
       "models": "models",
       "adminOnlyTitle": "Admin access required",
-      "adminOnlyMessage": "Feature status is available to administrators only."
+      "adminOnlyMessage": "Feature status is available to administrators only.",
+      "modulesTitle": "Feature modules",
+      "modulesSubtitle": "Optional features this installation declares. Each one is switched on by its configuration; the list shows which keys, never their values.",
+      "modulesConfigured": "{configured} of {total} configured",
+      "configuredBy": "Configured by:"
     },
     "notLoggedIn": "Not logged in"
   },
@@ -6418,5 +6422,54 @@
     "applyImport": "Import selected",
     "imported": "Tools imported.",
     "importFailed": "The OpenAPI description could not be imported."
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (document text extraction)"
+    },
+    "docling": {
+      "label": "Docling (document conversion)"
+    },
+    "office_convert": {
+      "label": "Office conversion"
+    },
+    "searxng": {
+      "label": "SearXNG web search"
+    },
+    "piper_tts": {
+      "label": "Piper text-to-speech"
+    },
+    "local_ai": {
+      "label": "Local AI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield video generation"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive image generation"
+    },
+    "stripe_billing": {
+      "label": "Stripe billing"
+    },
+    "mobile_iap": {
+      "label": "Mobile in-app purchases"
+    },
+    "whatsapp": {
+      "label": "WhatsApp channel"
+    },
+    "state": {
+      "available": "Available",
+      "needs_setup": "Needs setup",
+      "absent": "Not installed"
+    },
+    "notice": {
+      "title": "{module} is not available on this installation",
+      "body": "This feature is optional. It is switched on by the administrator of this installation.",
+      "howToEnable": "How to enable it",
+      "openFeatureStatus": "Open feature status"
+    }
   }
 }

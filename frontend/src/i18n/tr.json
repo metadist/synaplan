@@ -2513,7 +2513,11 @@
       "model": "model",
       "models": "model",
       "adminOnlyTitle": "Yönetici erişimi gerekli",
-      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir."
+      "adminOnlyMessage": "Özellik durumu yalnızca yöneticiler için kullanılabilir.",
+      "modulesTitle": "Özellik modülleri",
+      "modulesSubtitle": "Bu kurulumun bildirdiği isteğe bağlı özellikler. Her biri kendi yapılandırmasıyla açılır; liste anahtarları gösterir, değerlerini asla göstermez.",
+      "modulesConfigured": "{total} modülden {configured} tanesi yapılandırıldı",
+      "configuredBy": "Yapılandıran:"
     },
     "notLoggedIn": "Oturum açılmadı"
   },
@@ -5433,5 +5437,54 @@
     "applyImport": "Seçilenleri içe aktar",
     "imported": "Araçlar içe aktarıldı.",
     "importFailed": "OpenAPI açıklaması içe aktarılamadı."
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (belge metni çıkarma)"
+    },
+    "docling": {
+      "label": "Docling (belge dönüştürme)"
+    },
+    "office_convert": {
+      "label": "Office dönüştürme"
+    },
+    "searxng": {
+      "label": "SearXNG web araması"
+    },
+    "piper_tts": {
+      "label": "Piper metinden sese"
+    },
+    "local_ai": {
+      "label": "Yerel AI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield video üretimi"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive görsel üretimi"
+    },
+    "stripe_billing": {
+      "label": "Stripe faturalandırma"
+    },
+    "mobile_iap": {
+      "label": "Mobil uygulama içi satın alma"
+    },
+    "whatsapp": {
+      "label": "WhatsApp kanalı"
+    },
+    "state": {
+      "available": "Kullanılabilir",
+      "needs_setup": "Kurulum gerekli",
+      "absent": "Kurulu değil"
+    },
+    "notice": {
+      "title": "{module} bu kurulumda kullanılamıyor",
+      "body": "Bu özellik isteğe bağlıdır. Bu kurulumun yöneticisi tarafından açılır.",
+      "howToEnable": "Nasıl etkinleştirilir",
+      "openFeatureStatus": "Özellik durumunu aç"
+    }
   }
 }

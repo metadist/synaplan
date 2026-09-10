@@ -2512,7 +2512,11 @@
       "model": "modelo",
       "models": "modelos",
       "adminOnlyTitle": "Se requiere acceso de administrador",
-      "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores."
+      "adminOnlyMessage": "El estado de las funciones solo está disponible para administradores.",
+      "modulesTitle": "Módulos de funciones",
+      "modulesSubtitle": "Funciones opcionales que declara esta instalación. Cada una se activa mediante su configuración; la lista muestra las claves, nunca sus valores.",
+      "modulesConfigured": "{configured} de {total} configurados",
+      "configuredBy": "Configurado por:"
     },
     "notLoggedIn": "No has iniciado sesión"
   },
@@ -5432,5 +5436,54 @@
     "applyImport": "Importar selección",
     "imported": "Herramientas importadas.",
     "importFailed": "No se pudo importar la descripción OpenAPI."
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (extracción de texto de documentos)"
+    },
+    "docling": {
+      "label": "Docling (conversión de documentos)"
+    },
+    "office_convert": {
+      "label": "Conversión de Office"
+    },
+    "searxng": {
+      "label": "Búsqueda web SearXNG"
+    },
+    "piper_tts": {
+      "label": "Piper texto a voz"
+    },
+    "local_ai": {
+      "label": "IA local (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Generación de vídeo Higgsfield"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "Generación de imágenes TheHive"
+    },
+    "stripe_billing": {
+      "label": "Facturación Stripe"
+    },
+    "mobile_iap": {
+      "label": "Compras dentro de la app móvil"
+    },
+    "whatsapp": {
+      "label": "Canal de WhatsApp"
+    },
+    "state": {
+      "available": "Disponible",
+      "needs_setup": "Requiere configuración",
+      "absent": "No instalado"
+    },
+    "notice": {
+      "title": "{module} no está disponible en esta instalación",
+      "body": "Esta función es opcional. La activa el administrador de esta instalación.",
+      "howToEnable": "Cómo activarla",
+      "openFeatureStatus": "Abrir estado de funciones"
+    }
   }
 }

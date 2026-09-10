@@ -7,7 +7,14 @@
       data-testid="section-header"
     />
 
-    <div class="surface-card p-6" data-testid="section-whatsapp">
+    <!-- WhatsApp is a feature module: an installation without it shows the shared notice instead -->
+    <FeatureNotConfiguredNotice
+      v-if="!whatsappAvailable"
+      module="whatsapp"
+      :docs="whatsappGate?.docs"
+    />
+
+    <div v-if="whatsappAvailable" class="surface-card p-6" data-testid="section-whatsapp">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
         <DevicePhoneMobileIcon class="w-5 h-5 text-green-500" />
         {{ $t('channels.whatsappChannels') }}
@@ -39,7 +46,7 @@
       </div>
     </div>
 
-    <PhoneVerification />
+    <PhoneVerification v-if="whatsappAvailable" />
 
     <div class="surface-card p-6" data-testid="section-email">
       <h3 class="text-lg font-semibold txt-primary mb-4 flex items-center gap-2">
@@ -150,6 +157,12 @@ import PageHeader from '@/components/PageHeader.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import ChannelAssistantSelect from '@/components/assistants/ChannelAssistantSelect.vue'
 import PhoneVerification from '@/components/config/PhoneVerification.vue'
+import FeatureNotConfiguredNotice from '@/components/common/FeatureNotConfiguredNotice.vue'
+import { isModuleConfigured } from '@/composables/useModuleFeature'
+import {
+  featureNotConfigured,
+  type FeatureNotConfigured,
+} from '@/services/api/featureNotConfigured'
 import { getWhatsAppAssistant, setWhatsAppAssistant } from '@/services/api/whatsappAssistantApi'
 import {
   mockWhatsAppChannels,
@@ -183,6 +196,12 @@ const originalData = ref({
 })
 
 // Computed refs for template access
+// Hidden when the runtime config reports the module absent, or when a request
+// came back as the module gate's 404 (deep link with a stale runtime config).
+const whatsappGate = ref<FeatureNotConfigured | null>(null)
+const whatsappAvailable = computed(
+  () => isModuleConfigured('whatsapp') && whatsappGate.value === null
+)
 const whatsappAgentId = ref<number | null>(null)
 const whatsappChannels = computed(() => formData.value.whatsappChannels)
 const emailChannels = computed<EmailChannel[]>(() => {
@@ -232,10 +251,12 @@ const loadEmailKeyword = async () => {
 onMounted(async () => {
   cleanupGuard = setupNavigationGuard()
   await loadEmailKeyword()
+  if (!whatsappAvailable.value) return
   try {
     whatsappAgentId.value = await getWhatsAppAssistant()
-  } catch {
+  } catch (err: unknown) {
     whatsappAgentId.value = null
+    whatsappGate.value = featureNotConfigured(err)
   }
 })
 
