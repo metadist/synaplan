@@ -19,6 +19,7 @@ const creating = ref(false)
 const importing = ref(false)
 
 const enabled = computed(() => isCustomToolsEnabled())
+const editorKey = computed(() => editing.value?.id ?? 'new')
 
 const load = async () => {
   if (!enabled.value) {
@@ -60,6 +61,25 @@ const classLabel = (sideEffect: string): string => {
   if (sideEffect === 'read') return t('customTools.classRead')
   if (sideEffect === 'destructive') return t('customTools.classDestructive')
   return t('customTools.classWrite')
+}
+
+const closeEditor = (): void => {
+  creating.value = false
+  editing.value = null
+}
+
+const onEditorSaved = (): void => {
+  closeEditor()
+  void load()
+}
+
+const closeImport = (): void => {
+  importing.value = false
+}
+
+const onImportApplied = (): void => {
+  closeImport()
+  void load()
 }
 </script>
 
@@ -125,25 +145,15 @@ const classLabel = (sideEffect: string): string => {
 
     <CustomToolEditor
       v-if="creating || editing"
-      :key="editing?.id ?? 'new'"
+      :key="editorKey"
       :tool="editing"
-      @close="
-        creating = false
-        editing = null
-      "
-      @saved="
-        creating = false
-        editing = null
-        load()
-      "
+      @close="closeEditor"
+      @saved="onEditorSaved"
     />
     <OpenApiImportWizard
       v-if="importing"
-      @close="importing = false"
-      @applied="
-        importing = false
-        load()
-      "
+      @close="closeImport"
+      @applied="onImportApplied"
     />
   </section>
 </template>
