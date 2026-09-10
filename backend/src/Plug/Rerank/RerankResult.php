@@ -18,6 +18,10 @@ final readonly class RerankResult
         public array $hits,
         public string $provider = '',
         public int $ms = 0,
+        public ?int $modelId = null,
+        public bool $meter = false,
+        public int $promptTokens = 0,
+        public int $requests = 1,
     ) {
     }
 }

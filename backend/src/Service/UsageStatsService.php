@@ -21,6 +21,7 @@ final readonly class UsageStatsService
         'AUDIOS',
         'FILE_ANALYSIS',
         'EMBEDDINGS',
+        'RERANK',
     ];
 
     public function __construct(

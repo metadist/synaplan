@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Plug\Rerank;
 
+use App\Entity\User;
 use App\Plug\PlugConfigService;
+use App\Service\RateLimitService;
 
 /**
  * Reorders RAG hits when a rerank adapter is active. On timeout, empty
@@ -18,6 +20,7 @@ final readonly class RerankStage
         private RerankRegistry $registry,
         private PlugConfigService $config,
         private RerankMetrics $metrics,
+        private RateLimitService $rateLimit,
     ) {
     }
 
@@ -44,7 +47,7 @@ final readonly class RerankStage
      *
      * @return list<RagHit>
      */
-    public function apply(string $query, array $results, int $k): array
+    public function apply(string $query, array $results, int $k, ?User $user = null): array
     {
         $provider = $this->registry->active();
         if (null === $provider || [] === $results || $k < 1 || '' === trim($query)) {
@@ -76,13 +79,41 @@ final readonly class RerankStage
                 return $this->fallback($results, $k, 'empty');
             }
 
-            return $this->reorder($results, $ranked, $k);
+            $out = $this->reorder($results, $ranked, $k);
         } catch (\Throwable) {
             $ms = (int) ((hrtime(true) - $started) / 1_000_000);
             $this->metrics->observeLatency($ms);
 
             return $this->fallback($results, $k, 'exception');
         }
+
+        // After a successful reorder only. A billing failure must not rewind
+        // the ranking into the embedding-order fallback, and the LLM adapter
+        // already bills through the summarize model's chat path (#1778).
+        $this->recordUsage($user, $ranked);
+
+        return $out;
+    }
+
+    private function recordUsage(?User $user, RerankResult $ranked): void
+    {
+        if (null === $user || !$ranked->meter || null === $ranked->modelId) {
+            return;
+        }
+
+        $this->rateLimit->recordUsage($user, 'RERANK', [
+            'usage' => [
+                'prompt_tokens' => $ranked->promptTokens,
+                'completion_tokens' => 0,
+                'total_tokens' => $ranked->promptTokens,
+            ],
+            'media_usage' => [
+                'requests' => max(1, $ranked->requests),
+            ],
+            'provider' => $ranked->provider,
+            'model_id' => $ranked->modelId,
+            'source' => 'RAG_RERANK',
+        ]);
     }
 
     /**

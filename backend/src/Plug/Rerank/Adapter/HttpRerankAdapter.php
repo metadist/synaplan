@@ -64,10 +64,10 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
             $texts[] = $this->truncate($candidate->text, $options->maxCandidateChars);
         }
 
-        $ranked = $this->request($model, $query, $texts, $topK, $options->latencyBudgetMs);
+        $outcome = $this->request($model, $query, $texts, $topK, $options->latencyBudgetMs);
         $ms = (int) ((hrtime(true) - $started) / 1_000_000);
         $hits = [];
-        foreach ($ranked as $row) {
+        foreach ($outcome['ranks'] as $row) {
             $index = $row['index'];
             if (!isset($candidates[$index])) {
                 continue;
@@ -83,7 +83,15 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
             }
         }
 
-        return new RerankResult($hits, self::KEY.':'.strtolower($model->getService()), $ms);
+        return new RerankResult(
+            $hits,
+            self::KEY.':'.strtolower($model->getService()),
+            $ms,
+            $model->getId() ?? $this->modelConfig->getDefaultModel('RERANK'),
+            true,
+            $outcome['tokens'],
+            $outcome['requests'],
+        );
     }
 
     public function health(): PlugHealth
@@ -147,7 +155,7 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
     /**
      * @param list<string> $texts
      *
-     * @return list<array{index: int, score: float}>
+     * @return array{ranks: list<array{index: int, score: float}>, tokens: int, requests: int}
      */
     private function request(Model $model, string $query, array $texts, int $topK, int $budgetMs): array
     {
@@ -174,7 +182,7 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
                 'raw_scores' => false,
             ], $timeout);
 
-            return $this->mapIndexed($payload, 'score');
+            return $this->withUsage($this->mapIndexed($payload, 'score'), $payload);
         }
 
         $key = $this->keys->getKey($service);
@@ -182,27 +190,68 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
             throw new \RuntimeException(ucfirst($service).' API key is not configured');
         }
 
-        return match ($service) {
-            'jina' => $this->mapResults($this->client->postJson(
+        $payload = match ($service) {
+            'jina' => $this->client->postJson(
                 'https://api.jina.ai/v1/rerank',
                 ['Authorization' => 'Bearer '.$key],
                 ['model' => $providerId, 'query' => $query, 'documents' => $texts, 'top_n' => $topK],
                 $timeout,
-            ), 'relevance_score'),
-            'cohere' => $this->mapResults($this->client->postJson(
+            ),
+            'cohere' => $this->client->postJson(
                 'https://api.cohere.com/v2/rerank',
                 ['Authorization' => 'Bearer '.$key],
                 ['model' => $providerId, 'query' => $query, 'documents' => $texts, 'top_n' => $topK],
                 $timeout,
-            ), 'relevance_score'),
-            'voyage' => $this->mapVoyage($this->client->postJson(
+            ),
+            'voyage' => $this->client->postJson(
                 'https://api.voyageai.com/v1/rerank',
                 ['Authorization' => 'Bearer '.$key],
                 ['model' => $providerId, 'query' => $query, 'documents' => $texts, 'top_k' => $topK],
                 $timeout,
-            )),
+            ),
             default => throw new \RuntimeException('Unsupported rerank service: '.$model->getService()),
         };
+
+        $ranks = match ($service) {
+            'voyage' => $this->mapVoyage($payload),
+            default => $this->mapResults($payload, 'relevance_score'),
+        };
+
+        return $this->withUsage($ranks, $payload);
+    }
+
+    /**
+     * Jina/Voyage report `usage.total_tokens`. Cohere bills `meta.billed_units.search_units`.
+     * TEI typically returns a bare list and is treated as one unbilled request.
+     *
+     * @param list<array{index: int, score: float}> $ranks
+     * @param array<int|string, mixed>              $payload
+     *
+     * @return array{ranks: list<array{index: int, score: float}>, tokens: int, requests: int}
+     */
+    private function withUsage(array $ranks, array $payload): array
+    {
+        $tokens = 0;
+        $usage = $payload['usage'] ?? null;
+        if (\is_array($usage)) {
+            if (is_numeric($usage['total_tokens'] ?? null)) {
+                $tokens = (int) $usage['total_tokens'];
+            } elseif (is_numeric($usage['prompt_tokens'] ?? null)) {
+                $tokens = (int) $usage['prompt_tokens'];
+            }
+        }
+
+        $requests = 1;
+        $meta = $payload['meta'] ?? null;
+        if (\is_array($meta)) {
+            $billed = $meta['billed_units'] ?? null;
+            $units = \is_array($billed) ? ($billed['search_units'] ?? null) : null;
+            if (is_numeric($units) && (int) $units > 0) {
+                $requests = (int) $units;
+            }
+        }
+
+        return ['ranks' => $ranks, 'tokens' => $tokens, 'requests' => $requests];
     }
 
     /**

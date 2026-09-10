@@ -42,6 +42,15 @@ final class HttpRerankAdapterContractTest extends TestCase
 
         $this->assertSame(['b', 'a'], array_column($result->hits, 'id'));
         $this->assertStringStartsWith('http:', $result->provider);
+        $this->assertTrue($result->meter);
+        $this->assertSame(347, $result->modelId);
+        if ('Jina' === $service) {
+            $this->assertSame(42, $result->promptTokens);
+        } elseif ('Voyage' === $service) {
+            $this->assertSame(17, $result->promptTokens);
+        } elseif ('Cohere' === $service) {
+            $this->assertSame(2, $result->requests);
+        }
     }
 
     public function testUnreachableTeiIsUnavailable(): void

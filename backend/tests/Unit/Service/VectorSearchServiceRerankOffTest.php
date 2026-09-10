@@ -53,6 +53,7 @@ final class VectorSearchServiceRerankOffTest extends TestCase
             new RerankRegistry([], new PlugConfigService($repo), $models),
             new PlugConfigService($repo),
             new RerankMetrics(new NullLogger()),
+            $this->createMock(RateLimitService::class),
         );
 
         $service = new VectorSearchService(
