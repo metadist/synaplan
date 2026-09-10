@@ -98,16 +98,54 @@ final class AgentSerializer
     }
 
     /**
-     * Reader payload — never the draft.
+     * Reader payload — never the draft JSON.
+     *
+     * `$visibleDefinition` is the published snapshot (or, for the owner of an
+     * unpublished assistant, the draft used only to expose `models.*`). The
+     * rest of the draft is discarded.
+     *
+     * @param array<string, mixed>|null $visibleDefinition
      *
      * @return array<string, mixed>
      */
-    public function publicView(Agent $agent): array
+    public function publicView(Agent $agent, ?array $visibleDefinition = null): array
     {
         $full = $this->full($agent);
         unset($full['draft']);
+        $full['models'] = $this->readerModels($visibleDefinition ?? $agent->getDraft());
 
         return $full;
+    }
+
+    /**
+     * Catalog keys a published recipe names. Null means "workspace default".
+     *
+     * @param array<string, mixed> $definition
+     *
+     * @return array{chat: ?string, vision: ?string, vectorize: ?string}
+     */
+    public function readerModels(array $definition): array
+    {
+        $models = $definition['models'] ?? [];
+        if (!is_array($models)) {
+            $models = [];
+        }
+
+        return [
+            'chat' => $this->nullableCatalogKey($models['chat'] ?? null),
+            'vision' => $this->nullableCatalogKey($models['vision'] ?? null),
+            'vectorize' => $this->nullableCatalogKey($models['vectorize'] ?? null),
+        ];
+    }
+
+    private function nullableCatalogKey(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $trimmed = trim($value);
+
+        return '' !== $trimmed ? $trimmed : null;
     }
 
     /**

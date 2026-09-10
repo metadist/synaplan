@@ -54,7 +54,7 @@ final class MessagesApiController extends AbstractController
         content: new OA\JsonContent(
             required: ['model', 'messages', 'max_tokens'],
             properties: [
-                new OA\Property(property: 'model', type: 'string', example: 'claude-sonnet-4-6'),
+                new OA\Property(property: 'model', type: 'string', example: 'claude-sonnet-4-6', description: 'Provider id or catalog key service:providerId:tag. When present this value always wins over a pinned Assistant recipe.'),
                 new OA\Property(
                     property: 'messages',
                     type: 'array',
@@ -73,6 +73,8 @@ final class MessagesApiController extends AbstractController
             ]
         )
     )]
+    #[OA\Parameter(name: 'x-synaplan-agent-id', in: 'header', required: false, schema: new OA\Schema(type: 'integer'), description: 'Optional Assistant id to pin this turn. Ignored when missing, invalid, or AGENTS.ENABLED is off. Does not replace the body model.')]
+    #[OA\Parameter(name: 'x-synaplan-rag-group-key', in: 'header', required: false, schema: new OA\Schema(type: 'string', example: 'DESKTOP:personal'), description: 'Optional knowledge folder. Desktop sends DESKTOP:{projectId}. Combined with a pinned Assistant\'s folders; never dropped.')]
     #[OA\Response(response: 200, description: 'Message response or SSE stream')]
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(response: 403, description: 'Gateway disabled')]

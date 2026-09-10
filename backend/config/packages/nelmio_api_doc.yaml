@@ -23,3 +23,7 @@ nelmio_api_doc:
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc
+            # Desktop project companion (paired keys). The rest of /v1 stays
+            # out of the published spec — it is the OpenAI/Anthropic gateway.
+            - ^/v1/models/catalog
+            - ^/v1/assistants
