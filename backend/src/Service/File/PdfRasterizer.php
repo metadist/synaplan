@@ -14,20 +14,9 @@ use Psr\Log\LoggerInterface;
  */
 final class PdfRasterizer
 {
-    /**
-     * One-page 1×1 PDF used to probe whether Imagick may read the PDF coder.
-     * Kept tiny so the process-wide probe is cheap.
-     */
-    private const MINIMAL_PDF = <<<'PDF'
-%PDF-1.1
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/MediaBox[0 0 1 1]/Parent 2 0 R>>endobj
-trailer<</Root 1 0 R>>
-%%EOF
-PDF;
-
     private static ?bool $cachedImagickPdfAllowed = null;
+
+    private static int $imagickPdfProbeCalls = 0;
 
     private string $lastEngine = '';
     private int $lastDpi = 0;
@@ -53,6 +42,15 @@ PDF;
     public static function resetImagickPdfProbeForTests(): void
     {
         self::$cachedImagickPdfAllowed = null;
+        self::$imagickPdfProbeCalls = 0;
+    }
+
+    /**
+     * How many times this process ran the Imagick-PDF probe. Tests only.
+     */
+    public static function imagickPdfProbeCallCountForTests(): int
+    {
+        return self::$imagickPdfProbeCalls;
     }
 
     /**
@@ -129,6 +127,8 @@ PDF;
 
     private function probeImagickPdfPolicy(): bool
     {
+        ++self::$imagickPdfProbeCalls;
+
         if (!class_exists(\Imagick::class)) {
             return false;
         }
@@ -141,6 +141,11 @@ PDF;
 
                     return false;
                 }
+                if ('' !== $rights) {
+                    // Coder is explicitly permitted. Do not let a probe blob
+                    // override that and disable Imagick for the whole process.
+                    return true;
+                }
             } catch (\Throwable) {
                 // Policy query unsupported or unset — fall through to a blob probe.
             }
@@ -149,7 +154,7 @@ PDF;
         try {
             $imagick = new \Imagick();
             $imagick->setResolution(2, 2);
-            $imagick->readImageBlob(self::MINIMAL_PDF);
+            $imagick->readImageBlob(self::minimalValidPdf());
             $imagick->clear();
             $imagick->destroy();
 
@@ -161,6 +166,34 @@ PDF;
 
             return false;
         }
+    }
+
+    /**
+     * One-page 3×3 PDF with a real xref/startxref so a policy-allowed Imagick
+     * does not reject the probe as malformed and cache "cannot read PDF".
+     */
+    private static function minimalValidPdf(): string
+    {
+        $objects = [
+            '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+            '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+            '3 0 obj<</Type/Page/MediaBox[0 0 3 3]/Parent 2 0 R>>endobj',
+        ];
+
+        $body = "%PDF-1.4\n";
+        $offsets = [0];
+        foreach ($objects as $object) {
+            $offsets[] = strlen($body);
+            $body .= $object."\n";
+        }
+
+        $xrefPos = strlen($body);
+        $xref = "xref\n0 4\n".sprintf("%010d 65535 f \n", 0);
+        foreach ([1, 2, 3] as $id) {
+            $xref .= sprintf("%010d 00000 n \n", $offsets[$id]);
+        }
+
+        return $body.$xref."trailer<</Size 4/Root 1 0 R>>\nstartxref\n".$xrefPos."\n%%EOF\n";
     }
 
     /**

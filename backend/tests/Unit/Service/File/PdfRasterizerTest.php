@@ -56,10 +56,17 @@ final class PdfRasterizerTest extends TestCase
             }
         };
 
-        $rasterizer = new PdfRasterizer($logger, $dir, 72, 1, 5000, false);
-        $rasterizer->pdfToPng($pdf);
+        if (!$this->pdftoppmAvailable()) {
+            self::markTestSkipped('pdftoppm is required to assert the blocked-Imagick fallback');
+        }
 
-        self::assertNotSame('imagick', $rasterizer->getLastEngine());
+        $rasterizer = new PdfRasterizer($logger, $dir, 72, 1, 5000, false);
+        $images = $rasterizer->pdfToPng($pdf);
+
+        self::assertNotSame([], $images);
+        self::assertSame('pdftoppm', $rasterizer->getLastEngine());
+        self::assertFileExists($images[0]);
+        self::assertGreaterThan(0, (int) filesize($images[0]));
         foreach ($logger->warnings as $warning) {
             self::assertStringNotContainsString('Imagick failed', $warning);
         }
@@ -70,14 +77,33 @@ final class PdfRasterizerTest extends TestCase
         @rmdir($dir);
     }
 
+    public function testProbePdfIsStructurallyComplete(): void
+    {
+        $method = new \ReflectionMethod(PdfRasterizer::class, 'minimalValidPdf');
+        $pdf = $method->invoke(null);
+        self::assertIsString($pdf);
+        self::assertStringContainsString("xref\n", $pdf);
+        self::assertStringContainsString("startxref\n", $pdf);
+
+        $marker = "startxref\n";
+        $offsetStart = strpos($pdf, $marker);
+        self::assertNotFalse($offsetStart);
+        $xrefOffset = (int) substr($pdf, $offsetStart + strlen($marker));
+        self::assertSame('xref', substr($pdf, $xrefOffset, 4));
+    }
+
     public function testProbeIsCachedAcrossInstances(): void
     {
         PdfRasterizer::resetImagickPdfProbeForTests();
+        self::assertSame(0, PdfRasterizer::imagickPdfProbeCallCountForTests());
+
         $first = $this->rasterizer();
         $allowed = $first->willAttemptImagick();
-        $second = $this->rasterizer();
+        self::assertSame(1, PdfRasterizer::imagickPdfProbeCallCountForTests());
 
+        $second = $this->rasterizer();
         self::assertSame($allowed, $second->willAttemptImagick());
+        self::assertSame(1, PdfRasterizer::imagickPdfProbeCallCountForTests());
     }
 
     private function rasterizer(?bool $imagickPdfAllowed = null): PdfRasterizer
@@ -98,5 +124,12 @@ final class PdfRasterizerTest extends TestCase
         self::assertFileExists($path);
 
         return $path;
+    }
+
+    private function pdftoppmAvailable(): bool
+    {
+        $path = trim((string) shell_exec('command -v pdftoppm 2>/dev/null'));
+
+        return '' !== $path;
     }
 }
