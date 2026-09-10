@@ -275,9 +275,13 @@ async function saveKey(provider: string): Promise<void> {
     if (card) {
       card.keyStatus = keyStatus
     }
-    const refreshed = await getWebSearchStatus()
-    applyStatus(refreshed)
     success(t('aiInfra.webSearch.keySaved'))
+    try {
+      const refreshed = await getWebSearchStatus()
+      applyStatus(refreshed)
+    } catch {
+      // Key is already stored; a stale badge is better than a false save error.
+    }
   } catch (err) {
     showError(err instanceof Error ? err.message : t('aiInfra.webSearch.saveFailed'))
   } finally {

@@ -10,6 +10,7 @@ use App\Plug\WebSearch\Client\SearxngClient;
 use App\Plug\WebSearch\SearchResult;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchOptionMapper;
 use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
@@ -18,7 +19,7 @@ use App\Plug\WebSearch\WebSearchQuery;
 /**
  * @internal
  */
-final readonly class SearxngAdapter implements WebSearchProviderInterface
+final readonly class SearxngAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public function __construct(
         private SearxngClient $client,

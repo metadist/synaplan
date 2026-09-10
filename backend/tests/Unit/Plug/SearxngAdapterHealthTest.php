@@ -19,6 +19,7 @@ use App\Repository\ConfigRepository;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class SearxngAdapterHealthTest extends TestCase
 {
@@ -37,6 +38,57 @@ final class SearxngAdapterHealthTest extends TestCase
         $probed = $adapter->probe();
         self::assertFalse($probed->available);
         self::assertStringContainsString('refused', strtolower((string) $probed->reason));
+    }
+
+    public function testUnresolvedHostIsNotReportedAsConnectionRefused(): void
+    {
+        $http = new MockHttpClient(static function (): never {
+            throw new class('Could not resolve host searxng.internal') extends \RuntimeException implements \Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface {};
+        });
+        $adapter = new SearxngAdapter(new SearxngClient(
+            $http,
+            new PlugConfigService($this->repo([])),
+            'http://searxng.internal',
+        ));
+
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('could not resolve host', strtolower((string) $probed->reason));
+        self::assertStringNotContainsString('connection refused', strtolower((string) $probed->reason));
+    }
+
+    public function testHtmlProbeBodyIsNotReportedAvailable(): void
+    {
+        $http = new MockHttpClient([new MockResponse(
+            '<html>login</html>',
+            ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']],
+        )]);
+        $adapter = new SearxngAdapter(new SearxngClient(
+            $http,
+            new PlugConfigService($this->repo([])),
+            'http://searxng.test',
+        ));
+
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('no results array', strtolower((string) $probed->reason));
+    }
+
+    public function testJsonWithoutResultsArrayIsNotReportedAvailable(): void
+    {
+        $http = new MockHttpClient([new MockResponse(
+            '{"error":"ok"}',
+            ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']],
+        )]);
+        $adapter = new SearxngAdapter(new SearxngClient(
+            $http,
+            new PlugConfigService($this->repo([])),
+            'http://searxng.test',
+        ));
+
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('no results array', strtolower((string) $probed->reason));
     }
 
     public function testEmptyBaseUrlIsUnavailable(): void

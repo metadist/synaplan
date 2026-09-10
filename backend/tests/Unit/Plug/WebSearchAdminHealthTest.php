@@ -10,6 +10,7 @@ use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchAdminHealth;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchHealthCache;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 use PHPUnit\Framework\TestCase;
@@ -100,6 +101,58 @@ final class WebSearchAdminHealthTest extends TestCase
         self::assertSame(1, $probes);
     }
 
+    public function testAdapterWithoutLiveProbeIsNotVerified(): void
+    {
+        $adapter = new class implements WebSearchProviderInterface {
+            public function key(): string
+            {
+                return 'searxng';
+            }
+
+            public function descriptor(): PlugDescriptor
+            {
+                return new PlugDescriptor('searxng', 'Plugin', '', [], 'test');
+            }
+
+            public function capabilities(): WebSearchCapabilities
+            {
+                return WebSearchCapabilities::brave();
+            }
+
+            public function search(WebSearchQuery $query): SearchResultSet
+            {
+                return SearchResultSet::empty($query->query);
+            }
+
+            public function health(): PlugHealth
+            {
+                return PlugHealth::available();
+            }
+        };
+
+        $health = $this->resolver()->forAdapter($adapter, 'searxng', '');
+
+        self::assertFalse($health->available);
+        self::assertSame('Key stored — not verified', $health->reason);
+    }
+
+    public function testForgetDropsCachedProbe(): void
+    {
+        $probes = 0;
+        $adapter = $this->provider('searxng', configured: true, probe: static function () use (&$probes): PlugHealth {
+            ++$probes;
+
+            return PlugHealth::available();
+        });
+        $resolver = $this->resolver();
+
+        $resolver->forAdapter($adapter, 'brave', '');
+        $resolver->forget('searxng');
+        $resolver->forAdapter($adapter, 'brave', '');
+
+        self::assertSame(2, $probes);
+    }
+
     private function resolver(): WebSearchAdminHealth
     {
         return new WebSearchAdminHealth(new WebSearchHealthCache());
@@ -107,7 +160,7 @@ final class WebSearchAdminHealthTest extends TestCase
 
     private function provider(string $key, bool $configured, callable $probe): WebSearchProviderInterface
     {
-        return new class($key, $configured, $probe) implements WebSearchProviderInterface {
+        return new class($key, $configured, $probe) implements WebSearchProviderInterface, WebSearchLiveProbeInterface {
             /**
              * @param callable(): PlugHealth $probe
              */

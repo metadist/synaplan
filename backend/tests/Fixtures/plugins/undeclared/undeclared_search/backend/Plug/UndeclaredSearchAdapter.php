@@ -41,9 +41,4 @@ final readonly class UndeclaredSearchAdapter implements WebSearchProviderInterfa
     {
         return PlugHealth::available();
     }
-
-    public function probe(): PlugHealth
-    {
-        return $this->health();
-    }
 }

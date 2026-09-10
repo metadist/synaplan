@@ -176,4 +176,30 @@ describe('WebSearchPlugTab', () => {
       (wrapper.get('[data-testid="web-search-key-tavily"]').element as HTMLInputElement).value
     ).toBe('not-a-real-key')
   })
+
+  it('still reports the key as saved when status refresh fails', async () => {
+    savePlugKey.mockResolvedValue({
+      configured: true,
+      source: 'db',
+      origin: 'ui',
+      maskedKey: '••••abcd',
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    getWebSearchStatus.mockRejectedValueOnce(new Error('status down'))
+    await wrapper.get('[data-testid="web-search-key-tavily"]').setValue('real-key')
+    await wrapper.get('[data-testid="web-search-save-key-tavily"]').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith('Key saved and verified. The next search can use it.')
+    expect(showError).not.toHaveBeenCalled()
+  })
 })

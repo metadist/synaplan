@@ -29,12 +29,18 @@ Steps:
    `getKey('<key>')`, declare `"plug_keys"` in the manifest `permissions`, and
    never read an env var directly or log the key. Your adapter's key is
    automatically allowed once it is declared in `provides.plugs`.
-4. **`health()` must be cheap and never throw** — a missing key or unreachable
-   service returns `PlugHealth::unavailable('<reason>')`. For the operation
-   itself, return an empty result when there is genuinely nothing to return; a
-   transient upstream failure (timeout, HTTP 5xx/429) may throw — the registry
-   catches it and falls back to another provider, so a down provider never
-   breaks chat or an upload while a recoverable error still triggers a retry.
+4. **`health()` must be cheap, config-only, and never throw** — a missing key
+   or URL returns `PlugHealth::unavailable('<reason>')`. Do not do live I/O
+   here: chat search calls `health()` on every request. For a live
+   reachability / credential check (admin badges, key verification), also
+   implement `App\Plug\WebSearch\WebSearchLiveProbeInterface` (`probe()`).
+   Plugins that skip that interface still load; the admin UI then shows
+   "Key stored — not verified" instead of a live badge. For the search
+   operation itself, return an empty result when there is genuinely nothing
+   to return; a transient upstream failure (timeout, HTTP 5xx/429) may throw
+   — the registry catches it and falls back to another provider, so a down
+   provider never breaks chat or an upload while a recoverable error still
+   triggers a retry.
 5. **Declare the adapter** in `manifest.json` under `provides.plugs` — the
    backend refuses to boot otherwise:
 

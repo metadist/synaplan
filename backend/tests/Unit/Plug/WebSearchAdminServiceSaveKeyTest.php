@@ -14,6 +14,7 @@ use App\Plug\WebSearch\WebSearchAdminHealth;
 use App\Plug\WebSearch\WebSearchAdminService;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchHealthCache;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 use App\Plug\WebSearch\WebSearchRegistry;
@@ -55,13 +56,13 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
         $plugKeys->method('getStatus')->willReturn([
             'configured' => true,
             'source' => 'db',
-            'origin' => 'ui',
+            'origin' => PlugKeyStore::ORIGIN_ENV,
             'maskedKey' => '••••',
         ]);
         $plugKeys->method('getKey')->willReturn('old-good-key');
         $plugKeys->expects(self::exactly(2))->method('saveKey')->willReturnCallback(
-            static function (string $provider, string $key) use (&$saved): void {
-                $saved[] = [$provider, $key];
+            static function (string $provider, string $key, string $origin = PlugKeyStore::ORIGIN_UI) use (&$saved): void {
+                $saved[] = [$provider, $key, $origin];
             },
         );
         $plugKeys->expects(self::never())->method('deleteKey');
@@ -76,6 +77,40 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
             self::fail('expected the rejected key to throw');
         } catch (\InvalidArgumentException $e) {
             self::assertStringContainsString('not stored', $e->getMessage());
+        }
+
+        self::assertSame([
+            ['exa', 'new-bad-key', PlugKeyStore::ORIGIN_UI],
+            ['exa', 'old-good-key', PlugKeyStore::ORIGIN_ENV],
+        ], $saved);
+    }
+
+    public function testProbeExceptionRollsBackPreviousKey(): void
+    {
+        $saved = [];
+        $plugKeys = $this->createMock(PlugKeyStore::class);
+        $plugKeys->method('supports')->willReturn(true);
+        $plugKeys->method('getStatus')->willReturn([
+            'configured' => true,
+            'source' => 'db',
+            'origin' => PlugKeyStore::ORIGIN_UI,
+            'maskedKey' => '••••',
+        ]);
+        $plugKeys->method('getKey')->willReturn('old-good-key');
+        $plugKeys->expects(self::exactly(2))->method('saveKey')->willReturnCallback(
+            static function (string $provider, string $key) use (&$saved): void {
+                $saved[] = [$provider, $key];
+            },
+        );
+
+        $service = $this->service($this->throwingAdapter('exa'), $plugKeys);
+
+        try {
+            $service->saveKey('exa', 'new-bad-key');
+            self::fail('expected the rejected key to throw');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('not stored', $e->getMessage());
+            self::assertStringContainsString('upstream timeout', $e->getMessage());
         }
 
         self::assertSame([['exa', 'new-bad-key'], ['exa', 'old-good-key']], $saved);
@@ -153,7 +188,7 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
 
     private function adapter(string $key, PlugHealth $probe): WebSearchProviderInterface
     {
-        return new class($key, $probe) implements WebSearchProviderInterface {
+        return new class($key, $probe) implements WebSearchProviderInterface, WebSearchLiveProbeInterface {
             public function __construct(
                 private string $providerKey,
                 private PlugHealth $probeHealth,
@@ -188,6 +223,46 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
             public function probe(): PlugHealth
             {
                 return $this->probeHealth;
+            }
+        };
+    }
+
+    private function throwingAdapter(string $key): WebSearchProviderInterface
+    {
+        return new class($key) implements WebSearchProviderInterface, WebSearchLiveProbeInterface {
+            public function __construct(
+                private string $providerKey,
+            ) {
+            }
+
+            public function key(): string
+            {
+                return $this->providerKey;
+            }
+
+            public function descriptor(): PlugDescriptor
+            {
+                return new PlugDescriptor($this->providerKey, $this->providerKey, '', [], 'test');
+            }
+
+            public function capabilities(): WebSearchCapabilities
+            {
+                return WebSearchCapabilities::exa();
+            }
+
+            public function search(WebSearchQuery $query): SearchResultSet
+            {
+                return SearchResultSet::empty($query->query);
+            }
+
+            public function health(): PlugHealth
+            {
+                return PlugHealth::available();
+            }
+
+            public function probe(): PlugHealth
+            {
+                throw new \RuntimeException('upstream timeout');
             }
         };
     }

@@ -47,9 +47,4 @@ final readonly class FixtureSearchAdapter implements WebSearchProviderInterface
     {
         return PlugHealth::available();
     }
-
-    public function probe(): PlugHealth
-    {
-        return $this->health();
-    }
 }
