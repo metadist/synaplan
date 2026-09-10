@@ -21,9 +21,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * protected route still sees 401, never a hint about the installation's modules.
  * Which routes belong to a module is declared by the module itself
  * ({@see \App\Module\Contract\FeatureModuleInterface::routeNames()}); health,
- * runtime config, API docs, credential/connect routes and store webhooks are
- * never listed there and therefore never gated. A configured module is never
- * gated regardless of the flag.
+ * runtime config, API docs, credential/connect routes, store notification
+ * webhooks (Apple/Google/Stripe) and the Meta verify handshake are never
+ * listed there and therefore never gated. The WhatsApp POST webhook
+ * (`api_webhooks_whatsapp`) is listed and is gated when WhatsApp is absent.
+ * A configured module is never gated regardless of the flag.
  */
 #[AsEventListener(event: KernelEvents::CONTROLLER)]
 final readonly class ModuleGateListener

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Config;
+use App\Module\Gate\ModuleGateConfig;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -136,5 +139,78 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertIsArray($data['auth']);
         $this->assertArrayHasKey('mailerConfigured', $data['auth']);
         $this->assertIsBool($data['auth']['mailerConfigured']);
+    }
+
+    /**
+     * FM14: every declared module is listed with configured/gated booleans.
+     * Seeded gates are off; flipping GATE_WHATSAPP is visible on the next request.
+     */
+    public function testRuntimeConfigReportsModuleConfiguredAndGatedStates(): void
+    {
+        $client = static::createClient();
+        $client->request('GET', '/api/v1/config/runtime');
+        $this->assertResponseIsSuccessful();
+
+        $data = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertIsArray($data);
+        $this->assertArrayHasKey('modules', $data);
+        $this->assertIsArray($data['modules']);
+        $this->assertNotEmpty($data['modules']);
+
+        foreach ($data['modules'] as $id => $state) {
+            $this->assertIsString($id);
+            $this->assertMatchesRegularExpression('/^[a-z][a-z0-9_]*$/', $id);
+            $this->assertIsArray($state);
+            $this->assertArrayHasKey('configured', $state);
+            $this->assertArrayHasKey('gated', $state);
+            $this->assertIsBool($state['configured']);
+            $this->assertIsBool($state['gated']);
+        }
+
+        $this->assertArrayHasKey('tika', $data['modules']);
+        $this->assertArrayHasKey('whatsapp', $data['modules']);
+        $this->assertFalse($data['modules']['whatsapp']['gated']);
+
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $row = $em->getRepository(Config::class)->findOneBy([
+            'ownerId' => 0,
+            'group' => ModuleGateConfig::GROUP,
+            'setting' => ModuleGateConfig::settingFor('whatsapp'),
+        ]);
+        if (!$row instanceof Config) {
+            $row = (new Config())
+                ->setOwnerId(0)
+                ->setGroup(ModuleGateConfig::GROUP)
+                ->setSetting(ModuleGateConfig::settingFor('whatsapp'))
+                ->setValue('0');
+            $em->persist($row);
+            $em->flush();
+        }
+        $previous = $row->getValue();
+        $row->setValue('1');
+        $em->flush();
+        $em->clear();
+
+        try {
+            $client->request('GET', '/api/v1/config/runtime');
+            $this->assertResponseIsSuccessful();
+            $gated = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertIsArray($gated);
+            $this->assertTrue($gated['modules']['whatsapp']['gated']);
+            $this->assertSame(
+                $data['modules']['whatsapp']['configured'],
+                $gated['modules']['whatsapp']['configured'],
+            );
+        } finally {
+            $restore = $em->getRepository(Config::class)->findOneBy([
+                'ownerId' => 0,
+                'group' => ModuleGateConfig::GROUP,
+                'setting' => ModuleGateConfig::settingFor('whatsapp'),
+            ]);
+            if ($restore instanceof Config) {
+                $restore->setValue($previous);
+                $em->flush();
+            }
+        }
     }
 }
