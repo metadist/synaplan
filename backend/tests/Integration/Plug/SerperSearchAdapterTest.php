@@ -60,6 +60,19 @@ final class SerperSearchAdapterTest extends TestCase
         self::assertSame([], $adapter->search(new WebSearchQuery('synaplan'))->results);
     }
 
+    public function testGarbageKeyIsUnavailableOnProbe(): void
+    {
+        $adapter = new SerperSearchAdapter(
+            new MockHttpClient([new MockResponse('unauthorized', ['http_code' => 401])]),
+            $this->keyStore('not-a-real-key'),
+        );
+
+        self::assertTrue($adapter->health()->available, 'A stored key is still configured');
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('401', (string) $probed->reason);
+    }
+
     /**
      * @return array<string, mixed>
      */

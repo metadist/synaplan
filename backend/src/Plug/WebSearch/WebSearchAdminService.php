@@ -6,6 +6,7 @@ namespace App\Plug\WebSearch;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\Plug\PlugConfigService;
+use App\Plug\PlugHealth;
 use App\Plug\PlugKeyStore;
 use App\Service\Search\BraveSearchService;
 
@@ -20,6 +21,7 @@ final readonly class WebSearchAdminService
         private PlugKeyStore $plugKeys,
         private ProviderKeyStore $providerKeys,
         private BraveSearchService $braveSearch,
+        private WebSearchAdminHealth $adminHealth,
     ) {
     }
 
@@ -33,10 +35,12 @@ final readonly class WebSearchAdminService
      */
     public function status(): array
     {
+        $active = $this->plugConfig->webSearchProvider(null);
+        $fallback = $this->plugConfig->webSearchFallback();
         $providers = [];
         foreach ($this->registry->all() as $adapter) {
             $descriptor = $adapter->descriptor();
-            $health = $adapter->health();
+            $health = $this->adminHealth->forAdapter($adapter, $active, $fallback);
             $providers[] = [
                 'key' => $adapter->key(),
                 'label' => $descriptor->label,
@@ -54,8 +58,8 @@ final readonly class WebSearchAdminService
 
         return [
             'providers' => $providers,
-            'active' => $this->plugConfig->webSearchProvider(null),
-            'fallback' => $this->plugConfig->webSearchFallback(),
+            'active' => $active,
+            'fallback' => $fallback,
             'userOverrideAllowed' => $this->plugConfig->isWebSearchUserOverrideAllowed(),
         ];
     }
@@ -89,6 +93,9 @@ final readonly class WebSearchAdminService
         $started = hrtime(true);
         try {
             $set = $adapter->search(new WebSearchQuery($query));
+            if ($adapter->health()->available) {
+                $this->adminHealth->remember($key, PlugHealth::available());
+            }
             $latencyMs = (int) ((hrtime(true) - $started) / 1_000_000);
             $results = [];
             foreach (array_slice($set->results, 0, 5) as $row) {
@@ -105,6 +112,8 @@ final readonly class WebSearchAdminService
                 'error' => null,
             ];
         } catch (\Throwable $e) {
+            $this->adminHealth->remember($key, PlugHealth::unavailable($e->getMessage()));
+
             return [
                 'results' => [],
                 'answer' => null,
@@ -122,11 +131,13 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->saveKey($normalized, $key);
+            $this->adminHealth->forget($normalized);
 
             return $this->plugKeys->getStatus($normalized);
         }
         if ('perplexity' === $normalized) {
             $this->providerKeys->saveKey('perplexity', $key);
+            $this->adminHealth->forget('perplexity');
 
             return $this->providerKeys->getStatus('perplexity');
         }
@@ -142,11 +153,13 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->deleteKey($normalized);
+            $this->adminHealth->forget($normalized);
 
             return $this->plugKeys->getStatus($normalized);
         }
         if ('perplexity' === $normalized) {
             $this->providerKeys->deleteKey('perplexity');
+            $this->adminHealth->forget('perplexity');
 
             return $this->providerKeys->getStatus('perplexity');
         }

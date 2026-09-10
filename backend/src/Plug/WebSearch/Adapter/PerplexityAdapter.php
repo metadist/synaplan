@@ -13,7 +13,9 @@ use App\Plug\WebSearch\ProviderAnswer;
 use App\Plug\WebSearch\SearchResult;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchOptionMapper;
+use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 use App\Repository\ConfigRepository;
@@ -26,7 +28,7 @@ use Psr\Log\LoggerInterface;
  *
  * @internal
  */
-final readonly class PerplexityAdapter implements WebSearchProviderInterface
+final readonly class PerplexityAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public function __construct(
         private PerplexitySearchClient $client,
@@ -101,6 +103,15 @@ final readonly class PerplexityAdapter implements WebSearchProviderInterface
         return $this->client->hasKey()
             ? PlugHealth::available()
             : PlugHealth::unavailable('Perplexity API key is not configured');
+    }
+
+    public function probe(): PlugHealth
+    {
+        return WebSearchProbe::run(
+            $this->client->hasKey(),
+            'Perplexity API key is not configured',
+            $this->client->probe(...),
+        );
     }
 
     /**

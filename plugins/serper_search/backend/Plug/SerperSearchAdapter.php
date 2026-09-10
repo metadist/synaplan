@@ -10,6 +10,8 @@ use App\Plug\PlugKeyStore;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchOptionMapper;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
+use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -26,7 +28,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * provider — so a down provider never breaks chat, yet a recoverable error
  * still triggers a retry rather than silently returning "no results".
  */
-final readonly class SerperSearchAdapter implements WebSearchProviderInterface
+final readonly class SerperSearchAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public const KEY = 'serper';
 
@@ -111,6 +113,28 @@ final readonly class SerperSearchAdapter implements WebSearchProviderInterface
         return null !== $key && '' !== $key
             ? PlugHealth::available()
             : PlugHealth::unavailable('Serper API key is not configured');
+    }
+
+    public function probe(): PlugHealth
+    {
+        $key = $this->keys->getKey(self::KEY);
+        $configured = null !== $key && '' !== $key;
+
+        return WebSearchProbe::run(
+            $configured,
+            'Serper API key is not configured',
+            function () use ($key): void {
+                $response = $this->httpClient->request('POST', self::ENDPOINT, [
+                    'timeout' => 5,
+                    'headers' => ['X-API-KEY' => (string) $key, 'Content-Type' => 'application/json'],
+                    'json' => ['q' => 'synaplan', 'num' => 1],
+                ]);
+                if ($response->getStatusCode() >= 400) {
+                    throw new \RuntimeException('Serper HTTP '.$response->getStatusCode());
+                }
+                $response->getContent(false);
+            },
+        );
     }
 
     /**

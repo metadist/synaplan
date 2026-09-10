@@ -20,5 +20,10 @@ interface WebSearchProviderInterface
 
     public function search(WebSearchQuery $query): SearchResultSet;
 
+    /**
+     * Cheap config check (key / URL present). Used on the chat search path.
+     * Must never throw or perform a paid / networked probe — see
+     * {@see WebSearchLiveProbeInterface} for admin reachability.
+     */
     public function health(): PlugHealth;
 }

@@ -58,4 +58,13 @@ final readonly class ExaClient
 
         return $response->toArray(false);
     }
+
+    public function probe(): void
+    {
+        $this->search([
+            'query' => 'synaplan',
+            'numResults' => 1,
+            'type' => 'auto',
+        ]);
+    }
 }

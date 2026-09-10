@@ -58,4 +58,12 @@ final readonly class PerplexitySearchClient
 
         return $response->toArray(false);
     }
+
+    public function probe(): void
+    {
+        $this->search([
+            'query' => 'synaplan',
+            'max_results' => 1,
+        ]);
+    }
 }

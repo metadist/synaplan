@@ -11,14 +11,16 @@ use App\Plug\WebSearch\ProviderAnswer;
 use App\Plug\WebSearch\SearchResult;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchOptionMapper;
+use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 
 /**
  * @internal
  */
-final readonly class TavilyAdapter implements WebSearchProviderInterface
+final readonly class TavilyAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public function __construct(
         private TavilyClient $client,
@@ -97,5 +99,14 @@ final readonly class TavilyAdapter implements WebSearchProviderInterface
         return $this->client->hasKey()
             ? PlugHealth::available()
             : PlugHealth::unavailable('Tavily API key is not configured');
+    }
+
+    public function probe(): PlugHealth
+    {
+        return WebSearchProbe::run(
+            $this->client->hasKey(),
+            'Tavily API key is not configured',
+            $this->client->probe(...),
+        );
     }
 }

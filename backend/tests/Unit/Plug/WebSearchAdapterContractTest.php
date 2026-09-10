@@ -79,6 +79,20 @@ final class WebSearchAdapterContractTest extends TestCase
         $this->assertTrue($adapter->capabilities()->answer);
     }
 
+    public function testExaGarbageKeyIsUnavailableOnProbe(): void
+    {
+        $http = new MockHttpClient([new MockResponse('unauthorized', ['http_code' => 401])]);
+        $adapter = new ExaAdapter(
+            new ExaClient($http, $this->plugKeys('exa'), $this->plugConfig()),
+            $this->plugConfig(),
+        );
+
+        self::assertTrue($adapter->health()->available, 'A stored key is still configured');
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('401', (string) $probed->reason);
+    }
+
     public function testHttpErrorBecomesExceptionForRegistryFallback(): void
     {
         $http = new MockHttpClient([new MockResponse('nope', ['http_code' => 500])]);

@@ -89,6 +89,11 @@ final class WebSearchRegistryTest extends TestCase
                     ? PlugHealth::available()
                     : PlugHealth::unavailable($this->providerKey.' unavailable');
             }
+
+            public function probe(): PlugHealth
+            {
+                return $this->health();
+            }
         };
     }
 }
