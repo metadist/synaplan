@@ -76,7 +76,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  21. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
  *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — default OFF)
  *  23. plugs         (BCONFIG: PLUGS extraction/search/rerank defaults, ownerId=0)
- *  24. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
+ *  24. tools         (BCONFIG: TOOLS registry/approvals/custom-HTTP flags, ownerId=0)
+ *  25. module-gates  (BCONFIG: MODULES.GATE_<ID> all OFF, ownerId=0)
+ *  26. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
  * on every container startup in dev AND prod.
@@ -155,7 +157,9 @@ final class SeedAllCommand extends Command
             "  21. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
             "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — default OFF)\n".
             "  23. plugs defaults             (BCONFIG, group=PLUGS, ownerId=0 — today's FileProcessor + Brave)\n".
-            "  24. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
+            "  24. tools flags                (BCONFIG, group=TOOLS, ownerId=0)\n".
+            "  25. module-gates               (BCONFIG, group=MODULES, GATE_<ID>=0 for every declared module)\n".
+            "  26. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );
     }
