@@ -64,6 +64,48 @@ final class HttpSidecarHealthProbeTest extends TestCase
         $this->assertNull($seen[2]);
     }
 
+    public function testProbesTheSameUrlOnceWithinARequestAndAgainAfterReset(): void
+    {
+        $calls = 0;
+        $client = new MockHttpClient(static function () use (&$calls): MockResponse {
+            ++$calls;
+
+            return new MockResponse('v1');
+        });
+        $probe = new HttpSidecarHealthProbe($client);
+
+        $this->assertTrue($probe->isReachable('http://tika/tika'));
+        $this->assertTrue($probe->isReachable('http://tika/tika'));
+        $this->assertSame('v1', $probe->fetchText('http://tika/version'));
+        $this->assertSame('v1', $probe->fetchText('http://tika/version'));
+        $this->assertSame(2, $calls, 'one request per distinct URL');
+
+        // A different user on the same URL is a different probe.
+        $this->assertTrue($probe->isReachable('http://tika/tika', 'user', 'pass'));
+        $this->assertSame(3, $calls);
+
+        $probe->reset();
+        $this->assertTrue($probe->isReachable('http://tika/tika'));
+        $this->assertSame(4, $calls, 'the memo is cleared between requests');
+    }
+
+    public function testAFailedProbeIsMemoisedToo(): void
+    {
+        $calls = 0;
+        $client = new MockHttpClient(static function () use (&$calls): never {
+            ++$calls;
+            throw new TransportException('resolving timed out');
+        });
+        $probe = new HttpSidecarHealthProbe($client);
+
+        $this->assertFalse($probe->isReachable('http://docling/health'));
+        $this->assertFalse($probe->isReachable('http://docling/health'));
+        $this->assertNull($probe->fetchText('http://docling/health'));
+        $this->assertNull($probe->fetchText('http://docling/health'));
+
+        $this->assertSame(2, $calls, 'one attempt per URL and method');
+    }
+
     public function testFetchTextReturnsBodyOnlyFor2xx(): void
     {
         $ok = new HttpSidecarHealthProbe(new MockHttpClient(new MockResponse("Apache Tika 2.9.2\n")));
