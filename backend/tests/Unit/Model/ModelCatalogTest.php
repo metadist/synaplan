@@ -1224,4 +1224,40 @@ class ModelCatalogTest extends TestCase
 
         ModelCatalog::upsert($connection, $model);
     }
+
+    /**
+     * #1778: a per1K catalog price on the implicit per_token mode is read by
+     * convertToPerToken as $price/1000 per token. Cohere's $2.00/1K searches
+     * would then bill ~1000×. Any per1K/per1000 row must author pricing_mode.
+     */
+    public function testPer1kRowsAuthorAnExplicitPricingMode(): void
+    {
+        foreach (ModelCatalog::all() as $row) {
+            $unit = strtolower((string) ($row['inUnit'] ?? ''));
+            if (!\in_array($unit, ['per1k', 'per1000'], true)) {
+                continue;
+            }
+
+            $this->assertArrayHasKey(
+                'pricing_mode',
+                $row['json'] ?? [],
+                sprintf(
+                    'BID %d (%s/%s) authors inUnit=%s and must set json.pricing_mode so it is not billed per token',
+                    $row['id'] ?? 0,
+                    $row['service'] ?? '',
+                    $row['providerId'] ?? '',
+                    $row['inUnit'] ?? '',
+                ),
+            );
+        }
+
+        $cohere = array_values(array_filter(
+            ModelCatalog::all(),
+            static fn (array $m): bool => 346 === ($m['id'] ?? null),
+        ));
+        $this->assertCount(1, $cohere);
+        $this->assertSame('per_request', $cohere[0]['json']['pricing_mode'] ?? null);
+        $this->assertSame('per1K', $cohere[0]['inUnit'] ?? null);
+        $this->assertEqualsWithDelta(2.0, (float) ($cohere[0]['priceIn'] ?? 0.0), 1e-9);
+    }
 }

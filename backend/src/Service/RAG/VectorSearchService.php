@@ -126,7 +126,9 @@ final readonly class VectorSearchService
             }, $results);
 
             if (null !== $queryText && '' !== trim($queryText)) {
-                return $this->rerankStage->apply($queryText, $mapped, $limit);
+                $user = $this->userRepository->find($userId);
+
+                return $this->rerankStage->apply($queryText, $mapped, $limit, $user instanceof User ? $user : null);
             }
 
             return $mapped;

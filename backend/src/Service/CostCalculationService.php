@@ -80,6 +80,12 @@ final readonly class CostCalculationService
             );
         }
 
+        // Per-search rows (Cohere rerank) must never go through convertToPerToken —
+        // a $2.00/1K-searches price would be read as $0.002/token (#1778).
+        if ('per_request' === ($model->getJson()['pricing_mode'] ?? 'per_token')) {
+            return $this->calculateMediaCost($modelId, 1.0, 0.0, $timestamp);
+        }
+
         // Long-context tier: several providers bill the WHOLE request at a
         // higher per-token rate once the prompt crosses a token threshold
         // (Gemini/Claude >200k, GPT-5.x / GPT-6 >272k). Switch both input and output to
@@ -338,7 +344,7 @@ final readonly class CostCalculationService
             'perhour' => $price / 3_600,
             // Flat per-clip / per-call billing (#1317): the authored price is
             // already the price for one whole generation, so no scaling.
-            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'per_generation', 'pergeneration' => $price,
+            'per1', 'perchar', 'perpic', 'perimage', 'persec', 'persecond', 'per_generation', 'pergeneration', 'perrequest', 'per_request' => $price,
             '-', '', 'free' => 0.0,
             default => $price,
         };

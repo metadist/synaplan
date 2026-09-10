@@ -3599,7 +3599,8 @@
         "file_analysis": "Análisis de Archivos",
         "sorting": "Clasificación",
         "search_query": "Consulta de búsqueda",
-        "api_chat": "Chat de API"
+        "api_chat": "Chat de API",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -3614,7 +3615,8 @@
         "openai_api": "API (compatible con OpenAI)",
         "api_summary": "Resumen de sesión de API",
         "mcp": "MCP",
-        "mcp_tool": "Herramientas MCP"
+        "mcp_tool": "Herramientas MCP",
+        "rag_rerank": "Rerank de documentos"
       },
       "periods": {
         "today": "Hoy",

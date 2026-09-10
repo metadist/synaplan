@@ -405,6 +405,26 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('2.500000', $result->outputCost);
     }
 
+    public function testPerRequestRerankIsOneSearchNotTokens(): void
+    {
+        $model = $this->createModelMock('cohere', 2.0, 0.0, 'per1K', '-', [
+            'pricing_mode' => 'per_request',
+        ], 'rerank-v3.5');
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $viaMedia = $this->service->calculateMediaCost(346, 1.0, 0.0);
+        $this->assertSame('0.002000', $viaMedia->totalCost);
+
+        // The token path must not treat $2.00/per1K as $0.002/token (25000
+        // tokens would have billed ≈ $50). It now delegates to per_request.
+        $viaTokens = $this->service->calculateCost(25000, 0, 0, 0, 346);
+        $this->assertSame('0.002000', $viaTokens->totalCost);
+    }
+
     public function testCalculateMediaCostPerGenerationScalesWithClipCount(): void
     {
         $model = $this->createModelMock('Higgsfield', 0.0, 1.75, '-', 'per_generation', [

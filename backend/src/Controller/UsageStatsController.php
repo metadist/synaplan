@@ -38,7 +38,7 @@ class UsageStatsController extends AbstractController
      * - Breakdown by source (WhatsApp, Email, Web)
      * - Breakdown by time period (today, this week, this month)
      * - Recent usage history
-     * - total_requests (sum across all actions) and total_messages (BACTION=MESSAGES only)
+     * - total_requests (sum across all tracked actions, including RERANK) and total_messages (BACTION=MESSAGES only)
      * - cost_budget and cost_summary
      *
      * TODO: the OpenAPI schema for the `data` property is currently `object`, which

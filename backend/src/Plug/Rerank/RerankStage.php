@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Plug\Rerank;
 
+use App\Entity\User;
 use App\Plug\PlugConfigService;
+use App\Service\RateLimitService;
 
 /**
  * Reorders RAG hits when a rerank adapter is active. On timeout, empty
@@ -18,6 +20,7 @@ final readonly class RerankStage
         private RerankRegistry $registry,
         private PlugConfigService $config,
         private RerankMetrics $metrics,
+        private RateLimitService $rateLimit,
     ) {
     }
 
@@ -44,7 +47,7 @@ final readonly class RerankStage
      *
      * @return list<RagHit>
      */
-    public function apply(string $query, array $results, int $k): array
+    public function apply(string $query, array $results, int $k, ?User $user = null): array
     {
         $provider = $this->registry->active();
         if (null === $provider || [] === $results || $k < 1 || '' === trim($query)) {
@@ -67,21 +70,53 @@ final readonly class RerankStage
         $started = hrtime(true);
         try {
             $ranked = $provider->rerank($query, $candidates, $k, $options);
-            $ms = $ranked->ms > 0 ? $ranked->ms : (int) ((hrtime(true) - $started) / 1_000_000);
-            $this->metrics->observeLatency($ms);
-            if ($ms > $options->latencyBudgetMs) {
-                return $this->fallback($results, $k, 'timeout');
-            }
-            if ([] === $ranked->hits) {
-                return $this->fallback($results, $k, 'empty');
-            }
-
-            return $this->reorder($results, $ranked, $k);
         } catch (\Throwable) {
             $ms = (int) ((hrtime(true) - $started) / 1_000_000);
             $this->metrics->observeLatency($ms);
 
             return $this->fallback($results, $k, 'exception');
+        }
+
+        $ms = $ranked->ms > 0 ? $ranked->ms : (int) ((hrtime(true) - $started) / 1_000_000);
+        $this->metrics->observeLatency($ms);
+        // The provider already ran (and may have billed us). Record that
+        // before the local timeout / empty-hit fallbacks, and never let a
+        // usage-row failure rewind a successful reorder (#1778).
+        $this->recordUsage($user, $ranked);
+
+        if ($ms > $options->latencyBudgetMs) {
+            return $this->fallback($results, $k, 'timeout');
+        }
+        if ([] === $ranked->hits) {
+            return $this->fallback($results, $k, 'empty');
+        }
+
+        return $this->reorder($results, $ranked, $k);
+    }
+
+    private function recordUsage(?User $user, RerankResult $ranked): void
+    {
+        if (null === $user || !$ranked->meter || null === $ranked->modelId) {
+            return;
+        }
+
+        try {
+            $this->rateLimit->recordUsage($user, 'RERANK', [
+                'usage' => [
+                    'prompt_tokens' => $ranked->promptTokens,
+                    'completion_tokens' => 0,
+                    'total_tokens' => $ranked->promptTokens,
+                ],
+                'media_usage' => [
+                    'requests' => max(1, $ranked->requests),
+                ],
+                'provider' => $ranked->provider,
+                'model' => $ranked->model,
+                'model_id' => $ranked->modelId,
+                'source' => 'RAG_RERANK',
+            ]);
+        } catch (\Throwable $error) {
+            $this->metrics->recordBillingFailure($error);
         }
     }
 

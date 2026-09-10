@@ -2555,7 +2555,8 @@
         "sorting": "Classification",
         "search_query": "Requête de recherche",
         "embeddings": "Embeddings",
-        "api_chat": "Chat API"
+        "api_chat": "Chat API",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -2570,7 +2571,8 @@
         "openai_api": "API (compatible OpenAI)",
         "api_summary": "Résumé de session API",
         "mcp": "MCP",
-        "mcp_tool": "Outils MCP"
+        "mcp_tool": "Outils MCP",
+        "rag_rerank": "Rerank de documents"
       },
       "periods": {
         "today": "Aujourd’hui",

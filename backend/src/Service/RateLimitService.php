@@ -380,6 +380,7 @@ final class RateLimitService
             $inputQty = match ($pricingMode) {
                 'per_character' => (float) ($mediaUsage['characters'] ?? 0),
                 'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+                'per_request' => (float) ($mediaUsage['requests'] ?? 1),
                 default => 0.0,
             };
             $outputQty = match ($pricingMode) {
@@ -805,7 +806,7 @@ final class RateLimitService
     public function getUserLimits(User $user): array
     {
         $level = $user->getRateLimitLevel();
-        $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS'];
+        $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS', 'RERANK'];
 
         $result = [
             'level' => $level,
