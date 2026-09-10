@@ -12,6 +12,7 @@ use App\Bundle\BundleConfig;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
+use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
@@ -96,6 +97,7 @@ class ConfigController extends AbstractController
         private CapabilityService $capabilityService,
         private FeatureStatusReporter $featureStatusReporter,
         private ModuleRegistry $modules,
+        private ModuleGateConfig $moduleGate,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
         private readonly ?SelfAwareConfig $selfAwareConfig = null,
@@ -477,6 +479,19 @@ class ConfigController extends AbstractController
                         ),
                     ]
                 ),
+                new OA\Property(
+                    property: 'modules',
+                    type: 'object',
+                    description: 'Declared feature modules keyed by module id (tika, docling, office_convert, searxng, piper_tts, local_ai, higgsfield, google_ai, thehive, stripe_billing, mobile_iap, whatsapp). `configured` is whether the installation provides the module; `gated` is whether an absent module answers 404 feature_not_configured on its routes (MODULES.GATE_<ID>, off by default). Older clients ignore this key; a client that does not receive it treats every module as configured.',
+                    additionalProperties: new OA\AdditionalProperties(
+                        type: 'object',
+                        required: ['configured', 'gated'],
+                        properties: [
+                            new OA\Property(property: 'configured', type: 'boolean', example: true),
+                            new OA\Property(property: 'gated', type: 'boolean', example: false),
+                        ]
+                    )
+                ),
             ]
         )
     )]
@@ -687,6 +702,7 @@ class ConfigController extends AbstractController
             'usageTaximeter' => [
                 'enabled' => $this->usageTaximeterConfig->isEnabled(),
             ],
+            'modules' => $this->moduleStates(),
         ];
 
         if ($user && !empty($unavailableProviders)) {
@@ -695,6 +711,22 @@ class ConfigController extends AbstractController
         $response['setup'] = $setup;
 
         return $this->json($response);
+    }
+
+    /**
+     * @return array<string, array{configured: bool, gated: bool}>
+     */
+    private function moduleStates(): array
+    {
+        $states = [];
+        foreach ($this->modules->all() as $id => $module) {
+            $states[$id] = [
+                'configured' => $module->isConfigured(),
+                'gated' => $this->moduleGate->isGated($id),
+            ];
+        }
+
+        return $states;
     }
 
     /**
