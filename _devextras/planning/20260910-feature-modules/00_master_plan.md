@@ -1,10 +1,11 @@
 # Feature modules — optional features declared, gated and provable — master plan
 
 **Status:** Draft 2026-09-10, awaiting the §0 decision checklist (log in
-[`STATUS.md`](./STATUS.md)). Cross-cutting refactor initiative, not a roadmap
-track; recommended to run **before Wave 5** of
-[`../20260903_roadmap.md`](../20260903_roadmap.md) because tracks 2, 3 and 5
-each add optional services in W5.
+[`STATUS.md`](./STATUS.md)). This is the **Intermezzo** release in
+[`../20260910_roadmap_update.md`](../20260910_roadmap_update.md) — after the
+two production bugfixes and Wave 4, before Wave 5. Cross-cutting refactor,
+not a seventh track. Wave 5 adds optional services (compute client, more
+tools); those must be born as modules, so this lands first.
 Research that produced this plan:
 [`../20260910-wave5-architecture-research/02_conditional_module_loading.md`](../20260910-wave5-architecture-research/02_conditional_module_loading.md).
 Sprint files: [`01_sprint_1_inventory_and_dead_weight.md`](./01_sprint_1_inventory_and_dead_weight.md) …

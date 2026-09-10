@@ -2,7 +2,9 @@
 
 **Status:** Binding from 2026-09-07. Copy and journeys are reviewed **before**
 the Vue is built, not after. This is the UX contract for every remaining
-sprint in [`20260903_roadmap.md`](./20260903_roadmap.md).
+sprint in the live plan
+[`20260910_roadmap_update.md`](./20260910_roadmap_update.md)
+(archived overview: [`20260903_roadmap/20260903_roadmap.md`](./20260903_roadmap/20260903_roadmap.md)).
 **Lesson:** IAM sharing (S2/S3) shipped as APIs plus a dialog. Recipients
 could not find a chat shared with their group. A follow-up
 ([#1717](https://github.com/metadist/synaplan/pull/1717)) had to invent the
