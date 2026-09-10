@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Chat;
 use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -91,10 +92,11 @@ class MessageRepository extends ServiceEntityRepository
      * may differ within a chat (e.g. WhatsApp anonymous flow), and all
      * are returned as long as the chat belongs to the given user.
      *
-     * @param int $userId        Owner of the chat (verified via Chat.userId)
-     * @param int $chatId        Chat ID to get messages from
-     * @param int $maxMessages   Maximum number of messages (default: 30)
-     * @param int $maxTotalChars Maximum total characters across all messages (default: 15000)
+     * @param int      $userId           Owner of the chat (verified via Chat.userId)
+     * @param int      $chatId           Chat ID to get messages from
+     * @param int      $maxMessages      Maximum number of messages (default: 30)
+     * @param int      $maxTotalChars    Maximum total characters across all messages (default: 15000)
+     * @param int|null $excludeMessageId Skip this id before applying caps (the just-persisted IN row)
      *
      * @return array Array of Message entities, ordered oldest first
      */
@@ -103,8 +105,9 @@ class MessageRepository extends ServiceEntityRepository
         int $chatId,
         int $maxMessages = 30,
         int $maxTotalChars = 15000,
+        ?int $excludeMessageId = null,
     ): array {
-        $messages = $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->join('m.chat', 'c')
             ->where('m.chatId = :chatId')
             ->andWhere('c.userId = :userId')
@@ -112,19 +115,23 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('userId', $userId)
             ->orderBy('m.unixTimestamp', 'DESC')
             ->addOrderBy('m.id', 'DESC')
-            ->setMaxResults($maxMessages)
-            ->getQuery()
-            ->getResult();
+            ->setMaxResults($maxMessages);
 
-        // Apply character limit: keep newest messages that fit within total char limit
+        if (null !== $excludeMessageId) {
+            $qb->andWhere('m.id != :excludeId')
+                ->setParameter('excludeId', $excludeMessageId);
+        }
+
+        $messages = $qb->getQuery()->getResult();
+
+        // Apply character limit: keep newest messages that fit within total char limit.
+        // Only message text counts — file bodies are clipped later in ChatHandler
+        // and must not evict prior turns from the conversation window.
         $result = [];
         $totalChars = 0;
 
         foreach ($messages as $message) {
             $messageLength = strlen($message->getText());
-            if ($message->getFileText()) {
-                $messageLength += strlen($message->getFileText());
-            }
 
             // Stop if adding this message would exceed char limit
             // (but always include at least 1 message)
@@ -179,14 +186,16 @@ class MessageRepository extends ServiceEntityRepository
      *
      * @return list<Message>
      */
-    public function findMessagesBetween(int $userId, int $chatId, int $afterId, int $upToIdInclusive): array
+    /**
+     * @return list<Message> chronological (oldest first)
+     */
+    public function findMessagesBetween(int $userId, int $chatId, int $afterId, int $upToIdInclusive, ?int $newestLimit = null): array
     {
         if ($afterId >= $upToIdInclusive) {
             return [];
         }
 
-        /** @var list<Message> $rows */
-        $rows = $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->join('m.chat', 'c')
             ->where('m.chatId = :chatId')
             ->andWhere('c.userId = :userId')
@@ -195,11 +204,24 @@ class MessageRepository extends ServiceEntityRepository
             ->setParameter('chatId', $chatId)
             ->setParameter('userId', $userId)
             ->setParameter('afterId', $afterId)
-            ->setParameter('upToId', $upToIdInclusive)
-            ->orderBy('m.unixTimestamp', 'ASC')
-            ->addOrderBy('m.id', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->setParameter('upToId', $upToIdInclusive);
+
+        if (null !== $newestLimit && $newestLimit > 0) {
+            $qb->orderBy('m.unixTimestamp', 'DESC')
+                ->addOrderBy('m.id', 'DESC')
+                ->setMaxResults($newestLimit);
+
+            /** @var list<Message> $rows */
+            $rows = $qb->getQuery()->getResult();
+
+            return array_reverse($rows);
+        }
+
+        $qb->orderBy('m.unixTimestamp', 'ASC')
+            ->addOrderBy('m.id', 'ASC');
+
+        /** @var list<Message> $rows */
+        $rows = $qb->getQuery()->getResult();
 
         return $rows;
     }
@@ -344,14 +366,22 @@ class MessageRepository extends ServiceEntityRepository
      * some text to digest, and NOT part of a widget/guest chat (those belong
      * to anonymous visitors, not the account owner's own history).
      *
+     * @param int|null $liveChatId When set, the quiet cutoff applies only to this
+     *                             chat; messages in other chats are indexable immediately
+     *
      * @return Message[] ordered oldest-first
      */
-    public function findDigestCandidates(int $userId, int $afterId, int $beforeUnix, int $limit, ?int $sinceUnix = null): array
-    {
+    public function findDigestCandidates(
+        int $userId,
+        int $afterId,
+        int $beforeUnix,
+        int $limit,
+        ?int $sinceUnix = null,
+        ?int $liveChatId = null,
+    ): array {
         $qb = $this->createQueryBuilder('m')
             ->where('m.userId = :userId')
             ->andWhere('m.id > :afterId')
-            ->andWhere('m.unixTimestamp < :beforeUnix')
             ->andWhere("(m.text != '' OR m.fileText != '')")
             ->andWhere(
                 'm.chatId IS NULL OR m.chatId NOT IN (
@@ -360,10 +390,19 @@ class MessageRepository extends ServiceEntityRepository
             )
             ->setParameter('userId', $userId)
             ->setParameter('afterId', $afterId)
-            ->setParameter('beforeUnix', $beforeUnix)
             ->setParameter('excludedSources', ['widget', 'guest'])
             ->orderBy('m.id', 'ASC')
             ->setMaxResults($limit);
+
+        if (null !== $liveChatId && $liveChatId > 0) {
+            // Other chats have already been left — do not wait for QUIET_SECONDS.
+            $qb->andWhere('(m.chatId IS NOT NULL AND m.chatId != :liveChatId) OR m.unixTimestamp < :beforeUnix')
+                ->setParameter('liveChatId', $liveChatId)
+                ->setParameter('beforeUnix', $beforeUnix);
+        } else {
+            $qb->andWhere('m.unixTimestamp < :beforeUnix')
+                ->setParameter('beforeUnix', $beforeUnix);
+        }
 
         if (null !== $sinceUnix) {
             $qb->andWhere('m.unixTimestamp >= :sinceUnix')
@@ -371,6 +410,43 @@ class MessageRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Verbatim tail of the user's most recently updated other chat (not widget/guest).
+     *
+     * @return list<Message> chronological (oldest first)
+     */
+    public function findRecentOtherChatTail(
+        int $userId,
+        int $excludeChatId,
+        int $maxMessages = 8,
+        int $maxTotalChars = 4000,
+    ): array {
+        $otherChatId = $this->getEntityManager()->createQueryBuilder()
+            ->select('c.id')
+            ->from(Chat::class, 'c')
+            ->where('c.userId = :userId')
+            ->andWhere('c.id != :excludeChatId')
+            ->andWhere('c.source NOT IN (:excludedSources)')
+            ->setParameter('userId', $userId)
+            ->setParameter('excludeChatId', $excludeChatId)
+            ->setParameter('excludedSources', ['widget', 'guest'])
+            ->orderBy('c.updatedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult(\Doctrine\ORM\Query::HYDRATE_SINGLE_SCALAR);
+
+        if (null === $otherChatId) {
+            return [];
+        }
+
+        $chatId = (int) $otherChatId;
+        if ($chatId <= 0) {
+            return [];
+        }
+
+        return $this->findChatHistory($userId, $chatId, $maxMessages, $maxTotalChars);
     }
 
     /**

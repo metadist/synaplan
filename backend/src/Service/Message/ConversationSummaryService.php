@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  *
  * Worker path ({@see refresh()}): runs after the turn is persisted. Folds only
  * the newly aged-out messages into the previous summary (or bootstraps from
- * scratch on the first refresh). Uses the SUMMARIZE model default.
+ * scratch on the first refresh). Uses Text Analytics (ANALYZE → CHAT).
  *
  * Storage is read-through: Redis is the hot cache, `BCHATSUMMARIES` the
  * durable layer. A cache miss falls back to the DB row and re-warms Redis, so
@@ -30,7 +30,9 @@ use Psr\Log\LoggerInterface;
  *
  * Never throws into the chat turn: on any failure the hot path returns
  * {@see RollingSummaryResult::notApplied()} and the caller keeps its normal
- * history window.
+ * history window. When older turns exist but no stored summary is available
+ * yet, a capped raw excerpt of that span is injected so those turns are not
+ * invisible until the worker finishes.
  */
 final readonly class ConversationSummaryService
 {
@@ -85,10 +87,16 @@ final readonly class ConversationSummaryService
 
         $stored = $this->readStored($chatId);
         if (null === $stored) {
-            // First long-chat turn (or cache eviction): answer without a summary
-            // this turn. The async refresh after the flush fills the store for
-            // the next one — never block time-to-first-token on a cold start.
-            return RollingSummaryResult::notApplied($recentWindow);
+            // Cold store (first overflow turn, cache miss, or worker lag):
+            // inject a capped raw excerpt of the older span so those turns
+            // stay visible. The async refresh still writes the real summary
+            // for later turns — no model call on the hot path.
+            $excerpt = $this->rawOlderExcerpt($userId ?? 0, $chatId, $olderLastId);
+            if ('' === $excerpt) {
+                return RollingSummaryResult::notApplied($recentWindow);
+            }
+
+            return new RollingSummaryResult(true, $excerpt, $tail, $olderCount);
         }
 
         $summary = $stored['summary'];
@@ -407,6 +415,36 @@ final readonly class ConversationSummaryService
     private function storeKey(int $chatId): string
     {
         return sprintf('conv_summary.chat.%d.%s', $chatId, $this->configFingerprint());
+    }
+
+    /**
+     * Hot-path fallback when no stored summary covers the older span.
+     */
+    private function rawOlderExcerpt(int $userId, int $chatId, int $olderLastId): string
+    {
+        $gap = $this->messageRepository->findMessagesBetween(
+            $userId,
+            $chatId,
+            0,
+            $olderLastId,
+            20,
+        );
+        if ([] === $gap) {
+            return '';
+        }
+
+        $kept = [];
+        $chars = 0;
+        foreach (array_reverse($gap) as $msg) {
+            $len = $this->messageLength($msg);
+            if (count($kept) > 0 && ($chars + $len) > self::GAP_CHAR_CAP) {
+                break;
+            }
+            $kept[] = $msg;
+            $chars += $len;
+        }
+
+        return $this->appendRawGap('', array_reverse($kept));
     }
 
     /**

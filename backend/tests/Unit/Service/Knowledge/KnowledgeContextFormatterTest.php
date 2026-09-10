@@ -124,6 +124,19 @@ final class KnowledgeContextFormatterTest extends TestCase
         $this->assertSame('', $block);
     }
 
+    public function testFormatOtherChatTailRendersRecentMessagesAndReferenceRules(): void
+    {
+        $block = (new KnowledgeContextFormatter())->formatOtherChatTail([
+            $this->digest(99, 'I prefer teal', 'Please remember I prefer teal.'),
+        ]);
+
+        $this->assertStringContainsString('Recent messages from another conversation', $block);
+        $this->assertStringContainsString('[Msg: 99', $block);
+        $this->assertStringContainsString('I prefer teal', $block);
+        $this->assertStringContainsString('[Message:ID]', $block);
+        $this->assertSame('', (new KnowledgeContextFormatter())->formatOtherChatTail([]));
+    }
+
     /**
      * @return array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, excerpt: string|null}
      */

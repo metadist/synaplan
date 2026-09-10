@@ -28,8 +28,7 @@ use Symfony\Component\Lock\LockFactory;
  * window, not one per request.
  *
  * The summarizer model resolves via
- * {@see ModelConfigService::getSummaryModelConfig()} (SUMMARIZE → SORT → CHAT
- * defaults — the shipped SORT binding is a fast, cheap Groq model). Never
+ * {@see ModelConfigService::getSummaryModelConfig()} (ANALYZE → CHAT). Never
  * hardcodes a model name.
  *
  * Privacy: mirrors BUSELOG's posture — no full transcripts are persisted,

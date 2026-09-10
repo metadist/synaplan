@@ -91,6 +91,7 @@ class ChatHandlerDigestAcceptanceTest extends TestCase
         $messageRepository->method('find')->willReturnCallback(
             static fn (mixed $id) => self::RENT_MESSAGE_ID === $id ? $rentMessage : null
         );
+        $messageRepository->method('findRecentOtherChatTail')->willReturn([]);
 
         // Real config on defaults (no BCONFIG rows).
         $configRepository = $this->createMock(ConfigRepository::class);

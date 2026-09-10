@@ -102,8 +102,11 @@ async function refreshAccessToken(): Promise<boolean> {
       })
 
       if (!refreshResponse.ok) {
-        // Stored cookie is dead - drop the hint so the next call short-circuits.
-        clearSessionHint()
+        // Only a genuine auth rejection means the cookie is dead. 5xx during
+        // a restart must keep the hint so the next call retries.
+        if (refreshResponse.status === 401 || refreshResponse.status === 403) {
+          clearSessionHint()
+        }
       }
       return refreshResponse.ok
     } catch (error) {
@@ -241,10 +244,12 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
           clearTimeout(retryTimeoutId)
           throw error
         }
-      } else {
+      } else if (!hasSessionHint()) {
         // Refresh failed - redirect to login
         redirectToSessionExpired()
         throw new Error('Session expired')
+      } else {
+        throw new Error('Authentication temporarily unavailable')
       }
     }
 

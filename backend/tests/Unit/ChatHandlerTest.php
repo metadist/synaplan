@@ -78,6 +78,7 @@ class ChatHandlerTest extends TestCase
         $this->memoryExtractionDispatcher = $this->createMock(MemoryExtractionDispatcher::class);
         $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
         $this->digestSearchService = $this->createMock(\App\Service\Digest\DigestSearchService::class);
+        $this->digestSearchService->method('recentOtherChatTail')->willReturn([]);
         $this->digestConfig = $this->createMock(\App\Service\Digest\MessageDigestConfig::class);
         $this->visionModelResolver = $this->createMock(\App\Service\Vision\VisionModelResolver::class);
 

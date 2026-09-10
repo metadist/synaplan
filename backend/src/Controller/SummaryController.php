@@ -232,19 +232,18 @@ class SummaryController extends AbstractController
             default => '200-500',
         };
 
-        // Get user's default chat model configuration
+        // Document summaries use Text Analytics (ANALYZE → CHAT).
         $provider = null;
         $modelName = null;
         $modelId = null;
 
         try {
-            $modelId = $this->modelConfigService->getDefaultModel('CHAT', $user->getId());
-            if ($modelId) {
-                $provider = $this->modelConfigService->getProviderForModel($modelId);
-                $modelName = $this->modelConfigService->getModelName($modelId);
-            }
+            $summaryConfig = $this->modelConfigService->getSummaryModelConfig($user->getId());
+            $modelId = $summaryConfig['model_id'];
+            $provider = $summaryConfig['provider'];
+            $modelName = $summaryConfig['model'];
         } catch (\Exception $e) {
-            $this->logger->warning('Could not get default chat model, will use provider default', [
+            $this->logger->warning('Could not get Text Analytics model, will use provider default', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
             ]);

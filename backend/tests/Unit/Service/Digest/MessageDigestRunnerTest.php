@@ -242,6 +242,32 @@ final class MessageDigestRunnerTest extends TestCase
         self::assertLessThanOrEqual($after - 3600, $capturedBeforeUnix);
     }
 
+    public function testRunForOtherChatsForwardsLiveChatIdSoQuietAppliesOnlyThere(): void
+    {
+        $user = $this->makeUser(7);
+        $this->config->method('getCursor')->willReturn(0);
+        $this->digestRepository->method('maxMessageIdForUser')->willReturn(0);
+
+        $capturedLiveChatId = null;
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnCallback(function (
+                int $userId,
+                int $afterId,
+                int $beforeUnix,
+                int $limit,
+                ?int $sinceUnix = null,
+                ?int $liveChatId = null,
+            ) use (&$capturedLiveChatId): array {
+                $capturedLiveChatId = $liveChatId;
+
+                return [];
+            });
+
+        $this->runner->runForOtherChats($user, 55);
+
+        self::assertSame(55, $capturedLiveChatId);
+    }
+
     private function makeUser(int $id): User
     {
         $user = new User();

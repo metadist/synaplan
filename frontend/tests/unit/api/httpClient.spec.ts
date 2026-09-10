@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { ApiError, httpClient } from '@/services/api/httpClient'
+import { hasSessionHint, setSessionHint } from '@/services/sessionHint'
 
 type MockResponseInit = {
   ok: boolean
@@ -44,6 +45,7 @@ describe('httpClient ApiError shape (issue #883)', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch
+    localStorage.clear()
   })
 
   afterEach(() => {
@@ -153,5 +155,41 @@ describe('httpClient ApiError shape (issue #883)', () => {
       expect(apiError.code).toBeUndefined()
       return true
     })
+  })
+
+  it('does not treat a 502 refresh during restart as a logout', async () => {
+    setSessionHint()
+
+    globalThis.fetch = vi.fn().mockImplementation((url: RequestInfo | URL) => {
+      if (String(url).includes('/api/v1/auth/refresh')) {
+        return Promise.resolve(
+          mockResponse({
+            ok: false,
+            status: 502,
+            statusText: 'Bad Gateway',
+            body: 'Bad Gateway',
+          })
+        )
+      }
+
+      return Promise.resolve(
+        mockResponse({
+          ok: false,
+          status: 401,
+          statusText: 'Unauthorized',
+          body: { error: 'expired' },
+        })
+      )
+    })
+
+    await expect(httpClient('/api/v1/auth/me')).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(ApiError)
+      const apiError = err as ApiError
+      expect(apiError.status).toBe(503)
+      expect(apiError.code).toBe('AUTH_TRANSIENT')
+      return true
+    })
+
+    expect(hasSessionHint()).toBe(true)
   })
 })

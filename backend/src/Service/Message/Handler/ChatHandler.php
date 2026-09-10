@@ -3740,11 +3740,37 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $this->logger->warning('ChatHandler: Failed to load message digests, continuing without', [
                 'error' => $e->getMessage(),
             ]);
-
-            return ['context' => '', 'digests' => []];
+            $digests = [];
         }
 
-        if ([] === $digests) {
+        $tail = [];
+        try {
+            $tail = $this->digestSearchService->recentOtherChatTail(
+                $message->getUserId(),
+                $message->getChatId(),
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatHandler: Failed to load other-chat tail, continuing without', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if ([] !== $tail) {
+            $seen = [];
+            foreach ($digests as $digest) {
+                $seen[(int) $digest['message_id']] = true;
+            }
+            $dedupedTail = [];
+            foreach ($tail as $row) {
+                if (!isset($seen[(int) $row['message_id']])) {
+                    $dedupedTail[] = $row;
+                    $seen[(int) $row['message_id']] = true;
+                }
+            }
+            $tail = $dedupedTail;
+        }
+
+        if ([] === $digests && [] === $tail) {
             return ['context' => '', 'digests' => []];
         }
 
@@ -3752,6 +3778,11 @@ final readonly class ChatHandler implements MessageHandlerInterface
             $digests,
             $this->digestConfig->getBlockMaxChars(),
         );
+        $context .= $this->knowledgeContextFormatter->formatOtherChatTail(
+            $tail,
+            $this->digestConfig->getBlockMaxChars(),
+        );
+        $digests = array_merge($digests, $tail);
 
         $this->logger->info('ChatHandler: Message digests loaded', [
             'user_id' => $message->getUserId(),

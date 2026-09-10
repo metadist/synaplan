@@ -244,6 +244,7 @@ final readonly class MessageProcessor
                     $message->getChatId(),
                     self::HISTORY_MAX_MESSAGES,
                     self::HISTORY_MAX_CHARS,
+                    $message->getId(),
                 );
                 $this->logger->debug('Using chat history for streaming', [
                     'chat_id' => $message->getChatId(),
@@ -706,6 +707,7 @@ final readonly class MessageProcessor
                     $message->getChatId(),
                     self::HISTORY_MAX_MESSAGES,
                     self::HISTORY_MAX_CHARS,
+                    $message->getId(),
                 );
                 $this->logger->debug('Using chat history for non-streaming', [
                     'chat_id' => $message->getChatId(),
@@ -1112,8 +1114,9 @@ final readonly class MessageProcessor
      * a cache/DB read and must not show up in time-to-first-token.
      *
      * Only for the chat-style path with a persisted chat; other intents ignore
-     * the option. On a cold store the turn proceeds without a summary and the
-     * async refresh fills it for the next one.
+     * the option. On a cold store a capped raw excerpt of the older span is
+     * injected so those turns stay visible; the async refresh writes the
+     * condensed summary for later turns.
      *
      * @param array<string, mixed> $classification
      * @param array<string, mixed> $options

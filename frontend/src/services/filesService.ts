@@ -575,13 +575,16 @@ const uploadFilesBatch = async (
             const refreshResult = await refreshAccessToken()
             if (refreshResult.success) {
               resolve(await sendXhr(true))
+            } else if (refreshResult.transient) {
+              reject(
+                new UploadFailedError('gateway', 'Authentication temporarily unavailable', 503)
+              )
             } else {
               window.location.href = '/login?reason=session_expired'
               reject(new Error('Session expired'))
             }
           } catch {
-            window.location.href = '/login?reason=session_expired'
-            reject(new Error('Session expired'))
+            reject(new UploadFailedError('network', 'Authentication temporarily unavailable', 0))
           }
         } else if (xhr.status === 401) {
           window.location.href = '/login?reason=session_expired'

@@ -22,8 +22,7 @@ use Psr\Log\LoggerInterface;
  * truncated first user message and so filled up with "Hi" and "New Chat"
  * (#1500).
  *
- * The model comes from the SUMMARIZE capability (SUMMARIZE → SORT → CHAT), so
- * an operator can point titling at a cheap or local model; nothing here names a
+ * The model comes from Text Analytics (ANALYZE → CHAT); nothing here names a
  * model. Requests are deliberately bare — a single user turn, no system prompt,
  * no memories, no RAG context, no tools — because a title is not worth a full
  * chat turn's tokens.

@@ -113,12 +113,24 @@ final readonly class MessageDigestRunner
      *
      * @return array{batches: int, created: int, scanned: int, cursor: int}
      */
+    /**
+     * After-turn pass: index other chats immediately (quiet applies only to
+     * the chat that just received a turn). Cost-capped at two batches.
+     *
+     * @return array{batches: int, created: int, scanned: int, cursor: int}
+     */
+    public function runForOtherChats(User $user, int $liveChatId, int $maxBatches = 2): array
+    {
+        return $this->runForUser($user, $maxBatches, liveChatId: $liveChatId);
+    }
+
     public function runForUser(
         User $user,
         int $maxBatches,
         ?int $sinceUnix = null,
         bool $dryRun = false,
         bool $advanceCursor = true,
+        ?int $liveChatId = null,
     ): array {
         $batchSize = $this->config->getBatchSize();
         $quietCutoff = time() - $this->config->getQuietSeconds();
@@ -138,6 +150,7 @@ final readonly class MessageDigestRunner
                 $quietCutoff,
                 $batchSize,
                 $sinceUnix,
+                $liveChatId,
             );
 
             if ([] === $candidates) {

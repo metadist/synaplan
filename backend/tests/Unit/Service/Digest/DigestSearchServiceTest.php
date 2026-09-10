@@ -193,6 +193,26 @@ final class DigestSearchServiceTest extends TestCase
         self::assertSame([6], array_column($hits, 'message_id'));
     }
 
+    public function testRecentOtherChatTailMapsMessagesAndSkipsWhenNoOtherChat(): void
+    {
+        self::assertSame([], $this->service->recentOtherChatTail(self::USER_ID, null));
+        self::assertSame([], $this->service->recentOtherChatTail(self::USER_ID, 0));
+
+        $other = $this->message(88, self::USER_ID, 'I just said this in the other window');
+        $other->setChatId(12);
+        $other->setProviderIndex('WEB');
+        $other->setUnixTimestamp(self::NOW);
+        $this->messageRepository->method('findRecentOtherChatTail')->willReturn([$other]);
+
+        $tail = $this->service->recentOtherChatTail(self::USER_ID, 55);
+
+        self::assertCount(1, $tail);
+        self::assertSame(88, $tail[0]['message_id']);
+        self::assertSame(12, $tail[0]['chat_id']);
+        self::assertSame('I just said this in the other window', $tail[0]['title']);
+        self::assertSame('I just said this in the other window', $tail[0]['excerpt']);
+    }
+
     /**
      * @return array{score: float, payload: array<string, mixed>}
      */

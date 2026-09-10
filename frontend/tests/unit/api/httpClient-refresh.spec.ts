@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { refreshAccessToken, beginAuthMutation, endAuthMutation } from '@/services/api/httpClient'
-import { setSessionHint, clearSessionHint } from '@/services/sessionHint'
+import { setSessionHint, clearSessionHint, hasSessionHint } from '@/services/sessionHint'
 
 describe('httpClient.refreshAccessToken — session hint guard (#204)', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -82,6 +82,36 @@ describe('httpClient.refreshAccessToken — session hint guard (#204)', () => {
 
     expect(secondResult).toEqual({ success: false })
     expect(refreshCalls()).toHaveLength(0)
+  })
+
+  it('keeps the session hint when refresh returns 502 during a restart', async () => {
+    setSessionHint()
+
+    fetchSpy.mockImplementation(((url: RequestInfo | URL) => {
+      if (String(url).includes('/api/v1/auth/refresh')) {
+        return Promise.resolve(new Response('Bad Gateway', { status: 502 }))
+      }
+      return Promise.resolve(new Response('', { status: 404 }))
+    }) as typeof fetch)
+
+    const result = await refreshAccessToken()
+
+    expect(result).toEqual({ success: false, transient: true })
+    expect(hasSessionHint()).toBe(true)
+
+    fetchSpy.mockClear()
+    await refreshAccessToken()
+    expect(refreshCalls()).toHaveLength(1)
+  })
+
+  it('keeps the session hint when refresh cannot reach the server', async () => {
+    setSessionHint()
+    fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    const result = await refreshAccessToken()
+
+    expect(result).toEqual({ success: false, transient: true })
+    expect(hasSessionHint()).toBe(true)
   })
 })
 

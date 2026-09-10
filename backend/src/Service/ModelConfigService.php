@@ -819,28 +819,22 @@ final readonly class ModelConfigService
     }
 
     /**
-     * Resolve the model that condenses long conversations into a rolling summary.
+     * Resolve the model for user-facing summaries and text analysis.
+     *
+     * DEFAULTMODEL.SUMMARIZE is a leftover slot: it is not on the AI Models
+     * purpose list, was seeded to a cheap Groq row, and silently stole document
+     * summaries (Excel + "please summarize") away from Text Analytics. Runtime
+     * never reads it.
      *
      * Priority:
-     *   1. User-scoped DEFAULTMODEL.SUMMARIZE (per-user override, e.g. GPT-OSS-120B)
-     *   2. Global DEFAULTMODEL.SUMMARIZE      (operator-configured summary model)
-     *   3. User/global DEFAULTMODEL.SORT      (default: reuse the sorting model —
-     *                                          cheap + fast, and always seeded)
-     *   4. User/global DEFAULTMODEL.CHAT      (last resort)
-     *
-     * Keeping this next to getMemoryModelConfig()/getToolsModelConfig() means the
-     * ConversationSummaryService never hardcodes a model name; operators pick the
-     * condensing model in the UI.
+     *   1. User/global DEFAULTMODEL.ANALYZE (Text Analytics — the visible slot)
+     *   2. User/global DEFAULTMODEL.CHAT    (last resort)
      *
      * @return array{model: ?string, provider: ?string, model_id: ?int}
      */
     public function getSummaryModelConfig(?int $userId = null): array
     {
-        // Capability key is 'SUMMARIZE' end to end (seeder, ModelCatalog map,
-        // ChatRunner). Reading 'SUMMARY' here silently missed the seeded default
-        // and always fell through to SORT (#1320).
-        $modelId = $this->getDefaultModel('SUMMARIZE', $userId)
-            ?? $this->getDefaultModel('SORT', $userId)
+        $modelId = $this->getDefaultModel('ANALYZE', $userId)
             ?? $this->getDefaultModel('CHAT', $userId);
 
         if (!$modelId) {

@@ -494,7 +494,7 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories);
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit);
         } catch (\Throwable $e) {
             $this->logger->error('searchMemoriesByVector failed', [
                 'user_id' => $userId,
@@ -645,7 +645,7 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories);
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit);
         } catch (\Throwable $e) {
             $this->logger->error('Memory search failed', ['error' => $e->getMessage()]);
 
@@ -673,10 +673,10 @@ final readonly class UserMemoryService
      *
      * @return list<array<string, mixed>>
      */
-    private function reconcileWithSqlCatalog(int $userId, array $memories): array
+    private function reconcileWithSqlCatalog(int $userId, array $memories, int $limit = 5): array
     {
         if ([] === $memories) {
-            return $memories;
+            return $this->recentActiveMemoriesAsHits($userId, $limit);
         }
 
         $ids = [];
@@ -706,7 +706,48 @@ final readonly class UserMemoryService
             ]);
         }
 
+        if ([] === $reconciled) {
+            if ($dropped > 0 && $dropped === count($memories)) {
+                $this->logger->warning('Dropped 100% of Qdrant memory hits without an active SQL row; falling back to recent SQL memories', [
+                    'user_id' => $userId,
+                    'dropped' => $dropped,
+                ]);
+            }
+
+            return $this->recentActiveMemoriesAsHits($userId, $limit);
+        }
+
         return $reconciled;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function recentActiveMemoriesAsHits(int $userId, int $limit): array
+    {
+        $limit = max(1, $limit);
+        $rows = $this->memoryRepository->findActiveForUser($userId, limit: $limit * 2);
+        $out = [];
+        foreach ($rows as $row) {
+            if ($this->isHiddenCategory($row->getCategory())) {
+                continue;
+            }
+            $item = $row->toDTO()->toArray();
+            $item['score'] = 0.0;
+            $out[] = $item;
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        if ([] !== $out) {
+            $this->logger->info('Fell back to recent SQL memories after empty vector retrieval', [
+                'user_id' => $userId,
+                'count' => count($out),
+            ]);
+        }
+
+        return $out;
     }
 
     /**

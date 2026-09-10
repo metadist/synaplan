@@ -102,6 +102,50 @@ final readonly class DigestSearchService
     }
 
     /**
+     * Immediate cross-chat recall: the verbatim tail of the user's most
+     * recently updated other chat. No embedding or digest index required.
+     *
+     * @return list<array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, score: float, effective_score: float, excerpt: string|null}>
+     */
+    public function recentOtherChatTail(int $userId, ?int $excludeChatId): array
+    {
+        if (null === $excludeChatId || $excludeChatId <= 0) {
+            return [];
+        }
+
+        $messages = $this->messageRepository->findRecentOtherChatTail($userId, $excludeChatId);
+        $out = [];
+        foreach ($messages as $msg) {
+            $id = $msg->getId();
+            if (null === $id) {
+                continue;
+            }
+
+            $text = trim($msg->getText());
+            $title = '' !== $text
+                ? (mb_strlen($text) > 120 ? mb_substr($text, 0, 117).'…' : $text)
+                : '(empty)';
+            $excerpt = $text;
+            if (mb_strlen($excerpt) > self::EXCERPT_MAX_CHARS) {
+                $excerpt = mb_substr($excerpt, 0, self::EXCERPT_MAX_CHARS).'…';
+            }
+
+            $out[] = [
+                'message_id' => $id,
+                'chat_id' => (int) $msg->getChatId(),
+                'title' => $title,
+                'channel' => (string) $msg->getProviderIndex(),
+                'source_date' => $msg->getUnixTimestamp(),
+                'score' => 1.0,
+                'effective_score' => 1.0,
+                'excerpt' => '' !== $excerpt ? $excerpt : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * The recency re-rank formula, shared with `app:digest:eval` so the eval
      * tunes exactly what production runs: slow exponential decay
      * `effective = score * 0.5^(age / half-life)`. Age must already be
