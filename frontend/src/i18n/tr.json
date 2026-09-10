@@ -1248,6 +1248,7 @@
       "winner": "Kazanan: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling kullanılamıyor — yerine Tika kullanıldı",
+      "doclingRejectedTika": "Docling’e erişildi ancak dosyayı reddetti — yerine Tika kullanıldı",
       "save": "Zinciri kaydet",
       "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
       "saveFailed": "Çıkarım zinciri kaydedilemedi",
@@ -1259,6 +1260,7 @@
         "empty": "boş",
         "low_quality": "çok az yararlı metin",
         "unavailable": "kullanılamıyor",
+        "rejected": "ulaşıldı ancak dosya reddedildi",
         "unsupported": "bu dosyayı desteklemiyor",
         "unknown": "bilinmeyen bağdaştırıcı",
         "skipped": "atlandı"

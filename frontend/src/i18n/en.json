@@ -2950,6 +2950,7 @@
       "winner": "Winner: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling unavailable — Tika used instead",
+      "doclingRejectedTika": "Docling reached but refused the file — Tika used instead",
       "save": "Save chain",
       "saved": "Extraction chain saved. The next upload uses it.",
       "saveFailed": "The extraction chain could not be saved",
@@ -2961,6 +2962,7 @@
         "empty": "empty",
         "low_quality": "too little useful text",
         "unavailable": "unavailable",
+        "rejected": "reached but refused the file",
         "unsupported": "does not support this file",
         "unknown": "unknown adapter",
         "skipped": "skipped"

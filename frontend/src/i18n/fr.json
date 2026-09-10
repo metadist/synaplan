@@ -2950,6 +2950,7 @@
       "winner": "Gagnant : {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling indisponible — Tika a été utilisé",
+      "doclingRejectedTika": "Docling a répondu mais a refusé le fichier — Tika a été utilisé",
       "save": "Enregistrer la chaîne",
       "saved": "Chaîne d’extraction enregistrée. Le prochain envoi l’utilise.",
       "saveFailed": "Impossible d’enregistrer la chaîne d’extraction",
@@ -2961,6 +2962,7 @@
         "empty": "vide",
         "low_quality": "trop peu de texte utile",
         "unavailable": "indisponible",
+        "rejected": "joignable, fichier refusé",
         "unsupported": "ne prend pas en charge ce fichier",
         "unknown": "adaptateur inconnu",
         "skipped": "ignoré"

@@ -163,6 +163,9 @@ const testSummary = computed(() => {
   const result = testResult.value
   if (!result) return ''
   const docling = result.attempts.find((attempt) => attempt.key === 'docling')
+  if (docling && docling.verdict === 'rejected' && result.strategy === 'tika') {
+    return t('aiInfra.extraction.doclingRejectedTika')
+  }
   if (
     docling &&
     ['unavailable', 'empty', 'low_quality'].includes(docling.verdict) &&

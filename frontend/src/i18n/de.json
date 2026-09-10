@@ -3042,6 +3042,7 @@
       "winner": "Gewinner: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling nicht verfügbar — stattdessen Tika verwendet",
+      "doclingRejectedTika": "Docling erreichbar, hat die Datei aber abgelehnt — stattdessen Tika verwendet",
       "save": "Kette speichern",
       "saved": "Extraktionskette gespeichert. Der nächste Upload nutzt sie.",
       "saveFailed": "Die Extraktionskette konnte nicht gespeichert werden",
@@ -3053,6 +3054,7 @@
         "empty": "leer",
         "low_quality": "zu wenig brauchbarer Text",
         "unavailable": "nicht verfügbar",
+        "rejected": "erreichbar, Datei abgelehnt",
         "unsupported": "unterstützt diese Datei nicht",
         "unknown": "unbekannter Adapter",
         "skipped": "übersprungen"
