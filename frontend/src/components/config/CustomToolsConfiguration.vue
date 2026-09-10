@@ -150,10 +150,6 @@ const onImportApplied = (): void => {
       @close="closeEditor"
       @saved="onEditorSaved"
     />
-    <OpenApiImportWizard
-      v-if="importing"
-      @close="closeImport"
-      @applied="onImportApplied"
-    />
+    <OpenApiImportWizard v-if="importing" @close="closeImport" @applied="onImportApplied" />
   </section>
 </template>
