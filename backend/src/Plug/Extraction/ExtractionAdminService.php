@@ -75,9 +75,9 @@ final readonly class ExtractionAdminService
      *     markdown: bool
      * }
      */
-    public function testFile(string $absolutePath, string $originalName): array
+    public function testFile(string $absolutePath, string $originalName, ?int $userId = null): array
     {
-        return $this->probe->testFile($absolutePath, $originalName);
+        return $this->probe->testFile($absolutePath, $originalName, $userId);
     }
 
     /**

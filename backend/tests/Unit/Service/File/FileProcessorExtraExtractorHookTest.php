@@ -24,7 +24,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * S2 unlock: keys outside BUILTIN_EXTRACTOR_KEYS run before FileProcessor strategies.
+ * Extra (non-built-in) keys run in the configured chain order.
  */
 final class FileProcessorExtraExtractorHookTest extends TestCase
 {
@@ -64,7 +64,7 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
         };
 
         $plugConfig = $this->createMock(PlugConfigService::class);
-        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+        $plugConfig->method('extractionChain')->willReturn(['docling']);
 
         $processor = $this->processor(
             new ExtractionRegistry([$extra], $plugConfig, new NullLogger()),
@@ -113,7 +113,7 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
         };
 
         $plugConfig = $this->createMock(PlugConfigService::class);
-        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+        $plugConfig->method('extractionChain')->willReturn(['docling', 'native']);
 
         $processor = $this->processor(
             new ExtractionRegistry([$extra], $plugConfig, new NullLogger()),
@@ -162,7 +162,7 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
         };
 
         $plugConfig = $this->createMock(PlugConfigService::class);
-        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+        $plugConfig->method('extractionChain')->willReturn(['docling', 'tika']);
         $plugConfig->method('qualityApplyTo')->willReturn(['pdf']);
         $plugConfig->method('qualityMinLength')->willReturn(10);
         $plugConfig->method('qualityMinEntropy')->willReturn(3.0);
@@ -235,7 +235,7 @@ final class FileProcessorExtraExtractorHookTest extends TestCase
         };
 
         $plugConfig = $this->createMock(PlugConfigService::class);
-        $plugConfig->method('extraExtractorKeys')->willReturn(['docling']);
+        $plugConfig->method('extractionChain')->willReturn(['docling', 'tika']);
 
         $tika = $this->createMock(TikaClient::class);
         $tika->method('isEnabled')->willReturn(true);

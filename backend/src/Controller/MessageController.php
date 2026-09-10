@@ -736,20 +736,17 @@ class MessageController extends AbstractController
             $this->em->flush();
 
             // Extract text synchronously for files the chat handler will analyze
-            // immediately (audio, documents). Image extraction is left to the
-            // vision-model pipeline, which reads the file directly at analyze
-            // time. Doing extraction here closes the race documented in
-            // issue #729: the stream used to run FileAnalysisHandler before
-            // the async/deferred extraction had populated BFILETEXT, yielding
-            // a false "Document text extraction failed" error on the user's
-            // first send. By the time uploadFileForChat returns, the file is
-            // either `extracted` (text available) or `error` (extraction
-            // failed) — never `uploaded` with empty text.
+            // immediately (audio, documents, images). Images used to skip this
+            // and go through MessagePreProcessor::processImageWithVision(), which
+            // ignored the extraction chain (issue #1792). Empty OCR on a photo
+            // is legitimate — only audio/documents treat empty text as failure.
             $extractMeta = [];
             $isAudio = in_array($fileExtension, MessagePreProcessor::AUDIO_EXTENSIONS, true);
             $isDocument = in_array($fileExtension, MessagePreProcessor::DOCUMENT_EXTENSIONS, true);
+            $isImage = in_array($fileExtension, MessagePreProcessor::IMAGE_EXTENSIONS, true);
 
-            if ($isAudio || $isDocument) {
+            if ($isAudio || $isDocument || $isImage) {
+                $kind = $isAudio ? 'audio' : ($isImage ? 'image' : 'document');
                 $messageFile->setStatus('extracting');
                 $this->em->flush();
 
@@ -761,13 +758,14 @@ class MessageController extends AbstractController
                     );
 
                     $messageFile->setFileText($extractedText);
-                    $messageFile->setStatus(empty(trim($extractedText)) ? 'error' : 'extracted');
+                    $emptyIsFailure = !$isImage;
+                    $messageFile->setStatus($emptyIsFailure && empty(trim($extractedText)) ? 'error' : 'extracted');
                     $this->em->flush();
 
                     $this->logger->info('Chat file extracted', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
-                        'kind' => $isAudio ? 'audio' : 'document',
+                        'kind' => $kind,
                         'text_length' => strlen($extractedText),
                         'strategy' => $extractMeta['strategy'] ?? 'unknown',
                     ]);
@@ -775,7 +773,7 @@ class MessageController extends AbstractController
                     $this->logger->error('Chat file extraction failed', [
                         'user_id' => $user->getId(),
                         'file_id' => $messageFile->getId(),
-                        'kind' => $isAudio ? 'audio' : 'document',
+                        'kind' => $kind,
                         'error' => $e->getMessage(),
                     ]);
 

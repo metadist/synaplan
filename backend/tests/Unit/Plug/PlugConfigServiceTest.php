@@ -134,6 +134,48 @@ final class PlugConfigServiceTest extends TestCase
         $service->setChain('document', ['nope'], ['tika']);
     }
 
+    public function testSetChainRejectsEmptyList(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('must not be empty');
+
+        $service = new PlugConfigService($this->repo([]));
+        $service->setChain('document', [], ['tika']);
+    }
+
+    public function testSetChainsValidatesEveryFamilyBeforePersisting(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+
+        $service = new PlugConfigService($repo);
+
+        try {
+            $service->setChains(
+                [
+                    'document' => ['tika'],
+                    'text' => [],
+                ],
+                ['tika', 'native'],
+            );
+            self::fail('Expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('must not be empty', $e->getMessage());
+        }
+    }
+
+    public function testStoredEmptyChainFallsBackToDefault(): void
+    {
+        $service = new PlugConfigService($this->repo([
+            [0, PlugConfigService::KEY_CHAIN_DOCUMENT, ''],
+        ]));
+
+        $this->assertSame(
+            ['structured_office', 'office_convert', 'tika', 'pdf_vision'],
+            $service->extractionChain('document'),
+        );
+    }
+
     /**
      * @param list<array{0: int, 1: string, 2: string}> $rows
      */

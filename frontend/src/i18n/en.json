@@ -2954,6 +2954,7 @@
       "save": "Save chain",
       "saved": "Extraction chain saved. The next upload uses it.",
       "saveFailed": "The extraction chain could not be saved",
+      "emptyChain": "Each file type needs at least one adapter.",
       "loadFailed": "Could not load extraction settings",
       "verdict": {
         "quality_ok": "accepted",
@@ -2965,7 +2966,8 @@
         "rejected": "reached but refused the file",
         "unsupported": "does not support this file",
         "unknown": "unknown adapter",
-        "skipped": "skipped"
+        "skipped": "skipped",
+        "rewritten": "converted for the next adapter"
       }
     },
     "webSearch": {

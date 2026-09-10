@@ -126,7 +126,7 @@ final class AdminPlugsExtractionController extends AbstractController
         )
     )]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 422, description: 'Unknown family or adapter key')]
+    #[OA\Response(response: 422, description: 'Unknown family, adapter key, or empty chain')]
     public function saveChains(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -148,7 +148,7 @@ final class AdminPlugsExtractionController extends AbstractController
     #[Route('/test', name: 'admin_plugs_extraction_test', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/admin/plugs/extraction/test',
-        summary: 'Probe every configured extra extractor then the built-in path',
+        summary: 'Probe the configured extraction chain with the same path as a real upload',
         security: [['Bearer' => []]],
         tags: ['Admin Plugs Extraction']
     )]
@@ -206,6 +206,7 @@ final class AdminPlugsExtractionController extends AbstractController
         return $this->json($this->extractionAdmin->testFile(
             $file->getPathname(),
             $file->getClientOriginalName() ?: $file->getFilename(),
+            $user?->getId(),
         ));
     }
 
