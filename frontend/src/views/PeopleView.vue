@@ -20,7 +20,7 @@
       <GroupsTab v-else-if="activeTab === 'groups'" />
       <PoliciesTab v-else-if="activeTab === 'policies'" />
       <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />
-      <AuditTab v-else />
+      <AuditTab v-else-if="activeTab === 'audit'" />
     </div>
   </MainLayout>
 </template>
@@ -35,7 +35,7 @@ import GroupsTab from '@/components/people/GroupsTab.vue'
 import PoliciesTab from '@/components/people/PoliciesTab.vue'
 import AuditTab from '@/components/people/AuditTab.vue'
 import PlatformInstancesTab from '@/components/people/PlatformInstancesTab.vue'
-import { isIamPoliciesEnabled } from '@/composables/useIamFeature'
+import { isIamGroupsEnabled, isIamPoliciesEnabled } from '@/composables/useIamFeature'
 import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { useI18n } from 'vue-i18n'
 
@@ -50,13 +50,15 @@ const tabNavItems = computed<TabNavItem[]>(() => {
       icon: 'mdi:account-multiple',
       testid: 'tab-users',
     },
-    {
+  ]
+  if (isIamGroupsEnabled()) {
+    tabs.push({
       id: 'groups',
       label: t('people.tabs.groups'),
       icon: 'mdi:account-group',
       testid: 'tab-groups',
-    },
-  ]
+    })
+  }
   if (isIamPoliciesEnabled()) {
     tabs.push({
       id: 'policies',
@@ -73,12 +75,14 @@ const tabNavItems = computed<TabNavItem[]>(() => {
       testid: 'tab-linked-platforms',
     })
   }
-  tabs.push({
-    id: 'audit',
-    label: t('people.tabs.audit'),
-    icon: 'mdi:clipboard-text-clock',
-    testid: 'tab-audit',
-  })
+  if (isIamGroupsEnabled()) {
+    tabs.push({
+      id: 'audit',
+      label: t('people.tabs.audit'),
+      icon: 'mdi:clipboard-text-clock',
+      testid: 'tab-audit',
+    })
+  }
   return tabs
 })
 

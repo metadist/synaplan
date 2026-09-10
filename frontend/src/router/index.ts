@@ -27,6 +27,7 @@ import {
 import { i18n } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
+import { adminUsersTabRedirect, peopleRouteGuard } from '@/router/iamGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -521,11 +522,7 @@ const router = createRouter({
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.admin' },
-      beforeEnter: (to) => {
-        if (to.query.tab === 'users') {
-          return { name: 'admin-people' }
-        }
-      },
+      beforeEnter: adminUsersTabRedirect,
     },
     {
       path: '/admin/features',
@@ -556,6 +553,7 @@ const router = createRouter({
       name: 'admin-people',
       component: () => import('@/views/PeopleView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, titleKey: 'pageTitles.adminPeople' },
+      beforeEnter: peopleRouteGuard,
     },
     {
       path: '/subscription',
