@@ -118,13 +118,16 @@ jobs:
           php bin/console app:sync-model-prices --dry-run --fail-on-drift 2>&1 | tee drift-report.txt
           code=${PIPESTATUS[0]}
 
-          # Just the models a human has to act on. The mode-mismatch, unmatched and
+          # Just the models a human has to act on: drifted rows, plus obsolete
+          # LITELLM_DEVIATIONS entries (LiteLLM adopted the catalog value, so the
+          # registry entry must go — the run stays green, so this field is the
+          # only place anyone sees it). The mode-mismatch, unmatched and
           # known-deviation sections are steady state (they are reported every
           # single run), so they stay out of both the Discord field and the change
           # signature below. Section titles come from SyncModelPricesCommand.
           awk '
-            /^Non-per-token price drift/ { section = 1; next }
-            /^Pricing-mode mismatch|^Unmatched|^Null-price protected|^Known LiteLLM deviations|^Obsolete LiteLLM deviations/ { section = 0 }
+            /^Non-per-token price drift|^Obsolete LiteLLM deviations/ { section = 1; next }
+            /^Pricing-mode mismatch|^Unmatched|^Null-price protected|^Known LiteLLM deviations/ { section = 0 }
             section && /^ \* / { print }
             /\[DRY-RUN\]/ { print }
           ' drift-report.txt > drift-flagged.txt

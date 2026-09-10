@@ -105,7 +105,9 @@ enforces this).
    upstream fix is what lets it retire.
 4. Add a drift-log entry to `docs/PRICING_MAINTENANCE.md` as in Path A step 3.
 5. **Obsolete entries:** when the report lists one under `Obsolete LiteLLM deviations`,
-   delete it from the registry in the same PR — no other change.
+   delete it from the registry in the same PR — no other change. The run stays green
+   and opens no issue for this; the entry surfaces only in the Discord report's
+   "Flagged models" field and the run log.
 
 ## Step 3 — Gate (unfiltered, in this order)
 
