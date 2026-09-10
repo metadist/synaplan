@@ -11,7 +11,6 @@ use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
-use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
@@ -21,10 +20,10 @@ use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Config\FeatureStatusReporter;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\GuestChatConfig;
-use App\Service\Infrastructure\RedisService;
 use App\Service\LocalAi\LocalAiDownloadStatusService;
 use App\Service\MailerConfig;
 use App\Service\MarketingNews\MarketingNewsConfig;
@@ -39,7 +38,6 @@ use App\Service\WhisperService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -69,7 +67,6 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->configRepository,
             $this->modelRepository,
             $this->createStub(ProviderRegistry::class),
-            $this->createStub(WebSearchGateway::class),
             $this->createStub(WhisperService::class),
             $this->createStub(PluginManager::class),
             $this->createStub(BillingService::class),
@@ -77,7 +74,6 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(EmbeddingModelChangeGuard::class),
             $this->createStub(EmbeddingMetadataService::class),
             $this->modelConfigService,
-            new RedisService('', 'test', new NullLogger()),
             new ClientContextResolver(),
             $this->createStub(BrandingService::class),
             $this->createStub(MobileVersionService::class),
@@ -102,6 +98,7 @@ final class ConfigControllerPlannerModelTest extends TestCase
             $this->createStub(LocalAiDownloadStatusService::class),
             new MailerConfig(),
             new CapabilityService(),
+            $this->createStub(FeatureStatusReporter::class),
             'http://qdrant.example',
         );
 

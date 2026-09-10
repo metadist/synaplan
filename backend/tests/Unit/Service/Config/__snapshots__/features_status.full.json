@@ -1,0 +1,192 @@
+{
+    "features": {
+        "web-search": {
+            "id": "web-search",
+            "category": "AI Features",
+            "name": "Web Search",
+            "enabled": true,
+            "status": "active",
+            "message": "Web search is active and ready to use",
+            "setup_required": false,
+            "env_vars": {
+                "BRAVE_SEARCH_API_KEY": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Get your API key from https://api.search.brave.com/"
+                },
+                "BRAVE_SEARCH_ENABLED": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Set to \"true\" to enable web search"
+                }
+            }
+        },
+        "image-gen": {
+            "id": "image-gen",
+            "category": "AI Features",
+            "name": "Image Generation",
+            "enabled": true,
+            "status": "active",
+            "message": "2 image generation model(s) available",
+            "setup_required": false,
+            "models_available": 2
+        },
+        "openai": {
+            "id": "openai",
+            "category": "AI Providers",
+            "name": "OpenAI",
+            "enabled": true,
+            "status": "active",
+            "message": "GPT models",
+            "setup_required": false,
+            "env_vars": {
+                "OPENAI_API_KEY": {
+                    "required": true,
+                    "set": true,
+                    "hint": "From platform.openai.com"
+                }
+            },
+            "models_available": 3,
+            "url": null
+        },
+        "ollama": {
+            "id": "ollama",
+            "category": "AI Providers",
+            "name": "Ollama",
+            "enabled": true,
+            "status": "active",
+            "message": "Local models",
+            "setup_required": false,
+            "env_vars": {
+                "OLLAMA_BASE_URL": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Ollama server URL"
+                }
+            },
+            "models_available": 1,
+            "url": "http://ollama:11434"
+        },
+        "whisper": {
+            "id": "whisper",
+            "category": "Processing Services",
+            "name": "Whisper.cpp",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Speech-to-text transcription is ready",
+            "setup_required": false,
+            "models_available": 2
+        },
+        "tika": {
+            "id": "tika",
+            "category": "Processing Services",
+            "name": "Apache Tika",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Document processing service is running",
+            "setup_required": false,
+            "url": "http://tika:9998",
+            "version": "Apache Tika 2.9.2"
+        },
+        "docling": {
+            "id": "docling",
+            "category": "Processing Services",
+            "name": "Docling",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Document extraction sidecar is running",
+            "setup_required": false,
+            "url": "http://docling:5001/"
+        },
+        "office-convert": {
+            "id": "office-convert",
+            "category": "Processing Services",
+            "name": "Office converter (Collabora)",
+            "enabled": true,
+            "status": "healthy",
+            "message": "LibreOffice convert-to is ready",
+            "setup_required": false,
+            "url": "http://collabora:9980"
+        },
+        "memory-service": {
+            "id": "memory-service",
+            "category": "Processing Services",
+            "name": "Qdrant Vector Database",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Qdrant is connected and ready",
+            "warnings": [],
+            "setup_required": false,
+            "url": "http://qdrant:6333",
+            "version": "1.11.0",
+            "stats": {
+                "collections": 2,
+                "points": 1234
+            },
+            "env_vars": {
+                "QDRANT_URL": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Internal Docker service URL",
+                    "example": "http://qdrant:6333"
+                }
+            }
+        },
+        "database": {
+            "id": "database",
+            "category": "Infrastructure",
+            "name": "MariaDB",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Database connection is active and responding",
+            "setup_required": false,
+            "version": "11.4.2"
+        },
+        "redis": {
+            "id": "redis",
+            "category": "Infrastructure",
+            "name": "Redis",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Cache, locks, rate-limiter, sessions and realtime fan-out are operational",
+            "setup_required": false,
+            "url": "redis://***@redis:6379",
+            "version": "7.2.4",
+            "env_vars": {
+                "REDIS_DSN": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Redis connection DSN shared by cache, locks, rate-limiter and Messenger (e.g. redis://redis:6379)"
+                }
+            }
+        },
+        "centrifugo": {
+            "id": "centrifugo",
+            "category": "Infrastructure",
+            "name": "Centrifugo",
+            "enabled": true,
+            "status": "healthy",
+            "message": "Realtime WebSocket gateway is running (chat streaming, widget events, presence)",
+            "setup_required": false,
+            "url": "http://centrifugo:8000",
+            "env_vars": {
+                "REALTIME_ENABLED": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Master switch for WebSocket publishing (no SSE fallback)"
+                },
+                "REALTIME_API_URL": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Centrifugo server API endpoint, e.g. http://centrifugo:8000/api"
+                }
+            }
+        }
+    },
+    "summary": {
+        "total": 12,
+        "healthy": 12,
+        "unhealthy": 0,
+        "all_ready": true
+    }
+}
