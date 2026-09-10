@@ -392,6 +392,78 @@ class ModelCatalog
     }
 
     /**
+     * Prices where LiteLLM is wrong and the catalog deliberately keeps the
+     * official rate — keyed by {@see litellmDeviationKey()}.
+     *
+     * `app:sync-model-prices` diffs every matched row against LiteLLM and the
+     * daily CI check fails on any difference. That is right when a provider
+     * moved its price, and permanently wrong when LiteLLM itself is off: the
+     * check would stay red forever, and a red monitor that is "always that one
+     * row" stops being read (#1772). An entry here records the verified error
+     * instead, and the sync files the row as a known deviation rather than
+     * drift.
+     *
+     * The entry pins the LiteLLM VALUE we disagree with — not the row. It
+     * therefore silences exactly the pair a human verified and nothing else:
+     * when LiteLLM moves to the catalog rate the sync reports the entry as
+     * obsolete (delete it), when LiteLLM moves to a third value the row drifts
+     * again like any other. No date-based expiry — that would only re-create
+     * the noise the entry removes; LiteLLM's own movement is the expiry.
+     *
+     * Prices are in the unit the sync compares in: USD per 1M tokens for
+     * per_token rows, USD per billable unit (second / image / character) for
+     * media rows. Both sides are always pinned; a row with resolution tiers is
+     * not covered (tiers are compared individually and cannot be pinned here).
+     *
+     * Adding an entry is the LAST step of a verification, never a shortcut past
+     * one: the official page must show the catalog value, the source must be a
+     * URL the next person can open, and the reason must say what LiteLLM got
+     * wrong. Also file the correction upstream (BerriAI/litellm) so the entry
+     * can retire — every entry here is a fork of the source of truth we chose.
+     *
+     * Fields:
+     *   litellm_in / litellm_out — LiteLLM's current (wrong) values.
+     *   source                    — official page or API the catalog value was read from.
+     *   verifiedOn                — date of that verification (YYYY-MM-DD).
+     *   reason                    — what LiteLLM got wrong, plus the upstream fix if filed.
+     *
+     * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     */
+    private const LITELLM_DEVIATIONS = [
+        // Jina raised the Search Foundation rate from $0.02 to $0.05 per 1M
+        // tokens in May 2025 (the machine-readable catalog at /v1/models lists
+        // pricing.prompt = 0.00000005 for this model). LiteLLM still carries
+        // 0.018 and mirrors it into output, which a reranker never bills.
+        'jina:jina-reranker-v2-base-multilingual' => [
+            'litellm_in' => 0.018,
+            'litellm_out' => 0.0,
+            'source' => 'https://api.jina.ai/v1/models',
+            'verifiedOn' => '2026-09-10',
+            'reason' => 'LiteLLM lists the pre-May-2025 $0.018/1M; Jina bills $0.05/1M input tokens (#1772). Upstream fix: BerriAI/litellm#40569.',
+        ],
+    ];
+
+    /**
+     * Registry key of a LiteLLM deviation: canonical provider + upstream model
+     * id, so the same providerId at two services (an open-weights model hosted
+     * by Groq and Ollama) can never share an entry.
+     */
+    public static function litellmDeviationKey(string $service, string $providerId): string
+    {
+        return self::normalizeProvider($service).':'.$providerId;
+    }
+
+    /**
+     * Every recorded LiteLLM deviation, keyed by {@see litellmDeviationKey()}.
+     *
+     * @return array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     */
+    public static function litellmDeviations(): array
+    {
+        return self::LITELLM_DEVIATIONS;
+    }
+
+    /**
      * Provider (service) name aliases → the canonical lowercase key. Only names
      * that appear in more than one spelling need an entry; everything else is
      * normalized by lowercasing + trimming.
@@ -4363,7 +4435,10 @@ class ModelCatalog
             'selectable' => 0,
             'active' => 1,
             'providerId' => 'jina-reranker-v2-base-multilingual',
-            'priceIn' => 0.02,
+            // $0.05 per 1M input tokens since Jina's May 2025 increase (was
+            // $0.02) — read from https://api.jina.ai/v1/models on 2026-09-10.
+            // LiteLLM still lists 0.018; see LITELLM_DEVIATIONS.
+            'priceIn' => 0.05,
             'inUnit' => 'per1M',
             'priceOut' => 0,
             'outUnit' => '-',
