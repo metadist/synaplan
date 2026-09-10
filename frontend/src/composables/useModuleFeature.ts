@@ -1,3 +1,5 @@
+import type { z } from 'zod'
+import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 import { getConfigSync } from '@/services/api/httpClient'
 
 /**
@@ -30,14 +32,12 @@ export type ModuleId =
   | 'mobile_iap'
   | 'whatsapp'
 
-interface ModuleState {
-  configured?: unknown
-  gated?: unknown
-}
+type RuntimeModules = NonNullable<
+  z.infer<typeof GetApiConfigRuntimeConfigResponseSchema>['modules']
+>
 
-function moduleState(id: string): ModuleState | undefined {
-  const modules = (getConfigSync() as { modules?: Record<string, ModuleState> }).modules
-  return modules?.[id]
+function moduleState(id: string): RuntimeModules[string] | undefined {
+  return getConfigSync().modules?.[id]
 }
 
 /** False only when the backend explicitly reports the module as not configured. */

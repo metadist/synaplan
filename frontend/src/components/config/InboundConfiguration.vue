@@ -11,7 +11,7 @@
     <FeatureNotConfiguredNotice
       v-if="!whatsappAvailable"
       module="whatsapp"
-      :docs="whatsappGate?.docs"
+      :docs="whatsappGate?.docs ?? 'modules/whatsapp'"
     />
 
     <div v-if="whatsappAvailable" class="surface-card p-6" data-testid="section-whatsapp">

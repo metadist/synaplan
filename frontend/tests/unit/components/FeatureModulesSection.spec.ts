@@ -80,7 +80,10 @@ describe('FeatureModulesSection', () => {
 
     const row = wrapper.get('[data-testid="item-module"]')
     expect(row.text()).toContain('Stripe billing')
-    expect(row.get('[data-testid="badge-module-state"]').text()).toBe('Needs setup')
+    const badge = row.get('[data-testid="badge-module-state"]')
+    expect(badge.text()).toBe('Needs setup')
+    expect(badge.classes().join(' ')).toContain('status-warning-muted')
+    expect(badge.classes().join(' ')).not.toContain('text-white')
     expect(row.text()).toContain('Stripe price id is missing')
     expect(row.findAll('[data-testid="chip-configured-by"]').map((c) => c.text())).toEqual([
       'STRIPE_SECRET_KEY',

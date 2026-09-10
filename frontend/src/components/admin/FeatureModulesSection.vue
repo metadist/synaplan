@@ -34,11 +34,11 @@ const label = (module: FeatureModule): string =>
 const stateClass = (state: FeatureModule['state']): string => {
   switch (state) {
     case 'available':
-      return 'bg-[var(--status-success)] text-white shadow-sm'
+      return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
     case 'needs_setup':
-      return 'bg-[var(--status-warning)] text-white shadow-sm'
+      return 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
     default:
-      return 'bg-[var(--status-neutral)] text-white shadow-sm'
+      return 'bg-[var(--status-neutral-muted)] text-[var(--status-neutral-text)]'
   }
 }
 
@@ -81,7 +81,7 @@ const docsHref = (module: FeatureModule): string =>
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap mb-2">
             <h3 class="text-base font-semibold txt-primary">{{ label(module) }}</h3>
-            <code class="text-xs txt-secondary font-mono opacity-60">{{ module.id }}</code>
+            <code class="text-xs txt-secondary font-mono">{{ module.id }}</code>
           </div>
           <p class="txt-secondary text-sm">{{ module.message }}</p>
 
