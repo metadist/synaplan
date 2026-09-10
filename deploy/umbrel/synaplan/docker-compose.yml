@@ -205,7 +205,7 @@ services:
     restart: on-failure
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.3@sha256:017d0a3d39757f94a09efa657b6ad7e68222564dd9ba7dd7193981d75cd8a025
+    image: centrifugo/centrifugo:v6.9.4@sha256:78b2fcd11e69f7cd82072924db99865be2beba4a03087d8ce0f5008ae357abe4
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     user: "1000:1000"
     environment:

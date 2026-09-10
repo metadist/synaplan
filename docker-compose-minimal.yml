@@ -340,7 +340,7 @@ services:
   # /centrifugo/api/* so the browser connects same-origin. Auth via short-lived
   # JWTs minted by the PHP backend.
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.3@sha256:017d0a3d39757f94a09efa657b6ad7e68222564dd9ba7dd7193981d75cd8a025
+    image: centrifugo/centrifugo:v6.9.4@sha256:78b2fcd11e69f7cd82072924db99865be2beba4a03087d8ce0f5008ae357abe4
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
