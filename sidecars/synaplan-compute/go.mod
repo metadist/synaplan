@@ -3,7 +3,7 @@ module github.com/metadist/synaplan-compute
 go 1.22
 
 require (
-	github.com/docker/docker v23.0.8+incompatible
+	github.com/docker/docker v23.0.18+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/oklog/ulid/v2 v2.1.0
 	golang.org/x/sys v0.1.0
