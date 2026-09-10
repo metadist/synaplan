@@ -24,8 +24,7 @@ final readonly class TemplateRenderer
             return match ($m[1]) {
                 'input' => self::scalar($input[$m[2]] ?? ''),
                 'response' => self::scalar($response[$m[2]] ?? ''),
-                'credential' => 'header' === $m[2] ? (string) $credentialHeader : '',
-                default => '',
+                default => 'header' === $m[2] ? (string) $credentialHeader : '',
             };
         }, $template);
     }

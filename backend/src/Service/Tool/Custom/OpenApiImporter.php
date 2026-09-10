@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Tool\Custom;
 
 use App\Service\Security\SsrfGuard;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpClientExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final readonly class OpenApiImporter
@@ -27,13 +29,29 @@ final readonly class OpenApiImporter
         if ($this->ssrfGuard->isBlockedUrl($url)) {
             throw new InvalidToolTemplateException('This URL is not allowed');
         }
-        $content = $this->httpClient->request('GET', $url, [
-            'max_redirects' => 0,
-            'timeout' => 15,
-            'max_duration' => 20,
-        ])->getContent();
-        if (strlen($content) > self::MAX_SPEC_BYTES) {
-            throw new InvalidToolTemplateException('The description is too large');
+        try {
+            $response = $this->httpClient->request('GET', $url, [
+                'max_redirects' => 0,
+                'timeout' => 15,
+                'max_duration' => 20,
+            ]);
+            if (200 !== $response->getStatusCode()) {
+                $response->cancel();
+                throw new InvalidToolTemplateException(sprintf('The description could not be fetched (HTTP %d)', $response->getStatusCode()));
+            }
+            $content = '';
+            foreach ($this->httpClient->stream($response) as $chunk) {
+                if ($chunk->isLast()) {
+                    break;
+                }
+                $content .= $chunk->getContent();
+                if (strlen($content) > self::MAX_SPEC_BYTES) {
+                    $response->cancel();
+                    throw new InvalidToolTemplateException('The description is too large');
+                }
+            }
+        } catch (HttpClientExceptionInterface $e) {
+            throw new InvalidToolTemplateException('The description could not be fetched: '.$e->getMessage(), 0, $e);
         }
 
         return $this->previewFromDocument($content, $url);
@@ -91,7 +109,11 @@ final readonly class OpenApiImporter
 
             return $json;
         }
-        $yaml = Yaml::parse($document);
+        try {
+            $yaml = Yaml::parse($document);
+        } catch (ParseException $e) {
+            throw new InvalidToolTemplateException('The description must be OpenAPI 3 JSON or YAML: '.$e->getMessage(), 0, $e);
+        }
         if (!is_array($yaml)) {
             throw new InvalidToolTemplateException('The description must be OpenAPI 3 JSON or YAML');
         }

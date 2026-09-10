@@ -15,6 +15,7 @@ class CustomTool
 {
     public const TYPE_HTTP = 'http';
     public const TYPE_OPENAPI = 'openapi_op';
+    public const NAME_MAX_LENGTH = 64;
     public const NAME_PATTERN = '/^[a-z][a-z0-9_]{2,63}$/';
 
     #[ORM\Id]

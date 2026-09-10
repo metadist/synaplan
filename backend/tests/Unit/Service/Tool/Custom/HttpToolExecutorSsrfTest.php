@@ -11,15 +11,14 @@ use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\Custom\TemplateRenderer;
 use App\Service\Tool\ToolsConfig;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 final class HttpToolExecutorSsrfTest extends TestCase
 {
-    /**
-     * @dataProvider blockedUrls
-     */
+    #[DataProvider('blockedUrls')]
     public function testBlockedTargetsRefuse(string $url): void
     {
         $executor = $this->executor();
@@ -53,6 +52,19 @@ final class HttpToolExecutorSsrfTest extends TestCase
         $resolved = $executor->resolve($tool, ['id' => '1'], includeSecret: false);
         $this->assertSame('***', $resolved['headers']['Authorization'] ?? null);
         $this->assertStringNotContainsString('super-secret', json_encode($resolved) ?: '');
+    }
+
+    public function testResolveEncodesPathInputAndAppendsQuery(): void
+    {
+        $executor = $this->executor();
+        $tool = new CustomTool(1, 'lookup', 'Lookup');
+        $tool->setSpec([
+            'method' => 'GET',
+            'url' => 'https://example.com/tickets/{{input.id}}',
+            'query' => ['q' => '{{input.q}}', 'fixed' => '1'],
+        ]);
+        $resolved = $executor->resolve($tool, ['id' => 'a/b c', 'q' => 'x&y'], includeSecret: false);
+        $this->assertSame('https://example.com/tickets/a%2Fb%20c?q=x%26y&fixed=1', $resolved['url']);
     }
 
     private function executor(?CredentialVaultInterface $vault = null): HttpToolExecutor

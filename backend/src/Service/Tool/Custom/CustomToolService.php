@@ -128,11 +128,8 @@ final readonly class CustomToolService
     {
         $created = [];
         foreach ($operations as $operation) {
-            if (!is_array($operation)) {
-                continue;
-            }
             $operationId = (string) ($operation['operationId'] ?? '');
-            $name = $this->nameFromOperationId($operationId);
+            $name = $this->uniqueName((int) $user->getId(), $this->nameFromOperationId($operationId));
             $method = strtoupper((string) ($operation['method'] ?? 'GET'));
             $path = (string) ($operation['path'] ?? '/');
             $sideEffect = (string) ($operation['sideEffect'] ?? 'write');
@@ -151,15 +148,20 @@ final readonly class CustomToolService
                 'sourceRef' => is_string($operation['sourceRef'] ?? null) ? $operation['sourceRef'] : null,
                 'credentialId' => $credentialId,
             ];
-            try {
-                $created[] = $this->create($user, $payload);
-            } catch (InvalidToolTemplateException) {
-                $payload['name'] = $name.'_'.substr(bin2hex(random_bytes(2)), 0, 4);
-                $created[] = $this->create($user, $payload);
-            }
+            $created[] = $this->create($user, $payload);
         }
 
         return $created;
+    }
+
+    private function uniqueName(int $ownerId, string $base): string
+    {
+        $name = $base;
+        for ($suffix = 2; null !== $this->tools->findOneByOwnerAndName($ownerId, $name); ++$suffix) {
+            $name = substr($base, 0, CustomTool::NAME_MAX_LENGTH - strlen((string) $suffix) - 1).'_'.$suffix;
+        }
+
+        return $name;
     }
 
     /**

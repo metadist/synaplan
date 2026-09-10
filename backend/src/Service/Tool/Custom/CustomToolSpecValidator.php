@@ -11,6 +11,8 @@ final readonly class CustomToolSpecValidator
 {
     private const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'];
     private const SPEC_KEYS = ['method', 'url', 'headers', 'query', 'body', 'response'];
+    /** Scheme, a literal host (name or IPv4/6 literal) and optional port; no userinfo, no template tokens. */
+    private const LITERAL_ORIGIN = '/^https?:\/\/(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\])(?::\d{1,5})?(?:[\/?#]|$)/';
 
     public function __construct(
         private TemplateRenderer $templates,
@@ -43,10 +45,28 @@ final readonly class CustomToolSpecValidator
         if ('' === $url) {
             throw new InvalidToolTemplateException('URL is required');
         }
+        $this->assertLiteralOrigin($url);
+        foreach (['headers', 'query'] as $mapKey) {
+            if (isset($spec[$mapKey]) && !is_array($spec[$mapKey])) {
+                throw new InvalidToolTemplateException(sprintf('"%s" must be a map of names to values', $mapKey));
+            }
+        }
         $this->templates->walk($spec);
         $spec['method'] = $method;
         $spec['url'] = $url;
 
         return $spec;
+    }
+
+    /**
+     * The scheme and host of a tool URL must be literal. Only the path and
+     * query may carry `{{input.*}}` — otherwise the model (or a prompt
+     * injection) could point a "read" tool at any host it likes.
+     */
+    private function assertLiteralOrigin(string $url): void
+    {
+        if (1 !== preg_match(self::LITERAL_ORIGIN, $url)) {
+            throw new InvalidToolTemplateException('URL must start with https:// and a fixed host name; use {{input.*}} only in the path or query');
+        }
     }
 }

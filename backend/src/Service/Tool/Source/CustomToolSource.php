@@ -10,9 +10,9 @@ use App\Repository\ShareRepository;
 use App\Service\Iam\ResourceKind\ToolResourceKind;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
+use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use App\Service\Tool\ToolSourceInterface;
-use App\Service\Tool\ToolsConfig;
 
 final readonly class CustomToolSource implements ToolSourceInterface
 {
@@ -45,14 +45,16 @@ final readonly class CustomToolSource implements ToolSourceInterface
             }
         }
         $shared = $this->tools->findEnabledByIds($sharedIds);
+        // Owned tools come first so a shared tool that happens to carry the same
+        // name is shadowed instead of blowing up the registry with a duplicate.
         $descriptors = [];
-        $seen = [];
+        $seenNames = [];
         foreach ([...$owned, ...$shared] as $tool) {
-            $id = (int) $tool->getId();
-            if (isset($seen[$id])) {
+            $name = $tool->registryName();
+            if (isset($seenNames[$name])) {
                 continue;
             }
-            $seen[$id] = true;
+            $seenNames[$name] = true;
             $descriptors[] = $this->toDescriptor($tool, $userId);
         }
 
