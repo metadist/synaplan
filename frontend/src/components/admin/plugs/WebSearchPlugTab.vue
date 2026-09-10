@@ -163,7 +163,7 @@
         </div>
         <ul v-if="testResult" class="mt-3 space-y-1" data-testid="web-search-test-results">
           <li
-            v-if="testResult.provider"
+            v-if="testResult.provider && !testResult.error"
             class="text-sm txt-secondary"
             data-testid="web-search-test-provider"
           >
@@ -282,9 +282,13 @@ async function saveKey(provider: string): Promise<void> {
     if (card) {
       card.keyStatus = keyStatus
     }
-    const refreshed = await getWebSearchStatus()
-    applyStatus(refreshed)
     success(t('aiInfra.webSearch.keySaved'))
+    try {
+      const refreshed = await getWebSearchStatus()
+      applyStatus(refreshed)
+    } catch {
+      // Key is already stored; a stale badge is better than a false save error.
+    }
   } catch (err) {
     showError(err instanceof Error ? err.message : t('aiInfra.webSearch.saveFailed'))
   } finally {

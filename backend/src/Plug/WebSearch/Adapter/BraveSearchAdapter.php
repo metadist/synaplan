@@ -8,6 +8,7 @@ use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
@@ -19,7 +20,7 @@ use App\Service\Search\BraveSearchService;
  *
  * @internal
  */
-final readonly class BraveSearchAdapter implements WebSearchProviderInterface
+final readonly class BraveSearchAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public function __construct(
         private BraveSearchService $braveSearch,

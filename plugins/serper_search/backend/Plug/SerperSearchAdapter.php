@@ -10,6 +10,7 @@ use App\Plug\PlugKeyStore;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchOptionMapper;
+use App\Plug\WebSearch\WebSearchLiveProbeInterface;
 use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
@@ -27,7 +28,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * provider — so a down provider never breaks chat, yet a recoverable error
  * still triggers a retry rather than silently returning "no results".
  */
-final readonly class SerperSearchAdapter implements WebSearchProviderInterface
+final readonly class SerperSearchAdapter implements WebSearchProviderInterface, WebSearchLiveProbeInterface
 {
     public const KEY = 'serper';
 

@@ -125,6 +125,35 @@ describe('WebSearchPlugTab', () => {
     )
   })
 
+  it('does not show Answered by when the test query fails', async () => {
+    testWebSearch.mockResolvedValue({
+      results: [],
+      answer: null,
+      latencyMs: 9,
+      error: 'Brave search returned HTTP 401',
+      provider: 'brave',
+      fellBackFrom: null,
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="web-search-test-query"]').setValue('synaplan')
+    await wrapper.get('[data-testid="web-search-test-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="web-search-test-provider"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="web-search-test-results"]').text()).toContain('HTTP 401')
+    expect(wrapper.get('[data-testid="web-search-test-results"]').text()).not.toContain(
+      'Answered by'
+    )
+  })
+
   it('warns when the saved active provider cannot search', async () => {
     saveWebSearch.mockResolvedValue({
       providers: [
@@ -180,5 +209,31 @@ describe('WebSearchPlugTab', () => {
     expect(
       (wrapper.get('[data-testid="web-search-key-tavily"]').element as HTMLInputElement).value
     ).toBe('not-a-real-key')
+  })
+
+  it('still reports the key as saved when status refresh fails', async () => {
+    savePlugKey.mockResolvedValue({
+      configured: true,
+      source: 'db',
+      origin: 'ui',
+      maskedKey: '••••abcd',
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    getWebSearchStatus.mockRejectedValueOnce(new Error('status down'))
+    await wrapper.get('[data-testid="web-search-key-tavily"]').setValue('real-key')
+    await wrapper.get('[data-testid="web-search-save-key-tavily"]').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith('Key saved and verified. The next search can use it.')
+    expect(showError).not.toHaveBeenCalled()
   })
 })

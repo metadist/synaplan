@@ -116,11 +116,10 @@ final class WebSearchRegistry
             return $fallbackSet->withMeta(['fellBackFrom' => $activeKey]);
         }
 
-        $this->fallbackMetrics->recordResolved($activeKey, 0, $activeKey);
+        $this->fallbackMetrics->recordResolved($activeKey, 0, null);
 
         return SearchResultSet::empty($query->query, [
             'provider' => $activeKey,
-            'fellBackFrom' => $activeKey,
         ]);
     }
 

@@ -93,7 +93,9 @@ final readonly class WebSearchAdminService
         $started = hrtime(true);
         try {
             $set = $adapter->search(new WebSearchQuery($query));
-            $this->adminHealth->remember($key, PlugHealth::available());
+            if ($adapter->health()->available) {
+                $this->adminHealth->remember($key, PlugHealth::available());
+            }
             $latencyMs = (int) ((hrtime(true) - $started) / 1_000_000);
             $results = [];
             foreach (array_slice($set->results, 0, 5) as $row) {
@@ -137,13 +139,25 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         $previous = $this->snapshotStoredKey($normalized);
         $status = $this->persistIncomingKey($normalized, $key);
+        $this->adminHealth->forget($normalized);
 
         $adapter = $this->registry->byKey($normalized);
         if (!$adapter instanceof WebSearchProviderInterface) {
             return $status;
         }
+        if (!$adapter instanceof WebSearchLiveProbeInterface) {
+            return $status;
+        }
 
-        $health = $adapter->probe();
+        try {
+            $health = $adapter->probe();
+        } catch (\Throwable $e) {
+            $this->restoreStoredKey($normalized, $previous);
+            $this->adminHealth->forget($normalized);
+
+            throw new \InvalidArgumentException('API key was not stored: '.$e->getMessage(), 0, $e);
+        }
+
         if ($health->available) {
             $this->adminHealth->remember($normalized, $health);
 
@@ -151,6 +165,7 @@ final readonly class WebSearchAdminService
         }
 
         $this->restoreStoredKey($normalized, $previous);
+        $this->adminHealth->forget($normalized);
         $reason = $health->reason ?? 'the provider rejected it';
 
         throw new \InvalidArgumentException('API key was not stored: '.$reason);
@@ -164,11 +179,13 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->deleteKey($normalized);
+            $this->adminHealth->forget($normalized);
 
             return $this->plugKeys->getStatus($normalized);
         }
         if ('perplexity' === $normalized) {
             $this->providerKeys->deleteKey('perplexity');
+            $this->adminHealth->forget('perplexity');
 
             return $this->providerKeys->getStatus('perplexity');
         }
@@ -240,21 +257,27 @@ final readonly class WebSearchAdminService
     }
 
     /**
-     * @return array{store: 'plug'|'provider', source: string, key: ?string}|null
+     * @return array{store: 'plug'|'provider', source: string, origin: ?string, key: ?string}|null
      */
     private function snapshotStoredKey(string $provider): ?array
     {
         if ($this->plugKeys->supports($provider)) {
+            $status = $this->plugKeys->getStatus($provider);
+
             return [
                 'store' => 'plug',
-                'source' => $this->plugKeys->getStatus($provider)['source'],
+                'source' => $status['source'],
+                'origin' => $status['origin'],
                 'key' => $this->plugKeys->getKey($provider),
             ];
         }
         if ('perplexity' === $provider) {
+            $status = $this->providerKeys->getStatus('perplexity');
+
             return [
                 'store' => 'provider',
-                'source' => $this->providerKeys->getStatus('perplexity')['source'],
+                'source' => $status['source'],
+                'origin' => $status['origin'],
                 'key' => $this->providerKeys->getKey('perplexity'),
             ];
         }
@@ -263,7 +286,7 @@ final readonly class WebSearchAdminService
     }
 
     /**
-     * @param array{store: 'plug'|'provider', source: string, key: ?string}|null $previous
+     * @param array{store: 'plug'|'provider', source: string, origin: ?string, key: ?string}|null $previous
      */
     private function restoreStoredKey(string $provider, ?array $previous): void
     {
@@ -273,10 +296,13 @@ final readonly class WebSearchAdminService
 
         $restorePrevious = 'db' === $previous['source'] && \is_string($previous['key']) && '' !== $previous['key'];
         if ($restorePrevious) {
+            $origin = \is_string($previous['origin']) && '' !== $previous['origin']
+                ? $previous['origin']
+                : PlugKeyStore::ORIGIN_UI;
             if ('plug' === $previous['store']) {
-                $this->plugKeys->saveKey($provider, $previous['key']);
+                $this->plugKeys->saveKey($provider, $previous['key'], $origin);
             } else {
-                $this->providerKeys->saveKey($provider, $previous['key']);
+                $this->providerKeys->saveKey($provider, $previous['key'], $origin);
             }
 
             return;

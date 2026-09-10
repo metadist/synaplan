@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Plug\WebSearch\Client;
 
 use App\Plug\PlugConfigService;
+use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -85,13 +86,22 @@ final readonly class SearxngClient
             if ($status >= 400) {
                 throw new \RuntimeException('SearXNG probe returned HTTP '.$status);
             }
-            $response->getContent(false);
+            $data = $response->toArray(false);
+            if (!isset($data['results']) || !\is_array($data['results'])) {
+                throw new \RuntimeException('SearXNG probe returned no results array');
+            }
+        } catch (DecodingExceptionInterface $e) {
+            throw new \RuntimeException('SearXNG probe returned no results array', 0, $e);
         } catch (TransportExceptionInterface $e) {
             $message = $e->getMessage();
-            if (str_contains(strtolower($message), 'timed out') || str_contains(strtolower($message), 'timeout')) {
+            $lower = strtolower($message);
+            if (str_contains($lower, 'timed out') || str_contains($lower, 'timeout')) {
                 throw new \RuntimeException('SearXNG request timed out', 0, $e);
             }
-            if (str_contains(strtolower($message), 'refused') || str_contains(strtolower($message), 'could not resolve')) {
+            if (str_contains($lower, 'could not resolve') || str_contains($lower, 'nodename nor servname') || str_contains($lower, 'name or service not known')) {
+                throw new \RuntimeException('SearXNG unavailable — could not resolve host', 0, $e);
+            }
+            if (str_contains($lower, 'refused')) {
                 throw new \RuntimeException('SearXNG unavailable — connection refused', 0, $e);
             }
 

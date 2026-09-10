@@ -29,11 +29,20 @@ final readonly class WebSearchAdminHealth
             return PlugHealth::unavailable('Key stored — not verified');
         }
 
+        if (!$adapter instanceof WebSearchLiveProbeInterface) {
+            return PlugHealth::unavailable('Key stored — not verified');
+        }
+
         return $this->cache->remember($key, $adapter->probe(...));
     }
 
     public function remember(string $key, PlugHealth $health): PlugHealth
     {
         return $this->cache->put($key, $health);
+    }
+
+    public function forget(string $key): void
+    {
+        $this->cache->forget($key);
     }
 }
