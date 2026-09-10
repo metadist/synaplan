@@ -1,6 +1,6 @@
 <template>
   <button
-    v-if="vectorStateOf(file) !== 'vectorized'"
+    v-if="vectorStateOf(file) !== 'vectorized' && !skipsExtraction(extensionOf(file.filename) || file.file_type)"
     type="button"
     class="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 txt-secondary hover:text-[var(--brand)] transition-colors disabled:opacity-50"
     :title="t('files.describeSortAction')"
@@ -21,6 +21,7 @@
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import type { FileItem } from '@/services/filesService'
+import { extensionOf, skipsExtraction } from '@/services/filePreview'
 import { vectorStateOf } from '@/utils/fileDisplayName'
 
 defineProps<{

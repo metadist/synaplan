@@ -153,9 +153,18 @@ final readonly class FileProcessor
      */
     public function extractText(string $relativePath, string $fileExtension, ?int $userId = null, bool $describe = false): array
     {
+        $ext = strtolower($fileExtension);
+        if (FileStorageService::skipsExtraction($ext)) {
+            $this->logger->info('FileProcessor: skipping extraction for store-only type', [
+                'ext' => $ext,
+                'file' => basename($relativePath),
+            ]);
+
+            return ['', ['strategy' => 'skipped_store_only', 'ext' => $ext]];
+        }
+
         $absolutePath = $this->resolveAbsolutePath($relativePath);
         $mime = mime_content_type($absolutePath) ?: '';
-        $ext = strtolower($fileExtension);
         $mime = $this->ensureOfficeMime($mime, $ext);
 
         $meta = [

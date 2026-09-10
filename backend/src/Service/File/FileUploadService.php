@@ -284,6 +284,14 @@ final readonly class FileUploadService
             return $result;
         }
 
+        // Archives such as .jar may be stored and attached to a chat, but
+        // Tika would unzip them. Never extract or vectorize.
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            $result['extraction_skipped'] = true;
+
+            return $result;
+        }
+
         $result = $this->extractText($file, $storageResult['path'], $fileExtension, $user, $processLevel, $result);
         if (!$result['success'] || 'extract' === $processLevel) {
             return $result;
@@ -539,7 +547,7 @@ final readonly class FileUploadService
     /**
      * Run extraction + vectorization for a stored file (used for async processing after fast upload).
      *
-     * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int}
+     * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int, extraction_skipped?: bool, message?: string}
      */
     public function processFile(File $file, User $user): array
     {
@@ -561,6 +569,14 @@ final readonly class FileUploadService
         }
 
         $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return [
+                'success' => true,
+                'status' => $file->getStatus(),
+                'extraction_skipped' => true,
+            ];
+        }
+
         $asyncMarkdown = null;
 
         if ('uploaded' === $file->getStatus()) {
@@ -687,6 +703,14 @@ final readonly class FileUploadService
             $file->getFileName() ?: '',
             $file->getFilePath() ?: '',
         );
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return [
+                'success' => false,
+                'error' => 'This file type is stored as-is and cannot be extracted.',
+                'errorType' => 'not_extractable',
+            ];
+        }
+
         $markdown = null;
 
         if ('' === trim($extractedText)) {
@@ -775,6 +799,14 @@ final readonly class FileUploadService
             $file->getFileName() ?: '',
             $file->getFilePath() ?: '',
         );
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return [
+                'success' => false,
+                'error' => 'This file type is stored as-is and cannot be extracted.',
+                'errorType' => 'not_extractable',
+            ];
+        }
+
         $category = FileTypeResolver::resolveCategory(
             $file->getFileType() ?: '',
             $file->getFileName() ?: '',

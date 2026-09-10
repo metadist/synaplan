@@ -452,7 +452,7 @@ class FileController extends AbstractController
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
             'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 
@@ -526,7 +526,7 @@ class FileController extends AbstractController
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
             'rate_limited' => Response::HTTP_TOO_MANY_REQUESTS,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 
@@ -1687,7 +1687,7 @@ class FileController extends AbstractController
 
         $statusCode = match ($result['errorType'] ?? null) {
             'not_found' => Response::HTTP_NOT_FOUND,
-            'empty_content' => Response::HTTP_UNPROCESSABLE_ENTITY,
+            'empty_content', 'not_extractable' => Response::HTTP_UNPROCESSABLE_ENTITY,
             default => Response::HTTP_INTERNAL_SERVER_ERROR,
         };
 

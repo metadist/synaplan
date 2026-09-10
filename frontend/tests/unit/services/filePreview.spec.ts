@@ -9,6 +9,7 @@ import {
   previewIconForName,
   previewKindForFile,
   previewSnippet,
+  skipsExtraction,
 } from '@/services/filePreview'
 import type { FileItem } from '@/services/filesService'
 
@@ -44,6 +45,13 @@ describe('filePreview helpers', () => {
     expect(kindFromExtension('docx')).toBe('document')
     expect(kindFromExtension('ics')).toBe('calendar')
     expect(kindFromExtension('bin')).toBe('unknown')
+    expect(kindFromExtension('jar')).toBe('unknown')
+  })
+
+  it('treats jar as store-only (never extract)', () => {
+    expect(skipsExtraction('jar')).toBe(true)
+    expect(skipsExtraction('JAR')).toBe(true)
+    expect(skipsExtraction('pdf')).toBe(false)
   })
 
   it('prefers the filename extension over the coarse origin_kind', () => {

@@ -58,7 +58,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.rtf,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.odp,.pages,.numbers,.key,.ics"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.rtf,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.odp,.pages,.numbers,.key,.ics,.jar"
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />
@@ -250,7 +250,10 @@
                   @click.stop
                 >
                   <button
-                    v-if="!['vectorized', 'extracting', 'vectorizing'].includes(file.status)"
+                    v-if="
+                      !['vectorized', 'extracting', 'vectorizing'].includes(file.status) &&
+                      !skipsExtraction(extensionOf(file.filename) || file.file_type)
+                    "
                     class="p-1 sm:p-1.5 rounded hover:bg-purple-500/10 text-purple-600 dark:text-purple-400 transition-colors"
                     :title="$t('fileSelection.reVectorize')"
                     data-testid="btn-file-revectorize"
@@ -365,6 +368,7 @@ import filesService, {
   UploadBlockedError,
   UploadFailedError,
 } from '@/services/filesService'
+import { extensionOf, skipsExtraction } from '@/services/filePreview'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { useMediaSrc } from '@/services/api/mediaAuth'
 import { useNotification } from '@/composables/useNotification'

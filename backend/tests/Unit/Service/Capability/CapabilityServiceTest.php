@@ -67,5 +67,6 @@ class CapabilityServiceTest extends TestCase
         $this->assertContains('pptx', $formats['presentations']);
         $this->assertContains('png', $formats['images']);
         $this->assertContains('mp4', $formats['video']);
+        $this->assertContains('jar', $formats['archives']);
     }
 }

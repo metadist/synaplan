@@ -59,6 +59,11 @@ describe('FileMakeSearchableButton', () => {
     expect(generated.find('button').attributes('data-testid')).toBe('btn-index-prompt')
   })
 
+  it('is hidden for store-only archives that must not be extracted', () => {
+    const wrapper = mountButton({ filename: 'sodium.jar', file_type: 'jar' })
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
+
   it('emits activate when clicked', async () => {
     const wrapper = mountButton()
     await wrapper.find('button').trigger('click')
