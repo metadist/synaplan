@@ -14,10 +14,13 @@ use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\MessagesGateway\ApiSessionSummaryService;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\PremiumFeatureGate;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Vision\VisionModelResolver;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -123,6 +126,8 @@ final readonly class MessagesGateway
         private LoggerInterface $logger,
         #[AutowireIterator('app.messages.translator')]
         private iterable $translators = [],
+        private ?AgentConfig $agentConfig = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
     ) {
     }
 
@@ -301,12 +306,27 @@ final readonly class MessagesGateway
         if ('on' === strtolower((string) $contextOverride)) {
             $injectContext = true;
         }
-        if ($injectContext) {
+        $desktop = DesktopTurnOptions::fromRequest($request);
+        $profile = $this->resolveDesktopProfile($user, $desktop);
+        // Desktop headers are an explicit per-request pin, not a bypass of
+        // CONTEXT_INJECTION_ENABLED. Ambient memories stay behind that flag.
+        // An explicit knowledge folder (or recipe folders) still searches RAG
+        // when the flag is off — otherwise x-synaplan-rag-group-key is a no-op.
+        $explicitFolder = null !== $desktop->ragGroupKey
+            || (null !== $profile && [] !== $profile->ragScopes);
+        $wantSessionBlock = $injectContext || $explicitFolder;
+        if ('off' === strtolower((string) $contextOverride)) {
+            $wantSessionBlock = false;
+        }
+        if ($injectContext || !$desktop->isEmpty()) {
             $injected = $this->contextInjector->inject(
                 $requestBody,
                 $user,
                 $sessionKey,
-                $contextOverride,
+                $wantSessionBlock ? $contextOverride : 'off',
+                $desktop,
+                $profile,
+                $injectContext,
             );
             $requestBody = $injected['body'];
             if ($injected['injected']) {
@@ -771,6 +791,33 @@ final readonly class MessagesGateway
                 'error' => $e->getMessage(),
                 'user_id' => $user->getId(),
             ]);
+        }
+    }
+
+    /**
+     * Pin an Assistant recipe from `x-synaplan-agent-id`. Invalid / flag-off
+     * pins are ignored (same as the web stream). The body `model` stays as
+     * already resolved — recipe chat keys never replace it (C15).
+     */
+    private function resolveDesktopProfile(User $user, DesktopTurnOptions $desktop): ?RuntimeProfile
+    {
+        if (null === $desktop->agentId || null === $this->agentRuntimeResolver || null === $this->agentConfig) {
+            return null;
+        }
+        if (!$this->agentConfig->isEnabled((int) $user->getId())) {
+            return null;
+        }
+
+        try {
+            return $this->agentRuntimeResolver->resolve($desktop->agentId, $user, false, null);
+        } catch (\Throwable $e) {
+            $this->logger->info('MessagesGateway: desktop agent pin ignored', [
+                'agent_id' => $desktop->agentId,
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
     }
 

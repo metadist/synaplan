@@ -356,6 +356,14 @@ A key may have at most 32 open sessions. Pending audio is transcribed through
 the same `AiFacade::transcribe()` path as chat uploads, so usage and SOUND2TEXT
 model choice stay consistent.
 
+### `GET /v1/models/catalog`
+
+Capability-grouped selectable models for machine clients (Synaplan Desktop).
+`id` is the catalog key `service:providerId:tag`. See
+[DESKTOP.md — Desktop project companion](DESKTOP.md#desktop-project-companion-machine-api).
+Paired keys (`desktop:messages`) may call this; `GET /api/v1/config/models`
+still requires `messages:*`.
+
 ### `GET /v1/models`
 
 Returns all available models in OpenAI format. An additive `capabilities`

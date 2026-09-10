@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\Entity\Model;
+use App\Model\ModelCatalog;
 use App\Repository\ModelRepository;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use Psr\Log\LoggerInterface;
@@ -49,6 +50,11 @@ final readonly class MessagesModelResolver
         $aliasedFrom = null;
         $candidate = $requested;
 
+        $fromCatalog = $this->findByCatalogKey($requested);
+        if (null !== $fromCatalog) {
+            return $this->toResolved($fromCatalog, $requested, null);
+        }
+
         $aliases = $this->config->modelAliases();
         if (isset($aliases[$candidate])) {
             $aliasedFrom = $candidate;
@@ -84,6 +90,14 @@ final readonly class MessagesModelResolver
             return null;
         }
 
+        return $this->toResolved($model, $requested, $aliasedFrom);
+    }
+
+    /**
+     * @return ResolvedModel
+     */
+    private function toResolved(Model $model, string $requested, ?string $aliasedFrom): array
+    {
         return [
             'provider' => strtolower($model->getService()),
             'providerModelId' => $model->getProviderId() ?: $model->getName(),
@@ -92,6 +106,25 @@ final readonly class MessagesModelResolver
             'requested' => $requested,
             'aliased_from' => $aliasedFrom,
         ];
+    }
+
+    private function findByCatalogKey(string $key): ?Model
+    {
+        if (!str_contains($key, ':')) {
+            return null;
+        }
+
+        $bid = ModelCatalog::findBidByKey($key);
+        if (null === $bid) {
+            return null;
+        }
+
+        $model = $this->modelRepository->find($bid);
+        if (!$model instanceof Model || 1 !== $model->getActive()) {
+            return null;
+        }
+
+        return $model;
     }
 
     /**

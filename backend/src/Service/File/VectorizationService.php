@@ -35,12 +35,13 @@ final readonly class VectorizationService
     /**
      * Vectorize file content and store in RAG database.
      *
-     * @param string      $fileText  Extracted text from file
-     * @param int         $userId    User ID
-     * @param int         $messageId Message ID
-     * @param string      $groupKey  Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
-     * @param int         $fileType  File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
-     * @param string|null $markdown  When set, chunks with {@see TextChunker::chunkifyMarkdown()}
+     * @param string      $fileText         Extracted text from file
+     * @param int         $userId           User ID
+     * @param int         $messageId        Message ID
+     * @param string      $groupKey         Custom grouping key (e.g., 'PRODUCTHELP', 'DOWNLOADS')
+     * @param int         $fileType         File type (0=text, 1=image, 2=audio/video, 3=pdf, 4=doc, etc.)
+     * @param string|null $markdown         When set, chunks with {@see TextChunker::chunkifyMarkdown()}
+     * @param int|null    $embeddingModelId Catalog-resolved BID; null uses account VECTORIZE
      *
      * @return array ['success' => bool, 'chunks_created' => int, 'error' => string|null, 'provider' => string]
      */
@@ -51,6 +52,7 @@ final readonly class VectorizationService
         string $groupKey = 'DEFAULT',
         int $fileType = 0,
         ?string $markdown = null,
+        ?int $embeddingModelId = null,
     ): array {
         if (empty($fileText)) {
             $this->logger->warning('VectorizationService: Empty text, skipping', [
@@ -67,8 +69,9 @@ final readonly class VectorizationService
         }
 
         try {
-            // Get user's preferred embedding model (or system default)
-            $embeddingModelId = $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
+            // Desktop project companion may send an explicit VECTORIZE catalog
+            // key. Omitted → account DEFAULTMODEL.VECTORIZE (web unchanged).
+            $embeddingModelId ??= $this->modelConfigService->getDefaultModel('VECTORIZE', $userId);
 
             if (!$embeddingModelId) {
                 $this->logger->error('VectorizationService: No embedding model configured');

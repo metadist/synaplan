@@ -88,6 +88,26 @@ final class MessagesModelResolverTest extends TestCase
         $this->assertSame('claude-haiku-4-5', $resolved['providerModelId']);
     }
 
+    public function testResolveByCatalogKey(): void
+    {
+        $key = 'ollama:bge-m3:vectorize';
+        $bid = \App\Model\ModelCatalog::findBidByKey($key);
+        if (null === $bid) {
+            $this->markTestSkipped('Catalog key '.$key.' is not in ModelCatalog on this install.');
+        }
+
+        $model = $this->makeModel($bid, 'Ollama', 'bge-m3', 'bge-m3');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository->expects($this->once())->method('find')->with($bid)->willReturn($model);
+
+        $resolved = $this->resolver->resolve($key);
+
+        $this->assertNotNull($resolved);
+        $this->assertSame($bid, $resolved['model_id']);
+        $this->assertSame('bge-m3', $resolved['providerModelId']);
+        $this->assertSame($key, $resolved['requested']);
+    }
+
     public function testResolveFailsClosedWhenUnknown(): void
     {
         $this->expectLookupSequence([null, null, null, null]);

@@ -79,6 +79,9 @@ final class ApiKeyScopeTest extends TestCase
         $scopes = ['desktop:messages'];
 
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/models'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/models/catalog'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/assistants'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/assistants/12'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/messages'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/mcp'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/admin/config/values'));
@@ -89,9 +92,12 @@ final class ApiKeyScopeTest extends TestCase
         $scopes = ApiKeyScope::pairingScopes();
 
         self::assertTrue(ApiKeyScope::allows($scopes, '/v1/messages'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/models/catalog'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/v1/assistants'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/mcp'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/desktop/jobs'));
         self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/files/123/download'));
+        self::assertTrue(ApiKeyScope::allows($scopes, '/api/v1/files/upload'));
     }
 
     public function testPairingKeyCannotReachAdmin(): void
@@ -194,6 +200,10 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/chats'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/rag/search'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/tts/stream'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/config/models'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/agents'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/agents/12'));
+        self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/agents/12/versions'));
     }
 
     public function testFilesPathAcceptsEitherFilesScope(): void

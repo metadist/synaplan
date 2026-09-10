@@ -8,6 +8,8 @@ use App\Entity\User;
 use App\Service\FeedbackConfigService;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\RAG\VectorSearchService;
+use App\Service\RAG\VectorStorage\DTO\RagScope;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\UserMemoryService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -40,19 +42,41 @@ final readonly class MessagesContextInjector
     /**
      * Append a trailing system content block when context injection is enabled.
      *
+     * Desktop headers pin an Assistant recipe and/or a knowledge folder. The
+     * request body `model` is never rewritten here (C15).
+     *
+     * `$includeMemories` is the ambient CONTEXT_INJECTION flag. An explicit
+     * desktop / recipe folder still searches RAG when the flag is off;
+     * workspace memories stay behind the flag.
+     *
      * @param array<string, mixed> $requestBody
      *
      * @return array{body: array<string, mixed>, injected: bool, hash: string|null}
      */
-    public function inject(array $requestBody, User $user, string $sessionKey, ?string $headerOverride = null): array
-    {
-        if ('off' === strtolower((string) $headerOverride)) {
-            return ['body' => $requestBody, 'injected' => false, 'hash' => null];
+    public function inject(
+        array $requestBody,
+        User $user,
+        string $sessionKey,
+        ?string $headerOverride = null,
+        ?DesktopTurnOptions $desktop = null,
+        ?RuntimeProfile $profile = null,
+        bool $includeMemories = true,
+    ): array {
+        $desktop ??= DesktopTurnOptions::none();
+        $injected = false;
+
+        if (null !== $profile && is_string($profile->systemPrompt) && '' !== trim($profile->systemPrompt)) {
+            $requestBody = $this->prependSystemBlock($requestBody, trim($profile->systemPrompt));
+            $injected = true;
         }
 
-        $block = $this->sessionBlock($user, $sessionKey, $requestBody);
+        if ('off' === strtolower((string) $headerOverride)) {
+            return ['body' => $requestBody, 'injected' => $injected, 'hash' => null];
+        }
+
+        $block = $this->sessionBlock($user, $sessionKey, $requestBody, $desktop, $profile, $includeMemories);
         if (null === $block || '' === $block) {
-            return ['body' => $requestBody, 'injected' => false, 'hash' => null];
+            return ['body' => $requestBody, 'injected' => $injected, 'hash' => null];
         }
 
         $requestBody = $this->appendSystemBlock($requestBody, $block);
@@ -67,10 +91,22 @@ final readonly class MessagesContextInjector
     /**
      * @param array<string, mixed> $requestBody
      */
-    private function sessionBlock(User $user, string $sessionKey, array $requestBody): ?string
-    {
+    private function sessionBlock(
+        User $user,
+        string $sessionKey,
+        array $requestBody,
+        DesktopTurnOptions $desktop,
+        ?RuntimeProfile $profile,
+        bool $includeMemories,
+    ): ?string {
         $userId = (int) $user->getId();
-        $cacheKey = self::CACHE_PREFIX.hash('sha256', $sessionKey.':'.$userId);
+        $cacheKey = self::CACHE_PREFIX.hash('sha256', implode(':', [
+            $sessionKey,
+            (string) $userId,
+            $desktop->ragGroupKey ?? '',
+            null !== $profile ? (string) ($profile->agentId ?? '') : '',
+            $includeMemories ? '1' : '0',
+        ]));
         $item = $this->cache->getItem($cacheKey);
         if ($item->isHit()) {
             $cached = $item->get();
@@ -103,13 +139,15 @@ final readonly class MessagesContextInjector
         $vector = null !== $embedded ? $embedded['embedding'] : [];
         if ([] !== $vector) {
             try {
+                $explicit = $this->explicitScopes($userId, $desktop, $profile);
                 $ragHits = $this->vectorSearchService->semanticSearchByVector(
                     $userId,
                     $vector,
-                    null,
-                    self::RAG_LIMIT,
-                    0.3,
+                    null === $explicit ? $desktop->ragGroupKey : null,
+                    null !== $profile && null !== $profile->ragLimit ? $profile->ragLimit : self::RAG_LIMIT,
+                    null !== $profile && null !== $profile->ragMinScore ? $profile->ragMinScore : 0.3,
                     $query,
+                    $explicit,
                 );
                 $rag = $this->formatter->formatRagContext($ragHits);
             } catch (\Throwable $e) {
@@ -119,25 +157,27 @@ final readonly class MessagesContextInjector
                 ]);
             }
 
-            try {
-                // Memory collection may use a pinned embedding model; fall back
-                // to a memory-specific embed when the shared VECTORIZE vector
-                // would be the wrong dimension.
-                $memoryEmbed = $this->userMemoryService->embedQueryForMemorySearch($userId, $query);
-                $memoryVector = null !== $memoryEmbed ? $memoryEmbed['embedding'] : $vector;
-                $memoryHits = $this->userMemoryService->searchMemoriesByVector(
-                    $userId,
-                    $memoryVector,
-                    null,
-                    self::MEMORY_LIMIT,
-                    $this->feedbackConfig->getMinChatMemoryScore(),
-                );
-                $memories = $this->formatter->formatMemoriesContext($memoryHits);
-            } catch (\Throwable $e) {
-                $this->logger->warning('MessagesContextInjector: memories failed', [
-                    'user_id' => $userId,
-                    'error' => $e->getMessage(),
-                ]);
+            if ($includeMemories) {
+                try {
+                    // Memory collection may use a pinned embedding model; fall back
+                    // to a memory-specific embed when the shared VECTORIZE vector
+                    // would be the wrong dimension.
+                    $memoryEmbed = $this->userMemoryService->embedQueryForMemorySearch($userId, $query);
+                    $memoryVector = null !== $memoryEmbed ? $memoryEmbed['embedding'] : $vector;
+                    $memoryHits = $this->userMemoryService->searchMemoriesByVector(
+                        $userId,
+                        $memoryVector,
+                        null,
+                        self::MEMORY_LIMIT,
+                        $this->feedbackConfig->getMinChatMemoryScore(),
+                    );
+                    $memories = $this->formatter->formatMemoriesContext($memoryHits);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('MessagesContextInjector: memories failed', [
+                        'user_id' => $userId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         }
 
@@ -147,6 +187,56 @@ final readonly class MessagesContextInjector
         $this->cache->save($item);
 
         return '' !== $block ? $block : null;
+    }
+
+    /**
+     * @return list<RagScope>|null
+     */
+    private function explicitScopes(int $userId, DesktopTurnOptions $desktop, ?RuntimeProfile $profile): ?array
+    {
+        if (null === $profile) {
+            return null;
+        }
+
+        $scopes = [];
+        foreach ($profile->ragScopes as $scope) {
+            $scopes[] = new RagScope((int) $scope['ownerId'], $scope['groupKey']);
+        }
+        if (null !== $desktop->ragGroupKey && '' !== $desktop->ragGroupKey) {
+            $scopes[] = new RagScope($userId, $desktop->ragGroupKey);
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function prependSystemBlock(array $requestBody, string $blockText): array
+    {
+        $block = ['type' => 'text', 'text' => $blockText];
+        $system = $requestBody['system'] ?? null;
+
+        if (null === $system || '' === $system) {
+            $requestBody['system'] = [$block];
+
+            return $requestBody;
+        }
+
+        if (\is_string($system)) {
+            $requestBody['system'] = [$block, ['type' => 'text', 'text' => $system]];
+
+            return $requestBody;
+        }
+
+        if (\is_array($system)) {
+            array_unshift($system, $block);
+            $requestBody['system'] = $system;
+        }
+
+        return $requestBody;
     }
 
     /**

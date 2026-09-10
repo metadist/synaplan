@@ -205,6 +205,30 @@ drops every other key before the payload is handed out
 unknown key. There is no field through which a shell string could reach the
 computer, so a future server bug cannot become remote code execution.
 
+## Desktop project companion (machine API)
+
+The desktop client also keeps **local-first projects** (notes, chats, and
+model picks live on that computer). There is no server Project table. The
+paired key already has everything it needs — **do not** add `desktop:agents`
+and **do not** change `protocol: 1`.
+
+These routes are for Synaplan Desktop. They are not a public Assistants CRUD.
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET` | `/v1/models/catalog` | Selectable models in eight groups (`CHAT`, `SOUND2TEXT`, `TEXT2SOUND`, `PIC2TEXT`, `TEXT2PIC`, `TEXT2VID`, `VECTORIZE`, `ANALYZE`). `id` is the catalog key `service:providerId:tag`. Unavailable rows stay listed with `available` / `unavailableReason`. |
+| `GET` | `/v1/assistants` | Reader `publicView` list, including `models.chat` / `vision` / `vectorize`. `AGENTS.ENABLED` off → **404** with code `assistants_disabled` (not an empty list). |
+| `GET` | `/v1/assistants/{id}` | One runnable Assistant. Same 404 when the flag is off. |
+| `POST` | `/v1/messages` | Existing Anthropic SSE. Optional headers `x-synaplan-agent-id` and `x-synaplan-rag-group-key` (`DESKTOP:{projectId}`). The JSON `model` (provider id or catalog key) **always wins** over the Assistant recipe. |
+| `POST` | `/api/v1/files/upload` and `/api/v1/files/{id}/process` | Existing `desktop:files` surface plus optional `vectorize_model` / `analyze_model` catalog keys. Unknown or wrong-capability keys are **400**. Omitted `vectorize_model` keeps the account VECTORIZE default. `process_level=vectorize` only indexes — `analyze_model` is fail-closed validated so a bad DOCS binding is rejected, but it is **not** applied because that path does not run document analysis. |
+
+`GET /api/v1/config/models` stays `messages:*`. `GET /api/v1/agents*` stays
+`agents:*`. A paired key must not reach either.
+
+Dictation stays on the existing `/v1/audio/transcriptions*` routes (also
+`desktop:messages`). The catalog `SOUND2TEXT` group is the source of truth
+for the project's dictation model once the client has it.
+
 ## Frozen fixtures
 
 The exact `protocol: 1` wire shapes are committed under

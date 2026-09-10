@@ -8,6 +8,7 @@ use App\Entity\File;
 use App\Entity\User;
 use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
+use App\Repository\ModelRepository;
 use App\Repository\WidgetSessionRepository;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentOfficeMergeService;
@@ -18,11 +19,13 @@ use App\Service\File\FileHelper;
 use App\Service\File\FileListService;
 use App\Service\File\FileStorageService;
 use App\Service\File\FileUploadService;
+use App\Service\File\InvalidProcessModelHintException;
 use App\Service\File\Office\DocumentCombineException;
 use App\Service\File\Office\DocumentCombineService;
 use App\Service\File\Office\DocumentExportService;
 use App\Service\File\Office\DocumentThumbnailGenerator;
 use App\Service\File\Office\OfficeConverterClient;
+use App\Service\File\ProcessModelHints;
 use App\Service\File\UploadOptions;
 use App\Service\Iam\KnowledgeFolderShareCleanup;
 use App\Service\Iam\SharedFileAccess;
@@ -69,6 +72,7 @@ class FileController extends AbstractController
         private DocumentOfficeMergeService $documentOfficeMergeService,
         private SharedFileAccess $sharedFileAccess,
         private KnowledgeFolderShareCleanup $folderShareCleanup,
+        private ModelRepository $modelRepository,
     ) {
     }
 
@@ -206,6 +210,8 @@ class FileController extends AbstractController
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
                         new OA\Property(property: 'overwrite', type: 'boolean', example: true, description: 'Replace the existing file matching (source, source_id) — or (group_key, original_name) — in place instead of creating a duplicate. Keeps the file id stable.'),
                         new OA\Property(property: 'retain_source', type: 'boolean', example: true, description: 'When false, the stored binary is discarded after successful vectorization; the row, extracted text and vectors are kept. Defaults to true.'),
+                        new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional catalog key for this file\'s embedding model. Omitted uses the account VECTORIZE default. Unknown or non-VECTORIZE keys return 400.'),
+                        new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Optional ANALYZE catalog key. Unknown or non-ANALYZE keys return 400. The extract+vectorize pipeline does not run document analysis, so this value is not applied for process_level=vectorize.'),
                     ]
                 )
             )
@@ -213,7 +219,7 @@ class FileController extends AbstractController
         responses: [
             new OA\Response(response: 200, description: 'All files uploaded successfully'),
             new OA\Response(response: 206, description: 'Partial success — some files failed'),
-            new OA\Response(response: 400, description: 'No files provided'),
+            new OA\Response(response: 400, description: 'No files provided, or an unknown / wrong-capability model hint'),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
     )]
@@ -248,7 +254,12 @@ class FileController extends AbstractController
         $overwrite = $request->request->getBoolean('overwrite');
         $retainSource = !$request->request->has('retain_source') || $request->request->getBoolean('retain_source');
 
-        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource);
+        $hints = $this->processModelHints($request);
+        if ($hints instanceof JsonResponse) {
+            return $hints;
+        }
+
+        $options = new UploadOptions($source, $originalName, $sourceId, $sourceEtag, $overwrite, $retainSource, $hints->vectorizeModelId);
 
         $uploadedFiles = $request->files->get('files', []);
 
@@ -391,13 +402,21 @@ class FileController extends AbstractController
         summary: 'Trigger extraction and vectorization for a stored file',
         tags: ['Files'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize'),
+                new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Validated as an ANALYZE catalog key (400 if unknown). Not applied on extract+vectorize.'),
+            ])
+        ),
         responses: [
             new OA\Response(response: 200, description: 'Processing result'),
+            new OA\Response(response: 400, description: 'Unknown or wrong-capability model hint'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'File not found'),
         ]
     )]
-    public function processFile(int $id, #[CurrentUser] ?User $user): JsonResponse
+    public function processFile(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -412,7 +431,12 @@ class FileController extends AbstractController
             return $this->json(['success' => true, 'status' => $file->getStatus(), 'already_processed' => true]);
         }
 
-        $result = $this->uploadService->processFile($file, $user);
+        $hints = $this->processModelHints($request);
+        if ($hints instanceof JsonResponse) {
+            return $hints;
+        }
+
+        $result = $this->uploadService->processFile($file, $user, $hints);
 
         return $this->json($result);
     }
@@ -1743,5 +1767,20 @@ class FileController extends AbstractController
         }
 
         return $this->sharedFileAccess->canRead($user, $file);
+    }
+
+    /**
+     * Optional catalog-key overrides from multipart fields or a JSON body.
+     */
+    private function processModelHints(Request $request): ProcessModelHints|JsonResponse
+    {
+        try {
+            return ProcessModelHints::fromRequest($request, $this->modelRepository);
+        } catch (InvalidProcessModelHintException $e) {
+            return $this->json([
+                'error' => $e->getMessage(),
+                'code' => $e->errorCode,
+            ], Response::HTTP_BAD_REQUEST);
+        }
     }
 }

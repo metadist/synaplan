@@ -299,6 +299,7 @@ final readonly class FileUploadService
                 $fileExtension,
                 $result,
                 is_string($result['extraction_markdown'] ?? null) ? $result['extraction_markdown'] : null,
+                $options->vectorizeModelId,
             );
 
             // Delete-after-embed (CORE-4): when the caller does not want the
@@ -500,6 +501,7 @@ final readonly class FileUploadService
         string $fileExtension,
         array $result,
         ?string $markdown = null,
+        ?int $embeddingModelId = null,
     ): array {
         try {
             $vectorResult = $this->vectorizationService->vectorizeAndStore(
@@ -509,6 +511,7 @@ final readonly class FileUploadService
                 $groupKey ?? '',
                 FileHelper::getFileTypeCode($fileExtension),
                 $markdown,
+                $embeddingModelId,
             );
 
             if ($vectorResult['success']) {
@@ -541,7 +544,7 @@ final readonly class FileUploadService
      *
      * @return array{success: bool, status: string, error?: string, extracted_text_length?: int, chunks_created?: int}
      */
-    public function processFile(File $file, User $user): array
+    public function processFile(File $file, User $user, ?ProcessModelHints $hints = null): array
     {
         if (in_array($file->getStatus(), ['extracting', 'vectorizing'], true)) {
             return ['success' => true, 'status' => $file->getStatus(), 'message' => 'File is already being processed'];
@@ -631,6 +634,7 @@ final readonly class FileUploadService
                 $groupKey,
                 FileHelper::getFileTypeCode($fileExtension),
                 $asyncMarkdown,
+                $hints?->vectorizeModelId,
             );
 
             if ($vectorResult['success']) {
