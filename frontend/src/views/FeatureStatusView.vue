@@ -105,6 +105,12 @@
             </div>
           </div>
 
+          <!-- Declared feature modules (absent on a backend without the module registry) -->
+          <FeatureModulesSection
+            v-if="featuresStatus.modules && featuresStatus.modules.length > 0"
+            :modules="featuresStatus.modules"
+          />
+
           <!-- Group features by category -->
           <div
             v-for="(category, categoryName) in featuresByCategory"
@@ -221,6 +227,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import {
   getFeaturesStatus,
   FeatureStatusForbiddenError,

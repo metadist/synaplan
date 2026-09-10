@@ -357,8 +357,8 @@ services:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'anthropic' }
+            - { name: 'app.ai.vision', key: 'anthropic' }
 
     App\AI\Provider\OpenAIProvider:
         arguments:
@@ -366,71 +366,71 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $storeResponses: '%env(bool:OPENAI_STORE_RESPONSES)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.speech_to_text' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'openai' }
+            - { name: 'app.ai.embedding', key: 'openai' }
+            - { name: 'app.ai.vision', key: 'openai' }
+            - { name: 'app.ai.image_generation', key: 'openai' }
+            - { name: 'app.ai.speech_to_text', key: 'openai' }
+            - { name: 'app.ai.text_to_speech', key: 'openai' }
 
     App\AI\Provider\OllamaProvider:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.chat', key: 'ollama' }
+            - { name: 'app.ai.embedding', key: 'ollama' }
 
     App\AI\Provider\TritonProvider:
         arguments:
             $serverUrl: '%env(TRITON_SERVER_URL)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.chat', key: 'triton' }
+            - { name: 'app.ai.embedding', key: 'triton' }
 
     App\AI\Provider\GroqProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.chat', key: 'groq' }
+            - { name: 'app.ai.vision', key: 'groq' }
+            - { name: 'app.ai.speech_to_text', key: 'groq' }
 
     App\AI\Provider\MistralProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.speech_to_text' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'mistral' }
+            - { name: 'app.ai.vision', key: 'mistral' }
+            - { name: 'app.ai.speech_to_text', key: 'mistral' }
+            - { name: 'app.ai.text_to_speech', key: 'mistral' }
 
     App\AI\Provider\TrustedTokensProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'trustedtokens' }
+            - { name: 'app.ai.vision', key: 'trustedtokens' }
 
     App\AI\Provider\XaiProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
-            - { name: 'app.ai.text_to_speech' }
-            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.chat', key: 'xai' }
+            - { name: 'app.ai.vision', key: 'xai' }
+            - { name: 'app.ai.image_generation', key: 'xai' }
+            - { name: 'app.ai.video_generation', key: 'xai' }
+            - { name: 'app.ai.text_to_speech', key: 'xai' }
+            - { name: 'app.ai.speech_to_text', key: 'xai' }
 
     App\AI\Provider\PerplexityProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
         tags:
-            - { name: 'app.ai.chat' }
+            - { name: 'app.ai.chat', key: 'perplexity' }
 
     App\AI\Provider\GoogleProvider:
         arguments:
@@ -440,17 +440,17 @@ services:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $vertexAccessToken: '%env(GOOGLE_VERTEX_ACCESS_TOKEN)%'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.chat', key: 'google' }
+            - { name: 'app.ai.vision', key: 'google' }
+            - { name: 'app.ai.image_generation', key: 'google' }
+            - { name: 'app.ai.video_generation', key: 'google' }
+            - { name: 'app.ai.text_to_speech', key: 'google' }
 
     App\AI\Provider\TheHiveProvider:
         arguments:
             $apiKey: '%env(THEHIVE_API_KEY)%'
         tags:
-            - { name: 'app.ai.image_generation' }
+            - { name: 'app.ai.image_generation', key: 'thehive' }
 
     # Higgsfield credentials: platform-wide env defaults + per-user override
     # (encrypted in BCONFIG via EncryptionService).
@@ -474,37 +474,37 @@ services:
             $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
             $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
         tags:
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.image_generation', key: 'higgsfield' }
+            - { name: 'app.ai.video_generation', key: 'higgsfield' }
 
     App\AI\Provider\PiperProvider:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
             $ttsUrl: '%env(default:synaplan_tts_url_default:SYNAPLAN_TTS_URL)%'
         tags:
-            - { name: 'app.ai.text_to_speech' }
+            - { name: 'app.ai.text_to_speech', key: 'piper' }
 
     App\AI\Provider\WhisperProvider:
         tags:
-            - { name: 'app.ai.speech_to_text' }
+            - { name: 'app.ai.speech_to_text', key: 'whisper' }
 
     App\AI\Provider\HuggingFaceProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.vision' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.image_generation' }
-            - { name: 'app.ai.video_generation' }
+            - { name: 'app.ai.chat', key: 'huggingface' }
+            - { name: 'app.ai.vision', key: 'huggingface' }
+            - { name: 'app.ai.embedding', key: 'huggingface' }
+            - { name: 'app.ai.image_generation', key: 'huggingface' }
+            - { name: 'app.ai.video_generation', key: 'huggingface' }
 
     App\AI\Provider\CloudflareProvider:
         arguments:
             $accountId: '%env(CLOUDFLARE_ACCOUNT_ID)%'
             $apiToken: '%env(CLOUDFLARE_API_TOKEN)%'
         tags:
-            - { name: 'app.ai.embedding' }
+            - { name: 'app.ai.embedding', key: 'cloudflare' }
 
     # Model health: the account-scoped Cloudflare catalog needs the same
     # credentials as the provider itself.
@@ -535,9 +535,9 @@ services:
         arguments:
             $uploadDir: '%kernel.project_dir%/var/uploads'
         tags:
-            - { name: 'app.ai.chat' }
-            - { name: 'app.ai.embedding' }
-            - { name: 'app.ai.vision' }
+            - { name: 'app.ai.chat', key: 'openaicompatible' }
+            - { name: 'app.ai.embedding', key: 'openaicompatible' }
+            - { name: 'app.ai.vision', key: 'openaicompatible' }
 
     # AI Facade
     App\AI\Service\AiFacade:
@@ -1347,13 +1347,13 @@ when@dev:
             arguments:
                 $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
-                - { name: 'app.ai.chat' }
-                - { name: 'app.ai.embedding' }
-                - { name: 'app.ai.vision' }
-                - { name: 'app.ai.image_generation' }
-                - { name: 'app.ai.speech_to_text' }
-                - { name: 'app.ai.text_to_speech' }
-                - { name: 'app.ai.file_analysis' }
+                - { name: 'app.ai.chat', key: 'test' }
+                - { name: 'app.ai.embedding', key: 'test' }
+                - { name: 'app.ai.vision', key: 'test' }
+                - { name: 'app.ai.image_generation', key: 'test' }
+                - { name: 'app.ai.speech_to_text', key: 'test' }
+                - { name: 'app.ai.text_to_speech', key: 'test' }
+                - { name: 'app.ai.file_analysis', key: 'test' }
 
 when@test:
     services:
@@ -1366,11 +1366,11 @@ when@test:
             arguments:
                 $uploadDir: '%kernel.project_dir%/var/uploads'
             tags:
-                - { name: 'app.ai.chat' }
-                - { name: 'app.ai.embedding' }
-                - { name: 'app.ai.vision' }
-                - { name: 'app.ai.image_generation' }
-                - { name: 'app.ai.speech_to_text' }
-                - { name: 'app.ai.text_to_speech' }
-                - { name: 'app.ai.file_analysis' }
+                - { name: 'app.ai.chat', key: 'test' }
+                - { name: 'app.ai.embedding', key: 'test' }
+                - { name: 'app.ai.vision', key: 'test' }
+                - { name: 'app.ai.image_generation', key: 'test' }
+                - { name: 'app.ai.speech_to_text', key: 'test' }
+                - { name: 'app.ai.text_to_speech', key: 'test' }
+                - { name: 'app.ai.file_analysis', key: 'test' }
 
