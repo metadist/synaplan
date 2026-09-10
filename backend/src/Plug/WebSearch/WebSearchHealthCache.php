@@ -37,4 +37,9 @@ final class WebSearchHealthCache
 
         return $health;
     }
+
+    public function forget(string $key): void
+    {
+        unset($this->items[$key]);
+    }
 }

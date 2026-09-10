@@ -22,11 +22,8 @@ interface WebSearchProviderInterface
 
     /**
      * Cheap config check (key / URL present). Used on the chat search path.
+     * Must never throw or perform a paid / networked probe — see
+     * {@see WebSearchLiveProbeInterface} for admin reachability.
      */
     public function health(): PlugHealth;
-
-    /**
-     * Live reachability / credential check. Admin badges use this, not {@see health()}.
-     */
-    public function probe(): PlugHealth;
 }

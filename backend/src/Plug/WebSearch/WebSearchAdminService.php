@@ -93,7 +93,9 @@ final readonly class WebSearchAdminService
         $started = hrtime(true);
         try {
             $set = $adapter->search(new WebSearchQuery($query));
-            $this->adminHealth->remember($key, PlugHealth::available());
+            if ($adapter->health()->available) {
+                $this->adminHealth->remember($key, PlugHealth::available());
+            }
             $latencyMs = (int) ((hrtime(true) - $started) / 1_000_000);
             $results = [];
             foreach (array_slice($set->results, 0, 5) as $row) {
@@ -129,11 +131,13 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->saveKey($normalized, $key);
+            $this->adminHealth->forget($normalized);
 
             return $this->plugKeys->getStatus($normalized);
         }
         if ('perplexity' === $normalized) {
             $this->providerKeys->saveKey('perplexity', $key);
+            $this->adminHealth->forget('perplexity');
 
             return $this->providerKeys->getStatus('perplexity');
         }
@@ -149,11 +153,13 @@ final readonly class WebSearchAdminService
         $normalized = strtolower(trim($provider));
         if ($this->plugKeys->supports($normalized)) {
             $this->plugKeys->deleteKey($normalized);
+            $this->adminHealth->forget($normalized);
 
             return $this->plugKeys->getStatus($normalized);
         }
         if ('perplexity' === $normalized) {
             $this->providerKeys->deleteKey('perplexity');
+            $this->adminHealth->forget('perplexity');
 
             return $this->providerKeys->getStatus('perplexity');
         }
