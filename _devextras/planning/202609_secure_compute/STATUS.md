@@ -44,3 +44,8 @@ the approval policy (this wave) being enabled in production.
 
 **2026-09-10 (review):** Egress allow-lists stay Wave 5 (B3); A1/A2 do not
 implement network policy. PHP still never mounts `docker.sock`.
+
+**2026-09-10 (review follow-up):** `safepath` now `openat`+`O_NOFOLLOW`s every
+component including the root; chown uses sandbox uid + service gid so `/out`
+listing stays readable; `ValidateHardened` rejects `Env`, recursive binds, and
+symlink mount sources; artefact list I/O errors return `500` instead of `200 []`.
