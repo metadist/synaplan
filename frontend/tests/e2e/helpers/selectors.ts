@@ -524,6 +524,15 @@ export const selectors = {
     admin: '[data-testid="view-admin"]',
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
+    featureStatus: '[data-testid="page-feature-status"]',
+  },
+
+  featureStatus: {
+    summary: '[data-testid="section-features-summary"]',
+    modulesSection: '[data-testid="section-modules"]',
+    moduleItem: '[data-testid="item-module"]',
+    moduleStateBadge: '[data-testid="badge-module-state"]',
+    moduleDocsLink: '[data-testid="link-module-docs"]',
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',

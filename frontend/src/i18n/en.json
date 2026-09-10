@@ -4807,7 +4807,8 @@
       "modulesTitle": "Feature modules",
       "modulesSubtitle": "Optional features this installation declares. Each one is switched on by its configuration; the list shows which keys, never their values.",
       "modulesConfigured": "{configured} of {total} configured",
-      "configuredBy": "Configured by:"
+      "configuredBy": "Configured by:",
+      "docs": "Documentation"
     },
     "notLoggedIn": "Not logged in"
   },

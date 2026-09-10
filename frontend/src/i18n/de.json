@@ -3750,7 +3750,8 @@
       "modulesTitle": "Feature-Module",
       "modulesSubtitle": "Optionale Funktionen, die diese Installation deklariert. Jede wird über ihre Konfiguration eingeschaltet; die Liste zeigt die Schlüssel, nie deren Werte.",
       "modulesConfigured": "{configured} von {total} konfiguriert",
-      "configuredBy": "Konfiguriert über:"
+      "configuredBy": "Konfiguriert über:",
+      "docs": "Dokumentation"
     },
     "notLoggedIn": "Nicht angemeldet"
   },

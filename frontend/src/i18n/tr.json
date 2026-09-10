@@ -2517,7 +2517,8 @@
       "modulesTitle": "Özellik modülleri",
       "modulesSubtitle": "Bu kurulumun bildirdiği isteğe bağlı özellikler. Her biri kendi yapılandırmasıyla açılır; liste anahtarları gösterir, değerlerini asla göstermez.",
       "modulesConfigured": "{total} modülden {configured} tanesi yapılandırıldı",
-      "configuredBy": "Yapılandıran:"
+      "configuredBy": "Yapılandıran:",
+      "docs": "Belgeler"
     },
     "notLoggedIn": "Oturum açılmadı"
   },

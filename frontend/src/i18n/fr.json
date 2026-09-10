@@ -4807,7 +4807,8 @@
       "modulesTitle": "Modules de fonctionnalités",
       "modulesSubtitle": "Fonctionnalités optionnelles déclarées par cette installation. Chacune est activée par sa configuration ; la liste affiche les clés, jamais leurs valeurs.",
       "modulesConfigured": "{configured} sur {total} configurés",
-      "configuredBy": "Configuré par :"
+      "configuredBy": "Configuré par :",
+      "docs": "Documentation"
     },
     "notLoggedIn": "Non connecté"
   },

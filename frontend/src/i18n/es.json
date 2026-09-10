@@ -2516,7 +2516,8 @@
       "modulesTitle": "Módulos de funciones",
       "modulesSubtitle": "Funciones opcionales que declara esta instalación. Cada una se activa mediante su configuración; la lista muestra las claves, nunca sus valores.",
       "modulesConfigured": "{configured} de {total} configurados",
-      "configuredBy": "Configurado por:"
+      "configuredBy": "Configurado por:",
+      "docs": "Documentación"
     },
     "notLoggedIn": "No has iniciado sesión"
   },
