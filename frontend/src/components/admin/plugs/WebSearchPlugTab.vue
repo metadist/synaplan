@@ -183,6 +183,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
+import { webSearchSaveFeedback } from '@/components/admin/plugs/webSearchSaveFeedback'
 import {
   getWebSearchStatus,
   savePlugKey,
@@ -198,7 +199,7 @@ type CapabilityKey = 'freshness' | 'country' | 'language' | 'siteFilter' | 'full
 const KEY_PROVIDERS = new Set(['tavily', 'exa', 'firecrawl', 'perplexity'])
 
 const { t } = useI18n()
-const { success, error: showError } = useNotification()
+const { success, warning, error: showError } = useNotification()
 
 const loading = ref(true)
 const loadFailed = ref(false)
@@ -249,7 +250,13 @@ async function save(): Promise<void> {
       userOverrideAllowed: userOverrideAllowed.value,
     })
     applyStatus(status)
-    success(t('aiInfra.webSearch.saved'))
+    const feedback = webSearchSaveFeedback(status)
+    const message = t(`aiInfra.webSearch.${feedback.key}`, feedback.params)
+    if (feedback.level === 'warning') {
+      warning(message)
+    } else {
+      success(message)
+    }
   } catch (err) {
     showError(err instanceof Error ? err.message : t('aiInfra.webSearch.saveFailed'))
   } finally {
@@ -262,13 +269,19 @@ async function saveKey(provider: string): Promise<void> {
   if (!key) return
   savingKey.value = provider
   try {
-    const status = await savePlugKey(provider, key)
+    const keyStatus = await savePlugKey(provider, key)
     keyDraft[provider] = ''
     const card = providers.value.find((p) => p.key === provider)
     if (card) {
-      card.keyStatus = status
+      card.keyStatus = keyStatus
     }
     success(t('aiInfra.webSearch.keySaved'))
+    try {
+      const refreshed = await getWebSearchStatus()
+      applyStatus(refreshed)
+    } catch {
+      // Key is already stored; a stale badge is better than a false save error.
+    }
   } catch (err) {
     showError(err instanceof Error ? err.message : t('aiInfra.webSearch.saveFailed'))
   } finally {
