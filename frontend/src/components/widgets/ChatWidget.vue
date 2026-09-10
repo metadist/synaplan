@@ -548,6 +548,7 @@
               </button>
             </template>
             <textarea
+              ref="inputRef"
               v-model="inputMessage"
               :disabled="inputDisabled"
               :placeholder="
@@ -822,6 +823,7 @@ const isOpen = ref(false)
 const isFullscreen = ref(props.fullscreenMode)
 const widgetTheme = ref<'light' | 'dark'>(props.defaultTheme)
 const inputMessage = ref('')
+const inputRef = ref<HTMLTextAreaElement | null>(null)
 const privacyStorageKey = `synaplan_privacy_${props.widgetId}`
 const privacyDismissed = ref(
   typeof window !== 'undefined' && window.localStorage.getItem(privacyStorageKey) === '1'
@@ -1573,6 +1575,9 @@ const sendMessage = async () => {
   }
 
   inputMessage.value = ''
+  // Tapping the send button blurs the composer; refocus so the visitor can keep
+  // typing (and the mobile keyboard stays open) without tapping the field again.
+  inputRef.value?.focus()
   await scrollToBottom()
 
   isSending.value = true
