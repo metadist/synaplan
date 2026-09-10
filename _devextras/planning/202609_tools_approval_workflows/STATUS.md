@@ -39,3 +39,10 @@ closing the tab is not governance. See
 
 **2026-09-10 (Wave 4 implementation):** S1–S4 on `cursor/wave4-tools-approval-compute-469d`.
 S5 stays Wave 5.
+
+**2026-09-10 (review):** Approve-to-auto loosening (`allow_unattended`, always-allow)
+now applies; resumed DAG nodes are marked approved so the gate is not consulted
+again; custom HTTP pins DNS, caps streamed bodies, and rejects a templated
+origin. The scheduler expires pending approvals hourly and sends the daily
+digest. Interactive chat approvals still execute the tool on approve but do
+**not** continue the turn as a new assistant message — deferred to Wave 5.

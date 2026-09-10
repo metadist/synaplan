@@ -41,3 +41,6 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 
 **2026-09-10 (Wave 4 implementation):** sidecar A0–A2 implemented. Phase B waits on
 the approval policy (this wave) being enabled in production.
+
+**2026-09-10 (review):** Egress allow-lists stay Wave 5 (B3); A1/A2 do not
+implement network policy. PHP still never mounts `docker.sock`.
