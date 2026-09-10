@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: SavedTaskRunRepository::class)]
 #[ORM\Table(name: 'BSAVEDTASK_RUNS')]
 #[ORM\Index(columns: ['BSAVEDTASKID', 'BCREATED'], name: 'idx_saved_task_run_task_created')]
+#[ORM\Index(columns: ['BSTATUS', 'BWAITINGNODE'], name: 'idx_saved_task_runs_waiting')]
 class SavedTaskRun
 {
     public const STATUS_QUEUED = 'queued';
