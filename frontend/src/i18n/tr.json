@@ -1248,7 +1248,7 @@
       "winner": "Kazanan: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling kullanılamıyor — yerine Tika kullanıldı",
-      "doclingRejectedTika": "Docling erişildi ancak dosyayı reddetti — yerine Tika kullanıldı",
+      "doclingRejectedTika": "Docling’e erişildi ancak dosyayı reddetti — yerine Tika kullanıldı",
       "save": "Zinciri kaydet",
       "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
       "saveFailed": "Çıkarım zinciri kaydedilemedi",
