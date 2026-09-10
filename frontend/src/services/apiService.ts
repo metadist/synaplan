@@ -1,6 +1,7 @@
 import type { AIModel } from '@/stores/models'
 import {
   getApiBaseUrl,
+  isDefinitiveAuthRejection,
   refreshAccessToken as refreshTokenViaHttpClient,
 } from '@/services/api/httpClient'
 import { isNativeApp } from '@/services/api/nativeRuntime'
@@ -102,9 +103,7 @@ async function refreshAccessToken(): Promise<boolean> {
       })
 
       if (!refreshResponse.ok) {
-        // Only a genuine auth rejection means the cookie is dead. 5xx during
-        // a restart must keep the hint so the next call retries.
-        if (refreshResponse.status === 401 || refreshResponse.status === 403) {
+        if (isDefinitiveAuthRejection(refreshResponse.status)) {
           clearSessionHint()
         }
       }

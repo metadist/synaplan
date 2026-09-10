@@ -104,6 +104,43 @@ describe('httpClient.refreshAccessToken — session hint guard (#204)', () => {
     expect(refreshCalls()).toHaveLength(1)
   })
 
+  it('clears the session hint on a definitive 400 from refresh', async () => {
+    setSessionHint()
+
+    fetchSpy.mockImplementation(((url: RequestInfo | URL) => {
+      if (String(url).includes('/api/v1/auth/refresh')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: 'bad_request' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        )
+      }
+      return Promise.resolve(new Response('', { status: 404 }))
+    }) as typeof fetch)
+
+    const result = await refreshAccessToken()
+
+    expect(result).toEqual({ success: false })
+    expect(hasSessionHint()).toBe(false)
+  })
+
+  it('keeps the session hint when refresh returns 429', async () => {
+    setSessionHint()
+
+    fetchSpy.mockImplementation(((url: RequestInfo | URL) => {
+      if (String(url).includes('/api/v1/auth/refresh')) {
+        return Promise.resolve(new Response('Too Many Requests', { status: 429 }))
+      }
+      return Promise.resolve(new Response('', { status: 404 }))
+    }) as typeof fetch)
+
+    const result = await refreshAccessToken()
+
+    expect(result).toEqual({ success: false, transient: true })
+    expect(hasSessionHint()).toBe(true)
+  })
+
   it('keeps the session hint when refresh cannot reach the server', async () => {
     setSessionHint()
     fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))

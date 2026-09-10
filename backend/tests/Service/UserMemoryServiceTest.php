@@ -539,6 +539,45 @@ final class UserMemoryServiceTest extends TestCase
         self::assertSame('teal', $result[0]['value']);
     }
 
+    public function testEmptyVectorHitSetDoesNotFallBackToUnrelatedSqlMemories(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+        $this->qdrantClient->method('searchMemories')->willReturn([]);
+        $this->memoryRepository->expects($this->never())->method('findActiveForUser');
+
+        $result = $this->service->searchRelevantMemories(1, 'something I have never stored');
+
+        self::assertSame([], $result);
+    }
+
+    public function testOrphanFallbackPreservesCategoryFilter(): void
+    {
+        $this->aiFacade->method('embed')->willReturn([
+            'embedding' => array_fill(0, 8, 0.1),
+            'usage' => ['total_tokens' => 3],
+        ]);
+        $this->em->method('getRepository')->willReturn($this->createMock(\Doctrine\ORM\EntityRepository::class));
+        $this->qdrantClient->method('searchMemories')->willReturn([
+            ['id' => 'mem_1_10', 'score' => 0.9, 'payload' => ['user_id' => 1, 'category' => 'work', 'key' => 'age', 'value' => '33']],
+        ]);
+        $this->memoryRepository->method('filterActiveIds')->willReturn([]);
+        $this->memoryRepository->expects($this->once())
+            ->method('findActiveForUser')
+            ->with(1, 'work', null, self::greaterThan(0))
+            ->willReturn([
+                $this->makeMemory(77, 1, 'standup notes', 'ritual'),
+            ]);
+
+        $result = $this->service->searchRelevantMemories(1, 'standup', 'work');
+
+        self::assertCount(1, $result);
+        self::assertSame(77, $result[0]['id']);
+    }
+
     /**
      * The reconciliation is scoped to the user-facing memory load. Hidden
      * feedback namespaces are internal and never appear in the Memories list,

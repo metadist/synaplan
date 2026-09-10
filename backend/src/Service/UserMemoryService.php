@@ -494,7 +494,7 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit);
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit, $category, $namespace);
         } catch (\Throwable $e) {
             $this->logger->error('searchMemoriesByVector failed', [
                 'user_id' => $userId,
@@ -645,7 +645,7 @@ final readonly class UserMemoryService
                 $memories[] = $memory;
             }
 
-            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit);
+            return $includeHidden ? $memories : $this->reconcileWithSqlCatalog($userId, $memories, $limit, $category, $namespace);
         } catch (\Throwable $e) {
             $this->logger->error('Memory search failed', ['error' => $e->getMessage()]);
 
@@ -673,10 +673,18 @@ final readonly class UserMemoryService
      *
      * @return list<array<string, mixed>>
      */
-    private function reconcileWithSqlCatalog(int $userId, array $memories, int $limit = 5): array
-    {
+    private function reconcileWithSqlCatalog(
+        int $userId,
+        array $memories,
+        int $limit = 5,
+        ?string $category = null,
+        ?string $namespace = null,
+    ): array {
+        // An empty vector hit set is a valid no-match — do not invent
+        // unrelated recent memories. SQL fallback is only for the case
+        // where Qdrant returned hits that were all orphaned.
         if ([] === $memories) {
-            return $this->recentActiveMemoriesAsHits($userId, $limit);
+            return [];
         }
 
         $ids = [];
@@ -714,7 +722,7 @@ final readonly class UserMemoryService
                 ]);
             }
 
-            return $this->recentActiveMemoriesAsHits($userId, $limit);
+            return $this->recentActiveMemoriesAsHits($userId, $limit, $category, $namespace);
         }
 
         return $reconciled;
@@ -723,10 +731,19 @@ final readonly class UserMemoryService
     /**
      * @return list<array<string, mixed>>
      */
-    private function recentActiveMemoriesAsHits(int $userId, int $limit): array
-    {
+    private function recentActiveMemoriesAsHits(
+        int $userId,
+        int $limit,
+        ?string $category = null,
+        ?string $namespace = null,
+    ): array {
         $limit = max(1, $limit);
-        $rows = $this->memoryRepository->findActiveForUser($userId, limit: $limit * 2);
+        $rows = $this->memoryRepository->findActiveForUser(
+            $userId,
+            $category,
+            $namespace,
+            $limit * 4,
+        );
         $out = [];
         foreach ($rows as $row) {
             if ($this->isHiddenCategory($row->getCategory())) {

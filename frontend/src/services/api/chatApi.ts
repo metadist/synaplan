@@ -3,7 +3,12 @@
  */
 
 import { z } from 'zod'
-import { httpClient, getApiBaseUrl, awaitAuthMutation } from './httpClient'
+import {
+  httpClient,
+  getApiBaseUrl,
+  awaitAuthMutation,
+  isDefinitiveAuthRejection,
+} from './httpClient'
 import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
@@ -145,9 +150,7 @@ async function refreshAccessToken(): Promise<boolean> {
         return true
       }
 
-      // Only a 401/403 means the cookie is gone. 502/503 during a restart
-      // must keep the hint so the next call retries instead of logging out.
-      if (refreshResponse.status === 401 || refreshResponse.status === 403) {
+      if (isDefinitiveAuthRejection(refreshResponse.status)) {
         clearSessionHint()
       }
       return false

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Digest;
 
+use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Service\VectorSearch\QdrantClientInterface;
 use Psr\Log\LoggerInterface;
@@ -121,7 +122,7 @@ final readonly class DigestSearchService
                 continue;
             }
 
-            $text = trim($msg->getText());
+            $text = $this->messageBody($msg);
             $title = '' !== $text
                 ? (mb_strlen($text) > 120 ? mb_substr($text, 0, 117).'…' : $text)
                 : '(empty)';
@@ -187,12 +188,7 @@ final readonly class DigestSearchService
                 continue;
             }
 
-            $text = trim($message->getText());
-            $fileText = trim($message->getFileText());
-            $combined = $text;
-            if ('' !== $fileText) {
-                $combined .= ('' !== $combined ? "\n" : '').$fileText;
-            }
+            $combined = $this->messageBody($message);
 
             if ('' === $combined) {
                 continue;
@@ -207,5 +203,20 @@ final readonly class DigestSearchService
         }
 
         return $hits;
+    }
+
+    /**
+     * Chat text plus extracted file text — file-only messages have an empty
+     * `text` but still carry a digestable body in `fileText`.
+     */
+    private function messageBody(Message $message): string
+    {
+        $text = trim($message->getText());
+        $fileText = trim($message->getFileText());
+        if ('' === $fileText) {
+            return $text;
+        }
+
+        return '' !== $text ? $text."\n".$fileText : $fileText;
     }
 }

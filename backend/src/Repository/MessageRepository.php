@@ -396,7 +396,11 @@ class MessageRepository extends ServiceEntityRepository
 
         if (null !== $liveChatId && $liveChatId > 0) {
             // Other chats have already been left — do not wait for QUIET_SECONDS.
-            $qb->andWhere('(m.chatId IS NOT NULL AND m.chatId != :liveChatId) OR m.unixTimestamp < :beforeUnix')
+            // The extra outer parens are load-bearing: Doctrine andWhere()
+            // concatenates with AND and does not wrap the expression, so an
+            // ungrouped OR would let `unixTimestamp < :beforeUnix` bypass
+            // the user / cursor / source predicates.
+            $qb->andWhere('((m.chatId IS NOT NULL AND m.chatId != :liveChatId) OR m.unixTimestamp < :beforeUnix)')
                 ->setParameter('liveChatId', $liveChatId)
                 ->setParameter('beforeUnix', $beforeUnix);
         } else {

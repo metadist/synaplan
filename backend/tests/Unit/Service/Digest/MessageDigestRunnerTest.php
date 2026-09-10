@@ -245,6 +245,7 @@ final class MessageDigestRunnerTest extends TestCase
     public function testRunForOtherChatsForwardsLiveChatIdSoQuietAppliesOnlyThere(): void
     {
         $user = $this->makeUser(7);
+        $this->config->method('isEnabled')->willReturn(true);
         $this->config->method('getCursor')->willReturn(0);
         $this->digestRepository->method('maxMessageIdForUser')->willReturn(0);
 
@@ -266,6 +267,46 @@ final class MessageDigestRunnerTest extends TestCase
         $this->runner->runForOtherChats($user, 55);
 
         self::assertSame(55, $capturedLiveChatId);
+    }
+
+    public function testRunForOtherChatsRespectsEnabledGuard(): void
+    {
+        $this->config->method('isEnabled')->willReturn(false);
+
+        $this->messageRepository->expects(self::never())->method('findDigestCandidates');
+        $this->digestService->expects(self::never())->method('digestBatch');
+
+        $result = $this->runner->runForOtherChats($this->makeUser(7), 55);
+
+        self::assertSame(0, $result['batches']);
+        self::assertSame(0, $result['created']);
+    }
+
+    public function testRunForOtherChatsDoesNotAdvanceTheSharedCursor(): void
+    {
+        $user = $this->makeUser(7);
+        $this->config->method('isEnabled')->willReturn(true);
+
+        $capturedAfterIds = [];
+        $this->messageRepository->method('findDigestCandidates')
+            ->willReturnCallback(function (int $userId, int $afterId) use (&$capturedAfterIds): array {
+                $capturedAfterIds[] = $afterId;
+
+                return 1 === count($capturedAfterIds) ? [$this->makeMessage(200)] : [];
+            });
+        $this->digestService->method('digestBatch')
+            ->willReturn(['scanned' => 1, 'created' => 1, 'proposals' => []]);
+
+        $this->config->method('getCursor')->willReturn(100);
+        $this->digestRepository->method('maxMessageIdForUser')->willReturn(90);
+        $this->config->expects(self::never())->method('setCursor');
+
+        $result = $this->runner->runForOtherChats($user, 55);
+
+        self::assertSame(100, $capturedAfterIds[0] ?? null);
+        self::assertSame(1, $result['batches']);
+        self::assertSame(1, $result['created']);
+        self::assertSame(200, $result['cursor']);
     }
 
     private function makeUser(int $id): User

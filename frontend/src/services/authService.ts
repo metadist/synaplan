@@ -280,7 +280,7 @@ export const authService = {
         }
         // A 502/503 refresh during restart leaves the hint in place.
         // Do not tear the session down — keep whoever we already are.
-        if (hasSessionHint()) {
+        if (hasAuthHint()) {
           return user.value
         }
         await this.logout(true)

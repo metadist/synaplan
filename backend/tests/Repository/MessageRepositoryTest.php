@@ -566,6 +566,86 @@ class MessageRepositoryTest extends KernelTestCase
     }
 
     /**
+     * The live-chat quiet exception is an OR. Doctrine andWhere() does not
+     * wrap the expression, so without extra parens `unixTimestamp < :beforeUnix`
+     * would bypass user / cursor / source filters and leak other users' rows.
+     */
+    public function testFindDigestCandidatesLiveChatOrDoesNotBypassUserFilter(): void
+    {
+        $otherUser = new User();
+        $otherUser->setMail('digest_leak_'.time().'@test.com');
+        $otherUser->setPw('test123');
+        $otherUser->setProviderId('WEB');
+        $otherUser->setUserLevel('NEW');
+        $this->em->persist($otherUser);
+        $this->em->flush();
+
+        $otherChat = new Chat();
+        $otherChat->setUserId($otherUser->getId());
+        $otherChat->setTitle('Other user chat');
+        $this->em->persist($otherChat);
+        $this->em->flush();
+
+        $foreign = new Message();
+        $foreign->setUserId($otherUser->getId());
+        $foreign->setChat($otherChat);
+        $foreign->setTrackingId(time());
+        $foreign->setUnixTimestamp(100);
+        $foreign->setDateTime(date('YmdHis', 100));
+        $foreign->setText('foreign old message');
+        $foreign->setDirection('IN');
+        $foreign->setProviderIndex('WEB');
+        $foreign->setMessageType('TEST');
+        $foreign->setTopic('CHAT');
+        $foreign->setLanguage('en');
+        $foreign->setStatus('complete');
+        $this->em->persist($foreign);
+        $this->em->flush();
+
+        $ownOtherChat = new Chat();
+        $ownOtherChat->setUserId($this->testUser->getId());
+        $ownOtherChat->setTitle('Own other chat');
+        $this->em->persist($ownOtherChat);
+        $this->em->flush();
+
+        $own = new Message();
+        $own->setUserId($this->testUser->getId());
+        $own->setChat($ownOtherChat);
+        $own->setTrackingId(time());
+        $own->setUnixTimestamp(9_999_999);
+        $own->setDateTime(date('YmdHis', 9_999_999));
+        $own->setText('own recent other-chat should match via chatId');
+        $own->setDirection('IN');
+        $own->setProviderIndex('WEB');
+        $own->setMessageType('TEST');
+        $own->setTopic('CHAT');
+        $own->setLanguage('en');
+        $own->setStatus('complete');
+        $this->em->persist($own);
+        $this->em->flush();
+
+        $hits = $this->repository->findDigestCandidates(
+            $this->testUser->getId(),
+            0,
+            1_000,
+            50,
+            null,
+            $this->testChat->getId(),
+        );
+
+        $ids = array_map(static fn (Message $m): int => (int) $m->getId(), $hits);
+        $this->assertContains($own->getId(), $ids);
+        $this->assertNotContains($foreign->getId(), $ids);
+
+        $this->em->remove($own);
+        $this->em->remove($ownOtherChat);
+        $this->em->remove($foreign);
+        $this->em->remove($otherChat);
+        $this->em->remove($otherUser);
+        $this->em->flush();
+    }
+
+    /**
      * Helper to create test message.
      */
     private function createTestMessage(string $text, int $timestamp): Message

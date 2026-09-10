@@ -339,11 +339,19 @@ interface RefreshResult {
 }
 
 /**
- * 401/403 from `/auth/refresh` means the refresh cookie (or native token) is
- * gone. 5xx / 429 during a rolling restart must not look like a logout.
+ * Statuses from `/auth/refresh` that mean the session is actually dead.
+ * 5xx / 429 / 408 (and network failures) are a restart or blip — keep the
+ * hint. Other 4xx (400/404/422/…) are a definitive broken request, not a
+ * rolling deploy, so they must clear the hint instead of retrying forever.
  */
 export function isDefinitiveAuthRejection(status: number): boolean {
-  return status === 401 || status === 403
+  if (status === 401 || status === 403) {
+    return true
+  }
+  if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+    return true
+  }
+  return false
 }
 
 /**

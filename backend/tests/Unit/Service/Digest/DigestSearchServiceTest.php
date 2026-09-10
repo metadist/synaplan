@@ -213,6 +213,22 @@ final class DigestSearchServiceTest extends TestCase
         self::assertSame('I just said this in the other window', $tail[0]['excerpt']);
     }
 
+    public function testRecentOtherChatTailUsesFileTextWhenChatTextIsEmpty(): void
+    {
+        $other = $this->message(89, self::USER_ID, '');
+        $other->setFileText('Quarterly numbers from the spreadsheet.');
+        $other->setChatId(12);
+        $other->setProviderIndex('WEB');
+        $other->setUnixTimestamp(self::NOW);
+        $this->messageRepository->method('findRecentOtherChatTail')->willReturn([$other]);
+
+        $tail = $this->service->recentOtherChatTail(self::USER_ID, 55);
+
+        self::assertCount(1, $tail);
+        self::assertSame('Quarterly numbers from the spreadsheet.', $tail[0]['title']);
+        self::assertSame('Quarterly numbers from the spreadsheet.', $tail[0]['excerpt']);
+    }
+
     /**
      * @return array{score: float, payload: array<string, mixed>}
      */

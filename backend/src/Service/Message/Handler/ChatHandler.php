@@ -3774,14 +3774,10 @@ final readonly class ChatHandler implements MessageHandlerInterface
             return ['context' => '', 'digests' => []];
         }
 
-        $context = $this->knowledgeContextFormatter->formatDigestContext(
-            $digests,
-            $this->digestConfig->getBlockMaxChars(),
-        );
-        $context .= $this->knowledgeContextFormatter->formatOtherChatTail(
-            $tail,
-            $this->digestConfig->getBlockMaxChars(),
-        );
+        $budget = $this->digestConfig->getBlockMaxChars();
+        $context = $this->knowledgeContextFormatter->formatDigestContext($digests, $budget);
+        $remaining = max(0, $budget - mb_strlen($context));
+        $context .= $this->knowledgeContextFormatter->formatOtherChatTail($tail, $remaining);
         $digests = array_merge($digests, $tail);
 
         $this->logger->info('ChatHandler: Message digests loaded', [
