@@ -106,9 +106,18 @@ FROM dev AS prod
 # --no-autoloader is required rather than an optimization: an authoritative
 # classmap has to see src/, the generated gRPC stubs and the plugins, none of
 # which exist yet.
+#
+# The pre-autoload-dump script (Google\Task\Composer::cleanup, configured in
+# composer.json) deletes every google/apiclient-services bundle except the ones
+# listed under extra.google/apiclient-services. It has to run in THIS layer:
+# --no-scripts skips it, and deleting the ~300 MB of bundles in the autoloader
+# layer further down would only add whiteouts on top of a layer that still
+# contains them. Composer autoloads the script class from the package map, so
+# the missing vendor/autoload.php is not a problem.
 COPY backend/composer.json backend/composer.lock backend/symfony.lock ./
 RUN COMPOSER_PROCESS_TIMEOUT=0 composer install \
         --prefer-dist --no-interaction --no-dev --no-scripts --no-autoloader && \
+    composer run-script --no-interaction pre-autoload-dump && \
     chown -R www-data:www-data /var/www/backend/vendor
 
 # Copy application (exclude .env files - use environment variables instead)
