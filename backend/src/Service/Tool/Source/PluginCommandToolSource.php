@@ -43,7 +43,7 @@ final readonly class PluginCommandToolSource implements ToolSourceInterface
                 $descriptors[] = new ToolDescriptor(
                     name: $name,
                     title: $command['command'],
-                    description: (string) ($command['description'] ?? ''),
+                    description: $command['description'],
                     inputSchema: ['type' => 'object', 'properties' => []],
                     sideEffect: $sideEffect,
                     source: ToolSource::Plugin,

@@ -13,15 +13,15 @@ use App\Service\Iam\Permission;
 final readonly class PluginManifest
 {
     /**
-     * @param string                                                                                      $name          The plugin internal name
-     * @param string                                                                                      $version       Version of the plugin
-     * @param string                                                                                      $description   Short description
-     * @param array<int, string>                                                                          $capabilities  List of features enabled by the plugin
-     * @param array<string, mixed>                                                                        $config        Default configuration values
+     * @param string                                                                                                            $name          The plugin internal name
+     * @param string                                                                                                            $version       Version of the plugin
+     * @param string                                                                                                            $description   Short description
+     * @param array<int, string>                                                                                                $capabilities  List of features enabled by the plugin
+     * @param array<string, mixed>                                                                                              $config        Default configuration values
      * @param array<int, array{command: string, endpoint: string, description: string, tool?: array{sideEffect?: string}|null}> $chatCommands  Slash-commands this plugin registers in the chat composer
-     * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}> $resourceKinds Shareable kinds declared in provides.resourceKinds
-     * @param list<array{port: string, class: string, key: string}>                                       $plugs         Plug adapters declared in provides.plugs
-     * @param list<string>                                                                                $agentPacks    Relative bundle globs declared in provides.agents
+     * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}>                       $resourceKinds Shareable kinds declared in provides.resourceKinds
+     * @param list<array{port: string, class: string, key: string}>                                                             $plugs         Plug adapters declared in provides.plugs
+     * @param list<string>                                                                                                      $agentPacks    Relative bundle globs declared in provides.agents
      */
     public function __construct(
         public string $name,

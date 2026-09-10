@@ -29,11 +29,11 @@ final class ApprovalExpiryServiceTest extends TestCase
         $approvals->expects($this->once())->method('flush');
 
         $runs = $this->createMock(SavedTaskRunRepository::class);
-        $runs->method('find')->with(44)->willReturn($run);
+        $runs->method('find')->willReturnCallback(static fn (int $id): ?SavedTaskRun => 44 === $id ? $run : null);
         $runs->expects($this->once())->method('save')->with($run);
 
         $tasks = $this->createMock(SavedTaskRepository::class);
-        $tasks->method('find')->with(9)->willReturn($task);
+        $tasks->method('find')->willReturnCallback(static fn (int $id): ?SavedTask => 9 === $id ? $task : null);
         $tasks->expects($this->once())->method('save')->with($task);
 
         $service = new ApprovalExpiryService(

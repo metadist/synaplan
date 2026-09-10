@@ -10,11 +10,11 @@ use App\Bundle\ChecklistItem;
 use App\Bundle\ImportOptions;
 use App\Bundle\SectionPreview;
 use App\Bundle\SectionResult;
+use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\Tool\Custom\CustomToolService;
 use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\ToolsConfig;
-use App\Repository\UserRepository;
-use App\Entity\User;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('app.bundle.section')]

@@ -87,12 +87,7 @@ final readonly class SavedTaskResumeService
         ]);
         $assembled = $this->dagExecutor->resume($plan, $context, $nodeId, $approval->getArgs() ?? []);
         $messageId = $run->getMessageId();
-        $statuses = [];
-        foreach (is_array($assembled['node_statuses'] ?? null) ? $assembled['node_statuses'] : [] as $id => $status) {
-            if (is_string($id) && is_string($status)) {
-                $statuses[$id] = $status;
-            }
-        }
+        $statuses = $assembled['node_statuses'];
         if (null !== $messageId) {
             $this->planStore->persistWithStatuses($messageId, $plan, null, $statuses);
         }

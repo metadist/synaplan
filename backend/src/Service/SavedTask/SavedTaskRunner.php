@@ -150,7 +150,7 @@ final readonly class SavedTaskRunner
 
             $this->persistReply($message, $chat, $result);
 
-            $waitingNode = $this->waitingNodeFromResult($result, is_array($snapshot) ? $snapshot : []);
+            $waitingNode = $this->waitingNodeFromResult($result, $snapshot);
             if (null !== $waitingNode) {
                 $run->markWaitingApproval($waitingNode, $messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
                 $this->runs->save($run);
@@ -405,7 +405,7 @@ final readonly class SavedTaskRunner
     }
 
     /**
-     * @param array<string, mixed>       $result
+     * @param array<string, mixed>                            $result
      * @param list<array<string, mixed>>|array<string, mixed> $snapshot
      */
     private function waitingNodeFromResult(array $result, array $snapshot): ?string

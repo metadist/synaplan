@@ -43,7 +43,7 @@ final readonly class ApprovalReference
         if (str_starts_with($requestedBy, 'task_run:')) {
             $rest = substr($requestedBy, 9);
             $parts = explode(':', $rest, 2);
-            $runId = isset($parts[0]) && ctype_digit($parts[0]) ? (int) $parts[0] : null;
+            $runId = ctype_digit($parts[0]) ? (int) $parts[0] : null;
             $nodeId = $parts[1] ?? null;
 
             return new self(self::KIND_TASK_RUN, $requestedBy, runId: $runId, nodeId: $nodeId);

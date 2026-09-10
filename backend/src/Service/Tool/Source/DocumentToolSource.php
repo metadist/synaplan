@@ -36,13 +36,12 @@ final readonly class DocumentToolSource implements ToolSourceInterface
                 }
                 $seen[$name] = true;
                 $declaration = $tool->declaration();
-                $function = is_array($declaration['function'] ?? null) ? $declaration['function'] : [];
-                $parameters = is_array($function['parameters'] ?? null) ? $function['parameters'] : [];
+                $function = $declaration['function'];
                 $descriptors[] = new ToolDescriptor(
                     name: $name,
                     title: $name,
-                    description: (string) ($function['description'] ?? ''),
-                    inputSchema: $parameters,
+                    description: $function['description'],
+                    inputSchema: $function['parameters'],
                     sideEffect: $this->sideEffectFor($name),
                     source: ToolSource::Document,
                     ownerId: $userId,

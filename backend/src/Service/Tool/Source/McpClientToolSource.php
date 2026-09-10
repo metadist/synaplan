@@ -38,15 +38,15 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                 continue;
             }
             foreach ($entry['tools'] as $tool) {
-                $annotations = is_array($tool['annotations'] ?? null) ? $tool['annotations'] : [];
+                $annotations = $tool['annotations'];
                 $readOnly = isset($annotations['readOnlyHint']) ? (bool) $annotations['readOnlyHint'] : null;
                 $destructive = isset($annotations['destructiveHint']) ? (bool) $annotations['destructiveHint'] : null;
                 $gatewayName = $this->catalogAdapter->namespace($serverId, (string) $tool['name']);
-                $schema = is_array($tool['inputSchema'] ?? null) ? $tool['inputSchema'] : [];
+                $schema = $tool['inputSchema'];
                 $descriptors[] = new ToolDescriptor(
                     name: sprintf('mcp:%d:%s', $serverId, (string) $tool['name']),
                     title: (string) $tool['name'],
-                    description: (string) ($tool['description'] ?? ''),
+                    description: $tool['description'],
                     inputSchema: $schema,
                     sideEffect: SideEffect::fromHints($readOnly, $destructive),
                     source: ToolSource::Mcp,

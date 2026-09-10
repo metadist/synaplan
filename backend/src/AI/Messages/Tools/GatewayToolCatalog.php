@@ -9,8 +9,8 @@ use App\Entity\User;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolRegistry;
-use App\Service\Tool\ToolSource;
 use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 

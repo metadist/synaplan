@@ -6,6 +6,7 @@ namespace App\Service\SavedTask;
 
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
+use App\Entity\SavedTaskRun;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Service\SavedTask\Graph\SavedTaskSummary;

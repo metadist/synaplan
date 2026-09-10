@@ -135,9 +135,6 @@ final readonly class ToolsConfig
         return array_values(array_filter($list, static fn ($item): bool => is_string($item) && '' !== $item));
     }
 
-    /**
-     * @param list<string> $tools
-     */
     public function addAlwaysAllow(int $userId, string $assistantKey, string $toolName): void
     {
         $raw = $this->configRepository->getValue($userId, self::CONFIG_GROUP, self::KEY_USER_OVERRIDES) ?? '{}';
