@@ -7,7 +7,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
-| S1 Registry refactor | `cursor/wave4-tools-approval-compute-469d` | implemented | One `ToolRegistry` + tagged sources. `TOOLS.REGISTRY_ENABLED` code default ON (kill switch). Characterization snapshots untouched. |
+| S1 Registry refactor | `main` (#1774) | implemented | One `ToolRegistry` + tagged sources. `TOOLS.REGISTRY_ENABLED` code default ON (kill switch). Characterization snapshots untouched. |
 | S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. Flag off. |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
 | S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). Flag off. |
@@ -23,6 +23,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-03 | Bundle sections (roadmap §8.1): `mcp_servers` in S1, `custom_tools` in S4, `saved_tasks` in S5 — never credentials or tokens. |
 | 2026-09-07 | **UX contract.** J-TL-1…5 binding. Card + inbox findability is the sharing lesson applied to approvals. Tool/template Share waits on IAM-UX. |
 | 2026-09-10 | Wave 4 S1–S4 implemented behind flags. Registry kill-switch defaults on; approvals and custom HTTP stay off. |
+| 2026-09-10 | Wave 4 S1–S4 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
 
 ## Review log
 
@@ -37,8 +38,8 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 closing the tab is not governance. See
 [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.4.
 
-**2026-09-10 (Wave 4 implementation):** S1–S4 on `cursor/wave4-tools-approval-compute-469d`.
-S5 stays Wave 5.
+**2026-09-10 (Wave 4 implementation):** S1–S4 on `cursor/wave4-tools-approval-compute-469d`,
+merged to `main` as #1774. S5 stays Wave 5.
 
 **2026-09-10 (review):** Approve-to-auto loosening (`allow_unattended`, always-allow)
 now applies; resumed DAG nodes are marked approved so the gate is not consulted

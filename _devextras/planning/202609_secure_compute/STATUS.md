@@ -26,6 +26,7 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-03 | Persistent user workspaces and per-run egress allow-lists stay in B3 (default off). |
 | 2026-09-07 | **UX contract.** J-CP-1/2: chat-native run card, quota as a sentence, no new page. Wireframe `compute-run-card.md`. |
 | 2026-09-10 | A0–A2 land in this repo under `sidecars/synaplan-compute`. No PHP integration in Wave 4. |
+| 2026-09-10 | A0–A2 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
 
 ## Review log
 
@@ -39,8 +40,9 @@ sprint files written. Next: technical plan review (roadmap §7 step 3).
 **2026-09-07 (UX contract):** results stay in the thread. See
 [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) §5.5.
 
-**2026-09-10 (Wave 4 implementation):** sidecar A0–A2 implemented. Phase B waits on
-the approval policy (this wave) being enabled in production.
+**2026-09-10 (Wave 4 implementation):** sidecar A0–A2 implemented and merged
+to `main` as #1774. Phase B waits on the approval policy (this wave) being
+enabled in production.
 
 **2026-09-10 (review):** Egress allow-lists stay Wave 5 (B3); A1/A2 do not
 implement network policy. PHP still never mounts `docker.sock`.
