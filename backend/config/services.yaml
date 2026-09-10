@@ -1112,6 +1112,18 @@ services:
         arguments:
             $apiKey: '%env(THEHIVE_API_KEY)%'
 
+    App\Module\Commerce\StripeBillingModule:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+            $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+
+    App\Module\Channel\WhatsappModule:
+        arguments:
+            $enabled: '%env(bool:WHATSAPP_ENABLED)%'
+            $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
+            $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+
     App\Service\File\Office\StructuredTextExtractor:
         arguments:
             $officeTextMaxRows: '%env(int:OFFICE_TEXT_MAX_ROWS)%'
