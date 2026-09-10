@@ -288,6 +288,17 @@ const onRunCopy = async () => {
     <p class="text-sm txt-primary">{{ summaryText }}</p>
     <p class="text-xs txt-secondary" data-testid="saved-task-last-run">{{ lastRunLine }}</p>
 
+    <button
+      v-if="task.waitingApprovalCount > 0"
+      type="button"
+      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary"
+      data-testid="saved-task-waiting-approval"
+      @click="router.push({ path: '/channels/approvals', query: { task: String(task.id) } })"
+    >
+      {{ $t('config.savedTasks.waitingApproval') }}
+      <span class="txt-secondary">{{ task.waitingApprovalCount }}</span>
+    </button>
+
     <div
       v-if="task.autoPaused"
       class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm"

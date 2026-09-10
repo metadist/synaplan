@@ -85,6 +85,21 @@ final class SavedTaskGraphValidator
             $errors[] = 'steps contain a cycle';
         }
 
+        $settings = $graph['settings'] ?? null;
+        if (null !== $settings && !is_array($settings)) {
+            $errors[] = 'graph settings must be an object';
+        } elseif (is_array($settings) && isset($settings['approvalExpiryHours'])) {
+            $hours = $settings['approvalExpiryHours'];
+            if (!is_int($hours) && !(is_string($hours) && ctype_digit($hours))) {
+                $errors[] = 'approvalExpiryHours must be a whole number of hours';
+            } else {
+                $value = (int) $hours;
+                if ($value < 1 || $value > 720) {
+                    $errors[] = 'approvalExpiryHours must be between 1 and 720';
+                }
+            }
+        }
+
         return $errors;
     }
 

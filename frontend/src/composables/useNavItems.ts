@@ -10,9 +10,11 @@ import {
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
+import { useApprovalsStore } from '../stores/approvals'
 import { getFeaturesStatus } from '../services/featuresService'
 import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
+import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 import { isPlatformLinksEnabled } from './usePlatformLinksFeature'
 import { isIamGroupsEnabled } from './useIamFeature'
@@ -133,6 +135,7 @@ export function useNavItems() {
   const route = useRoute()
   const authStore = useAuthStore()
   const configStore = useConfigStore()
+  const approvalsStore = useApprovalsStore()
 
   const isGuestMode = computed(() => !authStore.isAuthenticated)
   const signedIn = computed(() => authStore.isAuthenticated)
@@ -229,6 +232,18 @@ export function useNavItems() {
                 key: 'saved-tasks',
                 path: '/channels/tasks',
                 label: t('nav.savedTasks'),
+                ...grouped('automations', automations),
+              },
+            ]
+          : []),
+        ...(isApprovalsEnabled()
+          ? [
+              {
+                key: 'approvals',
+                path: '/channels/approvals',
+                label: t('nav.approvals'),
+                badge:
+                  approvalsStore.pendingCount > 0 ? String(approvalsStore.pendingCount) : undefined,
                 ...grouped('automations', automations),
               },
             ]

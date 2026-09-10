@@ -53,6 +53,17 @@ final class SkillCatalog
     }
 
     /**
+     * Every registered skill, including flag-gated ones. The tool registry
+     * lists them; planner rendering still omits disabled capabilities.
+     *
+     * @return list<SkillDescriptor>
+     */
+    public function descriptors(): array
+    {
+        return array_values($this->byCapability);
+    }
+
+    /**
      * Render the `[CAPABILITYLIST]` block: one `- "capability": summary` line
      * per capability, plus any per-user dynamic note a descriptor contributes.
      *

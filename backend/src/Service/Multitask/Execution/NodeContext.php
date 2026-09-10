@@ -159,6 +159,11 @@ final class NodeContext
         $this->results[$nodeId] = $result;
     }
 
+    public function clearResult(string $nodeId): void
+    {
+        unset($this->results[$nodeId]);
+    }
+
     public function getResult(string $nodeId): ?NodeResult
     {
         return $this->results[$nodeId] ?? null;

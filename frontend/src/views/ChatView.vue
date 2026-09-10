@@ -302,6 +302,21 @@
         :can-continue="chatsStore.conversationAccess === 'use'"
         @continue="continueSharedConversation"
       />
+      <div
+        v-if="isApprovalsEnabled() && approvalsStore.pending.length > 0"
+        class="mx-4 mb-3 space-y-3"
+        data-testid="chat-approvals"
+      >
+        <ApprovalCard
+          v-for="row in approvalsStore.pending"
+          :key="row.id"
+          :approval="row"
+          :can-always-allow="row.canAlwaysAllow"
+          @approved="approvalsStore.approve($event)"
+          @rejected="(id, reason) => approvalsStore.reject(id, reason)"
+          @always-allow="approvalsStore.approve($event, true)"
+        />
+      </div>
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -530,6 +545,9 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
+import { useApprovalsStore } from '@/stores/approvals'
+import ApprovalCard from '@/components/chat/ApprovalCard.vue'
+import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
@@ -683,7 +701,51 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
+const approvalsStore = useApprovalsStore()
 const guestStore = useGuestStore()
+
+function ingestApprovalRequired(data: StreamUpdatePayload): void {
+  if (!isApprovalsEnabled()) {
+    return
+  }
+  if (data.status === 'approval_required' && data.approvalId) {
+    approvalsStore.addFromStream({
+      id: data.approvalId,
+      tool: data.tool ?? '',
+      preview: data.preview ?? '',
+      status: 'pending',
+      expiresAt: data.expiresAt ?? 0,
+      created: Math.floor(Date.now() / 1000),
+      requestedBy: {
+        kind: 'chat',
+        chatId: chatsStore.activeChatId,
+        messageId: data.messageId ?? null,
+      },
+      canAlwaysAllow: true,
+    })
+    return
+  }
+  if (data.status === 'task_update' && data.metadata?.state === 'waiting_approval') {
+    const approvalId = data.metadata.approval_id
+    if (typeof approvalId !== 'number' || approvalId < 1) {
+      return
+    }
+    approvalsStore.addFromStream({
+      id: approvalId,
+      tool: typeof data.metadata.tool === 'string' ? data.metadata.tool : '',
+      preview: typeof data.metadata.preview === 'string' ? data.metadata.preview : '',
+      status: 'pending',
+      expiresAt: typeof data.metadata.expires_at === 'number' ? data.metadata.expires_at : 0,
+      created: Math.floor(Date.now() / 1000),
+      requestedBy: {
+        kind: 'chat',
+        chatId: chatsStore.activeChatId,
+        messageId: data.messageId ?? null,
+      },
+      canAlwaysAllow: true,
+    })
+  }
+}
 const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
@@ -1083,6 +1145,10 @@ onMounted(async () => {
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
   void mediaJobsStore.subscribe(authStore.user?.id)
+  if (isApprovalsEnabled()) {
+    void approvalsStore.subscribe(authStore.user?.id)
+    void approvalsStore.load('pending')
+  }
   // Hydrate the global Jobs tray with any renders already running across chats.
   if (authStore.isAuthenticated) {
     void mediaJobsStore.loadActive()
@@ -2684,6 +2750,11 @@ const streamAIResponse = async (
             return
           }
 
+          if (data.status === 'approval_required' && data.approvalId) {
+            ingestApprovalRequired(data)
+            return
+          }
+
           if (data.status === 'started') {
             processingStatus.value = 'started'
             processingMetadata.value = {}
@@ -2793,6 +2864,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && card.state === 'cancelled') {
@@ -3189,6 +3261,11 @@ const streamAIResponse = async (
             return
           }
 
+          if (data.status === 'approval_required' && data.approvalId) {
+            ingestApprovalRequired(data)
+            return
+          }
+
           // Recognised here rather than in each terminal branch below, which
           // exist per error kind and would each need their own reset.
           if (data.status === 'complete' || data.status === 'error') {
@@ -3382,6 +3459,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             // A user-cancelled step is terminal on the client: ignore the

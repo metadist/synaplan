@@ -1,0 +1,10 @@
+{
+  "runId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "cancelled",
+  "reason": "cancelled",
+  "startedAt": "2026-09-10T07:00:00Z",
+  "finishedAt": "2026-09-10T07:00:05Z",
+  "durationMs": 5000,
+  "usage": { "cpuSec": 0.0, "maxMemoryMb": 0, "bytesIn": 0, "bytesOut": 0 },
+  "truncated": { "stdout": false, "stderr": false }
+}

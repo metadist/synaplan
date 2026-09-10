@@ -126,6 +126,10 @@ export interface StreamUpdatePayload {
    * a trip to another view (`chatApi.attachStream`).
    */
   runId?: string
+  approvalId?: number
+  tool?: string
+  preview?: string
+  expiresAt?: number
   error?: string
   message?: string
   messageId?: number

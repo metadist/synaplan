@@ -157,7 +157,8 @@
     "savedTasks": "Tareas guardadas",
     "setup": "Configuración",
     "assistants": "Asistentes",
-    "assistantBuilder": "Asistente"
+    "assistantBuilder": "Asistente",
+    "approvals": "Aprobaciones"
   },
   "adminModelStatus": {
     "title": "Estado de modelos",
@@ -753,7 +754,8 @@
     "groupTools": "Herramientas",
     "liveSupport": "Soporte en vivo",
     "usage": "Uso",
-    "assistants": "Asistentes"
+    "assistants": "Asistentes",
+    "approvals": "Aprobaciones"
   },
   "guest": {
     "disabledTitle": "El chat de invitados no está disponible",
@@ -2069,7 +2071,8 @@
       "done": "Hecho",
       "failed": "Fallido",
       "skipped": "Omitido",
-      "cancelled": "Detenido"
+      "cancelled": "Detenido",
+      "waiting_approval": "Esperando aprobación"
     },
     "kind": {
       "text": "Texto",
@@ -2865,7 +2868,8 @@
         "running": "En curso",
         "completed": "Completada",
         "failed": "Fallida",
-        "cancelled": "Cancelada"
+        "cancelled": "Cancelada",
+        "waiting_approval": "Esperando aprobación"
       },
       "runTrigger": {
         "manual": "iniciada por ti",
@@ -2956,7 +2960,11 @@
           "calendar": "una entrada de calendario",
           "reply": "una respuesta en el chat"
         }
-      }
+      },
+      "waitingApproval": "Esperando aprobación",
+      "waitingApprovalCount": "{count} ejecución esperando aprobación | {count} ejecuciones esperando aprobación",
+      "approvalExpired": "La aprobación caducó",
+      "rejectedBy": "Rechazado por {name}"
     },
     "connections": {
       "title": "Conexiones",
@@ -5342,5 +5350,77 @@
       "conflict": "Ya existe — se omitirá salvo que lo reemplace ({key})",
       "skipped": "Omitido ({key})"
     }
+  },
+  "approvals": {
+    "title": "Aprobaciones",
+    "subtitle": "Cosas que esperan tu visto bueno antes de ocurrir.",
+    "pending": "En espera",
+    "decided": "Decididas",
+    "emptyPending": "Nada necesita tu aprobación. Aquí aparecen tarjetas cuando una tarea guardada o un chat quiere cambiar algo.",
+    "emptyDecided": "Aún no hay decisiones anteriores.",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "alwaysAllow": "Permitir siempre para este asistente",
+    "rejectReason": "¿Por qué lo rechazas?",
+    "rejectReasonPlaceholder": "Nota opcional",
+    "expired": "Esta solicitud caducó",
+    "expiresInHours": "Caduca en {hours} hora | Caduca en {hours} horas",
+    "nothingCreatedYet": "Todavía no se ha creado nada.",
+    "approvedToast": "Aprobado. Continuará.",
+    "rejectedToast": "Rechazado.",
+    "decideFailed": "No se pudo decidir. Inténtalo de nuevo.",
+    "openContext": "Abrir de dónde viene",
+    "notify": "Cómo te enteras de las solicitudes nuevas",
+    "notifyInstant": "Avísame por correo en cuanto algo espere",
+    "notifyDigest": "Enviarme un resumen diario",
+    "notifySaved": "Preferencia de avisos guardada.",
+    "blocked": "No puedo hacer eso. Un administrador lo ha desactivado.",
+    "waitingForApproval": "Esperando aprobación",
+    "status": {
+      "pending": "En espera",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "expired": "Caducado",
+      "executed": "Hecho",
+      "failed": "Fallido"
+    }
+  },
+  "customTools": {
+    "title": "Herramientas propias",
+    "subtitle": "Llama a tus propias APIs HTTP desde el chat y las tareas guardadas. Las credenciales se quedan en este servidor.",
+    "add": "Añadir una herramienta propia",
+    "edit": "Editar herramienta propia",
+    "import": "Importar desde OpenAPI",
+    "empty": "Todavía no se ha creado nada. Añade una herramienta para llamar a una API HTTP, o importa una desde una descripción OpenAPI.",
+    "loading": "Cargando herramientas propias…",
+    "name": "Nombre",
+    "titleLabel": "Título",
+    "description": "Qué hace",
+    "class": "Qué hace esta herramienta",
+    "classRead": "Lee datos",
+    "classWrite": "Cambia algo",
+    "classDestructive": "Elimina algo",
+    "method": "Método HTTP",
+    "url": "URL",
+    "body": "Plantilla del cuerpo de la petición",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "saved": "Herramienta propia guardada.",
+    "saveFailed": "No se pudo guardar la herramienta propia.",
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar la herramienta propia \"{name}\"? Las llamadas que la usan dejarán de funcionar.",
+    "deleted": "Herramienta propia eliminada.",
+    "deleteFailed": "No se pudo eliminar la herramienta propia.",
+    "loadFailed": "No se pudieron cargar las herramientas propias.",
+    "try": "Probarlo",
+    "tryHint": "Envía una llamada de prueba. Los secretos se muestran como *** y no se guarda nada.",
+    "tryFailed": "No se pudo enviar la llamada de prueba.",
+    "importUrl": "URL de OpenAPI",
+    "importDocument": "O pega el documento OpenAPI",
+    "baseUrl": "URL base para las herramientas importadas",
+    "preview": "Ver operaciones",
+    "applyImport": "Importar selección",
+    "imported": "Herramientas importadas.",
+    "importFailed": "No se pudo importar la descripción OpenAPI."
   }
 }

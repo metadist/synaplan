@@ -61,6 +61,7 @@ function task(overrides: Partial<SavedTask> = {}): SavedTask {
       params: { when: 'manual' },
     },
     instructionPreview: 'Create a realistic picture of a cat, soft natural light',
+    waitingApprovalCount: 0,
     ...overrides,
   }
 }
@@ -76,6 +77,7 @@ function run(overrides: Partial<SavedTaskRun> = {}): SavedTaskRun {
     started: '2026-08-15T07:00:00+00:00',
     finished: '2026-08-15T07:00:12+00:00',
     created: 20260815070000,
+    waitingNode: null,
     ...overrides,
   }
 }
@@ -96,6 +98,13 @@ describe('SavedTaskCard', () => {
       task({ ...patch } as Partial<SavedTask>)
     )
     mockResume.mockResolvedValue(task({ enabled: true, autoPaused: false, consecutiveFailures: 0 }))
+  })
+
+  it('shows a waiting-for-approval pill that opens the inbox', () => {
+    const wrapper = mountCard(task({ waitingApprovalCount: 2 }))
+    const pill = wrapper.get('[data-testid="saved-task-waiting-approval"]')
+    expect(pill.text()).toContain('Waiting for approval')
+    expect(pill.text()).toContain('2')
   })
 
   it('shows the off state when the task is disabled', () => {

@@ -42,6 +42,7 @@ const task: SavedTask = {
     params: { when: 'manual' },
   },
   instructionPreview: 'Summarize my inbox',
+  waitingApprovalCount: 0,
 }
 
 const mountPage = async () => {

@@ -11,7 +11,7 @@ Track 3 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | S2 Docling | `synaplan/` `main` (#1756) | done | `PL9`–`PL15`: Docling extra extractor, quality gate, markdown chunking, opt-in compose profile, Extraction tab |
 | S3 Web search providers | `synaplan/` `main` (#1758) | done | `PL16`–`PL24`: SearXNG + Tavily/Exa/Firecrawl/Perplexity adapters, Perplexity chat, Web search tab, Settings override |
 | S4 Rerank | `synaplan/` `main` (#1760) | done | `PL25`–`PL31`: catalog `rerank` rows, HTTP + LLM adapters, stage in VectorSearchService, eval command, Reranking tab. Default stays `0` (see `eval/baseline-default-off.md`). |
-| S5 Model import | `synaplan/` `main` (#1761) | done | `PL32`–`PL36` + `PL38`: endpoint/Ollama discovery + tag guesser, opt-in capability probe, `/import/endpoint/{preview,apply}` (idempotent, C6), health-check listing re-check (C7), import dialog in Models & keys, docs. `PL37` (`model_preferences` bundle section) deferred — waits on Agent Builder S6 `BundleSectionInterface`. |
+| S5 Model import | `synaplan/` `main` (#1761) | done | `PL32`–`PL36` + `PL38`. `PL37` (`model_preferences` bundle section) remains open now that Agent Builder S6 is on `main`. |
 | S6 Plugin adapters | `synaplan/` `feat/wave3-ai-plugs-s6-plugin-adapters` | implemented | `PL39`–`PL43`: manifest v2 `provides.plugs` parser, `PlugDeclarationCheckPass` (undeclared adapter fails boot) + `DuplicatePlugKeyException`, `serper_search` reference plugin, fixture-plugin integration tests, `plugins/README.md`. `synaplan-docs` section is a follow-up in that repo. |
 
 ## Decisions

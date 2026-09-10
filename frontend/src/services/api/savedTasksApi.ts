@@ -42,6 +42,7 @@ export interface SavedTask {
   summary: SavedTaskSummary
   /** First ~60 characters of the underlying instruction ("what runs"). */
   instructionPreview: string | null
+  waitingApprovalCount: number
 }
 
 export interface SavedTaskRun {
@@ -52,8 +53,9 @@ export interface SavedTaskRun {
   planSnapshot: { cards?: unknown[] } | null
   error: string | null
   started: string | null
-  finished: string | null
-  created: number
+    finished: string | null
+    created: number
+    waitingNode: string | null
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -67,6 +69,8 @@ function asTask(raw: RawTask | undefined): SavedTask {
     throw new Error('Malformed Saved Task response')
   }
   const params = asRecord(raw.summary?.params) ?? {}
+  const extra = asRecord(raw) ?? {}
+  const waitingCount = extra.waitingApprovalCount
   return {
     id: raw.id,
     promptId: raw.promptId,
@@ -88,6 +92,7 @@ function asTask(raw: RawTask | undefined): SavedTask {
       ),
     },
     instructionPreview: raw.instructionPreview ?? null,
+    waitingApprovalCount: typeof waitingCount === 'number' ? waitingCount : 0,
   }
 }
 
@@ -96,6 +101,8 @@ function asRun(raw: RawRun | undefined): SavedTaskRun {
     throw new Error('Malformed Saved Task run response')
   }
   const snapshot = asRecord(raw.planSnapshot)
+  const extra = asRecord(raw) ?? {}
+  const waitingNode = extra.waitingNode
   return {
     id: raw.id,
     status: raw.status ?? 'failed',
@@ -106,6 +113,7 @@ function asRun(raw: RawRun | undefined): SavedTaskRun {
     started: raw.started ?? null,
     finished: raw.finished ?? null,
     created: raw.created ?? 0,
+    waitingNode: typeof waitingNode === 'string' ? waitingNode : null,
   }
 }
 

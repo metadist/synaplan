@@ -373,6 +373,32 @@ final readonly class InternalEmailService
     }
 
     /**
+     * Inbox link only — never include the tool arguments.
+     */
+    public function sendApprovalRequestEmail(string $to, string $preview, string $inboxUrl): void
+    {
+        $this->sendTaskResultEmail(
+            $to,
+            'Waiting for your approval',
+            $preview."\n\nNothing has been sent yet. Open Approvals to Approve or Reject:\n".$inboxUrl,
+        );
+    }
+
+    /**
+     * @param list<string> $previews
+     */
+    public function sendApprovalDigestEmail(string $to, array $previews, int $count): void
+    {
+        $frontendUrl = $_ENV['FRONTEND_URL'] ?? $_ENV['APP_URL'] ?? 'http://localhost:5173';
+        $lines = array_map(static fn (string $preview): string => '- '.$preview, array_slice($previews, 0, 20));
+        $this->sendTaskResultEmail(
+            $to,
+            sprintf('%d actions waiting for your approval', $count),
+            "These actions are still waiting:\n\n".implode("\n", $lines)."\n\nOpen Approvals:\n".$frontendUrl.'/channels/approvals',
+        );
+    }
+
+    /**
      * Whether an attachment should be treated as an embeddable image — by
      * descriptor type first, file extension as fallback.
      */

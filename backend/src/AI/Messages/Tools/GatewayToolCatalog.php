@@ -7,6 +7,10 @@ namespace App\AI\Messages\Tools;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\Entity\User;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\Tool\SideEffect;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolSource;
+use App\Service\Tool\ToolsConfig;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -52,6 +56,8 @@ final readonly class GatewayToolCatalog
         private MessagesGatewayConfig $config,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -149,7 +155,13 @@ final readonly class GatewayToolCatalog
             }
         }
 
-        $mcp = $this->mcpCatalogAdapter->toAnthropicTools($userId, includeMutating: false);
+        $includeMutating = null !== $this->toolsConfig
+            && $this->toolsConfig->isRegistryEnabled($userId)
+            && $this->toolsConfig->isApprovalsEnabled($userId);
+        $mcp = $this->mcpCatalogAdapter->toAnthropicTools($userId, includeMutating: $includeMutating);
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            $mcp = $this->mcpFromRegistry($userId, $includeMutating);
+        }
         $snapshot = $this->empty();
         foreach ($mcp['tools'] as $tool) {
             $snapshot['tools'][] = $tool;
@@ -357,6 +369,39 @@ final readonly class GatewayToolCatalog
         }
 
         return $tools;
+    }
+
+    /**
+     * @return array{tools: list<GatewayTool>, dispatch: array<string, array{serverId: int, tool: string, annotations: array<string, mixed>}>}
+     */
+    private function mcpFromRegistry(int $userId, bool $includeMutating): array
+    {
+        $tools = [];
+        $dispatch = [];
+        foreach ($this->toolRegistry?->forUser($userId) ?? [] as $descriptor) {
+            if (ToolSource::Mcp !== $descriptor->source) {
+                continue;
+            }
+            if (!$includeMutating && SideEffect::Read !== $descriptor->sideEffect) {
+                continue;
+            }
+            $name = $descriptor->callName();
+            $serverId = (int) ($descriptor->meta['serverId'] ?? 0);
+            $tool = is_string($descriptor->meta['tool'] ?? null) ? $descriptor->meta['tool'] : $descriptor->title;
+            $annotations = is_array($descriptor->meta['annotations'] ?? null) ? $descriptor->meta['annotations'] : [];
+            $tools[] = [
+                'name' => $name,
+                'description' => $descriptor->description,
+                'input_schema' => $descriptor->inputSchema,
+            ];
+            $dispatch[$name] = [
+                'serverId' => $serverId,
+                'tool' => $tool,
+                'annotations' => $annotations,
+            ];
+        }
+
+        return ['tools' => $tools, 'dispatch' => $dispatch];
     }
 
     /**

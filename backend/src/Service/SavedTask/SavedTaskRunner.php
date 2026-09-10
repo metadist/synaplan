@@ -123,7 +123,7 @@ final readonly class SavedTaskRunner
             $this->em->persist($message);
             $this->em->flush();
 
-            $result = $this->processor->process($message, $this->processorOptions($task, $prompt));
+            $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId()));
 
             $ok = !empty($result['success']);
             $messageId = $message->getId();
@@ -149,6 +149,14 @@ final readonly class SavedTaskRunner
             }
 
             $this->persistReply($message, $chat, $result);
+
+            $waitingNode = $this->waitingNodeFromResult($result, is_array($snapshot) ? $snapshot : []);
+            if (null !== $waitingNode) {
+                $run->markWaitingApproval($waitingNode, $messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
+                $this->runs->save($run);
+
+                return ['run' => $run, 'task' => $task];
+            }
 
             $this->rateLimits->recordUsage($user, 'MESSAGES', [
                 'source' => 'SAVED_TASK',
@@ -193,7 +201,7 @@ final readonly class SavedTaskRunner
      *
      * @return array<string, mixed>
      */
-    private function processorOptions(SavedTask $task, Prompt $prompt): array
+    private function processorOptions(SavedTask $task, Prompt $prompt, ?int $runId = null): array
     {
         $options = [
             'saved_task' => true,
@@ -206,6 +214,10 @@ final readonly class SavedTaskRunner
         if ($agentId > 0) {
             $options['agentId'] = $agentId;
         }
+        if (null !== $runId) {
+            $options['saved_task_run_id'] = $runId;
+        }
+        $options['allow_unattended'] = $task->allowsUnattended();
 
         return $options;
     }
@@ -390,6 +402,31 @@ final readonly class SavedTaskRunner
                 is_string($taskFile['source_text'] ?? null) ? $taskFile['source_text'] : null,
             );
         }
+    }
+
+    /**
+     * @param array<string, mixed>       $result
+     * @param list<array<string, mixed>>|array<string, mixed> $snapshot
+     */
+    private function waitingNodeFromResult(array $result, array $snapshot): ?string
+    {
+        $response = is_array($result['response'] ?? null) ? $result['response'] : [];
+        $metadata = is_array($response['metadata'] ?? null) ? $response['metadata'] : [];
+        $multitask = is_array($metadata['multitask'] ?? null) ? $metadata['multitask'] : [];
+        $statuses = is_array($multitask['node_statuses'] ?? null) ? $multitask['node_statuses'] : [];
+        foreach ($statuses as $nodeId => $status) {
+            if ('waiting_approval' === $status && is_string($nodeId)) {
+                return $nodeId;
+            }
+        }
+        $cards = is_array($snapshot['cards'] ?? null) ? $snapshot['cards'] : $snapshot;
+        foreach ($cards as $card) {
+            if (is_array($card) && 'waiting_approval' === ($card['state'] ?? null) && is_string($card['nodeId'] ?? $card['node_id'] ?? null)) {
+                return (string) ($card['nodeId'] ?? $card['node_id']);
+            }
+        }
+
+        return null;
     }
 
     private function ensureChat(SavedTask $task, User $user): Chat

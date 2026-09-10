@@ -1,0 +1,17 @@
+{
+  "protocol": 1,
+  "tier": "docker",
+  "images": [
+    {
+      "key": "python",
+      "ref": "ghcr.io/metadist/synaplan-compute-python@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "key": "node",
+      "ref": "ghcr.io/metadist/synaplan-compute-node@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "capacity": { "maxConcurrent": 8, "running": 0, "queued": 0 },
+  "caps": { "timeoutSec": 300, "memoryMb": 2048, "cpu": 2.0, "pids": 256, "outputMb": 200 },
+  "features": { "workspaces": true, "egress": false }
+}

@@ -1,0 +1,11 @@
+id: 1
+event: stdout
+data: {"seq":1,"text":"rows=3\n"}
+
+id: 2
+event: status
+data: {"status":"running"}
+
+id: 3
+event: done
+data: {"status":"succeeded","exitCode":0}

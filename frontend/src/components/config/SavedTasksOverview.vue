@@ -67,6 +67,7 @@ const sharedTasks = computed(() =>
       autoPaused: false,
       summary: { key: 'config.savedTasks.summary.simple', params: { when: 'manual' } },
       instructionPreview: null,
+      waitingApprovalCount: 0,
     } satisfies SavedTask,
     ownerName: item.ownerName ?? '',
     sharedVia: item.sharedVia ?? null,

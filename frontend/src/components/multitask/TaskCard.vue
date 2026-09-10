@@ -255,6 +255,12 @@ const handleRetry = () => {
           class="w-4 h-4 txt-muted"
         />
         <Icon
+          v-else-if="card.state === 'waiting_approval'"
+          icon="mdi:hand-back-right-outline"
+          class="w-4 h-4"
+          style="color: var(--brand)"
+        />
+        <Icon
           v-else-if="card.state === 'cancelled'"
           icon="mdi:stop-circle-outline"
           class="w-4 h-4 txt-muted"

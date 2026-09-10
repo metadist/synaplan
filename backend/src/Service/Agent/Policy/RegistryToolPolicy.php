@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Service\Agent\Policy;
 
 use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\ToolRegistry;
 
 /**
- * Track-4 adapter. When `App\Tools\ToolRegistry` exists it evaluates
+ * Track-4 adapter. When a {@see ToolRegistry} is injected it evaluates
  * allow/deny against registry names; otherwise it behaves like
  * {@see LegacyFlagToolPolicy} so both adapters stay interchangeable.
  */
@@ -15,7 +16,7 @@ final class RegistryToolPolicy implements ToolPolicySourceInterface
 {
     public function __construct(
         private readonly LegacyFlagToolPolicy $legacy,
-        private readonly ?object $registry = null,
+        private readonly ?ToolRegistry $registry = null,
     ) {
     }
 
@@ -65,13 +66,11 @@ final class RegistryToolPolicy implements ToolPolicySourceInterface
      */
     private function registryNames(): ?array
     {
-        if (null === $this->registry || !is_callable([$this->registry, 'names'])) {
+        if (null === $this->registry) {
             return null;
         }
 
-        $names = $this->registry->names();
-
-        return is_array($names) ? array_values(array_filter($names, 'is_string')) : null;
+        return $this->registry->names();
     }
 
     /**

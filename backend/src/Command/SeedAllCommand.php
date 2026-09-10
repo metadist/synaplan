@@ -32,6 +32,7 @@ use App\Seed\SeedResult;
 use App\Seed\SelfAwareConfigSeeder;
 use App\Seed\StructuredOutputConfigSeeder;
 use App\Seed\SubscriptionPlanSeeder;
+use App\Seed\ToolsConfigSeeder;
 use App\Seed\UpdateConfigSeeder;
 use App\Seed\UsageTaximeterConfigSeeder;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -115,6 +116,7 @@ final class SeedAllCommand extends Command
         private readonly NativeToolRoutingConfigSeeder $nativeToolRoutingConfigSeeder,
         private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
         private readonly PlugsConfigSeeder $plugsConfigSeeder,
+        private readonly ToolsConfigSeeder $toolsConfigSeeder,
     ) {
         parent::__construct();
     }
@@ -190,6 +192,7 @@ final class SeedAllCommand extends Command
             ['native-tool-routing', fn (): SeedResult => $this->nativeToolRoutingConfigSeeder->seed()],
             ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
             ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
+            ['tools', fn (): SeedResult => $this->toolsConfigSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 

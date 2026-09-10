@@ -17,6 +17,7 @@ class SavedTaskRun
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
+    public const STATUS_WAITING_APPROVAL = 'waiting_approval';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -26,7 +27,7 @@ class SavedTaskRun
     #[ORM\Column(name: 'BSAVEDTASKID', type: 'bigint')]
     private int $savedTaskId;
 
-    #[ORM\Column(name: 'BSTATUS', length: 16, options: ['default' => self::STATUS_QUEUED])]
+    #[ORM\Column(name: 'BSTATUS', length: 32, options: ['default' => self::STATUS_QUEUED])]
     private string $status = self::STATUS_QUEUED;
 
     #[ORM\Column(name: 'BTRIGGER', length: 32, options: ['default' => 'manual'])]
@@ -48,6 +49,9 @@ class SavedTaskRun
 
     #[ORM\Column(name: 'BFINISHED', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $finished = null;
+
+    #[ORM\Column(name: 'BWAITINGNODE', length: 64, nullable: true)]
+    private ?string $waitingNode = null;
 
     #[ORM\Column(name: 'BCREATED', type: 'bigint')]
     private int $created;
@@ -107,6 +111,11 @@ class SavedTaskRun
         return $this->finished;
     }
 
+    public function getWaitingNode(): ?string
+    {
+        return $this->waitingNode;
+    }
+
     public function getCreated(): int
     {
         return $this->created;
@@ -144,6 +153,28 @@ class SavedTaskRun
         $this->messageId = $messageId;
         $this->planSnapshot = $planSnapshot;
         $this->finished = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+
+        return $this;
+    }
+
+    /**
+     * @param array<string, mixed>|null $planSnapshot
+     */
+    public function markWaitingApproval(string $nodeId, ?int $messageId = null, ?array $planSnapshot = null): self
+    {
+        $this->status = self::STATUS_WAITING_APPROVAL;
+        $this->waitingNode = $nodeId;
+        $this->error = null;
+        $this->messageId = $messageId;
+        $this->planSnapshot = $planSnapshot;
+        $this->finished = null;
+
+        return $this;
+    }
+
+    public function clearWaitingNode(): self
+    {
+        $this->waitingNode = null;
 
         return $this;
     }

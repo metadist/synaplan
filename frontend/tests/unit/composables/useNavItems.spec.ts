@@ -19,6 +19,7 @@ const runtimeFeatures = {
   iamGroups: false,
   agentsEnabled: false,
   platformLinksEnabled: false,
+  toolsApprovalsEnabled: false,
 }
 
 vi.mock('@/services/api/httpClient', () => ({
@@ -61,6 +62,7 @@ const navMessages = {
     mcpServers: 'MCP Servers',
     configApiKeys: 'API Keys',
     savedTasks: 'Saved tasks',
+    approvals: 'Approvals',
     aiAgents: 'Coding clients',
     assistants: 'Assistants',
     linkedPlatforms: 'Linked platforms',
@@ -158,6 +160,7 @@ describe('useNavItems rail', () => {
     runtimeFeatures.iamGroups = false
     runtimeFeatures.agentsEnabled = false
     runtimeFeatures.platformLinksEnabled = false
+    runtimeFeatures.toolsApprovalsEnabled = false
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -181,6 +184,7 @@ describe('useNavItems rail', () => {
     const childKeys = (manage?.children ?? []).map((child: { key: string }) => child.key)
     expect(childKeys).toContain('mail-handler')
     expect(childKeys).toContain('saved-tasks')
+    expect(childKeys).not.toContain('approvals')
     expect(childKeys).toContain('live-support')
     expect(childKeys).toContain('chat-widget')
     expect(childKeys).toContain('doc-summary')
@@ -195,6 +199,15 @@ describe('useNavItems rail', () => {
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
     ).toEqual(new Set(['assistants', 'automations', 'channels', 'connections']))
+  })
+
+  it('shows Approvals under Automations when the flag is on', () => {
+    runtimeFeatures.toolsApprovalsEnabled = true
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    const child = (manage?.children ?? []).find((item: { key: string }) => item.key === 'approvals')
+    expect(child?.label).toBe('Approvals')
+    expect(child?.path).toBe('/channels/approvals')
   })
 
   it('hides Linked platforms when the flag is off and shows it when on', () => {

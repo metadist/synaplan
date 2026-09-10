@@ -158,7 +158,8 @@
     "savedTasks": "Tâches enregistrées",
     "setup": "Configuration",
     "assistants": "Assistants",
-    "assistantBuilder": "Assistant"
+    "assistantBuilder": "Assistant",
+    "approvals": "Approbations"
   },
   "adminModelStatus": {
     "title": "État des modèles",
@@ -764,7 +765,8 @@
     "liveSupport": "Assistance en direct",
     "usage": "Utilisation",
     "assistants": "Assistants",
-    "linkedPlatforms": "Plateformes liées"
+    "linkedPlatforms": "Plateformes liées",
+    "approvals": "Approbations"
   },
   "chatInput": {
     "placeholder": "Saisissez votre message…",
@@ -1981,7 +1983,8 @@
         "running": "En cours",
         "completed": "Terminée",
         "failed": "Échouée",
-        "cancelled": "Annulée"
+        "cancelled": "Annulée",
+        "waiting_approval": "En attente d’approbation"
       },
       "runTrigger": {
         "manual": "lancée par vous",
@@ -2072,7 +2075,11 @@
           "calendar": "une entrée de calendrier",
           "reply": "une réponse dans le chat"
         }
-      }
+      },
+      "waitingApproval": "En attente d’approbation",
+      "waitingApprovalCount": "{count} exécution en attente d’approbation | {count} exécutions en attente d’approbation",
+      "approvalExpired": "Approbation expirée",
+      "rejectedBy": "Refusé par {name}"
     },
     "connections": {
       "title": "Connexions",
@@ -4482,7 +4489,8 @@
       "done": "Terminé",
       "failed": "Échoué",
       "skipped": "Ignoré",
-      "cancelled": "Arrêté"
+      "cancelled": "Arrêté",
+      "waiting_approval": "En attente d’approbation"
     },
     "kind": {
       "text": "Texte",
@@ -6328,5 +6336,77 @@
       "conflict": "Existe déjà — sera ignoré sauf si vous remplacez ({key})",
       "skipped": "Ignoré ({key})"
     }
+  },
+  "approvals": {
+    "title": "Approbations",
+    "subtitle": "Actions qui vous attendent avant d’avoir lieu.",
+    "pending": "En attente",
+    "decided": "Décidées",
+    "emptyPending": "Rien n’attend votre accord. Des cartes apparaissent ici lorsqu’une tâche enregistrée ou un chat veut modifier quelque chose.",
+    "emptyDecided": "Aucune décision précédente pour le moment.",
+    "approve": "Approuver",
+    "reject": "Refuser",
+    "alwaysAllow": "Toujours autoriser pour cet assistant",
+    "rejectReason": "Pourquoi refusez-vous ceci ?",
+    "rejectReasonPlaceholder": "Note facultative",
+    "expired": "Cette demande a expiré",
+    "expiresInHours": "Expire dans {hours} heure | Expire dans {hours} heures",
+    "nothingCreatedYet": "Rien n’a encore été créé.",
+    "approvedToast": "Approuvé. Cela va continuer.",
+    "rejectedToast": "Refusé.",
+    "decideFailed": "La décision n’a pas pu être enregistrée. Réessayez.",
+    "openContext": "Ouvrir l’origine",
+    "notify": "Comment vous êtes informé des nouvelles demandes",
+    "notifyInstant": "M’envoyer un e-mail dès qu’une action attend",
+    "notifyDigest": "M’envoyer un résumé quotidien",
+    "notifySaved": "Préférence de notification enregistrée.",
+    "blocked": "Je ne peux pas faire cela. Un administrateur l’a désactivé.",
+    "waitingForApproval": "En attente d’approbation",
+    "status": {
+      "pending": "En attente",
+      "approved": "Approuvé",
+      "rejected": "Refusé",
+      "expired": "Expiré",
+      "executed": "Terminé",
+      "failed": "Échoué"
+    }
+  },
+  "customTools": {
+    "title": "Outils personnalisés",
+    "subtitle": "Appelez vos propres API HTTP depuis le chat et les tâches enregistrées. Les identifiants restent sur ce serveur.",
+    "add": "Ajouter un outil personnalisé",
+    "edit": "Modifier l’outil personnalisé",
+    "import": "Importer depuis OpenAPI",
+    "empty": "Rien n’a encore été créé. Ajoutez un outil pour appeler une API HTTP, ou importez-en un depuis une description OpenAPI.",
+    "loading": "Chargement des outils personnalisés…",
+    "name": "Nom",
+    "titleLabel": "Titre",
+    "description": "Ce qu’il fait",
+    "class": "Ce que fait cet outil",
+    "classRead": "Lit des données",
+    "classWrite": "Modifie quelque chose",
+    "classDestructive": "Supprime quelque chose",
+    "method": "Méthode HTTP",
+    "url": "URL",
+    "body": "Modèle du corps de la requête",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "saved": "Outil personnalisé enregistré.",
+    "saveFailed": "L’outil personnalisé n’a pas pu être enregistré.",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer l’outil personnalisé « {name} » ? Les appels qui l’utilisent cesseront de fonctionner.",
+    "deleted": "Outil personnalisé supprimé.",
+    "deleteFailed": "L’outil personnalisé n’a pas pu être supprimé.",
+    "loadFailed": "Les outils personnalisés n’ont pas pu être chargés.",
+    "try": "Essayer",
+    "tryHint": "Envoyer un appel de test. Les secrets s’affichent en *** et rien n’est enregistré.",
+    "tryFailed": "L’appel de test n’a pas pu être envoyé.",
+    "importUrl": "URL OpenAPI",
+    "importDocument": "Ou coller le document OpenAPI",
+    "baseUrl": "URL de base des outils importés",
+    "preview": "Aperçu des opérations",
+    "applyImport": "Importer la sélection",
+    "imported": "Outils importés.",
+    "importFailed": "La description OpenAPI n’a pas pu être importée."
   }
 }

@@ -6,8 +6,8 @@ namespace App\Service\SavedTask;
 
 use App\Entity\Prompt;
 use App\Entity\SavedTask;
-use App\Entity\SavedTaskRun;
 use App\Repository\PromptRepository;
+use App\Repository\SavedTaskRunRepository;
 use App\Service\SavedTask\Graph\SavedTaskSummary;
 
 final readonly class SavedTaskSerializer
@@ -21,6 +21,7 @@ final readonly class SavedTaskSerializer
     public function __construct(
         private SavedTaskSummary $summary,
         private PromptRepository $prompts,
+        private ?SavedTaskRunRepository $runs = null,
     ) {
     }
 
@@ -47,6 +48,7 @@ final readonly class SavedTaskSerializer
             'autoPaused' => $task->isAutoPaused(),
             'summary' => $summary,
             'instructionPreview' => $this->instructionPreview($task->getPromptId()),
+            'waitingApprovalCount' => $this->waitingApprovalCount($task),
         ];
     }
 
@@ -65,6 +67,7 @@ final readonly class SavedTaskSerializer
             'started' => $run->getStarted()?->format(\DateTimeInterface::ATOM),
             'finished' => $run->getFinished()?->format(\DateTimeInterface::ATOM),
             'created' => $run->getCreated(),
+            'waitingNode' => $run->getWaitingNode(),
         ];
     }
 
@@ -84,5 +87,15 @@ final readonly class SavedTaskSerializer
         }
 
         return rtrim(mb_substr($text, 0, self::PREVIEW_LENGTH)).'…';
+    }
+
+    private function waitingApprovalCount(SavedTask $task): int
+    {
+        $taskId = $task->getId();
+        if (null === $taskId || null === $this->runs) {
+            return 0;
+        }
+
+        return $this->runs->countWaitingForTask($taskId);
     }
 }
