@@ -421,6 +421,7 @@ final readonly class McpActionRunner implements TaskRunner
                 'tool' => $approval->getTool(),
                 'preview' => $approval->getPreview(),
                 'expires_at' => $approval->getExpiresAt(),
+                'side_effect' => $approval->getSideEffect(),
             ]);
         }
 

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\Tool\CustomToolResponse;
+use App\DTO\Tool\OpenApiOperationPreview;
 use App\Entity\CustomTool;
 use App\Entity\User;
 use App\Repository\CustomToolRepository;
 use App\Service\Tool\Custom\CustomToolService;
 use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\ToolsConfig;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,7 +38,17 @@ final class CustomToolController extends AbstractController
         summary: 'List custom HTTP tools for the current user',
         tags: ['Custom Tools'],
         responses: [
-            new OA\Response(response: 200, description: 'Custom tools'),
+            new OA\Response(
+                response: 200,
+                description: 'Custom tools',
+                content: new OA\JsonContent(
+                    required: ['success', 'tools'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'tools', type: 'array', items: new OA\Items(ref: new Model(type: CustomToolResponse::class))),
+                    ]
+                )
+            ),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Custom HTTP tools disabled'),
         ]
@@ -69,7 +82,17 @@ final class CustomToolController extends AbstractController
             ]
         )),
         responses: [
-            new OA\Response(response: 201, description: 'Created'),
+            new OA\Response(
+                response: 201,
+                description: 'Created',
+                content: new OA\JsonContent(
+                    required: ['success', 'tool'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'tool', ref: new Model(type: CustomToolResponse::class)),
+                    ]
+                )
+            ),
             new OA\Response(response: 400, description: 'Invalid spec'),
         ]
     )]
@@ -94,7 +117,21 @@ final class CustomToolController extends AbstractController
         path: '/api/v1/tools/custom/import-openapi/preview',
         summary: 'Preview operations from an OpenAPI 3 document',
         tags: ['Custom Tools'],
-        responses: [new OA\Response(response: 200, description: 'Operations')]
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Operations',
+                content: new OA\JsonContent(
+                    required: ['success', 'operations'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'operations', type: 'array', items: new OA\Items(ref: new Model(type: OpenApiOperationPreview::class))),
+                        new OA\Property(property: 'dropped', type: 'integer'),
+                        new OA\Property(property: 'notices', type: 'array', items: new OA\Items(type: 'string')),
+                    ]
+                )
+            ),
+        ]
     )]
     public function importPreview(#[CurrentUser] ?User $user, Request $request): JsonResponse
     {
@@ -119,7 +156,19 @@ final class CustomToolController extends AbstractController
         path: '/api/v1/tools/custom/import-openapi/apply',
         summary: 'Create custom tools from selected OpenAPI operations',
         tags: ['Custom Tools'],
-        responses: [new OA\Response(response: 201, description: 'Created')]
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Created',
+                content: new OA\JsonContent(
+                    required: ['success', 'tools'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'tools', type: 'array', items: new OA\Items(ref: new Model(type: CustomToolResponse::class))),
+                    ]
+                )
+            ),
+        ]
     )]
     public function importApply(#[CurrentUser] ?User $user, Request $request): JsonResponse
     {
@@ -145,7 +194,25 @@ final class CustomToolController extends AbstractController
     }
 
     #[Route('/{id}', name: 'get', methods: ['GET'], requirements: ['id' => '\d+'])]
-    #[OA\Get(path: '/api/v1/tools/custom/{id}', summary: 'Get one custom tool', tags: ['Custom Tools'])]
+    #[OA\Get(
+        path: '/api/v1/tools/custom/{id}',
+        summary: 'Get one custom tool',
+        tags: ['Custom Tools'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Custom tool',
+                content: new OA\JsonContent(
+                    required: ['success', 'tool'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'tool', ref: new Model(type: CustomToolResponse::class)),
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function get(int $id, #[CurrentUser] ?User $user): JsonResponse
     {
         $denied = $this->guard($user);
@@ -162,7 +229,26 @@ final class CustomToolController extends AbstractController
     }
 
     #[Route('/{id}', name: 'update', methods: ['PATCH'], requirements: ['id' => '\d+'])]
-    #[OA\Patch(path: '/api/v1/tools/custom/{id}', summary: 'Update a custom tool', tags: ['Custom Tools'])]
+    #[OA\Patch(
+        path: '/api/v1/tools/custom/{id}',
+        summary: 'Update a custom tool',
+        tags: ['Custom Tools'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Updated',
+                content: new OA\JsonContent(
+                    required: ['success', 'tool'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'tool', ref: new Model(type: CustomToolResponse::class)),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid spec'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
     public function update(int $id, #[CurrentUser] ?User $user, Request $request): JsonResponse
     {
         $denied = $this->guard($user);
@@ -205,7 +291,24 @@ final class CustomToolController extends AbstractController
     #[OA\Post(
         path: '/api/v1/tools/custom/{id}/try',
         summary: 'Try a custom tool. Write-class tools are not sent.',
-        tags: ['Custom Tools']
+        tags: ['Custom Tools'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Try result',
+                content: new OA\JsonContent(
+                    required: ['success', 'sent'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'sent', type: 'boolean'),
+                        new OA\Property(property: 'result', description: 'Present when the read-class call was sent'),
+                        new OA\Property(property: 'request', description: 'Resolved request preview when the call was not sent'),
+                    ]
+                )
+            ),
+            new OA\Response(response: 400, description: 'Invalid input'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
     )]
     public function try(int $id, #[CurrentUser] ?User $user, Request $request): JsonResponse
     {

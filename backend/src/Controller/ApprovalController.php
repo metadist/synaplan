@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\Tool\ApprovalResponse;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ToolsConfig;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,33 +48,7 @@ final class ApprovalController extends AbstractController
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(property: 'pendingCount', type: 'integer', example: 1),
-                        new OA\Property(property: 'approvals', type: 'array', items: new OA\Items(
-                            type: 'object',
-                            required: ['id', 'tool', 'preview', 'status', 'expiresAt', 'created', 'requestedBy'],
-                            properties: [
-                                new OA\Property(property: 'id', type: 'integer', example: 1),
-                                new OA\Property(property: 'tool', type: 'string'),
-                                new OA\Property(property: 'sideEffect', type: 'string'),
-                                new OA\Property(property: 'preview', type: 'string', nullable: true),
-                                new OA\Property(property: 'status', type: 'string'),
-                                new OA\Property(property: 'expiresAt', type: 'integer'),
-                                new OA\Property(property: 'created', type: 'integer'),
-                                new OA\Property(property: 'decidedAt', type: 'integer', nullable: true),
-                                new OA\Property(property: 'canAlwaysAllow', type: 'boolean'),
-                                new OA\Property(
-                                    property: 'requestedBy',
-                                    type: 'object',
-                                    properties: [
-                                        new OA\Property(property: 'kind', type: 'string', example: 'chat'),
-                                        new OA\Property(property: 'chatId', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'messageId', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'taskId', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'runId', type: 'integer', nullable: true),
-                                        new OA\Property(property: 'nodeId', type: 'string', nullable: true),
-                                    ]
-                                ),
-                            ]
-                        )),
+                        new OA\Property(property: 'approvals', type: 'array', items: new OA\Items(ref: new Model(type: ApprovalResponse::class))),
                     ]
                 )
             ),
@@ -107,7 +83,17 @@ final class ApprovalController extends AbstractController
             new OA\Property(property: 'assistantKey', type: 'string', nullable: true),
         ])),
         responses: [
-            new OA\Response(response: 200, description: 'Approved'),
+            new OA\Response(
+                response: 200,
+                description: 'Approved',
+                content: new OA\JsonContent(
+                    required: ['success', 'approval'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'approval', ref: new Model(type: ApprovalResponse::class)),
+                    ]
+                )
+            ),
             new OA\Response(response: 404, description: 'Not found'),
         ]
     )]
@@ -145,7 +131,17 @@ final class ApprovalController extends AbstractController
             new OA\Property(property: 'reason', type: 'string', nullable: true),
         ])),
         responses: [
-            new OA\Response(response: 200, description: 'Rejected'),
+            new OA\Response(
+                response: 200,
+                description: 'Rejected',
+                content: new OA\JsonContent(
+                    required: ['success', 'approval'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'approval', ref: new Model(type: ApprovalResponse::class)),
+                    ]
+                )
+            ),
             new OA\Response(response: 404, description: 'Not found'),
         ]
     )]
@@ -173,7 +169,19 @@ final class ApprovalController extends AbstractController
         path: '/api/v1/approvals/notify-setting',
         summary: 'Get approval notification preference',
         tags: ['Approvals'],
-        responses: [new OA\Response(response: 200, description: 'Setting')]
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Setting',
+                content: new OA\JsonContent(
+                    required: ['success', 'mode'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'mode', type: 'string', enum: ['instant', 'digest']),
+                    ]
+                )
+            ),
+        ]
     )]
     public function getNotifySetting(#[CurrentUser] ?User $user): JsonResponse
     {
@@ -197,7 +205,19 @@ final class ApprovalController extends AbstractController
         requestBody: new OA\RequestBody(content: new OA\JsonContent(required: ['mode'], properties: [
             new OA\Property(property: 'mode', type: 'string', enum: ['instant', 'digest']),
         ])),
-        responses: [new OA\Response(response: 200, description: 'Saved')]
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Saved',
+                content: new OA\JsonContent(
+                    required: ['success', 'mode'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'mode', type: 'string', enum: ['instant', 'digest']),
+                    ]
+                )
+            ),
+        ]
     )]
     public function setNotifySetting(#[CurrentUser] ?User $user, Request $request): JsonResponse
     {
