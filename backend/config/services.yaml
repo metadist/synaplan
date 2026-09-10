@@ -1108,6 +1108,10 @@ services:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
 
+    App\Module\Provider\TheHiveModule:
+        arguments:
+            $apiKey: '%env(THEHIVE_API_KEY)%'
+
     App\Service\File\Office\StructuredTextExtractor:
         arguments:
             $officeTextMaxRows: '%env(int:OFFICE_TEXT_MAX_ROWS)%'
