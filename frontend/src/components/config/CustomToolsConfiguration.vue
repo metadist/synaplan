@@ -125,14 +125,25 @@ const classLabel = (sideEffect: string): string => {
 
     <CustomToolEditor
       v-if="creating || editing"
+      :key="editing?.id ?? 'new'"
       :tool="editing"
-      @close="creating = false; editing = null"
-      @saved="creating = false; editing = null; load()"
+      @close="
+        creating = false
+        editing = null
+      "
+      @saved="
+        creating = false
+        editing = null
+        load()
+      "
     />
     <OpenApiImportWizard
       v-if="importing"
       @close="importing = false"
-      @applied="importing = false; load()"
+      @applied="
+        importing = false
+        load()
+      "
     />
   </section>
 </template>

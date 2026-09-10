@@ -303,18 +303,18 @@
         @continue="continueSharedConversation"
       />
       <div
-        v-if="isApprovalsEnabled() && approvalsStore.pending.length > 0"
+        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
         class="mx-4 mb-3 space-y-3"
         data-testid="chat-approvals"
       >
         <ApprovalCard
-          v-for="row in approvalsStore.pending"
+          v-for="row in chatPendingApprovals"
           :key="row.id"
           :approval="row"
           :can-always-allow="row.canAlwaysAllow"
-          @approved="approvalsStore.approve($event)"
-          @rejected="(id, reason) => approvalsStore.reject(id, reason)"
-          @always-allow="approvalsStore.approve($event, true)"
+          @approved="onChatApprovalApproved"
+          @rejected="onChatApprovalRejected"
+          @always-allow="onChatApprovalAlwaysAllow"
         />
       </div>
       <ChatInput
@@ -704,47 +704,69 @@ const mediaJobsStore = useMediaJobsStore()
 const approvalsStore = useApprovalsStore()
 const guestStore = useGuestStore()
 
+const chatPendingApprovals = computed(() =>
+  approvalsStore.pending.filter(
+    (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
+  )
+)
+
+async function onChatApprovalApproved(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalRejected(id: number, reason: string): Promise<void> {
+  try {
+    await approvalsStore.reject(id, reason)
+    showSuccessToast(t('approvals.rejectedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id, true)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
 function ingestApprovalRequired(data: StreamUpdatePayload): void {
   if (!isApprovalsEnabled()) {
     return
   }
-  if (data.status === 'approval_required' && data.approvalId) {
-    approvalsStore.addFromStream({
-      id: data.approvalId,
-      tool: data.tool ?? '',
-      preview: data.preview ?? '',
-      status: 'pending',
-      expiresAt: data.expiresAt ?? 0,
-      created: Math.floor(Date.now() / 1000),
-      requestedBy: {
-        kind: 'chat',
-        chatId: chatsStore.activeChatId,
-        messageId: data.messageId ?? null,
-      },
-      canAlwaysAllow: true,
-    })
+  if (data.status !== 'task_update' || data.metadata?.state !== 'waiting_approval') {
     return
   }
-  if (data.status === 'task_update' && data.metadata?.state === 'waiting_approval') {
-    const approvalId = data.metadata.approval_id
-    if (typeof approvalId !== 'number' || approvalId < 1) {
-      return
-    }
-    approvalsStore.addFromStream({
-      id: approvalId,
-      tool: typeof data.metadata.tool === 'string' ? data.metadata.tool : '',
-      preview: typeof data.metadata.preview === 'string' ? data.metadata.preview : '',
-      status: 'pending',
-      expiresAt: typeof data.metadata.expires_at === 'number' ? data.metadata.expires_at : 0,
-      created: Math.floor(Date.now() / 1000),
-      requestedBy: {
-        kind: 'chat',
-        chatId: chatsStore.activeChatId,
-        messageId: data.messageId ?? null,
-      },
-      canAlwaysAllow: true,
-    })
+  const approvalId = data.metadata.approval_id
+  if (typeof approvalId !== 'number' || approvalId < 1) {
+    return
   }
+  const rawClass = data.metadata.side_effect
+  const sideEffect =
+    rawClass === 'read' || rawClass === 'write' || rawClass === 'destructive' ? rawClass : 'read'
+  approvalsStore.addFromStream({
+    id: approvalId,
+    tool: typeof data.metadata.tool === 'string' ? data.metadata.tool : '',
+    preview: typeof data.metadata.preview === 'string' ? data.metadata.preview : '',
+    status: 'pending',
+    expiresAt: typeof data.metadata.expires_at === 'number' ? data.metadata.expires_at : 0,
+    created: Math.floor(Date.now() / 1000),
+    requestedBy: {
+      kind: 'chat',
+      chatId: chatsStore.activeChatId,
+      messageId: data.messageId ?? null,
+    },
+    sideEffect,
+    canAlwaysAllow: sideEffect === 'write',
+  })
+  void approvalsStore.load('pending')
 }
 const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
@@ -1147,7 +1169,9 @@ onMounted(async () => {
   void mediaJobsStore.subscribe(authStore.user?.id)
   if (isApprovalsEnabled()) {
     void approvalsStore.subscribe(authStore.user?.id)
-    void approvalsStore.load('pending')
+    if (authStore.isAuthenticated) {
+      void approvalsStore.load('pending')
+    }
   }
   // Hydrate the global Jobs tray with any renders already running across chats.
   if (authStore.isAuthenticated) {
@@ -2750,11 +2774,6 @@ const streamAIResponse = async (
             return
           }
 
-          if (data.status === 'approval_required' && data.approvalId) {
-            ingestApprovalRequired(data)
-            return
-          }
-
           if (data.status === 'started') {
             processingStatus.value = 'started'
             processingMetadata.value = {}
@@ -3258,11 +3277,6 @@ const streamAIResponse = async (
 
           if (data.status === 'run_started') {
             noteRunStarted(data.runId)
-            return
-          }
-
-          if (data.status === 'approval_required' && data.approvalId) {
-            ingestApprovalRequired(data)
             return
           }
 

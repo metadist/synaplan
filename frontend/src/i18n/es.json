@@ -5403,6 +5403,7 @@
     "method": "Método HTTP",
     "url": "URL",
     "body": "Plantilla del cuerpo de la petición",
+    "bodyInvalid": "El cuerpo de la petición debe ser JSON válido.",
     "save": "Guardar",
     "cancel": "Cancelar",
     "saved": "Herramienta propia guardada.",

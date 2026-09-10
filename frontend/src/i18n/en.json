@@ -6389,6 +6389,7 @@
     "method": "HTTP method",
     "url": "URL",
     "body": "Request body template",
+    "bodyInvalid": "The request body must be valid JSON.",
     "save": "Save",
     "cancel": "Cancel",
     "saved": "Custom tool saved.",

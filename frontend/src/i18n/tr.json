@@ -5404,6 +5404,7 @@
     "method": "HTTP yöntemi",
     "url": "URL",
     "body": "İstek gövdesi şablonu",
+    "bodyInvalid": "İstek gövdesi geçerli JSON olmalıdır.",
     "save": "Kaydet",
     "cancel": "Vazgeç",
     "saved": "Özel araç kaydedildi.",

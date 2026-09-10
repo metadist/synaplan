@@ -1,45 +1,14 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
+import {
+  GetApiApprovalsListResponseSchema,
+  GetApiApprovalsNotifyGetResponseSchema,
+  PatchApiApprovalsNotifyPatchResponseSchema,
+  PostApiApprovalsApproveResponseSchema,
+  PostApiApprovalsRejectResponseSchema,
+} from '@/generated/api-schemas'
 
-const RequestedBySchema = z.object({
-  kind: z.string(),
-  chatId: z.number().nullable().optional(),
-  messageId: z.number().nullable().optional(),
-  taskId: z.number().nullable().optional(),
-  runId: z.number().nullable().optional(),
-  nodeId: z.string().nullable().optional(),
-})
-
-const ApprovalSchema = z.object({
-  id: z.number(),
-  tool: z.string(),
-  sideEffect: z.string().optional(),
-  preview: z.string().nullable().optional(),
-  status: z.string(),
-  expiresAt: z.number(),
-  created: z.number(),
-  decidedAt: z.number().nullable().optional(),
-  requestedBy: RequestedBySchema,
-  canAlwaysAllow: z.boolean().optional(),
-})
-
-const ListSchema = z.object({
-  success: z.boolean(),
-  pendingCount: z.number(),
-  approvals: z.array(ApprovalSchema),
-})
-
-const OneSchema = z.object({
-  success: z.boolean(),
-  approval: ApprovalSchema,
-})
-
-const NotifySchema = z.object({
-  success: z.boolean(),
-  mode: z.enum(['instant', 'digest']),
-})
-
-export type Approval = z.infer<typeof ApprovalSchema>
+export type Approval = z.infer<typeof GetApiApprovalsListResponseSchema>['approvals'][number]
 
 export const approvalsApi = {
   async list(status: 'pending' | 'decided' = 'pending'): Promise<{
@@ -48,7 +17,7 @@ export const approvalsApi = {
   }> {
     const data = await httpClient('/api/v1/approvals', {
       params: { status },
-      schema: ListSchema,
+      schema: GetApiApprovalsListResponseSchema,
     })
     return { pendingCount: data.pendingCount, approvals: data.approvals }
   },
@@ -57,7 +26,7 @@ export const approvalsApi = {
     const data = await httpClient(`/api/v1/approvals/${id}/approve`, {
       method: 'POST',
       body: JSON.stringify({ alwaysAllow, assistantKey: assistantKey ?? null }),
-      schema: OneSchema,
+      schema: PostApiApprovalsApproveResponseSchema,
     })
     return data.approval
   },
@@ -66,13 +35,15 @@ export const approvalsApi = {
     const data = await httpClient(`/api/v1/approvals/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason: reason ?? null }),
-      schema: OneSchema,
+      schema: PostApiApprovalsRejectResponseSchema,
     })
     return data.approval
   },
 
   async getNotifyMode(): Promise<'instant' | 'digest'> {
-    const data = await httpClient('/api/v1/approvals/notify-setting', { schema: NotifySchema })
+    const data = await httpClient('/api/v1/approvals/notify-setting', {
+      schema: GetApiApprovalsNotifyGetResponseSchema,
+    })
     return data.mode
   },
 
@@ -80,7 +51,7 @@ export const approvalsApi = {
     const data = await httpClient('/api/v1/approvals/notify-setting', {
       method: 'PATCH',
       body: JSON.stringify({ mode }),
-      schema: NotifySchema,
+      schema: PatchApiApprovalsNotifyPatchResponseSchema,
     })
     return data.mode
   },

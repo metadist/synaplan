@@ -36,6 +36,8 @@ const row = {
   expiresAt: 1,
   created: 1,
   requestedBy: { kind: 'chat' as const },
+  sideEffect: 'write' as const,
+  canAlwaysAllow: true,
 }
 
 describe('approvals store', () => {

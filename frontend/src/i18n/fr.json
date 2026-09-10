@@ -6389,6 +6389,7 @@
     "method": "Méthode HTTP",
     "url": "URL",
     "body": "Modèle du corps de la requête",
+    "bodyInvalid": "Le corps de la requête doit être du JSON valide.",
     "save": "Enregistrer",
     "cancel": "Annuler",
     "saved": "Outil personnalisé enregistré.",

@@ -291,7 +291,7 @@ const onRunCopy = async () => {
     <button
       v-if="task.waitingApprovalCount > 0"
       type="button"
-      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary"
+      class="pill text-sm font-medium"
       data-testid="saved-task-waiting-approval"
       @click="router.push({ path: '/channels/approvals', query: { task: String(task.id) } })"
     >

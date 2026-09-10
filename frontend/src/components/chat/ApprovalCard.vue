@@ -54,10 +54,7 @@ const onReject = async () => {
 </script>
 
 <template>
-  <section
-    class="surface-card p-4 space-y-3"
-    data-testid="approval-card"
-  >
+  <section class="surface-card p-4 space-y-3" data-testid="approval-card">
     <p class="text-sm txt-secondary">{{ $t('approvals.nothingCreatedYet') }}</p>
     <p class="txt-primary font-medium">{{ approval.preview || approval.tool }}</p>
     <p class="text-xs txt-secondary">{{ expiresIn }}</p>

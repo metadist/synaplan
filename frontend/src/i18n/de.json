@@ -6323,6 +6323,7 @@
     "method": "HTTP-Methode",
     "url": "URL",
     "body": "Vorlage für den Anfragetext",
+    "bodyInvalid": "Der Anfragetext muss gültiges JSON sein.",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "saved": "Eigenes Werkzeug gespeichert.",

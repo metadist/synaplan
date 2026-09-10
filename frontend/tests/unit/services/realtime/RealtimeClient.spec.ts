@@ -358,6 +358,38 @@ describe('RealtimeClient', () => {
     expect(errors).toEqual(['auth-failed'])
   })
 
+  it('multiplexes a second subscriber onto the same centrifuge channel', async () => {
+    const sink: { state?: ConnectionState; error?: string } = {}
+    const client = buildClient(sink)
+    const first: unknown[] = []
+    const second: unknown[] = []
+
+    const handleA = await client.subscribe('user:1', {
+      onPublication: (event) => first.push(event),
+    })
+    const handleB = await client.subscribe('user:1', {
+      onPublication: (event) => second.push(event),
+    })
+
+    const c = instances[0]
+    expect(c.newSubscription).toHaveBeenCalledOnce()
+    const sub = c.__lastSubscription!
+
+    sub.__emit('publication', {
+      data: { type: 'approval.pending', ts: 1, data: { id: 9 } },
+    })
+    expect(first).toEqual([{ type: 'approval.pending', ts: 1, data: { id: 9 } }])
+    expect(second).toEqual([{ type: 'approval.pending', ts: 1, data: { id: 9 } }])
+
+    handleA.unsubscribe()
+    expect(sub.unsubscribe).not.toHaveBeenCalled()
+    expect(c.removeSubscription).not.toHaveBeenCalled()
+
+    handleB.unsubscribe()
+    expect(sub.unsubscribe).toHaveBeenCalledOnce()
+    expect(c.removeSubscription).toHaveBeenCalledOnce()
+  })
+
   it('exposes a publish() handle that forwards to centrifuge sub.publish', async () => {
     const sink: { state?: ConnectionState; error?: string } = {}
     const client = buildClient(sink)

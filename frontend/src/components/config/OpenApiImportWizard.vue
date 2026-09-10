@@ -22,6 +22,12 @@ const operations = ref<OpenApiOperation[]>([])
 const selected = ref<Record<string, boolean>>({})
 const loading = ref(false)
 
+const classLabel = (sideEffect: string): string => {
+  if (sideEffect === 'read') return t('customTools.classRead')
+  if (sideEffect === 'destructive') return t('customTools.classDestructive')
+  return t('customTools.classWrite')
+}
+
 const preview = async () => {
   loading.value = true
   try {
@@ -70,7 +76,7 @@ const apply = async () => {
     </label>
     <button
       type="button"
-      class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+      class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       :disabled="loading"
       @click="preview"
     >
@@ -78,19 +84,15 @@ const apply = async () => {
     </button>
     <ul v-if="operations.length" class="space-y-2">
       <li v-for="op in operations" :key="op.operationId" class="flex items-center gap-2 text-sm">
-        <input
-          v-model="selected[op.operationId]"
-          type="checkbox"
-          class="accent-[var(--brand)]"
-        />
+        <input v-model="selected[op.operationId]" type="checkbox" class="accent-[var(--brand)]" />
         <span class="txt-primary">{{ op.method }} {{ op.path }}</span>
-        <span class="txt-secondary">{{ op.sideEffect }}</span>
+        <span class="txt-secondary">{{ classLabel(op.sideEffect) }}</span>
       </li>
     </ul>
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="loading || operations.length === 0"
         @click="apply"
       >

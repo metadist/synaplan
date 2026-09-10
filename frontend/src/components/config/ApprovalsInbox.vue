@@ -7,6 +7,7 @@ import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import { useApprovalsStore } from '@/stores/approvals'
 import { useNotification } from '@/composables/useNotification'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
+import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 
 const { t, te } = useI18n()
 const route = useRoute()
@@ -17,6 +18,9 @@ const tab = ref<'pending' | 'decided'>('pending')
 const notifyMode = ref<'instant' | 'digest'>('instant')
 
 onMounted(async () => {
+  if (!isApprovalsEnabled()) {
+    return
+  }
   await store.load('pending')
   try {
     notifyMode.value = await approvalsApi.getNotifyMode()
@@ -91,7 +95,7 @@ const onNotifyChange = async () => {
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="page-approvals">
+  <div v-if="isApprovalsEnabled()" class="space-y-6" data-testid="page-approvals">
     <PageHeader
       :title="$t('approvals.title')"
       :subtitle="$t('approvals.subtitle')"
@@ -162,7 +166,7 @@ const onNotifyChange = async () => {
         </div>
         <button
           type="button"
-          class="mt-2 text-sm txt-secondary underline"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
           @click="openContext(row)"
         >
           {{ $t('approvals.openContext') }}

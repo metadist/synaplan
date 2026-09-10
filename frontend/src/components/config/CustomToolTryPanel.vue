@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { customToolsApi, customToolFieldClass, type CustomTool } from '@/services/api/customToolsApi'
+import {
+  customToolsApi,
+  customToolFieldClass,
+  type CustomTool,
+} from '@/services/api/customToolsApi'
 import { useNotification } from '@/composables/useNotification'
 
 const props = defineProps<{

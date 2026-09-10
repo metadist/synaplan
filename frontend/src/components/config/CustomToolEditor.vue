@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { customToolsApi, customToolFieldClass, type CustomTool } from '@/services/api/customToolsApi'
+import {
+  customToolsApi,
+  customToolFieldClass,
+  type CustomTool,
+} from '@/services/api/customToolsApi'
 import CustomToolTryPanel from '@/components/config/CustomToolTryPanel.vue'
 import { useNotification } from '@/composables/useNotification'
 
@@ -33,12 +37,28 @@ const body = ref(
 
 const methods = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']
 
-const payload = computed(() => {
-  let parsedBody: unknown = body.value
+const bodyError = computed(() => {
+  if (body.value.trim() === '') {
+    return ''
+  }
   try {
-    parsedBody = body.value.trim() === '' ? undefined : JSON.parse(body.value)
+    JSON.parse(body.value)
+    return ''
   } catch {
-    parsedBody = body.value
+    return t('customTools.bodyInvalid')
+  }
+})
+
+const payload = computed(() => {
+  let parsedBody: unknown
+  if (body.value.trim() === '') {
+    parsedBody = undefined
+  } else {
+    try {
+      parsedBody = JSON.parse(body.value)
+    } catch {
+      parsedBody = body.value
+    }
   }
   return {
     name: name.value,
@@ -54,6 +74,9 @@ const payload = computed(() => {
 })
 
 const save = async () => {
+  if (bodyError.value) {
+    return
+  }
   saving.value = true
   try {
     if (props.tool) {
@@ -99,7 +122,12 @@ const save = async () => {
         {{ $t('customTools.classWrite') }}
       </label>
       <label class="flex items-center gap-2 text-sm txt-primary">
-        <input v-model="sideEffect" type="radio" value="destructive" class="accent-[var(--brand)]" />
+        <input
+          v-model="sideEffect"
+          type="radio"
+          value="destructive"
+          class="accent-[var(--brand)]"
+        />
         {{ $t('customTools.classDestructive') }}
       </label>
     </fieldset>
@@ -117,12 +145,13 @@ const save = async () => {
       {{ $t('customTools.body') }}
       <textarea v-model="body" rows="4" :class="fieldClass" />
     </label>
+    <p v-if="bodyError" class="text-sm text-red-600 dark:text-red-400">{{ bodyError }}</p>
     <CustomToolTryPanel v-if="tool" :tool="tool" />
     <div class="flex flex-wrap gap-2">
       <button
         type="button"
         class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="saving"
+        :disabled="saving || !!bodyError"
         @click="save"
       >
         {{ $t('customTools.save') }}
