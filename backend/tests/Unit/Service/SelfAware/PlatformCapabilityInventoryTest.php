@@ -6,6 +6,11 @@ namespace App\Tests\Unit\Service\SelfAware;
 
 use App\AI\Credential\ChatReadinessService;
 use App\Entity\User;
+use App\Module\Channel\WhatsappModule;
+use App\Module\Contract\FeatureModuleInterface;
+use App\Module\ModuleRegistry;
+use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\PiperTtsModule;
 use App\Repository\ConnectionRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
@@ -24,7 +29,9 @@ use App\Service\SelfAware\CapabilityState;
 use App\Service\SelfAware\PlatformCapabilityInventory;
 use App\Service\Update\UpdateStatusService;
 use App\Tests\Support\WebSearchGatewayFactory;
+use App\Tests\Unit\Module\Fixture\FakeSidecarHealthProbe;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 
 final class PlatformCapabilityInventoryTest extends TestCase
 {
@@ -49,8 +56,6 @@ final class PlatformCapabilityInventoryTest extends TestCase
     public function testNoKeysInstallMarksChatAndSearchAsNeedsSetup(): void
     {
         $this->setEnv('QDRANT_URL', '');
-        $this->setEnv('OFFICE_CONVERT_URL', '');
-        $this->setEnv('SYNAPLAN_TTS_URL', '');
 
         $report = $this->inventory(
             chatReady: false,
@@ -88,14 +93,14 @@ final class PlatformCapabilityInventoryTest extends TestCase
     public function testNoEngineInstallHasChatAndImagesButNotPdfOrVideo(): void
     {
         $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
-        $this->setEnv('OFFICE_CONVERT_URL', '');
-        $this->setEnv('SYNAPLAN_TTS_URL', '');
 
         $report = $this->inventory(
             chatReady: true,
             models: ['PIC2TEXT' => 1, 'VECTORIZE' => 2, 'TEXT2PIC' => 3, 'SOUND2TEXT' => 4],
             brave: true,
             billing: false,
+            officeUrl: '',
+            ttsUrl: '',
         )->build(2);
 
         $this->assertSame(CapabilityState::Available, $report->fact('chat')?->state);
@@ -112,8 +117,6 @@ final class PlatformCapabilityInventoryTest extends TestCase
     public function testFullInstallMarksPdfAndTtsAvailableAndUpgradesMusicAlternative(): void
     {
         $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
-        $this->setEnv('OFFICE_CONVERT_URL', 'http://office:8080');
-        $this->setEnv('SYNAPLAN_TTS_URL', 'http://tts:8090');
 
         $report = $this->inventory(
             chatReady: true,
@@ -127,6 +130,8 @@ final class PlatformCapabilityInventoryTest extends TestCase
             ],
             brave: true,
             billing: true,
+            officeUrl: 'http://office:8080',
+            ttsUrl: 'http://tts:8090',
         )->build(2);
 
         $this->assertSame(CapabilityState::Available, $report->fact('pdf_export')?->state);
@@ -141,7 +146,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
     /**
      * @param array<string, int> $models
      */
-    private function inventory(bool $chatReady, array $models, bool $brave, bool $billing): PlatformCapabilityInventory
+    private function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = ''): PlatformCapabilityInventory
     {
         $chatReadiness = $this->createMock(ChatReadinessService::class);
         $chatReadiness->method('isChatReady')->willReturn($chatReady);
@@ -218,9 +223,29 @@ final class PlatformCapabilityInventoryTest extends TestCase
             $billingService,
             $connections,
             $users,
-            false,
-            '',
+            $this->modules($officeUrl, $ttsUrl),
         );
+    }
+
+    /**
+     * The three modules that own capabilities this inventory reports
+     * (pdf_export, text_to_speech, channel_whatsapp), never probing.
+     */
+    private function modules(string $officeUrl, string $ttsUrl): ModuleRegistry
+    {
+        $probe = new FakeSidecarHealthProbe();
+        $modules = [
+            OfficeConvertModule::ID => new OfficeConvertModule($probe, $officeUrl),
+            PiperTtsModule::ID => new PiperTtsModule($probe, $ttsUrl),
+            WhatsappModule::ID => new WhatsappModule(false, '', ''),
+        ];
+
+        $factories = [];
+        foreach ($modules as $id => $module) {
+            $factories[$id] = static fn (): FeatureModuleInterface => $module;
+        }
+
+        return new ModuleRegistry(new ServiceLocator($factories));
     }
 
     private function setEnv(string $key, string $value): void

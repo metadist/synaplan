@@ -11,6 +11,7 @@ use App\Controller\ConfigController;
 use App\Entity\Config;
 use App\Entity\Model;
 use App\Entity\User;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
@@ -111,6 +112,7 @@ final class ConfigControllerSaveDefaultModelsTest extends TestCase
             new MailerConfig(),
             new CapabilityService(),
             $this->createStub(FeatureStatusReporter::class),
+            $this->createStub(ModuleRegistry::class),
             'http://qdrant.example',
         );
 

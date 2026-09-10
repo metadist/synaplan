@@ -12,6 +12,8 @@ use App\Bundle\BundleConfig;
 use App\Entity\Config;
 use App\Entity\User;
 use App\Model\ModelCatalog;
+use App\Module\ModuleRegistry;
+use App\Module\Sidecar\OfficeConvertModule;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Agent\AgentConfig;
@@ -93,6 +95,7 @@ class ConfigController extends AbstractController
         private MailerConfig $mailerConfig,
         private CapabilityService $capabilityService,
         private FeatureStatusReporter $featureStatusReporter,
+        private ModuleRegistry $modules,
         #[Autowire('%env(string:default::QDRANT_URL)%')]
         private readonly string $qdrantUrl,
         private readonly ?SelfAwareConfig $selfAwareConfig = null,
@@ -504,7 +507,7 @@ class ConfigController extends AbstractController
             'iamImpersonationDisabled' => $this->iamConfig->isImpersonationDisabled($user?->getId()),
             'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
-            'officeConvertEnabled' => $this->isOfficeConvertConfigured(),
+            'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
             'documentToolsEnabled' => true === filter_var(
                 $this->configRepository->getValue(0, 'DOCUMENT_TOOLS', 'ENABLED') ?? '0',
                 \FILTER_VALIDATE_BOOL
@@ -2120,6 +2123,35 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'all_ready', type: 'boolean', example: false),
                     ]
                 ),
+                new OA\Property(
+                    property: 'modules',
+                    type: 'array',
+                    description: 'Optional feature modules (sidecars, providers, commerce, channels) as declared by the module registry. Additive to `features`; absent modules are never probed.',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', example: 'office_convert'),
+                            new OA\Property(property: 'label_key', type: 'string', example: 'modules.office_convert.label'),
+                            new OA\Property(property: 'state', type: 'string', enum: ['absent', 'available', 'needs_setup'], example: 'available'),
+                            new OA\Property(property: 'configured', type: 'boolean', example: true),
+                            new OA\Property(property: 'healthy', type: 'boolean', example: true),
+                            new OA\Property(property: 'message', type: 'string', example: 'Office converter is running'),
+                            new OA\Property(property: 'details', type: 'object', description: 'Module-specific, never contains secrets', additionalProperties: true),
+                            new OA\Property(
+                                property: 'configured_by',
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'env', type: 'array', items: new OA\Items(type: 'string'), example: ['OFFICE_CONVERT_URL']),
+                                    new OA\Property(property: 'bconfig', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'providers', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'plugs', type: 'array', items: new OA\Items(type: 'string')),
+                                ],
+                            ),
+                            new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), example: ['pdf_export']),
+                            new OA\Property(property: 'docs_anchor', type: 'string', example: 'modules/office-convert'),
+                            new OA\Property(property: 'mobile_class', type: 'string', enum: ['backend-only', 'ota-candidate'], example: 'ota-candidate'),
+                        ],
+                    ),
+                ),
             ]
         )
     )]
@@ -2136,19 +2168,5 @@ class ConfigController extends AbstractController
         }
 
         return $this->json($this->featureStatusReporter->build($user));
-    }
-
-    private function officeConvertUrl(): string
-    {
-        $fromEnv = $_ENV['OFFICE_CONVERT_URL'] ?? $_SERVER['OFFICE_CONVERT_URL'] ?? getenv('OFFICE_CONVERT_URL');
-
-        return trim(is_string($fromEnv) ? $fromEnv : '');
-    }
-
-    private function isOfficeConvertConfigured(): bool
-    {
-        $url = $this->officeConvertUrl();
-
-        return '' !== $url && 'disabled' !== $url;
     }
 }

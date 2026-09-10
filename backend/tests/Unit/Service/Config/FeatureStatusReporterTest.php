@@ -6,6 +6,12 @@ namespace App\Tests\Unit\Service\Config;
 
 use App\AI\Service\ProviderRegistry;
 use App\Entity\User;
+use App\Module\Contract\FeatureModuleInterface;
+use App\Module\ModuleRegistry;
+use App\Module\ModuleStatusPresenter;
+use App\Module\Sidecar\DoclingModule;
+use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ModelRepository;
 use App\Service\Config\FeatureStatusReporter;
@@ -13,11 +19,13 @@ use App\Service\Infrastructure\RedisService;
 use App\Service\UserMemoryService;
 use App\Service\VectorSearch\QdrantClientInterface;
 use App\Service\WhisperService;
+use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use App\Tests\Unit\Module\Fixture\FakeSidecarHealthProbe;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
  * Characterization of the admin feature-status payload.
@@ -32,6 +40,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class FeatureStatusReporterTest extends TestCase
 {
+    use BuildsAllModules;
+
     private const SNAPSHOT_DIR = __DIR__.'/__snapshots__';
 
     /** @var array<string, string|false> */
@@ -160,7 +170,10 @@ final class FeatureStatusReporterTest extends TestCase
         $redis->method('getLastConnectionError')->willReturn(new \RuntimeException('Connection refused [tcp://redis:6379]'));
         $redis->method('serverVersion')->willReturn(null);
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, new FakeSidecarHealthProbe());
+        $probe = new FakeSidecarHealthProbe();
+        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: '', officeUrl: 'disabled');
+
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
     }
 
     private function fullReporter(): FeatureStatusReporter
@@ -231,8 +244,28 @@ final class FeatureStatusReporterTest extends TestCase
             ],
             bodies: ['http://tika:9998/version' => "Apache Tika 2.9.2\n"],
         );
+        $registry = $this->registry($probe, tikaUrl: 'http://tika:9998', doclingUrl: ' http://docling:5001/ ', officeUrl: ' http://collabora:9980 ', tikaUser: 'tika', tikaPass: 'secret');
 
-        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe);
+        return new FeatureStatusReporter($connection, $models, $providers, $webSearch, $whisper, $memory, $redis, $probe, $registry, new ModuleStatusPresenter($registry));
+    }
+
+    /**
+     * All twelve descriptors (unconfigured stubs), with the three sidecars the
+     * page renders replaced by instances that see the scenario's URLs.
+     */
+    private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null): ModuleRegistry
+    {
+        $modules = $this->allModules();
+        $modules[TikaModule::ID] = new TikaModule($probe, $tikaUrl, $tikaUser, $tikaPass);
+        $modules[DoclingModule::ID] = new DoclingModule($probe, $doclingUrl);
+        $modules[OfficeConvertModule::ID] = new OfficeConvertModule($probe, $officeUrl);
+
+        $factories = [];
+        foreach ($modules as $id => $module) {
+            $factories[$id] = static fn (): FeatureModuleInterface => $module;
+        }
+
+        return new ModuleRegistry(new ServiceLocator($factories));
     }
 
     /**

@@ -6,7 +6,13 @@ namespace App\Service\Config;
 
 use App\AI\Service\ProviderRegistry;
 use App\Entity\User;
+use App\Module\Contract\ModuleStatus;
+use App\Module\ModuleRegistry;
+use App\Module\ModuleStatusPresenter;
 use App\Module\Probe\SidecarHealthProbeInterface;
+use App\Module\Sidecar\DoclingModule;
+use App\Module\Sidecar\OfficeConvertModule;
+use App\Module\Sidecar\TikaModule;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ModelRepository;
 use App\Service\Infrastructure\RedisService;
@@ -32,11 +38,13 @@ final class FeatureStatusReporter
         private readonly UserMemoryService $memoryService,
         private readonly RedisService $redisService,
         private readonly SidecarHealthProbeInterface $probe,
+        private readonly ModuleRegistry $modules,
+        private readonly ModuleStatusPresenter $modulePresenter,
     ) {
     }
 
     /**
-     * @return array{features: array<string, array<string, mixed>>, summary: array{total: int, healthy: int, unhealthy: int, all_ready: bool}}
+     * @return array{features: array<string, array<string, mixed>>, summary: array{total: int, healthy: int, unhealthy: int, all_ready: bool}, modules: list<array<string, mixed>>}
      */
     public function build(User $user): array
     {
@@ -164,72 +172,45 @@ final class FeatureStatusReporter
             'models_available' => count($availableModels),
         ];
 
-        // Apache Tika (Document Processing)
-        $tikaUrl = $_ENV['TIKA_BASE_URL'] ?? 'http://tika:9998';
-        $tikaHttpUser = $_ENV['TIKA_HTTP_USER'] ?? null;
-        $tikaHttpPass = $_ENV['TIKA_HTTP_PASS'] ?? null;
-        $tikaHealthy = $this->probe->isReachable($tikaUrl.'/tika', $tikaHttpUser, $tikaHttpPass);
+        // Sidecar rows come from the feature-module descriptors. The row shape
+        // and wording are the historic ones (snapshot-locked); only the probing
+        // moved into the modules.
 
-        // Try to get Tika version
-        $tikaVersion = '';
-        if ($tikaHealthy) {
-            $versionResponse = $this->probe->fetchText($tikaUrl.'/version', $tikaHttpUser, $tikaHttpPass);
-            if ($versionResponse) {
-                $tikaVersion = trim($versionResponse);
-            }
-        }
-
+        // Apache Tika (Document Processing) — always listed, never "disabled".
+        $tika = $this->modules->get(TikaModule::ID)->status();
         $features['tika'] = [
             'id' => 'tika',
             'category' => 'Processing Services',
             'name' => 'Apache Tika',
             'enabled' => true,
-            'status' => $tikaHealthy ? 'healthy' : 'unhealthy',
-            'message' => $tikaHealthy
+            'status' => $tika->healthy ? 'healthy' : 'unhealthy',
+            'message' => $tika->healthy
                 ? 'Document processing service is running'
                 : 'Tika service is not responding',
             'setup_required' => false,
-            'url' => $tikaUrl,
-            'version' => $tikaVersion,
+            'url' => (string) ($tika->details['url'] ?? ''),
+            'version' => (string) ($tika->details['version'] ?? ''),
         ];
 
         // Docling (optional document extraction sidecar)
-        $doclingUrl = trim((string) ($_ENV['DOCLING_BASE_URL'] ?? ''));
-        $doclingConfigured = '' !== $doclingUrl && 'disabled' !== strtolower($doclingUrl);
-        $doclingHealthy = $doclingConfigured && $this->probe->isReachable(rtrim($doclingUrl, '/').'/health');
-        $features['docling'] = [
-            'id' => 'docling',
-            'category' => 'Processing Services',
-            'name' => 'Docling',
-            'enabled' => $doclingConfigured,
-            'status' => $doclingConfigured ? ($doclingHealthy ? 'healthy' : 'unhealthy') : 'disabled',
-            'message' => $doclingConfigured
-                ? ($doclingHealthy
-                    ? 'Document extraction sidecar is running'
-                    : 'Docling is not responding at DOCLING_BASE_URL')
-                : 'Optional. Set DOCLING_BASE_URL and start the docling Compose profile',
-            'setup_required' => !$doclingConfigured,
-            'url' => $doclingConfigured ? $doclingUrl : '',
-        ];
+        $features['docling'] = $this->optionalSidecarRow(
+            $this->modules->get(DoclingModule::ID)->status(),
+            id: 'docling',
+            name: 'Docling',
+            runningMessage: 'Document extraction sidecar is running',
+            downMessage: 'Docling is not responding at DOCLING_BASE_URL',
+            absentMessage: 'Optional. Set DOCLING_BASE_URL and start the docling Compose profile',
+        );
 
         // Collabora CODE convert-to (optional office engine)
-        $officeUrl = $this->officeConvertUrl();
-        $officeConfigured = $this->isOfficeConvertConfigured();
-        $officeHealthy = $officeConfigured && $this->probe->isReachable(rtrim($officeUrl, '/').'/hosting/capabilities');
-        $features['office-convert'] = [
-            'id' => 'office-convert',
-            'category' => 'Processing Services',
-            'name' => 'Office converter (Collabora)',
-            'enabled' => $officeConfigured,
-            'status' => $officeConfigured ? ($officeHealthy ? 'healthy' : 'unhealthy') : 'disabled',
-            'message' => $officeConfigured
-                ? ($officeHealthy
-                    ? 'LibreOffice convert-to is ready'
-                    : 'Collabora CODE is not responding at OFFICE_CONVERT_URL')
-                : 'Optional. Set OFFICE_CONVERT_URL and start the office Compose profile',
-            'setup_required' => !$officeConfigured,
-            'url' => $officeConfigured ? $officeUrl : '',
-        ];
+        $features['office-convert'] = $this->optionalSidecarRow(
+            $this->modules->get(OfficeConvertModule::ID)->status(),
+            id: 'office-convert',
+            name: 'Office converter (Collabora)',
+            runningMessage: 'LibreOffice convert-to is ready',
+            downMessage: 'Collabora CODE is not responding at OFFICE_CONVERT_URL',
+            absentMessage: 'Optional. Set OFFICE_CONVERT_URL and start the office Compose profile',
+        );
 
         // Qdrant - User memories with vector search
         $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
@@ -402,6 +383,8 @@ final class FeatureStatusReporter
                 'unhealthy' => $totalServices - $healthyServices,
                 'all_ready' => $healthyServices === $totalServices,
             ],
+            // Additive, module-centric view of the same page (master plan §4.1).
+            'modules' => $this->modulePresenter->rows(),
         ];
     }
 
@@ -413,17 +396,31 @@ final class FeatureStatusReporter
         return (string) preg_replace('#://[^@/]*@#', '://***@', $dsn);
     }
 
-    private function officeConvertUrl(): string
-    {
-        $fromEnv = $_ENV['OFFICE_CONVERT_URL'] ?? $_SERVER['OFFICE_CONVERT_URL'] ?? getenv('OFFICE_CONVERT_URL');
-
-        return trim(is_string($fromEnv) ? $fromEnv : '');
-    }
-
-    private function isOfficeConvertConfigured(): bool
-    {
-        $url = $this->officeConvertUrl();
-
-        return '' !== $url && 'disabled' !== $url;
+    /**
+     * Historic row shape for an optional sidecar: disabled / healthy / unhealthy,
+     * `setup_required` while absent, URL only while configured.
+     *
+     * @return array<string, mixed>
+     */
+    private function optionalSidecarRow(
+        ModuleStatus $status,
+        string $id,
+        string $name,
+        string $runningMessage,
+        string $downMessage,
+        string $absentMessage,
+    ): array {
+        return [
+            'id' => $id,
+            'category' => 'Processing Services',
+            'name' => $name,
+            'enabled' => $status->configured,
+            'status' => $status->configured ? ($status->healthy ? 'healthy' : 'unhealthy') : 'disabled',
+            'message' => $status->configured
+                ? ($status->healthy ? $runningMessage : $downMessage)
+                : $absentMessage,
+            'setup_required' => !$status->configured,
+            'url' => $status->configured ? (string) ($status->details['url'] ?? '') : '',
+        ];
     }
 }

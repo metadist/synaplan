@@ -61,7 +61,7 @@ final class TikaModule implements FeatureModuleInterface
     public function status(): ModuleStatus
     {
         if (!$this->isConfigured()) {
-            return ModuleStatus::absent('TIKA_BASE_URL is unset or disabled');
+            return ModuleStatus::absent('TIKA_BASE_URL is unset or disabled', ['url' => $this->baseUrl, 'version' => null]);
         }
 
         $url = rtrim($this->baseUrl, '/');

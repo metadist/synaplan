@@ -85,6 +85,21 @@ final class ModuleRegistry
     }
 
     /**
+     * The module that declares the given capability id, if any. Instantiates
+     * descriptors (they are cheap) but never calls status().
+     */
+    public function forCapability(string $capabilityId): ?FeatureModuleInterface
+    {
+        foreach ($this->all() as $module) {
+            if (in_array($capabilityId, $module->capabilityIds(), true)) {
+                return $module;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * The module that owns the given route name, if any. An exact entry beats a
      * `prefix*` entry; among prefixes the longest wins, so a specific module can
      * sit under a broader one.

@@ -27,9 +27,12 @@ final readonly class ModuleStatus
     ) {
     }
 
-    public static function absent(string $message): self
+    /**
+     * @param array<string, scalar|array<mixed>|null> $details
+     */
+    public static function absent(string $message, array $details = []): self
     {
-        return new self(configured: false, healthy: false, message: $message);
+        return new self(configured: false, healthy: false, message: $message, details: $details);
     }
 
     /**
