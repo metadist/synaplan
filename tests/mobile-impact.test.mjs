@@ -20,6 +20,19 @@ test('classifies documentation as no-app-impact', () => {
   assert.equal(result.classification, 'no-app-impact')
 })
 
+test('classifies compute sidecars as no-app-impact', () => {
+  const result = classifyFiles(
+    [
+      entry('sidecars/synaplan-compute/cmd/synaplan-compute/main.go', 'A'),
+      entry('sidecars/synaplan-compute/internal/runner/hostconfig.go', 'A'),
+      entry('sidecars/synaplan-compute/README.md', 'A'),
+    ],
+    policy
+  )
+
+  assert.equal(result.classification, 'no-app-impact')
+})
+
 test('classifies allow-listed internal backend files as backend-only', () => {
   const result = classifyFiles([
     entry('backend/src/Service/ReportExportService.php', 'M'),

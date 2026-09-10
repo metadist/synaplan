@@ -18,6 +18,7 @@ use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\Schedule\ScheduleParser;
+use App\Service\Tool\ToolsConfig;
 
 final readonly class SavedTaskService
 {
@@ -29,6 +30,7 @@ final readonly class SavedTaskService
         private ScheduleParser $scheduleParser,
         private AccessGate $accessGate,
         private SavedTaskGraphCapture $graphCapture,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -294,6 +296,9 @@ final readonly class SavedTaskService
             }
         }
         if ($mutating && !$task->allowsUnattended()) {
+            if (null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($task->getOwnerId())) {
+                return;
+            }
             throw new \InvalidArgumentException('This schedule would send or save files on its own. Confirm “runs on its own” first.');
         }
     }

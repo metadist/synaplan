@@ -280,6 +280,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.savedTasks' },
     },
     {
+      path: '/channels/approvals',
+      name: 'channels-approvals',
+      component: () => import('@/views/ConfigView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.approvals' },
+    },
+    {
       path: '/channels/agents',
       name: 'channels-agents',
       component: () => import('@/views/ConfigView.vue'),

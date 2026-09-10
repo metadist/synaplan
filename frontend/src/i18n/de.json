@@ -158,7 +158,8 @@
     "savedTasks": "Gespeicherte Aufgaben",
     "setup": "Einrichtung",
     "assistants": "Assistenten",
-    "assistantBuilder": "Assistent"
+    "assistantBuilder": "Assistent",
+    "approvals": "Freigaben"
   },
   "adminModelStatus": {
     "title": "Modell-Status",
@@ -760,7 +761,8 @@
     "liveSupport": "Live-Support",
     "usage": "Nutzung",
     "assistants": "Assistenten",
-    "linkedPlatforms": "Verknüpfte Plattformen"
+    "linkedPlatforms": "Verknüpfte Plattformen",
+    "approvals": "Freigaben"
   },
   "chatInput": {
     "attach": "Anhängen",
@@ -1422,7 +1424,8 @@
       "done": "Fertig",
       "failed": "Fehlgeschlagen",
       "skipped": "Übersprungen",
-      "cancelled": "Gestoppt"
+      "cancelled": "Gestoppt",
+      "waiting_approval": "Wartet auf Freigabe"
     },
     "kind": {
       "text": "Text",
@@ -2092,7 +2095,8 @@
         "running": "Läuft",
         "completed": "Abgeschlossen",
         "failed": "Fehlgeschlagen",
-        "cancelled": "Abgebrochen"
+        "cancelled": "Abgebrochen",
+        "waiting_approval": "Wartet auf Freigabe"
       },
       "runTrigger": {
         "manual": "von dir gestartet",
@@ -2183,7 +2187,11 @@
           "calendar": "einen Kalendereintrag",
           "reply": "eine Antwort im Chat"
         }
-      }
+      },
+      "waitingApproval": "Wartet auf Freigabe",
+      "waitingApprovalCount": "{count} Ausführung wartet auf Freigabe | {count} Ausführungen warten auf Freigabe",
+      "approvalExpired": "Freigabe abgelaufen",
+      "rejectedBy": "Abgelehnt von {name}"
     },
     "connections": {
       "title": "Verbindungen",
@@ -6262,5 +6270,78 @@
       "conflict": "Existiert bereits — wird übersprungen, außer Sie ersetzen ({key})",
       "skipped": "Übersprungen ({key})"
     }
+  },
+  "approvals": {
+    "title": "Freigaben",
+    "subtitle": "Dinge, die auf dich warten, bevor sie passieren.",
+    "pending": "Wartend",
+    "decided": "Entschieden",
+    "emptyPending": "Nichts braucht deine Freigabe. Karten erscheinen hier, wenn eine gespeicherte Aufgabe oder ein Chat etwas ändern möchte.",
+    "emptyDecided": "Noch keine früheren Entscheidungen.",
+    "approve": "Freigeben",
+    "reject": "Ablehnen",
+    "alwaysAllow": "Für diesen Assistenten immer erlauben",
+    "rejectReason": "Warum lehnst du das ab?",
+    "rejectReasonPlaceholder": "Optionale Notiz",
+    "expired": "Diese Anfrage ist abgelaufen",
+    "expiresInHours": "Läuft in {hours} Stunde ab | Läuft in {hours} Stunden ab",
+    "nothingCreatedYet": "Es wurde noch nichts erstellt.",
+    "approvedToast": "Freigegeben. Es geht weiter.",
+    "rejectedToast": "Abgelehnt.",
+    "decideFailed": "Das konnte nicht entschieden werden. Bitte erneut versuchen.",
+    "openContext": "Öffnen, woher das kommt",
+    "notify": "Wie du von neuen Anfragen erfährst",
+    "notifyInstant": "Per E-Mail, sobald etwas wartet",
+    "notifyDigest": "Tägliche Zusammenfassung senden",
+    "notifySaved": "Benachrichtigungseinstellung gespeichert.",
+    "blocked": "Das kann ich nicht tun. Ein Administrator hat das ausgeschaltet.",
+    "waitingForApproval": "Wartet auf Freigabe",
+    "status": {
+      "pending": "Wartend",
+      "approved": "Freigegeben",
+      "rejected": "Abgelehnt",
+      "expired": "Abgelaufen",
+      "executed": "Erledigt",
+      "failed": "Fehlgeschlagen"
+    }
+  },
+  "customTools": {
+    "title": "Eigene Werkzeuge",
+    "subtitle": "Rufe eigene HTTP-APIs aus Chat und gespeicherten Aufgaben auf. Zugangsdaten bleiben auf diesem Server.",
+    "add": "Eigenes Werkzeug hinzufügen",
+    "edit": "Eigenes Werkzeug bearbeiten",
+    "import": "Aus OpenAPI importieren",
+    "empty": "Es wurde noch nichts erstellt. Füge ein Werkzeug hinzu, das eine HTTP-API aufruft, oder importiere eines aus einer OpenAPI-Beschreibung.",
+    "loading": "Eigene Werkzeuge werden geladen…",
+    "name": "Name",
+    "titleLabel": "Titel",
+    "description": "Was es tut",
+    "class": "Was dieses Werkzeug tut",
+    "classRead": "Liest Daten",
+    "classWrite": "Ändert etwas",
+    "classDestructive": "Löscht etwas",
+    "method": "HTTP-Methode",
+    "url": "URL",
+    "body": "Vorlage für den Anfragetext",
+    "bodyInvalid": "Der Anfragetext muss gültiges JSON sein.",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "saved": "Eigenes Werkzeug gespeichert.",
+    "saveFailed": "Das eigene Werkzeug konnte nicht gespeichert werden.",
+    "delete": "Löschen",
+    "deleteConfirm": "Das eigene Werkzeug \"{name}\" löschen? Aufrufe, die es nutzen, funktionieren dann nicht mehr.",
+    "deleted": "Eigenes Werkzeug gelöscht.",
+    "deleteFailed": "Das eigene Werkzeug konnte nicht gelöscht werden.",
+    "loadFailed": "Eigene Werkzeuge konnten nicht geladen werden.",
+    "try": "Ausprobieren",
+    "tryHint": "Einen Testaufruf senden. Geheimnisse werden als *** gezeigt, nichts wird gespeichert.",
+    "tryFailed": "Der Testaufruf konnte nicht gesendet werden.",
+    "importUrl": "OpenAPI-URL",
+    "importDocument": "Oder das OpenAPI-Dokument einfügen",
+    "baseUrl": "Basis-URL für importierte Werkzeuge",
+    "preview": "Operationen anzeigen",
+    "applyImport": "Auswahl importieren",
+    "imported": "Werkzeuge importiert.",
+    "importFailed": "Die OpenAPI-Beschreibung konnte nicht importiert werden."
   }
 }

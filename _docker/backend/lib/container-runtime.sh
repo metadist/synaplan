@@ -372,6 +372,13 @@ run_scheduler_role() {
             if ! run_scheduler_command bin/console --env="$env" app:files:reap-ephemeral --no-interaction; then
                 runtime_log "Ephemeral-file reaper failed; it will be retried next hour." >&2
             fi
+
+            # Tool approvals nobody decided within their deadline (default 72 h)
+            # flip to `expired` and fail the paused Saved Task run. Cheap: one
+            # indexed query, a no-op while approvals are disabled.
+            if ! run_scheduler_command bin/console --env="$env" app:approvals:expire --no-interaction; then
+                runtime_log "Approval expiry sweep failed; it will be retried next hour." >&2
+            fi
             next_hourly=$((now + hourly_seconds))
         fi
 
@@ -405,6 +412,12 @@ run_scheduler_role() {
             # is retried on the next interval; the previous corpus stays.
             if ! run_scheduler_command bin/console --env="$env" app:selfaware:sync-docs --no-interaction; then
                 runtime_log "Platform docs sync failed; it will be retried on the next daily interval." >&2
+            fi
+
+            # One mail per user who chose "daily digest" for pending tool
+            # approvals. Users on "instant" were mailed when the row was created.
+            if ! run_scheduler_command bin/console --env="$env" app:approvals:digest --no-interaction; then
+                runtime_log "Approval digest failed; it will be retried on the next daily interval." >&2
             fi
 
             next_daily=$((now + daily_seconds))

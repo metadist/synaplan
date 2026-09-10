@@ -13,15 +13,15 @@ use App\Service\Iam\Permission;
 final readonly class PluginManifest
 {
     /**
-     * @param string                                                                                      $name          The plugin internal name
-     * @param string                                                                                      $version       Version of the plugin
-     * @param string                                                                                      $description   Short description
-     * @param array<int, string>                                                                          $capabilities  List of features enabled by the plugin
-     * @param array<string, mixed>                                                                        $config        Default configuration values
-     * @param array<int, array{command: string, endpoint: string, description: string}>                   $chatCommands  Slash-commands this plugin registers in the chat composer
-     * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}> $resourceKinds Shareable kinds declared in provides.resourceKinds
-     * @param list<array{port: string, class: string, key: string}>                                       $plugs         Plug adapters declared in provides.plugs
-     * @param list<string>                                                                                $agentPacks    Relative bundle globs declared in provides.agents
+     * @param string                                                                                                            $name          The plugin internal name
+     * @param string                                                                                                            $version       Version of the plugin
+     * @param string                                                                                                            $description   Short description
+     * @param array<int, string>                                                                                                $capabilities  List of features enabled by the plugin
+     * @param array<string, mixed>                                                                                              $config        Default configuration values
+     * @param array<int, array{command: string, endpoint: string, description: string, tool?: array{sideEffect?: string}|null}> $chatCommands  Slash-commands this plugin registers in the chat composer
+     * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}>                       $resourceKinds Shareable kinds declared in provides.resourceKinds
+     * @param list<array{port: string, class: string, key: string}>                                                             $plugs         Plug adapters declared in provides.plugs
+     * @param list<string>                                                                                                      $agentPacks    Relative bundle globs declared in provides.agents
      */
     public function __construct(
         public string $name,
@@ -159,7 +159,7 @@ final readonly class PluginManifest
      * Keep only well-formed chat-command entries, so a malformed manifest can
      * never inject partial/incorrect commands into the composer.
      *
-     * @return array<int, array{command: string, endpoint: string, description: string}>
+     * @return array<int, array{command: string, endpoint: string, description: string, tool?: array{sideEffect?: string}|null}>
      */
     private static function normalizeChatCommands(mixed $raw): array
     {
@@ -177,10 +177,18 @@ final readonly class PluginManifest
             if ('' === $command || '' === $endpoint) {
                 continue;
             }
+            $tool = null;
+            if (is_array($entry['tool'] ?? null)) {
+                $sideEffect = $entry['tool']['sideEffect'] ?? null;
+                $tool = is_string($sideEffect) && '' !== $sideEffect
+                    ? ['sideEffect' => $sideEffect]
+                    : $entry['tool'];
+            }
             $commands[] = [
                 'command' => $command,
                 'endpoint' => '/' === $endpoint[0] ? $endpoint : '/'.$endpoint,
                 'description' => (string) ($entry['description'] ?? ''),
+                'tool' => $tool,
             ];
         }
 

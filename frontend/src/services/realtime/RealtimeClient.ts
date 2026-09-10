@@ -73,8 +73,19 @@ export class RealtimeClient {
   private state: ConnectionState = 'disconnected'
   private destroyed = false
 
-  /** Subscriptions we re-establish across reconnects. Key = channel name. */
-  private readonly subscriptions = new Map<string, SubscribeOptions<Record<string, unknown>>>()
+  /**
+   * One centrifuge subscription per channel, fanning out to every caller.
+   * `centrifuge.newSubscription(channel)` throws if the channel is already
+   * subscribed, so media jobs and approvals both listen on `user:{id}`
+   * through this shared entry.
+   */
+  private readonly subscriptions = new Map<
+    string,
+    {
+      sub: ReturnType<Centrifuge['newSubscription']>
+      handlers: Set<SubscribeOptions<Record<string, unknown>>>
+    }
+  >()
 
   constructor(private readonly options: RealtimeClientOptions) {}
 
@@ -252,8 +263,19 @@ export class RealtimeClient {
       return { unsubscribe: () => undefined, publish: async () => undefined }
     }
 
-    this.subscriptions.set(channel, handlers as SubscribeOptions<Record<string, unknown>>)
+    const existing = this.subscriptions.get(channel)
+    const typedHandlers = handlers as SubscribeOptions<Record<string, unknown>>
+    if (existing) {
+      existing.handlers.add(typedHandlers)
+      return {
+        unsubscribe: () => this.removeChannelHandler(channel, typedHandlers),
+        publish: async (data) => {
+          await existing.sub.publish(data)
+        },
+      }
+    }
 
+    const handlerSet = new Set<SubscribeOptions<Record<string, unknown>>>([typedHandlers])
     const sub = c.newSubscription(channel, {
       getToken: async () => {
         try {
@@ -292,31 +314,40 @@ export class RealtimeClient {
       // code; the payload type itself stays a compile-time contract.
       const parsed = RealtimeEnvelopeSchema.safeParse(ctx.data)
       if (!parsed.success) {
-        handlers.onError?.(`malformed realtime envelope on ${channel}`)
+        for (const handler of handlerSet) {
+          handler.onError?.(`malformed realtime envelope on ${channel}`)
+        }
         return
       }
-      handlers.onPublication(parsed.data as RealtimeEnvelope<TPayload>)
+      for (const handler of handlerSet) {
+        handler.onPublication(parsed.data as RealtimeEnvelope<TPayload>)
+      }
     })
-    if (handlers.onJoin)
-      sub.on('join', (ctx) =>
-        handlers.onJoin?.({
+    sub.on('join', (ctx) => {
+      for (const handler of handlerSet) {
+        handler.onJoin?.({
           user: String(ctx.info?.user ?? ''),
           client: String(ctx.info?.client ?? ''),
         })
-      )
-    if (handlers.onLeave)
-      sub.on('leave', (ctx) =>
-        handlers.onLeave?.({
+      }
+    })
+    sub.on('leave', (ctx) => {
+      for (const handler of handlerSet) {
+        handler.onLeave?.({
           user: String(ctx.info?.user ?? ''),
           client: String(ctx.info?.client ?? ''),
         })
-      )
+      }
+    })
     sub.on('subscribed', () => this.setState('connected'))
     sub.on('error', (ctx: SubscriptionErrorContext) => {
-      handlers.onError?.(ctx?.error?.message ?? 'subscription error')
+      for (const handler of handlerSet) {
+        handler.onError?.(ctx?.error?.message ?? 'subscription error')
+      }
     })
 
     sub.subscribe()
+    this.subscriptions.set(channel, { sub, handlers: handlerSet })
 
     // Connect lazily on first subscription so callers don't have to remember.
     if (this.state === 'disconnected') {
@@ -324,17 +355,7 @@ export class RealtimeClient {
     }
 
     return {
-      unsubscribe: () => {
-        try {
-          sub.unsubscribe()
-          sub.removeAllListeners()
-          c.removeSubscription(sub)
-        } catch {
-          // ignore — channel may have been torn down already
-        } finally {
-          this.subscriptions.delete(channel)
-        }
-      },
+      unsubscribe: () => this.removeChannelHandler(channel, typedHandlers),
       publish: async (data) => {
         // Direct client-publish only succeeds on namespaces configured for
         // it — see the docblock on ChannelHandle.publish for the security
@@ -343,6 +364,29 @@ export class RealtimeClient {
         // failure should not be silently swallowed during development).
         await sub.publish(data)
       },
+    }
+  }
+
+  private removeChannelHandler(
+    channel: string,
+    handlers: SubscribeOptions<Record<string, unknown>>
+  ): void {
+    const entry = this.subscriptions.get(channel)
+    if (!entry) {
+      return
+    }
+    entry.handlers.delete(handlers)
+    if (entry.handlers.size > 0) {
+      return
+    }
+    try {
+      entry.sub.unsubscribe()
+      entry.sub.removeAllListeners()
+      this.centrifuge?.removeSubscription(entry.sub)
+    } catch {
+      // ignore — channel may have been torn down already
+    } finally {
+      this.subscriptions.delete(channel)
     }
   }
 

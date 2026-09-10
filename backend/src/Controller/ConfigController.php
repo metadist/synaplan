@@ -42,6 +42,7 @@ use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SelfAware\CapabilityInventory;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Setup\SetupStateService;
+use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use App\Service\UserMemoryService;
 use App\Service\WebSpeechConfig;
@@ -101,6 +102,7 @@ class ConfigController extends AbstractController
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?GroupPolicyService $groupPolicyService = null,
         private readonly ?BundleConfig $bundleConfig = null,
+        private readonly ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -196,6 +198,9 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, People shows Policies and group defaults / allowed models apply. Requires iamGroups. Off by default.'),
                         new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
                         new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. Off by default.'),
+                        new OA\Property(property: 'toolsRegistryEnabled', type: 'boolean', example: true, description: 'When true, GET /api/v1/tools lists the tool registry. Kill switch after the Wave 4 registry refactor.'),
+                        new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. Off by default.'),
+                        new OA\Property(property: 'toolsCustomHttpEnabled', type: 'boolean', example: false, description: 'When true, Connections shows Custom tools for HTTP/OpenAPI tools. Off by default.'),
                     ]
                 ),
                 new OA\Property(
@@ -506,6 +511,9 @@ class ConfigController extends AbstractController
                 $this->configRepository->getValue(0, 'DOCUMENT_TOOLS', 'ENABLED') ?? '0',
                 \FILTER_VALIDATE_BOOL
             ),
+            'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
+            'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
+            'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration

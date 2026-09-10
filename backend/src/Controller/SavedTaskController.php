@@ -12,9 +12,12 @@ use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\SavedTaskDisabledException;
 use App\Service\SavedTask\SavedTaskNotFoundException;
+use App\Service\SavedTask\SavedTaskNotWaitingException;
+use App\Service\SavedTask\SavedTaskResumeService;
 use App\Service\SavedTask\SavedTaskRunner;
 use App\Service\SavedTask\SavedTaskSerializer;
 use App\Service\SavedTask\SavedTaskService;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,6 +37,7 @@ final class SavedTaskController extends AbstractController
         private SavedTaskRunRepository $runs,
         private SavedTaskSerializer $serializer,
         private ShareRepository $shareRepository,
+        private SavedTaskResumeService $resumeService,
     ) {
     }
 
@@ -70,6 +74,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
                             ]
                         )),
                     ]
@@ -140,6 +145,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
                             ]
                         ),
                     ]
@@ -209,6 +215,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
                             ]
                         ),
                     ]
@@ -313,6 +320,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0),
                             ]
                         ),
                     ]
@@ -387,6 +395,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
                             ]
                         ),
                         new OA\Property(
@@ -466,6 +475,7 @@ final class SavedTaskController extends AbstractController
                                 new OA\Property(property: 'started', type: 'string', nullable: true),
                                 new OA\Property(property: 'finished', type: 'string', nullable: true),
                                 new OA\Property(property: 'created', type: 'integer'),
+                                new OA\Property(property: 'waitingNode', type: 'string', nullable: true),
                             ]
                         )),
                         new OA\Property(property: 'total', type: 'integer', example: 3),
@@ -538,6 +548,7 @@ final class SavedTaskController extends AbstractController
                                     new OA\Property(property: 'params', type: 'object'),
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
+                                new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
                             ]
                         ),
                     ]
@@ -560,6 +571,55 @@ final class SavedTaskController extends AbstractController
         }
 
         return $this->json(['success' => true, 'task' => $this->serializer->task($this->service->resume($task))]);
+    }
+
+    #[Route('/{id}/runs/{runId}/resume', name: 'resume_run', methods: ['POST'], requirements: ['id' => '\d+', 'runId' => '\d+'])]
+    #[OA\Post(
+        path: '/api/v1/saved-tasks/{id}/runs/{runId}/resume',
+        summary: 'Resume a Saved Task run that is waiting for approval',
+        tags: ['Saved Tasks'],
+        requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'approvalId', type: 'integer'),
+            new OA\Property(property: 'nodeId', type: 'string', nullable: true),
+        ])),
+        responses: [
+            new OA\Response(response: 200, description: 'Resumed'),
+            new OA\Response(response: 409, description: 'Run is not waiting for approval'),
+        ]
+    )]
+    public function resumeRun(int $id, int $runId, #[CurrentUser] ?User $user, Request $request): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        $task = $this->service->getOwned($id, (int) $user->getId());
+        if (null === $task) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        $run = $this->runs->find($runId);
+        if (null === $run || $run->getSavedTaskId() !== $id) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        $payload = json_decode($request->getContent() ?: '{}', true);
+        $payload = is_array($payload) ? $payload : [];
+        $approvalId = is_numeric($payload['approvalId'] ?? null) ? (int) $payload['approvalId'] : 0;
+        $nodeId = is_string($payload['nodeId'] ?? null) ? $payload['nodeId'] : (string) $run->getWaitingNode();
+        if ($approvalId < 1 || '' === $nodeId) {
+            return $this->json(['error' => 'approvalId and a waiting step are required'], Response::HTTP_BAD_REQUEST);
+        }
+        try {
+            $resumed = $this->resumeService->resume($runId, $nodeId, $approvalId);
+        } catch (SavedTaskNotWaitingException) {
+            return $this->json(['error' => 'This run is not waiting for approval'], Response::HTTP_CONFLICT);
+        } catch (ToolNotRegisteredException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_CONFLICT);
+        } catch (SavedTaskNotFoundException) {
+            return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true, 'run' => $this->serializer->run($resumed)]);
     }
 
     private function guard(?User $user): ?JsonResponse
