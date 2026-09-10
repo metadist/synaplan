@@ -18,7 +18,7 @@ use PHPUnit\Framework\TestCase;
  * boot never gets slower.
  *
  * S2 (FM10) replaces the MODULE_ENV_KEYS constant with the descriptors'
- * `configuredBy()` and burns ALLOWED_UNOWNED down to zero; until then this file
+ * `configuredBy()` and burns allowedUnowned() down to zero; until then this file
  * is the machine-readable form of module_map.md.
  *
  * Scope: services.yaml only. Infrastructure DSNs in config/packages/*.yaml
@@ -284,7 +284,7 @@ final class ModuleOwnershipTest extends TestCase
         $unowned = array_values(array_diff($existing, $owned));
 
         $this->assertSame([], $unowned, sprintf(
-            "Unowned optional env keys in config/services.yaml:\n  %s\n\nAssign each to a module in MODULE_ENV_KEYS, to a CORE_ENV_KEYS group with a reason, or (last resort) add it to ALLOWED_UNOWNED with today's date.",
+            "Unowned optional env keys in config/services.yaml:\n  %s\n\nAssign each to a module in MODULE_ENV_KEYS, to a CORE_ENV_KEYS group with a reason, or (last resort) add it to allowedUnowned() with today's date.",
             implode("\n  ", $unowned),
         ));
     }

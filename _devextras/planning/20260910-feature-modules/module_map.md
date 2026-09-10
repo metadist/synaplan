@@ -6,7 +6,7 @@ All paths are relative to the repository root (`/wwwroot/synaplan`). Backend pat
 
 ## Method
 
-Read-only inventory. No git, docker, or build command was run; nothing outside this file was modified.
+Inventory compiled from the working tree with the read-only searches listed below (`rg`, file reads); no service was started and no build was run to produce it. The removals it recommends (FM2/FM3) and the ownership test (FM4) are separate commits in the same PR.
 
 | Step | Exact search / read |
 | --- | --- |
