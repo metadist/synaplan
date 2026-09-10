@@ -31,6 +31,28 @@ final class WebSearchFallbackMetrics
         ]);
     }
 
+    /**
+     * Every chat search — success, fallback, or empty — so a broken provider
+     * is not indistinguishable from "the web had nothing".
+     */
+    public function recordResolved(string $provider, int $results, ?string $fellBackFrom): void
+    {
+        $this->logger->info('synaplan_plugs_web_search_resolved', [
+            'provider' => $provider,
+            'results' => $results,
+            'fellBackFrom' => $fellBackFrom,
+            'empty' => 0 === $results,
+        ]);
+    }
+
+    public function recordFailure(string $provider, string $reason): void
+    {
+        $this->logger->warning('synaplan_plugs_web_search_failed', [
+            'provider' => $provider,
+            'reason' => $reason,
+        ]);
+    }
+
     public function count(string $from, string $to): int
     {
         return $this->counts[$from."\t".$to] ?? 0;

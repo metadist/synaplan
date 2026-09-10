@@ -167,7 +167,7 @@ final class AdminPlugsWebSearchController extends AbstractController
         response: 200,
         description: 'Up to five result titles',
         content: new OA\JsonContent(
-            required: ['results', 'answer', 'latencyMs', 'error'],
+            required: ['results', 'answer', 'latencyMs', 'error', 'provider', 'fellBackFrom'],
             properties: [
                 new OA\Property(
                     property: 'results',
@@ -184,6 +184,8 @@ final class AdminPlugsWebSearchController extends AbstractController
                 new OA\Property(property: 'answer', type: 'string', nullable: true),
                 new OA\Property(property: 'latencyMs', type: 'integer', example: 120),
                 new OA\Property(property: 'error', type: 'string', nullable: true),
+                new OA\Property(property: 'provider', type: 'string', example: 'exa'),
+                new OA\Property(property: 'fellBackFrom', type: 'string', nullable: true, example: null),
             ],
             type: 'object'
         )

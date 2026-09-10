@@ -3005,7 +3005,9 @@
       "testHint": "Run a short query. You will see up to five titles from the active provider.",
       "testPlaceholder": "synaplan open source",
       "testButton": "Test query",
-      "testing": "Testing…"
+      "testing": "Testing…",
+      "testProvider": "Answered by {provider}",
+      "testProviderFallback": "Answered by {provider} (fell back from {from})"
     },
     "rerank": {
       "lead": "After search finds many snippets, a reranker puts the most useful ones first. Leave this off until a test shows it helps. Chat stays the same while it is off.",

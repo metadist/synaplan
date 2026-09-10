@@ -144,6 +144,26 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
         self::assertTrue($remembered->available);
     }
 
+    public function testAdminTestNamesTheProviderOnSuccessAndFailure(): void
+    {
+        $ok = $this->adapter(
+            'exa',
+            PlugHealth::available(),
+            [['title' => 'Synaplan', 'url' => 'https://synaplan.com']],
+        );
+        $service = $this->service($ok, $this->unusedPlugKeys());
+        $okResult = $service->test('exa', 'synaplan');
+        self::assertSame('exa', $okResult['provider']);
+        self::assertNull($okResult['fellBackFrom']);
+        self::assertNull($okResult['error']);
+
+        $down = $this->adapter('exa', PlugHealth::available(), throws: true);
+        $failed = $this->service($down, $this->unusedPlugKeys())->test('exa', 'synaplan');
+        self::assertSame('exa', $failed['provider']);
+        self::assertNull($failed['fellBackFrom']);
+        self::assertNotNull($failed['error']);
+    }
+
     public function testRerankKeyIsNotProbedAsWebSearch(): void
     {
         $plugKeys = $this->createMock(PlugKeyStore::class);
@@ -186,12 +206,32 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
         );
     }
 
-    private function adapter(string $key, PlugHealth $probe): WebSearchProviderInterface
+    private function unusedPlugKeys(): PlugKeyStore
     {
-        return new class($key, $probe) implements WebSearchProviderInterface, WebSearchLiveProbeInterface {
+        $plugKeys = $this->createMock(PlugKeyStore::class);
+        $plugKeys->method('supports')->willReturn(false);
+
+        return $plugKeys;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $results
+     */
+    private function adapter(
+        string $key,
+        PlugHealth $probe,
+        array $results = [],
+        bool $throws = false,
+    ): WebSearchProviderInterface {
+        return new class($key, $probe, $results, $throws) implements WebSearchProviderInterface, WebSearchLiveProbeInterface {
+            /**
+             * @param list<array<string, mixed>> $results
+             */
             public function __construct(
                 private string $providerKey,
                 private PlugHealth $probeHealth,
+                private array $results,
+                private bool $throws,
             ) {
             }
 
@@ -212,7 +252,18 @@ final class WebSearchAdminServiceSaveKeyTest extends TestCase
 
             public function search(WebSearchQuery $query): SearchResultSet
             {
-                return SearchResultSet::empty($query->query);
+                if ($this->throws) {
+                    throw new \RuntimeException('Exa search returned HTTP 401');
+                }
+                if ([] === $this->results) {
+                    return SearchResultSet::empty($query->query, ['provider' => $this->providerKey]);
+                }
+
+                return SearchResultSet::fromLegacyArray([
+                    'query' => $query->query,
+                    'results' => $this->results,
+                    'query_metadata' => ['provider' => $this->providerKey],
+                ]);
             }
 
             public function health(): PlugHealth

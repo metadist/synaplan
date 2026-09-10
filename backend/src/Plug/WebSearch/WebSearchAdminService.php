@@ -80,7 +80,7 @@ final readonly class WebSearchAdminService
     }
 
     /**
-     * @return array{results: list<array{title: string, url: string}>, answer: ?string, latencyMs: int, error: ?string}
+     * @return array{results: list<array{title: string, url: string}>, answer: ?string, latencyMs: int, error: ?string, provider: string, fellBackFrom: ?string}
      */
     public function test(string $provider, string $query): array
     {
@@ -110,6 +110,8 @@ final readonly class WebSearchAdminService
                 'answer' => $set->answer?->text,
                 'latencyMs' => $latencyMs,
                 'error' => null,
+                'provider' => $this->metaString($set->meta['provider'] ?? null) ?: $key,
+                'fellBackFrom' => $this->metaStringOrNull($set->meta['fellBackFrom'] ?? null),
             ];
         } catch (\Throwable $e) {
             $this->adminHealth->remember($key, PlugHealth::unavailable($e->getMessage()));
@@ -119,6 +121,8 @@ final readonly class WebSearchAdminService
                 'answer' => null,
                 'latencyMs' => (int) ((hrtime(true) - $started) / 1_000_000),
                 'error' => $e->getMessage(),
+                'provider' => $key,
+                'fellBackFrom' => null,
             ];
         }
     }
@@ -221,6 +225,16 @@ final readonly class WebSearchAdminService
         }
 
         return ['configured' => false, 'source' => 'none', 'origin' => null, 'maskedKey' => ''];
+    }
+
+    private function metaString(mixed $value): string
+    {
+        return \is_string($value) && '' !== $value ? $value : '';
+    }
+
+    private function metaStringOrNull(mixed $value): ?string
+    {
+        return \is_string($value) && '' !== $value ? $value : null;
     }
 
     /**

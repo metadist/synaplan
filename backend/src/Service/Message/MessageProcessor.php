@@ -490,6 +490,8 @@ final readonly class MessageProcessor
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
+                            'provider' => $this->webSearchMetaString($searchResults, 'provider'),
+                            'fellBackFrom' => $this->webSearchMetaString($searchResults, 'fellBackFrom'),
                             'has_repository' => null !== $this->searchResultRepository,
                         ]);
                         $searchResults = null; // Reset to null if no results
@@ -963,6 +965,8 @@ final readonly class MessageProcessor
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
+                            'provider' => $this->webSearchMetaString($searchResults, 'provider'),
+                            'fellBackFrom' => $this->webSearchMetaString($searchResults, 'fellBackFrom'),
                             'has_repository' => null !== $this->searchResultRepository,
                         ]);
                         $searchResults = null;
@@ -1540,5 +1544,19 @@ final readonly class MessageProcessor
             'document', 'officemaker', 'text2doc' => 'officemaker',
             default => $fallback ?: 'chat',
         };
+    }
+
+    /**
+     * @param array<string, mixed>|null $searchResults
+     */
+    private function webSearchMetaString(?array $searchResults, string $key): ?string
+    {
+        $meta = $searchResults['query_metadata'] ?? null;
+        if (!\is_array($meta)) {
+            return null;
+        }
+        $value = $meta[$key] ?? null;
+
+        return \is_string($value) && '' !== $value ? $value : null;
     }
 }

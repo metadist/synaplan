@@ -15,6 +15,7 @@ use App\Plug\WebSearch\WebSearchQuery;
 use App\Plug\WebSearch\WebSearchRegistry;
 use App\Repository\ConfigRepository;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 final class WebSearchRegistryFallbackTest extends TestCase
@@ -87,6 +88,108 @@ final class WebSearchRegistryFallbackTest extends TestCase
         $this->assertSame('Brave hit', $set->results[0]['title'] ?? null);
         $this->assertSame(1, $metrics->count('tavily', 'brave'));
         $this->assertSame(1, $calls);
+    }
+
+    public function testPrimarySuccessIsLoggedEvenWithoutFallback(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('info')->with(
+            'synaplan_plugs_web_search_resolved',
+            self::equalTo([
+                'provider' => 'brave',
+                'results' => 1,
+                'fellBackFrom' => null,
+                'empty' => false,
+            ]),
+        );
+        $logger->expects(self::never())->method('warning');
+
+        $registry = new WebSearchRegistry(
+            [
+                $this->provider('brave', available: true, results: [
+                    ['title' => 'Brave hit', 'url' => 'https://example.test'],
+                ]),
+            ],
+            new PlugConfigService($this->repo([
+                [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'brave'],
+            ])),
+            new WebSearchFallbackMetrics($logger),
+        );
+
+        $set = $registry->search(new WebSearchQuery('synaplan'));
+        $this->assertSame('brave', $set->meta['provider'] ?? null);
+    }
+
+    public function testFailedPrimaryWithoutFallbackIsLoggedAsEmpty(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning')->with(
+            'synaplan_plugs_web_search_failed',
+            self::equalTo([
+                'provider' => 'exa',
+                'reason' => 'provider down',
+            ]),
+        );
+        $logger->expects(self::once())->method('info')->with(
+            'synaplan_plugs_web_search_resolved',
+            self::equalTo([
+                'provider' => 'exa',
+                'results' => 0,
+                'fellBackFrom' => null,
+                'empty' => true,
+            ]),
+        );
+
+        $calls = 0;
+        $registry = new WebSearchRegistry(
+            [$this->throwingProvider('exa', $calls)],
+            new PlugConfigService($this->repo([
+                [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'exa'],
+            ])),
+            new WebSearchFallbackMetrics($logger),
+        );
+
+        $set = $registry->search(new WebSearchQuery('synaplan'));
+        $this->assertSame([], $set->results);
+        $this->assertSame('exa', $set->meta['provider'] ?? null);
+        $this->assertArrayNotHasKey('fellBackFrom', $set->meta);
+    }
+
+    public function testBothProvidersFailDoesNotClaimAFallback(): void
+    {
+        $primaryCalls = 0;
+        $fallbackCalls = 0;
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::exactly(2))->method('warning');
+        $logger->expects(self::once())->method('info')->with(
+            'synaplan_plugs_web_search_resolved',
+            self::equalTo([
+                'provider' => 'tavily',
+                'results' => 0,
+                'fellBackFrom' => null,
+                'empty' => true,
+            ]),
+        );
+
+        $registry = new WebSearchRegistry(
+            [
+                $this->throwingProvider('tavily', $primaryCalls),
+                $this->throwingProvider('brave', $fallbackCalls),
+            ],
+            new PlugConfigService($this->repo([
+                [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'tavily'],
+                [0, PlugConfigService::KEY_WEB_SEARCH_FALLBACK, 'brave'],
+            ])),
+            new WebSearchFallbackMetrics($logger),
+        );
+
+        $set = $registry->search(new WebSearchQuery('synaplan'));
+
+        $this->assertSame([], $set->results);
+        $this->assertSame('tavily', $set->meta['provider'] ?? null);
+        $this->assertArrayNotHasKey('fellBackFrom', $set->meta);
+        $this->assertSame(1, $primaryCalls);
+        $this->assertSame(1, $fallbackCalls);
     }
 
     /**
