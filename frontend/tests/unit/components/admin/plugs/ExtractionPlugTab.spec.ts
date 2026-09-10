@@ -24,6 +24,7 @@ vi.mock('@/services/api/adminConfigApi', () => ({
 describe('ExtractionPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    testExtraction.mockReset()
     getExtractionStatus.mockResolvedValue({
       adapters: [
         {
@@ -74,6 +75,44 @@ describe('ExtractionPlugTab', () => {
     )
     expect(wrapper.get('[data-testid="extraction-test-button"]').text()).toContain(
       'Test with a file'
+    )
+  })
+
+  it('distinguishes a reachable-but-refused Docling convert from a down sidecar', async () => {
+    testExtraction.mockResolvedValue({
+      winner: 'tika',
+      strategy: 'tika',
+      attempts: [
+        { key: 'docling', verdict: 'rejected', ms: 40 },
+        { key: 'tika', verdict: 'quality_ok', ms: 80 },
+      ],
+      preview: 'Tika fallback',
+      markdown: false,
+    })
+
+    const wrapper = mount(ExtractionPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        },
+      },
+    })
+    await flushPromises()
+
+    const input = wrapper.get('[data-testid="extraction-test-file"]')
+    const file = new File(['%PDF-1.4'], 'invoice.pdf', { type: 'application/pdf' })
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await wrapper.get('[data-testid="extraction-test-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="extraction-test-summary"]').text()).toContain(
+      'Docling reached but refused the file — Tika used instead'
+    )
+    expect(wrapper.text()).toContain('reached but refused the file')
+    expect(wrapper.get('[data-testid="extraction-test-summary"]').text()).not.toContain(
+      'Docling unavailable'
     )
   })
 })

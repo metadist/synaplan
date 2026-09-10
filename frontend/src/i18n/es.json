@@ -1248,6 +1248,7 @@
       "winner": "Ganador: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling no disponible — se usó Tika",
+      "doclingRejectedTika": "Docling respondió pero rechazó el archivo — se usó Tika",
       "save": "Guardar cadena",
       "saved": "Cadena de extracción guardada. La próxima carga la usará.",
       "saveFailed": "No se pudo guardar la cadena de extracción",
@@ -1259,6 +1260,7 @@
         "empty": "vacío",
         "low_quality": "demasiado poco texto útil",
         "unavailable": "no disponible",
+        "rejected": "alcanzó el servicio pero rechazó el archivo",
         "unsupported": "no admite este archivo",
         "unknown": "adaptador desconocido",
         "skipped": "omitido"
