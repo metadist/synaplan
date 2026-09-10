@@ -72,7 +72,7 @@ final readonly class ConditionRunner implements TaskRunner
         return match ($operator) {
             'equals' => $left === $right,
             'contains' => '' !== $right && str_contains($left, $right),
-            'matches' => '' !== $right && false !== @preg_match($this->asPattern($right), $left),
+            'matches' => '' !== $right && 1 === @preg_match($this->asPattern($right), $left),
             default => '' !== trim($left),
         };
     }

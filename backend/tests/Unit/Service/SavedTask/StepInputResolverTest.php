@@ -32,4 +32,20 @@ final class StepInputResolverTest extends TestCase
         self::assertSame('Inbox summary', $resolved['text']);
         self::assertSame('Hello', $resolved['title']);
     }
+
+    public function testEmptyFieldMeansTheWholeEventOrTheStepText(): void
+    {
+        $message = new Message();
+        $message->setUserId(1);
+        $payload = ['title' => 'Hello', 'count' => 2];
+        $context = new NodeContext($message, [], 1, ['language' => 'en'], ['trigger_payload' => $payload]);
+        $context->setResult('step_1', NodeResult::ok('Inbox summary'));
+
+        $resolver = new StepInputResolver();
+
+        self::assertSame($payload, $resolver->resolve(['from' => 'trigger'], $context));
+        self::assertSame($payload, $resolver->resolve(['from' => 'trigger', 'field' => ''], $context));
+        self::assertSame('Inbox summary', $resolver->resolve(['from' => 'step_1', 'field' => ''], $context));
+        self::assertNull($resolver->resolve(['from' => 'trigger', 'field' => 'missing'], $context));
+    }
 }

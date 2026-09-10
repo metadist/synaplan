@@ -6502,11 +6502,21 @@
       "matches": "correspond à",
       "not_empty": "n’est pas vide"
     },
-    "sendToWebhook": "Envoyer à un autre système",
     "webhookUrl": "Adresse (https)",
+    "whatToSend": "Quoi envoyer",
     "webhookSecret": "Secret partagé (facultatif)",
+    "secretSet": "Un secret est enregistré",
+    "secretSetHint": "Il reste tel quel. Saisissez ici pour le remplacer, ou videz le champ pour le supprimer.",
     "pickTool": "Choisir un outil",
-    "thisAssistant": "Cet assistant",
+    "arguments": "Ce qui est envoyé à l’outil",
+    "noArguments": "Cet outil ne demande aucune donnée.",
+    "required": "obligatoire",
+    "inputSource": "D’où vient la valeur",
+    "field": "Champ",
+    "fieldHintTrigger": "Laissez vide pour tout l’événement de départ, ou indiquez une partie comme title ou order.id.",
+    "fieldHintStep": "text est la réponse de l’étape. Aussi : summary, error ou un champ de son résultat.",
+    "compareWith": "Comparer avec",
+    "patternPlaceholder": "Motif, p. ex. ^INV-\\d+$",
     "kinds": {
       "email_search": "Chercher dans les e-mails",
       "summarize": "Résumer",
@@ -6535,6 +6545,10 @@
     "regenerateConfirm": "L’ancienne adresse ne fonctionnera plus. Continuer ?",
     "hmacEnable": "Exiger une signature",
     "hmacHint": "L’autre système doit envoyer une signature correspondante. Plus sûr si l’adresse fuitait.",
-    "hmacOn": "Signature exigée. Le secret est stocké sur le serveur et n’est plus affiché."
+    "hmacOn": "Signature exigée. Le secret a été affiché une seule fois à l’activation ; désactivez puis réactivez pour en obtenir un nouveau.",
+    "secretRevealTitle": "Votre secret partagé — copiez-le maintenant",
+    "secretRevealHint": "Collez-le dans l’autre système. Il n’est affiché que cette fois et ne pourra pas être récupéré plus tard.",
+    "copySecret": "Copier le secret",
+    "secretCopied": "Secret copié."
   }
 }

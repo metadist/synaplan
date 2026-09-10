@@ -6502,11 +6502,21 @@
       "matches": "matches",
       "not_empty": "is not empty"
     },
-    "sendToWebhook": "Send to another system",
     "webhookUrl": "Address (https)",
+    "whatToSend": "What to send",
     "webhookSecret": "Shared secret (optional)",
+    "secretSet": "A secret is saved",
+    "secretSetHint": "It stays as it is. Type here to replace it, or clear the field to remove it.",
     "pickTool": "Choose a tool",
-    "thisAssistant": "This assistant",
+    "arguments": "What to send to the tool",
+    "noArguments": "This tool takes no input.",
+    "required": "required",
+    "inputSource": "Where the value comes from",
+    "field": "Field",
+    "fieldHintTrigger": "Leave empty for the whole starting event, or name a part like title or order.id.",
+    "fieldHintStep": "text is the step’s answer. Also: summary, error, or a field of its result.",
+    "compareWith": "Compare with",
+    "patternPlaceholder": "Pattern, e.g. ^INV-\\d+$",
     "kinds": {
       "email_search": "Search mail",
       "summarize": "Summarize",
@@ -6535,6 +6545,10 @@
     "regenerateConfirm": "The old address will stop working. Continue?",
     "hmacEnable": "Require a signature",
     "hmacHint": "The other system must send a matching signature. Safer if the address might leak.",
-    "hmacOn": "Signature required. The secret is stored on the server and is never shown again."
+    "hmacOn": "Signature required. The secret was shown once when you turned this on; turn it off and on again for a new one.",
+    "secretRevealTitle": "Your shared secret — copy it now",
+    "secretRevealHint": "Paste it into the other system. It is shown only this once and cannot be retrieved later.",
+    "copySecret": "Copy secret",
+    "secretCopied": "Secret copied."
   }
 }

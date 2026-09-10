@@ -43,7 +43,11 @@
       @change="emit('change', $event)"
     />
 
-    <label class="flex items-start gap-2 text-sm txt-primary">
+    <!-- Only the tool gate can pause a run; other step kinds never ask. -->
+    <label
+      v-if="step.capability === 'tool_call'"
+      class="flex items-start gap-2 text-sm txt-primary"
+    >
       <input
         type="checkbox"
         class="mt-1 accent-[var(--brand)]"

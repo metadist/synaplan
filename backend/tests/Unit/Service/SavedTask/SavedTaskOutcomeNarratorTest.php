@@ -35,6 +35,20 @@ final class SavedTaskOutcomeNarratorTest extends TestCase
         self::assertStringNotContainsString('Nothing was sent or saved', $message);
     }
 
+    public function testTwoStepsOfOneKindWithOneFailureCountAsNotComplete(): void
+    {
+        $message = (new SavedTaskOutcomeNarrator())->failureMessage(
+            [],
+            [
+                ['capability' => 'save_to_folder', 'nodeId' => 'n1', 'state' => 'done'],
+                ['capability' => 'email_me', 'nodeId' => 'n2', 'state' => 'done'],
+                ['capability' => 'email_me', 'nodeId' => 'n3', 'state' => 'failed'],
+            ],
+        );
+
+        self::assertSame('Saving the file finished. The email did not complete.', $message);
+    }
+
     public function testGenericStopWhenNothingFinished(): void
     {
         $message = (new SavedTaskOutcomeNarrator())->failureMessage([], [], null);

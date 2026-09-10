@@ -6,28 +6,33 @@ namespace App\Service\SavedTask;
 
 use App\Entity\SavedTask;
 use App\Entity\User;
+use App\Message\RunSavedTaskCommand;
 use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
 use App\Service\RateLimitService;
-use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
  * Public inbound webhook for a Saved Task. Same 404 for unknown, disabled,
  * or flag-off so tokens cannot be enumerated.
+ *
+ * Everything that can reject the call happens here, on the request path.
+ * The run itself is queued (`RunSavedTaskCommand`) so a slow step can never
+ * outlive the caller's timeout and be retried into a duplicate run.
  */
 final readonly class SavedTaskWebhookIngress
 {
     public const MAX_BODY_BYTES = 65536;
-    public const RATE_PER_MINUTE = 60;
 
     public function __construct(
         private SavedTaskRepository $tasks,
         private UserRepository $users,
-        private SavedTaskRunner $runner,
+        private MessageBusInterface $bus,
         private WorkflowsConfig $workflows,
         private RateLimitService $rateLimits,
-        private CacheItemPoolInterface $cache,
+        private RateLimiterFactoryInterface $savedTaskWebhookLimiter,
     ) {
     }
 
@@ -58,7 +63,8 @@ final readonly class SavedTaskWebhookIngress
             }
         }
 
-        if (!$this->allowTaskRate((int) $task->getId())) {
+        // Atomic per-task limiter (shared storage across web nodes).
+        if (!$this->savedTaskWebhookLimiter->create('task_'.(int) $task->getId())->consume()->isAccepted()) {
             return ['status' => Response::HTTP_TOO_MANY_REQUESTS, 'body' => ['error' => 'Too many requests']];
         }
 
@@ -71,12 +77,12 @@ final readonly class SavedTaskWebhookIngress
             return ['status' => Response::HTTP_TOO_MANY_REQUESTS, 'body' => ['error' => 'Too many requests']];
         }
 
-        $payload = $this->decodeBody($rawBody);
-        try {
-            $this->runner->run($task->getOwnerId(), (int) $task->getId(), '', 'webhook', $payload);
-        } catch (SavedTaskDisabledException|SavedTaskNotFoundException) {
-            return $notFound;
-        }
+        $this->bus->dispatch(new RunSavedTaskCommand(
+            $task->getOwnerId(),
+            (int) $task->getId(),
+            'webhook',
+            $this->decodeBody($rawBody),
+        ));
 
         return ['status' => Response::HTTP_ACCEPTED, 'body' => ['success' => true]];
     }
@@ -96,21 +102,5 @@ final readonly class SavedTaskWebhookIngress
         }
 
         return is_array($decoded) ? $decoded : ['body' => $rawBody];
-    }
-
-    private function allowTaskRate(int $taskId): bool
-    {
-        $minute = (string) intdiv(time(), 60);
-        $key = sprintf('saved_task_wh_%d_%s', $taskId, $minute);
-        $item = $this->cache->getItem($key);
-        $used = is_int($item->get()) ? $item->get() : 0;
-        if ($used >= self::RATE_PER_MINUTE) {
-            return false;
-        }
-        $item->set($used + 1);
-        $item->expiresAfter(70);
-        $this->cache->save($item);
-
-        return true;
     }
 }

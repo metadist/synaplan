@@ -7,6 +7,8 @@ export type RegistryTool = {
   description: string
   sideEffect: string
   source: string
+  /** JSON Schema of the tool's arguments, when the tool publishes one. */
+  inputSchema?: Record<string, unknown>
 }
 
 export const toolsApi = {
@@ -20,6 +22,9 @@ export const toolsApi = {
       description: tool.description ?? '',
       sideEffect: tool.sideEffect ?? 'read',
       source: tool.source ?? 'custom',
+      ...(tool.inputSchema && typeof tool.inputSchema === 'object'
+        ? { inputSchema: tool.inputSchema as Record<string, unknown> }
+        : {}),
     }))
   },
 }

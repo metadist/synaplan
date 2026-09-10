@@ -67,7 +67,8 @@ final readonly class OutboundWebhookRunner implements TaskRunner
             'task' => $context->options['saved_task_id'] ?? null,
             'run' => $context->options['saved_task_run_id'] ?? null,
             'step' => $node->id,
-            'result' => $mapped,
+            // No mapping means "send what the previous steps produced" — never an empty result.
+            'result' => [] !== $mapped ? $mapped : $this->dependencyResults($node, $context),
         ];
         $json = json_encode($body, \JSON_THROW_ON_ERROR);
         $headers = [
@@ -106,5 +107,22 @@ final readonly class OutboundWebhookRunner implements TaskRunner
         }
 
         return NodeResult::ok('Sent to the other system', [], ['webhook' => ['status' => $status]]);
+    }
+
+    /**
+     * @return array<string, array{text: string|null, metadata: array<string, mixed>}>
+     */
+    private function dependencyResults(TaskNode $node, NodeContext $context): array
+    {
+        $out = [];
+        foreach ($node->dependsOn as $dependencyId) {
+            $result = $context->getResult($dependencyId);
+            if (null === $result) {
+                continue;
+            }
+            $out[$dependencyId] = ['text' => $result->text, 'metadata' => $result->metadata];
+        }
+
+        return $out;
     }
 }

@@ -16,6 +16,12 @@ use App\Service\Tool\Policy\PolicyOutcome;
  */
 final readonly class ToolExecutionGate
 {
+    /**
+     * Refusal when an authored Saved Task step pins `params.approval = block`.
+     * Applies even while the approvals flag is off — a step can only tighten.
+     */
+    public const NODE_BLOCK_REFUSAL = 'I cannot do that. This step is set to never run this tool.';
+
     public function __construct(
         private ToolsConfig $toolsConfig,
         private ToolRegistry $registry,
@@ -54,9 +60,7 @@ final readonly class ToolExecutionGate
                 'outcome' => PolicyOutcome::Block === $nodeOverride ? PolicyOutcome::Block : PolicyOutcome::Auto,
                 'descriptor' => $descriptor,
                 'approval' => null,
-                'refusal' => PolicyOutcome::Block === $nodeOverride
-                    ? 'I cannot do that. This step is set to always ask — and it is blocked.'
-                    : null,
+                'refusal' => PolicyOutcome::Block === $nodeOverride ? self::NODE_BLOCK_REFUSAL : null,
             ];
         }
 

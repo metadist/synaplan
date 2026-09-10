@@ -160,15 +160,25 @@ const webhookUrl = computed(() => {
 
 const hmacConfigured = computed(() => props.task.triggerConfig?.hmacConfigured === true)
 
-const copyWebhookUrl = async () => {
-  if (!webhookUrl.value) return
+// The server mints the shared secret and returns it exactly once; keep it only
+// in memory until the user leaves or turns the signature off.
+const revealedSecret = ref('')
+watch(hmacConfigured, (on) => {
+  if (!on) revealedSecret.value = ''
+})
+
+const copyToClipboard = async (value: string, doneMessage: string) => {
+  if (!value) return
   try {
-    await navigator.clipboard.writeText(webhookUrl.value)
-    success(t('workflows.urlCopied'))
+    await navigator.clipboard.writeText(value)
+    success(doneMessage)
   } catch {
     showError(t('config.savedTasks.updateFailed'))
   }
 }
+
+const copyWebhookUrl = () => copyToClipboard(webhookUrl.value, t('workflows.urlCopied'))
+const copyWebhookSecret = () => copyToClipboard(revealedSecret.value, t('workflows.secretCopied'))
 
 const regenerateWebhook = async () => {
   const ok = await dialog.confirm({
@@ -193,13 +203,13 @@ const regenerateWebhook = async () => {
 const onHmacToggle = async () => {
   hmacSaving.value = true
   try {
-    emit(
-      'updated',
-      await savedTasksApi.update(props.task.id, {
-        triggerType: 'webhook',
-        hmacEnabled: !hmacConfigured.value,
-      })
-    )
+    const { webhookSecret, ...updated } = await savedTasksApi.update(props.task.id, {
+      triggerType: 'webhook',
+      hmacEnabled: !hmacConfigured.value,
+    })
+    // Show it here, once; the list state never carries the secret.
+    revealedSecret.value = webhookSecret ?? ''
+    emit('updated', updated)
   } catch {
     showError(t('config.savedTasks.updateFailed'))
   } finally {
@@ -444,7 +454,7 @@ const onRunCopy = async () => {
         <option value="interval">{{ $t('config.savedTasks.schedule.hourly') }}</option>
         <option value="daily">{{ $t('config.savedTasks.schedule.daily') }}</option>
         <option value="weekly">{{ $t('config.savedTasks.schedule.weekdays') }}</option>
-        <option v-if="workflowsEnabled" value="webhook">
+        <option v-if="workflowsEnabled || scheduleKind === 'webhook'" value="webhook">
           {{ $t('config.savedTasks.schedule.webhook') }}
         </option>
       </select>
@@ -534,6 +544,7 @@ const onRunCopy = async () => {
       <input
         class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :value="webhookUrl"
+        :aria-label="$t('workflows.webhookCardTitle')"
         readonly
         data-testid="saved-task-webhook-url"
       />
@@ -571,6 +582,29 @@ const onRunCopy = async () => {
           </span>
         </span>
       </label>
+      <div
+        v-if="revealedSecret"
+        class="alert-warning text-sm space-y-2"
+        data-testid="saved-task-webhook-secret"
+      >
+        <p class="alert-warning-text">{{ $t('workflows.secretRevealTitle') }}</p>
+        <p class="alert-warning-text font-normal">{{ $t('workflows.secretRevealHint') }}</p>
+        <input
+          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :value="revealedSecret"
+          :aria-label="$t('workflows.secretRevealTitle')"
+          readonly
+          data-testid="saved-task-webhook-secret-value"
+        />
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-copy-webhook-secret"
+          @click="copyWebhookSecret"
+        >
+          {{ $t('workflows.copySecret') }}
+        </button>
+      </div>
     </div>
 
     <SavedTaskStepsEditor

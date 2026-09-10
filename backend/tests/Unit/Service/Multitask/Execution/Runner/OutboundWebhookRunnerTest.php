@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Multitask\Execution\Runner;
 
 use App\Entity\Message;
 use App\Service\Multitask\Execution\NodeContext;
+use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\OutboundWebhookRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -62,6 +63,32 @@ final class OutboundWebhookRunnerTest extends TestCase
         self::assertStringContainsString('"result"', $body);
         self::assertStringNotContainsString('abc', $body);
         self::assertStringNotContainsString('sk_', $body);
+    }
+
+    public function testWithoutAMappingItSendsWhatTheEarlierStepsProduced(): void
+    {
+        $captured = '';
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = is_string($options['body'] ?? null) ? $options['body'] : '';
+
+            return new MockResponse('{}', ['http_code' => 200]);
+        });
+        $ssrf = $this->createMock(SsrfGuard::class);
+        $ssrf->method('isBlockedUrl')->willReturn(false);
+        $runner = new OutboundWebhookRunner($client, $ssrf, new StepInputResolver(), new NullLogger());
+        $context = $this->context();
+        $context->setResult('n1', NodeResult::ok('Weekly digest ready', [], ['tool' => 'custom:digest']));
+
+        $result = $runner->run(
+            new TaskNode('w1', Capability::OutboundWebhook, ['n1'], [], ['url' => 'https://hooks.example/in']),
+            $context,
+        );
+
+        self::assertTrue($result->isSuccessful());
+        $decoded = json_decode($captured, true);
+        self::assertIsArray($decoded);
+        self::assertSame('Weekly digest ready', $decoded['result']['n1']['text'] ?? null);
+        self::assertSame('custom:digest', $decoded['result']['n1']['metadata']['tool'] ?? null);
     }
 
     private function context(): NodeContext

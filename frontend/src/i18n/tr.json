@@ -5517,11 +5517,21 @@
       "matches": "eşleşir",
       "not_empty": "boş değil"
     },
-    "sendToWebhook": "Başka bir sisteme gönder",
     "webhookUrl": "Adres (https)",
+    "whatToSend": "Ne gönderilecek",
     "webhookSecret": "Paylaşılan gizli anahtar (isteğe bağlı)",
+    "secretSet": "Bir gizli anahtar kayıtlı",
+    "secretSetHint": "Olduğu gibi kalır. Değiştirmek için buraya yazın veya kaldırmak için alanı boşaltın.",
     "pickTool": "Bir araç seç",
-    "thisAssistant": "Bu asistan",
+    "arguments": "Araca ne gönderilecek",
+    "noArguments": "Bu araç girdi almaz.",
+    "required": "zorunlu",
+    "inputSource": "Değer nereden geliyor",
+    "field": "Alan",
+    "fieldHintTrigger": "Başlangıç olayının tamamı için boş bırak ya da title veya order.id gibi bir bölüm belirt.",
+    "fieldHintStep": "text adımın yanıtıdır. Ayrıca: summary, error veya sonucunun bir alanı.",
+    "compareWith": "Şununla karşılaştır",
+    "patternPlaceholder": "Desen, örn. ^INV-\\d+$",
     "kinds": {
       "email_search": "Postada ara",
       "summarize": "Özetle",
@@ -5550,6 +5560,10 @@
     "regenerateConfirm": "Eski adres çalışmayı durdurur. Devam edilsin mi?",
     "hmacEnable": "İmza iste",
     "hmacHint": "Diğer sistem eşleşen bir imza göndermelidir. Adres sızarsa daha güvenlidir.",
-    "hmacOn": "İmza gerekli. Gizli anahtar sunucuda saklanır ve bir daha gösterilmez."
+    "hmacOn": "İmza gerekli. Gizli anahtar açarken bir kez gösterildi; yenisi için kapatıp tekrar aç.",
+    "secretRevealTitle": "Paylaşılan gizli anahtarın — şimdi kopyala",
+    "secretRevealHint": "Diğer sisteme yapıştır. Yalnızca bu kez gösterilir ve sonradan alınamaz.",
+    "copySecret": "Gizli anahtarı kopyala",
+    "secretCopied": "Gizli anahtar kopyalandı."
   }
 }

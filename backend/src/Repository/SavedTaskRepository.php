@@ -132,19 +132,22 @@ class SavedTaskRepository extends ServiceEntityRepository
         if ('' === $token) {
             return null;
         }
-        /** @var list<SavedTask> $tasks */
-        $tasks = $this->createQueryBuilder('t')
-            ->where('t.triggerType = :type')
-            ->setParameter('type', SavedTask::TRIGGER_WEBHOOK)
-            ->getQuery()
-            ->getResult();
-        foreach ($tasks as $task) {
-            if (($task->getTriggerConfig()['token'] ?? null) === $token) {
-                return $task;
-            }
+        // Resolve the id in SQL so the lookup stays O(1) as tasks grow; the
+        // constant-time compare afterwards keeps the DB's collation out of it.
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            "SELECT BID FROM BSAVEDTASKS WHERE BTRIGGERTYPE = :type AND JSON_UNQUOTE(JSON_EXTRACT(BTRIGGERCONFIG, '$.token')) = :token LIMIT 1",
+            ['type' => SavedTask::TRIGGER_WEBHOOK, 'token' => $token]
+        );
+        if (false === $id || null === $id) {
+            return null;
         }
+        $task = $this->find((int) $id);
+        if (!$task instanceof SavedTask) {
+            return null;
+        }
+        $stored = $task->getTriggerConfig()['token'] ?? null;
 
-        return null;
+        return is_string($stored) && hash_equals($stored, $token) ? $task : null;
     }
 
     public function findEnabledInboundEmailTasks(int $ownerId, int $accountId): array

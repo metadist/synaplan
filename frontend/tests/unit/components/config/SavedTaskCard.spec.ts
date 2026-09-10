@@ -305,6 +305,35 @@ describe('SavedTaskCard', () => {
     expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(false)
   })
 
+  it('shows the webhook address and reveals a fresh shared secret exactly once', async () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    const webhookTask = task({
+      triggerType: 'webhook',
+      triggerConfig: { token: 'tok-123', hmacConfigured: false },
+    })
+    mockUpdate.mockResolvedValueOnce({
+      ...webhookTask,
+      triggerConfig: { token: 'tok-123', hmacConfigured: true },
+      webhookSecret: 'shh-once',
+    })
+    const wrapper = mountCard(webhookTask)
+
+    const url = wrapper.get('[data-testid="saved-task-webhook-url"]').element as HTMLInputElement
+    expect(url.value).toContain('/api/v1/webhooks/saved-tasks/tok-123')
+    expect(wrapper.find('[data-testid="saved-task-webhook-secret"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="saved-task-webhook-hmac"]').trigger('change')
+    await flushPromises()
+
+    expect(mockUpdate).toHaveBeenCalledWith(7, { triggerType: 'webhook', hmacEnabled: true })
+    const secret = wrapper.get('[data-testid="saved-task-webhook-secret-value"]')
+      .element as HTMLInputElement
+    expect(secret.value).toBe('shh-once')
+    const emitted = wrapper.emitted('updated')?.[0]?.[0] as SavedTask
+    expect(emitted.webhookSecret).toBeUndefined()
+    expect(emitted.triggerConfig).toEqual({ token: 'tok-123', hmacConfigured: true })
+  })
+
   it('does not delete when the confirm is cancelled', async () => {
     const wrapper = mountCard(task())
     await wrapper.get('[data-testid="btn-delete-saved-task"]').trigger('click')

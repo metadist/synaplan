@@ -1,21 +1,43 @@
 <template>
   <div class="space-y-3" data-testid="step-inputs">
-    <div v-if="step.capability === 'tool_call'">
-      <label class="text-sm font-medium txt-primary" :for="`${step.id}-tool`">
-        {{ $t('workflows.pickTool') }}
-      </label>
-      <select
-        :id="`${step.id}-tool`"
-        class="mt-1 w-full"
-        :class="STEP_FIELD_CLASS"
-        :value="stringParam('tool')"
-        @change="setParam('tool', ($event.target as HTMLSelectElement).value)"
-      >
-        <option value="">{{ $t('workflows.pickTool') }}</option>
-        <option v-for="tool in tools" :key="tool.name" :value="tool.name">
-          {{ tool.title || tool.name }}
-        </option>
-      </select>
+    <div v-if="step.capability === 'tool_call'" class="space-y-3">
+      <div>
+        <label class="text-sm font-medium txt-primary" :for="`${step.id}-tool`">
+          {{ $t('workflows.pickTool') }}
+        </label>
+        <select
+          :id="`${step.id}-tool`"
+          :class="STEP_FIELD_CLASS"
+          :value="stringParam('tool')"
+          @change="setTool(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">{{ $t('workflows.pickTool') }}</option>
+          <option v-for="tool in tools" :key="tool.name" :value="tool.name">
+            {{ tool.title || tool.name }}
+          </option>
+        </select>
+      </div>
+
+      <template v-if="selectedTool">
+        <p v-if="!toolArguments.length" class="text-xs txt-secondary">
+          {{ $t('workflows.noArguments') }}
+        </p>
+        <div v-else class="space-y-3" data-testid="tool-arguments">
+          <p class="text-sm font-medium txt-primary">{{ $t('workflows.arguments') }}</p>
+          <div v-for="argument in toolArguments" :key="argument.name">
+            <label class="block text-xs font-medium txt-secondary" :for="`${argument.name}-source`">
+              {{ argument.name }}
+              <span v-if="argument.required">· {{ $t('workflows.required') }}</span>
+            </label>
+            <InputSourcePicker
+              :name="argument.name"
+              :model-value="inputs()[argument.name]"
+              :earlier-steps="earlierSteps"
+              @update:model-value="setInput(argument.name, $event)"
+            />
+          </div>
+        </div>
+      </template>
     </div>
 
     <div v-if="step.capability === 'outbound_webhook'" class="space-y-3">
@@ -23,19 +45,37 @@
         {{ $t('workflows.webhookUrl') }}
         <input
           :class="STEP_FIELD_CLASS"
+          type="url"
           :value="stringParam('url')"
-          :placeholder="$t('workflows.webhookUrl')"
+          placeholder="https://"
           @input="setParam('url', ($event.target as HTMLInputElement).value)"
         />
       </label>
+      <div>
+        <label class="block text-sm font-medium txt-primary" for="result-source">
+          {{ $t('workflows.whatToSend') }}
+        </label>
+        <InputSourcePicker
+          name="result"
+          :model-value="inputs().result"
+          :earlier-steps="earlierSteps"
+          @update:model-value="setInput('result', $event)"
+        />
+      </div>
       <label class="block text-sm font-medium txt-primary">
         {{ $t('workflows.webhookSecret') }}
         <input
           :class="STEP_FIELD_CLASS"
+          type="password"
           :value="stringParam('secret')"
-          autocomplete="off"
-          @input="setParam('secret', ($event.target as HTMLInputElement).value)"
+          :placeholder="secretConfigured ? $t('workflows.secretSet') : ''"
+          autocomplete="new-password"
+          data-testid="outbound-secret"
+          @input="setSecret(($event.target as HTMLInputElement).value)"
         />
+        <span v-if="secretConfigured" class="block text-xs txt-secondary mt-1 font-normal">
+          {{ $t('workflows.secretSetHint') }}
+        </span>
       </label>
     </div>
 
@@ -44,7 +84,7 @@
         {{ $t('workflows.condition') }}
         <select
           :class="STEP_FIELD_CLASS"
-          :value="stringParam('operator') || 'not_empty'"
+          :value="operator"
           @change="setParam('operator', ($event.target as HTMLSelectElement).value)"
         >
           <option value="not_empty">{{ $t('workflows.operator.not_empty') }}</option>
@@ -53,31 +93,26 @@
           <option value="matches">{{ $t('workflows.operator.matches') }}</option>
         </select>
       </label>
-      <label class="block text-sm font-medium txt-primary">
-        {{ $t('workflows.inputValue') }}
-        <select
-          :class="STEP_FIELD_CLASS"
-          :value="inputSource('input')"
-          @change="onSourceChange('input', ($event.target as HTMLSelectElement).value)"
-        >
-          <option value="literal">{{ $t('workflows.literal') }}</option>
-          <option value="trigger">{{ $t('workflows.fromTrigger') }}</option>
-          <option v-for="(earlier, index) in earlierSteps" :key="earlier.id" :value="earlier.id">
-            {{ $t('workflows.fromStep', { n: index + 1 }) }}
-          </option>
-        </select>
-      </label>
+      <div>
+        <label class="block text-sm font-medium txt-primary" for="input-source">
+          {{ $t('workflows.inputValue') }}
+        </label>
+        <InputSourcePicker
+          name="input"
+          :model-value="inputs().input"
+          :earlier-steps="earlierSteps"
+          @update:model-value="setInput('input', $event)"
+        />
+      </div>
       <input
-        v-if="inputSource('input') === 'literal'"
-        :class="STEP_FIELD_CLASS"
-        :value="inputLiteral('input')"
-        @input="setLiteral('input', ($event.target as HTMLInputElement).value)"
-      />
-      <input
-        v-if="stringParam('operator') === 'equals' || stringParam('operator') === 'contains'"
+        v-if="operator !== 'not_empty'"
         :class="STEP_FIELD_CLASS"
         :value="stringParam('value')"
-        :placeholder="$t('workflows.inputValue')"
+        :aria-label="$t('workflows.compareWith')"
+        :placeholder="
+          operator === 'matches' ? $t('workflows.patternPlaceholder') : $t('workflows.compareWith')
+        "
+        data-testid="condition-value"
         @input="setParam('value', ($event.target as HTMLInputElement).value)"
       />
     </div>
@@ -85,7 +120,9 @@
 </template>
 
 <script setup lang="ts">
-import { STEP_FIELD_CLASS, type AuthoredStep } from './stepTypes'
+import { computed } from 'vue'
+import InputSourcePicker from './InputSourcePicker.vue'
+import { STEP_FIELD_CLASS, toolArgumentNames, type AuthoredStep, type InputSpec } from './stepTypes'
 import type { RegistryTool } from '@/services/api/toolsApi'
 
 const props = defineProps<{
@@ -103,29 +140,34 @@ const stringParam = (key: string): string => {
   return typeof value === 'string' ? value : ''
 }
 
-const inputs = (): Record<string, Record<string, unknown>> => {
+const operator = computed(() => stringParam('operator') || 'not_empty')
+
+// The server never returns a saved secret, only that one exists. Leaving the
+// field untouched keeps it; typing replaces it; clearing the field removes it.
+const secretConfigured = computed(
+  () => props.step.params.secretConfigured === true && !('secret' in props.step.params)
+)
+
+const setSecret = (value: string) => {
+  const params = { ...props.step.params }
+  delete params.secretConfigured
+  emit('change', { ...props.step, params: { ...params, secret: value } })
+}
+
+const selectedTool = computed(() => props.tools.find((tool) => tool.name === stringParam('tool')))
+
+const toolArguments = computed(() => toolArgumentNames(selectedTool.value?.inputSchema))
+
+const inputs = (): Record<string, InputSpec> => {
   const raw = props.step.params.inputs
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
-  const out: Record<string, Record<string, unknown>> = {}
+  const out: Record<string, InputSpec> = {}
   for (const [key, spec] of Object.entries(raw as Record<string, unknown>)) {
     if (spec && typeof spec === 'object' && !Array.isArray(spec)) {
-      out[key] = { ...(spec as Record<string, unknown>) }
+      out[key] = { ...(spec as InputSpec) }
     }
   }
   return out
-}
-
-const inputSource = (key: string): string => {
-  const spec = inputs()[key]
-  if (!spec) return 'literal'
-  if (typeof spec.literal === 'string') return 'literal'
-  if (spec.from === 'trigger') return 'trigger'
-  return typeof spec.from === 'string' ? spec.from : 'literal'
-}
-
-const inputLiteral = (key: string): string => {
-  const spec = inputs()[key]
-  return typeof spec?.literal === 'string' ? spec.literal : ''
 }
 
 const patch = (params: Record<string, unknown>) => {
@@ -136,25 +178,12 @@ const setParam = (key: string, value: string) => {
   patch({ [key]: value })
 }
 
-const setInputs = (next: Record<string, Record<string, unknown>>) => {
-  patch({ inputs: next })
+// A different tool takes different arguments — start its mapping fresh.
+const setTool = (name: string) => {
+  patch({ tool: name, inputs: name === stringParam('tool') ? inputs() : {} })
 }
 
-const onSourceChange = (key: string, source: string) => {
-  const next = inputs()
-  if (source === 'literal') {
-    next[key] = { literal: inputLiteral(key) }
-  } else if (source === 'trigger') {
-    next[key] = { from: 'trigger', field: 'body' }
-  } else {
-    next[key] = { from: source, field: 'text' }
-  }
-  setInputs(next)
-}
-
-const setLiteral = (key: string, value: string) => {
-  const next = inputs()
-  next[key] = { literal: value }
-  setInputs(next)
+const setInput = (key: string, spec: InputSpec) => {
+  patch({ inputs: { ...inputs(), [key]: spec } })
 }
 </script>

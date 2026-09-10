@@ -53,6 +53,7 @@ final class ToolsController extends AbstractController
                                 new OA\Property(property: 'policy', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'policyException', type: 'string', nullable: true, example: 'own_artefact'),
                                 new OA\Property(property: 'shared', type: 'boolean', example: false),
+                                new OA\Property(property: 'inputSchema', type: 'object', additionalProperties: true, description: 'JSON Schema of the arguments the tool accepts; the Saved Task Steps editor maps inputs from it.'),
                             ]
                         )),
                     ]

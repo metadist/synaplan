@@ -18,7 +18,7 @@ final class SavedTaskOutcomeNarrator
     {
         $done = [];
         $failed = [];
-        foreach ($this->statuses($result, $cards) as $capability => $status) {
+        foreach ($this->statuses($result, $cards) as [$capability, $status]) {
             $label = $this->label($capability);
             if ('done' === $status || 'stopped' === $status) {
                 $done[$label] = true;
@@ -26,7 +26,8 @@ final class SavedTaskOutcomeNarrator
                 $failed[$label] = true;
             }
         }
-        $doneLabels = array_keys($done);
+        // Two steps of one kind, one of them failed: that kind did not complete.
+        $doneLabels = array_values(array_diff(array_keys($done), array_keys($failed)));
         $failedLabels = array_keys($failed);
         if ([] !== $doneLabels && [] !== $failedLabels) {
             return sprintf(
@@ -50,7 +51,7 @@ final class SavedTaskOutcomeNarrator
      * @param array<string, mixed>       $result
      * @param list<array<string, mixed>> $cards
      *
-     * @return array<string, string> capability => status
+     * @return list<array{0: string, 1: string}> one [capability, status] pair per step
      */
     private function statuses(array $result, array $cards): array
     {
@@ -67,13 +68,13 @@ final class SavedTaskOutcomeNarrator
                 $status = $byNode[$nodeId];
             }
             if ('' !== $status) {
-                $out[$capability] = $status;
+                $out[] = [$capability, $status];
             }
         }
         if ([] === $out && [] !== $byNode) {
             foreach ($byNode as $status) {
                 if (is_string($status)) {
-                    $out['step'] = $status;
+                    $out[] = ['step', $status];
                 }
             }
         }

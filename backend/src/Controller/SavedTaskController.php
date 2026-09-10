@@ -216,6 +216,7 @@ final class SavedTaskController extends AbstractController
                                 ]),
                                 new OA\Property(property: 'instructionPreview', type: 'string', nullable: true, description: 'First ~60 characters of the underlying instruction, for the task card.'),
                                 new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0, description: 'How many runs are paused waiting for approval.'),
+                                new OA\Property(property: 'webhookSecret', type: 'string', nullable: true, description: 'Only on the response that turned on "Require a signature": the new HMAC secret, shown once. Never returned again.'),
                             ]
                         ),
                     ]
@@ -239,12 +240,15 @@ final class SavedTaskController extends AbstractController
         }
 
         try {
-            $task = $this->service->update($task, $request->toArray());
+            $updated = $this->service->updateAndRevealWebhookSecret($task, $request->toArray());
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->json(['success' => true, 'task' => $this->serializer->task($task)]);
+        return $this->json([
+            'success' => true,
+            'task' => $this->serializer->task($updated['task'], $updated['webhookSecret']),
+        ]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]

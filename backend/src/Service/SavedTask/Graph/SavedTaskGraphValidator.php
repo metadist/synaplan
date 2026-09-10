@@ -151,14 +151,17 @@ final class SavedTaskGraphValidator
             }
         }
 
+        $capability = $node['capability'] ?? null;
         $approval = $params['approval'] ?? null;
         if (null !== $approval) {
             if (!in_array($approval, ['approve', 'block'], true)) {
                 $errors[] = "step[$i] can only tighten approval (ask me, or block)";
+            } elseif (Capability::ToolCall->value !== $capability) {
+                // Only the tool gate pauses a run; promising it elsewhere would be a lie.
+                $errors[] = "step[$i] can only ask before a tool step";
             }
         }
 
-        $capability = $node['capability'] ?? null;
         if (Capability::OutboundWebhook->value === $capability) {
             $url = is_string($params['url'] ?? null) ? trim($params['url']) : '';
             if ('' === $url || !str_starts_with(strtolower($url), 'https://')) {

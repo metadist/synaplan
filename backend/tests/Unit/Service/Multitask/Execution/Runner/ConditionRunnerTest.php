@@ -41,6 +41,42 @@ final class ConditionRunnerTest extends TestCase
         self::assertTrue($result->isSuccessful());
     }
 
+    public function testMatchesOperatorStopsWhenThePatternDoesNotMatch(): void
+    {
+        $runner = new ConditionRunner(new StepInputResolver());
+        $node = new TaskNode('c1', Capability::Condition, [], [], [
+            'operator' => 'matches',
+            'value' => '^INV-\d+$',
+            'inputs' => ['input' => ['literal' => 'hello']],
+        ]);
+
+        self::assertTrue($runner->run($node, $this->context())->isStopped());
+    }
+
+    public function testMatchesOperatorContinuesOnAMatch(): void
+    {
+        $runner = new ConditionRunner(new StepInputResolver());
+        $node = new TaskNode('c1', Capability::Condition, [], [], [
+            'operator' => 'matches',
+            'value' => '^INV-\d+$',
+            'inputs' => ['input' => ['literal' => 'INV-42']],
+        ]);
+
+        self::assertTrue($runner->run($node, $this->context())->isSuccessful());
+    }
+
+    public function testMatchesOperatorTreatsAnInvalidPatternAsNoMatch(): void
+    {
+        $runner = new ConditionRunner(new StepInputResolver());
+        $node = new TaskNode('c1', Capability::Condition, [], [], [
+            'operator' => 'matches',
+            'value' => '(unclosed',
+            'inputs' => ['input' => ['literal' => '(unclosed']],
+        ]);
+
+        self::assertTrue($runner->run($node, $this->context())->isStopped());
+    }
+
     private function context(): NodeContext
     {
         $message = new Message();

@@ -45,11 +45,15 @@ final class StepInputResolver
         if (!is_string($from) || '' === $from) {
             return $spec;
         }
-        $field = is_string($spec['field'] ?? null) ? $spec['field'] : 'text';
+        $field = is_string($spec['field'] ?? null) ? trim($spec['field']) : '';
         if ('trigger' === $from) {
             $payload = $context->options['trigger_payload'] ?? [];
+            if (!is_array($payload)) {
+                return null;
+            }
 
-            return is_array($payload) ? $this->nested($payload, $field) : null;
+            // No field means the whole starting event.
+            return '' === $field ? $payload : $this->nested($payload, $field);
         }
 
         $result = $context->getResult($from);
@@ -57,7 +61,7 @@ final class StepInputResolver
             return null;
         }
 
-        return $this->fromResult($result, $field);
+        return $this->fromResult($result, '' === $field ? 'text' : $field);
     }
 
     private function fromResult(NodeResult $result, string $field): mixed

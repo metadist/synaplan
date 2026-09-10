@@ -136,6 +136,23 @@ final class SavedTaskGraphValidatorTest extends TestCase
         );
         $this->assertContains('step[0] can only tighten approval (ask me, or block)', $auto);
 
+        // Only the tool gate pauses a run; "ask me" on a webhook step would be an empty promise.
+        $askOnWebhook = $validator->validate(
+            [
+                'version' => 1,
+                'trigger' => ['type' => 'manual'],
+                'nodes' => [[
+                    'id' => 'n1',
+                    'capability' => 'outbound_webhook',
+                    'depends_on' => [],
+                    'params' => ['url' => 'https://example.com/hook', 'approval' => 'approve'],
+                ]],
+            ],
+            'manual',
+            null,
+        );
+        $this->assertContains('step[0] can only ask before a tool step', $askOnWebhook);
+
         $from = $validator->validate(
             [
                 'version' => 1,

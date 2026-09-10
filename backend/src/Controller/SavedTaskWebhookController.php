@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class SavedTaskWebhookController extends AbstractController
 {
     public function __construct(
-        private SavedTaskWebhookIngress $ingress,
+        private readonly SavedTaskWebhookIngress $ingress,
     ) {
     }
 

@@ -104,8 +104,8 @@ final readonly class ToolCallRunner implements TaskRunner
     {
         $override = is_string($node->params['approval'] ?? null) ? $node->params['approval'] : null;
         if (null === $this->executionGate) {
-            return 'block' === $override
-                ? NodeResult::failed('I cannot do that. This step is set to always ask — and it is blocked.')
+            return PolicyOutcome::Block->value === $override
+                ? NodeResult::failed(ToolExecutionGate::NODE_BLOCK_REFUSAL)
                 : null;
         }
         if ($context->isApproved($node->id)) {

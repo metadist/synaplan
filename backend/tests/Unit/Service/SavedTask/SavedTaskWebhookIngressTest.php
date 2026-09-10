@@ -6,22 +6,25 @@ namespace App\Tests\Unit\Service\SavedTask;
 
 use App\Entity\SavedTask;
 use App\Entity\User;
+use App\Message\RunSavedTaskCommand;
 use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
 use App\Service\RateLimitService;
-use App\Service\SavedTask\SavedTaskRunner;
 use App\Service\SavedTask\SavedTaskWebhookIngress;
 use App\Service\SavedTask\WorkflowsConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class SavedTaskWebhookIngressTest extends TestCase
 {
     private SavedTaskRepository&MockObject $tasks;
     private UserRepository&MockObject $users;
-    private SavedTaskRunner&MockObject $runner;
+    private MessageBusInterface&MockObject $bus;
     private WorkflowsConfig&MockObject $workflows;
     private RateLimitService&MockObject $rateLimits;
     private SavedTaskWebhookIngress $ingress;
@@ -30,27 +33,30 @@ final class SavedTaskWebhookIngressTest extends TestCase
     {
         $this->tasks = $this->createMock(SavedTaskRepository::class);
         $this->users = $this->createMock(UserRepository::class);
-        $this->runner = $this->createMock(SavedTaskRunner::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
         $this->workflows = $this->createMock(WorkflowsConfig::class);
         $this->rateLimits = $this->createMock(RateLimitService::class);
         $this->ingress = new SavedTaskWebhookIngress(
             $this->tasks,
             $this->users,
-            $this->runner,
+            $this->bus,
             $this->workflows,
             $this->rateLimits,
-            new ArrayAdapter(),
+            new RateLimiterFactory(
+                ['id' => 'saved_task_webhook', 'policy' => 'sliding_window', 'limit' => 60, 'interval' => '1 minute'],
+                new InMemoryStorage(),
+            ),
         );
     }
 
     public function testUnknownTokenIsNotFound(): void
     {
         $this->tasks->method('findByWebhookToken')->willReturn(null);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = $this->ingress->handle('missing', '{}', null);
 
         self::assertSame(Response::HTTP_NOT_FOUND, $result['status']);
-        $this->runner->expects(self::never())->method('run');
     }
 
     public function testDisabledOrFlagOffUsesTheSameNotFound(): void
@@ -59,6 +65,7 @@ final class SavedTaskWebhookIngressTest extends TestCase
         $task->setEnabled(false);
         $task->setTrigger(SavedTask::TRIGGER_WEBHOOK, ['token' => 'tok']);
         $this->tasks->method('findByWebhookToken')->willReturn($task);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = $this->ingress->handle('tok', '{}', null);
 
@@ -70,14 +77,14 @@ final class SavedTaskWebhookIngressTest extends TestCase
         $task = $this->enabledWebhookTask(['token' => 'tok', 'hmacSecret' => 's3cret']);
         $this->tasks->method('findByWebhookToken')->willReturn($task);
         $this->workflows->method('isBuilderEnabled')->willReturn(true);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = $this->ingress->handle('tok', '{"a":1}', 'sha256=deadbeef');
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $result['status']);
-        $this->runner->expects(self::never())->method('run');
     }
 
-    public function testValidCallRunsAsOwner(): void
+    public function testValidCallQueuesARunAsTheOwner(): void
     {
         $task = $this->enabledWebhookTask(['token' => 'tok']);
         $this->tasks->method('findByWebhookToken')->willReturn($task);
@@ -86,7 +93,14 @@ final class SavedTaskWebhookIngressTest extends TestCase
         $user->method('isActive')->willReturn(true);
         $this->users->expects(self::once())->method('find')->with(9)->willReturn($user);
         $this->rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
-        $this->runner->expects(self::once())->method('run')->with(9, 0, '', 'webhook', ['hello' => 'world']);
+        $this->bus->expects(self::once())->method('dispatch')
+            ->with(self::callback(static function (RunSavedTaskCommand $command): bool {
+                return 9 === $command->ownerId
+                    && 0 === $command->taskId
+                    && 'webhook' === $command->trigger
+                    && ['hello' => 'world'] === $command->triggerPayload;
+            }))
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
         $result = $this->ingress->handle('tok', '{"hello":"world"}', null);
 
@@ -102,7 +116,8 @@ final class SavedTaskWebhookIngressTest extends TestCase
         $user->method('isActive')->willReturn(true);
         $this->users->method('find')->willReturn($user);
         $this->rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
-        $this->runner->method('run')->willReturn([]);
+        $this->bus->expects(self::exactly(60))->method('dispatch')
+            ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
         $last = ['status' => 0, 'body' => []];
         for ($i = 0; $i < 61; ++$i) {

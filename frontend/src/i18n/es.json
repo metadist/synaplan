@@ -5516,11 +5516,21 @@
       "matches": "coincide con",
       "not_empty": "no está vacío"
     },
-    "sendToWebhook": "Enviar a otro sistema",
     "webhookUrl": "Dirección (https)",
+    "whatToSend": "Qué enviar",
     "webhookSecret": "Secreto compartido (opcional)",
+    "secretSet": "Hay un secreto guardado",
+    "secretSetHint": "Se mantiene tal cual. Escribe aquí para reemplazarlo o vacía el campo para eliminarlo.",
     "pickTool": "Elegir una herramienta",
-    "thisAssistant": "Este asistente",
+    "arguments": "Qué enviar a la herramienta",
+    "noArguments": "Esta herramienta no necesita datos de entrada.",
+    "required": "obligatorio",
+    "inputSource": "De dónde viene el valor",
+    "field": "Campo",
+    "fieldHintTrigger": "Déjalo vacío para todo el evento inicial, o indica una parte como title u order.id.",
+    "fieldHintStep": "text es la respuesta del paso. También: summary, error o un campo de su resultado.",
+    "compareWith": "Comparar con",
+    "patternPlaceholder": "Patrón, p. ej. ^INV-\\d+$",
     "kinds": {
       "email_search": "Buscar correo",
       "summarize": "Resumir",
@@ -5549,6 +5559,10 @@
     "regenerateConfirm": "La dirección anterior dejará de funcionar. ¿Continuar?",
     "hmacEnable": "Exigir una firma",
     "hmacHint": "El otro sistema debe enviar una firma coincidente. Más seguro si la dirección puede filtrarse.",
-    "hmacOn": "Firma exigida. El secreto se guarda en el servidor y no se vuelve a mostrar."
+    "hmacOn": "Firma exigida. El secreto se mostró una sola vez al activarlo; desactívalo y actívalo de nuevo para obtener otro.",
+    "secretRevealTitle": "Tu secreto compartido: cópialo ahora",
+    "secretRevealHint": "Pégalo en el otro sistema. Solo se muestra esta vez y no se podrá recuperar después.",
+    "copySecret": "Copiar secreto",
+    "secretCopied": "Secreto copiado."
   }
 }

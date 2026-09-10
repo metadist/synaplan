@@ -81,7 +81,13 @@ import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { toolsApi, type RegistryTool } from '@/services/api/toolsApi'
 import StepPicker from './StepPicker.vue'
 import StepRow from './StepRow.vue'
-import { emptyStep, graphFromSteps, stepsFromGraph, type AuthoredStep } from './stepTypes'
+import {
+  emptyStep,
+  graphFromSteps,
+  renumberSteps,
+  stepsFromGraph,
+  type AuthoredStep,
+} from './stepTypes'
 
 const props = defineProps<{
   open: boolean
@@ -126,7 +132,11 @@ const capabilityFromPick = (key: string): { capability: string; tool?: string } 
 
 const addPicked = () => {
   const chosen = capabilityFromPick(picked.value)
-  const step = emptyStep(chosen.capability, steps.value.length)
+  const previous = steps.value[steps.value.length - 1]
+  const step = emptyStep(chosen.capability, steps.value.length, {
+    previousStepId: previous?.id,
+    triggerType: props.task.triggerType,
+  })
   if (chosen.tool) step.params.tool = chosen.tool
   steps.value = [...steps.value, step]
 }
@@ -143,7 +153,7 @@ const move = (index: number, delta: number) => {
   const next = [...steps.value]
   const [row] = next.splice(index, 1)
   next.splice(target, 0, row)
-  steps.value = next.map((step, i) => ({ ...step, id: `step_${i + 1}` }))
+  steps.value = renumberSteps(next)
 }
 
 const remove = async (index: number) => {
@@ -153,9 +163,7 @@ const remove = async (index: number) => {
     danger: true,
   })
   if (!ok) return
-  steps.value = steps.value
-    .filter((_, i) => i !== index)
-    .map((step, i) => ({ ...step, id: `step_${i + 1}` }))
+  steps.value = renumberSteps(steps.value.filter((_, i) => i !== index))
 }
 
 const save = async () => {
@@ -163,7 +171,7 @@ const save = async () => {
   error.value = ''
   try {
     const updated = await savedTasksApi.update(props.task.id, {
-      graph: graphFromSteps(steps.value, props.task.triggerType),
+      graph: graphFromSteps(steps.value, props.task.triggerType, props.task.graph),
     })
     success(t('workflows.saved'))
     emit('updated', updated)

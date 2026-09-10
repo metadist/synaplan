@@ -106,6 +106,7 @@ final readonly class SavedTaskRunner
             return $this->fail($task, $run, 'The AI instruction for this task is empty.');
         }
 
+        $messageId = null;
         try {
             $chat = $this->ensureChat($task, $user);
             $now = time();
@@ -125,11 +126,11 @@ final readonly class SavedTaskRunner
             $message->setStatus('processing');
             $this->em->persist($message);
             $this->em->flush();
+            $messageId = $message->getId();
 
             $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId(), $triggerPayload));
 
             $ok = !empty($result['success']);
-            $messageId = $message->getId();
             $snapshot = null !== $messageId ? $this->planStore->loadCards($messageId) : [];
 
             // Like the web stream: the IN row records what the sorter decided.
@@ -157,7 +158,13 @@ final readonly class SavedTaskRunner
 
             $waitingNode = $this->waitingNodeFromResult($result, $snapshot);
             if (null !== $waitingNode) {
-                $run->markWaitingApproval($waitingNode, $messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
+                // The resume re-resolves step inputs; a webhook-started run needs
+                // its starting event again or `from: trigger` values come back null.
+                $waitingSnapshot = [] !== $snapshot ? ['cards' => $snapshot] : [];
+                if ([] !== $triggerPayload) {
+                    $waitingSnapshot['trigger_payload'] = $triggerPayload;
+                }
+                $run->markWaitingApproval($waitingNode, $messageId, [] !== $waitingSnapshot ? $waitingSnapshot : null);
                 $this->runs->save($run);
 
                 return ['run' => $run, 'task' => $task];
@@ -185,7 +192,32 @@ final readonly class SavedTaskRunner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fail($task, $run, 'This run stopped before anything was sent or saved.');
+            // Steps may already have run before the exception; say so instead of
+            // claiming nothing happened.
+            $snapshot = $this->cardsAfterCrash($messageId);
+
+            return $this->fail(
+                $task,
+                $run,
+                $this->outcomeNarrator->failureMessage([], $snapshot),
+                $messageId,
+                [] !== $snapshot ? $snapshot : null,
+            );
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function cardsAfterCrash(?int $messageId): array
+    {
+        if (null === $messageId) {
+            return [];
+        }
+        try {
+            return $this->planStore->loadCards($messageId);
+        } catch (\Throwable) {
+            return [];
         }
     }
 

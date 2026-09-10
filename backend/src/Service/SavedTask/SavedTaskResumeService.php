@@ -21,6 +21,8 @@ use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
 use App\Service\SavedTask\Graph\StepInputResolver;
+use App\Service\Tool\ApprovalArgsRedactor;
+use App\Service\Tool\ApprovalReference;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\ApprovalPolicy;
 use App\Service\Tool\Policy\PolicyContext;
@@ -44,6 +46,7 @@ final readonly class SavedTaskResumeService
         private LoggerInterface $logger,
         private ApprovalPolicy $approvalPolicy,
         private StepInputResolver $inputs,
+        private ApprovalArgsRedactor $redactor = new ApprovalArgsRedactor(),
     ) {
     }
 
@@ -68,6 +71,14 @@ final readonly class SavedTaskResumeService
         if (!$approval instanceof Approval) {
             throw new SavedTaskNotFoundException();
         }
+        // The approval must be the one this run paused for: same owner, decided,
+        // and requested by exactly this run and step. Anything else is not a match.
+        if ($approval->getOwnerId() !== $task->getOwnerId()
+            || Approval::STATUS_APPROVED !== $approval->getStatus()
+            || $approval->getRequestedBy() !== ApprovalReference::taskRun($runId, $nodeId)->raw
+            || $run->getWaitingNode() !== $nodeId) {
+            throw new SavedTaskNotWaitingException();
+        }
 
         $limit = $this->rateLimits->checkLimit($user, 'MESSAGES');
         if (empty($limit['allowed'])) {
@@ -85,10 +96,15 @@ final readonly class SavedTaskResumeService
 
         $plan = $this->planFactory->fromTask($task);
         $node = $plan->nodeById($nodeId);
-        $context = $this->rehydrator->fromRun($run, [
+        $options = [
             'saved_task_run_id' => $runId,
             'allow_unattended' => $task->allowsUnattended(),
-        ]);
+        ];
+        $triggerPayload = $run->getPlanSnapshot()['trigger_payload'] ?? null;
+        if (is_array($triggerPayload) && [] !== $triggerPayload) {
+            $options['trigger_payload'] = $triggerPayload;
+        }
+        $context = $this->rehydrator->fromRun($run, $options);
 
         if (null !== $node && Capability::ToolCall === $node->capability) {
             $bound = $this->recheckToolCall($node, $context, $approval, $task);
@@ -153,7 +169,8 @@ final readonly class SavedTaskResumeService
         }
         $rawInputs = is_array($node->params['inputs'] ?? null) ? $node->params['inputs'] : $node->inputs;
         $args = $this->inputs->resolveAll($rawInputs, $context);
-        if ($this->argsDiffer($args, $approval->getArgs() ?? [])) {
+        // Stored approval arguments are redacted; compare like with like.
+        if ($this->argsDiffer($this->redactor->redact($args), $approval->getArgs() ?? [])) {
             return 'This approval no longer matches the step.';
         }
         $descriptor = $this->registry->get($task->getOwnerId(), $toolName);
@@ -193,9 +210,29 @@ final readonly class SavedTaskResumeService
      */
     private function normalizeArgs(array $args): array
     {
+        foreach ($args as $key => $value) {
+            if (is_array($value)) {
+                $args[$key] = $this->normalizeArgs($this->stringKeyed($value));
+            }
+        }
         ksort($args);
 
         return $args;
+    }
+
+    /**
+     * @param array<mixed> $value
+     *
+     * @return array<string, mixed>
+     */
+    private function stringKeyed(array $value): array
+    {
+        $out = [];
+        foreach ($value as $key => $item) {
+            $out[(string) $key] = $item;
+        }
+
+        return $out;
     }
 
     private function failResume(

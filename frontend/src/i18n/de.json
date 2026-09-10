@@ -6436,11 +6436,21 @@
       "matches": "entspricht",
       "not_empty": "nicht leer ist"
     },
-    "sendToWebhook": "An ein anderes System senden",
     "webhookUrl": "Adresse (https)",
+    "whatToSend": "Was gesendet wird",
     "webhookSecret": "Gemeinsames Geheimnis (optional)",
+    "secretSet": "Ein Geheimnis ist gespeichert",
+    "secretSetHint": "Es bleibt unverändert. Hier tippen, um es zu ersetzen, oder das Feld leeren, um es zu entfernen.",
     "pickTool": "Werkzeug wählen",
-    "thisAssistant": "Dieser Assistent",
+    "arguments": "Was an das Werkzeug geht",
+    "noArguments": "Dieses Werkzeug braucht keine Eingabe.",
+    "required": "erforderlich",
+    "inputSource": "Woher der Wert kommt",
+    "field": "Feld",
+    "fieldHintTrigger": "Leer lassen für das ganze Startereignis, oder einen Teil nennen wie title oder order.id.",
+    "fieldHintStep": "text ist die Antwort des Schritts. Außerdem: summary, error oder ein Feld seines Ergebnisses.",
+    "compareWith": "Vergleichen mit",
+    "patternPlaceholder": "Muster, z. B. ^INV-\\d+$",
     "kinds": {
       "email_search": "E-Mails durchsuchen",
       "summarize": "Zusammenfassen",
@@ -6469,6 +6479,10 @@
     "regenerateConfirm": "Die alte Adresse funktioniert danach nicht mehr. Fortfahren?",
     "hmacEnable": "Signatur verlangen",
     "hmacHint": "Das andere System muss eine passende Signatur senden. Sicherer, falls die Adresse bekannt wird.",
-    "hmacOn": "Signatur erforderlich. Das Geheimnis liegt auf dem Server und wird nicht erneut angezeigt."
+    "hmacOn": "Signatur erforderlich. Das Geheimnis wurde beim Einschalten einmal angezeigt; für ein neues aus- und wieder einschalten.",
+    "secretRevealTitle": "Dein gemeinsames Geheimnis – jetzt kopieren",
+    "secretRevealHint": "Füge es im anderen System ein. Es wird nur dieses eine Mal angezeigt und kann später nicht abgerufen werden.",
+    "copySecret": "Geheimnis kopieren",
+    "secretCopied": "Geheimnis kopiert."
   }
 }
