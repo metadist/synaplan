@@ -5,11 +5,19 @@ declare(strict_types=1);
 namespace App\Service\SavedTask\Graph;
 
 use App\Service\Multitask\Plan\Capability;
+use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\Security\SsrfGuard;
 
 final class SavedTaskGraphValidator
 {
     public const VERSION = 1;
     public const MAX_NODES = 16;
+
+    public function __construct(
+        private readonly ?WorkflowsConfig $workflowsConfig = null,
+        private readonly ?SsrfGuard $ssrfGuard = null,
+    ) {
+    }
 
     /**
      * @param array<string, mixed>      $graph
@@ -17,7 +25,7 @@ final class SavedTaskGraphValidator
      *
      * @return list<string>
      */
-    public function validate(array $graph, string $columnTriggerType, ?array $columnConfig): array
+    public function validate(array $graph, string $columnTriggerType, ?array $columnConfig, ?int $ownerId = null): array
     {
         $errors = [];
         if (($graph['version'] ?? null) !== self::VERSION) {
@@ -41,8 +49,13 @@ final class SavedTaskGraphValidator
             $errors[] = sprintf('too many steps (%d > %d)', count($nodes), self::MAX_NODES);
         }
 
+        $builderOn = null !== $this->workflowsConfig && $this->workflowsConfig->isBuilderEnabled($ownerId);
+        $allowed = Capability::values();
+        if (!$builderOn) {
+            $allowed = array_values(array_diff($allowed, Capability::builderOnlyValues()));
+        }
+
         $ids = [];
-        $capabilities = Capability::values();
         foreach ($nodes as $i => $node) {
             if (!is_array($node)) {
                 $errors[] = "step[$i] must be an object";
@@ -57,8 +70,16 @@ final class SavedTaskGraphValidator
                 $ids[$id] = true;
             }
             $capability = $node['capability'] ?? null;
-            if (!is_string($capability) || !in_array($capability, $capabilities, true)) {
+            if (!is_string($capability) || !in_array($capability, $allowed, true)) {
                 $errors[] = "step[$i] has an unknown action";
+            }
+        }
+
+        if ($builderOn) {
+            foreach ($nodes as $i => $node) {
+                if (is_array($node)) {
+                    array_push($errors, ...$this->validateBuilderNode($i, $node));
+                }
             }
         }
 
@@ -97,6 +118,65 @@ final class SavedTaskGraphValidator
                 if ($value < 1 || $value > 720) {
                     $errors[] = 'approvalExpiryHours must be between 1 and 720';
                 }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @param array<string, mixed> $node
+     *
+     * @return list<string>
+     */
+    private function validateBuilderNode(int $i, array $node): array
+    {
+        $errors = [];
+        $depends = is_array($node['depends_on'] ?? null) ? $node['depends_on'] : [];
+        $params = is_array($node['params'] ?? null) ? $node['params'] : [];
+        $inputs = is_array($params['inputs'] ?? null) ? $params['inputs'] : (is_array($node['inputs'] ?? null) ? $node['inputs'] : []);
+        foreach ($inputs as $key => $spec) {
+            if (!is_array($spec)) {
+                continue;
+            }
+            $from = $spec['from'] ?? null;
+            if (!is_string($from) || '' === $from) {
+                continue;
+            }
+            if ('trigger' === $from) {
+                continue;
+            }
+            if (!in_array($from, $depends, true)) {
+                $errors[] = "step[$i] input '$key' must come from an earlier step this step depends on";
+            }
+        }
+
+        $approval = $params['approval'] ?? null;
+        if (null !== $approval) {
+            if (!in_array($approval, ['approve', 'block'], true)) {
+                $errors[] = "step[$i] can only tighten approval (ask me, or block)";
+            }
+        }
+
+        $capability = $node['capability'] ?? null;
+        if (Capability::OutboundWebhook->value === $capability) {
+            $url = is_string($params['url'] ?? null) ? trim($params['url']) : '';
+            if ('' === $url || !str_starts_with(strtolower($url), 'https://')) {
+                $errors[] = "step[$i] needs an https address";
+            } elseif (null !== $this->ssrfGuard && $this->ssrfGuard->isBlockedUrl($url)) {
+                $errors[] = "step[$i] cannot send to that address";
+            }
+        }
+        if (Capability::ToolCall->value === $capability) {
+            $tool = is_string($params['tool'] ?? null) ? trim($params['tool']) : '';
+            if ('' === $tool) {
+                $errors[] = "step[$i] needs a tool";
+            }
+        }
+        if (Capability::Condition->value === $capability) {
+            $operator = $params['operator'] ?? 'not_empty';
+            if (!in_array($operator, ['equals', 'contains', 'matches', 'not_empty'], true)) {
+                $errors[] = "step[$i] has an unknown condition";
             }
         }
 

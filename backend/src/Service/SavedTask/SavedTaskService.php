@@ -31,6 +31,7 @@ final readonly class SavedTaskService
         private AccessGate $accessGate,
         private SavedTaskGraphCapture $graphCapture,
         private ?ToolsConfig $toolsConfig = null,
+        private ?WorkflowsConfig $workflowsConfig = null,
     ) {
     }
 
@@ -169,7 +170,7 @@ final readonly class SavedTaskService
         $task = new SavedTask($ownerId, $promptId, $name);
         if (null !== $sourceMessageId && $sourceMessageId > 0) {
             $graph = $this->graphCapture->fromMessage($sourceMessageId, $ownerId, $task->getTriggerType());
-            if (null !== $graph && [] === $this->graphValidator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig())) {
+            if (null !== $graph && [] === $this->graphValidator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig(), $ownerId)) {
                 $task->setGraph($graph);
             }
         }
@@ -194,9 +195,11 @@ final readonly class SavedTaskService
         }
         if (isset($data['triggerType']) && is_string($data['triggerType'])) {
             $config = is_array($data['triggerConfig'] ?? null) ? $data['triggerConfig'] : $task->getTriggerConfig();
-            $task->setTrigger($data['triggerType'], $config);
+            $this->applyTrigger($task, $data['triggerType'], $config, $data);
         } elseif (isset($data['triggerConfig']) && is_array($data['triggerConfig'])) {
-            $task->setTrigger($task->getTriggerType(), $data['triggerConfig']);
+            $this->applyTrigger($task, $task->getTriggerType(), $data['triggerConfig'], $data);
+        } elseif (true === ($data['regenerateWebhookToken'] ?? false)) {
+            $this->applyTrigger($task, $task->getTriggerType(), $task->getTriggerConfig(), $data);
         }
 
         // The graph carries the trigger it was authored for and the factory
@@ -215,7 +218,7 @@ final readonly class SavedTaskService
             }
             /** @var array<string, mixed>|null $graph */
             if (null !== $graph) {
-                $errors = $this->graphValidator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig());
+                $errors = $this->graphValidator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig(), $task->getOwnerId());
                 if ([] !== $errors) {
                     throw new \InvalidArgumentException(implode('; ', $errors));
                 }
@@ -266,6 +269,40 @@ final readonly class SavedTaskService
         return $graph;
     }
 
+    /**
+     * @param array<string, mixed>|null $config
+     * @param array<string, mixed>      $data
+     */
+    private function applyTrigger(SavedTask $task, string $type, ?array $config, array $data): void
+    {
+        if (SavedTask::TRIGGER_WEBHOOK === $type) {
+            if (null === $this->workflowsConfig || !$this->workflowsConfig->isBuilderEnabled($task->getOwnerId())) {
+                throw new \InvalidArgumentException('Letting another system start this is turned off');
+            }
+            $config = is_array($config) ? $config : [];
+            unset($config['token'], $config['hmacSecret'], $config['hmacConfigured']);
+            $existing = $task->getTriggerConfig() ?? [];
+            $token = is_string($existing['token'] ?? null) ? $existing['token'] : '';
+            if (true === ($data['regenerateWebhookToken'] ?? false) || '' === $token) {
+                $token = $this->randomToken();
+            }
+            $config['token'] = $token;
+            if (true === ($data['hmacEnabled'] ?? false)) {
+                $secret = is_string($existing['hmacSecret'] ?? null) ? $existing['hmacSecret'] : '';
+                $config['hmacSecret'] = '' !== $secret ? $secret : $this->randomToken();
+            } elseif (!array_key_exists('hmacEnabled', $data) && is_string($existing['hmacSecret'] ?? null) && '' !== $existing['hmacSecret']) {
+                $config['hmacSecret'] = $existing['hmacSecret'];
+            }
+            $config['maxBodyBytes'] = 65536;
+        }
+        $task->setTrigger($type, $config);
+    }
+
+    private function randomToken(): string
+    {
+        return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+    }
+
     private function assertUsablePrompt(int $promptId, int $ownerId): void
     {
         $prompt = $this->prompts->find($promptId);
@@ -290,7 +327,7 @@ final readonly class SavedTaskService
                 continue;
             }
             $capability = (string) ($node['capability'] ?? '');
-            if (in_array($capability, ['email_me', 'save_to_folder', 'outbound_webhook', 'mcp_action'], true)) {
+            if (in_array($capability, ['email_me', 'save_to_folder', 'outbound_webhook', 'mcp_action', 'tool_call'], true)) {
                 $mutating = true;
                 break;
             }

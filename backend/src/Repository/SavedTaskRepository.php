@@ -127,9 +127,26 @@ class SavedTaskRepository extends ServiceEntityRepository
         return $affected > 0;
     }
 
-    /**
-     * @return list<SavedTask>
-     */
+    public function findByWebhookToken(string $token): ?SavedTask
+    {
+        if ('' === $token) {
+            return null;
+        }
+        /** @var list<SavedTask> $tasks */
+        $tasks = $this->createQueryBuilder('t')
+            ->where('t.triggerType = :type')
+            ->setParameter('type', SavedTask::TRIGGER_WEBHOOK)
+            ->getQuery()
+            ->getResult();
+        foreach ($tasks as $task) {
+            if (($task->getTriggerConfig()['token'] ?? null) === $token) {
+                return $task;
+            }
+        }
+
+        return null;
+    }
+
     public function findEnabledInboundEmailTasks(int $ownerId, int $accountId): array
     {
         $tasks = $this->createQueryBuilder('t')

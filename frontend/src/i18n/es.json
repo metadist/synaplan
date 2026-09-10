@@ -2891,7 +2891,8 @@
         "manual": "iniciada por ti",
         "schedule": "programada",
         "chat": "desde el chat",
-        "inbound_email": "correo entrante"
+        "inbound_email": "correo entrante",
+        "webhook": "iniciada por otro sistema"
       },
       "advancedSteps": "Pasos avanzados",
       "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
@@ -2956,7 +2957,8 @@
         "off": "Sin programación",
         "hourly": "Cada hora",
         "daily": "Cada día",
-        "weekdays": "Cada día laborable"
+        "weekdays": "Cada día laborable",
+        "webhook": "Que otro sistema lo inicie"
       },
       "summary": {
         "simple": "Se ejecuta {when}.",
@@ -2968,7 +2970,8 @@
           "weekly": "los días laborables a las {at} ({tz})",
           "schedule": "según un horario",
           "inboundEmail": "cuando llega correo nuevo",
-          "chat": "cuando llega un mensaje de chat coincidente"
+          "chat": "cuando llega un mensaje de chat coincidente",
+          "webhook": "cuando otro sistema lo llama"
         },
         "reads": {
           "instruction": "esta instrucción",
@@ -5486,5 +5489,66 @@
       "howToEnable": "Cómo activarla",
       "openFeatureStatus": "Abrir estado de funciones"
     }
+  },
+  "workflows": {
+    "steps": "Pasos",
+    "stepsTitle": "Pasos de esta tarea",
+    "stepsSubtitle": "Cada paso se ejecuta en orden. La mayoría de las tareas solo necesitan uno o dos.",
+    "addStep": "Añadir un paso",
+    "saveSteps": "Guardar pasos",
+    "saved": "Pasos guardados.",
+    "saveFailed": "No se pudieron guardar estos pasos.",
+    "close": "Cerrar",
+    "deleteStep": "Quitar este paso",
+    "deleteStepConfirm": "¿Quitar el paso {n}?",
+    "moveUp": "Subir",
+    "moveDown": "Bajar",
+    "askBefore": "Preguntarme antes de este paso",
+    "askBeforeHint": "El paso espera tu OK. Solo puede hacer la tarea más cuidadosa, nunca menos.",
+    "fromTrigger": "Del evento inicial",
+    "fromStep": "Del paso {n}",
+    "literal": "Escribir un valor",
+    "inputValue": "Valor",
+    "condition": "Continuar solo si",
+    "operator": {
+      "equals": "es igual a",
+      "contains": "contiene",
+      "matches": "coincide con",
+      "not_empty": "no está vacío"
+    },
+    "sendToWebhook": "Enviar a otro sistema",
+    "webhookUrl": "Dirección (https)",
+    "webhookSecret": "Secreto compartido (opcional)",
+    "pickTool": "Elegir una herramienta",
+    "thisAssistant": "Este asistente",
+    "kinds": {
+      "email_search": "Buscar correo",
+      "summarize": "Resumir",
+      "chat": "Escribir una respuesta",
+      "email_me": "Enviarme el resultado",
+      "tool_call": "Usar una herramienta conectada",
+      "condition": "Continuar solo si…",
+      "outbound_webhook": "Enviar a otro sistema"
+    },
+    "kindHints": {
+      "email_search": "Busca en el buzón conectado.",
+      "summarize": "Acorta el resultado anterior.",
+      "chat": "Usa el asistente de esta tarea.",
+      "email_me": "Te envía un correo.",
+      "tool_call": "Ejecuta una herramienta que ya conectaste.",
+      "condition": "Detiene los pasos siguientes si el valor no coincide.",
+      "outbound_webhook": "Envía el resultado a una dirección https."
+    },
+    "empty": "Aún no hay pasos. Añade uno para empezar.",
+    "stepN": "Paso {n}",
+    "webhookCardTitle": "Otro sistema puede iniciar esto",
+    "webhookCardHint": "Copia esta dirección en n8n, Make o un script. Quien tenga la dirección puede iniciar una ejecución en tu nombre.",
+    "copyUrl": "Copiar dirección",
+    "urlCopied": "Dirección copiada.",
+    "regenerate": "Crear una dirección nueva",
+    "regenerateConfirm": "La dirección anterior dejará de funcionar. ¿Continuar?",
+    "hmacEnable": "Exigir una firma",
+    "hmacHint": "El otro sistema debe enviar una firma coincidente. Más seguro si la dirección puede filtrarse.",
+    "hmacOn": "Firma exigida. El secreto se guarda en el servidor y no se vuelve a mostrar."
   }
 }

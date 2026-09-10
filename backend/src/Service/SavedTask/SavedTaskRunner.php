@@ -51,6 +51,7 @@ final readonly class SavedTaskRunner
         private GeneratedFileRegistrar $generatedFiles,
         private InternalEmailService $mail,
         private LoggerInterface $logger,
+        private SavedTaskOutcomeNarrator $outcomeNarrator = new SavedTaskOutcomeNarrator(),
     ) {
     }
 
@@ -60,9 +61,11 @@ final readonly class SavedTaskRunner
      * (the pinned prompt body) is used, so "Run now" and scheduled runs never
      * need a synthetic message.
      *
+     * @param array<string, mixed> $triggerPayload JSON body from an inbound webhook, if any
+     *
      * @return array{run: SavedTaskRun, task: SavedTask}
      */
-    public function run(int $ownerId, int $taskId, string $messageText = '', string $trigger = 'manual'): array
+    public function run(int $ownerId, int $taskId, string $messageText = '', string $trigger = 'manual', array $triggerPayload = []): array
     {
         if (!$this->config->isEnabled($ownerId)) {
             throw new SavedTaskDisabledException();
@@ -123,7 +126,7 @@ final readonly class SavedTaskRunner
             $this->em->persist($message);
             $this->em->flush();
 
-            $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId()));
+            $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId(), $triggerPayload));
 
             $ok = !empty($result['success']);
             $messageId = $message->getId();
@@ -141,9 +144,11 @@ final readonly class SavedTaskRunner
             $this->em->flush();
 
             if (!$ok) {
-                $reason = is_string($result['error'] ?? null)
-                    ? $result['error']
-                    : 'The AI step could not complete. Nothing was sent or saved.';
+                $reason = $this->outcomeNarrator->failureMessage(
+                    $result,
+                    $snapshot,
+                    is_string($result['error'] ?? null) ? $result['error'] : null,
+                );
 
                 return $this->fail($task, $run, $reason, $messageId, $snapshot);
             }
@@ -180,7 +185,7 @@ final readonly class SavedTaskRunner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fail($task, $run, 'The AI step could not complete. Nothing was sent or saved.');
+            return $this->fail($task, $run, 'This run stopped before anything was sent or saved.');
         }
     }
 
@@ -199,14 +204,19 @@ final readonly class SavedTaskRunner
      * keeps the run plannable (multi-step tasks must run their DAG, not
      * degrade to chat).
      *
+     * @param array<string, mixed> $triggerPayload
+     *
      * @return array<string, mixed>
      */
-    private function processorOptions(SavedTask $task, Prompt $prompt, ?int $runId = null): array
+    private function processorOptions(SavedTask $task, Prompt $prompt, ?int $runId = null, array $triggerPayload = []): array
     {
         $options = [
             'saved_task' => true,
             'saved_task_id' => (int) $task->getId(),
         ];
+        if ([] !== $triggerPayload) {
+            $options['trigger_payload'] = $triggerPayload;
+        }
         if (!str_starts_with($prompt->getTopic(), self::CHAT_INSTRUCTION_TOPIC_PREFIX)) {
             $options['fixed_task_prompt'] = $prompt->getTopic();
         }

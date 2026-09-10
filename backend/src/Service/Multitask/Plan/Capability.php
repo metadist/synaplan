@@ -91,6 +91,38 @@ enum Capability: string
     case ComposeReply = 'compose_reply';
 
     /**
+     * Call a registered tool (custom HTTP or MCP) from an authored Saved Task.
+     * Hidden from the planner catalog ({@see SkillDescriptor::$available}).
+     */
+    case ToolCall = 'tool_call';
+
+    /**
+     * HMAC-signed HTTPS POST of a step result to an external URL.
+     * Hidden from the planner catalog.
+     */
+    case OutboundWebhook = 'outbound_webhook';
+
+    /**
+     * Gate: on false the run stops and dependents are skipped (not failed).
+     * Hidden from the planner catalog.
+     */
+    case Condition = 'condition';
+
+    /**
+     * Capabilities that exist only for the Steps editor (flag-gated at validate).
+     *
+     * @return list<string>
+     */
+    public static function builderOnlyValues(): array
+    {
+        return [
+            self::ToolCall->value,
+            self::OutboundWebhook->value,
+            self::Condition->value,
+        ];
+    }
+
+    /**
      * @return list<string> all capability string values
      */
     public static function values(): array
@@ -116,6 +148,9 @@ enum Capability: string
             self::EmailMe => 'email',
             self::SaveToFolder => 'folder',
             self::ComposeReply => 'hidden',
+            self::ToolCall => 'search',
+            self::OutboundWebhook => 'email',
+            self::Condition => 'text',
         };
     }
 

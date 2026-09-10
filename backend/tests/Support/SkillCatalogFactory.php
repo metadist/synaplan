@@ -7,6 +7,7 @@ namespace App\Tests\Support;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
+use App\Service\Multitask\Execution\Runner\ConditionRunner;
 use App\Service\Multitask\Execution\Runner\DocumentCombineRunner;
 use App\Service\Multitask\Execution\Runner\DocumentExportRunner;
 use App\Service\Multitask\Execution\Runner\DocumentGenerationRunner;
@@ -17,8 +18,10 @@ use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\McpActionRunner;
 use App\Service\Multitask\Execution\Runner\McpFetchRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
+use App\Service\Multitask\Execution\Runner\OutboundWebhookRunner;
 use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
+use App\Service\Multitask\Execution\Runner\ToolCallRunner;
 use App\Service\Multitask\Execution\Runner\UrlFetchRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -58,6 +61,9 @@ final class SkillCatalogFactory
         EmailMeRunner::class,
         SaveToFolderRunner::class,
         ComposeReplyRunner::class,
+        ToolCallRunner::class,
+        OutboundWebhookRunner::class,
+        ConditionRunner::class,
     ];
 
     public static function real(): SkillCatalog

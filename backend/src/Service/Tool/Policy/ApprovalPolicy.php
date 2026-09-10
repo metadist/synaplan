@@ -35,6 +35,7 @@ final readonly class ApprovalPolicy
         ?array $assistantTools = null,
         bool $allowUnattended = false,
         ?string $assistantKey = null,
+        ?PolicyOutcome $nodeOverride = null,
     ): PolicyOutcome {
         $class = $tool->sideEffect;
         $resolved = $this->mostRestrictive([
@@ -42,6 +43,7 @@ final readonly class ApprovalPolicy
             $this->groupPolicy->outcomeFor($actorId, $tool, $class),
             $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class),
             $this->hardBlock($tool, $class),
+            $nodeOverride,
         ]);
         if (PolicyOutcome::Approve !== $resolved || SideEffect::Write !== $class) {
             return $resolved;

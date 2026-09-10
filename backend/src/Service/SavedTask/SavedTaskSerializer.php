@@ -39,7 +39,7 @@ final readonly class SavedTaskSerializer
             'name' => $task->getName(),
             'enabled' => $task->isEnabled(),
             'triggerType' => $task->getTriggerType(),
-            'triggerConfig' => $task->getTriggerConfig(),
+            'triggerConfig' => $this->publicTriggerConfig($task),
             'graph' => $task->getGraph(),
             'allowUnattended' => $task->allowsUnattended(),
             'chatId' => $task->getChatId(),
@@ -70,6 +70,27 @@ final readonly class SavedTaskSerializer
             'created' => $run->getCreated(),
             'waitingNode' => $run->getWaitingNode(),
         ];
+    }
+
+    /**
+     * Never expose HMAC secrets. The webhook URL is reconstructed by the client
+     * from the public token.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function publicTriggerConfig(SavedTask $task): ?array
+    {
+        $config = $task->getTriggerConfig();
+        if (null === $config) {
+            return null;
+        }
+        $hasSecret = is_string($config['hmacSecret'] ?? null) && '' !== $config['hmacSecret'];
+        unset($config['hmacSecret']);
+        if (SavedTask::TRIGGER_WEBHOOK === $task->getTriggerType()) {
+            $config['hmacConfigured'] = $hasSecret;
+        }
+
+        return $config;
     }
 
     private function instructionPreview(int $promptId): ?string

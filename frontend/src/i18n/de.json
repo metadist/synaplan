@@ -2102,7 +2102,8 @@
         "manual": "von dir gestartet",
         "schedule": "per Zeitplan",
         "chat": "aus dem Chat",
-        "inbound_email": "eingehende E-Mail"
+        "inbound_email": "eingehende E-Mail",
+        "webhook": "von einem anderen System gestartet"
       },
       "advancedSteps": "Erweiterte Schritte",
       "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
@@ -2167,7 +2168,8 @@
         "off": "Kein Zeitplan",
         "hourly": "Jede Stunde",
         "daily": "Jeden Tag",
-        "weekdays": "Jeden Werktag"
+        "weekdays": "Jeden Werktag",
+        "webhook": "Ein anderes System darf dies starten"
       },
       "summary": {
         "simple": "Läuft {when}.",
@@ -2179,7 +2181,8 @@
           "weekly": "an Werktagen um {at} ({tz})",
           "schedule": "nach Zeitplan",
           "inboundEmail": "wenn neue E-Mails eintreffen",
-          "chat": "wenn eine passende Chat-Nachricht eintrifft"
+          "chat": "wenn eine passende Chat-Nachricht eintrifft",
+          "webhook": "wenn ein anderes System es aufruft"
         },
         "reads": {
           "instruction": "diese Anweisung",
@@ -6406,5 +6409,66 @@
       "howToEnable": "So wird sie aktiviert",
       "openFeatureStatus": "Feature-Status öffnen"
     }
+  },
+  "workflows": {
+    "steps": "Schritte",
+    "stepsTitle": "Schritte für diese Aufgabe",
+    "stepsSubtitle": "Jeder Schritt läuft der Reihe nach. Die meisten Aufgaben brauchen nur ein oder zwei.",
+    "addStep": "Schritt hinzufügen",
+    "saveSteps": "Schritte speichern",
+    "saved": "Schritte gespeichert.",
+    "saveFailed": "Diese Schritte konnten nicht gespeichert werden.",
+    "close": "Schließen",
+    "deleteStep": "Diesen Schritt entfernen",
+    "deleteStepConfirm": "Schritt {n} entfernen?",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "askBefore": "Vor diesem Schritt nachfragen",
+    "askBeforeHint": "Der Schritt wartet auf dein OK. Das macht die Aufgabe nur vorsichtiger, nie weniger.",
+    "fromTrigger": "Vom Startereignis",
+    "fromStep": "Von Schritt {n}",
+    "literal": "Wert eingeben",
+    "inputValue": "Wert",
+    "condition": "Nur fortfahren, wenn",
+    "operator": {
+      "equals": "gleich",
+      "contains": "enthält",
+      "matches": "entspricht",
+      "not_empty": "nicht leer ist"
+    },
+    "sendToWebhook": "An ein anderes System senden",
+    "webhookUrl": "Adresse (https)",
+    "webhookSecret": "Gemeinsames Geheimnis (optional)",
+    "pickTool": "Werkzeug wählen",
+    "thisAssistant": "Dieser Assistent",
+    "kinds": {
+      "email_search": "E-Mails durchsuchen",
+      "summarize": "Zusammenfassen",
+      "chat": "Eine Antwort schreiben",
+      "email_me": "Ergebnis per E-Mail an mich",
+      "tool_call": "Verbundenes Werkzeug nutzen",
+      "condition": "Nur fortfahren, wenn…",
+      "outbound_webhook": "An ein anderes System senden"
+    },
+    "kindHints": {
+      "email_search": "Schaut ins verbundene Postfach.",
+      "summarize": "Kürzt das vorherige Ergebnis.",
+      "chat": "Nutzt den Assistenten dieser Aufgabe.",
+      "email_me": "Schickt dir eine E-Mail.",
+      "tool_call": "Führt ein bereits verbundenes Werkzeug aus.",
+      "condition": "Stoppt spätere Schritte, wenn der Wert nicht passt.",
+      "outbound_webhook": "Sendet das Ergebnis an eine https-Adresse."
+    },
+    "empty": "Noch keine Schritte. Füge einen hinzu.",
+    "stepN": "Schritt {n}",
+    "webhookCardTitle": "Ein anderes System kann dies starten",
+    "webhookCardHint": "Kopiere diese Adresse nach n8n, Make oder ein Skript. Wer die Adresse hat, kann einen Lauf in deinem Namen starten.",
+    "copyUrl": "Adresse kopieren",
+    "urlCopied": "Adresse kopiert.",
+    "regenerate": "Neue Adresse erzeugen",
+    "regenerateConfirm": "Die alte Adresse funktioniert danach nicht mehr. Fortfahren?",
+    "hmacEnable": "Signatur verlangen",
+    "hmacHint": "Das andere System muss eine passende Signatur senden. Sicherer, falls die Adresse bekannt wird.",
+    "hmacOn": "Signatur erforderlich. Das Geheimnis liegt auf dem Server und wird nicht erneut angezeigt."
   }
 }

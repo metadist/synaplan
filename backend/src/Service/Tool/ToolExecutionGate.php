@@ -40,18 +40,23 @@ final readonly class ToolExecutionGate
         ?array $assistantTools = null,
         bool $allowUnattended = false,
         ?string $assistantKey = null,
+        ?string $nodeApproval = null,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
         if (null === $descriptor) {
             throw new ToolNotRegisteredException($toolName);
         }
 
+        $nodeOverride = PolicyOutcome::tryFrom((string) $nodeApproval);
+
         if (!$this->toolsConfig->isApprovalsEnabled($userId)) {
             return [
-                'outcome' => PolicyOutcome::Auto,
+                'outcome' => PolicyOutcome::Block === $nodeOverride ? PolicyOutcome::Block : PolicyOutcome::Auto,
                 'descriptor' => $descriptor,
                 'approval' => null,
-                'refusal' => null,
+                'refusal' => PolicyOutcome::Block === $nodeOverride
+                    ? 'I cannot do that. This step is set to always ask — and it is blocked.'
+                    : null,
             ];
         }
 
@@ -62,6 +67,7 @@ final readonly class ToolExecutionGate
             $assistantTools,
             $allowUnattended,
             $assistantKey,
+            $nodeOverride,
         );
 
         if (PolicyOutcome::Block === $outcome) {

@@ -3,17 +3,25 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTaskCard from '@/components/config/SavedTaskCard.vue'
 import type { SavedTask, SavedTaskRun } from '@/services/api/savedTasksApi'
 
-const { mockUpdate, mockRun, mockRuns, mockResume, mockRemove, mockPush, mockConfirm } = vi.hoisted(
-  () => ({
-    mockUpdate: vi.fn(),
-    mockRun: vi.fn(),
-    mockRuns: vi.fn(),
-    mockResume: vi.fn(),
-    mockRemove: vi.fn(),
-    mockPush: vi.fn(),
-    mockConfirm: vi.fn(),
-  })
-)
+const {
+  mockUpdate,
+  mockRun,
+  mockRuns,
+  mockResume,
+  mockRemove,
+  mockPush,
+  mockConfirm,
+  mockWorkflowsEnabled,
+} = vi.hoisted(() => ({
+  mockUpdate: vi.fn(),
+  mockRun: vi.fn(),
+  mockRuns: vi.fn(),
+  mockResume: vi.fn(),
+  mockRemove: vi.fn(),
+  mockPush: vi.fn(),
+  mockConfirm: vi.fn(),
+  mockWorkflowsEnabled: vi.fn(() => false),
+}))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
   savedTasksApi: {
@@ -31,6 +39,10 @@ vi.mock('@/composables/useNotification', () => ({
 
 vi.mock('@/composables/useIamFeature', () => ({
   isIamSharingEnabled: () => false,
+}))
+
+vi.mock('@/composables/useWorkflowsFeature', () => ({
+  isWorkflowsBuilderEnabled: () => mockWorkflowsEnabled(),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -86,13 +98,14 @@ const mountCard = (value: SavedTask) =>
   mount(SavedTaskCard, {
     props: { task: value },
     global: {
-      stubs: { Icon: true, ShareDialog: true },
+      stubs: { Icon: true, ShareDialog: true, SavedTaskStepsEditor: true },
     },
   })
 
 describe('SavedTaskCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockWorkflowsEnabled.mockReturnValue(false)
     mockConfirm.mockResolvedValue(false)
     mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
       task({ ...patch } as Partial<SavedTask>)
@@ -276,6 +289,20 @@ describe('SavedTaskCard', () => {
     )
     expect(mockRemove).toHaveBeenCalledWith(7)
     expect(wrapper.emitted('deleted')).toEqual([[7]])
+  })
+
+  it('hides Steps when the builder flag is off', () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.find('[data-testid="btn-saved-task-steps"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="saved-task-webhook"]').exists()).toBe(false)
+  })
+
+  it('shows Steps when the builder flag is on', () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    const wrapper = mountCard(task())
+    expect(wrapper.find('[data-testid="btn-saved-task-steps"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(false)
   })
 
   it('does not delete when the confirm is cancelled', async () => {

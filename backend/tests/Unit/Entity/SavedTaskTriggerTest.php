@@ -19,17 +19,12 @@ final class SavedTaskTriggerTest extends TestCase
         }
     }
 
-    /**
-     * The webhook ingress endpoint does not exist yet (Sprint 4, E22+). A task
-     * stored with this trigger could never fire, so the entity must reject it
-     * until the route ships.
-     */
-    public function testRejectsWebhookTriggerUntilIngressExists(): void
+    public function testAcceptsWebhookTriggerNowThatIngressExists(): void
     {
         $task = new SavedTask(1, 42, 'Meeting requests from mail');
+        $task->setTrigger(SavedTask::TRIGGER_WEBHOOK, ['token' => 'abc']);
 
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Unsupported trigger type "webhook"');
-        $task->setTrigger(SavedTask::TRIGGER_WEBHOOK, null);
+        self::assertSame(SavedTask::TRIGGER_WEBHOOK, $task->getTriggerType());
+        self::assertContains(SavedTask::TRIGGER_WEBHOOK, SavedTask::TRIGGER_TYPES);
     }
 }

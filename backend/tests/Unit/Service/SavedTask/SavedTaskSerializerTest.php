@@ -46,6 +46,24 @@ final class SavedTaskSerializerTest extends TestCase
         self::assertSame('Summarize my inbox', $data['instructionPreview']);
     }
 
+    public function testWebhookTriggerNeverExposesTheHmacSecret(): void
+    {
+        $this->prompts->method('find')->willReturn(null);
+        $task = new SavedTask(1, 12, 'From n8n');
+        $task->setTrigger(SavedTask::TRIGGER_WEBHOOK, [
+            'token' => 'public-token',
+            'hmacSecret' => 'super-secret',
+        ]);
+
+        $data = $this->serializer->task($task);
+        $config = $data['triggerConfig'];
+
+        self::assertIsArray($config);
+        self::assertSame('public-token', $config['token']);
+        self::assertTrue($config['hmacConfigured']);
+        self::assertArrayNotHasKey('hmacSecret', $config);
+    }
+
     public function testMissingPromptYieldsNullPreview(): void
     {
         $this->prompts->method('find')->willReturn(null);

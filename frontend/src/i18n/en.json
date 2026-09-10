@@ -1992,7 +1992,8 @@
         "manual": "started by you",
         "schedule": "scheduled run",
         "chat": "from chat",
-        "inbound_email": "incoming email"
+        "inbound_email": "incoming email",
+        "webhook": "started by another system"
       },
       "advancedSteps": "Advanced steps",
       "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
@@ -2057,7 +2058,8 @@
         "off": "No schedule",
         "hourly": "Every hour",
         "daily": "Every day",
-        "weekdays": "Every weekday"
+        "weekdays": "Every weekday",
+        "webhook": "Let another system start this"
       },
       "summary": {
         "simple": "Runs {when}.",
@@ -2069,7 +2071,8 @@
           "weekly": "every weekday at {at} ({tz})",
           "schedule": "on a schedule",
           "inboundEmail": "when new mail arrives",
-          "chat": "when a matching chat message arrives"
+          "chat": "when a matching chat message arrives",
+          "webhook": "when another system calls it"
         },
         "reads": {
           "instruction": "this instruction",
@@ -6472,5 +6475,66 @@
       "howToEnable": "How to enable it",
       "openFeatureStatus": "Open feature status"
     }
+  },
+  "workflows": {
+    "steps": "Steps",
+    "stepsTitle": "Steps for this task",
+    "stepsSubtitle": "Each step runs in order. Most tasks only need one or two.",
+    "addStep": "Add a step",
+    "saveSteps": "Save steps",
+    "saved": "Steps saved.",
+    "saveFailed": "Could not save these steps.",
+    "close": "Close",
+    "deleteStep": "Remove this step",
+    "deleteStepConfirm": "Remove step {n}?",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "askBefore": "Ask me before this step",
+    "askBeforeHint": "The step waits for your OK. This can only make the task more careful, never less.",
+    "fromTrigger": "From the starting event",
+    "fromStep": "From step {n}",
+    "literal": "Type a value",
+    "inputValue": "Value",
+    "condition": "Only continue if",
+    "operator": {
+      "equals": "equals",
+      "contains": "contains",
+      "matches": "matches",
+      "not_empty": "is not empty"
+    },
+    "sendToWebhook": "Send to another system",
+    "webhookUrl": "Address (https)",
+    "webhookSecret": "Shared secret (optional)",
+    "pickTool": "Choose a tool",
+    "thisAssistant": "This assistant",
+    "kinds": {
+      "email_search": "Search mail",
+      "summarize": "Summarize",
+      "chat": "Write an answer",
+      "email_me": "Mail me the result",
+      "tool_call": "Use a connected tool",
+      "condition": "Only continue if…",
+      "outbound_webhook": "Send to another system"
+    },
+    "kindHints": {
+      "email_search": "Looks in the connected mailbox.",
+      "summarize": "Shortens the previous result.",
+      "chat": "Uses this task’s assistant.",
+      "email_me": "Sends you an email.",
+      "tool_call": "Runs a tool you already connected.",
+      "condition": "Stops later steps when the value does not match.",
+      "outbound_webhook": "Posts the result to an https address."
+    },
+    "empty": "No steps yet. Add one to start.",
+    "stepN": "Step {n}",
+    "webhookCardTitle": "Another system can start this",
+    "webhookCardHint": "Copy this address into n8n, Make, or a script. Anyone with the address can start a run as you.",
+    "copyUrl": "Copy address",
+    "urlCopied": "Address copied.",
+    "regenerate": "Create a new address",
+    "regenerateConfirm": "The old address will stop working. Continue?",
+    "hmacEnable": "Require a signature",
+    "hmacHint": "The other system must send a matching signature. Safer if the address might leak.",
+    "hmacOn": "Signature required. The secret is stored on the server and is never shown again."
   }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\SavedTask;
 
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
+use App\Service\SavedTask\WorkflowsConfig;
+use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 
 final class SavedTaskGraphValidatorTest extends TestCase
@@ -66,5 +68,94 @@ final class SavedTaskGraphValidatorTest extends TestCase
         );
 
         $this->assertSame([], $errors);
+    }
+
+    public function testFlagOffRejectsBuilderOnlyCapabilitiesAsUnknown(): void
+    {
+        $errors = $this->validator->validate(
+            [
+                'version' => 1,
+                'trigger' => ['type' => 'manual'],
+                'nodes' => [['id' => 'n1', 'capability' => 'tool_call', 'depends_on' => [], 'params' => ['tool' => 'custom:x']]],
+            ],
+            'manual',
+            null,
+        );
+
+        $this->assertContains('step[0] has an unknown action', $errors);
+    }
+
+    public function testFlagOnAcceptsBuilderCapabilitiesAndRejectsAutoOverride(): void
+    {
+        $config = $this->createMock(WorkflowsConfig::class);
+        $config->method('isBuilderEnabled')->willReturn(true);
+        $ssrf = $this->createMock(SsrfGuard::class);
+        $ssrf->method('isBlockedUrl')->willReturn(false);
+        $validator = new SavedTaskGraphValidator($config, $ssrf);
+
+        $ok = $validator->validate(
+            [
+                'version' => 1,
+                'trigger' => ['type' => 'webhook'],
+                'nodes' => [
+                    [
+                        'id' => 'n1',
+                        'capability' => 'tool_call',
+                        'depends_on' => [],
+                        'params' => ['tool' => 'custom:x', 'approval' => 'approve'],
+                    ],
+                    [
+                        'id' => 'n2',
+                        'capability' => 'outbound_webhook',
+                        'depends_on' => ['n1'],
+                        'params' => [
+                            'url' => 'https://example.com/hook',
+                            'inputs' => ['text' => ['from' => 'n1', 'field' => 'text']],
+                        ],
+                    ],
+                ],
+            ],
+            'webhook',
+            ['token' => 't'],
+        );
+        $this->assertSame([], $ok);
+
+        $auto = $validator->validate(
+            [
+                'version' => 1,
+                'trigger' => ['type' => 'manual'],
+                'nodes' => [[
+                    'id' => 'n1',
+                    'capability' => 'tool_call',
+                    'depends_on' => [],
+                    'params' => ['tool' => 'custom:x', 'approval' => 'auto'],
+                ]],
+            ],
+            'manual',
+            null,
+        );
+        $this->assertContains('step[0] can only tighten approval (ask me, or block)', $auto);
+
+        $from = $validator->validate(
+            [
+                'version' => 1,
+                'trigger' => ['type' => 'manual'],
+                'nodes' => [
+                    ['id' => 'n1', 'capability' => 'chat', 'depends_on' => []],
+                    [
+                        'id' => 'n2',
+                        'capability' => 'condition',
+                        'depends_on' => [],
+                        'params' => [
+                            'operator' => 'equals',
+                            'inputs' => ['input' => ['from' => 'n1', 'field' => 'text']],
+                        ],
+                    ],
+                ],
+            ],
+            'manual',
+            null,
+        );
+        $this->assertContains("step[1] input 'input' must come from an earlier step this step depends on", $from);
     }
 }
