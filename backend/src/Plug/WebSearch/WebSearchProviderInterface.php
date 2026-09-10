@@ -20,5 +20,13 @@ interface WebSearchProviderInterface
 
     public function search(WebSearchQuery $query): SearchResultSet;
 
+    /**
+     * Cheap config check (key / URL present). Used on the chat search path.
+     */
     public function health(): PlugHealth;
+
+    /**
+     * Live reachability / credential check. Admin badges use this, not {@see health()}.
+     */
+    public function probe(): PlugHealth;
 }

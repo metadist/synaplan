@@ -58,4 +58,12 @@ final readonly class FirecrawlClient
 
         return $response->toArray(false);
     }
+
+    public function probe(): void
+    {
+        $this->search([
+            'query' => 'synaplan',
+            'limit' => 1,
+        ]);
+    }
 }

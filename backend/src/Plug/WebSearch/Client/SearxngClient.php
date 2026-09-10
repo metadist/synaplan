@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Plug\WebSearch\Client;
 
 use App\Plug\PlugConfigService;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -59,6 +60,43 @@ final readonly class SearxngClient
         }
 
         return $data;
+    }
+
+    /**
+     * Cheap reachability check. A set URL is not enough — a stopped sidecar
+     * still has SEARXNG_BASE_URL.
+     */
+    public function probe(): void
+    {
+        if (!$this->isConfigured()) {
+            throw new \RuntimeException('SEARXNG_BASE_URL is unset or disabled');
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', $this->endpoint('/search'), [
+                'timeout' => 5,
+                'query' => [
+                    'q' => 'synaplan',
+                    'format' => 'json',
+                ],
+                'headers' => ['Accept' => 'application/json'],
+            ]);
+            $status = $response->getStatusCode();
+            if ($status >= 400) {
+                throw new \RuntimeException('SearXNG probe returned HTTP '.$status);
+            }
+            $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            $message = $e->getMessage();
+            if (str_contains(strtolower($message), 'timed out') || str_contains(strtolower($message), 'timeout')) {
+                throw new \RuntimeException('SearXNG request timed out', 0, $e);
+            }
+            if (str_contains(strtolower($message), 'refused') || str_contains(strtolower($message), 'could not resolve')) {
+                throw new \RuntimeException('SearXNG unavailable — connection refused', 0, $e);
+            }
+
+            throw new \RuntimeException('SearXNG unavailable: '.$message, 0, $e);
+        }
     }
 
     private function endpoint(string $path): string

@@ -11,6 +11,7 @@ use App\Plug\WebSearch\SearchResult;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
 use App\Plug\WebSearch\WebSearchOptionMapper;
+use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 
@@ -97,5 +98,14 @@ final readonly class SearxngAdapter implements WebSearchProviderInterface
         return $this->client->isConfigured()
             ? PlugHealth::available()
             : PlugHealth::unavailable('SEARXNG_BASE_URL is unset or disabled');
+    }
+
+    public function probe(): PlugHealth
+    {
+        return WebSearchProbe::run(
+            $this->client->isConfigured(),
+            'SEARXNG_BASE_URL is unset or disabled',
+            $this->client->probe(...),
+        );
     }
 }

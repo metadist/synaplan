@@ -22,6 +22,23 @@ use Symfony\Component\HttpClient\MockHttpClient;
 
 final class SearxngAdapterHealthTest extends TestCase
 {
+    public function testConfiguredButUnreachableSidecarIsUnavailableOnProbe(): void
+    {
+        $http = new MockHttpClient(static function (): never {
+            throw new class('Connection refused') extends \RuntimeException implements \Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface {};
+        });
+        $adapter = new SearxngAdapter(new SearxngClient(
+            $http,
+            new PlugConfigService($this->repo([])),
+            'http://searxng.test',
+        ));
+
+        self::assertTrue($adapter->health()->available, 'A set URL is still configured');
+        $probed = $adapter->probe();
+        self::assertFalse($probed->available);
+        self::assertStringContainsString('refused', strtolower((string) $probed->reason));
+    }
+
     public function testEmptyBaseUrlIsUnavailable(): void
     {
         $adapter = new SearxngAdapter(new SearxngClient(
@@ -130,6 +147,11 @@ final class SearxngAdapterHealthTest extends TestCase
                 return $this->available
                     ? PlugHealth::available()
                     : PlugHealth::unavailable($this->providerKey.' unavailable');
+            }
+
+            public function probe(): PlugHealth
+            {
+                return $this->health();
             }
         };
     }

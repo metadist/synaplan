@@ -58,4 +58,13 @@ final readonly class TavilyClient
 
         return $response->toArray(false);
     }
+
+    public function probe(): void
+    {
+        $this->search([
+            'query' => 'synaplan',
+            'max_results' => 1,
+            'search_depth' => 'basic',
+        ]);
+    }
 }

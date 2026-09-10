@@ -153,6 +153,11 @@ final class WebSearchRegistryFallbackTest extends TestCase
                     ? PlugHealth::available()
                     : PlugHealth::unavailable($this->providerKey.' unavailable');
             }
+
+            public function probe(): PlugHealth
+            {
+                return $this->health();
+            }
         };
     }
 
@@ -189,6 +194,11 @@ final class WebSearchRegistryFallbackTest extends TestCase
             public function health(): PlugHealth
             {
                 return PlugHealth::available();
+            }
+
+            public function probe(): PlugHealth
+            {
+                return $this->health();
             }
         };
     }

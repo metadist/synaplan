@@ -8,6 +8,7 @@ use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
 use App\Plug\WebSearch\SearchResultSet;
 use App\Plug\WebSearch\WebSearchCapabilities;
+use App\Plug\WebSearch\WebSearchProbe;
 use App\Plug\WebSearch\WebSearchProviderInterface;
 use App\Plug\WebSearch\WebSearchQuery;
 use App\Service\Search\BraveSearchService;
@@ -58,5 +59,16 @@ final readonly class BraveSearchAdapter implements WebSearchProviderInterface
         return $this->braveSearch->isEnabled()
             ? PlugHealth::available()
             : PlugHealth::unavailable('Brave Search is not enabled or has no API key');
+    }
+
+    public function probe(): PlugHealth
+    {
+        return WebSearchProbe::run(
+            $this->braveSearch->isEnabled(),
+            'Brave Search is not enabled or has no API key',
+            function (): void {
+                $this->braveSearch->search('synaplan', ['count' => 1]);
+            },
+        );
     }
 }

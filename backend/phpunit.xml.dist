@@ -57,6 +57,9 @@
              when the Collabora sidecar is up; without force=true, kernel tests
              (runtime config, sorter snapshots) would see the live engine. -->
         <env name="OFFICE_CONVERT_URL" value="" force="true" />
+        <!-- Compose injects SEARXNG_BASE_URL=http://searxng:8080. Admin status
+             now live-probes that sidecar; keep the suite off the network. -->
+        <env name="SEARXNG_BASE_URL" value="" force="true" />
         <server name="OFFICE_CONVERT_URL" value="" force="true" />
         <env name="OFFICE_CONVERT_TIMEOUT_MS" value="60000" force="true" />
     </php>
