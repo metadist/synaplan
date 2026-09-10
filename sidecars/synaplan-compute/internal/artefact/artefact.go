@@ -1,19 +1,22 @@
 // Package artefact lists and streams files from a run's /out directory.
-// Results are untrusted: regular files only, Lstat + O_NOFOLLOW, MIME allow-list.
+// Results are untrusted: regular files only, no symlink is ever followed
+// (safepath), and the MIME allow-list and size cap apply to both listing
+// and download so a rejected row can never be fetched.
 package artefact
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/metadist/synaplan-compute/internal/names"
+	"github.com/metadist/synaplan-compute/internal/safepath"
 	"github.com/metadist/synaplan-compute/pkg/contract"
 )
 
@@ -26,10 +29,20 @@ type Item struct {
 	Rejected string
 }
 
+// Refused is returned by Open for a listed-but-rejected artefact.
+type Refused struct {
+	Code string
+}
+
+func (e *Refused) Error() string { return "artefact refused: " + e.Code }
+
+// ErrNotFound is returned by Open when name is not a regular file in /out.
+var ErrNotFound = errors.New("artefact not found")
+
 // List regular files under outDir. Symlinks are omitted. Total size above
 // maxBytes marks subsequent files rejected.
 func List(outDir string, maxBytes int64, mimeAllow []string) ([]Item, error) {
-	entries, err := os.ReadDir(outDir)
+	entries, err := safepath.ReadDir(outDir, "")
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []Item{}, nil
@@ -43,59 +56,89 @@ func List(outDir string, maxBytes int64, mimeAllow []string) ([]Item, error) {
 	var total int64
 	items := make([]Item, 0, len(entries))
 	for _, e := range entries {
-		name := e.Name()
-		if !names.FileName(name) {
+		if e.Symlink || e.Info == nil || !e.Info.Mode().IsRegular() || !names.FileName(e.Name) {
 			continue
 		}
-		full := filepath.Join(outDir, name)
-		st, err := os.Lstat(full)
+		it := Item{Name: e.Name, Size: e.Info.Size()}
+		f, st, err := safepath.OpenFile(outDir, e.Name)
 		if err != nil {
 			continue
 		}
-		if !st.Mode().IsRegular() {
-			continue
-		}
-		it := Item{Name: name, Size: st.Size(), Mime: sniff(full, name)}
-		sum, err := hashFile(full)
-		if err == nil {
+		it.Size = st.Size()
+		it.Mime = sniffOpen(f, e.Name)
+		if sum, err := hashOpen(f); err == nil {
 			it.SHA256 = sum
 		}
+		_ = f.Close()
 		if _, ok := allow[it.Mime]; !ok && len(allow) > 0 {
-			it.Rejected = "mime_not_allowed"
+			it.Rejected = contract.ErrMimeNotAllowed
 		}
-		if maxBytes > 0 && total+st.Size() > maxBytes {
-			it.Rejected = "output_limit"
+		if maxBytes > 0 && total+it.Size > maxBytes {
+			it.Rejected = contract.ReasonOutputLimit
 		}
 		if it.Rejected == "" {
-			total += st.Size()
+			total += it.Size
 		}
 		items = append(items, it)
 	}
 	return items, nil
 }
 
-// Open streams a regular file; symlinks and odd names are refused.
-func Open(outDir, name string) (*os.File, error) {
+// Open streams a regular file that List would report as accepted. Symlinks,
+// odd names, disallowed MIME types, and files beyond the size cap are refused.
+func Open(outDir, name string, maxBytes int64, mimeAllow []string) (*os.File, Item, error) {
 	if !names.FileName(name) {
-		return nil, os.ErrInvalid
+		return nil, Item{}, ErrNotFound
 	}
-	full := filepath.Join(outDir, name)
-	st, err := os.Lstat(full)
+	items, err := List(outDir, maxBytes, mimeAllow)
 	if err != nil {
-		return nil, err
+		return nil, Item{}, err
 	}
-	if !st.Mode().IsRegular() {
-		return nil, os.ErrPermission
+	for _, it := range items {
+		if it.Name != name {
+			continue
+		}
+		if it.Rejected != "" {
+			return nil, it, &Refused{Code: it.Rejected}
+		}
+		f, _, err := safepath.OpenFile(outDir, name)
+		if err != nil {
+			return nil, it, err
+		}
+		return f, it, nil
 	}
-	return os.OpenFile(full, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+	return nil, Item{}, ErrNotFound
 }
 
-func hashFile(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
+// TotalBytes sums regular-file sizes directly under each dir without
+// following symlinks. Missing dirs count as zero.
+func TotalBytes(dirs ...string) int64 {
+	var total int64
+	for _, dir := range dirs {
+		entries, err := safepath.ReadDir(dir, "")
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.Symlink || e.Info == nil {
+				continue
+			}
+			if e.Info.IsDir() {
+				total += TotalBytes(filepath.Join(dir, e.Name))
+				continue
+			}
+			if e.Info.Mode().IsRegular() {
+				total += e.Info.Size()
+			}
+		}
+	}
+	return total
+}
+
+func hashOpen(f *os.File) (string, error) {
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return "", err
 	}
-	defer f.Close()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
@@ -103,21 +146,16 @@ func hashFile(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-func sniff(path, name string) string {
+func sniffOpen(f *os.File, name string) string {
 	if ext := strings.ToLower(filepath.Ext(name)); ext != "" {
 		if m := mime.TypeByExtension(ext); m != "" {
-			return strings.Split(m, ";")[0]
+			return strings.TrimSpace(strings.Split(m, ";")[0])
 		}
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return "application/octet-stream"
-	}
-	defer f.Close()
 	buf := make([]byte, 512)
 	n, _ := f.Read(buf)
 	ct := http.DetectContentType(buf[:n])
-	return strings.Split(ct, ";")[0]
+	return strings.TrimSpace(strings.Split(ct, ";")[0])
 }
 
 // ToContract maps items to protocol artefacts.

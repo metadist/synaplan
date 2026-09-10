@@ -8,8 +8,9 @@
 package contract
 
 import (
+	"bufio"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 )
@@ -54,7 +55,47 @@ const (
 	ErrDockerUnavailable = "docker_unavailable"
 	ErrInvalidProtocol   = "invalid_protocol"
 	ErrInvalidWorkspace  = "invalid_workspace"
+	ErrInvalidJSON       = "invalid_json"
+	ErrInternal          = "internal_error"
+	ErrRunNotFound       = "run_not_found"
+	ErrArtefactNotFound  = "artefact_not_found"
+	ErrMimeNotAllowed    = "mime_not_allowed"
 )
+
+// SSE event names emitted by GET /v1/runs/{id}/logs.
+const (
+	LogEventStdout    = "stdout"
+	LogEventStderr    = "stderr"
+	LogEventStatus    = "status"
+	LogEventTruncated = "truncated"
+	LogEventDone      = "done"
+)
+
+// LogChunk is the data of a stdout or stderr event.
+type LogChunk struct {
+	Seq  int    `json:"seq"`
+	Text string `json:"text"`
+}
+
+// LogStatus is the data of a status event.
+type LogStatus struct {
+	Status string `json:"status"`
+}
+
+// LogDone is the data of the final done event; exitCode is absent when the
+// container never reported one (cancelled, docker unavailable).
+type LogDone struct {
+	Status   string `json:"status"`
+	ExitCode *int   `json:"exitCode,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+}
+
+// LimitDetail is the details object of a limits_exceed_caps error.
+type LimitDetail struct {
+	Field     string  `json:"field"`
+	Requested float64 `json:"requested"`
+	Cap       float64 `json:"cap"`
+}
 
 // RunRequest is POST /v1/runs request.json.
 type RunRequest struct {
@@ -125,8 +166,10 @@ type RunStatus struct {
 	Truncated  Truncated `json:"truncated"`
 }
 
-// Usage is resource accounting for a run.
+// Usage is resource accounting for a run. wallMs is the container wall time;
+// cpuSec and maxMemoryMb stay zero until cgroup accounting lands (A3).
 type Usage struct {
+	WallMs      int64   `json:"wallMs"`
 	CPUSec      float64 `json:"cpuSec"`
 	MaxMemoryMb int     `json:"maxMemoryMb"`
 	BytesIn     int64   `json:"bytesIn"`
@@ -226,12 +269,24 @@ type Artefact struct {
 	Rejected string `json:"rejected,omitempty"`
 }
 
+// DecodeError carries the protocol error code for a failed decode:
+// unknown_field for DisallowUnknownFields violations, invalid_json otherwise.
+type DecodeError struct {
+	Code string
+	Err  error
+}
+
+func (e *DecodeError) Error() string { return e.Code + ": " + e.Err.Error() }
+
+// Unwrap exposes the underlying decoder error.
+func (e *DecodeError) Unwrap() error { return e.Err }
+
 // DecodeJSON decodes v with unknown fields rejected. maxBytes 0 means no extra cap.
 func DecodeJSON(r io.Reader, v any) error {
 	dec := json.NewDecoder(r)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
-		return fmt.Errorf("%s: %w", ErrUnknownField, err)
+		return &DecodeError{Code: classifyDecodeError(err), Err: err}
 	}
 	return nil
 }
@@ -244,11 +299,75 @@ func DecodeJSONLimited(r io.Reader, maxBytes int64, v any) error {
 	return DecodeJSON(r, v)
 }
 
+func classifyDecodeError(err error) string {
+	if strings.Contains(err.Error(), "unknown field") {
+		return ErrUnknownField
+	}
+	return ErrInvalidJSON
+}
+
+// DecodeCode returns the protocol code for a DecodeJSON error, or "" when err
+// did not come from DecodeJSON.
+func DecodeCode(err error) string {
+	var de *DecodeError
+	if errors.As(err, &de) {
+		return de.Code
+	}
+	return ""
+}
+
 // UnknownField reports whether err came from DisallowUnknownFields.
 func UnknownField(err error) bool {
-	if err == nil {
-		return false
+	return DecodeCode(err) == ErrUnknownField
+}
+
+// SSEEvent is one parsed text/event-stream record.
+type SSEEvent struct {
+	ID    string
+	Event string
+	Data  string
+}
+
+// ParseSSE reads a text/event-stream body into records. Only id, event, and
+// data fields are recognised; comments and unknown fields are ignored.
+func ParseSSE(r io.Reader) ([]SSEEvent, error) {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	var out []SSEEvent
+	var cur SSEEvent
+	var dataLines []string
+	flush := func() {
+		if cur.Event == "" && len(dataLines) == 0 && cur.ID == "" {
+			return
+		}
+		cur.Data = strings.Join(dataLines, "\n")
+		out = append(out, cur)
+		cur = SSEEvent{}
+		dataLines = nil
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "unknown field") || strings.HasPrefix(msg, ErrUnknownField)
+	for sc.Scan() {
+		line := sc.Text()
+		if line == "" {
+			flush()
+			continue
+		}
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		field, value, _ := strings.Cut(line, ":")
+		value = strings.TrimPrefix(value, " ")
+		switch field {
+		case "id":
+			cur.ID = value
+		case "event":
+			cur.Event = value
+		case "data":
+			dataLines = append(dataLines, value)
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	flush()
+	return out, nil
 }

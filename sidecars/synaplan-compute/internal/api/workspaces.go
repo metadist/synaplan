@@ -1,8 +1,10 @@
 package api
 
 import (
+	"errors"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/metadist/synaplan-compute/internal/audit"
@@ -13,8 +15,14 @@ import (
 
 func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	var body contract.WorkspaceCreate
+	if r.ContentLength > s.cfg.MaxRequestBytes {
+		writeError(w, http.StatusRequestEntityTooLarge, contract.ErrPayloadTooLarge, "request body exceeds the configured maximum", nil)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxRequestBytes)
 	if err := contract.DecodeJSONLimited(r.Body, s.cfg.MaxRequestBytes, &body); err != nil {
-		writeError(w, http.StatusBadRequest, contract.ErrUnknownField, err.Error(), nil)
+		code := bodyErrCode(err)
+		writeError(w, statusFor(code), code, err.Error(), nil)
 		return
 	}
 	if body.Owner == "" {
@@ -23,7 +31,7 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	meta, err := s.ws.Create(body.Owner, body.QuotaMb)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, contract.ErrMissingOwner, err.Error(), nil)
+		writeError(w, http.StatusInternalServerError, contract.ErrInternal, "workspace could not be created", nil)
 		return
 	}
 	s.audit.Log(audit.Event{Event: audit.WorkspaceCreated, Owner: meta.Owner})
@@ -78,9 +86,25 @@ func (s *Server) handleWorkspaceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
-	w.Header().Set("Content-Type", info.Mime)
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+info.Path+"\"")
+	if !s.mimeAllowed(info.Mime) {
+		writeError(w, http.StatusForbidden, contract.ErrMimeNotAllowed, "file type is not on the allow-list", nil)
+		return
+	}
+	setDownloadHeaders(w, info.Mime, info.Path, info.Size)
+	w.WriteHeader(http.StatusOK)
 	_, _ = io.Copy(w, f)
+}
+
+func (s *Server) mimeAllowed(m string) bool {
+	if len(s.cfg.ArtefactMIMEAllow) == 0 {
+		return true
+	}
+	for _, a := range s.cfg.ArtefactMIMEAllow {
+		if a == m {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) {
@@ -99,14 +123,18 @@ func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeWorkspaceErr(w http.ResponseWriter, err error) {
-	switch err {
-	case workspace.ErrNotOwned:
+	switch {
+	case errors.Is(err, workspace.ErrNotOwned):
 		writeError(w, http.StatusForbidden, contract.ErrWorkspaceNotOwned, err.Error(), nil)
-	case workspace.ErrNotFound:
+	case errors.Is(err, workspace.ErrNotFound):
 		writeError(w, http.StatusNotFound, contract.ErrWorkspaceNotFound, err.Error(), nil)
-	case workspace.ErrQuota:
+	case errors.Is(err, workspace.ErrQuota):
 		writeError(w, http.StatusConflict, contract.ErrWorkspaceQuota, err.Error(), nil)
-	default:
+	case errors.Is(err, workspace.ErrBadName):
 		writeError(w, http.StatusBadRequest, contract.ErrBadFileName, err.Error(), nil)
+	case errors.Is(err, os.ErrNotExist):
+		writeError(w, http.StatusNotFound, contract.ErrWorkspaceNotFound, "file not found", nil)
+	default:
+		writeError(w, http.StatusInternalServerError, contract.ErrInternal, "workspace operation failed", nil)
 	}
 }

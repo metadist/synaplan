@@ -10,5 +10,3 @@ linters:
     - revive
 run:
   timeout: 5m
-issues:
-  exclude-use-default: false

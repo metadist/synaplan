@@ -22,31 +22,47 @@ import (
 
 const testToken = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
-func testServer(t *testing.T) *httptest.Server {
+type testOpts struct {
+	runner runner.Runner
+	cfg    func(*config.Config)
+}
+
+func newTestServer(t *testing.T, o testOpts) (*Server, *httptest.Server) {
 	t.Helper()
 	cfg := &config.Config{
-		AuthToken:       testToken,
-		ScratchDir:      t.TempDir(),
-		WorkspacesDir:   t.TempDir(),
-		MaxTimeoutSec:   300,
-		MaxMemoryMb:     2048,
-		MaxCPU:          2,
-		MaxPids:         256,
-		MaxOutputMb:     200,
-		MaxConcurrent:   8,
-		QueueMax:        16,
-		LogCapBytes:     256 * 1024,
-		MaxRequestBytes: 8 << 20,
-		MaxFiles:        32,
-		EgressMaxHosts:  8,
+		AuthToken:         testToken,
+		ScratchDir:        t.TempDir(),
+		WorkspacesDir:     t.TempDir(),
+		SandboxUID:        65534,
+		SandboxGID:        65534,
+		MaxTimeoutSec:     300,
+		MaxMemoryMb:       2048,
+		MaxCPU:            2,
+		MaxPids:           256,
+		MaxOutputMb:       200,
+		MaxConcurrent:     8,
+		QueueMax:          16,
+		LogCapBytes:       256 * 1024,
+		RunRetention:      time.Hour,
+		MaxRequestBytes:   8 << 20,
+		MaxFiles:          32,
+		EgressMaxHosts:    8,
+		ArtefactMIMEAllow: []string{"image/png", "text/plain", "text/csv", "application/json"},
+	}
+	if o.cfg != nil {
+		o.cfg(cfg)
 	}
 	ws, err := workspace.New(cfg.WorkspacesDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	var rn runner.Runner = &runner.Docker{}
+	if o.runner != nil {
+		rn = o.runner
+	}
 	s, err := New(Options{
 		Config: cfg,
-		Docker: &runner.Docker{},
+		Docker: rn,
 		Store:  ws,
 		Audit:  audit.New(io.Discard),
 		Tier:   rt.Selection{Tier: rt.TierDocker},
@@ -56,6 +72,12 @@ func testServer(t *testing.T) *httptest.Server {
 	}
 	ts := httptest.NewServer(s.Handler())
 	t.Cleanup(ts.Close)
+	return s, ts
+}
+
+func testServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	_, ts := newTestServer(t, testOpts{})
 	return ts
 }
 
@@ -141,7 +163,7 @@ func TestWorkspaceQuotaKillsRun(t *testing.T) {
 	wsID := createWorkspace(t, ts, "user:123", 1)
 	body := validRun()
 	body.Workspace = contract.Workspace{Kind: "user", ID: wsID}
-	// JSON path has no extra files; still 202 is ok. Quota with a large part:
+	body.Files = append(body.Files, contract.FileRef{Name: "blob.bin", Role: "input"})
 	req, contentType := multipartRun(t, body, map[string][]byte{"blob.bin": bytes.Repeat([]byte("x"), 2*1024*1024)})
 	httpReq, err := http.NewRequest(http.MethodPost, ts.URL+"/v1/runs", req)
 	if err != nil {

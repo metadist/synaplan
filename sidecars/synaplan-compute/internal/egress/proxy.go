@@ -1,3 +1,10 @@
+// Package egress holds the per-run network allow-list policy.
+//
+// Phases A0–A2 do not implement egress: there is no proxy listener and the
+// runner never selects a NetworkMode other than none. Validate therefore
+// fails closed on any non-empty allow-list. CheckAllowList and Proxy are the
+// future policy (pinned IPs, no private ranges, host cap) and are kept under
+// test so the contract does not drift before the proxy exists.
 package egress
 
 import (
@@ -8,61 +15,47 @@ import (
 	"github.com/metadist/synaplan-compute/pkg/contract"
 )
 
-const networkNone = "none"
-
-// Decision is the networking result for a run.
-type Decision struct {
-	NetworkMode string
-	Env         []string
-}
-
-// Config is the service-level egress policy.
+// Config is the service-level egress policy. Enabled is reserved: until a
+// proxy ships it does not open the network.
 type Config struct {
 	Enabled  bool
 	MaxHosts int
 }
 
-// Result of Validate.
-type Result struct {
-	Decision Decision
-	Hosts    []string
+// Validate is what POST /v1/runs applies: an empty allow-list is the only
+// accepted value. Any entry is refused with egress_not_allowed.
+func Validate(_ Config, eg contract.Egress) error {
+	if len(eg.Allow) == 0 {
+		return nil
+	}
+	return &Refused{Code: contract.ErrEgressNotAllowed, Message: "egress is not available yet; every run is network-isolated"}
 }
 
-// Validate applies C4: empty allow keeps NetworkMode none. A non-empty list
-// is refused when COMPUTE_EGRESS_ENABLED is false, when any entry lacks
-// pinned IPs, names a private range, or exceeds MaxHosts.
-func Validate(cfg Config, eg contract.Egress) (Result, error) {
+// CheckAllowList is the future policy for a non-empty list: refused when the
+// feature is disabled, when any entry lacks pinned IPs, names a private or
+// special-purpose range, or exceeds MaxHosts. It returns the host names.
+func CheckAllowList(cfg Config, eg contract.Egress) ([]string, error) {
 	if len(eg.Allow) == 0 {
-		return Result{Decision: Decision{NetworkMode: networkNone}}, nil
+		return nil, nil
 	}
 	if !cfg.Enabled {
-		return Result{}, &Refused{Code: contract.ErrEgressNotAllowed, Message: "egress is disabled"}
+		return nil, &Refused{Code: contract.ErrEgressNotAllowed, Message: "egress is disabled"}
 	}
 	max := cfg.MaxHosts
 	if max <= 0 {
 		max = 8
 	}
 	if len(eg.Allow) > max {
-		return Result{}, &Refused{Code: contract.ErrEgressNotAllowed, Message: "too many egress hosts"}
+		return nil, &Refused{Code: contract.ErrEgressNotAllowed, Message: "too many egress hosts"}
 	}
 	names := make([]string, 0, len(eg.Allow))
 	for _, h := range eg.Allow {
 		if err := checkHost(h); err != nil {
-			return Result{}, err
+			return nil, err
 		}
 		names = append(names, h.Host)
 	}
-	return Result{
-		Decision: Decision{
-			NetworkMode: "compute-egress",
-			Env: []string{
-				"HTTP_PROXY=http://172.18.0.1:3128",
-				"HTTPS_PROXY=http://172.18.0.1:3128",
-				"NO_PROXY=",
-			},
-		},
-		Hosts: names,
-	}, nil
+	return names, nil
 }
 
 func checkHost(h contract.EgressHost) error {
@@ -84,9 +77,41 @@ func checkHost(h contract.EgressHost) error {
 	return nil
 }
 
+// specialRanges are IPv4 blocks that net.IP predicates do not cover: shared
+// address space (CGNAT), "this" network, IETF protocol assignments,
+// benchmarking, and limited broadcast.
+var specialRanges = mustCIDRs(
+	"100.64.0.0/10",
+	"0.0.0.0/8",
+	"192.0.0.0/24",
+	"198.18.0.0/15",
+	"255.255.255.255/32",
+)
+
+func mustCIDRs(cidrs ...string) []*net.IPNet {
+	out := make([]*net.IPNet, 0, len(cidrs))
+	for _, c := range cidrs {
+		_, n, err := net.ParseCIDR(c)
+		if err != nil {
+			panic(err)
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
 func privateIP(ip net.IP) bool {
-	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
-		ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() ||
+		ip.IsMulticast() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsInterfaceLocalMulticast() {
+		return true
+	}
+	for _, n := range specialRanges {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // Refused is a 400 egress_not_allowed.
@@ -97,8 +122,8 @@ type Refused struct {
 
 func (e *Refused) Error() string { return e.Message }
 
-// Proxy is a CONNECT proxy that dials only pinned IPs. Empty allow is not
-// attached; NetworkMode stays none.
+// Proxy is the pin map a future CONNECT proxy dials from. It has no listener
+// in A0–A2.
 type Proxy struct {
 	allow map[string][]net.IP
 }
@@ -130,9 +155,4 @@ func (p *Proxy) Allowed(host string, port int, ip net.IP) bool {
 		}
 	}
 	return false
-}
-
-// EmptyMeansNone reports whether the decision is isolated.
-func EmptyMeansNone(d Decision) bool {
-	return d.NetworkMode == networkNone
 }

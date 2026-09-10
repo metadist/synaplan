@@ -28,6 +28,22 @@ func TestAllowConstantTimeMatch(t *testing.T) {
 	}
 }
 
+func TestAllowRejectsWrongLengthTokens(t *testing.T) {
+	t.Parallel()
+	b, err := New(testToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tok := range []string{"", "A", testToken[:31], testToken + "A", testToken + testToken} {
+		if b.Allow("Bearer " + tok) {
+			t.Fatalf("token of length %d must not match", len(tok))
+		}
+	}
+	if b.Allow("Bearer ") || b.Allow("Bearer") || b.Allow("bearer "+testToken) {
+		t.Fatal("malformed header must not match")
+	}
+}
+
 func TestNewRejectsShortToken(t *testing.T) {
 	t.Parallel()
 	if _, err := New("too-short"); err == nil {

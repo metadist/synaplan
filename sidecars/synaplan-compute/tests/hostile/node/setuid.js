@@ -1,7 +1,7 @@
-# expected-result: succeeded
-# reason:
-# note: setuid(0) is refused; no-new-privileges holds
-"""setuid.js — attempt to become root via process.setuid."""
+// expected-result: succeeded
+// reason:
+// note: setuid(0) is refused; no-new-privileges holds
+// setuid.js — attempt to become root via process.setuid.
 try {
   if (typeof process.setuid === 'function') {
     process.setuid(0);

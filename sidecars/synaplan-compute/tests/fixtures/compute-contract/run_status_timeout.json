@@ -5,6 +5,6 @@
   "startedAt": "2026-09-10T07:00:00Z",
   "finishedAt": "2026-09-10T07:01:00Z",
   "durationMs": 60000,
-  "usage": { "cpuSec": 0.1, "maxMemoryMb": 12, "bytesIn": 128, "bytesOut": 0 },
+  "usage": { "wallMs": 60000, "cpuSec": 0.0, "maxMemoryMb": 0, "bytesIn": 128, "bytesOut": 0 },
   "truncated": { "stdout": false, "stderr": false }
 }

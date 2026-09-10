@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -8,7 +9,11 @@ import (
 	"time"
 )
 
-const minAuthTokenBytes = 32
+const (
+	minAuthTokenBytes = 32
+	// DefaultSandboxUID is nobody:nogroup, the uid the sandbox images ship with.
+	DefaultSandboxUID = 65534
+)
 
 // Config is env-derived service configuration.
 type Config struct {
@@ -18,6 +23,8 @@ type Config struct {
 	WorkspacesDir     string
 	Tier              string
 	RuntimeName       string
+	SandboxUID        int
+	SandboxGID        int
 	MaxTimeoutSec     int
 	MaxMemoryMb       int
 	MaxCPU            float64
@@ -35,7 +42,10 @@ type Config struct {
 }
 
 // Load reads COMPUTE_* environment variables. Auth token must be ≥ 32 bytes.
+// A malformed numeric or boolean value fails startup instead of silently
+// falling back to a default.
 func Load() (*Config, error) {
+	var p parser
 	c := &Config{
 		ListenAddr:        env("COMPUTE_LISTEN", ":8080"),
 		AuthToken:         os.Getenv("COMPUTE_AUTH_TOKEN"),
@@ -43,20 +53,25 @@ func Load() (*Config, error) {
 		WorkspacesDir:     env("COMPUTE_WORKSPACES_DIR", "/var/lib/synaplan-compute/workspaces"),
 		Tier:              strings.ToLower(strings.TrimSpace(os.Getenv("COMPUTE_TIER"))),
 		RuntimeName:       os.Getenv("COMPUTE_RUNTIME_NAME"),
-		MaxTimeoutSec:     envInt("COMPUTE_MAX_TIMEOUT_SEC", 300),
-		MaxMemoryMb:       envInt("COMPUTE_MAX_MEMORY_MB", 2048),
-		MaxCPU:            envFloat("COMPUTE_MAX_CPU", 2.0),
-		MaxPids:           envInt("COMPUTE_MAX_PIDS", 256),
-		MaxOutputMb:       envInt("COMPUTE_MAX_OUTPUT_MB", 200),
-		MaxConcurrent:     envInt("COMPUTE_MAX_CONCURRENT", 8),
-		QueueMax:          envInt("COMPUTE_QUEUE_MAX", 16),
-		LogCapBytes:       envInt("COMPUTE_LOG_CAP_BYTES", 256*1024),
-		RunRetention:      time.Duration(envInt("COMPUTE_RUN_RETENTION_MIN", 60)) * time.Minute,
-		EgressEnabled:     envBool("COMPUTE_EGRESS_ENABLED", false),
-		EgressMaxHosts:    envInt("COMPUTE_EGRESS_MAX_HOSTS", 8),
-		MaxRequestBytes:   int64(envInt("COMPUTE_MAX_REQUEST_BYTES", 32*1024*1024)),
-		MaxFiles:          envInt("COMPUTE_MAX_FILES", 32),
+		SandboxUID:        p.int("COMPUTE_SANDBOX_UID", DefaultSandboxUID),
+		SandboxGID:        p.int("COMPUTE_SANDBOX_GID", DefaultSandboxUID),
+		MaxTimeoutSec:     p.int("COMPUTE_MAX_TIMEOUT_SEC", 300),
+		MaxMemoryMb:       p.int("COMPUTE_MAX_MEMORY_MB", 2048),
+		MaxCPU:            p.float("COMPUTE_MAX_CPU", 2.0),
+		MaxPids:           p.int("COMPUTE_MAX_PIDS", 256),
+		MaxOutputMb:       p.int("COMPUTE_MAX_OUTPUT_MB", 200),
+		MaxConcurrent:     p.int("COMPUTE_MAX_CONCURRENT", 8),
+		QueueMax:          p.int("COMPUTE_QUEUE_MAX", 16),
+		LogCapBytes:       p.int("COMPUTE_LOG_CAP_BYTES", 256*1024),
+		RunRetention:      time.Duration(p.int("COMPUTE_RUN_RETENTION_MIN", 60)) * time.Minute,
+		EgressEnabled:     p.boolean("COMPUTE_EGRESS_ENABLED", false),
+		EgressMaxHosts:    p.int("COMPUTE_EGRESS_MAX_HOSTS", 8),
+		MaxRequestBytes:   int64(p.int("COMPUTE_MAX_REQUEST_BYTES", 32*1024*1024)),
+		MaxFiles:          p.int("COMPUTE_MAX_FILES", 32),
 		ArtefactMIMEAllow: splitCSV(env("COMPUTE_ARTEFACT_MIME_ALLOW", strings.Join(defaultMIME, ","))),
+	}
+	if p.err != nil {
+		return nil, p.err
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
@@ -72,9 +87,38 @@ func (c *Config) Validate() error {
 	switch c.Tier {
 	case "", "docker", "gvisor", "microvm":
 	default:
-		return fmt.Errorf("COMPUTE_TIER must be docker, gvisor, or microvm")
+		return errors.New("COMPUTE_TIER must be docker, gvisor, or microvm")
+	}
+	if c.SandboxUID <= 0 || c.SandboxGID <= 0 {
+		return errors.New("COMPUTE_SANDBOX_UID and COMPUTE_SANDBOX_GID must be positive (never root)")
+	}
+	positive := map[string]int{
+		"COMPUTE_MAX_TIMEOUT_SEC":   c.MaxTimeoutSec,
+		"COMPUTE_MAX_MEMORY_MB":     c.MaxMemoryMb,
+		"COMPUTE_MAX_PIDS":          c.MaxPids,
+		"COMPUTE_MAX_OUTPUT_MB":     c.MaxOutputMb,
+		"COMPUTE_MAX_CONCURRENT":    c.MaxConcurrent,
+		"COMPUTE_LOG_CAP_BYTES":     c.LogCapBytes,
+		"COMPUTE_MAX_REQUEST_BYTES": int(c.MaxRequestBytes),
+		"COMPUTE_MAX_FILES":         c.MaxFiles,
+	}
+	for name, v := range positive {
+		if v <= 0 {
+			return fmt.Errorf("%s must be positive", name)
+		}
+	}
+	if c.QueueMax < 0 || c.RunRetention < 0 || c.EgressMaxHosts < 0 {
+		return errors.New("COMPUTE_QUEUE_MAX, COMPUTE_RUN_RETENTION_MIN, and COMPUTE_EGRESS_MAX_HOSTS must not be negative")
+	}
+	if c.MaxCPU <= 0 {
+		return errors.New("COMPUTE_MAX_CPU must be positive")
 	}
 	return nil
+}
+
+// SandboxUser renders the container User field.
+func (c *Config) SandboxUser() string {
+	return fmt.Sprintf("%d:%d", c.SandboxUID, c.SandboxGID)
 }
 
 func env(key, fallback string) string {
@@ -84,38 +128,55 @@ func env(key, fallback string) string {
 	return fallback
 }
 
-func envInt(key string, fallback int) int {
-	v := os.Getenv(key)
+// parser records the first malformed value; Load reports it after reading
+// every variable so defaults never mask a typo.
+type parser struct {
+	err error
+}
+
+func (p *parser) fail(key, v string, err error) {
+	if p.err == nil {
+		p.err = fmt.Errorf("%s=%q: %w", key, v, err)
+	}
+}
+
+func (p *parser) int(key string, fallback int) int {
+	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
 		return fallback
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
+		p.fail(key, v, err)
 		return fallback
 	}
 	return n
 }
 
-func envFloat(key string, fallback float64) float64 {
-	v := os.Getenv(key)
+func (p *parser) float(key string, fallback float64) float64 {
+	v := strings.TrimSpace(os.Getenv(key))
 	if v == "" {
 		return fallback
 	}
 	f, err := strconv.ParseFloat(v, 64)
 	if err != nil {
+		p.fail(key, v, err)
 		return fallback
 	}
 	return f
 }
 
-func envBool(key string, fallback bool) bool {
+func (p *parser) boolean(key string, fallback bool) bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
 	switch v {
+	case "":
+		return fallback
 	case "1", "true", "yes", "on":
 		return true
 	case "0", "false", "no", "off":
 		return false
 	default:
+		p.fail(key, v, errors.New("must be true or false"))
 		return fallback
 	}
 }

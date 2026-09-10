@@ -4,5 +4,12 @@
     "size": 4096,
     "mime": "image/png",
     "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+    "name": "evil.bin",
+    "size": 4,
+    "mime": "application/octet-stream",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "rejected": "mime_not_allowed"
   }
 ]

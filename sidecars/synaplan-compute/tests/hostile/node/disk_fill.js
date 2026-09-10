@@ -1,7 +1,7 @@
-# expected-result: failed
-# reason: output_limit
-# note: Stops at the /work /tmp size caps; host disk unchanged
-"""disk_fill.js — write until ENOSPC or the output ulimit."""
+// expected-result: failed
+// reason: output_limit
+// note: Stops at the fsize ulimit / outputMb cap; host disk unchanged
+// disk_fill.js — write until ENOSPC, EFBIG, or the output cap.
 const fs = require('fs');
 const chunk = Buffer.alloc(1024 * 1024, 65);
 let written = 0;

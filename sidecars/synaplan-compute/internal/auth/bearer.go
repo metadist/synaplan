@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
 	"strings"
@@ -10,9 +11,11 @@ import (
 
 const minTokenBytes = 32
 
-// Bearer checks Authorization: Bearer with a constant-time compare.
+// Bearer checks Authorization: Bearer with a constant-time compare over
+// SHA-256 digests, so neither length nor content of the presented token
+// changes the comparison time.
 type Bearer struct {
-	token string
+	digest [sha256.Size]byte
 }
 
 // New fails if token is shorter than 32 bytes.
@@ -20,7 +23,7 @@ func New(token string) (*Bearer, error) {
 	if len(token) < minTokenBytes {
 		return nil, errShortToken
 	}
-	return &Bearer{token: token}, nil
+	return &Bearer{digest: sha256.Sum256([]byte(token))}, nil
 }
 
 var errShortToken = errString("COMPUTE_AUTH_TOKEN must be at least 32 bytes")
@@ -50,14 +53,8 @@ func (b *Bearer) Allow(header string) bool {
 	if !strings.HasPrefix(header, prefix) {
 		return false
 	}
-	got := header[len(prefix):]
-	if len(got) != len(b.token) {
-		// Compare against token anyway so length is not a fast reject that
-		// leaks through timing of the early return alone; still require equal length.
-		subtle.ConstantTimeCompare([]byte(got), []byte(got))
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(got), []byte(b.token)) == 1
+	got := sha256.Sum256([]byte(header[len(prefix):]))
+	return subtle.ConstantTimeCompare(got[:], b.digest[:]) == 1
 }
 
 func writeUnauthorized(w http.ResponseWriter) {

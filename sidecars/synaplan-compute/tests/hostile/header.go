@@ -17,6 +17,8 @@ type Expectation struct {
 }
 
 // ParseHeader reads expected-result fields from the leading comment block.
+// Python scripts use "# key: value" lines, Node scripts "// key: value";
+// parsing stops at the first line that is neither.
 func ParseHeader(path string) (Expectation, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -30,13 +32,10 @@ func ParseHeader(path string) (Expectation, error) {
 		if line == "" {
 			continue
 		}
-		if strings.HasPrefix(line, `"""`) || strings.HasPrefix(line, "import ") || strings.HasPrefix(line, "const ") || strings.HasPrefix(line, "const{") {
+		body, ok := commentBody(line)
+		if !ok {
 			break
 		}
-		if !strings.HasPrefix(line, "#") {
-			break
-		}
-		body := strings.TrimSpace(strings.TrimPrefix(line, "#"))
 		key, val, ok := strings.Cut(body, ":")
 		if !ok {
 			continue
@@ -55,4 +54,14 @@ func ParseHeader(path string) (Expectation, error) {
 		}
 	}
 	return ex, sc.Err()
+}
+
+func commentBody(line string) (string, bool) {
+	switch {
+	case strings.HasPrefix(line, "//"):
+		return strings.TrimSpace(strings.TrimPrefix(line, "//")), true
+	case strings.HasPrefix(line, "#"):
+		return strings.TrimSpace(strings.TrimPrefix(line, "#")), true
+	}
+	return "", false
 }

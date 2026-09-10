@@ -72,6 +72,97 @@ func TestWorkspaceQuotaPrecheck(t *testing.T) {
 	}
 }
 
+func TestMetadataLivesOutsideMountedTree(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	if filepath.Base(host) != "data" || filepath.Dir(filepath.Dir(host)) != s.root {
+		t.Fatalf("host path %q must be <root>/<id>/data", host)
+	}
+	if _, err := os.Stat(filepath.Join(s.root, meta.ID+".json")); err != nil {
+		t.Fatalf("meta must be <root>/<id>.json: %v", err)
+	}
+	entries, err := os.ReadDir(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("mounted tree must start empty (no meta.json inside): %v", entries)
+	}
+	// A script rewriting a meta.json inside the mount must have no effect.
+	if err := os.WriteFile(filepath.Join(host, "meta.json"), []byte(`{"id":"`+meta.ID+`","owner":"user:evil","quotaMb":99999}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.Get(meta.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Owner != "user:1" || got.QuotaMb != 16 {
+		t.Fatalf("metadata tampered from inside the mount: %+v", got)
+	}
+	if err := s.Delete(meta.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Get(meta.ID); err != ErrNotFound {
+		t.Fatalf("after delete: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(s.root, meta.ID)); !os.IsNotExist(err) {
+		t.Fatal("id dir must be removed")
+	}
+}
+
+func TestWorkspaceRefusesSymlinkEscape(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("host secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	if err := os.Symlink(outside, filepath.Join(host, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(outside, "secret.txt"), filepath.Join(host, "file-link.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(host, "ok.txt"), []byte("fine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := s.ListFiles(meta.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Path != "ok.txt" {
+		t.Fatalf("symlinks must not be listed: %+v", files)
+	}
+	if _, err := s.ListFiles(meta.ID, "link"); err != ErrBadName {
+		t.Fatalf("listing through a directory symlink must be refused, got %v", err)
+	}
+	if _, _, err := s.OpenFile(meta.ID, "link/secret.txt"); err != ErrBadName {
+		t.Fatalf("open through a directory symlink must be refused, got %v", err)
+	}
+	if _, _, err := s.OpenFile(meta.ID, "file-link.txt"); err != ErrBadName {
+		t.Fatalf("open of a file symlink must be refused, got %v", err)
+	}
+	f, info, err := s.OpenFile(meta.ID, "ok.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	if info.Mime != "text/plain" {
+		t.Fatalf("mime must have no parameters: %q", info.Mime)
+	}
+}
+
 func TestCreateRejectsMissingOwner(t *testing.T) {
 	t.Parallel()
 	s := testStore(t)

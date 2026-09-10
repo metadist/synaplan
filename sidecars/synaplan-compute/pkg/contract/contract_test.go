@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -29,9 +30,12 @@ func TestFixturesDecode(t *testing.T) {
 		{"health.json", &contract.Health{}},
 		{"workspace_create.json", &contract.WorkspaceCreate{}},
 		{"workspace_usage.json", &contract.WorkspaceUsage{}},
+		{"run_status_output_limit.json", &contract.RunStatus{}},
 		{"error_limits_exceed_caps.json", &contract.ErrorBody{}},
 		{"error_workspace_quota_exceeded.json", &contract.ErrorBody{}},
 		{"error_egress_not_allowed.json", &contract.ErrorBody{}},
+		{"error_invalid_json.json", &contract.ErrorBody{}},
+		{"error_payload_too_large.json", &contract.ErrorBody{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.file, func(t *testing.T) {
@@ -59,6 +63,83 @@ func TestUnknownFieldRejected(t *testing.T) {
 		if !contract.UnknownField(err) {
 			t.Fatalf("want unknown field, got %v", err)
 		}
+	}
+}
+
+func TestSyntaxErrorIsInvalidJSON(t *testing.T) {
+	t.Parallel()
+	var req contract.RunRequest
+	for _, p := range []string{`{"protocol":`, `nope`, ``, `{"protocol":"one"}`} {
+		err := contract.DecodeJSON(strings.NewReader(p), &req)
+		if err == nil {
+			t.Fatalf("expected error for %q", p)
+		}
+		if contract.DecodeCode(err) != contract.ErrInvalidJSON || contract.UnknownField(err) {
+			t.Fatalf("%q: want invalid_json, got %v", p, err)
+		}
+	}
+	if contract.DecodeCode(nil) != "" || contract.DecodeCode(os.ErrNotExist) != "" {
+		t.Fatal("only DecodeJSON errors carry a code")
+	}
+}
+
+// TestLogsFixtureMatchesServerShape locks logs.sse to the exact event set and
+// data payloads the server emits (see internal/api TestLogsCapturedAndStreamedAsSSE,
+// which asserts the same sequence against a live handler).
+func TestLogsFixtureMatchesServerShape(t *testing.T) {
+	t.Parallel()
+	raw := readFixture(t, fixtureDir(t), "logs.sse")
+	events, err := contract.ParseSSE(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("events %+v", events)
+	}
+	wantKinds := []string{contract.LogEventStdout, contract.LogEventStatus, contract.LogEventDone}
+	for i, e := range events {
+		if e.Event != wantKinds[i] {
+			t.Fatalf("event %d = %q want %q", i, e.Event, wantKinds[i])
+		}
+		if e.ID != strconv.Itoa(i+1) {
+			t.Fatalf("event %d id %q", i, e.ID)
+		}
+		var dst any
+		switch e.Event {
+		case contract.LogEventStdout, contract.LogEventStderr:
+			dst = &contract.LogChunk{}
+		case contract.LogEventStatus:
+			dst = &contract.LogStatus{}
+		case contract.LogEventTruncated:
+			dst = &contract.Truncated{}
+		case contract.LogEventDone:
+			dst = &contract.LogDone{}
+		}
+		if err := contract.DecodeJSON(strings.NewReader(e.Data), dst); err != nil {
+			t.Fatalf("event %s data %s: %v", e.Event, e.Data, err)
+		}
+		if done, ok := dst.(*contract.LogDone); ok {
+			if done.Status != contract.StatusSucceeded || done.ExitCode == nil || *done.ExitCode != 0 {
+				t.Fatalf("done %+v", done)
+			}
+		}
+	}
+}
+
+func TestLimitsErrorFixtureHasDetails(t *testing.T) {
+	t.Parallel()
+	var body struct {
+		Error struct {
+			Code    string               `json:"code"`
+			Message string               `json:"message"`
+			Details contract.LimitDetail `json:"details"`
+		} `json:"error"`
+	}
+	if err := contract.DecodeJSON(bytes.NewReader(readFixture(t, fixtureDir(t), "error_limits_exceed_caps.json")), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Error.Code != contract.ErrLimitsExceedCaps || body.Error.Details.Field == "" || body.Error.Details.Cap <= 0 {
+		t.Fatalf("%+v", body)
 	}
 }
 
