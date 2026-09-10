@@ -202,7 +202,54 @@ final readonly class PlugConfigService
      */
     public function setChain(string $family, array $keys, array $knownKeys): void
     {
-        $setting = $this->chainSetting($family);
+        $normalized = $this->normalizeChain($family, $keys, $knownKeys);
+        $this->configRepository->setValue(
+            0,
+            self::CONFIG_GROUP,
+            $this->chainSetting($family),
+            implode(',', $normalized),
+        );
+    }
+
+    /**
+     * Validate every family first, then persist. A later empty/unknown chain
+     * must not leave earlier families written.
+     *
+     * @param array<mixed, mixed> $chains
+     * @param list<string>        $knownKeys
+     */
+    public function setChains(array $chains, array $knownKeys): void
+    {
+        $pending = [];
+        foreach ($chains as $family => $keys) {
+            if (!\is_string($family)) {
+                throw new \InvalidArgumentException('Unknown extraction family');
+            }
+            if (!\is_array($keys)) {
+                throw new \InvalidArgumentException('Chain for '.$family.' must be a list of keys');
+            }
+            $pending[] = [$family, $this->normalizeChain($family, $keys, $knownKeys)];
+        }
+
+        foreach ($pending as [$family, $normalized]) {
+            $this->configRepository->setValue(
+                0,
+                self::CONFIG_GROUP,
+                $this->chainSetting($family),
+                implode(',', $normalized),
+            );
+        }
+    }
+
+    /**
+     * @param list<mixed>  $keys
+     * @param list<string> $knownKeys
+     *
+     * @return list<string>
+     */
+    private function normalizeChain(string $family, array $keys, array $knownKeys): array
+    {
+        $this->chainSetting($family);
         $normalized = [];
         foreach ($keys as $key) {
             if (!\is_string($key)) {
@@ -222,24 +269,7 @@ final readonly class PlugConfigService
             throw new \InvalidArgumentException('Extraction chain for '.$family.' must not be empty');
         }
 
-        $this->configRepository->setValue(0, self::CONFIG_GROUP, $setting, implode(',', $normalized));
-    }
-
-    /**
-     * @param array<mixed, mixed> $chains
-     * @param list<string>        $knownKeys
-     */
-    public function setChains(array $chains, array $knownKeys): void
-    {
-        foreach ($chains as $family => $keys) {
-            if (!\is_string($family)) {
-                throw new \InvalidArgumentException('Unknown extraction family');
-            }
-            if (!\is_array($keys)) {
-                throw new \InvalidArgumentException('Chain for '.$family.' must be a list of keys');
-            }
-            $this->setChain($family, $keys, $knownKeys);
-        }
+        return $normalized;
     }
 
     private function chainSetting(string $family): string

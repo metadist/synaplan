@@ -330,7 +330,65 @@ class MessagePreProcessorTest extends TestCase
     }
 
     /**
-     * Issue #1191 — re-attaching an already-vectorized file (BFILETEXT
+     * Issue #1793 — a textless photo is stored as status=extracted with empty
+     * BFILETEXT. The preprocessor must not run Vision a second time.
+     */
+    public function testProcessFileEntityWithExtractedEmptyImageSkipsReExtraction(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_img_'.uniqid().'.png';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(88);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('png');
+            $file->method('getFileName')->willReturn('photo.png');
+            $file->method('getFileSize')->willReturn(2048);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getStatus')->willReturn('extracted');
+            $file->method('getUserId')->willReturn(7);
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('processed');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->fileProcessor
+                ->expects($this->never())
+                ->method('extractText');
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
+
+    /**
+     * Issue #1191 — re-attaching an already-vectorized file (BFILETEXT)
      * present) must NOT downgrade its status to 'processed'. The Qdrant
      * vectors are still valid, so flipping the DB status to 'processed' would
      * make the two stores inconsistent.

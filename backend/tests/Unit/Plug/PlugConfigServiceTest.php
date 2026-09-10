@@ -143,6 +143,27 @@ final class PlugConfigServiceTest extends TestCase
         $service->setChain('document', [], ['tika']);
     }
 
+    public function testSetChainsValidatesEveryFamilyBeforePersisting(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+
+        $service = new PlugConfigService($repo);
+
+        try {
+            $service->setChains(
+                [
+                    'document' => ['tika'],
+                    'text' => [],
+                ],
+                ['tika', 'native'],
+            );
+            self::fail('Expected InvalidArgumentException');
+        } catch (\InvalidArgumentException $e) {
+            self::assertStringContainsString('must not be empty', $e->getMessage());
+        }
+    }
+
     public function testStoredEmptyChainFallsBackToDefault(): void
     {
         $service = new PlugConfigService($this->repo([

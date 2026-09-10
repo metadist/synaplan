@@ -17,6 +17,7 @@ use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
 use App\Service\File\FileProcessor;
 use App\Service\File\HeicConverter;
+use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\PdfRasterizer;
 use App\Service\File\TextCleaner;
 use App\Service\File\TikaClient;
@@ -116,6 +117,75 @@ final class FileProcessorConfiguredChainTest extends TestCase
         self::assertSame(['tika', 'pdf_vision'], $keys);
         self::assertSame('low_quality', $meta['attempts'][0]['verdict'] ?? null);
         self::assertSame('quality_ok', $meta['attempts'][1]['verdict'] ?? null);
+        @unlink($dir.'/'.$relative);
+        @unlink($png);
+    }
+
+    public function testTikaOfficePdfIsGatedAsPdfThenVisionWins(): void
+    {
+        $dir = sys_get_temp_dir();
+        $relative = 'chain-docx-'.uniqid('', true).'.docx';
+        file_put_contents($dir.'/'.$relative, "PK\x03\x04");
+
+        $tinyPdf = dirname(__DIR__, 3).'/Fixtures/extraction/files/tiny.pdf';
+        $tika = $this->createMock(TikaClient::class);
+        $tika->method('isEnabled')->willReturn(true);
+        $tika->method('extractText')->willReturnCallback(
+            static function (string $path, string $mime): array {
+                if (str_contains($mime, 'pdf') || str_ends_with($path, '.pdf')) {
+                    return ['aaaaaaa', []];
+                }
+
+                return ['', []];
+            },
+        );
+
+        $office = $this->createMock(OfficeConverterClient::class);
+        $office->method('isEnabled')->willReturn(true);
+        $office->method('convert')->willReturnCallback(
+            static function () use ($dir, $tinyPdf): string {
+                $pdf = $dir.'/converted-'.uniqid('', true).'.pdf';
+                copy($tinyPdf, $pdf);
+
+                return $pdf;
+            },
+        );
+
+        $png = $dir.'/page-docx.png';
+        file_put_contents($png, 'png');
+        $rasterizer = $this->createMock(PdfRasterizer::class);
+        $rasterizer->method('pdfToPng')->willReturn([$png]);
+        $rasterizer->method('getLastEngine')->willReturn('pdftoppm');
+
+        $ai = $this->createMock(AiFacade::class);
+        $ai->method('analyzeImage')->willReturn([
+            'content' => 'Vision read the converted Office page',
+            'provider' => 'groq',
+        ]);
+
+        $plugConfig = $this->createMock(PlugConfigService::class);
+        $plugConfig->method('extractionChain')->willReturn(['tika', 'pdf_vision']);
+        $plugConfig->method('qualityApplyTo')->willReturn(['pdf']);
+        $plugConfig->method('qualityMinLength')->willReturn(10);
+        $plugConfig->method('qualityMinEntropy')->willReturn(3.0);
+
+        $processor = $this->processor(
+            $dir,
+            ['tika', 'pdf_vision'],
+            tika: $tika,
+            rasterizer: $rasterizer,
+            ai: $ai,
+            plugConfig: $plugConfig,
+            qualityGate: new ExtractionQualityGate($plugConfig, new TextCleaner()),
+            officeConverter: $office,
+        );
+
+        [$text, $meta] = $processor->extractText($relative, 'docx', 1);
+
+        self::assertSame('Vision read the converted Office page', $text);
+        self::assertSame('rasterize_vision', $meta['strategy'] ?? null);
+        self::assertSame('low_quality', $meta['attempts'][0]['verdict'] ?? null);
+        self::assertSame('tika', $meta['attempts'][0]['key'] ?? null);
         @unlink($dir.'/'.$relative);
         @unlink($png);
     }
@@ -240,6 +310,7 @@ final class FileProcessorConfiguredChainTest extends TestCase
         ?ContentExtractorInterface $extra = null,
         ?PlugConfigService $plugConfig = null,
         ?ExtractionQualityGate $qualityGate = null,
+        ?OfficeConverterClient $officeConverter = null,
     ): FileProcessor {
         $plugConfig ??= $this->plugConfig($chain);
         $extractors = null !== $extra ? [$extra] : [];
@@ -257,7 +328,7 @@ final class FileProcessorConfiguredChainTest extends TestCase
             10,
             3.0,
             '/nonexistent/ffmpeg',
-            null,
+            $officeConverter,
             null,
             new ExtractionRegistry($extractors, $plugConfig, new NullLogger()),
             $plugConfig,

@@ -165,9 +165,9 @@ final readonly class MessagePreProcessor
             return;
         }
 
-        // Skip extraction if text already exists (e.g., from FileProcessor in upload endpoint)
-        // This prevents overwriting robust extraction with simple Tika-only extraction
-        if (!empty($messageFile->getFileText())) {
+        // Skip if upload already ran FileProcessor. Empty OCR on a photo is a
+        // real result (status=extracted, fileText='') — do not Vision twice.
+        if (!empty($messageFile->getFileText()) || 'extracted' === $messageFile->getStatus()) {
             $this->logger->info('PreProcessor: File text already extracted, skipping re-extraction', [
                 'file_id' => $messageFile->getId(),
                 'type' => $fileType,

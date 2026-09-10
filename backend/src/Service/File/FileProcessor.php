@@ -494,9 +494,11 @@ final readonly class FileProcessor
             }
         }
 
+        // Office→PDF here is Tika's own fallback (how it reads a DOCX Tika
+        // could not parse), not the `office_convert` chain step (.doc→.docx).
         $viaPdf = $this->extractTikaViaOfficePdf($request->absolutePath, $request->ext, $meta);
         if (null !== $viaPdf) {
-            return $this->gatePair($viaPdf, $request);
+            return $this->gatePair($viaPdf, $this->asPdfRequest($request));
         }
 
         return $this->gatePair(['', ['strategy' => 'tika_failed'] + $meta], $request);
@@ -516,6 +518,8 @@ final readonly class FileProcessor
             );
         }
 
+        // pdf_vision rasterizes pages. Office files must become a PDF first;
+        // that is this step's input prep, not the `office_convert` rewrite.
         $convertible = isset(self::LEGACY_OFFICE_TARGETS[$request->ext])
             || \in_array($request->ext, ['docx', 'xlsx', 'pptx'], true);
         if (!$convertible || null === $this->officeConverter || !$this->officeConverter->isEnabled()) {
@@ -528,9 +532,10 @@ final readonly class FileProcessor
         }
 
         try {
+            // Rasterize needs a PDF; gate as PDF so qualityApplyTo=['pdf'] applies.
             return $this->gatePair(
                 $this->extractFromPdfViaVision($pdf, $request->userId, $meta),
-                $request,
+                $this->asPdfRequest($request, $pdf),
             );
         } finally {
             @unlink($pdf);
@@ -699,6 +704,15 @@ final readonly class FileProcessor
         $markdown = \is_string($pair[1]['markdown'] ?? null) ? $pair[1]['markdown'] : null;
 
         return $this->gateResult(ExtractionResult::of($pair[0], $strategy, $pair[1], $markdown), $request);
+    }
+
+    /**
+     * Quality apply_to=['pdf'] keys off ext/mime. Converted Office text came
+     * from a PDF, so gate it as one (legacy extractOfficeViaConvertedPdf already does).
+     */
+    private function asPdfRequest(ExtractionRequest $request, ?string $pdfPath = null): ExtractionRequest
+    {
+        return $request->withPath($pdfPath ?? $request->absolutePath, 'pdf', 'application/pdf');
     }
 
     private function detectFamily(string $mime, string $ext): string
