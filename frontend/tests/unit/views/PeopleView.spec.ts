@@ -64,7 +64,10 @@ function mountView() {
   setActivePinia(createPinia())
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/', component: { template: '<div />' } }],
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/admin', name: 'admin', component: { template: '<div />' } },
+    ],
   })
   return mount(PeopleView, {
     global: {
@@ -113,6 +116,36 @@ describe('PeopleView', () => {
         updated: 1,
       },
     ])
+  })
+
+  it('offers a back link to Operate', async () => {
+    setActivePinia(createPinia())
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<div />' } },
+        { path: '/admin', name: 'admin', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
+    const wrapper = mount(PeopleView, {
+      global: {
+        plugins: [router],
+        stubs: {
+          MainLayout: { template: '<div><slot /></div>' },
+          PageHeader: { template: '<div><slot /></div>' },
+          Teleport: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    const back = wrapper.get('[data-testid="link-people-back-operate"]')
+    expect(back.text()).toContain('Back to Operate')
+    await back.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('admin')
   })
 
   it('hides Groups and Audit tabs when IAM groups are off', async () => {

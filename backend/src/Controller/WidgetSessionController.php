@@ -7,10 +7,10 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Entity\WidgetSession;
 use App\Repository\ChatRepository;
-use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
 use App\Repository\WidgetRepository;
 use App\Repository\WidgetSessionRepository;
+use App\Service\Chat\ChatDeletionService;
 use App\Service\WidgetService;
 use App\Service\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -36,7 +36,7 @@ class WidgetSessionController extends AbstractController
         private WidgetRepository $widgetRepository,
         private WidgetSessionRepository $sessionRepository,
         private ChatRepository $chatRepository,
-        private ChatSummaryRepository $chatSummaryRepository,
+        private ChatDeletionService $chatDeletionService,
         private MessageRepository $messageRepository,
         private LoggerInterface $logger,
         private EntityManagerInterface $em,
@@ -658,19 +658,8 @@ class WidgetSessionController extends AbstractController
                 }
             }
 
-            // Delete messages associated with the chats
-            if (!empty($chatIds)) {
-                $this->messageRepository->deleteByChatIds($chatIds);
-            }
-
-            // Delete chats (+ their rolling-summary rows — no FK cascade on
-            // BCHATSUMMARIES per the Galera rule, so clean up explicitly)
-            foreach ($chatIds as $chatId) {
-                $this->chatSummaryRepository->deleteByChatId((int) $chatId);
-                $chat = $this->chatRepository->find($chatId);
-                if ($chat) {
-                    $this->chatRepository->remove($chat);
-                }
+            if ([] !== $chatIds) {
+                $this->chatDeletionService->deleteOwnedChats($user->getId(), array_map('intval', $chatIds));
             }
 
             // Delete sessions

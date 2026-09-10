@@ -95,8 +95,20 @@ final class UrlWatchControllerTest extends WebTestCase
         $second = (int) ($this->json()['watch']['id'] ?? 0);
 
         self::assertSame($first, $second);
+        self::assertFalse($this->json()['created'] ?? true);
         $this->client->request('GET', '/api/v1/url-watches');
         self::assertCount(1, $this->json()['watches'] ?? []);
+    }
+
+    public function testPrivateUrlIsRejectedAtCreate(): void
+    {
+        $owner = $this->createUser('url-watch-ssrf@synaplan.internal');
+        $this->authenticateClient($this->client, $owner);
+
+        $this->postJson('/api/v1/url-watches', ['url' => 'http://127.0.0.1/page.html']);
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        self::assertSame('URL points to a private/blocked address', $this->json()['error'] ?? null);
     }
 
     private function createUser(string $email): User

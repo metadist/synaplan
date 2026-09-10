@@ -51,6 +51,9 @@ final class UrlWatchController extends AbstractController
                                 new OA\Property(property: 'fetchedAt', type: 'string', nullable: true),
                                 new OA\Property(property: 'created', type: 'string', nullable: true),
                                 new OA\Property(property: 'updated', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastDiffText', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastError', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastFailedAt', type: 'string', nullable: true),
                             ]
                         )),
                     ]
@@ -95,9 +98,10 @@ final class UrlWatchController extends AbstractController
                 response: 200,
                 description: 'Existing or newly registered watch',
                 content: new OA\JsonContent(
-                    required: ['success', 'watch'],
+                    required: ['success', 'created', 'watch'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'created', type: 'boolean', example: true),
                         new OA\Property(
                             property: 'watch',
                             type: 'object',
@@ -111,12 +115,15 @@ final class UrlWatchController extends AbstractController
                                 new OA\Property(property: 'created', type: 'string', nullable: true),
                                 new OA\Property(property: 'updated', type: 'string', nullable: true),
                                 new OA\Property(property: 'body', type: 'string'),
+                                new OA\Property(property: 'lastDiffText', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastError', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastFailedAt', type: 'string', nullable: true),
                             ]
                         ),
                     ]
                 )
             ),
-            new OA\Response(response: 400, description: 'Invalid URL'),
+            new OA\Response(response: 400, description: 'Invalid or blocked URL'),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
@@ -132,12 +139,23 @@ final class UrlWatchController extends AbstractController
         $payload = $request->toArray();
         $url = trim((string) ($payload['url'] ?? ''));
         try {
-            $watch = $this->service->register((int) $user->getId(), $url);
-        } catch (\InvalidArgumentException) {
+            $result = $this->service->register((int) $user->getId(), $url);
+        } catch (\InvalidArgumentException $e) {
+            if ('blocked_url' === $e->getMessage()) {
+                return $this->json(
+                    ['error' => 'URL points to a private/blocked address'],
+                    Response::HTTP_BAD_REQUEST,
+                );
+            }
+
             return $this->json(['error' => 'invalid_url'], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->json(['success' => true, 'watch' => $this->service->toDetail($watch)]);
+        return $this->json([
+            'success' => true,
+            'created' => $result['created'],
+            'watch' => $this->service->toDetail($result['watch']),
+        ]);
     }
 
     #[Route('/{id}', name: 'get', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -166,6 +184,9 @@ final class UrlWatchController extends AbstractController
                                 new OA\Property(property: 'created', type: 'string', nullable: true),
                                 new OA\Property(property: 'updated', type: 'string', nullable: true),
                                 new OA\Property(property: 'body', type: 'string'),
+                                new OA\Property(property: 'lastDiffText', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastError', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastFailedAt', type: 'string', nullable: true),
                             ]
                         ),
                     ]
@@ -217,6 +238,9 @@ final class UrlWatchController extends AbstractController
                                 new OA\Property(property: 'created', type: 'string', nullable: true),
                                 new OA\Property(property: 'updated', type: 'string', nullable: true),
                                 new OA\Property(property: 'body', type: 'string'),
+                                new OA\Property(property: 'lastDiffText', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastError', type: 'string', nullable: true),
+                                new OA\Property(property: 'lastFailedAt', type: 'string', nullable: true),
                             ]
                         ),
                         new OA\Property(

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\UrlWatch;
 
 use App\Entity\UrlWatch;
 use App\Repository\UrlWatchRepository;
+use App\Service\Security\SsrfGuard;
 use App\Service\UrlContentResult;
 use App\Service\UrlContentService;
 use App\Service\UrlWatch\TextDiff;
@@ -15,6 +16,7 @@ use App\Service\UrlWatch\UrlWatchNotFoundException;
 use App\Service\UrlWatch\UrlWatchService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 final class UrlWatchServiceTest extends TestCase
 {
@@ -53,6 +55,7 @@ final class UrlWatchServiceTest extends TestCase
         self::assertStringContainsString('- line two', $changed->diffText);
         self::assertStringContainsString('+ line three', $changed->diffText);
         self::assertSame("line one\nline three", $changed->watch->getBody());
+        self::assertSame($changed->diffText, $changed->watch->getLastDiffText());
     }
 
     public function testRegisterIsIdempotentPerOwnerAndUrl(): void
@@ -62,9 +65,18 @@ final class UrlWatchServiceTest extends TestCase
         $b = $service->register(7, 'https://example.com/a/');
         $other = $service->register(8, 'https://example.com/a');
 
-        self::assertSame($a, $b);
-        self::assertNotSame($a, $other);
-        self::assertSame('https://example.com/a', $a->getUrl());
+        self::assertTrue($a['created']);
+        self::assertFalse($b['created']);
+        self::assertSame($a['watch'], $b['watch']);
+        self::assertNotSame($a['watch'], $other['watch']);
+        self::assertSame('https://example.com/a', $a['watch']->getUrl());
+    }
+
+    public function testRegisterRejectsPrivateUrl(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('blocked_url');
+        $this->service(blocked: true)->register(7, 'http://127.0.0.1/page.html');
     }
 
     public function testRegisterRejectsNonUrl(): void
@@ -82,7 +94,7 @@ final class UrlWatchServiceTest extends TestCase
             hostname: 'example.com',
             success: true,
         )));
-        $watch = $service->register(7, 'https://example.com/a');
+        $watch = $service->register(7, 'https://example.com/a')['watch'];
         self::assertNotNull($watch->getId());
 
         $result = $service->refresh((int) $watch->getId(), 7);
@@ -107,16 +119,24 @@ final class UrlWatchServiceTest extends TestCase
             success: false,
             error: 'HTTP 500',
         )));
-        $watch = $service->register(7, 'https://example.com/a');
+        $watch = $service->register(7, 'https://example.com/a')['watch'];
 
-        $this->expectException(UrlWatchFetchFailedException::class);
-        $service->refresh((int) $watch->getId(), 7);
+        try {
+            $service->refresh((int) $watch->getId(), 7);
+            self::fail('expected UrlWatchFetchFailedException');
+        } catch (UrlWatchFetchFailedException $e) {
+            self::assertStringContainsString('HTTP 500', $e->getMessage());
+        }
+
+        self::assertSame('HTTP 500', $watch->getLastError());
+        self::assertNotNull($watch->getLastFailedAt());
+        self::assertNull($watch->getFetchedAt());
     }
 
     public function testDeleteOnlyForOwner(): void
     {
         $service = $this->service();
-        $watch = $service->register(7, 'https://example.com/a');
+        $watch = $service->register(7, 'https://example.com/a')['watch'];
         $id = (int) $watch->getId();
 
         self::assertFalse($service->delete($id, 8));
@@ -124,7 +144,7 @@ final class UrlWatchServiceTest extends TestCase
         self::assertNull($service->get($id, 7));
     }
 
-    private function service(?UrlContentService $urlContent = null): UrlWatchService
+    private function service(?UrlContentService $urlContent = null, bool $blocked = false): UrlWatchService
     {
         $urlContent ??= $this->urlContentMock();
         /** @var array<string, UrlWatch> $store */
@@ -180,7 +200,17 @@ final class UrlWatchServiceTest extends TestCase
             },
         );
 
-        return new UrlWatchService($repo, $em, $urlContent, new TextDiff());
+        $ssrf = $this->createMock(SsrfGuard::class);
+        $ssrf->method('isBlockedUrl')->willReturn($blocked);
+
+        return new UrlWatchService(
+            $repo,
+            $em,
+            $urlContent,
+            new TextDiff(),
+            $ssrf,
+            $this->createMock(LoggerInterface::class),
+        );
     }
 
     private function urlContentMock(?UrlContentResult $fetchResult = null): UrlContentService

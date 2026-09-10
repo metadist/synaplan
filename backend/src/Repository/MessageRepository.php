@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -689,7 +690,10 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Delete all messages for the given chat IDs.
+     * Delete all messages for the given chat IDs, and their BMESSAGEMETA rows.
+     *
+     * Bulk DQL skips Doctrine orphanRemoval, and BMESSAGEMETA has no
+     * ON DELETE CASCADE, so meta must be removed first (#1811).
      *
      * @param array<int> $chatIds
      *
@@ -697,8 +701,25 @@ class MessageRepository extends ServiceEntityRepository
      */
     public function deleteByChatIds(array $chatIds): int
     {
-        if (empty($chatIds)) {
+        if ([] === $chatIds) {
             return 0;
+        }
+
+        $ids = $this->createQueryBuilder('m')
+            ->select('m.id')
+            ->where('m.chatId IN (:chatIds)')
+            ->setParameter('chatIds', $chatIds)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        $messageIds = array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
+        if ([] !== $messageIds) {
+            $this->getEntityManager()->createQueryBuilder()
+                ->delete(MessageMeta::class, 'meta')
+                ->where('meta.messageId IN (:ids)')
+                ->setParameter('ids', $messageIds)
+                ->getQuery()
+                ->execute();
         }
 
         $qb = $this->getEntityManager()->createQueryBuilder();

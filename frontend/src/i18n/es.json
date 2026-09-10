@@ -2911,8 +2911,10 @@
         "add": "Vigilar esta página",
         "adding": "Guardando…",
         "added": "Página guardada. Pulsa Comprobar ahora para guardar la primera copia.",
+        "alreadyWatching": "Esta página ya está vigilada.",
         "addFailed": "No se pudo vigilar esta página.",
         "invalidUrl": "Introduce una dirección web que empiece por http:// o https://.",
+        "blockedUrl": "Esa dirección no se puede vigilar (privada o bloqueada).",
         "loading": "Cargando páginas vigiladas…",
         "loadFailed": "No se pudieron cargar las páginas vigiladas.",
         "empty": "Aún no hay páginas vigiladas.",
@@ -2930,6 +2932,8 @@
         "deleteFailed": "No se pudo quitar esta página vigilada.",
         "neverFetched": "Aún no se ha obtenido",
         "lastFetched": "Último guardado {when}",
+        "lastCheckFailed": "La última comprobación falló: {reason}",
+        "lastDiff": "Qué cambió",
         "untitled": "Página sin título"
       },
       "scheduleThis": "Volver a ejecutar esto más tarde",
@@ -4811,6 +4815,7 @@
       "audit": "Auditoría"
     },
     "openPeople": "Abrir Personas",
+    "backToOperate": "Volver a Operar",
     "myGroups": {
       "subtitle": "Grupos a los que pertenece en esta instancia.",
       "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Personas.",

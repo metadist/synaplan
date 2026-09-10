@@ -5,12 +5,10 @@ namespace App\Controller;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ChatRepository;
-use App\Repository\ChatSummaryRepository;
 use App\Repository\MessageRepository;
-use App\Repository\ShareRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\ChatDeletionService;
 use App\Service\Chat\Run\ChatRunService;
-use App\Service\Digest\MessageDigestMaintenance;
 use App\Service\File\OgImageService;
 use App\Service\Iam\AccessGate;
 use App\Service\Iam\ConversationCopyService;
@@ -38,8 +36,7 @@ class ChatController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ChatRepository $chatRepository,
-        private ChatSummaryRepository $chatSummaryRepository,
-        private MessageDigestMaintenance $digestMaintenance,
+        private ChatDeletionService $chatDeletionService,
         private MessageRepository $messageRepository,
         private WidgetSessionService $widgetSessionService,
         private OgImageService $ogImageService,
@@ -50,7 +47,6 @@ class ChatController extends AbstractController
         private AccessGate $accessGate,
         private IamConfig $iamConfig,
         private ConversationCopyService $conversationCopyService,
-        private ShareRepository $shareRepository,
         private ShareService $shareService,
         private UserRepository $userRepository,
     ) {
@@ -463,16 +459,7 @@ class ChatController extends AbstractController
             return $this->json(['error' => 'Chat not found'], Response::HTTP_NOT_FOUND);
         }
 
-        // No FK cascade on BCHATSUMMARIES (Galera rule) — clean up explicitly.
-        $this->chatSummaryRepository->deleteByChatId($id);
-
-        // Deep-memory hygiene: digests of this chat stop resolving and their
-        // vectors leave the search index.
-        $this->digestMaintenance->deactivateForChat($user->getId(), $id);
-
-        $this->shareRepository->deleteByResource(ConversationKind::KEY, (string) $id);
-        $this->em->remove($chat);
-        $this->em->flush();
+        $this->chatDeletionService->deleteOwnedChat($user->getId(), $chat);
 
         $this->logger->info('Chat deleted', [
             'chat_id' => $id,

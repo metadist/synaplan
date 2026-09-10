@@ -22,6 +22,9 @@ export interface UrlWatch {
   created: string | null
   updated: string | null
   body: string
+  lastDiffText: string | null
+  lastError: string | null
+  lastFailedAt: string | null
 }
 
 export interface UrlWatchCompare {
@@ -42,6 +45,11 @@ function asWatch(raw: RawListWatch | RawDetailWatch | undefined): UrlWatch {
     created: raw.created ?? null,
     updated: raw.updated ?? null,
     body: 'body' in raw && typeof raw.body === 'string' ? raw.body : '',
+    lastDiffText:
+      'lastDiffText' in raw && typeof raw.lastDiffText === 'string' ? raw.lastDiffText : null,
+    lastError: 'lastError' in raw && typeof raw.lastError === 'string' ? raw.lastError : null,
+    lastFailedAt:
+      'lastFailedAt' in raw && typeof raw.lastFailedAt === 'string' ? raw.lastFailedAt : null,
   }
 }
 
@@ -53,13 +61,13 @@ export const urlWatchesApi = {
     return (data.watches ?? []).map((watch) => asWatch(watch))
   },
 
-  async create(url: string): Promise<UrlWatch> {
+  async create(url: string): Promise<{ watch: UrlWatch; created: boolean }> {
     const data = await httpClient('/api/v1/url-watches', {
       method: 'POST',
       body: JSON.stringify({ url }),
       schema: PostApiUrlWatchesCreateResponseSchema,
     })
-    return asWatch(data.watch)
+    return { watch: asWatch(data.watch), created: data.created === true }
   },
 
   async get(id: number): Promise<UrlWatch> {
