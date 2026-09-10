@@ -78,7 +78,9 @@ import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 
 import { useAuth } from '@/composables/useAuth'
+import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useNotification } from '@/composables/useNotification'
+import { getConfig } from '@/services/api/httpClient'
 
 /**
  * Persistent impersonation indicator.
@@ -124,11 +126,18 @@ async function onExit(): Promise<void> {
     const result = await stopImpersonation()
     if (result.success) {
       success(t('admin.impersonate.stopped'))
+      // stopImpersonation() kicks off config reload without awaiting it and
+      // that reload nulls the runtime-config cache first. Reading the IAM
+      // flag against the empty default would send a groups-on install to
+      // Admin, and a subsequent /admin/people push would 404 in the guard.
+      await getConfig()
       // Send the admin back to the user list so they can either pick another
       // impersonation target or continue admin work without a stale view.
       // Do not swallow navigation failures — a silent `.catch` left CI on
       // `/` after the banner hid, waiting 15s for the admin users page.
-      await router.push({ name: 'admin-people' })
+      await router.push(
+        isIamGroupsEnabled() ? { name: 'admin-people' } : { name: 'admin', query: { tab: 'users' } }
+      )
     } else {
       error(result.error ?? t('admin.impersonate.stopFailed'))
     }
