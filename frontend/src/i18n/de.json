@@ -3746,7 +3746,12 @@
       "model": "Modell",
       "models": "Modelle",
       "adminOnlyTitle": "Admin-Zugriff erforderlich",
-      "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar."
+      "adminOnlyMessage": "Der Feature-Status ist nur für Administratoren verfügbar.",
+      "modulesTitle": "Feature-Module",
+      "modulesSubtitle": "Optionale Funktionen, die diese Installation deklariert. Jede wird über ihre Konfiguration eingeschaltet; die Liste zeigt die Schlüssel, nie deren Werte.",
+      "modulesConfigured": "{configured} von {total} konfiguriert",
+      "configuredBy": "Konfiguriert über:",
+      "docs": "Dokumentation"
     },
     "notLoggedIn": "Nicht angemeldet"
   },
@@ -6352,5 +6357,54 @@
     "applyImport": "Auswahl importieren",
     "imported": "Werkzeuge importiert.",
     "importFailed": "Die OpenAPI-Beschreibung konnte nicht importiert werden."
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (Textextraktion aus Dokumenten)"
+    },
+    "docling": {
+      "label": "Docling (Dokumentkonvertierung)"
+    },
+    "office_convert": {
+      "label": "Office-Konvertierung"
+    },
+    "searxng": {
+      "label": "SearXNG-Websuche"
+    },
+    "piper_tts": {
+      "label": "Piper Text-zu-Sprache"
+    },
+    "local_ai": {
+      "label": "Lokale KI (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Higgsfield-Videogenerierung"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "TheHive-Bildgenerierung"
+    },
+    "stripe_billing": {
+      "label": "Stripe-Abrechnung"
+    },
+    "mobile_iap": {
+      "label": "Mobile In-App-Käufe"
+    },
+    "whatsapp": {
+      "label": "WhatsApp-Kanal"
+    },
+    "state": {
+      "available": "Verfügbar",
+      "needs_setup": "Einrichtung nötig",
+      "absent": "Nicht installiert"
+    },
+    "notice": {
+      "title": "{module} ist auf dieser Installation nicht verfügbar",
+      "body": "Diese Funktion ist optional. Sie wird vom Administrator dieser Installation eingeschaltet.",
+      "howToEnable": "So wird sie aktiviert",
+      "openFeatureStatus": "Feature-Status öffnen"
+    }
   }
 }

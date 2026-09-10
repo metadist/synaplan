@@ -4803,7 +4803,12 @@
       "model": "modèle",
       "models": "modèles",
       "adminOnlyTitle": "Accès administrateur requis",
-      "adminOnlyMessage": "L’état des fonctionnalités n’est disponible que pour les administrateurs."
+      "adminOnlyMessage": "L’état des fonctionnalités n’est disponible que pour les administrateurs.",
+      "modulesTitle": "Modules de fonctionnalités",
+      "modulesSubtitle": "Fonctionnalités optionnelles déclarées par cette installation. Chacune est activée par sa configuration ; la liste affiche les clés, jamais leurs valeurs.",
+      "modulesConfigured": "{configured} sur {total} configurés",
+      "configuredBy": "Configuré par :",
+      "docs": "Documentation"
     },
     "notLoggedIn": "Non connecté"
   },
@@ -6418,5 +6423,54 @@
     "applyImport": "Importer la sélection",
     "imported": "Outils importés.",
     "importFailed": "La description OpenAPI n’a pas pu être importée."
+  },
+  "modules": {
+    "tika": {
+      "label": "Apache Tika (extraction de texte des documents)"
+    },
+    "docling": {
+      "label": "Docling (conversion de documents)"
+    },
+    "office_convert": {
+      "label": "Conversion Office"
+    },
+    "searxng": {
+      "label": "Recherche web SearXNG"
+    },
+    "piper_tts": {
+      "label": "Synthèse vocale Piper"
+    },
+    "local_ai": {
+      "label": "IA locale (Ollama)"
+    },
+    "higgsfield": {
+      "label": "Génération vidéo Higgsfield"
+    },
+    "google_ai": {
+      "label": "Google AI"
+    },
+    "thehive": {
+      "label": "Génération d’images TheHive"
+    },
+    "stripe_billing": {
+      "label": "Facturation Stripe"
+    },
+    "mobile_iap": {
+      "label": "Achats intégrés mobiles"
+    },
+    "whatsapp": {
+      "label": "Canal WhatsApp"
+    },
+    "state": {
+      "available": "Disponible",
+      "needs_setup": "Configuration requise",
+      "absent": "Non installé"
+    },
+    "notice": {
+      "title": "{module} n’est pas disponible sur cette installation",
+      "body": "Cette fonctionnalité est optionnelle. Elle est activée par l’administrateur de cette installation.",
+      "howToEnable": "Comment l’activer",
+      "openFeatureStatus": "Ouvrir l’état des fonctionnalités"
+    }
   }
 }

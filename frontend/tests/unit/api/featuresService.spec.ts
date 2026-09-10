@@ -91,6 +91,76 @@ describe('getFeaturesStatus', () => {
     expect(result.features.test.env_vars).toEqual(envVars)
   })
 
+  it('should leave modules undefined on a backend without the module registry', async () => {
+    mockedApi.get.mockResolvedValue({ data: validResponse })
+
+    const result = await getFeaturesStatus()
+
+    expect(result.modules).toBeUndefined()
+  })
+
+  it('should parse declared feature modules, normalising empty details', async () => {
+    const validModule = {
+      id: 'whatsapp',
+      label_key: 'modules.whatsapp.label',
+      state: 'absent',
+      configured: false,
+      healthy: false,
+      message: 'WhatsApp is not configured',
+      details: [],
+      configured_by: {
+        env: ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'],
+        bconfig: [],
+        providers: [],
+        plugs: [],
+      },
+      capabilities: [],
+      docs_anchor: 'modules/whatsapp',
+      mobile_class: 'backend-only',
+    }
+    mockedApi.get.mockResolvedValue({
+      data: {
+        ...validResponse,
+        modules: [
+          validModule,
+          { ...validModule, id: 'docling', details: { url: 'http://docling:5001' } },
+        ],
+      },
+    })
+
+    const result = await getFeaturesStatus()
+
+    expect(result.modules).toHaveLength(2)
+    expect(result.modules?.[0].details).toEqual({})
+    expect(result.modules?.[1].details).toEqual({ url: 'http://docling:5001' })
+    expect(result.modules?.[0].configured_by.env).toContain('WHATSAPP_ACCESS_TOKEN')
+  })
+
+  it('should reject a module with an unknown state', async () => {
+    mockedApi.get.mockResolvedValue({
+      data: {
+        ...validResponse,
+        modules: [
+          {
+            id: 'whatsapp',
+            label_key: 'modules.whatsapp.label',
+            state: 'broken',
+            configured: false,
+            healthy: false,
+            message: '',
+            details: {},
+            configured_by: { env: [], bconfig: [], providers: [], plugs: [] },
+            capabilities: [],
+            docs_anchor: '',
+            mobile_class: 'backend-only',
+          },
+        ],
+      },
+    })
+
+    await expect(getFeaturesStatus()).rejects.toThrow(ZodError)
+  })
+
   it('should reject invalid status values', async () => {
     const response = {
       ...validResponse,
