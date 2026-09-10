@@ -70,16 +70,6 @@ final readonly class RerankStage
         $started = hrtime(true);
         try {
             $ranked = $provider->rerank($query, $candidates, $k, $options);
-            $ms = $ranked->ms > 0 ? $ranked->ms : (int) ((hrtime(true) - $started) / 1_000_000);
-            $this->metrics->observeLatency($ms);
-            if ($ms > $options->latencyBudgetMs) {
-                return $this->fallback($results, $k, 'timeout');
-            }
-            if ([] === $ranked->hits) {
-                return $this->fallback($results, $k, 'empty');
-            }
-
-            $out = $this->reorder($results, $ranked, $k);
         } catch (\Throwable) {
             $ms = (int) ((hrtime(true) - $started) / 1_000_000);
             $this->metrics->observeLatency($ms);
@@ -87,12 +77,21 @@ final readonly class RerankStage
             return $this->fallback($results, $k, 'exception');
         }
 
-        // After a successful reorder only. A billing failure must not rewind
-        // the ranking into the embedding-order fallback, and the LLM adapter
-        // already bills through the summarize model's chat path (#1778).
+        $ms = $ranked->ms > 0 ? $ranked->ms : (int) ((hrtime(true) - $started) / 1_000_000);
+        $this->metrics->observeLatency($ms);
+        // The provider already ran (and may have billed us). Record that
+        // before the local timeout / empty-hit fallbacks, and never let a
+        // usage-row failure rewind a successful reorder (#1778).
         $this->recordUsage($user, $ranked);
 
-        return $out;
+        if ($ms > $options->latencyBudgetMs) {
+            return $this->fallback($results, $k, 'timeout');
+        }
+        if ([] === $ranked->hits) {
+            return $this->fallback($results, $k, 'empty');
+        }
+
+        return $this->reorder($results, $ranked, $k);
     }
 
     private function recordUsage(?User $user, RerankResult $ranked): void
@@ -101,19 +100,24 @@ final readonly class RerankStage
             return;
         }
 
-        $this->rateLimit->recordUsage($user, 'RERANK', [
-            'usage' => [
-                'prompt_tokens' => $ranked->promptTokens,
-                'completion_tokens' => 0,
-                'total_tokens' => $ranked->promptTokens,
-            ],
-            'media_usage' => [
-                'requests' => max(1, $ranked->requests),
-            ],
-            'provider' => $ranked->provider,
-            'model_id' => $ranked->modelId,
-            'source' => 'RAG_RERANK',
-        ]);
+        try {
+            $this->rateLimit->recordUsage($user, 'RERANK', [
+                'usage' => [
+                    'prompt_tokens' => $ranked->promptTokens,
+                    'completion_tokens' => 0,
+                    'total_tokens' => $ranked->promptTokens,
+                ],
+                'media_usage' => [
+                    'requests' => max(1, $ranked->requests),
+                ],
+                'provider' => $ranked->provider,
+                'model' => $ranked->model,
+                'model_id' => $ranked->modelId,
+                'source' => 'RAG_RERANK',
+            ]);
+        } catch (\Throwable $error) {
+            $this->metrics->recordBillingFailure($error);
+        }
     }
 
     /**

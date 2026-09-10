@@ -35,6 +35,13 @@ final class RerankMetrics
         $this->logger->info('synaplan_plugs_rerank_fallback_total', ['reason' => $reason]);
     }
 
+    public function recordBillingFailure(\Throwable $error): void
+    {
+        $this->logger->warning('synaplan_plugs_rerank_billing_failed', [
+            'error' => $error->getMessage(),
+        ]);
+    }
+
     public function fallbackCount(string $reason): int
     {
         return $this->fallbacks[$reason] ?? 0;

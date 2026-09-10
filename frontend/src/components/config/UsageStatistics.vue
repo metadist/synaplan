@@ -300,6 +300,7 @@
             <option value="SORTING">{{ $t('config.usage.actions.sorting') }}</option>
             <option value="SEARCH_QUERY">{{ $t('config.usage.actions.search_query') }}</option>
             <option value="EMBEDDINGS">{{ $t('config.usage.actions.embeddings') }}</option>
+            <option value="RERANK">{{ $t('config.usage.actions.rerank') }}</option>
           </select>
 
           <input

@@ -142,7 +142,9 @@ final class RerankStageFallbackTest extends TestCase
                 return 346 === ($metadata['model_id'] ?? null)
                     && 12 === ($metadata['usage']['prompt_tokens'] ?? null)
                     && 1 === ($metadata['media_usage']['requests'] ?? null)
-                    && 'RAG_RERANK' === ($metadata['source'] ?? null);
+                    && 'RAG_RERANK' === ($metadata['source'] ?? null)
+                    && 'cohere' === ($metadata['provider'] ?? null)
+                    && 'rerank-v3.5' === ($metadata['model'] ?? null);
             }),
         );
 
@@ -162,12 +164,13 @@ final class RerankStageFallbackTest extends TestCase
                 {
                     return new RerankResult(
                         [['id' => '1', 'text' => 'first', 'score' => 0.9]],
-                        'http:cohere',
+                        'cohere',
                         8,
                         346,
                         true,
                         12,
                         1,
+                        'rerank-v3.5',
                     );
                 }
 
@@ -227,6 +230,146 @@ final class RerankStageFallbackTest extends TestCase
         $stage->apply('question', [
             ['chunk_id' => '1', 'chunk_text' => 'first', 'score' => 0.9],
         ], 1, $this->createMock(User::class));
+    }
+
+    public function testBillableTimeoutStillRecordsUsage(): void
+    {
+        $user = $this->createMock(User::class);
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->expects($this->once())->method('recordUsage');
+
+        $stage = new RerankStage(
+            $this->registry(new class implements RerankProviderInterface {
+                public function key(): string
+                {
+                    return 'http';
+                }
+
+                public function descriptor(): PlugDescriptor
+                {
+                    return new PlugDescriptor('http', 'HTTP', '', [], 'mixed');
+                }
+
+                public function rerank(string $query, array $candidates, int $topK, RerankOptions $options): RerankResult
+                {
+                    return new RerankResult(
+                        [['id' => '1', 'text' => 'first', 'score' => 0.9]],
+                        'cohere',
+                        50_000,
+                        346,
+                        true,
+                        12,
+                        1,
+                        'rerank-v3.5',
+                    );
+                }
+
+                public function health(): PlugHealth
+                {
+                    return PlugHealth::available();
+                }
+            }),
+            $this->config(),
+            new RerankMetrics(new NullLogger()),
+            $rateLimit,
+        );
+
+        $out = $stage->apply('question', [
+            ['chunk_id' => '1', 'chunk_text' => 'first', 'score' => 0.9],
+        ], 1, $user);
+
+        $this->assertFalse($out[0]['rerank']['applied']);
+        $this->assertSame('timeout', $out[0]['rerank']['reason']);
+    }
+
+    public function testBillableEmptyHitsStillRecordsUsage(): void
+    {
+        $user = $this->createMock(User::class);
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->expects($this->once())->method('recordUsage');
+
+        $stage = new RerankStage(
+            $this->registry(new class implements RerankProviderInterface {
+                public function key(): string
+                {
+                    return 'http';
+                }
+
+                public function descriptor(): PlugDescriptor
+                {
+                    return new PlugDescriptor('http', 'HTTP', '', [], 'mixed');
+                }
+
+                public function rerank(string $query, array $candidates, int $topK, RerankOptions $options): RerankResult
+                {
+                    return new RerankResult([], 'cohere', 8, 346, true, 12, 1, 'rerank-v3.5');
+                }
+
+                public function health(): PlugHealth
+                {
+                    return PlugHealth::available();
+                }
+            }),
+            $this->config(),
+            new RerankMetrics(new NullLogger()),
+            $rateLimit,
+        );
+
+        $out = $stage->apply('question', [
+            ['chunk_id' => '1', 'chunk_text' => 'first', 'score' => 0.9],
+        ], 1, $user);
+
+        $this->assertFalse($out[0]['rerank']['applied']);
+        $this->assertSame('empty', $out[0]['rerank']['reason']);
+    }
+
+    public function testBillingFailureDoesNotDiscardRankedHits(): void
+    {
+        $rateLimit = $this->createMock(RateLimitService::class);
+        $rateLimit->method('recordUsage')->willThrowException(new \RuntimeException('buselog down'));
+
+        $stage = new RerankStage(
+            $this->registry(new class implements RerankProviderInterface {
+                public function key(): string
+                {
+                    return 'http';
+                }
+
+                public function descriptor(): PlugDescriptor
+                {
+                    return new PlugDescriptor('http', 'HTTP', '', [], 'mixed');
+                }
+
+                public function rerank(string $query, array $candidates, int $topK, RerankOptions $options): RerankResult
+                {
+                    return new RerankResult(
+                        [['id' => '1', 'text' => 'first', 'score' => 0.9]],
+                        'cohere',
+                        8,
+                        346,
+                        true,
+                        12,
+                        1,
+                        'rerank-v3.5',
+                    );
+                }
+
+                public function health(): PlugHealth
+                {
+                    return PlugHealth::available();
+                }
+            }),
+            $this->config(),
+            new RerankMetrics(new NullLogger()),
+            $rateLimit,
+        );
+
+        $out = $stage->apply('question', [
+            ['chunk_id' => '1', 'chunk_text' => 'first', 'score' => 0.9],
+        ], 1, $this->createMock(User::class));
+
+        $this->assertTrue($out[0]['rerank']['applied']);
+        $this->assertSame('1', $out[0]['chunk_id']);
     }
 
     private function registry(RerankProviderInterface $provider): RerankRegistry

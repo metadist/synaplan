@@ -22,6 +22,7 @@ final readonly class RerankResult
         public bool $meter = false,
         public int $promptTokens = 0,
         public int $requests = 1,
+        public string $model = '',
     ) {
     }
 }

@@ -3600,7 +3600,8 @@
         "file_analysis": "Dosya Analizi",
         "sorting": "Sınıflandırma",
         "search_query": "Arama Sorgusu",
-        "api_chat": "API Sohbeti"
+        "api_chat": "API Sohbeti",
+        "rerank": "Yeniden sıralama"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -3615,7 +3616,8 @@
         "openai_api": "API (OpenAI uyumlu)",
         "api_summary": "API oturum özeti",
         "mcp": "MCP",
-        "mcp_tool": "MCP Araçları"
+        "mcp_tool": "MCP Araçları",
+        "rag_rerank": "Belge yeniden sıralama"
       },
       "periods": {
         "today": "Bugün",

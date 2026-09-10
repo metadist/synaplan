@@ -85,12 +85,13 @@ final readonly class HttpRerankAdapter implements RerankProviderInterface
 
         return new RerankResult(
             $hits,
-            self::KEY.':'.strtolower($model->getService()),
+            strtolower($model->getService()),
             $ms,
             $model->getId() ?? $this->modelConfig->getDefaultModel('RERANK'),
             true,
             $outcome['tokens'],
             $outcome['requests'],
+            $model->getProviderId(),
         );
     }
 
