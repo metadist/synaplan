@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Architecture;
 
+use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -17,9 +18,9 @@ use PHPUnit\Framework\TestCase;
  * PlugDeclarationCheckPass applied to first-party code, at test time so prod
  * boot never gets slower.
  *
- * S2 (FM10) replaces the MODULE_ENV_KEYS constant with the descriptors'
- * `configuredBy()` and burns ALLOWED_UNOWNED down to zero; until then this file
- * is the machine-readable form of module_map.md.
+ * Module ownership comes from the descriptors' `configuredBy()` (S2), so the
+ * declaration that drives the status page and the gates is the one this test
+ * checks — there is no second list to keep in sync.
  *
  * Scope: services.yaml only. Infrastructure DSNs in config/packages/*.yaml
  * (DATABASE_URL, MESSENGER_TRANSPORT_DSN, MAILER_DSN, …) are mandatory, not
@@ -27,6 +28,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class ModuleOwnershipTest extends TestCase
 {
+    use BuildsAllModules;
+
     /** Guard against a vacuous pass if the parser stops matching (132 keys on 2026-09-10). */
     private const MIN_EXPECTED_ENV_KEYS = 100;
 
@@ -44,86 +47,6 @@ final class ModuleOwnershipTest extends TestCase
         'stripe_billing',
         'mobile_iap',
         'whatsapp',
-    ];
-
-    /**
-     * Environment keys owned by each module (module_map.md, "Env keys" rows).
-     *
-     * @var array<string, list<string>>
-     */
-    private const MODULE_ENV_KEYS = [
-        'tika' => [
-            'TIKA_BASE_URL',
-            'TIKA_HTTP_USER',
-            'TIKA_HTTP_PASS',
-            'TIKA_TIMEOUT_MS',
-            'TIKA_RETRIES',
-            'TIKA_RETRY_BACKOFF_MS',
-            'TIKA_MIN_LENGTH',
-            'TIKA_MIN_ENTROPY',
-        ],
-        'docling' => [
-            'DOCLING_BASE_URL',
-            'DOCLING_TIMEOUT_MS',
-            'DOCLING_MAX_BYTES',
-        ],
-        'office_convert' => [
-            'OFFICE_CONVERT_URL',
-            'OFFICE_CONVERT_TIMEOUT_MS',
-        ],
-        'searxng' => [
-            'SEARXNG_BASE_URL',
-        ],
-        'piper_tts' => [
-            'SYNAPLAN_TTS_URL',
-        ],
-        'local_ai' => [
-            'OLLAMA_BASE_URL',
-        ],
-        'higgsfield' => [
-            'HIGGSFIELD_API_KEY',
-            'HIGGSFIELD_API_SECRET',
-        ],
-        'google_ai' => [
-            'GOOGLE_GEMINI_API_KEY',
-            'GEMINI_API_KEY',
-            'GOOGLE_API_KEY',
-            'GOOGLE_CLOUD_PROJECT_ID',
-            'GOOGLE_VERTEX_ACCESS_TOKEN',
-        ],
-        'thehive' => [
-            'THEHIVE_API_KEY',
-        ],
-        'stripe_billing' => [
-            'STRIPE_SECRET_KEY',
-            'STRIPE_WEBHOOK_SECRET',
-            'STRIPE_PRICE_PRO',
-            'STRIPE_PRICE_TEAM',
-            'STRIPE_PRICE_BUSINESS',
-            'STRIPE_PAYMENT_METHODS',
-            'STRIPE_AUTOMATIC_TAX',
-        ],
-        'mobile_iap' => [
-            'IAP_PRODUCT_PRO',
-            'IAP_PRODUCT_TEAM',
-            'IAP_PRODUCT_BUSINESS',
-            'IAP_PRICE_MARKUP_PERCENT',
-            'IAP_STORE_PRICE_PRO',
-            'IAP_STORE_PRICE_TEAM',
-            'IAP_STORE_PRICE_BUSINESS',
-            'IAP_APPLE_APP_APPLE_ID',
-            'IAP_APPLE_BUNDLE_ID',
-            'IAP_APPLE_ENVIRONMENT',
-            'IAP_APPLE_ROOT_CERTS_DIR',
-            'IAP_GOOGLE_PACKAGE_NAME',
-            'IAP_GOOGLE_SERVICE_ACCOUNT_JSON',
-        ],
-        'whatsapp' => [
-            'WHATSAPP_ENABLED',
-            'WHATSAPP_ACCESS_TOKEN',
-            'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
-            'WHATSAPP_GRAPH_API_BASE_URL',
-        ],
     ];
 
     /**
@@ -272,7 +195,13 @@ final class ModuleOwnershipTest extends TestCase
     public function testModuleIdsMatchThePlan(): void
     {
         $this->assertCount(12, self::MODULE_IDS);
-        $this->assertSame(self::MODULE_IDS, array_keys(self::MODULE_ENV_KEYS), 'MODULE_ENV_KEYS must list exactly the plan\'s modules, in rollout order.');
+
+        $declared = array_keys($this->allModules());
+        sort($declared);
+        $plan = self::MODULE_IDS;
+        sort($plan);
+
+        $this->assertSame($plan, $declared, 'The descriptor set must be exactly the plan\'s module set.');
     }
 
     public function testEveryEnvKeyInServicesYamlIsOwnedOrCore(): void
@@ -284,7 +213,7 @@ final class ModuleOwnershipTest extends TestCase
         $unowned = array_values(array_diff($existing, $owned));
 
         $this->assertSame([], $unowned, sprintf(
-            "Unowned optional env keys in config/services.yaml:\n  %s\n\nAssign each to a module in MODULE_ENV_KEYS, to a CORE_ENV_KEYS group with a reason, or (last resort) add it to ALLOWED_UNOWNED with today's date.",
+            "Unowned optional env keys in config/services.yaml:\n  %s\n\nAdd each to a module's configuredBy(), to a CORE_ENV_KEYS group with a reason, or (last resort) to allowedUnowned() with today's date.",
             implode("\n  ", $unowned),
         ));
     }
@@ -321,8 +250,8 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testEveryModuleOwnsAtLeastOneEnvKey(): void
     {
-        foreach (self::MODULE_ENV_KEYS as $moduleId => $keys) {
-            $this->assertNotEmpty($keys, "Module '{$moduleId}' must be configured by at least one env key (master plan §0 row 4).");
+        foreach ($this->allModules() as $moduleId => $module) {
+            $this->assertNotEmpty($module->configuredBy()->envKeys, "Module '{$moduleId}' must be configured by at least one env key (master plan §0 row 4).");
         }
     }
 
@@ -331,7 +260,12 @@ final class ModuleOwnershipTest extends TestCase
      */
     private function moduleKeys(): array
     {
-        return array_merge(...array_values(self::MODULE_ENV_KEYS));
+        $keys = [];
+        foreach ($this->allModules() as $module) {
+            $keys[] = $module->configuredBy()->envKeys;
+        }
+
+        return array_merge(...$keys);
     }
 
     /**

@@ -37,6 +37,29 @@ The worker **MUST run in the same `APP_ENV` as the backend container**. The `Red
 
 After switching branches a `docker compose restart worker` is enough to pick up code changes (the entrypoint clears and re-warms the cache).
 
+### Optional feature modules
+
+Everything below this heading that is marked *optional* (Collabora, Docling,
+SearXNG, the local TTS service, Ollama, the Higgsfield / Google AI / TheHive
+providers, Stripe billing, mobile IAP, the WhatsApp channel) is a **feature
+module**: a declared, self-describing part of the platform that the core must
+run without. Each module declares the environment variables that configure it
+(`backend/src/Module/**`), and the platform reports it in three places from
+that one declaration — the admin feature-status page, the self-aware
+capability inventory, and this command:
+
+```bash
+docker compose exec backend php bin/console app:modules:list           # table
+docker compose exec backend php bin/console app:modules:list --json    # same shape as /api/v1/config/features → modules
+docker compose exec backend php bin/console app:modules:list --assert-none-configured   # exit 1 if any module is configured
+```
+
+*configured* means the module's declaration is satisfied (e.g. `OFFICE_CONVERT_URL`
+is set and not `disabled`); *healthy* means the configured service also
+answered its health endpoint. Absent modules are never probed, so the command
+is safe on a minimal stack — the `--assert-none-configured` flag is what the
+minimal CI lane uses to prove the core carries no optional feature.
+
 ### Office conversion (optional)
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,

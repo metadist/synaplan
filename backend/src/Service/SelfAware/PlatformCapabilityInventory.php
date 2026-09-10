@@ -6,6 +6,7 @@ namespace App\Service\SelfAware;
 
 use App\AI\Credential\ChatReadinessService;
 use App\Entity\User;
+use App\Module\ModuleRegistry;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\ConnectionRepository;
 use App\Repository\PromptRepository;
@@ -21,7 +22,6 @@ use App\Service\Plugin\PluginManager;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\Update\UpdateStatusService;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Builds a live capability report from sources that already gate behaviour
@@ -105,10 +105,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         private BillingService $billingService,
         private ConnectionRepository $connectionRepository,
         private UserRepository $userRepository,
-        #[Autowire('%env(bool:WHATSAPP_ENABLED)%')]
-        private bool $whatsappEnabled = false,
-        #[Autowire('%env(WHATSAPP_ACCESS_TOKEN)%')]
-        private string $whatsappAccessToken = '',
+        private ModuleRegistry $modules,
     ) {
     }
 
@@ -117,7 +114,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         $user = $userId > 0 ? $this->userRepository->find($userId) : null;
         $isAdmin = $user instanceof User && $user->isAdmin();
         $chatReady = $this->chatReadiness->isChatReady(userId: $userId > 0 ? $userId : null);
-        $ttsAvailable = $this->modelResolves('TEXT2SOUND', $userId) || $this->ttsUrlConfigured();
+        $ttsAvailable = $this->modelResolves('TEXT2SOUND', $userId) || $this->moduleConfigured('text_to_speech');
 
         $facts = [];
         $facts[] = $this->fact(
@@ -248,7 +245,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'Channels → Email / Microsoft 365',
             'channels',
         );
-        $pdfReady = $this->officeEngineConfigured();
+        $pdfReady = $this->moduleConfigured('pdf_export');
         $facts[] = new CapabilityFact(
             'document_generation',
             'Documents',
@@ -326,8 +323,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             'Channels → MCP Servers',
             'mcp',
         );
-        $whatsAppOn = $this->whatsappEnabled
-            && '' !== trim($this->whatsappAccessToken)
+        $whatsAppOn = $this->moduleConfigured('channel_whatsapp')
             && $user instanceof User
             && $user->hasVerifiedPhone();
         $facts[] = $this->fact(
@@ -463,9 +459,14 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         return null !== $this->modelConfig->getDefaultModel($capability, $userId > 0 ? $userId : null);
     }
 
-    private function ttsUrlConfigured(): bool
+    /**
+     * "Configured" as declared by the feature module that owns the capability
+     * (`FeatureModuleInterface::capabilityIds()`), so this inventory and the
+     * feature-status page can never disagree about a sidecar or channel.
+     */
+    private function moduleConfigured(string $capabilityId): bool
     {
-        return $this->envNonEmpty('SYNAPLAN_TTS_URL');
+        return $this->modules->forCapability($capabilityId)?->isConfigured() ?? false;
     }
 
     private function envNonEmpty(string $key): bool
@@ -476,20 +477,6 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         }
 
         return '' !== trim($value);
-    }
-
-    /**
-     * Same gate as {@see \App\Service\File\Office\OfficeConverterClient::isEnabled()}.
-     */
-    private function officeEngineConfigured(): bool
-    {
-        $value = $_ENV['OFFICE_CONVERT_URL'] ?? $_SERVER['OFFICE_CONVERT_URL'] ?? getenv('OFFICE_CONVERT_URL');
-        if (!is_string($value)) {
-            return false;
-        }
-        $url = trim($value);
-
-        return '' !== $url && 'disabled' !== $url;
     }
 
     private function userHasWebDav(int $userId): bool

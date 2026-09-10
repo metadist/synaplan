@@ -3,6 +3,8 @@
 namespace App;
 
 use App\DependencyInjection\Compiler\EnableTestSavepointsPass;
+use App\Module\Contract\FeatureModuleInterface;
+use App\Module\DependencyInjection\FeatureModuleTagPass;
 use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
 use App\Plug\Extraction\ContentExtractorInterface;
 use App\Plug\Rerank\RerankProviderInterface;
@@ -91,6 +93,12 @@ class Kernel extends BaseKernel
         $container->registerForAutoconfiguration(ContentExtractorInterface::class)->addTag('app.plug.extractor');
         $container->registerForAutoconfiguration(WebSearchProviderInterface::class)->addTag('app.plug.web_search');
         $container->registerForAutoconfiguration(RerankProviderInterface::class)->addTag('app.plug.rerank');
+
+        // Feature modules: every descriptor reaches ModuleRegistry by implementing
+        // the interface; the pass indexes the tag by the class's ID constant and
+        // refuses duplicate ids at compile time.
+        $container->registerForAutoconfiguration(FeatureModuleInterface::class)->addTag(FeatureModuleTagPass::TAG);
+        $container->addCompilerPass(new FeatureModuleTagPass());
 
         // Nested-transaction savepoints are required by dama/doctrine-test-bundle
         // on MariaDB/MySQL. We register the compiler pass conditionally because

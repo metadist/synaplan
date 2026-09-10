@@ -1,0 +1,502 @@
+{
+    "features": {
+        "web-search": {
+            "id": "web-search",
+            "category": "AI Features",
+            "name": "Web Search",
+            "enabled": false,
+            "status": "disabled",
+            "message": "Web search requires Brave Search API configuration",
+            "setup_required": true,
+            "env_vars": {
+                "BRAVE_SEARCH_API_KEY": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Get your API key from https://api.search.brave.com/"
+                },
+                "BRAVE_SEARCH_ENABLED": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Set to \"true\" to enable web search"
+                }
+            }
+        },
+        "image-gen": {
+            "id": "image-gen",
+            "category": "AI Features",
+            "name": "Image Generation",
+            "enabled": false,
+            "status": "disabled",
+            "message": "No image generation models configured",
+            "setup_required": true,
+            "models_available": 0
+        },
+        "openai": {
+            "id": "openai",
+            "category": "AI Providers",
+            "name": "OpenAI",
+            "enabled": false,
+            "status": "disabled",
+            "message": "API key not configured",
+            "setup_required": true,
+            "env_vars": {
+                "OPENAI_API_KEY": {
+                    "required": true,
+                    "set": false,
+                    "hint": "From platform.openai.com"
+                }
+            },
+            "models_available": 0,
+            "url": null
+        },
+        "ollama": {
+            "id": "ollama",
+            "category": "AI Providers",
+            "name": "Ollama",
+            "enabled": true,
+            "status": "unhealthy",
+            "message": "Local models",
+            "setup_required": false,
+            "env_vars": {
+                "OLLAMA_BASE_URL": {
+                    "required": true,
+                    "set": true,
+                    "hint": "Ollama server URL"
+                }
+            },
+            "models_available": 0,
+            "url": "http://ollama:11434"
+        },
+        "whisper": {
+            "id": "whisper",
+            "category": "Processing Services",
+            "name": "Whisper.cpp",
+            "enabled": false,
+            "status": "unhealthy",
+            "message": "Whisper.cpp binary or models not found",
+            "setup_required": true,
+            "models_available": 0
+        },
+        "tika": {
+            "id": "tika",
+            "category": "Processing Services",
+            "name": "Apache Tika",
+            "enabled": true,
+            "status": "unhealthy",
+            "message": "Tika service is not responding",
+            "setup_required": false,
+            "url": "http://tika:9998",
+            "version": ""
+        },
+        "docling": {
+            "id": "docling",
+            "category": "Processing Services",
+            "name": "Docling",
+            "enabled": false,
+            "status": "disabled",
+            "message": "Optional. Set DOCLING_BASE_URL and start the docling Compose profile",
+            "setup_required": true,
+            "url": ""
+        },
+        "office-convert": {
+            "id": "office-convert",
+            "category": "Processing Services",
+            "name": "Office converter (Collabora)",
+            "enabled": false,
+            "status": "disabled",
+            "message": "Optional. Set OFFICE_CONVERT_URL and start the office Compose profile",
+            "setup_required": true,
+            "url": ""
+        },
+        "memory-service": {
+            "id": "memory-service",
+            "category": "Processing Services",
+            "name": "Qdrant Vector Database",
+            "enabled": false,
+            "status": "unhealthy",
+            "message": "Qdrant URL not configured",
+            "warnings": [],
+            "setup_required": true,
+            "url": "not configured",
+            "version": "unknown",
+            "stats": [],
+            "env_vars": {
+                "QDRANT_URL": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Internal Docker service URL",
+                    "example": "http://qdrant:6333"
+                }
+            }
+        },
+        "database": {
+            "id": "database",
+            "category": "Infrastructure",
+            "name": "MariaDB",
+            "enabled": true,
+            "status": "unhealthy",
+            "message": "Database connection failed",
+            "setup_required": false,
+            "version": ""
+        },
+        "redis": {
+            "id": "redis",
+            "category": "Infrastructure",
+            "name": "Redis",
+            "enabled": true,
+            "status": "unhealthy",
+            "message": "Redis unreachable: Connection refused [tcp://redis:6379]",
+            "setup_required": true,
+            "url": "not configured",
+            "version": "",
+            "env_vars": {
+                "REDIS_DSN": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Redis connection DSN shared by cache, locks, rate-limiter and Messenger (e.g. redis://redis:6379)"
+                }
+            }
+        },
+        "centrifugo": {
+            "id": "centrifugo",
+            "category": "Infrastructure",
+            "name": "Centrifugo",
+            "enabled": false,
+            "status": "disabled",
+            "message": "Realtime is disabled (REALTIME_ENABLED=false) — clients see fresh data via REST only, without push updates",
+            "setup_required": true,
+            "url": "not configured",
+            "env_vars": {
+                "REALTIME_ENABLED": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Master switch for WebSocket publishing (no SSE fallback)"
+                },
+                "REALTIME_API_URL": {
+                    "required": true,
+                    "set": false,
+                    "hint": "Centrifugo server API endpoint, e.g. http://centrifugo:8000/api"
+                }
+            }
+        }
+    },
+    "summary": {
+        "total": 12,
+        "healthy": 0,
+        "unhealthy": 12,
+        "all_ready": false
+    },
+    "modules": [
+        {
+            "id": "docling",
+            "label_key": "modules.docling.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "DOCLING_BASE_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "DOCLING_BASE_URL",
+                    "DOCLING_TIMEOUT_MS",
+                    "DOCLING_MAX_BYTES"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/docling",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "google_ai",
+            "label_key": "modules.google_ai.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "No Google AI API key in the environment or admin settings",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "GOOGLE_GEMINI_API_KEY",
+                    "GEMINI_API_KEY",
+                    "GOOGLE_API_KEY",
+                    "GOOGLE_CLOUD_PROJECT_ID",
+                    "GOOGLE_VERTEX_ACCESS_TOKEN"
+                ],
+                "bconfig": [
+                    "PROVIDER_KEYS.google"
+                ],
+                "providers": [
+                    "google"
+                ],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/google-ai",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "higgsfield",
+            "label_key": "modules.higgsfield.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET are not both set",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "HIGGSFIELD_API_KEY",
+                    "HIGGSFIELD_API_SECRET"
+                ],
+                "bconfig": [],
+                "providers": [
+                    "higgsfield"
+                ],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/higgsfield",
+            "mobile_class": "ota-candidate"
+        },
+        {
+            "id": "local_ai",
+            "label_key": "modules.local_ai.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "OLLAMA_BASE_URL is unset",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "OLLAMA_BASE_URL"
+                ],
+                "bconfig": [],
+                "providers": [
+                    "ollama"
+                ],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/local-ai",
+            "mobile_class": "ota-candidate"
+        },
+        {
+            "id": "mobile_iap",
+            "label_key": "modules.mobile_iap.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "No IAP_PRODUCT_* tier is mapped to a store product",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "IAP_PRODUCT_PRO",
+                    "IAP_PRODUCT_TEAM",
+                    "IAP_PRODUCT_BUSINESS",
+                    "IAP_PRICE_MARKUP_PERCENT",
+                    "IAP_STORE_PRICE_PRO",
+                    "IAP_STORE_PRICE_TEAM",
+                    "IAP_STORE_PRICE_BUSINESS",
+                    "IAP_APPLE_BUNDLE_ID",
+                    "IAP_APPLE_APP_APPLE_ID",
+                    "IAP_APPLE_ENVIRONMENT",
+                    "IAP_APPLE_ROOT_CERTS_DIR",
+                    "IAP_GOOGLE_PACKAGE_NAME",
+                    "IAP_GOOGLE_SERVICE_ACCOUNT_JSON"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/mobile-iap",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "office_convert",
+            "label_key": "modules.office_convert.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "OFFICE_CONVERT_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "OFFICE_CONVERT_URL",
+                    "OFFICE_CONVERT_TIMEOUT_MS"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "pdf_export"
+            ],
+            "docs_anchor": "modules/office-convert",
+            "mobile_class": "ota-candidate"
+        },
+        {
+            "id": "piper_tts",
+            "label_key": "modules.piper_tts.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "SYNAPLAN_TTS_URL is unset",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "SYNAPLAN_TTS_URL"
+                ],
+                "bconfig": [],
+                "providers": [
+                    "piper"
+                ],
+                "plugs": []
+            },
+            "capabilities": [
+                "text_to_speech"
+            ],
+            "docs_anchor": "modules/piper-tts",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "searxng",
+            "label_key": "modules.searxng.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "SEARXNG_BASE_URL is unset or disabled",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "SEARXNG_BASE_URL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": [
+                    "searxng"
+                ]
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/searxng",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "stripe_billing",
+            "label_key": "modules.stripe_billing.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Missing: STRIPE_SECRET_KEY, STRIPE_PRICE_PRO, STRIPE_WEBHOOK_SECRET",
+            "details": {
+                "missing": [
+                    "STRIPE_SECRET_KEY",
+                    "STRIPE_PRICE_PRO",
+                    "STRIPE_WEBHOOK_SECRET"
+                ]
+            },
+            "configured_by": {
+                "env": [
+                    "STRIPE_SECRET_KEY",
+                    "STRIPE_WEBHOOK_SECRET",
+                    "STRIPE_PRICE_PRO",
+                    "STRIPE_PRICE_TEAM",
+                    "STRIPE_PRICE_BUSINESS",
+                    "STRIPE_PAYMENT_METHODS",
+                    "STRIPE_AUTOMATIC_TAX"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/stripe-billing",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "thehive",
+            "label_key": "modules.thehive.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "THEHIVE_API_KEY is unset",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "THEHIVE_API_KEY"
+                ],
+                "bconfig": [],
+                "providers": [
+                    "thehive"
+                ],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/thehive",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "tika",
+            "label_key": "modules.tika.label",
+            "state": "needs_setup",
+            "configured": true,
+            "healthy": false,
+            "message": "Tika is not reachable",
+            "details": {
+                "url": "http://tika:9998",
+                "version": null
+            },
+            "configured_by": {
+                "env": [
+                    "TIKA_BASE_URL",
+                    "TIKA_HTTP_USER",
+                    "TIKA_HTTP_PASS",
+                    "TIKA_TIMEOUT_MS",
+                    "TIKA_RETRIES",
+                    "TIKA_RETRY_BACKOFF_MS",
+                    "TIKA_MIN_LENGTH",
+                    "TIKA_MIN_ENTROPY"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/tika",
+            "mobile_class": "backend-only"
+        },
+        {
+            "id": "whatsapp",
+            "label_key": "modules.whatsapp.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Missing: WHATSAPP_ENABLED, WHATSAPP_ACCESS_TOKEN, WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+            "details": {
+                "missing": [
+                    "WHATSAPP_ENABLED",
+                    "WHATSAPP_ACCESS_TOKEN",
+                    "WHATSAPP_WEBHOOK_VERIFY_TOKEN"
+                ]
+            },
+            "configured_by": {
+                "env": [
+                    "WHATSAPP_ENABLED",
+                    "WHATSAPP_ACCESS_TOKEN",
+                    "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+                    "WHATSAPP_GRAPH_API_BASE_URL"
+                ],
+                "bconfig": [],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "channel_whatsapp"
+            ],
+            "docs_anchor": "modules/whatsapp",
+            "mobile_class": "ota-candidate"
+        }
+    ]
+}

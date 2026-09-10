@@ -248,6 +248,10 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+            # Feature-module value objects and the compiler pass are not services.
+            - '../src/Module/Contract/'
+            - '../src/Module/DependencyInjection/'
+            - '../src/Module/Exception/'
             # Factory product of PluginResourceKindCatalog — never a singleton.
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
 
@@ -1067,6 +1071,58 @@ services:
         arguments:
             $officeConvertUrl: '%env(OFFICE_CONVERT_URL)%'
             $officeConvertTimeoutMs: '%env(int:OFFICE_CONVERT_TIMEOUT_MS)%'
+
+    # Feature-module descriptors (_devextras/planning/20260910-feature-modules).
+    # Each one reads the SAME env expression as the service it describes so
+    # "configured" can never drift from the runtime behaviour. Scalars only —
+    # descriptors must stay cheap to construct; probes happen in status().
+    App\Module\Probe\SidecarHealthProbeInterface:
+        alias: App\Module\Probe\HttpSidecarHealthProbe
+
+    App\Module\Sidecar\TikaModule:
+        arguments:
+            $baseUrl: '%env(TIKA_BASE_URL)%'
+            $httpUser: '%env(TIKA_HTTP_USER)%'
+            $httpPass: '%env(TIKA_HTTP_PASS)%'
+
+    App\Module\Sidecar\DoclingModule:
+        arguments:
+            $baseUrl: '%env(DOCLING_BASE_URL)%'
+
+    App\Module\Sidecar\OfficeConvertModule:
+        arguments:
+            $baseUrl: '%env(OFFICE_CONVERT_URL)%'
+
+    App\Module\Sidecar\SearxngModule:
+        arguments:
+            $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Module\Sidecar\PiperTtsModule:
+        arguments:
+            # Raw value on purpose: PiperProvider receives the defaulted URL and
+            # therefore always reports available; the module tells apart
+            # "operator pointed at a TTS service" from "compose default".
+            $ttsUrl: '%env(SYNAPLAN_TTS_URL)%'
+
+    App\Module\Sidecar\LocalAiModule:
+        arguments:
+            $baseUrl: '%env(OLLAMA_BASE_URL)%'
+
+    App\Module\Provider\TheHiveModule:
+        arguments:
+            $apiKey: '%env(THEHIVE_API_KEY)%'
+
+    App\Module\Commerce\StripeBillingModule:
+        arguments:
+            $stripeSecretKey: '%env(STRIPE_SECRET_KEY)%'
+            $stripePricePro: '%env(STRIPE_PRICE_PRO)%'
+            $stripeWebhookSecret: '%env(STRIPE_WEBHOOK_SECRET)%'
+
+    App\Module\Channel\WhatsappModule:
+        arguments:
+            $enabled: '%env(bool:WHATSAPP_ENABLED)%'
+            $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
+            $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
 
     App\Service\File\Office\StructuredTextExtractor:
         arguments:
