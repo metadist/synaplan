@@ -95,11 +95,15 @@ final class WebSearchRegistry
         $primary = $this->byKey[$activeKey] ?? null;
         $primarySet = $this->trySearch($primary, $query, $activeKey);
         if (null !== $primarySet) {
+            $this->fallbackMetrics->recordResolved($activeKey, \count($primarySet->results), null);
+
             return $primarySet;
         }
 
         $fallbackKey = $this->config->webSearchFallback();
         if ('' === $fallbackKey || $fallbackKey === $activeKey) {
+            $this->fallbackMetrics->recordResolved($activeKey, 0, null);
+
             return SearchResultSet::empty($query->query, ['provider' => $activeKey]);
         }
 
@@ -107,9 +111,12 @@ final class WebSearchRegistry
         $fallbackSet = $this->trySearch($fallback, $query, $fallbackKey);
         if (null !== $fallbackSet) {
             $this->fallbackMetrics->increment($activeKey, $fallbackKey);
+            $this->fallbackMetrics->recordResolved($fallbackKey, \count($fallbackSet->results), $activeKey);
 
             return $fallbackSet->withMeta(['fellBackFrom' => $activeKey]);
         }
+
+        $this->fallbackMetrics->recordResolved($activeKey, 0, $activeKey);
 
         return SearchResultSet::empty($query->query, [
             'provider' => $activeKey,
@@ -125,6 +132,11 @@ final class WebSearchRegistry
     private function trySearch(?WebSearchProviderInterface $provider, WebSearchQuery $query, string $key): ?SearchResultSet
     {
         if (null === $provider || !$provider->health()->available) {
+            $this->fallbackMetrics->recordFailure(
+                $key,
+                $provider?->health()->reason ?? 'provider is not registered',
+            );
+
             return null;
         }
 
@@ -137,7 +149,9 @@ final class WebSearchRegistry
                 'provider' => $key,
                 'latencyMs' => $latencyMs,
             ]);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->fallbackMetrics->recordFailure($key, $e->getMessage());
+
             return null;
         }
     }

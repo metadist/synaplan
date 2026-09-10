@@ -3001,7 +3001,9 @@
       "testHint": "Lancez une courte requête. Vous verrez jusqu’à cinq titres du fournisseur actif.",
       "testPlaceholder": "synaplan open source",
       "testButton": "Requête de test",
-      "testing": "Test…"
+      "testing": "Test…",
+      "testProvider": "Répondu par {provider}",
+      "testProviderFallback": "Répondu par {provider} (secours depuis {from})"
     },
     "rerank": {
       "lead": "Après la recherche, un réordonnanceur place les extraits les plus utiles en premier. Laissez cette option désactivée tant qu’un test n’a pas montré qu’elle aide. Le chat ne change pas tant qu’elle est désactivée.",

@@ -162,6 +162,13 @@
           </button>
         </div>
         <ul v-if="testResult" class="mt-3 space-y-1" data-testid="web-search-test-results">
+          <li
+            v-if="testResult.provider"
+            class="text-sm txt-secondary"
+            data-testid="web-search-test-provider"
+          >
+            {{ testProviderLabel(testResult) }}
+          </li>
           <li v-if="testResult.error" class="text-sm text-red-600 dark:text-red-400">
             {{ testResult.error }}
           </li>
@@ -295,6 +302,17 @@ async function runTest(): Promise<void> {
   } finally {
     testing.value = false
   }
+}
+
+function testProviderLabel(result: WebSearchTestResult): string {
+  if (result.fellBackFrom) {
+    return t('aiInfra.webSearch.testProviderFallback', {
+      provider: result.provider,
+      from: result.fellBackFrom,
+    })
+  }
+
+  return t('aiInfra.webSearch.testProvider', { provider: result.provider ?? '' })
 }
 
 function hasKeyField(key: string): boolean {

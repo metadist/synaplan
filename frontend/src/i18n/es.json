@@ -1301,7 +1301,9 @@
       "testHint": "Ejecute una consulta breve. Verá hasta cinco títulos del proveedor activo.",
       "testPlaceholder": "synaplan open source",
       "testButton": "Consulta de prueba",
-      "testing": "Probando…"
+      "testing": "Probando…",
+      "testProvider": "Respondido por {provider}",
+      "testProviderFallback": "Respondido por {provider} (reserva de {from})"
     },
     "rerank": {
       "lead": "Tras la búsqueda, un reordenador pone primero los fragmentos más útiles. Déjalo apagado hasta que una prueba demuestre que ayuda. El chat no cambia mientras esté apagado.",

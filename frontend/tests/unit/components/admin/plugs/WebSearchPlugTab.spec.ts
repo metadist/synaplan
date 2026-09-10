@@ -91,6 +91,8 @@ describe('WebSearchPlugTab', () => {
       answer: null,
       latencyMs: 12,
       error: null,
+      provider: 'brave',
+      fellBackFrom: null,
     })
 
     const wrapper = mount(WebSearchPlugTab, {
@@ -118,6 +120,9 @@ describe('WebSearchPlugTab', () => {
     expect(testWebSearch).toHaveBeenCalledWith('brave', 'synaplan open source')
     expect(wrapper.get('[data-testid="web-search-test-results"]').text()).toContain('Synaplan')
     expect(wrapper.get('[data-testid="web-search-test-results"]').text()).toContain('Docs')
+    expect(wrapper.get('[data-testid="web-search-test-provider"]').text()).toContain(
+      'Answered by brave'
+    )
   })
 
   it('warns when the saved active provider cannot search', async () => {

@@ -1301,7 +1301,9 @@
       "testHint": "Kısa bir sorgu çalıştırın. Etkin sağlayıcıdan en fazla beş başlık görürsünüz.",
       "testPlaceholder": "synaplan open source",
       "testButton": "Test sorgusu",
-      "testing": "Test ediliyor…"
+      "testing": "Test ediliyor…",
+      "testProvider": "{provider} yanıtladı",
+      "testProviderFallback": "{provider} yanıtladı ({from} yerine)"
     },
     "rerank": {
       "lead": "Arama birçok parçayı bulduktan sonra bir yeniden sıralayıcı en yararlı olanları öne alır. Bir test faydasını gösterene kadar kapalı bırakın. Kapalıyken sohbet değişmez.",

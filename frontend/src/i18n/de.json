@@ -3093,7 +3093,9 @@
       "testHint": "Führen Sie eine kurze Abfrage aus. Sie sehen bis zu fünf Titel des aktiven Anbieters.",
       "testPlaceholder": "synaplan open source",
       "testButton": "Testabfrage",
-      "testing": "Test läuft…"
+      "testing": "Test läuft…",
+      "testProvider": "Beantwortet von {provider}",
+      "testProviderFallback": "Beantwortet von {provider} (Ersatz für {from})"
     },
     "rerank": {
       "lead": "Nach der Suche rückt ein Neuordner die nützlichsten Textstellen nach vorne. Lass dies aus, bis ein Test zeigt, dass es hilft. Der Chat bleibt unverändert, solange es aus ist.",
