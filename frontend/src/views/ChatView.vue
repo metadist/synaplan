@@ -302,6 +302,21 @@
         :can-continue="chatsStore.conversationAccess === 'use'"
         @continue="continueSharedConversation"
       />
+      <div
+        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
+        class="mx-4 mb-3 space-y-3"
+        data-testid="chat-approvals"
+      >
+        <ApprovalCard
+          v-for="row in chatPendingApprovals"
+          :key="row.id"
+          :approval="row"
+          :can-always-allow="row.canAlwaysAllow"
+          @approved="onChatApprovalApproved"
+          @rejected="onChatApprovalRejected"
+          @always-allow="onChatApprovalAlwaysAllow"
+        />
+      </div>
       <ChatInput
         v-if="!needsProviderSetup && canComposeSharedChat"
         ref="chatInputRef"
@@ -530,6 +545,9 @@ import { useModelsStore } from '@/stores/models'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
+import { useApprovalsStore } from '@/stores/approvals'
+import ApprovalCard from '@/components/chat/ApprovalCard.vue'
+import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
 import { useUsageTaximeterStore, type UsageTotals } from '@/stores/usageTaximeter'
@@ -683,7 +701,73 @@ const modelsStore = useModelsStore()
 const aiConfigStore = useAiConfigStore()
 const authStore = useAuthStore()
 const mediaJobsStore = useMediaJobsStore()
+const approvalsStore = useApprovalsStore()
 const guestStore = useGuestStore()
+
+const chatPendingApprovals = computed(() =>
+  approvalsStore.pending.filter(
+    (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
+  )
+)
+
+async function onChatApprovalApproved(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalRejected(id: number, reason: string): Promise<void> {
+  try {
+    await approvalsStore.reject(id, reason)
+    showSuccessToast(t('approvals.rejectedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+async function onChatApprovalAlwaysAllow(id: number): Promise<void> {
+  try {
+    await approvalsStore.approve(id, true)
+    showSuccessToast(t('approvals.approvedToast'))
+  } catch {
+    showErrorToast(t('approvals.decideFailed'))
+  }
+}
+
+function ingestApprovalRequired(data: StreamUpdatePayload): void {
+  if (!isApprovalsEnabled()) {
+    return
+  }
+  if (data.status !== 'task_update' || data.metadata?.state !== 'waiting_approval') {
+    return
+  }
+  const approvalId = data.metadata.approval_id
+  if (typeof approvalId !== 'number' || approvalId < 1) {
+    return
+  }
+  const rawClass = data.metadata.side_effect
+  const sideEffect =
+    rawClass === 'read' || rawClass === 'write' || rawClass === 'destructive' ? rawClass : 'read'
+  approvalsStore.addFromStream({
+    id: approvalId,
+    tool: typeof data.metadata.tool === 'string' ? data.metadata.tool : '',
+    preview: typeof data.metadata.preview === 'string' ? data.metadata.preview : '',
+    status: 'pending',
+    expiresAt: typeof data.metadata.expires_at === 'number' ? data.metadata.expires_at : 0,
+    created: Math.floor(Date.now() / 1000),
+    requestedBy: {
+      kind: 'chat',
+      chatId: chatsStore.activeChatId,
+      messageId: data.messageId ?? null,
+    },
+    sideEffect,
+    canAlwaysAllow: sideEffect === 'write',
+  })
+  void approvalsStore.load('pending')
+}
 const configStore = useConfigStore()
 const usageTaximeterStore = useUsageTaximeterStore()
 const memoriesStore = useMemoriesStore()
@@ -1083,6 +1167,12 @@ onMounted(async () => {
   // their banner instantly (push primary). No-op for guests / when realtime is
   // disabled; the 25s banner poll remains the fallback.
   void mediaJobsStore.subscribe(authStore.user?.id)
+  if (isApprovalsEnabled()) {
+    void approvalsStore.subscribe(authStore.user?.id)
+    if (authStore.isAuthenticated) {
+      void approvalsStore.load('pending')
+    }
+  }
   // Hydrate the global Jobs tray with any renders already running across chats.
   if (authStore.isAuthenticated) {
     void mediaJobsStore.loadActive()
@@ -2793,6 +2883,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             if (card && card.state === 'cancelled') {
@@ -3382,6 +3473,7 @@ const streamAIResponse = async (
               message.wasMultitask = false
             }
           } else if (data.status === 'task_update') {
+            ingestApprovalRequired(data)
             const message = historyStore.messages.find((m) => m.id === messageId)
             const card = message?.taskPlan?.cards.find((c) => c.nodeId === data.metadata?.node_id)
             // A user-cancelled step is terminal on the client: ignore the

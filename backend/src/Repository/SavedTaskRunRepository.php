@@ -46,6 +46,18 @@ class SavedTaskRunRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    public function countWaitingForTask(int $savedTaskId): int
+    {
+        return (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.savedTaskId = :taskId')
+            ->andWhere('r.status = :status')
+            ->setParameter('taskId', $savedTaskId)
+            ->setParameter('status', SavedTaskRun::STATUS_WAITING_APPROVAL)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function deleteForTask(int $savedTaskId): void
     {
         $this->createQueryBuilder('r')

@@ -18,4 +18,6 @@ enum NodeStatus: string
     case Failed = 'failed';
     /** A dependency failed, so this node could not run. */
     case Skipped = 'skipped';
+    /** A write-class tool is waiting for the owner to approve it. */
+    case WaitingApproval = 'waiting_approval';
 }

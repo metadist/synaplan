@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "payload_too_large",
+    "message": "request body exceeds the configured maximum"
+  }
+}

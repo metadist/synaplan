@@ -79,7 +79,7 @@ enforces this).
    `cache_read_price_per_1M`), and `ModelCatalog::CONTEXT_PRICING` if a long-context tier
    moved. Put the source URL and the date in a comment on the row.
 2. **Ship a data migration** so existing installs receive it — copy
-   `backend/migrations/Version20260910120000.php` (single row) or `Version20260907120000.php`
+   `backend/migrations/Version20260910130000.php` (single row) or `Version20260907120000.php`
    (tiered row) verbatim as the template: full catalog snapshot of the row with the json keys
    in catalog order, fingerprint computed by the frozen local `fingerprint()`, guard on the
    OLD value, operator-owned columns (`BSELECTABLE`, `BACTIVE`, `BISDEFAULT`,

@@ -64,12 +64,13 @@ final class ResultAssembler
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
                 ++$failureCount;
-            } elseif (NodeStatus::Running === $status || NodeStatus::Pending === $status) {
+            } elseif (NodeStatus::Running === $status || NodeStatus::Pending === $status || NodeStatus::WaitingApproval === $status) {
                 // A node still running (async media detached to a background job)
                 // or pending (blocked by such a dependency) means the plan is
                 // IN PROGRESS, not failed. Counting these as failures made
                 // `all_failed` true for async media plans, which triggered the
                 // legacy fallback and a second, duplicate generation (#1218).
+                // waiting_approval is the same: the run is paused, not dead.
                 ++$inProgressCount;
             }
         }

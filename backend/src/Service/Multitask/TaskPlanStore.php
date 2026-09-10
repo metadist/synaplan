@@ -199,6 +199,43 @@ final readonly class TaskPlanStore
     }
 
     /**
+     * All persisted nodes for a message, including hidden assembler nodes.
+     * Used to rehydrate a DAG resume.
+     *
+     * @return list<array{nodeId: string, status: string, text: ?string, error: ?string}>
+     */
+    public function loadRows(int $messageId): array
+    {
+        try {
+            $rows = $this->connection->fetchAllAssociative(
+                'SELECT BNODEID, BSTATUS, BRESULTREF, BERROR FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
+                [$messageId],
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('TaskPlanStore: failed to load node rows', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            $decoded = $this->decodeResultPayload($row['BRESULTREF'] ?? null);
+            $error = $row['BERROR'] ?? null;
+            $out[] = [
+                'nodeId' => (string) $row['BNODEID'],
+                'status' => (string) $row['BSTATUS'],
+                'text' => is_string($decoded['text'] ?? null) ? $decoded['text'] : null,
+                'error' => is_string($error) && '' !== $error ? $error : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Encode card body fields into the BRESULTREF / BERROR columns (#1343).
      *
      * @param array{text?: ?string, url?: ?string, error?: ?string, query?: ?string, resultsCount?: ?int, type?: ?string} $result

@@ -58,6 +58,23 @@ final readonly class NodeResult
         return new self(NodeStatus::Running, metadata: $metadata);
     }
 
+    /**
+     * Unattended write paused until the owner approves.
+     *
+     * @param array<string, mixed> $args
+     * @param array<string, mixed> $metadata
+     */
+    public static function waitingApproval(int $approvalId, array $args = [], array $metadata = []): self
+    {
+        return new self(
+            NodeStatus::WaitingApproval,
+            metadata: array_merge($metadata, [
+                'approval_id' => $approvalId,
+                'approved_args' => $args,
+            ]),
+        );
+    }
+
     public function firstFile(): ?array
     {
         return $this->files[0] ?? null;
@@ -76,5 +93,10 @@ final readonly class NodeResult
     public function isSettledUnsuccessful(): bool
     {
         return NodeStatus::Failed === $this->status || NodeStatus::Skipped === $this->status;
+    }
+
+    public function isWaitingApproval(): bool
+    {
+        return NodeStatus::WaitingApproval === $this->status;
     }
 }

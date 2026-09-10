@@ -14,6 +14,11 @@ use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\ToolExecutionGate;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -48,6 +53,9 @@ final readonly class OpenAiGatewayToolLoop
         private MessagesGatewayConfig $config,
         private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
+        private ?ToolExecutionGate $executionGate = null,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -241,11 +249,16 @@ final readonly class OpenAiGatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
+                $gated = $this->gatedToolMessage($user, $name, $arguments, $id);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
                 $results[] = $this->executeNative($entry['tool'], $arguments, $id, $user, $notes);
                 continue;
             }
 
-            if ($this->mcpCatalogAdapter->isMutatingTool($entry['annotations'])) {
+            if ($this->mcpCatalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
                 $results[] = $this->toolMessage($id, sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']));
                 continue;
             }
@@ -257,6 +270,11 @@ final readonly class OpenAiGatewayToolLoop
             }
 
             try {
+                $gated = $this->gatedToolMessage($user, $name, $arguments, $id);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
                 $callResult = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
                 $text = $this->formatMcpContent($callResult['content']);
                 $results[] = $this->toolMessage($id, $text);
@@ -272,6 +290,45 @@ final readonly class OpenAiGatewayToolLoop
         }
 
         return $results;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>|null
+     */
+    private function gatedToolMessage(User $user, string $name, array $arguments, string $id): ?array
+    {
+        $userId = (int) $user->getId();
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            if (null === $this->toolRegistry->get($userId, $name)) {
+                throw new ToolNotRegisteredException($name);
+            }
+        }
+        if (null === $this->executionGate || !$this->approvalsOn($userId)) {
+            return null;
+        }
+        $decision = $this->executionGate->inspect(
+            $userId,
+            $name,
+            $arguments,
+            $user,
+            PolicyContext::Interactive,
+            'chat:0',
+        );
+        if (null !== $decision['refusal']) {
+            return $this->toolMessage($id, $decision['refusal']);
+        }
+        if (null !== $decision['approval']) {
+            return $this->toolMessage($id, sprintf('requires approval; request #%d created', (int) $decision['approval']->getId()));
+        }
+
+        return null;
+    }
+
+    private function approvalsOn(int $userId): bool
+    {
+        return null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($userId);
     }
 
     /**

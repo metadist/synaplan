@@ -14,6 +14,11 @@ use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\ToolExecutionGate;
+use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -57,6 +62,9 @@ final readonly class GatewayToolLoop
         private MessagesGatewayConfig $config,
         private RateLimitService $rateLimitService,
         private LoggerInterface $logger,
+        private ?ToolExecutionGate $executionGate = null,
+        private ?ToolRegistry $toolRegistry = null,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -597,6 +605,11 @@ final readonly class GatewayToolLoop
             }
 
             if (GatewayToolCatalog::KIND_NATIVE === $entry['kind']) {
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
                 $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user);
                 if (null !== $ping) {
                     $ping();
@@ -605,7 +618,7 @@ final readonly class GatewayToolLoop
                 continue;
             }
 
-            if ($this->catalogAdapter->isMutatingTool($entry['annotations'])) {
+            if ($this->catalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']),
@@ -627,6 +640,12 @@ final readonly class GatewayToolLoop
             }
 
             try {
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
+                    continue;
+                }
                 $call = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
                 $text = $this->formatToolContent($call['content']);
                 $isError = $call['isError'];
@@ -653,6 +672,48 @@ final readonly class GatewayToolLoop
         }
 
         return $results;
+    }
+
+    /**
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed>|null a tool_result block when the call must not execute
+     */
+    private function gatedToolResult(User $user, string $name, array $arguments, string $toolUseId): ?array
+    {
+        $userId = (int) $user->getId();
+        if (null !== $this->toolRegistry && null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($userId)) {
+            if (null === $this->toolRegistry->get($userId, $name)) {
+                throw new ToolNotRegisteredException($name);
+            }
+        }
+        if (null === $this->executionGate || !$this->approvalsOn($userId)) {
+            return null;
+        }
+        $decision = $this->executionGate->inspect(
+            $userId,
+            $name,
+            $arguments,
+            $user,
+            PolicyContext::Interactive,
+            'chat:0',
+        );
+        if (null !== $decision['refusal']) {
+            return $this->toolResultBlock($toolUseId, $decision['refusal'], isError: true);
+        }
+        if (null !== $decision['approval']) {
+            return $this->toolResultBlock(
+                $toolUseId,
+                sprintf('requires approval; request #%d created', (int) $decision['approval']->getId()),
+            );
+        }
+
+        return null;
+    }
+
+    private function approvalsOn(int $userId): bool
+    {
+        return null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($userId);
     }
 
     /**

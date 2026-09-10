@@ -35,6 +35,9 @@ final class PolicyAllowList
         'MULTITASK.MCP_FETCH_ENABLED',
         'MULTITASK.MCP_ACTION_ENABLED',
         'MULTITASK.EMAIL_SEARCH_ENABLED',
+        'TOOLS.REGISTRY_ENABLED',
+        'TOOLS.APPROVALS_ENABLED',
+        'TOOLS.CUSTOM_HTTP_ENABLED',
     ];
 
     /**
