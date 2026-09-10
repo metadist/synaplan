@@ -18,9 +18,10 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     const chat = new ChatHelper(page)
     const adminCreds = CREDENTIALS.getAdminCredentials()
     let targetUserId: number
+    let adminCookie: string
 
     await test.step('Arrange: look up the worker user ID via admin API', async () => {
-      const adminCookie = await loginViaApi(request, adminCreds)
+      adminCookie = await loginViaApi(request, adminCreds)
       const usersRes = await request.get(
         `${getApiUrl()}/api/v1/admin/users?search=${encodeURIComponent(credentials.user)}`,
         { headers: { Cookie: adminCookie } }
@@ -97,7 +98,11 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
     })
 
     await test.step('Act: exit impersonation and land on the admin user list', async () => {
-      const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`)
+      // iamGroups is user-scoped. The unauthenticated request fixture would
+      // see only the global default; onExit routes as the restored admin.
+      const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`, {
+        headers: { Cookie: adminCookie },
+      })
       expect(runtimeRes.ok()).toBeTruthy()
       const runtime = (await runtimeRes.json()) as { features?: { iamGroups?: boolean } }
       const iamGroups = runtime.features?.iamGroups === true
