@@ -35,6 +35,12 @@ const DOCUMENT_EXTENSIONS = [
 export const extensionOf = (name: string | undefined | null): string =>
   (name ?? '').split('.').pop()?.toLowerCase() ?? ''
 
+/** Uploads that may be stored and attached, but must never be extracted. */
+const STORE_ONLY_EXTENSIONS = ['jar']
+
+export const skipsExtraction = (ext: string): boolean =>
+  STORE_ONLY_EXTENSIONS.includes(ext.toLowerCase())
+
 /** Map a bare file extension to a preview kind. */
 export const kindFromExtension = (ext: string): PreviewKind => {
   if (IMAGE_EXTENSIONS.includes(ext)) return 'image'

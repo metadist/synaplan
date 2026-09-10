@@ -26,6 +26,18 @@ final readonly class FileStorageService
         'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm',
         // Video formats analysable via audio transcription + key-frame vision (#983)
         'mov', 'avi', 'mkv',
+        // Minecraft / Java archives: store and attach, never extract (Tika would unzip).
+        'jar',
+    ];
+
+    /**
+     * Uploads that may be stored and attached to a chat, but must never be
+     * unpacked or sent through Tika / Whisper / Vision.
+     *
+     * @var list<string>
+     */
+    public const STORE_ONLY_EXTENSIONS = [
+        'jar',
     ];
 
     /**
@@ -44,6 +56,11 @@ final readonly class FileStorageService
     public static function getAllowedExtensions(): array
     {
         return self::ALLOWED_EXTENSIONS;
+    }
+
+    public static function skipsExtraction(string $extension): bool
+    {
+        return in_array(strtolower($extension), self::STORE_ONLY_EXTENSIONS, true);
     }
 
     public function __construct(
