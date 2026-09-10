@@ -248,6 +248,10 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
             - '../src/Test/'
+            # Feature-module value objects and the compiler pass are not services.
+            - '../src/Module/Contract/'
+            - '../src/Module/DependencyInjection/'
+            - '../src/Module/Exception/'
             # Factory product of PluginResourceKindCatalog — never a singleton.
             - '../src/Service/Iam/ResourceKind/PluginResourceKind.php'
 
