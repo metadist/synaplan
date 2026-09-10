@@ -1013,6 +1013,11 @@ const sendMessage = () => {
   clearPersistedInput()
   clearPersistedAttachments()
   clearPersistedBlocks()
+
+  // Sending via the button moves focus onto that button, so the next message
+  // would need a click back into the composer. Refocus synchronously — inside
+  // the click gesture — so the mobile keyboard stays open as well.
+  textareaRef.value?.focus()
 }
 
 const toggleThinking = () => {

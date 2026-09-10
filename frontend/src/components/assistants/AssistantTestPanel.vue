@@ -19,6 +19,7 @@
     </div>
     <form class="flex gap-2" @submit.prevent="send">
       <input
+        ref="draftInputRef"
         v-model="draft"
         type="text"
         class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
@@ -46,6 +47,7 @@ import { useAgentsStore } from '@/stores/agents'
 const store = useAgentsStore()
 const authStore = useAuthStore()
 const draft = ref('')
+const draftInputRef = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const lines = ref<string[]>([])
 
@@ -62,6 +64,9 @@ function send(): void {
     return
   }
   draft.value = ''
+  // Submitting focuses the send button, which is then disabled while the reply
+  // streams — keep the caret in the field so the next message can just be typed.
+  draftInputRef.value?.focus()
   lines.value.push(message)
   sending.value = true
   let reply = ''

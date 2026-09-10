@@ -31,7 +31,7 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
   }
 })
 
-function mountPanel() {
+function mountPanel(attach = false) {
   setActivePinia(createPinia())
   const store = useAgentsStore()
   store.current = {
@@ -54,6 +54,7 @@ function mountPanel() {
   auth.user = { id: 1, email: 'ada@test.com', level: 'PRO', isAdmin: false } as never
   const i18n = createI18n({ legacy: false, locale: 'en', messages: { en } })
   return mount(AssistantTestPanel, {
+    attachTo: attach ? document.body : undefined,
     global: {
       plugins: [i18n],
       stubs: { Icon: true },
@@ -75,5 +76,15 @@ describe('AssistantTestPanel', () => {
         message: 'hello draft',
       })
     )
+  })
+
+  it('keeps the input focused after sending', async () => {
+    const wrapper = mountPanel(true)
+    const input = wrapper.get('[data-testid="input-test-message"]')
+    await input.setValue('hello draft')
+    await wrapper.get('form').trigger('submit')
+
+    expect(document.activeElement).toBe(input.element)
+    wrapper.unmount()
   })
 })

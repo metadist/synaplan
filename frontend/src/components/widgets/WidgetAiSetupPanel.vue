@@ -544,6 +544,11 @@ async function send() {
   } finally {
     isTyping.value = false
     scrollToBottom()
+
+    // The composer is disabled while the assistant answers, which drops focus.
+    // Restore it once it is enabled again so the next message can just be typed.
+    await nextTick()
+    inputRef.value?.focus()
   }
 }
 

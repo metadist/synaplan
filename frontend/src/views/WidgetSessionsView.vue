@@ -811,6 +811,7 @@
                   <Icon icon="heroicons:paper-clip" class="w-5 h-5 txt-secondary" />
                 </button>
                 <input
+                  ref="messageInputRef"
                   v-model="messageText"
                   type="text"
                   class="flex-1 px-5 py-3 rounded-2xl bg-white/5 dark:bg-white/5 txt-primary text-sm placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)]/30 transition-all"
@@ -1024,6 +1025,7 @@ const selectedSessionIds = ref<Set<string>>(new Set())
 const selectedSessionIdsArray = computed(() => Array.from(selectedSessionIds.value))
 const deletingSessions = ref(false)
 const messageText = ref('')
+const messageInputRef = ref<HTMLInputElement | null>(null)
 const sendingMessage = ref(false)
 const eventSubscription = ref<WidgetSubscription | null>(null)
 // Dedicated typing channel — published from the browser via Centrifugo
@@ -1947,6 +1949,12 @@ const sendMessage = async () => {
     error(err instanceof Error ? err.message : t('widgetSessions.sendFailed'))
   } finally {
     sendingMessage.value = false
+
+    // Submitting moves focus to the send button and the composer stays disabled
+    // for the duration of the request, so the operator would have to click back
+    // into it before typing the next reply. Restore focus once it is enabled again.
+    await nextTick()
+    messageInputRef.value?.focus()
   }
 }
 
