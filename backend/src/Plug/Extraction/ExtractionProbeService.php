@@ -68,6 +68,12 @@ final readonly class ExtractionProbeService
                         $winnerKey = $key;
                     }
                 }
+            } catch (ExtractorRejectedException $e) {
+                $this->logger->info('ExtractionProbe: extra extractor refused the file', [
+                    'key' => $key,
+                    'error' => $e->getMessage(),
+                ]);
+                $verdict = 'rejected';
             } catch (\Throwable $e) {
                 $this->logger->info('ExtractionProbe: extra extractor failed', [
                     'key' => $key,

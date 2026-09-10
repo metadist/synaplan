@@ -2654,7 +2654,8 @@
         "sorting": "Klassifikation",
         "search_query": "Suchanfrage",
         "embeddings": "Embeddings",
-        "api_chat": "API-Chat"
+        "api_chat": "API-Chat",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -2669,7 +2670,8 @@
         "openai_api": "API (OpenAI-kompatibel)",
         "api_summary": "API-Sitzungszusammenfassung",
         "mcp": "MCP",
-        "mcp_tool": "MCP-Tools"
+        "mcp_tool": "MCP-Tools",
+        "rag_rerank": "Dokument-Rerank"
       },
       "periods": {
         "today": "Heute",
@@ -3040,6 +3042,7 @@
       "winner": "Gewinner: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling nicht verfügbar — stattdessen Tika verwendet",
+      "doclingRejectedTika": "Docling erreichbar, hat die Datei aber abgelehnt — stattdessen Tika verwendet",
       "save": "Kette speichern",
       "saved": "Extraktionskette gespeichert. Der nächste Upload nutzt sie.",
       "saveFailed": "Die Extraktionskette konnte nicht gespeichert werden",
@@ -3051,6 +3054,7 @@
         "empty": "leer",
         "low_quality": "zu wenig brauchbarer Text",
         "unavailable": "nicht verfügbar",
+        "rejected": "erreichbar, Datei abgelehnt",
         "unsupported": "unterstützt diese Datei nicht",
         "unknown": "unbekannter Adapter",
         "skipped": "übersprungen"
@@ -3117,7 +3121,9 @@
       "saveKey": "Schlüssel speichern",
       "keySaved": "Schlüssel gespeichert. Die nächste Neuordnung kann ihn nutzen.",
       "save": "Neuordnung speichern",
-      "saved": "Neuordnung gespeichert. Der nächste Chat nutzt die Einstellungen.",
+      "saved": "Neuordnung gespeichert. Die nächste Dokumentsuche nutzt die Einstellungen.",
+      "savedOff": "Neuordnung gespeichert. Die Dokumentsuche behält die ursprüngliche Vektorreihenfolge.",
+      "savedInactive": "Neuordnung gespeichert. Sie bleibt inaktiv, bis ein Neuordnungsmodell oder der Chat-Modell-Fallback verfügbar ist.",
       "saveFailed": "Die Neuordnung konnte nicht gespeichert werden",
       "loadFailed": "Neuordnung konnte nicht geladen werden",
       "testTitle": "Mit Beispieltexten testen",

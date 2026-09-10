@@ -236,4 +236,87 @@ describe('WebSearchPlugTab', () => {
     expect(success).toHaveBeenCalledWith('Key saved and verified. The next search can use it.')
     expect(showError).not.toHaveBeenCalled()
   })
+
+  it('warns when the saved active provider cannot search', async () => {
+    saveWebSearch.mockResolvedValue({
+      providers: [
+        {
+          key: 'exa',
+          label: 'Exa',
+          docsUrl: '',
+          sovereignty: 'US cloud',
+          capabilities: noneCapabilities,
+          health: { available: false, reason: 'Exa API key is not configured' },
+          keyStatus,
+        },
+      ],
+      active: 'exa',
+      fallback: '',
+      userOverrideAllowed: false,
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="web-search-save"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('Chat web search will return nothing')
+    )
+    expect(success).not.toHaveBeenCalled()
+  })
+
+  it('keeps an unverified key out of the card when save is rejected', async () => {
+    savePlugKey.mockRejectedValue(new Error('API key was not stored: Exa search returned HTTP 401'))
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="web-search-key-tavily"]').setValue('not-a-real-key')
+    await wrapper.get('[data-testid="web-search-save-key-tavily"]').trigger('click')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('API key was not stored: Exa search returned HTTP 401')
+    expect(success).not.toHaveBeenCalled()
+    expect(
+      (wrapper.get('[data-testid="web-search-key-tavily"]').element as HTMLInputElement).value
+    ).toBe('not-a-real-key')
+  })
+
+  it('still reports the key as saved when status refresh fails', async () => {
+    savePlugKey.mockResolvedValue({
+      configured: true,
+      source: 'db',
+      origin: 'ui',
+      maskedKey: '••••abcd',
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    getWebSearchStatus.mockRejectedValueOnce(new Error('status down'))
+    await wrapper.get('[data-testid="web-search-key-tavily"]').setValue('real-key')
+    await wrapper.get('[data-testid="web-search-save-key-tavily"]').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith('Key saved and verified. The next search can use it.')
+    expect(showError).not.toHaveBeenCalled()
+  })
 })

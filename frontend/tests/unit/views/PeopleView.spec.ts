@@ -115,7 +115,21 @@ describe('PeopleView', () => {
     ])
   })
 
-  it('renders Users and Groups tabs', async () => {
+  it('hides Groups and Audit tabs when IAM groups are off', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-audit"]').exists()).toBe(false)
+  })
+
+  it('renders Users, Groups and Audit tabs when IAM groups are on', async () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: true } })
     const wrapper = mountView()
     await flushPromises()
 
@@ -145,6 +159,7 @@ describe('PeopleView', () => {
   })
 
   it('lists audit events on the Audit tab', async () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: true } })
     const wrapper = mountView()
     await flushPromises()
 
@@ -157,6 +172,7 @@ describe('PeopleView', () => {
   })
 
   it('lists groups on the Groups tab', async () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: true } })
     const wrapper = mountView()
     await flushPromises()
 

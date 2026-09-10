@@ -25,12 +25,16 @@ vi.mock('@/services/api/impersonationApi', () => ({
   },
 }))
 
+const getConfigSync = vi.fn()
+
 vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue(true),
   beginAuthMutation: vi.fn(),
   endAuthMutation: vi.fn(),
   getInFlightRefresh: vi.fn().mockReturnValue(null),
+  getConfigSync: () => getConfigSync(),
+  getConfig: () => Promise.resolve(getConfigSync()),
 }))
 
 vi.mock('@/services/authService', async () => {
@@ -118,6 +122,8 @@ describe('ImpersonationBanner', () => {
     setActivePinia(createPinia())
     successMock.mockClear()
     errorMock.mockClear()
+    getConfigSync.mockReset()
+    getConfigSync.mockReturnValue({ features: {} })
     stopImpersonationMock.mockReset()
   })
 
@@ -173,6 +179,27 @@ describe('ImpersonationBanner', () => {
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
     expect(successMock).toHaveBeenCalledWith('Admin session restored.')
+    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin')
+    expect(wrapper.vm.$router.currentRoute.value.path).toBe('/admin')
+    expect(wrapper.vm.$router.currentRoute.value.query).toEqual({ tab: 'users' })
+  })
+
+  it('returns to People after Exit when IAM groups are enabled', async () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: true } })
+    const store = useAuthStore()
+    store.user = { id: 99, email: 'normal-user@example.com', level: 'PRO' }
+    store.impersonator = { id: 1, email: 'admin@example.com', level: 'ADMIN' }
+
+    stopImpersonationMock.mockResolvedValueOnce({
+      success: true,
+      data: { success: true, user: { id: 1, email: 'admin@example.com', level: 'ADMIN' } },
+      status: 200,
+    })
+
+    const wrapper = await mountBanner()
+    await wrapper.find('[data-testid="btn-impersonation-exit"]').trigger('click')
+    await flushPromises()
+
     expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin-people')
     expect(wrapper.vm.$router.currentRoute.value.path).toBe('/admin/people')
   })

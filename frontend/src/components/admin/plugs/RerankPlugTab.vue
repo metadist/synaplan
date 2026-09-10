@@ -203,6 +203,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
+import { rerankSaveFeedback } from '@/components/admin/plugs/rerankSaveFeedback'
 import {
   getRerankStatus,
   savePlugKey,
@@ -215,7 +216,7 @@ import {
 const keyProviders = ['jina', 'cohere', 'voyage'] as const
 
 const { t } = useI18n()
-const { success, error: showError } = useNotification()
+const { success, error: showError, warning, info } = useNotification()
 
 const loading = ref(true)
 const loadFailed = ref(false)
@@ -272,16 +273,22 @@ function applyStatus(status: RerankStatus): void {
 async function save(): Promise<void> {
   saving.value = true
   try {
-    applyStatus(
-      await saveRerank({
-        enabled: enabled.value,
-        modelKey: modelKey.value || null,
-        multiplier: multiplier.value,
-        budgetMs: budgetMs.value,
-        llmFallback: llmFallback.value,
-      })
-    )
-    success(t('aiInfra.rerank.saved'))
+    const status = await saveRerank({
+      enabled: enabled.value,
+      modelKey: modelKey.value || null,
+      multiplier: multiplier.value,
+      budgetMs: budgetMs.value,
+      llmFallback: llmFallback.value,
+    })
+    applyStatus(status)
+    const feedback = rerankSaveFeedback(status)
+    if (feedback === 'off') {
+      info(t('aiInfra.rerank.savedOff'))
+    } else if (feedback === 'inactive') {
+      warning(t('aiInfra.rerank.savedInactive'))
+    } else {
+      success(t('aiInfra.rerank.saved'))
+    }
   } catch (err) {
     showError(err instanceof Error ? err.message : t('aiInfra.rerank.saveFailed'))
   } finally {

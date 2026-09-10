@@ -7,6 +7,7 @@ namespace App\Plug\Extraction\Docling;
 use App\Plug\PlugHealth;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -82,30 +83,34 @@ final class DoclingClient
         }
 
         try {
+            // Symfony HttpClient encodes an array `body` as application/x-www-form-urlencoded.
+            // docling-serve expects multipart/form-data with a real `files` part — a urlencoded
+            // body yields HTTP 422 "Field required" at body.files while GET /health stays green.
+            $formData = new FormDataPart([
+                'files' => DataPart::fromPath($absolutePath, basename($absolutePath)),
+                'to_formats' => 'md',
+                'do_ocr' => 'true',
+                'image_export_mode' => 'placeholder',
+                'table_mode' => 'accurate',
+            ]);
             $response = $this->httpClient->request('POST', $this->endpoint('/v1/convert/file'), [
                 'timeout' => $this->timeoutMs / 1000,
-                'headers' => [
+                'headers' => array_merge($formData->getPreparedHeaders()->toArray(), [
                     'Accept' => 'application/json',
                     'User-Agent' => 'synaplan-docling-client',
-                ],
-                'body' => [
-                    'files' => DataPart::fromPath($absolutePath, basename($absolutePath)),
-                    'to_formats' => 'md',
-                    'do_ocr' => 'true',
-                    'image_export_mode' => 'placeholder',
-                    'table_mode' => 'accurate',
-                ],
+                ]),
+                'body' => $formData->bodyToIterable(),
             ]);
             $status = $response->getStatusCode();
             if ($status >= 500) {
                 throw new DoclingUnavailableException('Docling convert returned HTTP '.$status);
             }
             if ($status >= 400) {
-                throw new DoclingUnavailableException('Docling convert returned HTTP '.$status);
+                throw new DoclingRejectedException('Docling convert returned HTTP '.$status);
             }
 
             $payload = $response->toArray(false);
-        } catch (DoclingUnavailableException $e) {
+        } catch (DoclingUnavailableException|DoclingRejectedException $e) {
             throw $e;
         } catch (TransportExceptionInterface $e) {
             throw new DoclingUnavailableException($this->transportReason($e), $e);

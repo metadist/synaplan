@@ -1248,6 +1248,7 @@
       "winner": "Ganador: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling no disponible — se usó Tika",
+      "doclingRejectedTika": "Docling respondió pero rechazó el archivo — se usó Tika",
       "save": "Guardar cadena",
       "saved": "Cadena de extracción guardada. La próxima carga la usará.",
       "saveFailed": "No se pudo guardar la cadena de extracción",
@@ -1259,6 +1260,7 @@
         "empty": "vacío",
         "low_quality": "demasiado poco texto útil",
         "unavailable": "no disponible",
+        "rejected": "alcanzó el servicio pero rechazó el archivo",
         "unsupported": "no admite este archivo",
         "unknown": "adaptador desconocido",
         "skipped": "omitido"
@@ -1325,7 +1327,9 @@
       "saveKey": "Guardar clave",
       "keySaved": "Clave guardada. La próxima reordenación puede usarla.",
       "save": "Guardar reordenación",
-      "saved": "Reordenación guardada. El próximo chat la usa.",
+      "saved": "Reordenación guardada. La próxima búsqueda de documentos la usa.",
+      "savedOff": "Reordenación guardada. La búsqueda de documentos mantiene el orden vectorial original.",
+      "savedInactive": "Reordenación guardada. Sigue inactiva hasta que haya un modelo de reordenación o el respaldo del modelo de chat.",
       "saveFailed": "No se pudieron guardar los ajustes de reordenación",
       "loadFailed": "No se pudieron cargar los ajustes de reordenación",
       "testTitle": "Probar con fragmentos de ejemplo",
@@ -3604,7 +3608,8 @@
         "file_analysis": "Análisis de Archivos",
         "sorting": "Clasificación",
         "search_query": "Consulta de búsqueda",
-        "api_chat": "Chat de API"
+        "api_chat": "Chat de API",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -3619,7 +3624,8 @@
         "openai_api": "API (compatible con OpenAI)",
         "api_summary": "Resumen de sesión de API",
         "mcp": "MCP",
-        "mcp_tool": "Herramientas MCP"
+        "mcp_tool": "Herramientas MCP",
+        "rag_rerank": "Rerank de documentos"
       },
       "periods": {
         "today": "Hoy",

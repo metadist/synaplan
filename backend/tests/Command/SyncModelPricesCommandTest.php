@@ -744,10 +744,10 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testRerankPerQueryPricingIsAStructuralMismatch(): void
     {
-        // Cohere bills rerank per request (input_cost_per_query). Billing has no
-        // per-request mode, so the row can neither be compared nor written: it is
-        // a structural mismatch — visible, never drift, and no longer misfiled as
-        // "null-price protected" (LiteLLM's per-token rate is 0 by construction).
+        // A catalog row still on implicit per_token (no json.pricing_mode)
+        // cannot be compared to LiteLLM's per_request query rate — that stays
+        // a structural mismatch. BID 346 now authors per_request; see the
+        // same-mode test below.
         $model = $this->createModelMock('cohere', 'rerank-v3.5', 2.0, 0.0, id: 346);
 
         $this->mockLiteLLMResponse([
@@ -772,6 +772,42 @@ class SyncModelPricesCommandTest extends TestCase
         $output = $this->commandTester->getDisplay();
         $this->assertStringContainsString('litellm=per_request', $output);
         $this->assertStringNotContainsString('Null-price protected', $output);
+    }
+
+    public function testRerankPerQueryPricingMatchesCatalogPerRequest(): void
+    {
+        $model = $this->createMock(Model::class);
+        $model->method('getId')->willReturn(346);
+        $model->method('getService')->willReturn('cohere');
+        $model->method('getProviderId')->willReturn('rerank-v3.5');
+        $model->method('getPriceIn')->willReturn(2.0);
+        $model->method('getPriceOut')->willReturn(0.0);
+        $model->method('getInUnit')->willReturn('per1K');
+        $model->method('getOutUnit')->willReturn('-');
+        $model->method('getJson')->willReturn(['pricing_mode' => 'per_request']);
+
+        $this->mockLiteLLMResponse([
+            'rerank-v3.5' => [
+                'mode' => 'rerank',
+                'input_cost_per_query' => 0.002,
+                'input_cost_per_token' => 0.0,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Pricing-mode mismatch', $output);
     }
 
     public function testKnownDeviationIsReportedButIsNotDrift(): void
