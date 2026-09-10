@@ -6,26 +6,67 @@ describe('rerankSaveFeedback', () => {
     expect(
       rerankSaveFeedback({
         enabled: false,
-        adapters: [{ health: { available: true } }],
+        modelKey: 'cohere:rerank-v3.5:rerank',
+        adapters: [
+          { key: 'http', health: { available: true } },
+          { key: 'llm', health: { available: true } },
+        ],
       })
     ).toBe('off')
   })
 
-  it('reports inactive when enabled but no adapter is available', () => {
+  it('reports inactive when a bound model has an unusable HTTP adapter', () => {
     expect(
       rerankSaveFeedback({
         enabled: true,
-        adapters: [{ health: { available: false } }, { health: { available: false } }],
+        modelKey: 'cohere:rerank-v3.5:rerank',
+        llmFallback: true,
+        adapters: [
+          { key: 'http', health: { available: false } },
+          { key: 'llm', health: { available: true } },
+        ],
       })
     ).toBe('inactive')
   })
 
-  it('reports active only when enabled and an adapter is available', () => {
+  it('reports active when the bound HTTP adapter is available', () => {
     expect(
       rerankSaveFeedback({
         enabled: true,
-        adapters: [{ health: { available: false } }, { health: { available: true } }],
+        modelKey: 'jina:jina-reranker-v2-base-multilingual:rerank',
+        adapters: [
+          { key: 'http', health: { available: true } },
+          { key: 'llm', health: { available: false } },
+        ],
       })
     ).toBe('active')
+  })
+
+  it('reports active for LLM fallback only when no model is bound', () => {
+    expect(
+      rerankSaveFeedback({
+        enabled: true,
+        modelKey: null,
+        llmFallback: true,
+        adapters: [
+          { key: 'http', health: { available: false } },
+          { key: 'llm', health: { available: true } },
+        ],
+      })
+    ).toBe('active')
+  })
+
+  it('reports inactive when enabled with neither a usable bound model nor LLM fallback', () => {
+    expect(
+      rerankSaveFeedback({
+        enabled: true,
+        modelKey: null,
+        llmFallback: false,
+        adapters: [
+          { key: 'http', health: { available: true } },
+          { key: 'llm', health: { available: true } },
+        ],
+      })
+    ).toBe('inactive')
   })
 })

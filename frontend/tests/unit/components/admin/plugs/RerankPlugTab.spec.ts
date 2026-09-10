@@ -163,4 +163,27 @@ describe('RerankPlugTab', () => {
     )
     expect(success.mock.calls[0][0]).not.toContain('chat')
   })
+
+  it('does not treat a healthy LLM fallback as active when the bound HTTP adapter is down', async () => {
+    saveRerank.mockResolvedValue({
+      ...inactiveStatus,
+      enabled: true,
+      modelKey: 'jina:jina-reranker-v2-base-multilingual:rerank',
+      llmFallback: true,
+      adapters: [
+        { key: 'http', label: 'HTTP rerank', health: { available: false, reason: 'no key' } },
+        { key: 'llm', label: 'Chat model', health: { available: true, reason: null } },
+      ],
+    })
+
+    const wrapper = mount(RerankPlugTab, {
+      global: { stubs: { Icon: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="rerank-save"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
+  })
 })
