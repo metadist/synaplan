@@ -143,7 +143,10 @@ final class UrlWatchController extends AbstractController
         } catch (\InvalidArgumentException $e) {
             if ('blocked_url' === $e->getMessage()) {
                 return $this->json(
-                    ['error' => 'URL points to a private/blocked address'],
+                    [
+                        'error' => 'blocked_url',
+                        'message' => 'URL points to a private/blocked address',
+                    ],
                     Response::HTTP_BAD_REQUEST,
                 );
             }

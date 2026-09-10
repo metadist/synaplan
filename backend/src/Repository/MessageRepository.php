@@ -10,6 +10,8 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
 {
+    private const DELETE_ID_BATCH = 500;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Message::class);
@@ -705,29 +707,33 @@ class MessageRepository extends ServiceEntityRepository
             return 0;
         }
 
-        $ids = $this->createQueryBuilder('m')
-            ->select('m.id')
-            ->where('m.chatId IN (:chatIds)')
-            ->setParameter('chatIds', $chatIds)
-            ->getQuery()
-            ->getSingleColumnResult();
+        $deleted = 0;
+        foreach (array_chunk(array_values(array_unique($chatIds)), self::DELETE_ID_BATCH) as $chatBatch) {
+            $ids = $this->createQueryBuilder('m')
+                ->select('m.id')
+                ->where('m.chatId IN (:chatIds)')
+                ->setParameter('chatIds', $chatBatch)
+                ->getQuery()
+                ->getSingleColumnResult();
 
-        $messageIds = array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
-        if ([] !== $messageIds) {
-            $this->getEntityManager()->createQueryBuilder()
-                ->delete(MessageMeta::class, 'meta')
-                ->where('meta.messageId IN (:ids)')
-                ->setParameter('ids', $messageIds)
+            $messageIds = array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
+            foreach (array_chunk($messageIds, self::DELETE_ID_BATCH) as $idBatch) {
+                $this->getEntityManager()->createQueryBuilder()
+                    ->delete(MessageMeta::class, 'meta')
+                    ->where('meta.messageId IN (:ids)')
+                    ->setParameter('ids', $idBatch)
+                    ->getQuery()
+                    ->execute();
+            }
+
+            $qb = $this->getEntityManager()->createQueryBuilder();
+            $deleted += $qb->delete(Message::class, 'm')
+                ->where($qb->expr()->in('m.chatId', ':chatIds'))
+                ->setParameter('chatIds', $chatBatch)
                 ->getQuery()
                 ->execute();
         }
 
-        $qb = $this->getEntityManager()->createQueryBuilder();
-
-        return $qb->delete(Message::class, 'm')
-            ->where($qb->expr()->in('m.chatId', ':chatIds'))
-            ->setParameter('chatIds', $chatIds)
-            ->getQuery()
-            ->execute();
+        return $deleted;
     }
 }

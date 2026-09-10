@@ -74,7 +74,7 @@ const onAdd = async () => {
   } catch (err) {
     if (err instanceof ApiError && err.status === 400) {
       showError(
-        err.message.includes('private/blocked')
+        err.code === 'blocked_url'
           ? t('config.savedTasks.watches.blockedUrl')
           : t('config.savedTasks.watches.invalidUrl')
       )

@@ -143,6 +143,18 @@ describe('UrlWatchPanel', () => {
     expect(buttons[1].attributes('disabled')).toBeUndefined()
   })
 
+  it('toasts the blocked-URL copy when create returns blocked_url', async () => {
+    mockList.mockResolvedValue([])
+    mockCreate.mockRejectedValue(
+      new ApiError(400, 'URL points to a private/blocked address', 'blocked_url')
+    )
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="url-watch-input"]').setValue('http://127.0.0.1/page.html')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mockError).toHaveBeenCalledWith('That address cannot be watched (private or blocked).')
+  })
+
   it('reports an existing watch instead of a first save', async () => {
     mockList.mockResolvedValue([watch])
     mockCreate.mockResolvedValue({ watch, created: false })

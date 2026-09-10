@@ -108,7 +108,9 @@ final class UrlWatchControllerTest extends WebTestCase
         $this->postJson('/api/v1/url-watches', ['url' => 'http://127.0.0.1/page.html']);
 
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
-        self::assertSame('URL points to a private/blocked address', $this->json()['error'] ?? null);
+        $body = $this->json();
+        self::assertSame('blocked_url', $body['error'] ?? null);
+        self::assertSame('URL points to a private/blocked address', $body['message'] ?? null);
     }
 
     private function createUser(string $email): User
