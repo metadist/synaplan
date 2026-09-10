@@ -3,7 +3,12 @@
  */
 
 import { z } from 'zod'
-import { httpClient, getApiBaseUrl, awaitAuthMutation } from './httpClient'
+import {
+  httpClient,
+  getApiBaseUrl,
+  awaitAuthMutation,
+  isDefinitiveAuthRejection,
+} from './httpClient'
 import { isNativeApp } from './nativeRuntime'
 import { getNativeAccessToken, hasNativeTokens } from './nativeAuth'
 import { UserMemorySchema } from './userMemoriesApi'
@@ -145,9 +150,9 @@ async function refreshAccessToken(): Promise<boolean> {
         return true
       }
 
-      // Server rejected the refresh - the cookie is gone. Clear the hint
-      // so subsequent calls short-circuit instead of repeating the dance.
-      clearSessionHint()
+      if (isDefinitiveAuthRejection(refreshResponse.status)) {
+        clearSessionHint()
+      }
       return false
     } catch {
       return false
@@ -216,10 +221,13 @@ async function getSseToken(): Promise<string | null> {
             '🔒 Token refresh succeeded but SSE token fetch failed - authentication expired'
           )
           throw new Error('Authentication required')
-        } else {
-          // Refresh failed - session expired
+        } else if (!hasSessionHint()) {
+          // Refresh failed and the hint was cleared — the cookie is dead.
           console.error('🔒 Token refresh failed - session expired')
           throw new Error('Authentication required')
+        } else {
+          // Transient refresh failure (restart / 502). Keep the session.
+          return null
         }
       }
 
@@ -515,7 +523,7 @@ function openStreamPost(
       if (!response.ok) {
         console.error(`🚫 Stream connection failed (HTTP ${response.status})`)
         onUpdate(
-          response.status === 401
+          response.status === 401 && !hasSessionHint()
             ? {
                 status: 'error',
                 error: 'Authentication required. Please log in again to continue.',

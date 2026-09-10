@@ -316,6 +316,7 @@ final class GraphClientTest extends TestCase
         self::assertStringEndsWith('/me/sendMail', $captured[0]['url']);
         $payload = json_decode((string) $captured[0]['options']['body'], true);
         self::assertTrue($payload['saveToSentItems']);
+        self::assertSame('html', $payload['message']['body']['contentType']);
         self::assertSame('owner@example.com', $payload['message']['toRecipients'][0]['emailAddress']['address']);
         self::assertSame('meeting.ics', $payload['message']['attachments'][0]['name']);
         self::assertSame('#microsoft.graph.fileAttachment', $payload['message']['attachments'][0]['@odata.type']);

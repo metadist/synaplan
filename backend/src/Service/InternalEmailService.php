@@ -3,7 +3,7 @@
 namespace App\Service;
 
 use App\AI\Health\ModelHealthAlert;
-use Parsedown;
+use App\Service\Email\MarkdownEmailFormatter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Exception\UnexpectedResponseException;
@@ -198,10 +198,8 @@ final readonly class InternalEmailService
 
         $hasInlineImage = false;
 
-        // Convert markdown to HTML using Parsedown
-        $parsedown = new \Parsedown();
-        $parsedown->setSafeMode(true); // Prevent XSS
-        $htmlBody = $parsedown->text($bodyText);
+        $formatter = new MarkdownEmailFormatter();
+        $htmlBody = $formatter->toFragment($bodyText);
 
         // Embed images inline via CID for broad email client compatibility (Outlook, Gmail, etc.)
         if ('image' === $mediaType && $attachmentPath && file_exists($attachmentPath)) {
@@ -256,7 +254,7 @@ final readonly class InternalEmailService
             ->to($to)
             ->subject('Re: '.$subject)
             ->text($textBody)
-            ->html($htmlBody);
+            ->html($formatter->wrapDocument($htmlBody));
 
         // Add In-Reply-To header for email threading
         if ($inReplyTo) {
@@ -316,9 +314,8 @@ final readonly class InternalEmailService
         $fromEmail = $this->configuredAddress('APP_SENDER_EMAIL') ?? 'noreply@synaplan.com';
         $fromName = $_ENV['APP_SENDER_NAME'] ?? 'Synaplan';
 
-        $parsedown = new \Parsedown();
-        $parsedown->setSafeMode(true); // Prevent XSS
-        $htmlBody = $parsedown->text($markdown);
+        $formatter = new MarkdownEmailFormatter();
+        $htmlBody = $formatter->toFragment($markdown);
 
         // Split attachments: first image becomes the inline (CID) hero image.
         $inlineImagePath = null;
@@ -347,7 +344,7 @@ final readonly class InternalEmailService
             ->to($to)
             ->subject($subject)
             ->text($markdown)
-            ->html($htmlBody);
+            ->html($formatter->wrapDocument($htmlBody));
 
         if (null !== $inlineImagePath) {
             $email->embedFromPath($inlineImagePath, 'generated-image');

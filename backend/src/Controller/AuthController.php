@@ -502,6 +502,12 @@ class AuthController extends AbstractController
         $response->headers->setCookie(
             $this->tokenService->createAccessCookie($result['access_token'])
         );
+        // Sliding window: rewrite the refresh cookie so its Max-Age matches
+        // the extended BTOKENS row. Without this the browser would still drop
+        // the cookie after the original login TTL even though the DB row lives on.
+        $response->headers->setCookie(
+            $this->tokenService->createRefreshCookie($refreshTokenString)
+        );
 
         return $response;
     }
@@ -510,7 +516,7 @@ class AuthController extends AbstractController
      * Refresh the access token for an active impersonation session.
      *
      * Delegates to {@see ImpersonationService::issueRefreshedImpersonationAccessToken},
-     * which validates the admin's stashed refresh token (DB-backed, 7d TTL),
+     * which validates the admin's stashed refresh token (DB-backed, 30d TTL),
      * recovers the impersonation target from the existing access cookie's
      * payload (signature-only verification — expiry is expected), and mints a
      * fresh impersonation access token. On failure we conservatively clear

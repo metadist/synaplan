@@ -741,6 +741,7 @@ class MessageProcessorTest extends TestCase
     {
         $message = $this->createMock(Message::class);
         $message->method('getUserId')->willReturn(1);
+        $message->method('getId')->willReturn(99);
         $message->method('getTrackingId')->willReturn(123);
         $message->method('getChatId')->willReturn(500);
         $message->method('getFile')->willReturn(0);
@@ -748,7 +749,10 @@ class MessageProcessorTest extends TestCase
         $tail = [$this->createMock(Message::class)];
 
         $this->preProcessor->method('process')->willReturn($message);
-        $this->messageRepository->method('findChatHistory')->willReturn([]);
+        $this->messageRepository->expects($this->once())
+            ->method('findChatHistory')
+            ->with(1, 500, MessageProcessor::HISTORY_MAX_MESSAGES, MessageProcessor::HISTORY_MAX_CHARS, 99)
+            ->willReturn([]);
         $this->messageRepository->method('countByChatId')->willReturn(40);
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);
         $this->classifier->method('classify')->willReturn([

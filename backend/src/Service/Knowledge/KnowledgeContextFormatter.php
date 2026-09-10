@@ -132,35 +132,60 @@ final class KnowledgeContextFormatter
         $footer .= "- ONE ID per bracket. Good: [Message:1234]. Bad: [Message:1234, 1235].\n";
         $footer .= "- Only use IDs from the list above. Never invent IDs.\n";
 
+        return $this->formatMessageReferenceBlock($digests, $header, $footer, $maxChars);
+    }
+
+    /**
+     * Immediate tail of another chat — same [Message:ID] citation rules as digests.
+     *
+     * @param list<array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, excerpt: string|null}> $messages
+     */
+    public function formatOtherChatTail(array $messages, int $maxChars = 4000): string
+    {
+        if ([] === $messages) {
+            return '';
+        }
+
+        $header = "\n\n## Recent messages from another conversation:\n";
+        $footer = "\nThese are the user's most recent messages from another chat. Use them when the current question continues that conversation.\n";
+        $footer .= "REFERENCES: cite as [Message:ID] (clickable). Rules:\n";
+        $footer .= "- ONE ID per bracket. Good: [Message:1234]. Bad: [Message:1234, 1235].\n";
+        $footer .= "- Only use IDs from the list above. Never invent IDs.\n";
+
+        return $this->formatMessageReferenceBlock($messages, $header, $footer, $maxChars);
+    }
+
+    /**
+     * @param list<array{message_id: int, chat_id: int, title: string, channel: string, source_date: int, excerpt: string|null}> $items
+     */
+    private function formatMessageReferenceBlock(array $items, string $header, string $footer, int $maxChars): string
+    {
         $budget = $maxChars - mb_strlen($header) - mb_strlen($footer);
 
-        // Pass 1: the digest lines themselves (cheap, always first priority).
         $lines = [];
-        foreach ($digests as $digest) {
+        foreach ($items as $item) {
             $line = sprintf(
                 "[Msg: %d | %s | %s] %s\n",
-                $digest['message_id'],
-                $digest['source_date'] > 0 ? gmdate('Y-m-d', $digest['source_date']) : 'unknown date',
-                '' !== $digest['channel'] ? $digest['channel'] : 'chat',
-                $digest['title'],
+                $item['message_id'],
+                $item['source_date'] > 0 ? gmdate('Y-m-d', $item['source_date']) : 'unknown date',
+                '' !== $item['channel'] ? $item['channel'] : 'chat',
+                $item['title'],
             );
 
             if (mb_strlen($line) > $budget) {
                 break;
             }
             $budget -= mb_strlen($line);
-            $lines[$digest['message_id']] = $line;
+            $lines[$item['message_id']] = $line;
         }
 
         if ([] === $lines) {
             return '';
         }
 
-        // Pass 2: excerpts for pulled hits, appended under their line while
-        // budget remains. An excerpt that no longer fits is skipped whole.
-        foreach ($digests as $digest) {
-            $excerpt = $digest['excerpt'];
-            if (null === $excerpt || '' === $excerpt || !isset($lines[$digest['message_id']])) {
+        foreach ($items as $item) {
+            $excerpt = $item['excerpt'] ?? null;
+            if (null === $excerpt || '' === $excerpt || !isset($lines[$item['message_id']])) {
                 continue;
             }
 
@@ -169,7 +194,7 @@ final class KnowledgeContextFormatter
                 continue;
             }
             $budget -= mb_strlen($quoted);
-            $lines[$digest['message_id']] .= $quoted;
+            $lines[$item['message_id']] .= $quoted;
         }
 
         return $header.implode('', $lines).$footer;

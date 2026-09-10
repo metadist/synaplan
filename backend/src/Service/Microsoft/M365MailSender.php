@@ -6,6 +6,7 @@ namespace App\Service\Microsoft;
 
 use App\Entity\Connection;
 use App\Repository\ConnectionRepository;
+use App\Service\Email\MarkdownEmailFormatter;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -74,7 +75,8 @@ final readonly class M365MailSender
             ];
         }
 
-        $this->graph->sendMail($connection, [$to], $subject, $body, $graphAttachments);
+        $htmlBody = (new MarkdownEmailFormatter())->toHtml($body);
+        $this->graph->sendMail($connection, [$to], $subject, $htmlBody, $graphAttachments);
 
         $this->logger->info('M365MailSender: result mail sent from the connected mailbox', [
             'owner_id' => $ownerId,

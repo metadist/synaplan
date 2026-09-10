@@ -63,7 +63,7 @@ final class SummaryEvalCommand extends Command
     {
         $this
             ->addOption('corpus', null, InputOption::VALUE_REQUIRED, 'Path to the corpus JSON (relative to the backend dir)', self::DEFAULT_CORPUS)
-            ->addOption('models', null, InputOption::VALUE_REQUIRED, 'Comma-separated provider:model pairs (default: the configured SUMMARIZE model)')
+            ->addOption('models', null, InputOption::VALUE_REQUIRED, 'Comma-separated provider:model pairs (default: the configured Text Analytics / ANALYZE model)')
             ->addOption('filter', null, InputOption::VALUE_REQUIRED, 'Only run cases whose id contains this substring')
             ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'Restrict to one prompt mode: bootstrap | incremental')
             ->addOption('repeat', null, InputOption::VALUE_REQUIRED, 'Run every case N times (stability check)', '1')
@@ -167,7 +167,7 @@ final class SummaryEvalCommand extends Command
 
         $config = $this->modelConfigService->getSummaryModelConfig($userId);
         if (null === ($config['model'] ?? null)) {
-            $io->error('No summary model configured (DEFAULTMODEL.SUMMARIZE/SORT/CHAT all unresolved) and no --models given.');
+            $io->error('No summary model configured (DEFAULTMODEL.ANALYZE/CHAT all unresolved) and no --models given.');
 
             return [];
         }

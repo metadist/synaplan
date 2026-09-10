@@ -1731,9 +1731,8 @@ class PromptController extends AbstractController
         }
 
         try {
-            // Resolve a cheap, fast summarization model via the SUMMARIZE
-            // capability default (SUMMARIZE → SORT → CHAT) instead of a
-            // hardcoded model id (#1320).
+            // Document summaries use Text Analytics (ANALYZE → CHAT), never
+            // the leftover hidden SUMMARIZE slot.
             $summaryConfig = $this->modelConfigService->getSummaryModelConfig($user->getId());
             $summaryModelId = $summaryConfig['model_id'];
             $provider = $summaryConfig['provider'];

@@ -279,7 +279,7 @@ final class ChatTitleServiceTest extends TestCase
         self::assertSame('user', $captured['messages'][0]['role'], 'No system prompt is attached');
         self::assertStringContainsString('Hello! How can I help you today?', $captured['messages'][0]['content']);
 
-        // The model must come from the SUMMARIZE capability, never a literal.
+        // The model must come from Text Analytics (ANALYZE), never a literal.
         self::assertSame('ollama', $captured['options']['provider']);
         self::assertSame('llama3.2', $captured['options']['model']);
     }

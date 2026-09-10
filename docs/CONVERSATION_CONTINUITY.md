@@ -12,6 +12,16 @@ Both are injected into the system prompt on **every channel** — web chat,
 WhatsApp, email, MCP, and the HTTP API — on both the streaming and the
 non-streaming path.
 
+**Never answer without older context.** The just-persisted current turn is
+excluded from the verbatim history budget, so a long paste or a file-heavy
+reply cannot evict prior turns. When a chat has already outgrown the window
+but no `BCHATSUMMARIES` row exists yet, the hot path injects a capped raw
+excerpt of the older span (no extra model call). The most recently updated
+*other* chat is also replayed as a short verbatim tail so a follow-up in a
+new window can see what was just said there. After every turn the worker
+indexes other chats immediately (`DigestOtherChatsCommand`); `QUIET_SECONDS`
+applies only to the live chat.
+
 ## Rolling conversation summary
 
 When a chat outgrows the verbatim context window, the older part is condensed
@@ -49,8 +59,11 @@ quoted digest title instead.
 - **Job:** `app:digest:run` — self-locking, scheduler-driven (daily, wired in
   `container-runtime.sh`). Per-user cost caps (`BATCH_SIZE` ×
   `MAX_BATCHES_PER_USER` model calls max per run) and a per-user cursor, so
-  every message is billed exactly once. Messages younger than `QUIET_SECONDS`
-  are left to the rolling summary.
+  every message is billed exactly once. Messages in the *live* chat younger
+  than `QUIET_SECONDS` are left to the rolling summary. After each completed
+  turn, `DigestOtherChatsCommand` indexes the user's other chats without
+  that quiet window. A short verbatim tail of the most recently updated
+  other chat is also injected on the hot path (SQL only, no digest wait).
 - **Exclusions:** widget/guest chats are never digested; users with memories
   disabled are skipped; the whole feature honours the user's memory opt-out at
   retrieval time too.

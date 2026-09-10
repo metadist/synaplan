@@ -155,16 +155,21 @@ class ConversationSummaryServiceTest extends TestCase
     public function testHotPathNeverCallsAiEvenOnAColdStore(): void
     {
         // Cold start: older span exists but nothing is stored yet. The hot path
-        // must answer without a summary rather than block on the summarizer.
+        // injects a raw excerpt of the older span — never blocks on the summarizer.
         $chat = $this->makeChat(40);
         $window = array_slice($chat, -15);
+        $older = array_slice($chat, 0, 25);
 
         $this->messageRepository->method('findIdBefore')->willReturn(25);
+        $this->messageRepository->method('findMessagesBetween')->willReturn($older);
         $this->aiFacade->expects($this->never())->method('chat');
 
         $result = $this->makeService()->buildRollingContext($window, count($chat), 7, 100);
 
-        self::assertFalse($result->applied);
+        self::assertTrue($result->applied);
+        self::assertIsString($result->summary);
+        self::assertStringContainsString('not yet condensed', $result->summary);
+        self::assertStringContainsString('message-1', $result->summary);
         self::assertSame($window, $result->recentMessages);
     }
 
@@ -365,6 +370,7 @@ class ConversationSummaryServiceTest extends TestCase
         $window = array_slice($chat, -15);
 
         $this->messageRepository->method('findIdBefore')->willReturn(25);
+        $this->messageRepository->method('findMessagesBetween')->willReturn(array_slice($chat, 0, 25));
         $this->aiFacade->expects($this->never())->method('chat');
 
         // Row exists but was produced under other summary settings.
@@ -379,7 +385,10 @@ class ConversationSummaryServiceTest extends TestCase
 
         $result = $this->makeService()->buildRollingContext($window, count($chat), 7, 100);
 
-        self::assertFalse($result->applied);
+        self::assertTrue($result->applied);
+        self::assertIsString($result->summary);
+        self::assertStringNotContainsString('STALE-CONFIG SUMMARY', $result->summary);
+        self::assertStringContainsString('not yet condensed', $result->summary);
     }
 
     public function testRefreshPersistsTheDurableRow(): void

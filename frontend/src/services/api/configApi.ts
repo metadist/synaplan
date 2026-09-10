@@ -101,8 +101,8 @@ export const savePlannerModel = async (
 }
 
 /**
- * Get the platform-wide summary model (DEFAULTMODEL.SUMMARIZE) that condenses
- * long conversations, plus the Sorting model it falls back to. Admin only.
+ * Legacy admin endpoint for the leftover DEFAULTMODEL.SUMMARIZE slot.
+ * Runtime no longer reads that slot — summaries use Text Analytics (ANALYZE).
  */
 export const getSummaryModel = async (): Promise<PlannerModelResponse> => {
   return httpClient<PlannerModelResponse>('/api/v1/config/routing/summary-model')

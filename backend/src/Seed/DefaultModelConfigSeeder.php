@@ -44,6 +44,9 @@ final readonly class DefaultModelConfigSeeder
         // dedicated binding so it can be tuned without touching the legacy
         // sorter. TaskPlanner falls back to SORT if this row is absent.
         ['group' => 'DEFAULTMODEL', 'setting' => 'PLAN',       'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
+        // Leftover slot: not on the AI Models purpose list and unread at
+        // runtime (summaries use ANALYZE). Kept insert-if-missing so existing
+        // installs are not rewritten.
         ['group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE',  'modelKey' => 'groq:openai/gpt-oss-120b:chat'],
         // Phase 2d: dedicated MEM tag so memory extraction never inherits the
         // user's heavy chat model (Gemini Pro etc.). Resolves to the new

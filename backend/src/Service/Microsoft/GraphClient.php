@@ -219,9 +219,10 @@ final readonly class GraphClient
 
     /**
      * Send a mail from the connected user's own mailbox (delegated
-     * `Mail.Send`) — the message lands in their Sent items. Attachments are
-     * inlined base64 (Graph's simple-attachment limit is ~3 MB per file;
-     * larger files must go through a folder destination instead).
+     * `Mail.Send`) — the message lands in their Sent items. `$body` is HTML
+     * (`contentType: html`). Attachments are inlined base64 (Graph's
+     * simple-attachment limit is ~3 MB per file; larger files must go through
+     * a folder destination instead).
      *
      * @param list<string>                                                         $to
      * @param list<array{name: string, contentBytes: string, contentType: string}> $attachments contentBytes = base64
@@ -235,7 +236,7 @@ final readonly class GraphClient
     ): void {
         $message = [
             'subject' => $subject,
-            'body' => ['contentType' => 'text', 'content' => $body],
+            'body' => ['contentType' => 'html', 'content' => $body],
             'toRecipients' => array_map(
                 static fn (string $address): array => ['emailAddress' => ['address' => $address]],
                 $to,

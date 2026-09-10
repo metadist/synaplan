@@ -1108,94 +1108,93 @@ class ModelConfigServiceTest extends TestCase
     }
 
     /**
-     * The rolling conversation summarizer must honour an explicit
-     * DEFAULTMODEL.SUMMARIZE override before anything else — this is how an
-     * operator points the condensing step at e.g. a GPT-OSS-120B model.
-     * (#1320: key is SUMMARIZE end to end — seeder, reader, ChatRunner.).
+     * Document summaries and rolling condensation use Text Analytics
+     * (DEFAULTMODEL.ANALYZE). The leftover SUMMARIZE slot is never read —
+     * even when a Groq row is still stored there.
      */
-    public function testGetSummaryModelConfigPrefersExplicitSummaryModel(): void
+    public function testGetSummaryModelConfigPrefersTextAnalyticsModel(): void
     {
         $userId = 5;
-        $summaryModelId = 300;
+        $analyzeModelId = 300;
 
-        $summaryConfig = $this->createMock(Config::class);
-        $summaryConfig->method('getValue')->willReturn((string) $summaryModelId);
+        $analyzeConfig = $this->createMock(Config::class);
+        $analyzeConfig->method('getValue')->willReturn((string) $analyzeModelId);
 
-        // First lookup (user SUMMARIZE) wins — no fallback lookups happen.
+        // First lookup (user ANALYZE) wins — SUMMARIZE is never consulted.
         $this->configRepository
             ->expects($this->once())
             ->method('findOneBy')
             ->with([
                 'ownerId' => $userId,
                 'group' => 'DEFAULTMODEL',
-                'setting' => 'SUMMARIZE',
+                'setting' => 'ANALYZE',
             ])
-            ->willReturn($summaryConfig);
+            ->willReturn($analyzeConfig);
 
         $model = $this->createMock(Model::class);
-        $model->method('getService')->willReturn('Groq');
-        $model->method('getProviderId')->willReturn('gpt-oss-120b');
+        $model->method('getService')->willReturn('Anthropic');
+        $model->method('getProviderId')->willReturn('claude-sonnet-5');
         $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
             ->method('find')
-            ->with($summaryModelId)
+            ->with($analyzeModelId)
             ->willReturn($model);
 
         $this->assertSame([
-            'model' => 'gpt-oss-120b',
-            'provider' => 'groq',
-            'model_id' => $summaryModelId,
+            'model' => 'claude-sonnet-5',
+            'provider' => 'anthropic',
+            'model_id' => $analyzeModelId,
         ], $this->service->getSummaryModelConfig($userId));
     }
 
     /**
-     * With no SUMMARIZE override the summarizer defaults to the sorting (SORT)
-     * model — the cheap/fast model requested for condensing by default.
+     * With no ANALYZE binding the summarizer falls back to CHAT — never the
+     * leftover SUMMARIZE slot or the Sorting model.
      */
-    public function testGetSummaryModelConfigFallsBackToSortModel(): void
+    public function testGetSummaryModelConfigFallsBackToChatModel(): void
     {
         $userId = 9;
-        $sortModelId = 73;
+        $chatModelId = 73;
 
-        $sortConfig = $this->createMock(Config::class);
-        $sortConfig->method('getValue')->willReturn((string) $sortModelId);
+        $chatConfig = $this->createMock(Config::class);
+        $chatConfig->method('getValue')->willReturn((string) $chatModelId);
 
-        // Chain: user SUMMARIZE → global SUMMARIZE → user SORT (returns here).
+        // Chain: user ANALYZE → global ANALYZE → user CHAT (returns here).
         $this->configRepository
             ->expects($this->exactly(3))
             ->method('findOneBy')
-            ->willReturnCallback(function (array $criteria) use ($userId, $sortConfig) {
+            ->willReturnCallback(function (array $criteria) use ($userId, $chatConfig) {
                 static $calls = 0;
                 ++$calls;
 
                 $expected = [
-                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
-                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'SUMMARIZE'],
-                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'SORT'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE'],
+                    ['ownerId' => 0, 'group' => 'DEFAULTMODEL', 'setting' => 'ANALYZE'],
+                    ['ownerId' => $userId, 'group' => 'DEFAULTMODEL', 'setting' => 'CHAT'],
                 ];
 
                 self::assertSame($expected[$calls - 1], $criteria, "Summary fallback step {$calls}");
 
-                return 3 === $calls ? $sortConfig : null;
+                return 3 === $calls ? $chatConfig : null;
             });
 
         $model = $this->createMock(Model::class);
-        $model->method('getService')->willReturn('Groq');
-        $model->method('getProviderId')->willReturn('qwen/qwen3.6-27b');
+        $model->method('getService')->willReturn('Anthropic');
+        $model->method('getProviderId')->willReturn('claude-sonnet-5');
         $model->method('getActive')->willReturn(1);
 
         $this->modelRepository
             ->expects(self::any())
             ->method('find')
-            ->with($sortModelId)
+            ->with($chatModelId)
             ->willReturn($model);
 
         $this->assertSame([
-            'model' => 'qwen/qwen3.6-27b',
-            'provider' => 'groq',
-            'model_id' => $sortModelId,
+            'model' => 'claude-sonnet-5',
+            'provider' => 'anthropic',
+            'model_id' => $chatModelId,
         ], $this->service->getSummaryModelConfig($userId));
     }
 

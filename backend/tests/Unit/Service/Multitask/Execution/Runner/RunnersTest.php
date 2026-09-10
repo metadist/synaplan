@@ -136,6 +136,37 @@ final class RunnersTest extends TestCase
     }
 
     /**
+     * Planner `summarize` nodes must use Text Analytics (ANALYZE), never the
+     * leftover hidden SUMMARIZE slot that was seeded to Groq and is not on
+     * the AI Models purpose list.
+     */
+    public function testSummarizeUsesAnalyzeCapabilityNotLegacySummarize(): void
+    {
+        $aiFacade = $this->createMock(AiFacade::class);
+        $aiFacade->method('chatStream')->willReturnCallback(function (array $messages, callable $cb): array {
+            $cb('THE SUMMARY');
+
+            return ['provider' => 'anthropic', 'model' => 'claude-sonnet-5'];
+        });
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->expects(self::once())
+            ->method('getDefaultModel')
+            ->with('ANALYZE', 1)
+            ->willReturn(55);
+        $modelConfig->method('getProviderForModel')->with(55)->willReturn('anthropic');
+        $modelConfig->method('getModelName')->with(55)->willReturn('claude-sonnet-5');
+
+        $runner = new ChatRunner($aiFacade, $modelConfig, $this->createMock(VectorSearchService::class), new \App\Service\Knowledge\KnowledgeContextFormatter(), $this->createMock(PromptService::class), $this->createMock(LoggerInterface::class));
+        $node = new TaskNode('n2', Capability::Summarize, ['n1'], ['text' => 'excel contents']);
+
+        $result = $runner->run($node, $this->context($this->message('summarize these spreadsheets')));
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame(55, $result->metadata['model_id'] ?? null);
+    }
+
+    /**
      * Regression for issue #1067: structured reasoning chunks (chain-of-thought
      * from thinking models like gpt-oss) must neither be streamed to the task
      * card nor end up in the node output — only the visible answer text counts.

@@ -55,13 +55,17 @@ final class M365MailSenderTest extends TestCase
             $captured,
         );
 
-        $sender->sendTaskResultEmail(1, 'owner@example.com', 'Your results', 'Here you go.', [
+        $sender->sendTaskResultEmail(1, 'owner@example.com', 'Your results', "# Heading\n\n**bold** text", [
             ['path' => $this->tempFile, 'type' => 'text/calendar'],
         ]);
 
         self::assertCount(1, $captured);
         self::assertStringEndsWith('/me/sendMail', $captured[0]['url']);
         $payload = json_decode($captured[0]['body'], true);
+        self::assertSame('html', $payload['message']['body']['contentType']);
+        self::assertStringContainsString('<h1>Heading</h1>', $payload['message']['body']['content']);
+        self::assertStringContainsString('<strong>bold</strong>', $payload['message']['body']['content']);
+        self::assertStringNotContainsString('# Heading', $payload['message']['body']['content']);
         self::assertSame('owner@example.com', $payload['message']['toRecipients'][0]['emailAddress']['address']);
         self::assertSame(base64_encode('BEGIN:VCALENDAR'), $payload['message']['attachments'][0]['contentBytes']);
         self::assertSame('text/calendar', $payload['message']['attachments'][0]['contentType']);

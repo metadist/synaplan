@@ -28,10 +28,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Text-capability runner for `chat`, `summarize`, `translate`, `rag_query`.
  *
- * Resolves the model via the existing capability→DEFAULTMODEL chain (SUMMARIZE
- * for summarize, CHAT otherwise) keyed by the effective user id — the migration
- * principle: the planner picks the task, the model resolution stays here. It
- * runs the transform through AiFacade::chat on the upstream text input.
+ * Resolves the model via the existing capability→DEFAULTMODEL chain (ANALYZE
+ * for summarize — Text Analytics — CHAT otherwise) keyed by the effective user
+ * id. The leftover SUMMARIZE slot is never consulted. The planner picks the
+ * task; model resolution stays here. It runs the transform through
+ * AiFacade::chat on the upstream text input.
  *
  * `chat` nodes honour `params.topic_id` the same way ChatHandler binds a
  * Task Prompt: the topic's system text is used, and PromptMeta.aiModel pins
@@ -89,7 +90,7 @@ final readonly class ChatRunner implements TaskRunner
 
         $language = is_string($context->classification['language'] ?? null) ? $context->classification['language'] : ($context->message->getLanguage() ?: 'en');
         $topicBinding = $this->resolveTopicBinding($node, $context, $language);
-        $capabilityTag = Capability::Summarize === $node->capability ? 'SUMMARIZE' : 'CHAT';
+        $capabilityTag = Capability::Summarize === $node->capability ? 'ANALYZE' : 'CHAT';
         $modelId = $this->resolveModelId($capabilityTag, $context, $topicBinding['modelId']);
         $provider = $modelId ? $this->modelConfigService->getProviderForModel($modelId) : null;
         $modelName = $modelId ? $this->modelConfigService->getModelName($modelId) : null;

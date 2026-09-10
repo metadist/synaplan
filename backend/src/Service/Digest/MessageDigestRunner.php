@@ -109,6 +109,29 @@ final readonly class MessageDigestRunner
     }
 
     /**
+     * After-turn pass: index other chats immediately (quiet applies only to
+     * the chat that just received a turn). Cost-capped at two batches.
+     *
+     * Reads the shared cursor so a 2-batch cap starts at new work, but does
+     * not persist it: this pass skips recent live-chat rows, and writing a
+     * higher cursor would hide those messages from the scheduled job.
+     * Already-digested rows are cheap no-ops in
+     * {@see MessageDigestService::digestBatch()}.
+     *
+     * @return array{batches: int, created: int, scanned: int, cursor: int}
+     */
+    public function runForOtherChats(User $user, int $liveChatId, int $maxBatches = 2): array
+    {
+        if (!$this->config->isEnabled()) {
+            $this->logger->info('Message digest job disabled via BCONFIG, skipping other-chats pass');
+
+            return ['batches' => 0, 'created' => 0, 'scanned' => 0, 'cursor' => 0];
+        }
+
+        return $this->runForUser($user, $maxBatches, liveChatId: $liveChatId, persistCursor: false);
+    }
+
+    /**
      * Digest up to `$maxBatches` batches for one user.
      *
      * @return array{batches: int, created: int, scanned: int, cursor: int}
@@ -119,6 +142,8 @@ final readonly class MessageDigestRunner
         ?int $sinceUnix = null,
         bool $dryRun = false,
         bool $advanceCursor = true,
+        ?int $liveChatId = null,
+        bool $persistCursor = true,
     ): array {
         $batchSize = $this->config->getBatchSize();
         $quietCutoff = time() - $this->config->getQuietSeconds();
@@ -138,6 +163,7 @@ final readonly class MessageDigestRunner
                 $quietCutoff,
                 $batchSize,
                 $sinceUnix,
+                $liveChatId,
             );
 
             if ([] === $candidates) {
@@ -152,7 +178,7 @@ final readonly class MessageDigestRunner
             $result['created'] += $batchResult['created'];
             $result['scanned'] += $batchResult['scanned'];
 
-            if ($advanceCursor && !$dryRun) {
+            if ($advanceCursor && $persistCursor && !$dryRun) {
                 $this->config->setCursor($user->getId(), $result['cursor']);
             }
         }

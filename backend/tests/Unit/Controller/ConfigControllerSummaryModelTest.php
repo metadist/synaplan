@@ -47,12 +47,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 
 /**
- * Coverage for the platform summary model endpoints: the SUMMARIZE slot
- * (DEFAULTMODEL.SUMMARIZE) drives the rolling conversation summary and was
- * previously only reachable through the seeder or direct SQL.
- *
- * Unlike the planner selection this row is global (ownerId 0) and admin-gated:
- * the summary runs inside the pipeline for every user's chat.
+ * Coverage for the leftover platform summary-model admin endpoints.
+ * Runtime no longer reads DEFAULTMODEL.SUMMARIZE (summaries use ANALYZE);
+ * these tests lock the HTTP contract that still writes that unused slot.
  */
 final class ConfigControllerSummaryModelTest extends TestCase
 {

@@ -251,7 +251,7 @@ final class WidgetSessionService
         ]);
 
         // Generation itself is shared with the web-chat titles (#1500): same
-        // SUMMARIZE-capability model resolution, same context-free request,
+        // Text Analytics model resolution, same context-free request,
         // same cleanup. Only the trigger and the target column differ.
         $title = $this->chatTitleService->generate(
             $this->chatTitleService->toTurns(array_values($userMessages)),

@@ -334,6 +334,24 @@ const MAX_AUTH_FAILURES_IN_WINDOW = 2
 interface RefreshResult {
   success: boolean
   oidcSessionExpired?: boolean
+  /** True when /auth/refresh failed for a reason that is not "cookie is dead". */
+  transient?: boolean
+}
+
+/**
+ * Statuses from `/auth/refresh` that mean the session is actually dead.
+ * 5xx / 429 / 408 (and network failures) are a restart or blip — keep the
+ * hint. Other 4xx (400/404/422/…) are a definitive broken request, not a
+ * rolling deploy, so they must clear the hint instead of retrying forever.
+ */
+export function isDefinitiveAuthRejection(status: number): boolean {
+  if (status === 401 || status === 403) {
+    return true
+  }
+  if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+    return true
+  }
+  return false
 }
 
 /**
@@ -437,6 +455,14 @@ async function refreshAccessToken(
         return { success: true }
       }
 
+      // A restarting backend answers 502/503/504 (or 429). That is not a
+      // dead session — keep the hint and let the caller retry. authService
+      // already treated those as transient; this path is what most API
+      // calls actually use, so a deploy used to log every active user out.
+      if (!isDefinitiveAuthRejection(response.status)) {
+        return { success: false, transient: true }
+      }
+
       // Refresh definitively failed - the stored cookie is dead. Clear the
       // hint so future visits don't keep retrying against a closed session.
       clearSessionHint()
@@ -457,7 +483,7 @@ async function refreshAccessToken(
       return { success: false }
     } catch (error) {
       console.error('Token refresh error:', error)
-      return { success: false }
+      return { success: false, transient: true }
     } finally {
       isRefreshing = false
       refreshPromise = null
@@ -637,6 +663,10 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
         await new Promise((resolve) => setTimeout(resolve, 100))
         // @ts-expect-error - Recursive call with same types
         return httpClient(endpoint, { ...options, _isRetry: true })
+      }
+
+      if (refreshResult.transient) {
+        throw new ApiError(503, 'Authentication temporarily unavailable', 'AUTH_TRANSIENT')
       }
 
       // Refresh failed - logout

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
+use App\Message\DigestOtherChatsCommand;
 use App\Message\RefreshConversationSummaryCommand;
 use App\Service\ConversationSummaryRefreshDispatcher;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -25,14 +26,23 @@ final class ConversationSummaryRefreshDispatcherTest extends TestCase
 
     public function testDispatchSendsTheCommand(): void
     {
-        $this->bus->expects($this->once())
+        $dispatched = [];
+        $this->bus->expects($this->exactly(2))
             ->method('dispatch')
-            ->with($this->callback(static function (RefreshConversationSummaryCommand $cmd): bool {
-                return 42 === $cmd->getChatId() && 7 === $cmd->getUserId();
-            }))
-            ->willReturnCallback(static fn (object $msg): Envelope => new Envelope($msg));
+            ->willReturnCallback(function (object $msg) use (&$dispatched): Envelope {
+                $dispatched[] = $msg;
+
+                return new Envelope($msg);
+            });
 
         $this->dispatcher->dispatch(42, 7);
+
+        self::assertInstanceOf(RefreshConversationSummaryCommand::class, $dispatched[0]);
+        self::assertSame(42, $dispatched[0]->getChatId());
+        self::assertSame(7, $dispatched[0]->getUserId());
+        self::assertInstanceOf(DigestOtherChatsCommand::class, $dispatched[1]);
+        self::assertSame(7, $dispatched[1]->getUserId());
+        self::assertSame(42, $dispatched[1]->getLiveChatId());
     }
 
     public function testDispatchNoOpsOnInvalidIds(): void
