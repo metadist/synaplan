@@ -6,8 +6,11 @@ namespace App\Service\UrlWatch;
 
 use App\Entity\UrlWatch;
 use App\Repository\UrlWatchRepository;
+use App\Service\File\FileHelper;
+use App\Service\Security\SsrfGuard;
 use App\Service\UrlContentService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * One saved page per owner+URL. Each remember()/refresh() overwrites.
@@ -23,6 +26,8 @@ final readonly class UrlWatchService
         private EntityManagerInterface $em,
         private UrlContentService $urlContent,
         private TextDiff $diff,
+        private SsrfGuard $ssrfGuard,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -39,25 +44,34 @@ final readonly class UrlWatchService
         return $this->watches->findOneForOwner($id, $ownerId);
     }
 
-    public function register(int $ownerId, string $url): UrlWatch
+    /**
+     * @return array{watch: UrlWatch, created: bool}
+     */
+    public function register(int $ownerId, string $url): array
     {
         $normalized = $this->canonicalize($url);
+        if ($this->ssrfGuard->isBlockedUrl($normalized)) {
+            throw new \InvalidArgumentException('blocked_url');
+        }
         $hash = self::hashUrl($normalized);
         $existing = $this->watches->findOneByOwnerAndHash($ownerId, $hash);
         if ($existing instanceof UrlWatch) {
-            return $existing;
+            return ['watch' => $existing, 'created' => false];
         }
 
         $watch = new UrlWatch($ownerId, $normalized, $hash);
         $this->em->persist($watch);
         $this->em->flush();
 
-        return $watch;
+        return ['watch' => $watch, 'created' => true];
     }
 
     public function remember(int $ownerId, string $url, string $title, string $body): UrlWatchCompareResult
     {
         $normalized = $this->canonicalize($url);
+        if ($this->ssrfGuard->isBlockedUrl($normalized)) {
+            throw new \InvalidArgumentException('blocked_url');
+        }
         $hash = self::hashUrl($normalized);
         $body = $this->clip($body, self::MAX_BODY_CHARS);
         $contentHash = hash('sha256', $body);
@@ -81,6 +95,7 @@ final readonly class UrlWatchService
         }
 
         $watch->replaceSnapshot($title, $body, $contentHash, $now);
+        $watch->setLastDiffText(UrlWatchCompareResult::CHANGED === $status ? $diff : null);
         $this->em->flush();
 
         return new UrlWatchCompareResult(
@@ -100,7 +115,16 @@ final readonly class UrlWatchService
 
         $result = $this->urlContent->fetchForCrawling($watch->getUrl());
         if (!$result->success) {
-            throw new UrlWatchFetchFailedException($result->error ?? 'fetch failed');
+            $reason = $result->error ?? 'fetch failed';
+            $this->logger->warning('URL watch fetch failed', [
+                'watch_id' => $watch->getId(),
+                'owner_id' => $ownerId,
+                'url' => FileHelper::redactUrlForLogging($watch->getUrl()),
+                'error' => $reason,
+            ]);
+            $watch->recordFailure($reason);
+            $this->em->flush();
+            throw new UrlWatchFetchFailedException($reason);
         }
 
         return $this->remember($ownerId, $watch->getUrl(), $result->title, $result->extractedText);
@@ -132,6 +156,9 @@ final readonly class UrlWatchService
             'fetchedAt' => $this->iso($watch->getFetchedAt()),
             'created' => $this->iso($watch->getCreated()),
             'updated' => $this->iso($watch->getUpdated()),
+            'lastDiffText' => $watch->getLastDiffText(),
+            'lastError' => $watch->getLastError(),
+            'lastFailedAt' => $this->iso($watch->getLastFailedAt()),
         ];
     }
 

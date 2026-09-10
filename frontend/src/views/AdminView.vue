@@ -480,7 +480,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -518,6 +518,7 @@ const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
 const route = useRoute()
+const router = useRouter()
 const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 type TabId =
@@ -528,8 +529,28 @@ interface AdminTab {
   icon: string
 }
 
+const isValidTab = (tab: unknown): tab is TabId =>
+  tab === 'overview' ||
+  tab === 'users' ||
+  tab === 'prompts' ||
+  tab === 'usage' ||
+  tab === 'subscriptions' ||
+  tab === 'moderation' ||
+  tab === 'appServer'
+
+const tabFromQuery = (): TabId => {
+  const tab = route.query.tab
+  if (isValidTab(tab)) {
+    if (tab === 'appServer' && !isNativeApp()) {
+      return 'overview'
+    }
+    return tab
+  }
+  return 'overview'
+}
+
 // Tabs
-const activeTab = ref<TabId>('overview')
+const activeTab = ref<TabId>(tabFromQuery())
 const tabs = computed<AdminTab[]>(() => {
   const baseTabs: AdminTab[] = [
     { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
@@ -564,6 +585,23 @@ function onTabNavChange(id: string) {
   }
   activeTab.value = id as TabId
 }
+
+watch(activeTab, (id) => {
+  if (id === 'users' && iamGroupsEnabled.value) {
+    return
+  }
+  const tab = route.query.tab
+  if (tab === id || (id === 'overview' && (tab === undefined || tab === ''))) {
+    return
+  }
+  const query = { ...route.query }
+  if (id === 'overview') {
+    delete query.tab
+  } else {
+    query.tab = id
+  }
+  void router.replace({ query })
+})
 
 // Overview
 const overview = ref<SystemOverview | null>(null)
@@ -743,12 +781,9 @@ function formatDate(dateStr: string): string {
 // Initialize
 watch(
   () => route.query.tab,
-  (tab) => {
-    if (!iamGroupsEnabled.value && tab === 'users') {
-      activeTab.value = 'users'
-    }
-  },
-  { immediate: true }
+  () => {
+    activeTab.value = tabFromQuery()
+  }
 )
 
 onMounted(() => {

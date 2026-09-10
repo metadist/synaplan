@@ -30,6 +30,17 @@ const formatWhen = (iso: string | null): string => {
   })
 }
 
+const rowStatus = (watch: UrlWatch): string => {
+  if (watch.lastError && watch.lastFailedAt) {
+    const failed = Date.parse(watch.lastFailedAt)
+    const fetched = watch.fetchedAt ? Date.parse(watch.fetchedAt) : 0
+    if (!Number.isNaN(failed) && failed >= fetched) {
+      return t('config.savedTasks.watches.lastCheckFailed', { reason: watch.lastError })
+    }
+  }
+  return formatWhen(watch.fetchedAt)
+}
+
 const load = async () => {
   loading.value = true
   try {
@@ -52,13 +63,21 @@ const onAdd = async () => {
   if (!value) return
   adding.value = true
   try {
-    const watch = await urlWatchesApi.create(value)
+    const { watch, created } = await urlWatchesApi.create(value)
     watches.value = [watch, ...watches.value.filter((row) => row.id !== watch.id)]
     url.value = ''
-    success(t('config.savedTasks.watches.added'))
+    success(
+      created
+        ? t('config.savedTasks.watches.added')
+        : t('config.savedTasks.watches.alreadyWatching')
+    )
   } catch (err) {
     if (err instanceof ApiError && err.status === 400) {
-      showError(t('config.savedTasks.watches.invalidUrl'))
+      showError(
+        err.code === 'blocked_url'
+          ? t('config.savedTasks.watches.blockedUrl')
+          : t('config.savedTasks.watches.invalidUrl')
+      )
     } else {
       showError(t('config.savedTasks.watches.addFailed'))
     }
@@ -91,8 +110,13 @@ const onCheck = async (id: number) => {
       viewing.value = result.watch
     }
     toastCompare(result.compare)
-  } catch {
-    showError(t('config.savedTasks.watches.checkFailed'))
+  } catch (err) {
+    showError(
+      err instanceof ApiError && err.message
+        ? err.message
+        : t('config.savedTasks.watches.checkFailed')
+    )
+    await load()
   } finally {
     checkingId.value = null
   }
@@ -180,7 +204,7 @@ onMounted(() => {
             {{ watch.title || $t('config.savedTasks.watches.untitled') }}
           </p>
           <p class="text-sm txt-secondary break-all">{{ watch.url }}</p>
-          <p class="text-xs txt-secondary">{{ formatWhen(watch.fetchedAt) }}</p>
+          <p class="text-xs txt-secondary" data-testid="url-watch-status">{{ rowStatus(watch) }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <button
@@ -230,9 +254,19 @@ onMounted(() => {
             {{ viewing.title || $t('config.savedTasks.watches.untitled') }}
           </h3>
           <p class="text-sm txt-secondary break-all">{{ viewing.url }}</p>
-          <p class="text-xs txt-secondary">{{ formatWhen(viewing.fetchedAt) }}</p>
+          <p class="text-xs txt-secondary">{{ rowStatus(viewing) }}</p>
+          <div v-if="viewing.lastDiffText" class="space-y-1">
+            <p class="text-sm font-medium txt-primary">
+              {{ $t('config.savedTasks.watches.lastDiff') }}
+            </p>
+            <pre
+              class="whitespace-pre-wrap text-sm txt-primary surface-card border border-light-border/30 dark:border-dark-border/20 rounded-lg p-3 max-h-80 overflow-y-auto"
+              data-testid="url-watch-diff"
+              >{{ viewing.lastDiffText }}</pre>
+          </div>
           <pre
             class="whitespace-pre-wrap text-sm txt-primary surface-card border border-light-border/30 dark:border-dark-border/20 rounded-lg p-3 max-h-80 overflow-y-auto"
+            data-testid="url-watch-body"
             >{{ viewing.body || $t('config.savedTasks.watches.neverFetched') }}</pre>
           <button
             type="button"

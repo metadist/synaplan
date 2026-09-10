@@ -392,13 +392,11 @@ export function useNavItems() {
         path: '/admin/config',
         label: t('nav.adminSystemConfig'),
       })
-      if (isIamGroupsEnabled()) {
-        adminChildren.push({
-          key: 'admin-people',
-          path: '/admin/people',
-          label: t('nav.adminPeople'),
-        })
-      }
+      adminChildren.push({
+        key: 'admin-people',
+        path: isIamGroupsEnabled() ? '/admin/people' : '/admin?tab=users',
+        label: t('nav.adminPeople'),
+      })
 
       items.push({
         key: 'admin',

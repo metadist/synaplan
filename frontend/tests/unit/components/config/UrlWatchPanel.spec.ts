@@ -1,14 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import UrlWatchPanel from '@/components/config/UrlWatchPanel.vue'
+import { ApiError } from '@/services/api/httpClient'
 import type { UrlWatch } from '@/services/api/urlWatchesApi'
 
-const { mockList, mockCreate, mockRemove, mockConfirm, mockRefresh } = vi.hoisted(() => ({
+const {
+  mockList,
+  mockCreate,
+  mockRemove,
+  mockConfirm,
+  mockRefresh,
+  mockGet,
+  mockSuccess,
+  mockError,
+} = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockCreate: vi.fn(),
   mockRemove: vi.fn(),
   mockConfirm: vi.fn(),
   mockRefresh: vi.fn(),
+  mockGet: vi.fn(),
+  mockSuccess: vi.fn(),
+  mockError: vi.fn(),
 }))
 
 vi.mock('@/services/api/urlWatchesApi', () => ({
@@ -16,13 +29,13 @@ vi.mock('@/services/api/urlWatchesApi', () => ({
     list: mockList,
     create: mockCreate,
     remove: mockRemove,
-    get: vi.fn(),
+    get: mockGet,
     refresh: mockRefresh,
   },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success: mockSuccess, error: mockError }),
 }))
 
 vi.mock('@/composables/useDialog', () => ({
@@ -38,6 +51,9 @@ const watch: UrlWatch = {
   created: '2026-09-08T08:00:00+00:00',
   updated: '2026-09-08T09:00:00+00:00',
   body: '',
+  lastDiffText: null,
+  lastError: null,
+  lastFailedAt: null,
 }
 
 const mountPanel = async () => {
@@ -69,7 +85,7 @@ describe('UrlWatchPanel', () => {
 
   it('creates a watch from the form', async () => {
     mockList.mockResolvedValue([])
-    mockCreate.mockResolvedValue(watch)
+    mockCreate.mockResolvedValue({ watch, created: true })
     const wrapper = await mountPanel()
     await wrapper.get('[data-testid="url-watch-input"]').setValue('https://example.com/news')
     await wrapper.get('form').trigger('submit')
@@ -125,5 +141,68 @@ describe('UrlWatchPanel', () => {
     await flushPromises()
     expect(buttons[0].attributes('disabled')).toBeUndefined()
     expect(buttons[1].attributes('disabled')).toBeUndefined()
+  })
+
+  it('toasts the blocked-URL copy when create returns blocked_url', async () => {
+    mockList.mockResolvedValue([])
+    mockCreate.mockRejectedValue(
+      new ApiError(400, 'URL points to a private/blocked address', 'blocked_url')
+    )
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="url-watch-input"]').setValue('http://127.0.0.1/page.html')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mockError).toHaveBeenCalledWith('That address cannot be watched (private or blocked).')
+  })
+
+  it('reports an existing watch instead of a first save', async () => {
+    mockList.mockResolvedValue([watch])
+    mockCreate.mockResolvedValue({ watch, created: false })
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="url-watch-input"]').setValue('https://example.com/news')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(mockSuccess).toHaveBeenCalledWith('This page is already watched.')
+  })
+
+  it('shows the API reason when a check fails', async () => {
+    mockList.mockResolvedValue([watch])
+    mockRefresh.mockRejectedValue(
+      new ApiError(400, 'could not read the page: HTTP 404', 'HTTP_400')
+    )
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="url-watch-check"]').trigger('click')
+    await flushPromises()
+    expect(mockError).toHaveBeenCalledWith('could not read the page: HTTP 404')
+    expect(wrapper.get('[data-testid="url-watch-status"]').text()).toContain('Last saved')
+  })
+
+  it('renders the last diff in the saved-copy dialog', async () => {
+    const changed: UrlWatch = {
+      ...watch,
+      lastDiffText: '- old uuid\n+ new uuid',
+      body: '{ "uuid": "new" }',
+    }
+    mockList.mockResolvedValue([changed])
+    mockGet.mockResolvedValue(changed)
+    const wrapper = await mountPanel()
+    await wrapper.get('[data-testid="url-watch-view"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="url-watch-diff"]').text()).toContain('- old uuid')
+    expect(wrapper.get('[data-testid="url-watch-body"]').text()).toContain('new')
+  })
+
+  it('labels a failed check instead of Not fetched yet', async () => {
+    const failed: UrlWatch = {
+      ...watch,
+      fetchedAt: null,
+      lastError: 'URL points to a private/blocked address',
+      lastFailedAt: '2026-09-10T17:00:00+00:00',
+    }
+    mockList.mockResolvedValue([failed])
+    const wrapper = await mountPanel()
+    expect(wrapper.get('[data-testid="url-watch-status"]').text()).toContain(
+      'Last check failed: URL points to a private/blocked address'
+    )
   })
 })

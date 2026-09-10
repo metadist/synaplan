@@ -2127,8 +2127,10 @@
         "add": "Seite beobachten",
         "adding": "Wird gespeichert…",
         "added": "Seite gespeichert. Mit „Jetzt prüfen“ die erste Kopie anlegen.",
+        "alreadyWatching": "Diese Seite wird bereits beobachtet.",
         "addFailed": "Diese Seite konnte nicht beobachtet werden.",
         "invalidUrl": "Gib eine Webadresse ein, die mit http:// oder https:// beginnt.",
+        "blockedUrl": "Diese Adresse kann nicht beobachtet werden (privat oder gesperrt).",
         "loading": "Beobachtete Seiten werden geladen…",
         "loadFailed": "Beobachtete Seiten konnten nicht geladen werden.",
         "empty": "Noch keine Seiten beobachtet.",
@@ -2146,6 +2148,8 @@
         "deleteFailed": "Die beobachtete Seite konnte nicht entfernt werden.",
         "neverFetched": "Noch nicht abgerufen",
         "lastFetched": "Zuletzt gespeichert {when}",
+        "lastCheckFailed": "Letzte Prüfung fehlgeschlagen: {reason}",
+        "lastDiff": "Was sich geändert hat",
         "untitled": "Seite ohne Titel"
       },
       "scheduleThis": "Später erneut ausführen",
@@ -5731,6 +5735,7 @@
       "audit": "Protokoll"
     },
     "openPeople": "Personen öffnen",
+    "backToOperate": "Zurück zu Betrieb",
     "myGroups": {
       "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",
       "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Personen hinzufügen.",

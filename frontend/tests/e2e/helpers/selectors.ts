@@ -525,6 +525,9 @@ export const selectors = {
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',
   },
+  people: {
+    backToOperate: '[data-testid="link-people-back-operate"]',
+  },
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',
     cancelBtn: '[data-testid="btn-dialog-cancel"]',

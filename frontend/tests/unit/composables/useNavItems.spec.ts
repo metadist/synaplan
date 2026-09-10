@@ -243,16 +243,22 @@ describe('useNavItems rail', () => {
     expect(keys).toContain('admin')
     const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
     expect(operate?.label).toBe('Operate')
-    const childKeys = (operate?.children ?? []).map((child: { key: string }) => child.key)
-    expect(childKeys).not.toContain('admin-people')
+    const children = operate?.children ?? []
+    const childKeys = children.map((child: { key: string }) => child.key)
+    expect(childKeys).toContain('admin-people')
+    expect(children.find((child: { key: string }) => child.key === 'admin-people')?.path).toBe(
+      '/admin?tab=users'
+    )
   })
 
-  it('shows People under Operate only when IAM groups are enabled', () => {
+  it('sends People to /admin/people when IAM groups are enabled', () => {
     runtimeFeatures.iamGroups = true
     const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
     const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
-    const childKeys = (operate?.children ?? []).map((child: { key: string }) => child.key)
-    expect(childKeys).toContain('admin-people')
+    const people = (operate?.children ?? []).find(
+      (child: { key: string }) => child.key === 'admin-people'
+    )
+    expect(people?.path).toBe('/admin/people')
   })
 
   it('plugins stay a top-level rail entry when installed', () => {

@@ -45,6 +45,15 @@ class UrlWatch
     #[ORM\Column(name: 'BUPDATED', type: 'bigint')]
     private int $updated;
 
+    #[ORM\Column(name: 'BLASTDIFFTEXT', type: 'text', nullable: true)]
+    private ?string $lastDiffText = null;
+
+    #[ORM\Column(name: 'BLASTERROR', length: 512, nullable: true)]
+    private ?string $lastError = null;
+
+    #[ORM\Column(name: 'BLASTFAILEDAT', type: 'bigint', nullable: true)]
+    private ?int $lastFailedAt = null;
+
     public function __construct(int $ownerId, string $url, string $urlHash)
     {
         $now = time();
@@ -105,6 +114,33 @@ class UrlWatch
         return $this->updated;
     }
 
+    public function getLastDiffText(): ?string
+    {
+        return $this->lastDiffText;
+    }
+
+    public function getLastError(): ?string
+    {
+        return $this->lastError;
+    }
+
+    public function getLastFailedAt(): ?int
+    {
+        return $this->lastFailedAt;
+    }
+
+    public function setLastDiffText(?string $diff): void
+    {
+        $this->lastDiffText = (null === $diff || '' === $diff) ? null : $diff;
+    }
+
+    public function recordFailure(string $error): void
+    {
+        $this->lastError = mb_substr($error, 0, 512);
+        $this->lastFailedAt = time();
+        $this->updated = $this->lastFailedAt;
+    }
+
     public function replaceSnapshot(string $title, string $body, string $contentHash, int $fetchedAt): void
     {
         if ('' !== $title) {
@@ -114,5 +150,7 @@ class UrlWatch
         $this->contentHash = $contentHash;
         $this->fetchedAt = $fetchedAt;
         $this->updated = $fetchedAt;
+        $this->lastError = null;
+        $this->lastFailedAt = null;
     }
 }

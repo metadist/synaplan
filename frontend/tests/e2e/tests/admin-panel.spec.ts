@@ -109,6 +109,11 @@ test.describe('@ci Admin panel', () => {
       })
       await expect(page.locator('[data-testid="tab-groups"]')).toBeVisible()
       await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
+      await expect(page.locator(selectors.people.backToOperate)).toBeVisible()
+      await page.locator(selectors.people.backToOperate).click()
+      await expect(page.locator(selectors.pages.admin)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
     } else {
       await expect(page.locator('[data-testid="page-not-found"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,

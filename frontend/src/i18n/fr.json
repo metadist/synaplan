@@ -2015,8 +2015,10 @@
         "add": "Surveiller cette page",
         "adding": "Enregistrement…",
         "added": "Page enregistrée. Cliquez sur Vérifier maintenant pour stocker la première copie.",
+        "alreadyWatching": "Cette page est déjà surveillée.",
         "addFailed": "Impossible de surveiller cette page.",
         "invalidUrl": "Saisissez une adresse web commençant par http:// ou https://.",
+        "blockedUrl": "Cette adresse ne peut pas être surveillée (privée ou bloquée).",
         "loading": "Chargement des pages surveillées…",
         "loadFailed": "Impossible de charger les pages surveillées.",
         "empty": "Aucune page surveillée pour le moment.",
@@ -2034,6 +2036,8 @@
         "deleteFailed": "Impossible de retirer cette page surveillée.",
         "neverFetched": "Pas encore récupérée",
         "lastFetched": "Dernier enregistrement {when}",
+        "lastCheckFailed": "Dernière vérification échouée : {reason}",
+        "lastDiff": "Ce qui a changé",
         "untitled": "Page sans titre"
       },
       "scheduleThis": "Relancer plus tard",
@@ -5797,6 +5801,7 @@
       "audit": "Journal"
     },
     "openPeople": "Ouvrir Personnes",
+    "backToOperate": "Retour à Exploitation",
     "myGroups": {
       "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
       "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Personnes.",

@@ -2912,8 +2912,10 @@
         "add": "Bu sayfayı izle",
         "adding": "Kaydediliyor…",
         "added": "Sayfa kaydedildi. İlk kopyayı saklamak için Şimdi kontrol et.",
+        "alreadyWatching": "Bu sayfa zaten izleniyor.",
         "addFailed": "Bu sayfa izlenemedi.",
         "invalidUrl": "http:// veya https:// ile başlayan bir web adresi gir.",
+        "blockedUrl": "Bu adres izlenemez (özel veya engelli).",
         "loading": "İzlenen sayfalar yükleniyor…",
         "loadFailed": "İzlenen sayfalar yüklenemedi.",
         "empty": "Henüz izlenen sayfa yok.",
@@ -2931,6 +2933,8 @@
         "deleteFailed": "Bu izlenen sayfa kaldırılamadı.",
         "neverFetched": "Henüz alınmadı",
         "lastFetched": "Son kayıt {when}",
+        "lastCheckFailed": "Son kontrol başarısız: {reason}",
+        "lastDiff": "Ne değişti",
         "untitled": "Başlıksız sayfa"
       },
       "scheduleThis": "Bunu daha sonra tekrar çalıştır",
@@ -4812,6 +4816,7 @@
       "audit": "Kayıt"
     },
     "openPeople": "Kişiler’i aç",
+    "backToOperate": "İşlet’e dön",
     "myGroups": {
       "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
       "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kişiler sayfasından ekleyebilir.",

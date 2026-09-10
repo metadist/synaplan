@@ -4,11 +4,14 @@ namespace App\Repository;
 
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
 {
+    private const DELETE_ID_BATCH = 500;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Message::class);
@@ -689,7 +692,10 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Delete all messages for the given chat IDs.
+     * Delete all messages for the given chat IDs, and their BMESSAGEMETA rows.
+     *
+     * Bulk DQL skips Doctrine orphanRemoval, and BMESSAGEMETA has no
+     * ON DELETE CASCADE, so meta must be removed first (#1811).
      *
      * @param array<int> $chatIds
      *
@@ -697,16 +703,37 @@ class MessageRepository extends ServiceEntityRepository
      */
     public function deleteByChatIds(array $chatIds): int
     {
-        if (empty($chatIds)) {
+        if ([] === $chatIds) {
             return 0;
         }
 
-        $qb = $this->getEntityManager()->createQueryBuilder();
+        $deleted = 0;
+        foreach (array_chunk(array_values(array_unique($chatIds)), self::DELETE_ID_BATCH) as $chatBatch) {
+            $ids = $this->createQueryBuilder('m')
+                ->select('m.id')
+                ->where('m.chatId IN (:chatIds)')
+                ->setParameter('chatIds', $chatBatch)
+                ->getQuery()
+                ->getSingleColumnResult();
 
-        return $qb->delete(Message::class, 'm')
-            ->where($qb->expr()->in('m.chatId', ':chatIds'))
-            ->setParameter('chatIds', $chatIds)
-            ->getQuery()
-            ->execute();
+            $messageIds = array_values(array_map(static fn (mixed $id): int => (int) $id, $ids));
+            foreach (array_chunk($messageIds, self::DELETE_ID_BATCH) as $idBatch) {
+                $this->getEntityManager()->createQueryBuilder()
+                    ->delete(MessageMeta::class, 'meta')
+                    ->where('meta.messageId IN (:ids)')
+                    ->setParameter('ids', $idBatch)
+                    ->getQuery()
+                    ->execute();
+            }
+
+            $qb = $this->getEntityManager()->createQueryBuilder();
+            $deleted += $qb->delete(Message::class, 'm')
+                ->where($qb->expr()->in('m.chatId', ':chatIds'))
+                ->setParameter('chatIds', $chatBatch)
+                ->getQuery()
+                ->execute();
+        }
+
+        return $deleted;
     }
 }

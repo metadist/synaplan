@@ -1,6 +1,15 @@
 <template>
   <MainLayout data-testid="view-people">
     <div class="container mx-auto px-6 py-8 max-w-7xl overflow-x-hidden">
+      <button
+        type="button"
+        class="text-xs txt-secondary hover:txt-primary transition-colors mb-3 inline-flex items-center gap-1.5"
+        data-testid="link-people-back-operate"
+        @click="router.push({ name: 'admin' })"
+      >
+        <Icon icon="heroicons:arrow-left" class="w-3.5 h-3.5" />
+        {{ $t('people.backToOperate') }}
+      </button>
       <PageHeader
         :title="$t('people.title')"
         :subtitle="$t('people.subtitle')"
@@ -27,6 +36,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
@@ -40,6 +51,7 @@ import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const router = useRouter()
 const activeTab = ref<'users' | 'groups' | 'policies' | 'linked-platforms' | 'audit'>('users')
 
 const tabNavItems = computed<TabNavItem[]>(() => {

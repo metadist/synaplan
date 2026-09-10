@@ -2017,8 +2017,10 @@
         "add": "Watch this page",
         "adding": "Saving…",
         "added": "Page saved. Check now to store the first copy.",
+        "alreadyWatching": "This page is already watched.",
         "addFailed": "Could not watch this page.",
         "invalidUrl": "Enter a web address starting with http:// or https://.",
+        "blockedUrl": "That address cannot be watched (private or blocked).",
         "loading": "Loading watched pages…",
         "loadFailed": "Could not load watched pages.",
         "empty": "No pages watched yet.",
@@ -2036,6 +2038,8 @@
         "deleteFailed": "Could not remove this watched page.",
         "neverFetched": "Not fetched yet",
         "lastFetched": "Last saved {when}",
+        "lastCheckFailed": "Last check failed: {reason}",
+        "lastDiff": "What changed",
         "untitled": "Untitled page"
       },
       "scheduleThis": "Run this again later",
@@ -5797,6 +5801,7 @@
       "audit": "Audit"
     },
     "openPeople": "Open People",
+    "backToOperate": "Back to Operate",
     "myGroups": {
       "subtitle": "Groups you belong to on this instance.",
       "emptyMember": "You are not in a group yet. An administrator can add you on the People page.",
