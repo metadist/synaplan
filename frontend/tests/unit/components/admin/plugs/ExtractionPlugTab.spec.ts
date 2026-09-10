@@ -6,6 +6,7 @@ import ExtractionPlugTab from '@/components/admin/plugs/ExtractionPlugTab.vue'
 const getExtractionStatus = vi.fn()
 const saveExtractionChains = vi.fn()
 const testExtraction = vi.fn()
+const notifyError = vi.fn()
 
 vi.mock('@/services/api/adminPlugsApi', () => ({
   getExtractionStatus: (...args: unknown[]) => getExtractionStatus(...args),
@@ -14,7 +15,7 @@ vi.mock('@/services/api/adminPlugsApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
+  useNotification: () => ({ error: notifyError, success: vi.fn() }),
 }))
 
 vi.mock('@/services/api/adminConfigApi', () => ({
@@ -25,6 +26,8 @@ describe('ExtractionPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     testExtraction.mockReset()
+    saveExtractionChains.mockReset()
+    notifyError.mockReset()
     getExtractionStatus.mockResolvedValue({
       adapters: [
         {
@@ -114,5 +117,31 @@ describe('ExtractionPlugTab', () => {
     expect(wrapper.get('[data-testid="extraction-test-summary"]').text()).not.toContain(
       'Docling unavailable'
     )
+  })
+
+  it('does not save when a family chain is empty', async () => {
+    const wrapper = mount(ExtractionPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        },
+      },
+    })
+    await flushPromises()
+
+    const removeDocumentAdapters = async () => {
+      const remove = wrapper.findAll('button').find((button) => button.text() === 'Remove')
+      expect(remove).toBeTruthy()
+      await remove!.trigger('click')
+    }
+    await removeDocumentAdapters()
+    await removeDocumentAdapters()
+
+    await wrapper.get('[data-testid="extraction-save-chains"]').trigger('click')
+    await flushPromises()
+
+    expect(saveExtractionChains).not.toHaveBeenCalled()
+    expect(notifyError).toHaveBeenCalled()
   })
 })

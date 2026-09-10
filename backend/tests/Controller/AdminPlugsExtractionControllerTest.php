@@ -54,6 +54,21 @@ final class AdminPlugsExtractionControllerTest extends WebTestCase
         self::assertContains('tika', $keys);
     }
 
+    public function testPutEmptyChainReturns422(): void
+    {
+        $this->loginAdmin();
+        $this->client->request(
+            'PUT',
+            '/api/v1/admin/plugs/extraction/chains',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['chains' => ['document' => []]], JSON_THROW_ON_ERROR),
+        );
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertStringContainsString('must not be empty', (string) ($body['error'] ?? ''));
+    }
+
     public function testPutUnknownAdapterReturns422(): void
     {
         $this->loginAdmin();

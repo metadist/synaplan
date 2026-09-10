@@ -2954,6 +2954,7 @@
       "save": "Enregistrer la chaîne",
       "saved": "Chaîne d’extraction enregistrée. Le prochain envoi l’utilise.",
       "saveFailed": "Impossible d’enregistrer la chaîne d’extraction",
+      "emptyChain": "Chaque type de fichier doit avoir au moins un adaptateur.",
       "loadFailed": "Impossible de charger les réglages d’extraction",
       "verdict": {
         "quality_ok": "accepté",
@@ -2965,7 +2966,8 @@
         "rejected": "joignable, fichier refusé",
         "unsupported": "ne prend pas en charge ce fichier",
         "unknown": "adaptateur inconnu",
-        "skipped": "ignoré"
+        "skipped": "ignoré",
+        "rewritten": "converti pour l’adaptateur suivant"
       }
     },
     "webSearch": {

@@ -121,7 +121,11 @@ final readonly class PlugConfigService
             default => self::DEFAULT_CHAIN_DOCUMENT,
         };
 
-        return $this->splitList($this->readGlobal($key, $default));
+        $keys = $this->splitList($this->readGlobal($key, $default));
+
+        // A previously accepted empty string must not disable extraction.
+        // New empty saves are rejected in setChain().
+        return [] !== $keys ? $keys : $this->splitList($default);
     }
 
     /**
@@ -212,6 +216,10 @@ final readonly class PlugConfigService
                 throw new \InvalidArgumentException('Unknown extractor key: '.$trimmed);
             }
             $normalized[] = $trimmed;
+        }
+
+        if ([] === $normalized) {
+            throw new \InvalidArgumentException('Extraction chain for '.$family.' must not be empty');
         }
 
         $this->configRepository->setValue(0, self::CONFIG_GROUP, $setting, implode(',', $normalized));

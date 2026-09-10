@@ -4,10 +4,12 @@ namespace App\Service\File;
 
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
+use App\Plug\Extraction\ContentExtractorInterface;
 use App\Plug\Extraction\ExtractionQualityGate;
 use App\Plug\Extraction\ExtractionRegistry;
 use App\Plug\Extraction\ExtractionRequest;
 use App\Plug\Extraction\ExtractionResult;
+use App\Plug\Extraction\ExtractorRejectedException;
 use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
@@ -164,9 +166,16 @@ final readonly class FileProcessor
 
         $this->logger->info('FileProcessor: Starting extraction', $meta);
 
-        $extra = $this->tryExtraExtractors($absolutePath, $relativePath, $mime, $ext, $userId, $describe);
-        if (null !== $extra) {
-            return $extra;
+        if (null !== $this->plugConfig) {
+            return $this->extractViaConfiguredChain(
+                $absolutePath,
+                $relativePath,
+                $mime,
+                $ext,
+                $userId,
+                $describe,
+                $meta,
+            );
         }
 
         $convertedTmp = $this->convertLegacyOffice($absolutePath, $ext);
@@ -194,96 +203,502 @@ final readonly class FileProcessor
     }
 
     /**
-     * Run extraction adapters whose keys are not FileProcessor built-ins.
-     * Empty in S1 (seeded chains only list built-in keys). S2 Docling lands here.
+     * Walk the configured family chain (built-ins and extras) in saved order.
+     * The first quality-ok result wins. Every step is recorded on meta.attempts.
      *
-     * @return array{0: string, 1: array<string, mixed>}|null
+     * @param array<string, mixed> $meta
+     *
+     * @return array{0: string, 1: array<string, mixed>}
      */
-    private function tryExtraExtractors(
+    private function extractViaConfiguredChain(
         string $absolutePath,
         string $relativePath,
         string $mime,
         string $ext,
         ?int $userId,
         bool $describe,
-    ): ?array {
-        if (null === $this->extractionRegistry || null === $this->plugConfig) {
-            return null;
+        array $meta,
+    ): array {
+        if (null === $this->plugConfig) {
+            throw new \LogicException('extractViaConfiguredChain requires PlugConfigService');
         }
 
         $family = $this->detectFamily($mime, $ext);
         $hasCloudStt = 'audio' === $family && $this->aiFacade->hasConfiguredSttProvider($userId);
+        $keys = $this->plugConfig->extractionChain($family, $hasCloudStt);
 
-        foreach ($this->plugConfig->extraExtractorKeys($family, $hasCloudStt) as $key) {
-            $adapter = $this->extractionRegistry->byKey($key);
-            if (null === $adapter) {
-                $this->logger->info('FileProcessor: skipping unknown extra extractor', [
+        $attempts = [];
+        $convertedTmp = null;
+        $workingPath = $absolutePath;
+        $workingExt = $ext;
+        $workingMime = $mime;
+        $workingMeta = $meta;
+
+        try {
+            foreach ($keys as $key) {
+                $started = hrtime(true);
+                $step = $this->runChainStep(
+                    $key,
+                    $workingPath,
+                    $relativePath,
+                    $workingMime,
+                    $workingExt,
+                    $userId,
+                    $describe,
+                    $workingMeta,
+                    $family,
+                );
+                $attempts[] = [
                     'key' => $key,
-                    'family' => $family,
-                ]);
-                continue;
-            }
+                    'verdict' => $step['verdict'],
+                    'ms' => (int) ((hrtime(true) - $started) / 1_000_000),
+                ];
 
-            $request = new ExtractionRequest(
-                $absolutePath,
-                $relativePath,
-                $mime,
-                $ext,
-                $userId,
-                $describe,
-                $family,
-            );
-            if (!$adapter->supports($request)) {
-                continue;
-            }
-
-            try {
-                $result = $adapter->extract($request);
-            } catch (\Throwable $e) {
-                $this->logger->info('FileProcessor: extra extractor failed, falling through', [
-                    'key' => $key,
-                    'error' => $e->getMessage(),
-                ]);
-                continue;
-            }
-
-            if (null !== $this->qualityGate) {
-                $verdict = $this->qualityGate->verdict($result, $request);
-                $result = $result->withMeta(array_merge($result->meta, ['gate' => $verdict->toArray()]));
-                if (!$verdict->passed) {
-                    $this->logger->info('FileProcessor: extra extractor lost quality gate', [
-                        'key' => $key,
-                        'reason' => $verdict->reason,
-                    ]);
+                if (isset($step['converted'])) {
+                    $convertedTmp = $step['converted']['path'];
+                    $workingPath = $step['converted']['path'];
+                    $workingExt = $step['converted']['ext'];
+                    $workingMime = $step['converted']['mime'];
+                    $workingMeta['mime'] = $workingMime;
+                    $workingMeta['ext'] = $workingExt;
+                    $workingMeta['converted_from'] = $ext;
                     continue;
+                }
+
+                if ($step['passed'] && isset($step['pair'])) {
+                    $pair = $step['pair'];
+                    $pair[1]['attempts'] = $attempts;
+                    $this->logger->info('FileProcessor: chain step succeeded', [
+                        'key' => $key,
+                        'strategy' => $pair[1]['strategy'] ?? $key,
+                        'family' => $family,
+                    ]);
+
+                    return $pair;
                 }
             }
 
-            if ($result->hasText()) {
-                $this->logger->info('FileProcessor: extra extractor succeeded', [
+            $this->logger->info('FileProcessor: configured chain exhausted', [
+                'family' => $family,
+                'keys' => $keys,
+            ]);
+
+            return ['', ['strategy' => 'chain_exhausted', 'attempts' => $attempts] + $workingMeta];
+        } finally {
+            if (null !== $convertedTmp && is_file($convertedTmp)) {
+                @unlink($convertedTmp);
+            }
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{
+     *     verdict: string,
+     *     passed: bool,
+     *     pair?: array{0: string, 1: array<string, mixed>},
+     *     converted?: array{path: string, ext: string, mime: string}
+     * }
+     */
+    private function runChainStep(
+        string $key,
+        string $absolutePath,
+        string $relativePath,
+        string $mime,
+        string $ext,
+        ?int $userId,
+        bool $describe,
+        array $meta,
+        string $family,
+    ): array {
+        $request = new ExtractionRequest(
+            $absolutePath,
+            $relativePath,
+            $mime,
+            $ext,
+            $userId,
+            $describe,
+            $family,
+        );
+
+        if (
+            null !== $this->extractionRegistry
+            && !\in_array($key, PlugConfigService::BUILTIN_EXTRACTOR_KEYS, true)
+        ) {
+            $adapter = $this->extractionRegistry->byKey($key);
+            if (null === $adapter) {
+                $this->logger->info('FileProcessor: skipping unknown chain key', [
                     'key' => $key,
-                    'strategy' => $result->strategy,
+                    'family' => $family,
                 ]);
 
-                return $result->toLegacyPair();
+                return ['verdict' => 'unknown', 'passed' => false];
             }
 
-            if (null !== $result->markdown && '' !== trim($result->markdown)) {
-                $this->logger->info('FileProcessor: extra extractor succeeded', [
-                    'key' => $key,
-                    'strategy' => $result->strategy,
-                ]);
+            return $this->runExtraAdapter($adapter, $request, $key);
+        }
 
-                return ExtractionResult::of(
+        return $this->runBuiltinStep($key, $request, $meta);
+    }
+
+    /**
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function runExtraAdapter(
+        ContentExtractorInterface $adapter,
+        ExtractionRequest $request,
+        string $key,
+    ): array {
+        if (!$adapter->supports($request)) {
+            $health = $adapter->health();
+
+            return [
+                'verdict' => $health->available ? 'unsupported' : 'unavailable',
+                'passed' => false,
+            ];
+        }
+
+        try {
+            $result = $adapter->extract($request);
+        } catch (ExtractorRejectedException $e) {
+            $this->logger->info('FileProcessor: extra extractor refused the file', [
+                'key' => $key,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['verdict' => 'rejected', 'passed' => false];
+        } catch (\Throwable $e) {
+            $this->logger->info('FileProcessor: extra extractor failed, falling through', [
+                'key' => $key,
+                'error' => $e->getMessage(),
+            ]);
+
+            return ['verdict' => 'unavailable', 'passed' => false];
+        }
+
+        return $this->gateResult($result, $request);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{
+     *     verdict: string,
+     *     passed: bool,
+     *     pair?: array{0: string, 1: array<string, mixed>},
+     *     converted?: array{path: string, ext: string, mime: string}
+     * }
+     */
+    private function runBuiltinStep(string $key, ExtractionRequest $request, array $meta): array
+    {
+        return match ($key) {
+            'native' => $this->stepNative($request, $meta),
+            'structured_office' => $this->stepStructuredOffice($request, $meta),
+            'office_convert' => $this->stepOfficeConvert($request),
+            'tika' => $this->stepTika($request, $meta),
+            'pdf_vision' => $this->stepPdfVision($request, $meta),
+            'vision' => $this->stepVision($request, $meta),
+            'stt_cloud' => $this->stepSttCloud($request, $meta),
+            'whisper_local' => $this->stepWhisperLocal($request, $meta),
+            'video_analysis' => $this->stepVideoAnalysis($request, $meta),
+            default => ['verdict' => 'unknown', 'passed' => false],
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepNative(ExtractionRequest $request, array $meta): array
+    {
+        if (!$this->isPlainTextMime($request->mime)) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        $text = $this->textCleaner->clean(@file_get_contents($request->absolutePath) ?: '');
+        $this->logger->info('FileProcessor: Native text extraction', [
+            'strategy' => 'native_text',
+            'bytes' => strlen($text),
+        ]);
+
+        return $this->gatePair([$text, ['strategy' => 'native_text'] + $meta], $request);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepStructuredOffice(ExtractionRequest $request, array $meta): array
+    {
+        $pair = $this->extractStructured($request->absolutePath, $request->ext, $meta);
+        if (null === $pair) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        return $this->gatePair($pair, $request);
+    }
+
+    /**
+     * @return array{
+     *     verdict: string,
+     *     passed: bool,
+     *     converted?: array{path: string, ext: string, mime: string}
+     * }
+     */
+    private function stepOfficeConvert(ExtractionRequest $request): array
+    {
+        if (!isset(self::LEGACY_OFFICE_TARGETS[$request->ext])) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        $converted = $this->convertLegacyOffice($request->absolutePath, $request->ext);
+        if (null === $converted) {
+            return ['verdict' => 'empty', 'passed' => false];
+        }
+
+        $newExt = strtolower(pathinfo($converted, PATHINFO_EXTENSION));
+        $newMime = $this->ensureOfficeMime(mime_content_type($converted) ?: $request->mime, $newExt);
+
+        return [
+            'verdict' => 'rewritten',
+            'passed' => false,
+            'converted' => [
+                'path' => $converted,
+                'ext' => $newExt,
+                'mime' => $newMime,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepTika(ExtractionRequest $request, array $meta): array
+    {
+        if (!$this->tikaClient->isEnabled()) {
+            return ['verdict' => 'unavailable', 'passed' => false];
+        }
+
+        [$tikaText, $tikaMeta] = $this->tikaClient->extractText($request->absolutePath, $request->mime);
+        if (\is_string($tikaText)) {
+            $tikaText = $this->textCleaner->clean($tikaText);
+            if (mb_strlen(trim($tikaText)) > 0) {
+                $tikaMeta = \is_array($tikaMeta) ? $tikaMeta : [];
+
+                return $this->gatePair([$tikaText, ['strategy' => 'tika'] + $meta + $tikaMeta], $request);
+            }
+        }
+
+        $viaPdf = $this->extractTikaViaOfficePdf($request->absolutePath, $request->ext, $meta);
+        if (null !== $viaPdf) {
+            return $this->gatePair($viaPdf, $request);
+        }
+
+        return $this->gatePair(['', ['strategy' => 'tika_failed'] + $meta], $request);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepPdfVision(ExtractionRequest $request, array $meta): array
+    {
+        if ($this->isPdfMime($request->mime) || 'pdf' === $request->ext) {
+            return $this->gatePair(
+                $this->extractFromPdfViaVision($request->absolutePath, $request->userId, $meta),
+                $request,
+            );
+        }
+
+        $convertible = isset(self::LEGACY_OFFICE_TARGETS[$request->ext])
+            || \in_array($request->ext, ['docx', 'xlsx', 'pptx'], true);
+        if (!$convertible || null === $this->officeConverter || !$this->officeConverter->isEnabled()) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        $pdf = $this->officeConverter->convert($request->absolutePath, 'pdf');
+        if (null === $pdf || !is_file($pdf)) {
+            return ['verdict' => 'empty', 'passed' => false];
+        }
+
+        try {
+            return $this->gatePair(
+                $this->extractFromPdfViaVision($pdf, $request->userId, $meta),
+                $request,
+            );
+        } finally {
+            @unlink($pdf);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepVision(ExtractionRequest $request, array $meta): array
+    {
+        if (!$this->isImageMime($request->mime)) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        return $this->gatePair(
+            $this->extractFromImage($request->relativePath, $request->userId, $meta, $request->describe),
+            $request,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepSttCloud(ExtractionRequest $request, array $meta): array
+    {
+        if ($this->isVideo($request->ext) || !$this->isTranscribableMedia($request->ext)) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        return $this->gatePair(
+            $this->extractFromAudioExternal($request->absolutePath, $meta, $request->userId),
+            $request,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepWhisperLocal(ExtractionRequest $request, array $meta): array
+    {
+        if ($this->isVideo($request->ext) || !$this->isTranscribableMedia($request->ext)) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        $pair = $this->transcribeLocally($request->absolutePath, $meta);
+        if (null === $pair) {
+            return ['verdict' => 'unavailable', 'passed' => false];
+        }
+
+        return $this->gatePair($pair, $request);
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function stepVideoAnalysis(ExtractionRequest $request, array $meta): array
+    {
+        if (!$this->isVideo($request->ext)) {
+            return ['verdict' => 'unsupported', 'passed' => false];
+        }
+
+        return $this->gatePair(
+            $this->extractFromVideo($request->relativePath, $request->absolutePath, $meta, $request->userId),
+            $request,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $meta
+     *
+     * @return array{0: string, 1: array<string, mixed>}|null
+     */
+    private function extractTikaViaOfficePdf(string $absolutePath, string $ext, array $meta): ?array
+    {
+        $convertible = isset(self::LEGACY_OFFICE_TARGETS[$ext])
+            || \in_array($ext, ['docx', 'xlsx', 'pptx'], true);
+        if (!$convertible || null === $this->officeConverter || !$this->officeConverter->isEnabled()) {
+            return null;
+        }
+
+        $pdf = $this->officeConverter->convert($absolutePath, 'pdf');
+        if (null === $pdf || !is_file($pdf)) {
+            return null;
+        }
+
+        try {
+            [$tikaText, $tikaMeta] = $this->tikaClient->extractText($pdf, 'application/pdf');
+            if (!\is_string($tikaText)) {
+                return null;
+            }
+            $tikaText = $this->textCleaner->clean($tikaText);
+            if (mb_strlen(trim($tikaText)) <= 0) {
+                return null;
+            }
+            $tikaMeta = \is_array($tikaMeta) ? $tikaMeta : [];
+
+            return [$tikaText, ['strategy' => 'tika_office_pdf'] + $meta + $tikaMeta];
+        } finally {
+            @unlink($pdf);
+        }
+    }
+
+    /**
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function gateResult(ExtractionResult $result, ExtractionRequest $request): array
+    {
+        if (null !== $this->qualityGate) {
+            $verdict = $this->qualityGate->verdict($result, $request);
+            $result = $result->withMeta(array_merge($result->meta, ['gate' => $verdict->toArray()]));
+            if (!$verdict->passed) {
+                return ['verdict' => $verdict->reason, 'passed' => false];
+            }
+            if ($result->hasText() || (null !== $result->markdown && '' !== trim($result->markdown))) {
+                $pair = $result->hasText()
+                    ? $result->toLegacyPair()
+                    : ExtractionResult::of(
+                        (string) $result->markdown,
+                        $result->strategy,
+                        $result->meta,
+                        $result->markdown,
+                    )->toLegacyPair();
+
+                return ['verdict' => $verdict->reason, 'passed' => true, 'pair' => $pair];
+            }
+
+            return ['verdict' => 'empty', 'passed' => false];
+        }
+
+        if ($result->hasText()) {
+            return ['verdict' => 'quality_ok', 'passed' => true, 'pair' => $result->toLegacyPair()];
+        }
+        if (null !== $result->markdown && '' !== trim($result->markdown)) {
+            return [
+                'verdict' => 'quality_ok',
+                'passed' => true,
+                'pair' => ExtractionResult::of(
                     $result->markdown,
                     $result->strategy,
                     $result->meta,
                     $result->markdown,
-                )->toLegacyPair();
-            }
+                )->toLegacyPair(),
+            ];
         }
 
-        return null;
+        return ['verdict' => 'empty', 'passed' => false];
+    }
+
+    /**
+     * @param array{0: string, 1: array<string, mixed>} $pair
+     *
+     * @return array{verdict: string, passed: bool, pair?: array{0: string, 1: array<string, mixed>}}
+     */
+    private function gatePair(array $pair, ExtractionRequest $request): array
+    {
+        $strategy = \is_string($pair[1]['strategy'] ?? null) ? $pair[1]['strategy'] : 'unknown';
+        $markdown = \is_string($pair[1]['markdown'] ?? null) ? $pair[1]['markdown'] : null;
+
+        return $this->gateResult(ExtractionResult::of($pair[0], $strategy, $pair[1], $markdown), $request);
     }
 
     private function detectFamily(string $mime, string $ext): string

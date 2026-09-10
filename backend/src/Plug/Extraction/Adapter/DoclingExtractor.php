@@ -12,7 +12,7 @@ use App\Plug\PlugDescriptor;
 use App\Plug\PlugHealth;
 
 /**
- * docling-serve adapter. Lands in FileProcessor via extraExtractorKeys().
+ * docling-serve adapter. Lands in FileProcessor via the configured family chain.
  *
  * @internal
  */

@@ -1252,6 +1252,7 @@
       "save": "Zinciri kaydet",
       "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
       "saveFailed": "Çıkarım zinciri kaydedilemedi",
+      "emptyChain": "Her dosya türü için en az bir bağdaştırıcı gerekir.",
       "loadFailed": "Çıkarım ayarları yüklenemedi",
       "verdict": {
         "quality_ok": "kabul edildi",
@@ -1263,7 +1264,8 @@
         "rejected": "ulaşıldı ancak dosya reddedildi",
         "unsupported": "bu dosyayı desteklemiyor",
         "unknown": "bilinmeyen bağdaştırıcı",
-        "skipped": "atlandı"
+        "skipped": "atlandı",
+        "rewritten": "sonraki bağdaştırıcı için dönüştürüldü"
       }
     },
     "webSearch": {

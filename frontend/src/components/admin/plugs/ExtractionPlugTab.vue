@@ -235,6 +235,10 @@ async function load() {
 }
 
 async function save() {
+  if (families.some((family) => (chains.value[family] ?? []).length === 0)) {
+    showError(t('aiInfra.extraction.emptyChain'))
+    return
+  }
   saving.value = true
   try {
     const status = await saveExtractionChains(chains.value)
