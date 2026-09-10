@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "97e7c3ac2e94f7f909f89f62d62fdb46",
+    "content-hash": "f35c8c72d79ee012529f255b66725253",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -3964,16 +3964,16 @@
         },
         {
             "name": "hoels/app-store-server-library-php",
-            "version": "2.2.0",
+            "version": "2.3.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/hoels/app-store-server-library-php.git",
-                "reference": "b2b04981a7e1234f194ae585f792d3add296b302"
+                "reference": "5aa5616d722199c313cb02bbd1714aec813221f2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/b2b04981a7e1234f194ae585f792d3add296b302",
-                "reference": "b2b04981a7e1234f194ae585f792d3add296b302",
+                "url": "https://api.github.com/repos/hoels/app-store-server-library-php/zipball/5aa5616d722199c313cb02bbd1714aec813221f2",
+                "reference": "5aa5616d722199c313cb02bbd1714aec813221f2",
                 "shasum": ""
             },
             "require": {
@@ -4009,9 +4009,9 @@
             "description": "The PHP server library for the App Store Server API and App Store Server Notifications.",
             "support": {
                 "issues": "https://github.com/hoels/app-store-server-library-php/issues",
-                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.2.0"
+                "source": "https://github.com/hoels/app-store-server-library-php/tree/2.3.0"
             },
-            "time": "2026-09-03T21:36:49+00:00"
+            "time": "2026-09-04T18:10:21+00:00"
         },
         {
             "name": "hoels/ocsp-php",
@@ -4966,16 +4966,16 @@
         },
         {
             "name": "nelmio/api-doc-bundle",
-            "version": "v5.12.0",
+            "version": "v5.12.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/nelmio/NelmioApiDocBundle.git",
-                "reference": "a8ddb642c9ce1b134bf5084714d8475f79d8d06a"
+                "reference": "8c31d27439f41e16f55e83af6dea29cf2d21d4bf"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/nelmio/NelmioApiDocBundle/zipball/a8ddb642c9ce1b134bf5084714d8475f79d8d06a",
-                "reference": "a8ddb642c9ce1b134bf5084714d8475f79d8d06a",
+                "url": "https://api.github.com/repos/nelmio/NelmioApiDocBundle/zipball/8c31d27439f41e16f55e83af6dea29cf2d21d4bf",
+                "reference": "8c31d27439f41e16f55e83af6dea29cf2d21d4bf",
                 "shasum": ""
             },
             "require": {
@@ -5076,7 +5076,7 @@
             ],
             "support": {
                 "issues": "https://github.com/nelmio/NelmioApiDocBundle/issues",
-                "source": "https://github.com/nelmio/NelmioApiDocBundle/tree/v5.12.0"
+                "source": "https://github.com/nelmio/NelmioApiDocBundle/tree/v5.12.1"
             },
             "funding": [
                 {
@@ -5084,7 +5084,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-03T13:29:16+00:00"
+            "time": "2026-09-07T10:57:11+00:00"
         },
         {
             "name": "nelmio/cors-bundle",
