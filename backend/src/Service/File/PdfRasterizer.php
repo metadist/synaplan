@@ -7,22 +7,60 @@ use Psr\Log\LoggerInterface;
 /**
  * PDF Rasterizer Service.
  *
- * Converts PDF pages to PNG images using Imagick or pdftoppm as fallback.
- * Used when Tika extraction fails or produces low-quality text.
+ * Converts PDF pages to PNG images. Imagick is used only when the PDF coder
+ * is actually permitted; the shipped ImageMagick policy sets
+ * `rights="none"` for PDF, so we skip that engine after a one-time probe
+ * and go straight to pdftoppm (issue #1794).
  */
 final class PdfRasterizer
 {
+    /**
+     * One-page 1×1 PDF used to probe whether Imagick may read the PDF coder.
+     * Kept tiny so the process-wide probe is cheap.
+     */
+    private const MINIMAL_PDF = <<<'PDF'
+%PDF-1.1
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/MediaBox[0 0 1 1]/Parent 2 0 R>>endobj
+trailer<</Root 1 0 R>>
+%%EOF
+PDF;
+
+    private static ?bool $cachedImagickPdfAllowed = null;
+
     private string $lastEngine = '';
     private int $lastDpi = 0;
     private int $lastPages = 0;
 
+    /**
+     * @param bool|null $imagickPdfAllowed When non-null, skip the process-wide
+     *                                     policy probe (tests). Null = detect.
+     */
     public function __construct(
         private LoggerInterface $logger,
         private string $uploadDir,
         private int $rasterizeDpi,
         private int $rasterizePageCap,
         private int $rasterizeTimeoutMs,
+        private ?bool $imagickPdfAllowed = null,
     ) {
+    }
+
+    /**
+     * Reset the process-wide Imagick-PDF probe. Tests only.
+     */
+    public static function resetImagickPdfProbeForTests(): void
+    {
+        self::$cachedImagickPdfAllowed = null;
+    }
+
+    /**
+     * Whether this process will attempt Imagick for PDF reads.
+     */
+    public function willAttemptImagick(): bool
+    {
+        return $this->imagickCanReadPdf();
     }
 
     /**
@@ -47,49 +85,12 @@ final class PdfRasterizer
         $basename = pathinfo($absolutePdfPath, PATHINFO_FILENAME);
         $images = [];
 
-        // Try Imagick first (faster and better quality)
-        if (class_exists('\\Imagick')) {
-            try {
-                $imagick = new \Imagick();
-                $imagick->setResolution($this->rasterizeDpi, $this->rasterizeDpi);
-                $imagick->readImage($absolutePdfPath);
-                $pages = min($cap, $imagick->getNumberImages());
-                $imagick->setIteratorIndex(0);
-
-                for ($i = 0; $i < $pages; ++$i) {
-                    $imagick->setIteratorIndex($i);
-                    $imagick->setImageFormat('png');
-                    $outputPath = $targetDir.'/'.$basename.'-'.($i + 1).'.png';
-
-                    if ($imagick->writeImage($outputPath)) {
-                        if (is_file($outputPath) && filesize($outputPath) > 0) {
-                            $images[] = $outputPath;
-                        } else {
-                            $this->logger->warning('Rasterizer Imagick: write failed', ['output' => $outputPath]);
-                        }
-                    }
-                }
-
-                $imagick->clear();
-                $imagick->destroy();
-
-                if (!empty($images)) {
-                    $this->lastEngine = 'imagick';
-                    $this->lastDpi = $this->rasterizeDpi;
-                    $this->lastPages = count($images);
-
-                    $this->logger->info('Rasterizer success with Imagick', [
-                        'engine' => 'imagick',
-                        'pages' => $this->lastPages,
-                        'dpi' => $this->lastDpi,
-                    ]);
-
-                    return $images;
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('Rasterizer Imagick failed, falling back to pdftoppm', [
-                    'error' => $e->getMessage(),
-                ]);
+        // Imagick only when the PDF coder is permitted. The shipped policy
+        // denies it; probing once avoids a warning on every scanned PDF.
+        if ($this->imagickCanReadPdf()) {
+            $images = $this->pdfToPngViaImagick($absolutePdfPath, $targetDir, $basename, $cap);
+            if (!empty($images)) {
+                return $images;
             }
         }
 
@@ -109,6 +110,109 @@ final class PdfRasterizer
         }
 
         return $images;
+    }
+
+    private function imagickCanReadPdf(): bool
+    {
+        if (null !== $this->imagickPdfAllowed) {
+            return $this->imagickPdfAllowed;
+        }
+
+        if (null !== self::$cachedImagickPdfAllowed) {
+            return self::$cachedImagickPdfAllowed;
+        }
+
+        self::$cachedImagickPdfAllowed = $this->probeImagickPdfPolicy();
+
+        return self::$cachedImagickPdfAllowed;
+    }
+
+    private function probeImagickPdfPolicy(): bool
+    {
+        if (!class_exists(\Imagick::class)) {
+            return false;
+        }
+
+        if (\is_callable([\Imagick::class, 'getPolicy'])) {
+            try {
+                $rights = strtolower(trim((string) \Imagick::getPolicy('coder', 'PDF')));
+                if ('none' === $rights) {
+                    $this->logger->info('Rasterizer: skipping Imagick for PDF (coder policy is none)');
+
+                    return false;
+                }
+            } catch (\Throwable) {
+                // Policy query unsupported or unset — fall through to a blob probe.
+            }
+        }
+
+        try {
+            $imagick = new \Imagick();
+            $imagick->setResolution(2, 2);
+            $imagick->readImageBlob(self::MINIMAL_PDF);
+            $imagick->clear();
+            $imagick->destroy();
+
+            return true;
+        } catch (\Throwable $e) {
+            $this->logger->info('Rasterizer: skipping Imagick for PDF', [
+                'reason' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function pdfToPngViaImagick(string $absolutePdfPath, string $targetDir, string $basename, int $pageCap): array
+    {
+        try {
+            $imagick = new \Imagick();
+            $imagick->setResolution($this->rasterizeDpi, $this->rasterizeDpi);
+            $imagick->readImage($absolutePdfPath);
+            $pages = min($pageCap, $imagick->getNumberImages());
+            $imagick->setIteratorIndex(0);
+
+            $images = [];
+            for ($i = 0; $i < $pages; ++$i) {
+                $imagick->setIteratorIndex($i);
+                $imagick->setImageFormat('png');
+                $outputPath = $targetDir.'/'.$basename.'-'.($i + 1).'.png';
+
+                if ($imagick->writeImage($outputPath)) {
+                    if (is_file($outputPath) && filesize($outputPath) > 0) {
+                        $images[] = $outputPath;
+                    } else {
+                        $this->logger->warning('Rasterizer Imagick: write failed', ['output' => $outputPath]);
+                    }
+                }
+            }
+
+            $imagick->clear();
+            $imagick->destroy();
+
+            if ([] !== $images) {
+                $this->lastEngine = 'imagick';
+                $this->lastDpi = $this->rasterizeDpi;
+                $this->lastPages = count($images);
+
+                $this->logger->info('Rasterizer success with Imagick', [
+                    'engine' => 'imagick',
+                    'pages' => $this->lastPages,
+                    'dpi' => $this->lastDpi,
+                ]);
+            }
+
+            return $images;
+        } catch (\Throwable $e) {
+            $this->logger->warning('Rasterizer Imagick failed, falling back to pdftoppm', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
     }
 
     /**
