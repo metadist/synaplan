@@ -34,18 +34,29 @@ class SyncModelPricesCommandTest extends TestCase
         $this->priceHistoryRepository = $this->createMock(ModelPriceHistoryRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
 
+        // An empty registry by default, so no test here depends on which LiteLLM
+        // errors the live ModelCatalog::LITELLM_DEVIATIONS happens to record.
+        $this->commandTester = $this->buildCommandTester([]);
+    }
+
+    /**
+     * @param array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}> $deviations
+     */
+    private function buildCommandTester(array $deviations): CommandTester
+    {
         $command = new SyncModelPricesCommand(
             $this->httpClient,
             $this->modelRepository,
             $this->priceHistoryRepository,
             $this->em,
             new NullLogger(),
+            $deviations,
         );
 
         $application = new Application();
         $application->addCommand($command);
 
-        $this->commandTester = new CommandTester($application->find('app:sync-model-prices'));
+        return new CommandTester($application->find('app:sync-model-prices'));
     }
 
     public function testSuccessWithNoModels(): void
@@ -623,6 +634,297 @@ class SyncModelPricesCommandTest extends TestCase
         $output = $this->commandTester->getDisplay();
         $this->assertStringContainsString('1 unchanged', $output);
         $this->assertStringNotContainsString('Non-per-token price drift', $output);
+    }
+
+    public function testTieredHeadlineIsNotComparedAgainstLiteLLMBaseRate(): void
+    {
+        // xAI Grok Imagine Video (#1772): the catalog sets the headline to the
+        // default render (720p = 0.07), LiteLLM's base rate is its cheapest tier
+        // (480p = 0.05), and the two tier tables agree exactly. Comparing headline
+        // against base flagged a correctly priced row every day. On a tiered row
+        // only the tiers — the table billing charges from — are compared.
+        $model = $this->createNonTokenModelMock(
+            'xAI',
+            'grok-imagine-video',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.07,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 317,
+            resolutionPrices: ['480p' => 0.05, '720p' => 0.07],
+        );
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-imagine-video' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.05,
+                'output_cost_per_second_480p' => 0.05,
+                'output_cost_per_second_720p' => 0.07,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('1 unchanged', $output);
+        $this->assertStringNotContainsString('Non-per-token price drift', $output);
+    }
+
+    public function testTieredRowStillDriftsWhenATierMoves(): void
+    {
+        // Skipping the headline must not blind the check: a repriced 720p tier on
+        // the same xAI row is still drift.
+        $model = $this->createNonTokenModelMock(
+            'xAI',
+            'grok-imagine-video',
+            priceIn: 0.0,
+            inUnit: '-',
+            priceOut: 0.07,
+            outUnit: 'persec',
+            mode: 'per_second',
+            id: 317,
+            resolutionPrices: ['480p' => 0.05, '720p' => 0.07],
+        );
+
+        $this->mockLiteLLMResponse([
+            'xai/grok-imagine-video' => [
+                'mode' => 'video_generation',
+                'output_cost_per_second' => 0.05,
+                'output_cost_per_second_720p' => 0.09,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('720p: 0.07000000 vs 0.09000000', $this->commandTester->getDisplay());
+    }
+
+    public function testRerankOutputRateFromLiteLLMIsIgnored(): void
+    {
+        // Jina (#1772): LiteLLM mirrors the input rate into output_cost_per_token
+        // on its rerank entry. A reranker returns scores, never billable output,
+        // so only the input side is compared; here it agrees → unchanged.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000005,
+                'output_cost_per_token' => 0.00000005,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('1 unchanged', $this->commandTester->getDisplay());
+    }
+
+    public function testRerankPerQueryPricingIsAStructuralMismatch(): void
+    {
+        // Cohere bills rerank per request (input_cost_per_query). Billing has no
+        // per-request mode, so the row can neither be compared nor written: it is
+        // a structural mismatch — visible, never drift, and no longer misfiled as
+        // "null-price protected" (LiteLLM's per-token rate is 0 by construction).
+        $model = $this->createModelMock('cohere', 'rerank-v3.5', 2.0, 0.0, id: 346);
+
+        $this->mockLiteLLMResponse([
+            'rerank-v3.5' => [
+                'mode' => 'rerank',
+                'input_cost_per_query' => 0.002,
+                'input_cost_per_token' => 0.0,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('litellm=per_request', $output);
+        $this->assertStringNotContainsString('Null-price protected', $output);
+    }
+
+    public function testKnownDeviationIsReportedButIsNotDrift(): void
+    {
+        // The catalog keeps Jina's official $0.05 while LiteLLM says 0.018. With
+        // the LiteLLM value pinned in the registry the row is a known deviation:
+        // listed for transparency, excluded from the drift exit code.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.000000018,
+                'output_cost_per_token' => 0.000000018,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->em->expects($this->never())->method('persist');
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $output = $tester->getDisplay();
+        $this->assertStringContainsString('Known LiteLLM deviations', $output);
+        $this->assertStringContainsString('https://api.jina.ai/v1/models', $output);
+        $this->assertStringNotContainsString('[DRY-RUN]', $output);
+        $this->assertStringNotContainsString('Price drift detected', $output);
+    }
+
+    public function testDeviationBecomesObsoleteWhenLiteLLMAgrees(): void
+    {
+        // Upstream fixed its value: LiteLLM now says exactly what the catalog says.
+        // The entry is dead weight — reported for deletion, not as drift.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000005,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $output = $tester->getDisplay();
+        $this->assertStringContainsString('Obsolete LiteLLM deviations', $output);
+        $this->assertStringContainsString('delete the LITELLM_DEVIATIONS entry', $output);
+        $this->assertStringNotContainsString('Known LiteLLM deviations', $output);
+    }
+
+    public function testDeviationDoesNotSilenceAThirdValue(): void
+    {
+        // LiteLLM moved off the pinned 0.018 to a value nobody has verified. The
+        // entry covers exactly the pair a human looked at — anything else is drift.
+        $model = $this->createModelMock('jina', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 345);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.00000003,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $tester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] jina-reranker-v2-base-multilingual', $tester->getDisplay());
+    }
+
+    public function testDeviationIsScopedToTheService(): void
+    {
+        // Same providerId at another service must not inherit the entry.
+        $model = $this->createModelMock('voyage', 'jina-reranker-v2-base-multilingual', 0.05, 0.0, id: 999);
+        $tester = $this->buildCommandTester($this->jinaDeviation());
+
+        $this->mockLiteLLMResponse([
+            'voyage/jina-reranker-v2-base-multilingual' => [
+                'mode' => 'rerank',
+                'input_cost_per_token' => 0.000000018,
+                'output_cost_per_token' => 0.0,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $tester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $tester->getStatusCode());
+    }
+
+    public function testLiteLLMSourceUrlIsPrintedNextToFlaggedModels(): void
+    {
+        // LiteLLM records where it read a price; the report hands that URL to the
+        // person verifying so this repo never keeps its own list of price pages.
+        $model = $this->createModelMock('openai', 'gpt-4o', 3.0, 15.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'input_cost_per_token' => 0.000005,
+                'output_cost_per_token' => 0.000020,
+                'mode' => 'chat',
+                'source' => 'https://openai.com/api/pricing/',
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true]);
+
+        $this->assertStringContainsString('| source: https://openai.com/api/pricing/', $this->commandTester->getDisplay());
+    }
+
+    /**
+     * @return array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
+     */
+    private function jinaDeviation(): array
+    {
+        return [
+            'jina:jina-reranker-v2-base-multilingual' => [
+                'litellm_in' => 0.018,
+                'litellm_out' => 0.0,
+                'source' => 'https://api.jina.ai/v1/models',
+                'verifiedOn' => '2026-09-10',
+                'reason' => 'LiteLLM lists the pre-increase rate.',
+            ],
+        ];
     }
 
     public function testModeMismatchImageIsReportedNotDrift(): void

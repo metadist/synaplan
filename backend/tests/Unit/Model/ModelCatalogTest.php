@@ -139,6 +139,99 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    public function testJinaRerankerCarriesJinasCurrentRate(): void
+    {
+        // $0.05/1M input tokens since Jina's May 2025 increase (api.jina.ai/v1/models,
+        // read 2026-09-10). The old $0.02 sat in the catalog for months because the
+        // drift check compared against LiteLLM, which lists yet another value.
+        $row = ModelCatalog::find('jina:jina-reranker-v2-base-multilingual:rerank')[0];
+
+        $this->assertSame(0.05, $row['priceIn']);
+        $this->assertSame('per1M', $row['inUnit']);
+        $this->assertSame(0, $row['priceOut']);
+        $this->assertSame('-', $row['outUnit']);
+    }
+
+    /**
+     * LITELLM_DEVIATIONS silences a verified LiteLLM error in the daily drift
+     * check. An entry is only meaningful while (a) the row it names exists and
+     * (b) the pinned LiteLLM value actually differs from the catalog — an entry
+     * that equals the catalog would silence nothing and hide a real drift later.
+     */
+    public function testLitellmDeviationsPointAtLiveRowsAndDifferFromTheCatalog(): void
+    {
+        $deviations = ModelCatalog::litellmDeviations();
+
+        foreach ($deviations as $key => $entry) {
+            [$service, $providerId] = explode(':', $key, 2);
+
+            $rows = array_values(array_filter(
+                ModelCatalog::all(),
+                static fn (array $row): bool => ModelCatalog::normalizeProvider($row['service']) === $service
+                    && $row['providerId'] === $providerId
+                    && 1 === $row['active'],
+            ));
+            $this->assertNotEmpty($rows, "LITELLM_DEVIATIONS[$key] names no active catalog row");
+            $this->assertSame($key, ModelCatalog::litellmDeviationKey($rows[0]['service'], $rows[0]['providerId']));
+
+            foreach (['litellm_in', 'litellm_out', 'source', 'verifiedOn', 'reason'] as $field) {
+                $this->assertArrayHasKey($field, $entry, "LITELLM_DEVIATIONS[$key] lacks '$field'");
+            }
+            $this->assertStringStartsWith('https://', $entry['source'], "LITELLM_DEVIATIONS[$key]: source must be a URL the next person can open");
+            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $entry['verifiedOn'], "LITELLM_DEVIATIONS[$key]: verifiedOn must be YYYY-MM-DD");
+            $this->assertNotSame('', trim($entry['reason']), "LITELLM_DEVIATIONS[$key]: reason must say what LiteLLM got wrong");
+
+            foreach ($rows as $row) {
+                $pricingMode = $row['json']['pricing_mode'] ?? 'per_token';
+                $this->assertArrayNotHasKey(
+                    'resolution_prices',
+                    $row['json'],
+                    "LITELLM_DEVIATIONS[$key]: tiered rows are compared per tier and cannot be pinned",
+                );
+
+                [$catalogIn, $catalogOut] = 'per_token' === $pricingMode
+                    ? [(float) $row['priceIn'], (float) $row['priceOut']]
+                    : [
+                        CostCalculationService::normaliseToPerUnit((float) $row['priceIn'], $row['inUnit']),
+                        CostCalculationService::normaliseToPerUnit((float) $row['priceOut'], $row['outUnit']),
+                    ];
+
+                $this->assertTrue(
+                    abs($catalogIn - $entry['litellm_in']) > 1e-9 || abs($catalogOut - $entry['litellm_out']) > 1e-9,
+                    "LITELLM_DEVIATIONS[$key] pins the catalog's own price — the entry silences nothing; delete it",
+                );
+            }
+        }
+    }
+
+    /**
+     * On a row with `resolution_prices` billing charges from the tier table and
+     * `priceOut` is only its fallback. The drift check therefore compares the
+     * tiers and skips the headline — which is safe only while the headline IS one
+     * of the tiers (LiteLLM's base = cheapest tier, ours = default render; both
+     * conventions are fine, an invented number is not).
+     */
+    public function testResolutionTieredRowsUseOneOfTheirOwnTiersAsHeadline(): void
+    {
+        $seen = 0;
+
+        foreach (ModelCatalog::all() as $row) {
+            $tiers = $row['json']['resolution_prices'] ?? null;
+            if (!is_array($tiers)) {
+                continue;
+            }
+            ++$seen;
+
+            $matches = array_filter($tiers, static fn ($price): bool => abs((float) $price - (float) $row['priceOut']) < 1e-9);
+            $this->assertNotEmpty(
+                $matches,
+                sprintf('BID %d: priceOut %s is none of its resolution_prices (%s)', $row['id'], $row['priceOut'], json_encode($tiers)),
+            );
+        }
+
+        $this->assertGreaterThan(0, $seen, 'expected at least one resolution-tiered row');
+    }
+
     public function testUpsertDoesNotOverwriteSelectableOnExistingRerankRow(): void
     {
         $model = null;

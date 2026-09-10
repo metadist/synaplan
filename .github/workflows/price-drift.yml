@@ -118,12 +118,16 @@ jobs:
           php bin/console app:sync-model-prices --dry-run --fail-on-drift 2>&1 | tee drift-report.txt
           code=${PIPESTATUS[0]}
 
-          # Just the models a human has to act on. The mode-mismatch and unmatched
-          # sections are steady state (they are reported every single run), so they
-          # stay out of both the Discord field and the change signature below.
+          # Just the models a human has to act on: drifted rows, plus obsolete
+          # LITELLM_DEVIATIONS entries (LiteLLM adopted the catalog value, so the
+          # registry entry must go — the run stays green, so this field is the
+          # only place anyone sees it). The mode-mismatch, unmatched and
+          # known-deviation sections are steady state (they are reported every
+          # single run), so they stay out of both the Discord field and the change
+          # signature below. Section titles come from SyncModelPricesCommand.
           awk '
-            /^Non-per-token price drift/ { section = 1; next }
-            /^Pricing-mode mismatch|^Unmatched|^Null-price protected/ { section = 0 }
+            /^Non-per-token price drift|^Obsolete LiteLLM deviations/ { section = 1; next }
+            /^Pricing-mode mismatch|^Unmatched|^Null-price protected|^Known LiteLLM deviations/ { section = 0 }
             section && /^ \* / { print }
             /\[DRY-RUN\]/ { print }
           ' drift-report.txt > drift-flagged.txt
@@ -207,11 +211,11 @@ jobs:
         run: |
           TITLE="Price drift detected — verify against official provider pages"
           {
-            echo "The daily price-drift check found models whose price differs from the LiteLLM database (a provider likely changed prices)."
+            echo "The daily price-drift check found models whose price differs from the LiteLLM database. A difference is a signal to verify, not a value to copy — LiteLLM has been wrong before (Veo 3.1 Fast, Jina rerank)."
             echo ""
-            echo "**What to do:** verify each flagged model against its official price page and update \`backend/src/Model/ModelCatalog.php\`, then ship a migration so existing installs get the corrected price. Follow the playbook in \`docs/PRICING_MAINTENANCE.md\`."
+            echo "**What to do:** for every model in the \`[DRY-RUN]\` lines and the \`Non-per-token price drift\` section, open the official provider price page (the \`source:\` URL on the line is LiteLLM's own reference) and decide which side is right. Provider changed the price → correct \`backend/src/Model/ModelCatalog.php\` and ship a fingerprint-preserving data migration. LiteLLM is wrong → record it in \`ModelCatalog::LITELLM_DEVIATIONS\` and file the fix upstream. The step-by-step procedure, including the STOP conditions, is \`docs/PRICE_DRIFT_PROCEDURE.md\` (background: \`docs/PRICING_MAINTENANCE.md\`)."
             echo ""
-            echo "_Per-token rows are the ones the sync could write itself. Media/audio rows (per_image / per_character / per_second, individual resolution tiers included) are compared and reported but never auto-written (#1318), so they always need a hand-authored catalog edit. Structural \`pricing_mode\` mismatches appear in the report below but never fail the check._"
+            echo "_Nothing is auto-written: the catalog is the source of truth. \`Known LiteLLM deviations\`, \`Pricing-mode mismatch\` and \`Unmatched\` are steady-state sections that never fail the check; an \`Obsolete LiteLLM deviations\` section means LiteLLM fixed a value and the registry entry can be deleted._"
             echo ""
             echo "<details><summary>Dry-run report ($(date -u +%Y-%m-%dT%H:%MZ))</summary>"
             echo ""
