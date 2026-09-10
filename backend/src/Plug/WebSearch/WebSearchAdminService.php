@@ -122,23 +122,34 @@ final readonly class WebSearchAdminService
     }
 
     /**
+     * Store a plug/provider key. Web-search adapters are probed once first:
+     * a rejected key is rolled back and never reported as configured.
+     * Rerank keys (jina/cohere/voyage) share this endpoint and are not probed.
+     *
      * @return array{configured: bool, source: 'db'|'env'|'none', origin: ?string, maskedKey: string}
      */
     public function saveKey(string $provider, string $key): array
     {
         $normalized = strtolower(trim($provider));
-        if ($this->plugKeys->supports($normalized)) {
-            $this->plugKeys->saveKey($normalized, $key);
+        $previous = $this->snapshotStoredKey($normalized);
+        $status = $this->persistIncomingKey($normalized, $key);
 
-            return $this->plugKeys->getStatus($normalized);
-        }
-        if ('perplexity' === $normalized) {
-            $this->providerKeys->saveKey('perplexity', $key);
-
-            return $this->providerKeys->getStatus('perplexity');
+        $adapter = $this->registry->byKey($normalized);
+        if (!$adapter instanceof WebSearchProviderInterface) {
+            return $status;
         }
 
-        throw new \InvalidArgumentException('Unknown plug key provider: '.$normalized);
+        $health = $adapter->probe();
+        if ($health->available) {
+            $this->adminHealth->remember($normalized, $health);
+
+            return $status;
+        }
+
+        $this->restoreStoredKey($normalized, $previous);
+        $reason = $health->reason ?? 'the provider rejected it';
+
+        throw new \InvalidArgumentException('API key was not stored: '.$reason);
     }
 
     /**
@@ -193,5 +204,74 @@ final readonly class WebSearchAdminService
         }
 
         return ['configured' => false, 'source' => 'none', 'origin' => null, 'maskedKey' => ''];
+    }
+
+    /**
+     * @return array{configured: bool, source: 'db'|'env'|'none', origin: ?string, maskedKey: string}
+     */
+    private function persistIncomingKey(string $provider, string $key): array
+    {
+        if ($this->plugKeys->supports($provider)) {
+            $this->plugKeys->saveKey($provider, $key);
+
+            return $this->plugKeys->getStatus($provider);
+        }
+        if ('perplexity' === $provider) {
+            $this->providerKeys->saveKey('perplexity', $key);
+
+            return $this->providerKeys->getStatus('perplexity');
+        }
+
+        throw new \InvalidArgumentException('Unknown plug key provider: '.$provider);
+    }
+
+    /**
+     * @return array{store: 'plug'|'provider', source: string, key: ?string}|null
+     */
+    private function snapshotStoredKey(string $provider): ?array
+    {
+        if ($this->plugKeys->supports($provider)) {
+            return [
+                'store' => 'plug',
+                'source' => $this->plugKeys->getStatus($provider)['source'],
+                'key' => $this->plugKeys->getKey($provider),
+            ];
+        }
+        if ('perplexity' === $provider) {
+            return [
+                'store' => 'provider',
+                'source' => $this->providerKeys->getStatus('perplexity')['source'],
+                'key' => $this->providerKeys->getKey('perplexity'),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array{store: 'plug'|'provider', source: string, key: ?string}|null $previous
+     */
+    private function restoreStoredKey(string $provider, ?array $previous): void
+    {
+        if (null === $previous) {
+            return;
+        }
+
+        $restorePrevious = 'db' === $previous['source'] && \is_string($previous['key']) && '' !== $previous['key'];
+        if ($restorePrevious) {
+            if ('plug' === $previous['store']) {
+                $this->plugKeys->saveKey($provider, $previous['key']);
+            } else {
+                $this->providerKeys->saveKey($provider, $previous['key']);
+            }
+
+            return;
+        }
+
+        if ('plug' === $previous['store']) {
+            $this->plugKeys->deleteKey($provider);
+        } else {
+            $this->providerKeys->deleteKey($provider);
+        }
     }
 }

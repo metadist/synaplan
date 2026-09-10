@@ -7,6 +7,11 @@ const getWebSearchStatus = vi.fn()
 const saveWebSearch = vi.fn()
 const testWebSearch = vi.fn()
 const savePlugKey = vi.fn()
+const { success, warning, showError } = vi.hoisted(() => ({
+  success: vi.fn(),
+  warning: vi.fn(),
+  showError: vi.fn(),
+}))
 
 vi.mock('@/services/api/adminPlugsApi', () => ({
   getWebSearchStatus: (...args: unknown[]) => getWebSearchStatus(...args),
@@ -16,7 +21,7 @@ vi.mock('@/services/api/adminPlugsApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
+  useNotification: () => ({ error: showError, success, warning }),
 }))
 
 const noneCapabilities = {
@@ -38,6 +43,9 @@ const keyStatus = {
 describe('WebSearchPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    success.mockClear()
+    warning.mockClear()
+    showError.mockClear()
     getWebSearchStatus.mockResolvedValue({
       providers: [
         {
@@ -110,5 +118,62 @@ describe('WebSearchPlugTab', () => {
     expect(testWebSearch).toHaveBeenCalledWith('brave', 'synaplan open source')
     expect(wrapper.get('[data-testid="web-search-test-results"]').text()).toContain('Synaplan')
     expect(wrapper.get('[data-testid="web-search-test-results"]').text()).toContain('Docs')
+  })
+
+  it('warns when the saved active provider cannot search', async () => {
+    saveWebSearch.mockResolvedValue({
+      providers: [
+        {
+          key: 'exa',
+          label: 'Exa',
+          docsUrl: '',
+          sovereignty: 'US cloud',
+          capabilities: noneCapabilities,
+          health: { available: false, reason: 'Exa API key is not configured' },
+          keyStatus,
+        },
+      ],
+      active: 'exa',
+      fallback: '',
+      userOverrideAllowed: false,
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="web-search-save"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('Chat web search will return nothing')
+    )
+    expect(success).not.toHaveBeenCalled()
+  })
+
+  it('keeps an unverified key out of the card when save is rejected', async () => {
+    savePlugKey.mockRejectedValue(new Error('API key was not stored: Exa search returned HTTP 401'))
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="web-search-key-tavily"]').setValue('not-a-real-key')
+    await wrapper.get('[data-testid="web-search-save-key-tavily"]').trigger('click')
+    await flushPromises()
+
+    expect(showError).toHaveBeenCalledWith('API key was not stored: Exa search returned HTTP 401')
+    expect(success).not.toHaveBeenCalled()
+    expect(
+      (wrapper.get('[data-testid="web-search-key-tavily"]').element as HTMLInputElement).value
+    ).toBe('not-a-real-key')
   })
 })

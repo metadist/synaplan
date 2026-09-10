@@ -244,7 +244,7 @@ final class AdminPlugsWebSearchController extends AbstractController
         )
     )]
     #[OA\Response(response: 403, description: 'Admin access required')]
-    #[OA\Response(response: 422, description: 'Unknown provider or invalid key')]
+    #[OA\Response(response: 422, description: 'Unknown provider, empty key, or the provider rejected the key')]
     public function saveKey(string $provider, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
