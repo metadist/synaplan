@@ -61,7 +61,7 @@ final readonly class ApprovalService
         $approval = $this->requireOwnedPending($id, $actor);
         $approval->markApproved((int) $actor->getId());
         $this->approvals->save($approval);
-        if ($alwaysAllow && null !== $assistantKey && '' !== $assistantKey) {
+        if ($alwaysAllow && $this->canAlwaysAllow($approval) && null !== $assistantKey && '' !== $assistantKey) {
             $this->toolsConfig->addAlwaysAllow((int) $actor->getId(), $assistantKey, $approval->getTool());
         }
         $this->auditLogWriter->record(
@@ -153,8 +153,17 @@ final readonly class ApprovalService
             'created' => $approval->getCreated(),
             'decidedAt' => $approval->getDecidedAt(),
             'requestedBy' => $reference->toArray(),
-            'canAlwaysAllow' => $approval->isPending() && 'write' === $approval->getSideEffect(),
+            'canAlwaysAllow' => $approval->isPending() && $this->canAlwaysAllow($approval),
         ];
+    }
+
+    /**
+     * "Always allow" only ever loosens approve → auto for write-class tools;
+     * destructive calls must be confirmed one by one ({@see ApprovalPolicy}).
+     */
+    private function canAlwaysAllow(Approval $approval): bool
+    {
+        return SideEffect::Write->value === $approval->getSideEffect();
     }
 
     private function hydrateReference(ApprovalReference $reference): ApprovalReference

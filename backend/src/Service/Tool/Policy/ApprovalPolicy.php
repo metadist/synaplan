@@ -6,12 +6,15 @@ namespace App\Service\Tool\Policy;
 
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
-use App\Service\Tool\ToolSource;
 use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 
 /**
- * Resolves auto / approve / block. Most restrictive wins (block > approve > auto).
- * `allow_unattended` can only turn approve into auto for write-class, never unblock.
+ * Resolves auto / approve / block. Most restrictive wins (block > approve > auto)
+ * across the instance default, group policy, assistant definition and the MCP
+ * hard block. Only afterwards may a resolved `approve` be loosened to `auto` —
+ * by `allow_unattended` on an unattended write-class step, or by the owner's
+ * "always allow" list for the assistant. Neither can unblock.
  */
 final readonly class ApprovalPolicy
 {
@@ -34,17 +37,23 @@ final readonly class ApprovalPolicy
         ?string $assistantKey = null,
     ): PolicyOutcome {
         $class = $tool->sideEffect;
-        $base = $this->baseOutcome($tool, $actorId, $class);
-        $group = $this->groupPolicy->outcomeFor($actorId, $tool, $class);
-        $agent = $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class);
-        $task = null;
-        if (PolicyContext::Unattended === $context && $allowUnattended && SideEffect::Write === $class) {
-            $task = PolicyOutcome::Auto;
+        $resolved = $this->mostRestrictive([
+            $this->baseOutcome($tool, $actorId, $class),
+            $this->groupPolicy->outcomeFor($actorId, $tool, $class),
+            $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class),
+            $this->hardBlock($tool, $class),
+        ]);
+        if (PolicyOutcome::Approve !== $resolved || SideEffect::Write !== $class) {
+            return $resolved;
         }
-        $hard = $this->hardBlock($tool, $class);
-        $user = $this->userOverride($actorId, $assistantKey, $tool);
+        if (PolicyContext::Unattended === $context && $allowUnattended) {
+            return PolicyOutcome::Auto;
+        }
+        if ($this->isAlwaysAllowed($actorId, $assistantKey, $tool)) {
+            return PolicyOutcome::Auto;
+        }
 
-        return $this->mostRestrictive([$base, $group, $agent, $task, $hard, $user]);
+        return $resolved;
     }
 
     public function canAlwaysAllow(PolicyOutcome $resolved): bool
@@ -74,17 +83,14 @@ final readonly class ApprovalPolicy
         return null;
     }
 
-    private function userOverride(int $actorId, ?string $assistantKey, ToolDescriptor $tool): ?PolicyOutcome
+    private function isAlwaysAllowed(int $actorId, ?string $assistantKey, ToolDescriptor $tool): bool
     {
         if (null === $assistantKey || '' === $assistantKey) {
-            return null;
+            return false;
         }
         $allowed = $this->toolsConfig->alwaysAllowTools($actorId, $assistantKey);
-        if (in_array($tool->name, $allowed, true) || in_array($tool->callName(), $allowed, true)) {
-            return PolicyOutcome::Auto;
-        }
 
-        return null;
+        return in_array($tool->name, $allowed, true) || in_array($tool->callName(), $allowed, true);
     }
 
     /**

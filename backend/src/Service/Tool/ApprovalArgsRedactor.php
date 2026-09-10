@@ -6,10 +6,18 @@ namespace App\Service\Tool;
 
 /**
  * Drops secrets from stored approval arguments and previews (C6).
+ *
+ * Keys that name a secret are dropped. Values are only masked when they LOOK
+ * like a credential (an HTTP auth scheme or a long opaque token) — a plain
+ * sentence that merely mentions "password" is legitimate user content.
  */
 final readonly class ApprovalArgsRedactor
 {
-    private const SENSITIVE_KEY = '/token|secret|password|authorization|credential/i';
+    public const MASK = '[redacted]';
+
+    private const SENSITIVE_KEY = '/token|secret|password|passwd|authorization|credential|api[_-]?key/i';
+    private const AUTH_SCHEME_VALUE = '/^\s*(bearer|basic|token|apikey)\s+\S+/i';
+    private const OPAQUE_TOKEN_VALUE = '/^[A-Za-z0-9_\-.=\/+]{32,}$/';
 
     /**
      * @param array<string, mixed> $args
@@ -20,7 +28,7 @@ final readonly class ApprovalArgsRedactor
     {
         $out = [];
         foreach ($args as $key => $value) {
-            $name = is_string($key) ? $key : (string) $key;
+            $name = (string) $key;
             if (1 === preg_match(self::SENSITIVE_KEY, $name)) {
                 continue;
             }
@@ -28,13 +36,16 @@ final readonly class ApprovalArgsRedactor
                 $out[$name] = $this->redact($value);
                 continue;
             }
-            if (is_string($value) && 1 === preg_match(self::SENSITIVE_KEY, $value)) {
-                continue;
-            }
-            $out[$name] = $value;
+            $out[$name] = is_string($value) && $this->looksLikeCredential($value) ? self::MASK : $value;
         }
 
         return $out;
+    }
+
+    private function looksLikeCredential(string $value): bool
+    {
+        return 1 === preg_match(self::AUTH_SCHEME_VALUE, $value)
+            || 1 === preg_match(self::OPAQUE_TOKEN_VALUE, $value);
     }
 
     /**

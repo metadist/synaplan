@@ -24,4 +24,19 @@ final class ApprovalArgsRedactorTest extends TestCase
         $this->assertStringContainsString('Create ticket', $preview);
         $this->assertStringNotContainsString('abc', $preview);
     }
+
+    public function testMasksCredentialLookingValuesButKeepsProse(): void
+    {
+        $redactor = new ApprovalArgsRedactor();
+        $redacted = $redactor->redact([
+            'header' => 'Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig',
+            'key' => 'sk_live_'.str_repeat('a', 40),
+            'body' => 'Please reset the password for user 42 and send the token by mail.',
+            'count' => 3,
+        ]);
+        $this->assertSame(ApprovalArgsRedactor::MASK, $redacted['header']);
+        $this->assertSame(ApprovalArgsRedactor::MASK, $redacted['key']);
+        $this->assertSame('Please reset the password for user 42 and send the token by mail.', $redacted['body']);
+        $this->assertSame(3, $redacted['count']);
+    }
 }

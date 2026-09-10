@@ -12,8 +12,8 @@ use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
-use App\Service\Tool\ToolSource;
 use App\Service\Tool\ToolsConfig;
+use App\Service\Tool\ToolSource;
 use PHPUnit\Framework\TestCase;
 
 final class ApprovalPolicyTest extends TestCase
@@ -86,6 +86,34 @@ final class ApprovalPolicyTest extends TestCase
         $policy = new ApprovalPolicy($config, new NullGroupPolicyProvider(), $this->assistant());
         $tool = new ToolDescriptor('blocked_tool', 'X', '', [], SideEffect::Destructive, ToolSource::Custom, 1);
         $this->assertSame(PolicyOutcome::Block, $policy->decide($tool, 1, PolicyContext::Interactive, null, false, 'assistant:1'));
+    }
+
+    public function testAlwaysAllowTurnsApproveIntoAutoForTheAssistantOnly(): void
+    {
+        $config = $this->createMock(ToolsConfig::class);
+        $config->method('defaultOutcome')->willReturn(PolicyOutcome::Approve);
+        $config->method('alwaysAllowTools')->willReturnCallback(
+            static fn (?int $userId, string $assistantKey): array => 'assistant:1' === $assistantKey ? ['web_search'] : [],
+        );
+        $policy = new ApprovalPolicy($config, new NullGroupPolicyProvider(), $this->assistant());
+        $write = $this->tool(SideEffect::Write);
+        $this->assertSame(PolicyOutcome::Auto, $policy->decide($write, 1, PolicyContext::Interactive, null, false, 'assistant:1'));
+        $this->assertSame(PolicyOutcome::Approve, $policy->decide($write, 1, PolicyContext::Interactive, null, false, 'assistant:2'));
+        $this->assertSame(PolicyOutcome::Approve, $policy->decide($write, 1, PolicyContext::Interactive));
+    }
+
+    public function testAllowUnattendedDoesNotLoosenGroupOrAssistantBlock(): void
+    {
+        $assistant = $this->createMock(AssistantPolicyProviderInterface::class);
+        $assistant->method('outcomeFor')->willReturn(PolicyOutcome::Block);
+        $config = $this->createMock(ToolsConfig::class);
+        $config->method('defaultOutcome')->willReturn(PolicyOutcome::Approve);
+        $config->method('alwaysAllowTools')->willReturn(['web_search']);
+        $policy = new ApprovalPolicy($config, new NullGroupPolicyProvider(), $assistant);
+        $this->assertSame(
+            PolicyOutcome::Block,
+            $policy->decide($this->tool(SideEffect::Write), 1, PolicyContext::Unattended, null, true, 'assistant:1'),
+        );
     }
 
     public function testCustomDestructiveBlocksByDefault(): void
