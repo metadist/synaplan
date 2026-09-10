@@ -40,4 +40,22 @@ final readonly class ApprovalRealtimeNotifier
             ],
         );
     }
+
+    /**
+     * Published once the approved call ran (status `executed`) or could not
+     * run (status `failed`). `summary` is a clipped, human-readable outcome.
+     */
+    public function executed(Approval $approval, ?string $summary): void
+    {
+        $this->publisher->publish(
+            new UserChannel($approval->getOwnerId()),
+            'approval.executed',
+            [
+                'approvalId' => $approval->getId(),
+                'status' => $approval->getStatus(),
+                'resultRef' => $approval->getResultRef(),
+                'summary' => $summary,
+            ],
+        );
+    }
 }

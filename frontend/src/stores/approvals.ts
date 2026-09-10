@@ -83,6 +83,8 @@ export const useApprovalsStore = defineStore('approvals', () => {
           onPublication: (envelope) => {
             if (envelope.type === 'approval.pending' || envelope.type === 'approval.decided') {
               void load('pending')
+            } else if (envelope.type === 'approval.executed' && decided.value.length > 0) {
+              void load('decided')
             }
           },
         })

@@ -383,6 +383,9 @@ final readonly class McpActionRunner implements TaskRunner
         if (null === $userId || null === $this->executionGate || null === $this->toolsConfig || !$this->toolsConfig->isApprovalsEnabled($userId)) {
             return null;
         }
+        if ($context->isApproved($node->id)) {
+            return null;
+        }
         $actor = $this->users?->find($userId);
         if (!$actor instanceof User) {
             return null;

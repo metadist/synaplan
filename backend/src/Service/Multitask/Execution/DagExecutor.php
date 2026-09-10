@@ -303,7 +303,7 @@ final readonly class DagExecutor
      * Continue a paused plan from an approved node, then the remaining pending
      * nodes. Policy is not consulted again — the approval is the decision.
      *
-     * @param array<string, mixed>                     $approvedArgs
+     * @param array<string, mixed>                      $approvedArgs
      * @param callable(array<string, mixed>): void|null $progressCallback
      *
      * @return array{
@@ -335,11 +335,10 @@ final readonly class DagExecutor
         }
 
         $context->clearResult($nodeId);
+        $context->markApproved($nodeId);
         $merged = $node->params;
         foreach ($approvedArgs as $key => $value) {
-            if (is_string($key)) {
-                $merged[$key] = $value;
-            }
+            $merged[$key] = $value;
         }
         $resumed = new TaskNode(
             $node->id,
