@@ -21,6 +21,7 @@ use App\Seed\MessagesGatewayConfigSeeder;
 use App\Seed\MobileConfigSeeder;
 use App\Seed\ModelRetirementSeeder;
 use App\Seed\ModelSeeder;
+use App\Seed\ModuleGateSeeder;
 use App\Seed\MultitaskConfigSeeder;
 use App\Seed\NativeToolRoutingConfigSeeder;
 use App\Seed\PlatformLinksConfigSeeder;
@@ -117,6 +118,7 @@ final class SeedAllCommand extends Command
         private readonly DocumentToolsConfigSeeder $documentToolsConfigSeeder,
         private readonly PlugsConfigSeeder $plugsConfigSeeder,
         private readonly ToolsConfigSeeder $toolsConfigSeeder,
+        private readonly ModuleGateSeeder $moduleGateSeeder,
     ) {
         parent::__construct();
     }
@@ -193,6 +195,7 @@ final class SeedAllCommand extends Command
             ['document-tools', fn (): SeedResult => $this->documentToolsConfigSeeder->seed()],
             ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
             ['tools', fn (): SeedResult => $this->toolsConfigSeeder->seed()],
+            ['module-gates', fn (): SeedResult => $this->moduleGateSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];
 
