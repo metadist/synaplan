@@ -1248,6 +1248,7 @@
       "winner": "Kazanan: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling kullanılamıyor — yerine Tika kullanıldı",
+      "doclingRejectedTika": "Docling’e erişildi ancak dosyayı reddetti — yerine Tika kullanıldı",
       "save": "Zinciri kaydet",
       "saved": "Çıkarım zinciri kaydedildi. Sonraki yükleme bunu kullanır.",
       "saveFailed": "Çıkarım zinciri kaydedilemedi",
@@ -1259,6 +1260,7 @@
         "empty": "boş",
         "low_quality": "çok az yararlı metin",
         "unavailable": "kullanılamıyor",
+        "rejected": "ulaşıldı ancak dosya reddedildi",
         "unsupported": "bu dosyayı desteklemiyor",
         "unknown": "bilinmeyen bağdaştırıcı",
         "skipped": "atlandı"
@@ -1323,7 +1325,9 @@
       "saveKey": "Anahtarı kaydet",
       "keySaved": "Anahtar kaydedildi. Sonraki yeniden sıralama bunu kullanabilir.",
       "save": "Yeniden sıralamayı kaydet",
-      "saved": "Yeniden sıralama ayarları kaydedildi. Sonraki sohbet bunları kullanır.",
+      "saved": "Yeniden sıralama ayarları kaydedildi. Sonraki belge araması bunları kullanır.",
+      "savedOff": "Yeniden sıralama ayarları kaydedildi. Belge araması orijinal vektör sırasını korur.",
+      "savedInactive": "Yeniden sıralama ayarları kaydedildi. Bir yeniden sıralama modeli veya sohbet modeli yedeği hazır olana kadar etkisiz kalır.",
       "saveFailed": "Yeniden sıralama ayarları kaydedilemedi",
       "loadFailed": "Yeniden sıralama ayarları yüklenemedi",
       "testTitle": "Örnek parçalarla test et",
@@ -3603,7 +3607,8 @@
         "file_analysis": "Dosya Analizi",
         "sorting": "Sınıflandırma",
         "search_query": "Arama Sorgusu",
-        "api_chat": "API Sohbeti"
+        "api_chat": "API Sohbeti",
+        "rerank": "Yeniden sıralama"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -3618,7 +3623,8 @@
         "openai_api": "API (OpenAI uyumlu)",
         "api_summary": "API oturum özeti",
         "mcp": "MCP",
-        "mcp_tool": "MCP Araçları"
+        "mcp_tool": "MCP Araçları",
+        "rag_rerank": "Belge yeniden sıralama"
       },
       "periods": {
         "today": "Bugün",

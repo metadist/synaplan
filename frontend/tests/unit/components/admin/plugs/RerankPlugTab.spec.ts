@@ -7,6 +7,9 @@ const getRerankStatus = vi.fn()
 const saveRerank = vi.fn()
 const testRerank = vi.fn()
 const savePlugKey = vi.fn()
+const success = vi.fn()
+const info = vi.fn()
+const warning = vi.fn()
 
 vi.mock('@/services/api/adminPlugsApi', () => ({
   getRerankStatus: (...args: unknown[]) => getRerankStatus(...args),
@@ -16,7 +19,7 @@ vi.mock('@/services/api/adminPlugsApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ error: vi.fn(), success: vi.fn() }),
+  useNotification: () => ({ error: vi.fn(), success, info, warning }),
 }))
 
 const keyStatus = {
@@ -26,30 +29,35 @@ const keyStatus = {
   maskedKey: '',
 }
 
+const inactiveStatus = {
+  enabled: false,
+  modelKey: null,
+  multiplier: 4,
+  budgetMs: 800,
+  llmFallback: false,
+  adapters: [
+    { key: 'http', label: 'HTTP rerank', health: { available: false, reason: 'no model' } },
+    { key: 'llm', label: 'Chat model', health: { available: false, reason: 'off' } },
+  ],
+  models: [
+    {
+      key: 'jina:jina-reranker-v2-base-multilingual:rerank',
+      label: 'Jina reranker',
+      available: false,
+      reason: 'no key',
+    },
+  ],
+  keys: { jina: keyStatus, cohere: keyStatus, voyage: keyStatus },
+  lastEval: null,
+}
+
 describe('RerankPlugTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    getRerankStatus.mockResolvedValue({
-      enabled: false,
-      modelKey: null,
-      multiplier: 4,
-      budgetMs: 800,
-      llmFallback: false,
-      adapters: [
-        { key: 'http', label: 'HTTP rerank', health: { available: false, reason: 'no model' } },
-        { key: 'llm', label: 'Chat model', health: { available: false, reason: 'off' } },
-      ],
-      models: [
-        {
-          key: 'jina:jina-reranker-v2-base-multilingual:rerank',
-          label: 'Jina reranker',
-          available: false,
-          reason: 'no key',
-        },
-      ],
-      keys: { jina: keyStatus, cohere: keyStatus, voyage: keyStatus },
-      lastEval: null,
-    })
+    success.mockReset()
+    info.mockReset()
+    warning.mockReset()
+    getRerankStatus.mockResolvedValue(inactiveStatus)
   })
 
   it('shows the lead sentence, health, keys and Test order results', async () => {
@@ -92,5 +100,90 @@ describe('RerankPlugTab', () => {
     )
     expect(wrapper.get('[data-testid="rerank-test-results"]').text()).toContain('#1')
     expect(wrapper.get('[data-testid="rerank-test-results"]').text()).toContain('0.91')
+  })
+
+  it('does not confirm an inactive save as in effect on the next chat', async () => {
+    saveRerank.mockResolvedValue(inactiveStatus)
+
+    const wrapper = mount(RerankPlugTab, {
+      global: { stubs: { Icon: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="rerank-save"]').trigger('click')
+    await flushPromises()
+
+    expect(info).toHaveBeenCalledWith(
+      'Reranking settings saved. Document search keeps the original vector order.'
+    )
+    expect(success).not.toHaveBeenCalled()
+    expect(warning).not.toHaveBeenCalled()
+  })
+
+  it('warns when settings are stored but no adapter is available', async () => {
+    saveRerank.mockResolvedValue({
+      ...inactiveStatus,
+      enabled: true,
+      modelKey: 'jina:jina-reranker-v2-base-multilingual:rerank',
+    })
+
+    const wrapper = mount(RerankPlugTab, {
+      global: { stubs: { Icon: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="rerank-enabled"]').setValue(true)
+    await wrapper.get('[data-testid="rerank-save"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalledWith(
+      'Reranking settings saved. They stay inactive until a rerank model or the chat-model fallback is available.'
+    )
+    expect(success).not.toHaveBeenCalled()
+  })
+
+  it('confirms activation only when an adapter is available', async () => {
+    saveRerank.mockResolvedValue({
+      ...inactiveStatus,
+      enabled: true,
+      modelKey: 'jina:jina-reranker-v2-base-multilingual:rerank',
+      adapters: [
+        { key: 'http', label: 'HTTP rerank', health: { available: true, reason: null } },
+        { key: 'llm', label: 'Chat model', health: { available: false, reason: 'off' } },
+      ],
+    })
+
+    const wrapper = mount(RerankPlugTab, {
+      global: { stubs: { Icon: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="rerank-save"]').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith(
+      'Reranking settings saved. The next document search uses them.'
+    )
+    expect(success.mock.calls[0][0]).not.toContain('chat')
+  })
+
+  it('does not treat a healthy LLM fallback as active when the bound HTTP adapter is down', async () => {
+    saveRerank.mockResolvedValue({
+      ...inactiveStatus,
+      enabled: true,
+      modelKey: 'jina:jina-reranker-v2-base-multilingual:rerank',
+      llmFallback: true,
+      adapters: [
+        { key: 'http', label: 'HTTP rerank', health: { available: false, reason: 'no key' } },
+        { key: 'llm', label: 'Chat model', health: { available: true, reason: null } },
+      ],
+    })
+
+    const wrapper = mount(RerankPlugTab, {
+      global: { stubs: { Icon: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-testid="rerank-save"]').trigger('click')
+    await flushPromises()
+
+    expect(warning).toHaveBeenCalled()
+    expect(success).not.toHaveBeenCalled()
   })
 })

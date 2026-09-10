@@ -143,6 +143,9 @@
           </div>
         </div>
 
+        <!-- Users stay on this page while IAM groups are off (U5 / sprint 1). -->
+        <UsersTab v-if="activeTab === 'users'" />
+
         <!-- Prompts Tab -->
         <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
           <div v-if="promptsLoading" class="text-center py-12">
@@ -477,10 +480,12 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
+import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
 import {
@@ -502,6 +507,7 @@ const AdminSystemInfoPanel = defineAsyncComponent(
 const NativeServerControl = defineAsyncComponent(
   () => import('@/components/NativeServerControl.vue')
 )
+const UsersTab = defineAsyncComponent(() => import('@/components/people/UsersTab.vue'))
 
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
@@ -511,6 +517,8 @@ import { isNativeApp } from '@/services/api/nativeRuntime'
 const { t } = useI18n()
 const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
+const route = useRoute()
+const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
 
 type TabId =
   'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
@@ -545,13 +553,13 @@ const tabNavItems = computed<TabNavItem[]>(() =>
     label: tab.label,
     icon: tab.icon,
     testid: `tab-${tab.id}`,
-    ...(tab.id === 'users' ? { to: '/admin/people' } : {}),
+    ...(tab.id === 'users' && iamGroupsEnabled.value ? { to: '/admin/people' } : {}),
   }))
 )
 
 function onTabNavChange(id: string) {
-  // Users is a navigation link to People, not a panel on this page.
-  if (id === 'users') {
+  // With IAM groups on, Users is a link to People, not a panel here.
+  if (id === 'users' && iamGroupsEnabled.value) {
     return
   }
   activeTab.value = id as TabId
@@ -733,6 +741,16 @@ function formatDate(dateStr: string): string {
 }
 
 // Initialize
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (!iamGroupsEnabled.value && tab === 'users') {
+      activeTab.value = 'users'
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   loadOverview()
   loadRegistrationAnalytics()

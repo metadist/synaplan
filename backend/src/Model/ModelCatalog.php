@@ -4468,6 +4468,9 @@ class ModelCatalog
                 'description' => 'Cohere rerank v2 API. Seeded unselectable; enable after adding a Cohere key on the Reranking tab.',
                 'params' => ['model' => 'rerank-v3.5'],
                 'features' => ['rerank'],
+                // $2.00 per 1,000 searches. Without this mode the token path
+                // would treat per1K as $0.002/token (~1000× the real price).
+                'pricing_mode' => 'per_request',
             ],
         ],
         [

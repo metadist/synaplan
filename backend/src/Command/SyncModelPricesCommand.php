@@ -230,7 +230,7 @@ class SyncModelPricesCommand extends Command
             }
 
             // Case 2 — same non-per-token mode on both sides (per_second, per_image,
-            // per_character). The prices ARE comparable once normalised to a single
+            // per_character, per_request). The prices ARE comparable once normalised to a single
             // unit, so we DETECT drift here (this is what makes whisper/tts/veo/imagen
             // checkable at all, #1318). Resolution-tiered rows are compared tier by
             // tier, because a provider can reprice 1080p or 4K while the headline
@@ -704,8 +704,9 @@ class SyncModelPricesCommand extends Command
         // output side — LiteLLM nevertheless mirrors the input rate into
         // `output_cost_per_token` on some entries (Jina), which compared against
         // the catalog's unbilled output read as drift. Cohere bills per request
-        // (`input_cost_per_query`); billing has no such mode, so that is reported
-        // as a structural mismatch rather than squeezed into per-token.
+        // (`input_cost_per_query`); that is the same `per_request` mode the
+        // catalog authors on BID 346, so the row is compared (never auto-written)
+        // instead of flagged as a structural mismatch.
         if ('rerank' === $mode) {
             $perQuery = (float) ($litellmModel['input_cost_per_query'] ?? 0.0);
 

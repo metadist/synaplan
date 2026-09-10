@@ -92,4 +92,42 @@ test.describe('@ci Admin panel', () => {
       })
     })
   })
+
+  test('People route follows the IAM groups flag', async ({ page, request }) => {
+    const adminCookie = await loginViaApi(request, CREDENTIALS.getAdminCredentials())
+    const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`, {
+      headers: { Cookie: adminCookie },
+    })
+    expect(runtimeRes.ok()).toBeTruthy()
+    const runtime = (await runtimeRes.json()) as { features?: { iamGroups?: boolean } }
+    const iamGroups = runtime.features?.iamGroups === true
+
+    await page.goto('/admin/people')
+    if (iamGroups) {
+      await expect(page.locator(selectors.pages.people)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator('[data-testid="tab-groups"]')).toBeVisible()
+      await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
+    } else {
+      await expect(page.locator('[data-testid="page-not-found"]')).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
+    }
+
+    await page.goto('/admin?tab=users')
+    if (iamGroups) {
+      await expect(page.locator(selectors.pages.people)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
+    } else {
+      await expect(page.locator(selectors.pages.admin)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
+      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
+    }
+  })
 })

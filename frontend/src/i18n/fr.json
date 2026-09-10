@@ -2555,7 +2555,8 @@
         "sorting": "Classification",
         "search_query": "Requête de recherche",
         "embeddings": "Embeddings",
-        "api_chat": "Chat API"
+        "api_chat": "Chat API",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -2570,7 +2571,8 @@
         "openai_api": "API (compatible OpenAI)",
         "api_summary": "Résumé de session API",
         "mcp": "MCP",
-        "mcp_tool": "Outils MCP"
+        "mcp_tool": "Outils MCP",
+        "rag_rerank": "Rerank de documents"
       },
       "periods": {
         "today": "Aujourd’hui",
@@ -2948,6 +2950,7 @@
       "winner": "Gagnant : {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling indisponible — Tika a été utilisé",
+      "doclingRejectedTika": "Docling a répondu mais a refusé le fichier — Tika a été utilisé",
       "save": "Enregistrer la chaîne",
       "saved": "Chaîne d’extraction enregistrée. Le prochain envoi l’utilise.",
       "saveFailed": "Impossible d’enregistrer la chaîne d’extraction",
@@ -2959,6 +2962,7 @@
         "empty": "vide",
         "low_quality": "trop peu de texte utile",
         "unavailable": "indisponible",
+        "rejected": "joignable, fichier refusé",
         "unsupported": "ne prend pas en charge ce fichier",
         "unknown": "adaptateur inconnu",
         "skipped": "ignoré"
@@ -3023,7 +3027,9 @@
       "saveKey": "Enregistrer la clé",
       "keySaved": "Clé enregistrée. Le prochain réordonnancement peut l’utiliser.",
       "save": "Enregistrer le réordonnancement",
-      "saved": "Réordonnancement enregistré. Le prochain chat l’utilise.",
+      "saved": "Réordonnancement enregistré. La prochaine recherche de documents l’utilise.",
+      "savedOff": "Réordonnancement enregistré. La recherche de documents conserve l’ordre vectoriel d’origine.",
+      "savedInactive": "Réordonnancement enregistré. Il reste inactif tant qu’un modèle de réordonnancement ou le recours au modèle de chat n’est pas disponible.",
       "saveFailed": "Les paramètres de réordonnancement n’ont pas pu être enregistrés",
       "loadFailed": "Impossible de charger les paramètres de réordonnancement",
       "testTitle": "Tester avec des extraits d’exemple",

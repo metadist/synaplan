@@ -2557,7 +2557,8 @@
         "sorting": "Classification",
         "search_query": "Search Query",
         "embeddings": "Embeddings",
-        "api_chat": "API Chat"
+        "api_chat": "API Chat",
+        "rerank": "Rerank"
       },
       "sources": {
         "whatsapp": "WhatsApp",
@@ -2572,7 +2573,8 @@
         "openai_api": "API (OpenAI-compatible)",
         "api_summary": "API Session Summary",
         "mcp": "MCP",
-        "mcp_tool": "MCP Tools"
+        "mcp_tool": "MCP Tools",
+        "rag_rerank": "Document rerank"
       },
       "periods": {
         "today": "Today",
@@ -2948,6 +2950,7 @@
       "winner": "Winner: {winner}",
       "attemptMs": "{ms} ms",
       "doclingUnavailableTika": "Docling unavailable — Tika used instead",
+      "doclingRejectedTika": "Docling reached but refused the file — Tika used instead",
       "save": "Save chain",
       "saved": "Extraction chain saved. The next upload uses it.",
       "saveFailed": "The extraction chain could not be saved",
@@ -2959,6 +2962,7 @@
         "empty": "empty",
         "low_quality": "too little useful text",
         "unavailable": "unavailable",
+        "rejected": "reached but refused the file",
         "unsupported": "does not support this file",
         "unknown": "unknown adapter",
         "skipped": "skipped"
@@ -3023,7 +3027,9 @@
       "saveKey": "Save key",
       "keySaved": "Key saved. The next rerank can use it.",
       "save": "Save reranking",
-      "saved": "Reranking settings saved. The next chat uses them.",
+      "saved": "Reranking settings saved. The next document search uses them.",
+      "savedOff": "Reranking settings saved. Document search keeps the original vector order.",
+      "savedInactive": "Reranking settings saved. They stay inactive until a rerank model or the chat-model fallback is available.",
       "saveFailed": "Reranking settings could not be saved",
       "loadFailed": "Could not load reranking settings",
       "testTitle": "Test with sample snippets",
