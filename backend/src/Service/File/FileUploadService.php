@@ -285,11 +285,10 @@ final readonly class FileUploadService
         }
 
         // Archives such as .jar may be stored and attached to a chat, but
-        // Tika would unzip them. Never extract or vectorize.
+        // Tika would unzip them. Never extract or vectorize. Mark extracted
+        // so the file picker's post-upload poll treats the upload as finished.
         if (FileStorageService::skipsExtraction($fileExtension)) {
-            $result['extraction_skipped'] = true;
-
-            return $result;
+            return array_merge($result, $this->completeStoreOnly($file));
         }
 
         $result = $this->extractText($file, $storageResult['path'], $fileExtension, $user, $processLevel, $result);
@@ -334,6 +333,27 @@ final readonly class FileUploadService
         ]);
 
         return $result;
+    }
+
+    /**
+     * Store-only types never get text or vectors. Persist a terminal status so
+     * FileSelectionModal's poll (vectorized / processed / extracted / error)
+     * can stop instead of spinning on `uploaded`.
+     *
+     * @return array{success: true, status: 'extracted', extraction_skipped: true}
+     */
+    private function completeStoreOnly(File $file): array
+    {
+        if ('extracted' !== $file->getStatus()) {
+            $file->setStatus('extracted');
+            $this->em->flush();
+        }
+
+        return [
+            'success' => true,
+            'status' => 'extracted',
+            'extraction_skipped' => true,
+        ];
     }
 
     private function createFileEntity(
@@ -559,21 +579,17 @@ final readonly class FileUploadService
             return ['success' => false, 'status' => 'error', 'error' => 'File is in error state'];
         }
 
+        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
+        if (FileStorageService::skipsExtraction($fileExtension)) {
+            return $this->completeStoreOnly($file);
+        }
+
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
         if (!$rateLimitCheck['allowed']) {
             return [
                 'success' => false,
                 'status' => $file->getStatus(),
                 'error' => "Rate limit exceeded for FILE_ANALYSIS. Used: {$rateLimitCheck['used']}/{$rateLimitCheck['limit']}",
-            ];
-        }
-
-        $fileExtension = strtolower($file->getFileType() ?: (string) pathinfo($file->getFilePath(), PATHINFO_EXTENSION));
-        if (FileStorageService::skipsExtraction($fileExtension)) {
-            return [
-                'success' => true,
-                'status' => $file->getStatus(),
-                'extraction_skipped' => true,
             ];
         }
 
