@@ -1043,6 +1043,35 @@
     opacity: 1;
   }
 
+  /* Icon contrast: an always-visible white icon button for actions that must
+     be found on a tile (folder share). White in both themes on purpose — the
+     hairline ring and shadow lift it off a light card, the white face off a
+     dark one. Hover/focus swap to the brand fill, like .btn-primary. */
+  .icon-contrast {
+    color: #1f2937;
+    background: #fff;
+    border-radius: 0.5rem;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.08),
+      0 1px 3px rgba(0, 0, 0, 0.18);
+    transition:
+      background 0.15s,
+      color 0.15s,
+      box-shadow 0.15s;
+  }
+  .icon-contrast:hover,
+  .icon-contrast:focus-visible {
+    background: var(--brand);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    outline: none;
+  }
+  .dark .icon-contrast {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+
   /* Icon ghost danger variant */
   .icon-ghost--danger {
     color: #dc2626;
