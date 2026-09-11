@@ -421,7 +421,7 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
   Revoking the share closes them again on the next request.
 - The public link token of a conversation is only returned to its owner; a
   group share never exposes it.
-- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) puts people into groups from the
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `1`) puts people into groups from the
   company login (OIDC groups claim) at sign-in. Role mapping is unchanged.
   Directory groups show **From your login** on People; you can still add extra
   people by hand. Login-managed memberships update at the next sign-in.
