@@ -1,11 +1,15 @@
 # Synaplan Desktop (agent client)
 
 > **Status.** The server half (pairing, scoped keys, job queue, check-in
-> contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (off by default).
-> The desktop client is an **unsigned 1.0 preview** you build from
-> [synaplan-desktop](https://github.com/metadist/synaplan-desktop). Signed
-> public download is deferred until notarization. The job contract stays
-> frozen at `protocol: 1`.
+> contract) ships in this app behind `DESKTOP_AGENT.ENABLED` (on by default
+> since the Features tab landed; see [Feature flags](FEATURE_FLAGS.md)). The
+> desktop client for **macOS, Windows and Linux** is a **public beta** in
+> [synaplan-desktop](https://github.com/metadist/synaplan-desktop): build it
+> from source or take a beta build from that repository's
+> [Releases](https://github.com/metadist/synaplan-desktop/releases) page once
+> one is published. Signed, notarized installers come later. The job contract
+> stays frozen at `protocol: 1`. The web app links to the repository from
+> **Channels → Desktop**.
 
 ## What it is
 
@@ -38,21 +42,25 @@ check-in  →  { jobs, next_call_at }  →  run the skill locally  →  report  
 
 Everything desktop-related is gated on the `BCONFIG` flag
 `DESKTOP_AGENT.ENABLED` (group `DESKTOP_AGENT`, setting `ENABLED`), resolved
-per-user → global → **false**:
+environment pin → per-user → global → code fallback **false**:
 
 | State | Effect |
 | ----- | ------ |
-| Off (default) | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. The feature is completely invisible. |
-| On (global) | The routes and MCP tools appear for every user. |
+| Off | Every `/api/v1/desktop/*` route answers **404**, the two MCP tools are **absent** from `tools/list`, the reaper command is a no-op, and no Desktop UI appears. The feature is completely invisible. |
+| On (global, default) | The routes and MCP tools appear for every user. |
 | On (per-user, `BOWNERID = <id>`) | Only that user sees the feature; a per-user value beats the global one. |
 
-The seeder inserts the flag as `0` if missing and never overwrites an existing
-value (`App\Seed\DesktopAgentConfigSeeder`). To turn it on for one user in dev:
+The seeder inserts the global flag as `1` if missing and never overwrites an
+existing value (`App\Seed\DesktopAgentConfigSeeder`); a migration turns the row
+on for installs that predate the default. Operators switch it under **Operate →
+System configuration → Features → Platforms & desktop**
+(`FEATURE_DESKTOP_AGENT_ENABLED`), or pin it for an automated deployment with
+`FEATURE_DESKTOP_AGENT_ENABLED=false`. To turn it off for everyone by SQL:
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-VALUES (0, 'DESKTOP_AGENT', 'ENABLED', '1')
-ON DUPLICATE KEY UPDATE BVALUE = '1';
+VALUES (0, 'DESKTOP_AGENT', 'ENABLED', '0')
+ON DUPLICATE KEY UPDATE BVALUE = '0';
 ```
 
 The runtime-config endpoint exposes the resolved boolean as
@@ -132,7 +140,7 @@ never logged at info level.
 
 Flow:
 
-1. User opens **Channels → Desktop** in the web app and clicks *Pair a
+1. User opens **Channels → Desktop** in the web app and clicks *Pair this
    computer* → server mints a code. The address shown is the API origin
    (`http://localhost:8000` in local Vite — or the same host on `:8000` when
    the UI is opened via a LAN IP — not `:5173` or Keycloak `:8080`).

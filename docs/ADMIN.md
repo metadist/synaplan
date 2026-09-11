@@ -371,10 +371,13 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 ## People and groups
 
 Groups, the People page under Operate, and the group API are gated by
-`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The seeder inserts the
-flag as `0`. Existing installs stay unchanged until an operator turns it on
-in **Operate → System configuration → Access → Sharing**
-(`/admin/config?tab=sharing`).
+`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The flag is **on by
+default** (seeded `1`; a migration turns it on for existing installs). Operators
+switch it in **Operate → System configuration → Features → People & sharing**
+(`/admin/config?tab=features`, field `FEATURE_IAM_GROUPS_ENABLED`) or pin it
+for automated deployments with the environment variable
+`FEATURE_IAM_GROUPS_ENABLED=false`. See [Feature flags](FEATURE_FLAGS.md) for
+the full list.
 
 When the flag is off:
 
@@ -396,8 +399,9 @@ When the flag is on:
 
 ## Sharing
 
-Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
-`1`. When they are on:
+Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
+(both are on by default; **Features → People & sharing** or
+`FEATURE_IAM_SHARING_ENABLED`). When they are on:
 
 - An owner can share a knowledge folder, a conversation, an **AI assistant**,
   a **saved task**, or a **chat widget** with a person, a group, or everyone
@@ -424,8 +428,10 @@ Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
 
 ### Directory groups
 
-Turn **Directory groups** on under **Operate → System configuration → Access →
-Sharing** (`IAM_DIRECTORY_SYNC_ENABLED`). Optional settings:
+**Directory groups** is on by default; switch it under **Operate → System
+configuration → Features → People & sharing**
+(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings stay under
+**Access → Sharing**. Optional settings:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -452,10 +458,10 @@ to hide that action.
 
 ### Group policies and locked defaults
 
-Turn **Group policies** on under **Operate → System configuration → Access →
-Sharing** (`IAM_GROUP_POLICIES_ENABLED`). People & groups must already be on.
-The seeder inserts the flag as `0`. Off means every resolver still reads only
-`[user, global]` and never touches `BGROUPCONFIG`.
+**Group policies** is switched under **Operate → System configuration →
+Features → People & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). People &
+groups must also be on. The seeder inserts the flag as `1`. Off means every
+resolver reads only `[user, global]` and never touches `BGROUPCONFIG`.
 
 When the flag is on, People shows a **Policies** tab. Pick one group at a
 time and set:
@@ -478,10 +484,11 @@ row.
 
 Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
 
-Enable the People, sharing, and (optionally) policy switches under
-**Operate → System configuration → Access → Sharing**. The page reloads the
-runtime config so People, Share, and Policies appear without a restart.
-SQL remains available for automation:
+The People, sharing, and policy switches live under
+**Operate → System configuration → Features → People & sharing**. The page
+reloads the runtime config so People, Share, and Policies appear without a
+restart. For automated deployments pin a flag with its `FEATURE_*` environment
+variable (the toggle then shows as locked); SQL remains available too:
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
@@ -535,9 +542,10 @@ Public token links are unchanged. Admins do not see other people's chats,
 files, assistants, tasks, or widget transcripts unless those items are shared
 with them.
 
-Turn **People & groups** on from the same Sharing page (`IAM_GROUPS_ENABLED`).
-Members then see **Account → My groups**. Rollback is the same toggle (or
-SQL with `'0'`). Group rows stay in the database.
+**People & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
+Features tab). Members see **Account → My groups**. Rollback is the same toggle
+(or SQL with `'0'`, or `FEATURE_IAM_GROUPS_ENABLED=false`). Group rows stay in
+the database.
 
 API keys: empty or legacy webhook-only scopes keep full access. A key that
 opts into `iam:read` or `iam:manage` is limited to those People routes.
@@ -623,8 +631,9 @@ Synaplan. The result is a scoped API key (`chat`, `files`, `rag`, optionally
 time. The Outlook add-in (Synamail) uses the same bridge page and is always on.
 
 Everything under `/api/v1/platform-links/*` and `/api/v1/me/platform-links*`
-is gated by `PLATFORM_LINKS.ENABLED` (seeded `0`); with the flag off those
-routes answer **404** and nothing in the UI changes.
+is gated by `PLATFORM_LINKS.ENABLED` (on by default — **Features → Platforms
+& desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); with the flag off those routes
+answer **404** and nothing in the UI changes.
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
