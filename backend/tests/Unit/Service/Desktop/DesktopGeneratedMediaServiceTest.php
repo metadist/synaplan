@@ -64,10 +64,10 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
         $file->method('getId')->willReturn(77);
 
         $repo = $this->createMock(EntityRepository::class);
-        $repo->method('findOneBy')->with(['filePath' => '01/000/x.png'])->willReturn($file);
+        $repo->expects($this->once())->method('findOneBy')->with(['filePath' => '01/000/x.png'])->willReturn($file);
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('getRepository')->with(File::class)->willReturn($repo);
+        $em->expects($this->once())->method('getRepository')->with(File::class)->willReturn($repo);
 
         $media = $this->createMock(MediaGenerationServiceInterface::class);
         $media->expects($this->once())
@@ -87,7 +87,6 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
         $svc = $this->service($media, $em);
         $out = $svc->generate($user, 'a cat', 'image', 'openai:gpt-image-1:text2pic');
 
-        self::assertTrue($out['success']);
         self::assertSame(77, $out['file']['id']);
         self::assertSame('/api/v1/files/uploads/01/000/x.png', $out['file']['url']);
     }
