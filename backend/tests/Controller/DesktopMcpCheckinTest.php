@@ -45,6 +45,13 @@ final class DesktopMcpCheckinTest extends WebTestCase
         $this->em->flush();
     }
 
+    private function disableFlag(): void
+    {
+        static::getContainer()->get(ConfigRepository::class)
+            ->setValue(0, DesktopAgentConfig::CONFIG_GROUP, DesktopAgentConfig::KEY_ENABLED, '0');
+        $this->em->flush();
+    }
+
     public function testDesktopToolsPresentForPairedDeviceWhenFlagOn(): void
     {
         $this->client->disableReboot();
@@ -76,7 +83,7 @@ final class DesktopMcpCheckinTest extends WebTestCase
     public function testDesktopToolsAbsentWhenFlagOff(): void
     {
         $this->client->disableReboot();
-        // Flag stays off (no enableFlag()).
+        $this->disableFlag();
         $this->createUserWithDesktopKey('desktop-mcp-off@synaplan.internal', self::DESKTOP_KEY);
 
         $tools = $this->toolNames(self::DESKTOP_KEY);

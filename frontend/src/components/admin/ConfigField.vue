@@ -169,12 +169,17 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 
     <!-- Boolean Toggle -->
     <div v-if="schema.type === 'boolean'" class="flex items-center gap-3">
+      <!--
+        The track colour lives on an inner element on purpose: the V2 design
+        sets a flat background on every `[role="switch"]`, which would beat a
+        utility class on the button itself and make on and off look identical.
+      -->
       <button
+        :id="fieldKey"
         type="button"
         :disabled="disabled || isPinnedByEnv"
         :class="[
-          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
-          displayedValue === 'true' ? 'bg-[var(--brand)]' : 'bg-gray-300 dark:bg-gray-600',
+          'relative inline-flex h-6 w-11 flex-shrink-0 items-center cursor-pointer rounded-full bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
           (disabled || isPinnedByEnv) && 'opacity-50 cursor-not-allowed',
         ]"
         role="switch"
@@ -183,8 +188,14 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
       >
         <span
           :class="[
-            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-            displayedValue === 'true' ? 'translate-x-5' : 'translate-x-0',
+            'pointer-events-none absolute inset-0 rounded-full transition-colors duration-200 ease-in-out',
+            displayedValue === 'true' ? 'bg-[var(--brand)]' : 'bg-[var(--status-neutral)]',
+          ]"
+        />
+        <span
+          :class="[
+            'pointer-events-none relative inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+            displayedValue === 'true' ? 'translate-x-5' : 'translate-x-0.5',
           ]"
         />
       </button>

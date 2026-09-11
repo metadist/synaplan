@@ -6,6 +6,7 @@ namespace App\Service\Agent;
 
 use App\Repository\ConfigRepository;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\Feature\FeatureFlagEnv;
 
 /**
  * Feature-flag resolver for the Agent Builder surface.
@@ -30,6 +31,7 @@ final readonly class AgentConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -49,6 +51,10 @@ final readonly class AgentConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
         if (null !== $this->layeredConfigResolver) {
             return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
         }

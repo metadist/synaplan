@@ -657,7 +657,7 @@
       "tabGroups": {
         "aiData": "AI & Data",
         "communication": "Communication",
-        "security": "Access"
+        "security": "Features & Access"
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",
@@ -1995,8 +1995,6 @@
         "inbound_email": "incoming email",
         "webhook": "started by another system"
       },
-      "advancedSteps": "Advanced steps",
-      "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
       "autoPauseTitle": "Paused automatically",
       "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
       "createFailed": "Could not save this as a task.",
@@ -2005,6 +2003,7 @@
       "overviewSubtitle": "Instructions that run when you ask, or later on a schedule.",
       "overviewLoading": "Loading saved tasks…",
       "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
+      "overviewEmptyAssistants": "Nothing scheduled yet. After a chat plan finishes, use the clock — or add a schedule to an assistant under",
       "loadFailed": "Could not load saved tasks.",
       "delete": "Delete",
       "deleteConfirm": "Delete the saved task \"{name}\"? Shares of this task are removed too.",
@@ -2012,7 +2011,7 @@
       "deleteFailed": "Could not delete the saved task.",
       "watches": {
         "title": "Watched pages",
-        "subtitle": "One saved copy per address. A daily Saved Task can fetch the page again, compare it, and mail you the differences.",
+        "subtitle": "Keep an eye on web pages and get told what changed.",
         "hint": "In chat, try: “get this URL, save it, compare it to the last version and mail me the differences” — then save that as a daily task.",
         "urlPlaceholder": "https://example.com/page",
         "add": "Watch this page",
@@ -2041,7 +2040,12 @@
         "lastFetched": "Last saved {when}",
         "lastCheckFailed": "Last check failed: {reason}",
         "lastDiff": "What changed",
-        "untitled": "Untitled page"
+        "untitled": "Untitled page",
+        "how": {
+          "step1": "Add the address of a page you want to keep an eye on.",
+          "step2": "Synaplan keeps one saved copy of that page and refreshes it on every check.",
+          "step3": "A scheduled saved task can check the page again, compare it with the saved copy and mail you the differences."
+        }
       },
       "scheduleThis": "Run this again later",
       "scheduleThisHint": "Name this task. You can set the schedule on the next screen.",
@@ -2088,7 +2092,11 @@
       "waitingApproval": "Waiting for approval",
       "waitingApprovalCount": "{count} run waiting for approval | {count} runs waiting for approval",
       "approvalExpired": "Approval expired",
-      "rejectedBy": "Rejected by {name}"
+      "rejectedBy": "Rejected by {name}",
+      "tabs": {
+        "tasks": "Saved tasks",
+        "watches": "Watched pages"
+      }
     },
     "connections": {
       "title": "Connections",
@@ -2407,7 +2415,6 @@
     "desktop": {
       "title": "Desktop",
       "description": "Synaplan Desktop is a separate app for this computer. It uses your Synaplan account and can run skills you install.",
-      "notAvailableYet": "Synaplan Desktop is not available to download yet. You can already create a pairing code to test the connection.",
       "pairButton": "Pair this computer",
       "loadFailed": "The connected computers could not be loaded.",
       "disconnect": "Disconnect",
@@ -2459,6 +2466,19 @@
         "unknownSkill": "This computer does not have that skill.",
         "skillDisabled": "That skill is turned off on this computer.",
         "localError": "The skill failed on this computer."
+      },
+      "get": {
+        "title": "Get Synaplan Desktop",
+        "beta": "Beta",
+        "platforms": "Available for",
+        "description": "A small app for macOS, Windows and Linux. It pairs with your Synaplan account and runs the skills you install on your own computer — for example building a presentation from your notes.",
+        "github": "Get it on GitHub",
+        "releases": "Releases",
+        "betaNote": "Beta builds are not signed yet, so your operating system may ask you to confirm the first start. The repository also explains how to build the app yourself.",
+        "stepsTitle": "Connect in three steps",
+        "step1": "Install Synaplan Desktop on the computer you want to use.",
+        "step2": "Click “Pair this computer” here and copy the address and the code.",
+        "step3": "Enter both in the app. The computer then appears in the list below."
       }
     },
     "phoneVerification": {

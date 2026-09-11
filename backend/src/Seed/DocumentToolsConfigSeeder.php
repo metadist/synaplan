@@ -9,7 +9,9 @@ use Doctrine\DBAL\Connection;
 
 /**
  * Idempotent seeder for DOCUMENT_TOOLS.* (ownerId=0). Insert-if-missing only.
- * All flags default OFF so classic officemaker stays unchanged.
+ * ENABLED seeds ON since 4.8 (System configuration → Features or
+ * `FEATURE_DOCUMENT_TOOLS_ENABLED=false` turns it off); the limits keep their
+ * conservative defaults and editing uploaded files stays opt-in.
  */
 final readonly class DocumentToolsConfigSeeder
 {
@@ -22,7 +24,7 @@ final readonly class DocumentToolsConfigSeeder
     {
         $group = DocumentToolsConfig::CONFIG_GROUP;
         $rows = [
-            ['ownerId' => 0, 'group' => $group, 'setting' => DocumentToolsConfig::KEY_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => DocumentToolsConfig::KEY_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => $group, 'setting' => DocumentToolsConfig::KEY_MAX_ITERATIONS, 'value' => '8'],
             ['ownerId' => 0, 'group' => $group, 'setting' => DocumentToolsConfig::KEY_MAX_OPS_PER_TURN, 'value' => '24'],
             ['ownerId' => 0, 'group' => $group, 'setting' => DocumentToolsConfig::KEY_KEEP_REVISIONS, 'value' => '10'],

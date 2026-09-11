@@ -371,7 +371,7 @@ On first start, the system:
 
 1. Creates `backend/.env` from template
 2. Installs dependencies (Composer, npm)
-3. Generates JWT keypair for authentication
+3. Signs session cookies with `APP_SECRET` from `backend/.env` — no keypair to generate; keep the value stable so sessions survive restarts ([details](ADMIN.md#sessions-survive-restarts))
 4. Creates database schema
 5. Loads test fixtures (if database is empty)
 6. Downloads the Ollama embedding model in the background — only with the

@@ -18,11 +18,95 @@
       </template>
     </PageHeader>
 
-    <!-- Honest "not downloadable yet" note (§3.1): the server ships before the
-         client, so the app cannot be installed yet. Never a Download button. -->
-    <div class="surface-card p-4 flex items-start gap-3" data-testid="note-not-available">
-      <InformationCircleIcon class="w-5 h-5 txt-brand mt-0.5 shrink-0" />
-      <p class="text-sm txt-secondary">{{ $t('config.desktop.notAvailableYet') }}</p>
+    <!-- Get the app: the client is a public beta on GitHub (build from source or
+         a beta build from Releases). Links go to the repository, never to a
+         binary we do not host. -->
+    <div class="surface-card p-5 md:p-6" data-testid="card-get-desktop">
+      <div class="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div class="min-w-0 space-y-4">
+          <div class="flex items-start gap-4">
+            <div
+              class="flex-shrink-0 w-12 h-12 rounded-xl bg-[var(--brand-alpha-light)] flex items-center justify-center"
+            >
+              <ArrowDownTrayIcon class="w-6 h-6 txt-brand" />
+            </div>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-lg font-semibold txt-primary">
+                  {{ $t('config.desktop.get.title') }}
+                </h2>
+                <span
+                  class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[var(--brand-alpha-light)] txt-brand"
+                  data-testid="badge-desktop-beta"
+                >
+                  {{ $t('config.desktop.get.beta') }}
+                </span>
+              </div>
+              <p class="mt-1 text-sm txt-secondary">{{ $t('config.desktop.get.description') }}</p>
+            </div>
+          </div>
+
+          <ul class="flex flex-wrap gap-2" :aria-label="$t('config.desktop.get.platforms')">
+            <li
+              v-for="platform in platforms"
+              :key="platform.id"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium surface-chip txt-primary"
+            >
+              <Icon :icon="platform.icon" class="w-4 h-4" aria-hidden="true" />
+              {{ platform.label }}
+            </li>
+          </ul>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <a
+              :href="DESKTOP_REPO_URL"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+              data-testid="link-desktop-github"
+            >
+              <Icon icon="mdi:github" class="w-5 h-5" aria-hidden="true" />
+              {{ $t('config.desktop.get.github') }}
+            </a>
+            <a
+              :href="`${DESKTOP_REPO_URL}/releases`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
+              data-testid="link-desktop-releases"
+            >
+              <ArrowTopRightOnSquareIcon class="w-4 h-4" aria-hidden="true" />
+              {{ $t('config.desktop.get.releases') }}
+            </a>
+          </div>
+
+          <p class="text-xs txt-secondary flex items-start gap-2">
+            <InformationCircleIcon class="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <span>{{ $t('config.desktop.get.betaNote') }}</span>
+          </p>
+        </div>
+
+        <div
+          class="rounded-xl border border-light-border/30 dark:border-dark-border/20 p-4 space-y-3"
+          data-testid="section-desktop-steps"
+        >
+          <h3 class="text-sm font-semibold txt-primary">
+            {{ $t('config.desktop.get.stepsTitle') }}
+          </h3>
+          <ol class="space-y-3 text-sm">
+            <li v-for="step in 3" :key="step" class="flex items-start gap-3">
+              <span
+                class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold bg-[var(--brand)] text-white"
+              >
+                {{ step }}
+              </span>
+              <span class="txt-secondary leading-snug">
+                {{ $t(`config.desktop.get.step${step}`) }}
+              </span>
+            </li>
+          </ol>
+        </div>
+      </div>
     </div>
 
     <!-- Error Alert -->
@@ -288,12 +372,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onActivated, onUnmounted, ref } from 'vue'
+import { Icon } from '@iconify/vue'
 import {
   PlusIcon,
   CheckIcon,
   ClipboardDocumentIcon,
   ComputerDesktopIcon,
   ArrowPathIcon,
+  ArrowDownTrayIcon,
+  ArrowTopRightOnSquareIcon,
   InformationCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
@@ -312,6 +399,16 @@ const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { formatRelativeTime } = useDateFormat()
 const { devices, reload } = useDesktopDevices()
+
+/** Public source repository of the desktop client (Apache-2.0, build from source or beta builds). */
+const DESKTOP_REPO_URL = 'https://github.com/metadist/synaplan-desktop'
+
+// Operating-system names are brand names and stay untranslated.
+const platforms = [
+  { id: 'macos', label: 'macOS', icon: 'mdi:apple' },
+  { id: 'windows', label: 'Windows', icon: 'mdi:microsoft-windows' },
+  { id: 'linux', label: 'Linux', icon: 'mdi:linux' },
+] as const
 
 const loading = ref(false)
 const error = ref<string | null>(null)

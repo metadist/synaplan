@@ -648,7 +648,7 @@
       "tabGroups": {
         "aiData": "IA y datos",
         "communication": "Comunicación",
-        "security": "Acceso"
+        "security": "Funciones y acceso"
       },
       "brandingMode": {
         "light": "Está editando los ajustes del modo CLARO — los colores guardados aquí se aplican en el modo claro. Cambie la aplicación al modo oscuro para editar los colores del modo oscuro.",
@@ -2904,8 +2904,6 @@
         "inbound_email": "correo entrante",
         "webhook": "iniciada por otro sistema"
       },
-      "advancedSteps": "Pasos avanzados",
-      "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
       "autoPauseTitle": "Pausada automáticamente",
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",
@@ -2914,6 +2912,7 @@
       "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
       "overviewLoading": "Cargando tareas guardadas…",
       "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
+      "overviewEmptyAssistants": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o añade una programación a un asistente en",
       "loadFailed": "No se pudieron cargar las tareas guardadas.",
       "delete": "Eliminar",
       "deleteConfirm": "¿Eliminar la tarea guardada \"{name}\"? También se quitan los usos compartidos de esta tarea.",
@@ -2921,7 +2920,7 @@
       "deleteFailed": "No se pudo eliminar la tarea guardada.",
       "watches": {
         "title": "Páginas vigiladas",
-        "subtitle": "Una copia guardada por dirección. Una tarea diaria puede volver a obtener la página, compararla y enviarte las diferencias por correo.",
+        "subtitle": "Vigila páginas web y entérate de lo que ha cambiado.",
         "hint": "En el chat, prueba: «obtén esta URL, guárdala, compárala con la última versión y envíame las diferencias» — y guarda eso como tarea diaria.",
         "urlPlaceholder": "https://example.com/pagina",
         "add": "Vigilar esta página",
@@ -2950,7 +2949,12 @@
         "lastFetched": "Último guardado {when}",
         "lastCheckFailed": "La última comprobación falló: {reason}",
         "lastDiff": "Qué cambió",
-        "untitled": "Página sin título"
+        "untitled": "Página sin título",
+        "how": {
+          "step1": "Añade la dirección de una página que quieras vigilar.",
+          "step2": "Synaplan guarda una copia de esa página y la actualiza en cada comprobación.",
+          "step3": "Una tarea guardada programada puede volver a comprobar la página, compararla con la copia guardada y enviarte las diferencias por correo."
+        }
       },
       "scheduleThis": "Volver a ejecutar esto más tarde",
       "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
@@ -2997,7 +3001,11 @@
       "waitingApproval": "Esperando aprobación",
       "waitingApprovalCount": "{count} ejecución esperando aprobación | {count} ejecuciones esperando aprobación",
       "approvalExpired": "La aprobación caducó",
-      "rejectedBy": "Rechazado por {name}"
+      "rejectedBy": "Rechazado por {name}",
+      "tabs": {
+        "tasks": "Tareas guardadas",
+        "watches": "Páginas vigiladas"
+      }
     },
     "connections": {
       "title": "Conexiones",
@@ -3503,7 +3511,6 @@
     "desktop": {
       "title": "Escritorio",
       "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
-      "notAvailableYet": "Synaplan Desktop aún no está disponible para descargar. Ya puedes crear un código de vinculación para probar la conexión.",
       "pairButton": "Vincular este equipo",
       "loadFailed": "No se pudieron cargar los equipos conectados.",
       "disconnect": "Desconectar",
@@ -3555,6 +3562,19 @@
         "unknownSkill": "Este equipo no tiene ese skill.",
         "skillDisabled": "Ese skill está desactivado en este equipo.",
         "localError": "El skill falló en este equipo."
+      },
+      "get": {
+        "title": "Obtener Synaplan Desktop",
+        "beta": "Beta",
+        "platforms": "Disponible para",
+        "description": "Una pequeña aplicación para macOS, Windows y Linux. Se vincula con tu cuenta de Synaplan y ejecuta en tu propio equipo las habilidades que instales, por ejemplo crear una presentación a partir de tus notas.",
+        "github": "Obtener en GitHub",
+        "releases": "Versiones",
+        "betaNote": "Las versiones beta aún no están firmadas, así que tu sistema operativo puede pedirte confirmación en el primer inicio. El repositorio también explica cómo compilar la aplicación tú mismo.",
+        "stepsTitle": "Conectar en tres pasos",
+        "step1": "Instala Synaplan Desktop en el equipo que quieras usar.",
+        "step2": "Pulsa aquí «Vincular este equipo» y copia la dirección y el código.",
+        "step3": "Introduce ambos en la aplicación. El equipo aparecerá en la lista de abajo."
       }
     },
     "phoneVerification": {

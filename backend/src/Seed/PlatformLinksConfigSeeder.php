@@ -14,8 +14,8 @@ use Doctrine\DBAL\Connection;
  * allow-list.
  *
  * Insert-if-missing only — operator overrides are never touched. The flag
- * seeds OFF (`0`) so existing installs stay unchanged until an operator
- * enables it. The Outlook row is also created by the migration; re-asserting
+ * seeds ON (`1`) since 4.8; System configuration → Features or
+ * `FEATURE_PLATFORM_LINKS_ENABLED=false` turns it off. The Outlook row is also created by the migration; re-asserting
  * it here restores it after `doctrine:fixtures:load` purged the table
  * (dev/test) and heals an install where the row went missing.
  */
@@ -29,7 +29,7 @@ final readonly class PlatformLinksConfigSeeder
     public function seed(): SeedResult
     {
         $rows = [
-            ['ownerId' => 0, 'group' => PlatformLinksConfig::CONFIG_GROUP, 'setting' => PlatformLinksConfig::KEY_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => PlatformLinksConfig::CONFIG_GROUP, 'setting' => PlatformLinksConfig::KEY_ENABLED, 'value' => '1'],
         ];
 
         $config = BConfigSeeder::insertIfMissing($this->connection, 'platform_links_config', $rows);

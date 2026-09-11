@@ -508,6 +508,10 @@ class ModelCatalogTest extends TestCase
             'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
             'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
             'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
+            'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
+            'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
+            'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
+            'gemini-3.5-flash-lite' => ['google:gemini-3.5-flash-lite', 0.03],
         ];
     }
 
@@ -1259,5 +1263,47 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('per_request', $cohere[0]['json']['pricing_mode'] ?? null);
         $this->assertSame('per1K', $cohere[0]['inUnit'] ?? null);
         $this->assertEqualsWithDelta(2.0, (float) ($cohere[0]['priceIn'] ?? 0.0), 1e-9);
+    }
+
+    /**
+     * Live-probed Google lineup from 2026-09-11. Chat ids returned matching
+     * modelVersion from generateContent; Omni only accepts Interactions API;
+     * Transcribe and Nano Banana 2 Lite answered GET /models/{id}.
+     */
+    public function testGemini38FamilyOmniAndTranscribeAreCatalogued(): void
+    {
+        foreach (['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'] as $id) {
+            $chat = ModelCatalog::find('google:'.$id.':chat');
+            $vision = ModelCatalog::find('google:'.$id.':pic2text');
+            $this->assertCount(1, $chat, $id.' chat');
+            $this->assertCount(1, $vision, $id.' vision');
+            $this->assertEqualsWithDelta(0.75, (float) $chat[0]['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(3.75, (float) $chat[0]['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.075, (float) ($chat[0]['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+            $this->assertContains('tool_use', $chat[0]['json']['features'] ?? []);
+        }
+
+        $lite = ModelCatalog::find('google:gemini-3.5-flash-lite:chat');
+        $this->assertCount(1, $lite);
+        $this->assertSame(356, $lite[0]['id']);
+        $this->assertEqualsWithDelta(0.30, (float) $lite[0]['priceIn'], 1e-9);
+
+        $bananaLite = ModelCatalog::find('google:gemini-3.1-flash-lite-image:text2pic');
+        $this->assertCount(1, $bananaLite);
+        $this->assertSame('per_image', $bananaLite[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.0336, (float) $bananaLite[0]['priceOut'], 1e-9);
+
+        $omni = ModelCatalog::find('google:gemini-omni-1.1-flash:text2vid');
+        $this->assertCount(1, $omni);
+        $this->assertSame(359, $omni[0]['id']);
+        $this->assertSame('per_second', $omni[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.10, (float) $omni[0]['priceOut'], 1e-9);
+        $this->assertSame(['720p'], $omni[0]['json']['allowed_resolutions'] ?? null);
+
+        $stt = ModelCatalog::find('google:gemini-3.5-transcribe:sound2text');
+        $this->assertCount(1, $stt);
+        $this->assertSame(360, $stt[0]['id']);
+        $this->assertSame('per_second', $stt[0]['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.003, (float) $stt[0]['priceIn'], 1e-9);
     }
 }

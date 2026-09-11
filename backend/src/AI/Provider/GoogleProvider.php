@@ -8,6 +8,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
@@ -27,12 +28,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Google AI Provider.
  *
  * Supports:
- * - Gemini 2.0 Flash, Gemini 2.5 Pro (Chat, Vision)
- * - Imagen 4 (Gemini API), Gemini native image models, optional Vertex Imagen with OAuth token
- * - Veo 2.0 (Video Generation)
- * - Text-to-Speech with Gemini
+ * - Gemini 2.5 / 3.x Flash and Pro (Chat, Vision, tools)
+ * - Gemini native image models (Nano Banana) and optional Vertex Imagen
+ * - Veo 3.1 (predictLongRunning) and Gemini Omni Flash (Interactions API)
+ * - Gemini TTS and Gemini 3.5 Transcribe
  */
-class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
+class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo
 {
     private const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
     private const VERTEX_BASE = 'https://{region}-aiplatform.googleapis.com/v1';
@@ -88,6 +89,32 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      * Fallback wall-clock budget when the resolution is missing or unknown.
      */
     private const VEO_POLL_TIMEOUT_DEFAULT_SECONDS = 300;
+
+    /**
+     * Opaque handle prefix so poll/cancel/download can tell an Omni
+     * Interactions id from a Veo long-running operation name.
+     */
+    private const OMNI_OPERATION_PREFIX = 'interactions/';
+
+    /**
+     * Omni clips are 3–10 seconds (https://ai.google.dev/gemini-api/docs/omni).
+     */
+    private const OMNI_DURATION_MIN_SECONDS = 3;
+
+    private const OMNI_DURATION_MAX_SECONDS = 10;
+
+    private const OMNI_DURATION_DEFAULT_SECONDS = 8;
+
+    /**
+     * Official Omni video rate is published for 720p only (~$0.10/sec).
+     */
+    private const OMNI_DEFAULT_RESOLUTION = '720p';
+
+    /**
+     * Gemini Transcribe bills audio at 25 tokens/sec; used to recover duration
+     * from usageMetadata when the response has no clock field.
+     */
+    private const TRANSCRIBE_AUDIO_TOKENS_PER_SECOND = 25;
 
     /**
      * $apiKey is an explicit override (tests, custom wiring) that wins over
@@ -151,7 +178,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
 
     public function getCapabilities(): array
     {
-        return ['chat', 'embedding', 'vision', 'image_generation', 'video_generation', 'text_to_speech'];
+        return ['chat', 'embedding', 'vision', 'image_generation', 'video_generation', 'speech_to_text', 'text_to_speech'];
     }
 
     public function getDefaultModels(): array
@@ -1070,6 +1097,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
         }
 
+        if ($this->isOmniVideoModel($model)) {
+            return $this->startOmniVideoOperation($prompt, $options, $model, $key);
+        }
+
         $requestedDuration = isset($options['duration']) && is_numeric($options['duration'])
             ? (int) $options['duration']
             : 8;
@@ -1159,6 +1190,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
         }
 
+        if ($this->isOmniOperation($operationName)) {
+            return $this->pollOmniVideoOperationOnce($operationName, $key);
+        }
+
         $operationUrl = self::API_BASE.'/'.$operationName;
 
         $statusResponse = $this->httpClient->request('GET', $operationUrl, [
@@ -1235,6 +1270,10 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function downloadVideoContent(string $videoUri): string
     {
+        if (str_starts_with($videoUri, 'data:')) {
+            return $videoUri;
+        }
+
         $raw = $this->downloadVideoRaw($videoUri);
 
         return 'data:video/mp4;base64,'.base64_encode($raw);
@@ -1245,6 +1284,19 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
      */
     public function downloadVideoRaw(string $videoUri, array $options = []): string
     {
+        if (str_starts_with($videoUri, 'data:')) {
+            $comma = strpos($videoUri, ',');
+            if (false === $comma) {
+                throw new ProviderException('Google Omni: malformed inline video data URI', 'google');
+            }
+            $decoded = base64_decode(substr($videoUri, $comma + 1), true);
+            if (false === $decoded || '' === $decoded) {
+                throw new ProviderException('Google Omni: failed to decode inline video', 'google');
+            }
+
+            return $decoded;
+        }
+
         $key = $this->resolveApiKey();
         if (null === $key) {
             throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
@@ -1343,18 +1395,31 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return;
         }
 
-        $cancelUrl = self::API_BASE.'/'.$operationName.':cancel';
+        $cancelUrl = $this->isOmniOperation($operationName)
+            ? self::API_BASE.'/interactions/'.$this->omniInteractionId($operationName)
+            : self::API_BASE.'/'.$operationName.':cancel';
+        $method = $this->isOmniOperation($operationName) ? 'DELETE' : 'POST';
 
         try {
-            $this->httpClient->request('POST', $cancelUrl, [
+            $response = $this->httpClient->request($method, $cancelUrl, [
                 'headers' => ['x-goog-api-key' => $key],
                 'timeout' => 30,
             ]);
-            $this->logger->info('Google Veo: cancel request sent to provider', [
-                'operation' => $operationName,
-            ]);
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 200 && $statusCode < 300) {
+                $this->logger->info('Google video: cancel request sent to provider', [
+                    'operation' => $operationName,
+                    'method' => $method,
+                ]);
+            } else {
+                $this->logger->warning('Google video: cancel request failed (already walking away)', [
+                    'operation' => $operationName,
+                    'status' => $statusCode,
+                    'error' => substr($response->getContent(false), 0, 500),
+                ]);
+            }
         } catch (\Throwable $e) {
-            $this->logger->warning('Google Veo: cancel request failed (already walking away)', [
+            $this->logger->warning('Google video: cancel request failed (already walking away)', [
                 'operation' => $operationName,
                 'error' => $e->getMessage(),
             ]);
@@ -1443,6 +1508,255 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     private static function mapResolutionForVeoApi(string $canonical): string
     {
         return self::VEO_API_RESOLUTION_MAP[$canonical] ?? $canonical;
+    }
+
+    private function isOmniVideoModel(string $model): bool
+    {
+        return str_starts_with(strtolower($model), 'gemini-omni');
+    }
+
+    private function isOmniOperation(string $operationName): bool
+    {
+        return str_starts_with($operationName, self::OMNI_OPERATION_PREFIX);
+    }
+
+    private function omniInteractionId(string $operationName): string
+    {
+        return $this->isOmniOperation($operationName)
+            ? substr($operationName, strlen(self::OMNI_OPERATION_PREFIX))
+            : $operationName;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array{operationName: string, model: string, duration: int, resolution: string}
+     */
+    private function startOmniVideoOperation(string $prompt, array $options, string $model, string $key): array
+    {
+        $requestedDuration = isset($options['duration']) && is_numeric($options['duration'])
+            ? (int) $options['duration']
+            : self::OMNI_DURATION_DEFAULT_SECONDS;
+        $durationSeconds = $this->mapToValidOmniDuration($requestedDuration);
+        $aspectRatio = is_string($options['aspect_ratio'] ?? null) ? $options['aspect_ratio'] : '16:9';
+        $modelConfig = isset($options['modelConfig']) && is_array($options['modelConfig'])
+            ? $options['modelConfig']
+            : [];
+        $requestedResolution = isset($options['resolution']) && is_string($options['resolution'])
+            ? $options['resolution']
+            : null;
+        $resolution = $this->resolveOmniResolution($requestedResolution, $modelConfig);
+
+        $this->logger->info('Google Omni: Starting video generation', [
+            'model' => $model,
+            'prompt_length' => strlen($prompt),
+            'requested_duration' => $requestedDuration,
+            'actual_duration' => $durationSeconds,
+            'aspect_ratio' => $aspectRatio,
+            'resolution' => $resolution,
+        ]);
+
+        $url = self::API_BASE.'/interactions';
+        $payload = [
+            'model' => $model,
+            'input' => $prompt,
+            'background' => true,
+            'store' => true,
+            'response_format' => [
+                'type' => 'video',
+                'aspect_ratio' => $aspectRatio,
+                'duration' => $durationSeconds.'s',
+                'resolution' => $resolution,
+            ],
+        ];
+
+        $response = $this->httpClient->request('POST', $url, [
+            'headers' => [
+                'Content-Type' => 'application/json',
+                'x-goog-api-key' => $key,
+            ],
+            'json' => $payload,
+            'timeout' => 30,
+        ]);
+
+        $statusCode = $response->getStatusCode();
+        if (200 !== $statusCode && 201 !== $statusCode) {
+            $errorBody = $response->getContent(false);
+            $this->logger->error('Google Omni: API returned error', [
+                'status_code' => $statusCode,
+                'error_body' => $errorBody,
+            ]);
+            throw new ProviderException("Google Omni API error (HTTP $statusCode): $errorBody", 'google');
+        }
+
+        $data = $response->toArray();
+        $interactionId = $data['id'] ?? null;
+        if (!is_string($interactionId) || '' === $interactionId) {
+            throw new ProviderException('No interaction id returned from Google Omni', 'google');
+        }
+
+        $this->logger->info('Google Omni: Interaction started', [
+            'interaction' => $interactionId,
+            'status' => $data['status'] ?? null,
+        ]);
+
+        return [
+            'operationName' => self::OMNI_OPERATION_PREFIX.$interactionId,
+            'model' => $model,
+            'duration' => $durationSeconds,
+            'resolution' => $resolution,
+        ];
+    }
+
+    /**
+     * @return array{done: bool, videoUri: ?string, error: ?string}
+     */
+    private function pollOmniVideoOperationOnce(string $operationName, string $key): array
+    {
+        $interactionId = $this->omniInteractionId($operationName);
+        $statusResponse = $this->httpClient->request('GET', self::API_BASE.'/interactions/'.$interactionId, [
+            'headers' => ['x-goog-api-key' => $key],
+            'timeout' => 60,
+        ]);
+
+        $statusData = $statusResponse->toArray();
+        $status = strtolower((string) ($statusData['status'] ?? ''));
+
+        if (in_array($status, ['in_progress', 'queued', 'pending', 'running', ''], true)) {
+            return ['done' => false, 'videoUri' => null, 'error' => null];
+        }
+
+        if (in_array($status, ['failed', 'cancelled', 'canceled', 'error'], true)) {
+            $errorMessage = $this->omniErrorMessage($statusData);
+
+            $this->logger->error('Google Omni: Interaction failed', [
+                'status' => $status,
+                'error_message' => $errorMessage,
+            ]);
+
+            if (str_contains(strtolower($errorMessage), 'safety') || str_contains(strtolower($errorMessage), 'blocked')) {
+                throw ProviderException::contentBlocked('google', 'SAFETY', $errorMessage);
+            }
+
+            return ['done' => true, 'videoUri' => null, 'error' => $errorMessage];
+        }
+
+        $videoUri = $this->extractOmniVideoUri($statusData);
+        if (null === $videoUri) {
+            $steps = $statusData['steps'] ?? null;
+            $this->logger->error('Google Omni: No video in completed interaction', [
+                'status' => $status,
+                'step_count' => is_array($steps) ? count($steps) : 0,
+            ]);
+
+            return ['done' => true, 'videoUri' => null, 'error' => 'No video in completed Omni interaction'];
+        }
+
+        $this->logger->info('Google Omni: Video generation completed');
+
+        return ['done' => true, 'videoUri' => $videoUri, 'error' => null];
+    }
+
+    /**
+     * @param array<string, mixed> $statusData
+     */
+    private function extractOmniVideoUri(array $statusData): ?string
+    {
+        $steps = $statusData['steps'] ?? null;
+        if (!is_array($steps)) {
+            return null;
+        }
+
+        $fromModelOutput = $this->extractOmniVideoFromSteps($steps, true);
+        if (null !== $fromModelOutput) {
+            return $fromModelOutput;
+        }
+
+        return $this->extractOmniVideoFromSteps($steps, false);
+    }
+
+    /**
+     * @param array<mixed> $steps
+     */
+    private function extractOmniVideoFromSteps(array $steps, bool $modelOutputOnly): ?string
+    {
+        foreach ($steps as $step) {
+            if (!is_array($step)) {
+                continue;
+            }
+            if ($modelOutputOnly && 'model_output' !== ($step['type'] ?? '')) {
+                continue;
+            }
+            $content = $step['content'] ?? null;
+            if (!is_array($content)) {
+                continue;
+            }
+            foreach ($content as $part) {
+                $uri = $this->omniVideoPartToUri($part);
+                if (null !== $uri) {
+                    return $uri;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function omniVideoPartToUri(mixed $part): ?string
+    {
+        if (!is_array($part) || 'video' !== ($part['type'] ?? '')) {
+            return null;
+        }
+        if (isset($part['uri']) && is_string($part['uri']) && '' !== $part['uri']) {
+            return $part['uri'];
+        }
+        $data = $part['data'] ?? null;
+        if (!is_string($data) || '' === $data) {
+            return null;
+        }
+
+        return str_starts_with($data, 'data:') ? $data : 'data:video/mp4;base64,'.$data;
+    }
+
+    /**
+     * @param array<string, mixed> $statusData
+     */
+    private function omniErrorMessage(array $statusData): string
+    {
+        $error = $statusData['error'] ?? null;
+        if (is_array($error)) {
+            $message = $error['message'] ?? null;
+
+            return is_string($message) && '' !== $message ? $message : 'Omni video generation failed';
+        }
+
+        return is_string($error) && '' !== $error ? $error : 'Omni video generation failed';
+    }
+
+    private function mapToValidOmniDuration(int $requestedDuration): int
+    {
+        return max(self::OMNI_DURATION_MIN_SECONDS, min(self::OMNI_DURATION_MAX_SECONDS, $requestedDuration));
+    }
+
+    /**
+     * @param array<string, mixed> $modelConfig
+     */
+    private function resolveOmniResolution(?string $requested, array $modelConfig): string
+    {
+        $allowed = is_array($modelConfig['allowed_resolutions'] ?? null)
+            ? array_values(array_filter($modelConfig['allowed_resolutions'], 'is_string'))
+            : [self::OMNI_DEFAULT_RESOLUTION];
+
+        if (null !== $requested && in_array($requested, $allowed, true)) {
+            return $requested;
+        }
+
+        $default = $modelConfig['default_resolution'] ?? null;
+        if (is_string($default) && in_array($default, $allowed, true)) {
+            return $default;
+        }
+
+        return [] !== $allowed ? $allowed[0] : self::OMNI_DEFAULT_RESOLUTION;
     }
 
     public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
@@ -1663,6 +1977,197 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
         } catch (\Exception $e) {
             throw new ProviderException('Google vision error: '.$e->getMessage(), 'google');
+        }
+    }
+
+    // ==================== SPEECH TO TEXT ====================
+
+    public function transcribe(string $audioPath, array $options = []): array
+    {
+        $key = $this->resolveApiKey();
+        if (null === $key) {
+            throw ProviderException::missingApiKey('google', 'GOOGLE_GEMINI_API_KEY');
+        }
+
+        $model = $options['model'] ?? 'gemini-3.5-transcribe';
+        if (!is_string($model) || !$this->isGeminiTranscribeModelId($model)) {
+            $model = 'gemini-3.5-transcribe';
+        }
+
+        $fullPath = str_starts_with($audioPath, '/')
+            ? $audioPath
+            : $this->uploadDir.'/'.ltrim($audioPath, '/');
+
+        if (!is_file($fullPath)) {
+            throw new ProviderException('Audio file not found: '.$fullPath, 'google');
+        }
+
+        $fileSize = filesize($fullPath);
+        if (false === $fileSize || $fileSize <= 0) {
+            throw new ProviderException('Audio file is empty: '.$fullPath, 'google');
+        }
+        if ($fileSize > 100 * 1024 * 1024) {
+            throw new ProviderException('Audio file too large: '.round($fileSize / 1024 / 1024, 2).'MB (max 100MB)', 'google');
+        }
+
+        $audioBytes = file_get_contents($fullPath);
+        if (false === $audioBytes || '' === $audioBytes) {
+            throw new ProviderException('Failed to read audio file: '.$fullPath, 'google');
+        }
+
+        $this->logger->info('Google Gemini: Transcribing audio', [
+            'model' => $model,
+            'file' => basename($fullPath),
+            'size_mb' => round($fileSize / 1024 / 1024, 2),
+        ]);
+
+        $url = self::API_BASE."/models/{$model}:generateContent";
+        $payload = [
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        [
+                            'inlineData' => [
+                                'mimeType' => $this->audioMimeType($fullPath),
+                                'data' => base64_encode($audioBytes),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        try {
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                    'x-goog-api-key' => $key,
+                ],
+                'json' => $payload,
+                'timeout' => 180,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+            if (200 !== $statusCode) {
+                $errorBody = $response->getContent(false);
+                throw new ProviderException("Google Gemini Transcribe API error (HTTP $statusCode): $errorBody", 'google');
+            }
+
+            $data = $response->toArray();
+            $text = '';
+            foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
+                if (isset($part['text']) && is_string($part['text'])) {
+                    $text .= $part['text'];
+                }
+            }
+
+            $duration = $this->transcribeDurationSeconds($data, $fullPath);
+
+            $this->logger->info('Google Gemini: Transcription complete', [
+                'model' => $model,
+                'duration_seconds' => $duration,
+                'text_length' => strlen($text),
+            ]);
+
+            return [
+                'text' => $text,
+                'language' => $options['language'] ?? 'unknown',
+                'duration' => $duration,
+                'segments' => [],
+            ];
+        } catch (ProviderException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            throw new ProviderException('Google transcription error: '.$e->getMessage(), 'google', null, 0, $e);
+        }
+    }
+
+    public function translateAudio(string $audioPath, string $targetLang): string
+    {
+        throw new ProviderException('Google Gemini Transcribe has no dedicated translate mode. Use transcribe() and translate the text with a chat model instead.', 'google');
+    }
+
+    private function isGeminiTranscribeModelId(string $model): bool
+    {
+        return str_starts_with($model, 'gemini-') && str_contains($model, 'transcribe');
+    }
+
+    private function audioMimeType(string $path): string
+    {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return match ($ext) {
+            'wav' => 'audio/wav',
+            'mp3' => 'audio/mpeg',
+            'm4a', 'aac' => 'audio/mp4',
+            'ogg' => 'audio/ogg',
+            'flac' => 'audio/flac',
+            'webm' => 'audio/webm',
+            default => 'audio/wav',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function transcribeDurationSeconds(array $data, string $fullPath): float
+    {
+        foreach ($data['usageMetadata']['promptTokensDetails'] ?? [] as $detail) {
+            if (!is_array($detail)) {
+                continue;
+            }
+            $modality = strtoupper((string) ($detail['modality'] ?? ''));
+            if ('AUDIO' !== $modality) {
+                continue;
+            }
+            $tokens = (int) ($detail['tokenCount'] ?? $detail['tokens'] ?? 0);
+            if ($tokens > 0) {
+                return $tokens / self::TRANSCRIBE_AUDIO_TOKENS_PER_SECOND;
+            }
+        }
+
+        $wavSeconds = $this->wavDurationSeconds($fullPath);
+        if (null !== $wavSeconds) {
+            return $wavSeconds;
+        }
+
+        throw new ProviderException(sprintf('Google Gemini Transcribe response omitted audio token usage, and local duration fallback is not implemented for non-WAV format: %s', basename($fullPath)), 'google');
+    }
+
+    private function wavDurationSeconds(string $path): ?float
+    {
+        if (!str_ends_with(strtolower($path), '.wav')) {
+            return null;
+        }
+
+        $handle = fopen($path, 'rb');
+        if (false === $handle) {
+            return null;
+        }
+
+        try {
+            $header = fread($handle, 44);
+            if (false === $header || strlen($header) < 44) {
+                return null;
+            }
+            if ('RIFF' !== substr($header, 0, 4) || 'WAVE' !== substr($header, 8, 4)) {
+                return null;
+            }
+            $byteRateParts = unpack('V', substr($header, 28, 4));
+            $dataSizeParts = unpack('V', substr($header, 40, 4));
+            if (!is_array($byteRateParts) || !is_array($dataSizeParts)) {
+                return null;
+            }
+            $byteRate = (int) ($byteRateParts[1] ?? 0);
+            $dataSize = (int) ($dataSizeParts[1] ?? 0);
+            if ($byteRate <= 0 || $dataSize <= 0) {
+                return null;
+            }
+
+            return $dataSize / $byteRate;
+        } finally {
+            fclose($handle);
         }
     }
 

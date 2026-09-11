@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch as vueWatch } from 'vue'
+import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
 import { urlWatchesApi, type UrlWatch, type UrlWatchCompare } from '@/services/api/urlWatchesApi'
+
+const emit = defineEmits<{
+  /** The server answered 404: URL watching is switched off on this instance. */
+  unavailable: []
+  /** Number of watched pages, for the tab badge. */
+  count: [value: number]
+}>()
 
 const { t, locale } = useI18n()
 const { success, error: showError } = useNotification()
@@ -50,6 +58,7 @@ const load = async () => {
     if (err instanceof ApiError && err.status === 404) {
       available.value = false
       watches.value = []
+      emit('unavailable')
     } else {
       showError(t('config.savedTasks.watches.loadFailed'))
     }
@@ -153,48 +162,84 @@ const onDelete = async (watch: UrlWatch) => {
   }
 }
 
+vueWatch(
+  () => watches.value.length,
+  (value) => emit('count', value),
+  { immediate: true }
+)
+
 onMounted(() => {
   void load()
 })
 </script>
 
 <template>
-  <section v-if="available" class="space-y-4 pt-2" data-testid="url-watch-panel">
-    <div>
-      <h2 class="text-lg font-semibold txt-primary">
-        {{ $t('config.savedTasks.watches.title') }}
-      </h2>
-      <p class="mt-1 text-sm txt-secondary">
-        {{ $t('config.savedTasks.watches.subtitle') }}
-      </p>
-      <p class="mt-1 text-sm txt-secondary">
+  <section v-if="available" class="space-y-4" data-testid="url-watch-panel">
+    <div class="surface-card p-5 space-y-4" data-testid="url-watch-intro">
+      <div class="flex items-start gap-3">
+        <span
+          class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center bg-[var(--brand)]/10 text-[var(--brand)]"
+          aria-hidden="true"
+        >
+          <Icon icon="heroicons:globe-alt" class="w-5 h-5" />
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold txt-primary">
+            {{ $t('config.savedTasks.watches.title') }}
+          </h2>
+          <p class="mt-1 text-sm txt-secondary">
+            {{ $t('config.savedTasks.watches.subtitle') }}
+          </p>
+        </div>
+      </div>
+
+      <ol class="grid gap-3 sm:grid-cols-3 text-sm" data-testid="url-watch-how">
+        <li v-for="step in 3" :key="step" class="flex items-start gap-2.5">
+          <span
+            class="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold bg-[var(--brand)] text-white"
+          >
+            {{ step }}
+          </span>
+          <span class="txt-secondary leading-snug">
+            {{ $t(`config.savedTasks.watches.how.step${step}`) }}
+          </span>
+        </li>
+      </ol>
+
+      <form class="flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="onAdd">
+        <input
+          v-model="url"
+          type="url"
+          class="w-full flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+          :placeholder="$t('config.savedTasks.watches.urlPlaceholder')"
+          :disabled="adding"
+          data-testid="url-watch-input"
+        />
+        <button
+          type="submit"
+          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!canAdd"
+          data-testid="url-watch-add"
+        >
+          {{
+            adding ? $t('config.savedTasks.watches.adding') : $t('config.savedTasks.watches.add')
+          }}
+        </button>
+      </form>
+
+      <p class="text-xs txt-secondary">
         {{ $t('config.savedTasks.watches.hint') }}
       </p>
     </div>
 
-    <form class="flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="onAdd">
-      <input
-        v-model="url"
-        type="url"
-        class="w-full flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
-        :placeholder="$t('config.savedTasks.watches.urlPlaceholder')"
-        :disabled="adding"
-        data-testid="url-watch-input"
-      />
-      <button
-        type="submit"
-        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        :disabled="!canAdd"
-        data-testid="url-watch-add"
-      >
-        {{ adding ? $t('config.savedTasks.watches.adding') : $t('config.savedTasks.watches.add') }}
-      </button>
-    </form>
-
-    <p v-if="loading" class="txt-secondary text-sm" data-testid="url-watch-loading">
+    <p v-if="loading" class="txt-secondary text-sm px-1" data-testid="url-watch-loading">
       {{ $t('config.savedTasks.watches.loading') }}
     </p>
-    <p v-else-if="watches.length === 0" class="txt-secondary text-sm" data-testid="url-watch-empty">
+    <p
+      v-else-if="watches.length === 0"
+      class="txt-secondary text-sm px-1"
+      data-testid="url-watch-empty"
+    >
       {{ $t('config.savedTasks.watches.empty') }}
     </p>
     <ul v-else class="space-y-3" data-testid="url-watch-list">

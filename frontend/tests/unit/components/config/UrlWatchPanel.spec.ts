@@ -74,13 +74,30 @@ describe('UrlWatchPanel', () => {
     expect(wrapper.get('[data-testid="url-watch-empty"]').text()).toContain('No pages watched')
   })
 
-  it('lists watched pages', async () => {
+  it('lists watched pages and reports the count for the tab badge', async () => {
     mockList.mockResolvedValue([watch])
     const wrapper = await mountPanel()
     expect(wrapper.find('[data-testid="url-watch-empty"]').exists()).toBe(false)
     expect(wrapper.get('[data-testid="url-watch-list"]').text()).toContain(
       'https://example.com/news'
     )
+    const counts = wrapper.emitted('count') ?? []
+    expect(counts.at(-1)).toEqual([1])
+  })
+
+  it('explains how watched pages work in three steps', async () => {
+    mockList.mockResolvedValue([])
+    const wrapper = await mountPanel()
+    expect(wrapper.get('[data-testid="url-watch-how"]').findAll('li')).toHaveLength(3)
+    expect(wrapper.get('[data-testid="url-watch-intro"]').text()).toContain('saved copy')
+  })
+
+  it('hides itself and tells the parent when the feature is off (404)', async () => {
+    mockList.mockRejectedValue(new ApiError(404, 'Not found', 'HTTP_404'))
+    const wrapper = await mountPanel()
+    expect(wrapper.find('[data-testid="url-watch-panel"]').exists()).toBe(false)
+    expect(wrapper.emitted('unavailable')).toHaveLength(1)
+    expect(mockError).not.toHaveBeenCalled()
   })
 
   it('creates a watch from the form', async () => {

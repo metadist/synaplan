@@ -433,6 +433,7 @@ In-repo guides (for developers working on this codebase):
 |-------|-------------|
 | [Installation](docs/INSTALLATION.md) | Local development stack and production self-hosting (`deploy/`) |
 | [Configuration](docs/CONFIGURATION.md) | Environment variables, API keys |
+| [Feature flags](docs/FEATURE_FLAGS.md) | Every wave feature (people & sharing, assistants, tools, saved-task steps, desktop, …): admin toggle, `FEATURE_*` env pin, defaults |
 | [Connections](docs/CONNECTIONS.md) | Microsoft 365, Dropbox, Nextcloud / WebDAV, CalDAV, Jira / Confluence |
 | [AI Model Pricing](docs/PRICING_MAINTENANCE.md) | Model catalog, provider prices, retiring a model |
 | [Development](docs/DEVELOPMENT.md) | Commands, testing, architecture |

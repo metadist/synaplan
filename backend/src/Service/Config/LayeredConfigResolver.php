@@ -11,6 +11,7 @@ use App\Repository\GroupConfigRepository;
 use App\Repository\GroupMemberRepository;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\PolicyAllowList;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Resolves BCONFIG with an optional group layer.
@@ -18,8 +19,14 @@ use App\Service\Iam\Policy\PolicyAllowList;
  * Flag off (C1): chain is exactly [user row?, global row?] and BGROUPCONFIG is
  * never read. Flag on: a blocked global row wins alone; otherwise
  * [user?, merged groups?, global?] for allow-listed keys only.
+ *
+ * Chains are memoized per (user, group, setting) for the rest of the request.
+ * In FrankenPHP worker mode the container outlives the request, so
+ * {@see ResetInterface} clears the memo between requests and
+ * {@see \App\Service\Admin\SystemConfigService} calls {@see reset()} right after a BCONFIG write,
+ * so a flag flipped in the admin UI is honoured by the very next check.
  */
-final class LayeredConfigResolver
+final class LayeredConfigResolver implements ResetInterface
 {
     /** @var array<string, list<string>> */
     private array $chainMemo = [];
@@ -67,6 +74,12 @@ final class LayeredConfigResolver
         $merged = $this->mergedGroupValue($userId, $group, $setting);
 
         return $this->chainMemo[$memoKey] = $this->appendPresent([], $user, $merged, $global);
+    }
+
+    public function reset(): void
+    {
+        $this->chainMemo = [];
+        $this->groupIdsMemo = [];
     }
 
     public function resolve(?int $userId, string $group, string $setting): ?string
