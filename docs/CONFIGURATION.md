@@ -689,6 +689,28 @@ See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
 
 ---
 
+## Assistants, workflows and portability (`AGENTS`, `WORKFLOWS`, `BUNDLE`)
+
+Product features that shipped switched off. They live in **Operate → System
+configuration**: Assistants and the workflow builder under *Routing*,
+Export & import under *Interface*. Each row is `BCONFIG` owner 0 and takes
+effect immediately — the browser has to reload, because the frontend reads the
+flags from `/api/v1/config/runtime`.
+
+| Setting | Default | Meaning |
+| ------- | ------- | ------- |
+| `AGENTS.ENABLED` | `0` | Assistants gallery, builder, pin-to-chat and assistant shares. Off = `/ai/assistants` is not found, `/api/v1/agents*` returns 404 and a streamed `agentId` is ignored |
+| `AGENTS.ROUTABLE_ENABLED` | `0` | Lets an assistant published as routable be picked by message classification. Requires `AGENTS.ENABLED` |
+| `WORKFLOWS.BUILDER_ENABLED` | `0` | Steps editor on a Saved Task and the inbound webhook trigger. Off = step graphs are rejected and webhook calls refused. Requires `SAVEDTASKS.ENABLED` |
+| `BUNDLE.ENABLED` | `0` | `synaplan-bundle.v1` Export & import in Settings (own resources) and System configuration (instance). Off = both panels hidden, `/api/v1/bundle*` returns 404 |
+
+All four resolve the per-user row before the global one, so a single account
+can be opted in with a `BOWNERID = <userId>` row. Setting the global switch
+from the admin page drops the acting administrator's own row, otherwise they
+would not see their own change.
+
+---
+
 ## Linked platforms (`PLATFORM_LINKS`)
 
 Lets users of a registered Nextcloud / ownCloud / OpenCloud instance link the

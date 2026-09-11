@@ -489,11 +489,29 @@ VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
 ON DUPLICATE KEY UPDATE BVALUE = '1';
 ```
 
+### Turning Assistants, workflows and Export & import on
+
+Three product features ship switched off and are switched on in **Operate →
+System configuration**, no SQL and no restart:
+
+| Feature | Where | Setting |
+| ------- | ----- | ------- |
+| Assistants (gallery, builder, pin to chat) | Routing → AI assistants | `AGENTS.ENABLED` |
+| Routable assistants (classifier may pick one) | Routing → AI assistants | `AGENTS.ROUTABLE_ENABLED` |
+| Workflow steps on a Saved Task + webhook trigger | Routing → Saved Tasks | `WORKFLOWS.BUILDER_ENABLED` |
+| Export & import (`synaplan-bundle.v1`) | Interface → Export & import | `BUNDLE.ENABLED` |
+
+Users have to reload the page afterwards: the frontend reads these from
+`/api/v1/config/runtime` at start-up. A single account can be opted in ahead
+of the instance with a per-user `BCONFIG` row (`BOWNERID = <userId>`), which
+wins over the global one.
+
 ### Publishing an assistant to a group
 
 1. Turn groups and sharing on (both flags above).
-2. Create a custom assistant under **AI → Instructions** (system assistants
-   with owner `0` cannot be shared — everyone can already use them).
+2. Create a custom assistant under **AI → Assistants** (**AI → Instructions**
+   while `AGENTS.ENABLED` is off). System assistants with owner `0` cannot be
+   shared — everyone can already use them.
 3. Open **Share** and grant **Can use** to the group (for example Sales).
 4. Members of that group see the assistant in their list and the classifier
    may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the

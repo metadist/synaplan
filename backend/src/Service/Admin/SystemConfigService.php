@@ -7,7 +7,9 @@ namespace App\Service\Admin;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
+use App\Bundle\BundleConfig;
 use App\Repository\ConfigRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
 use App\Service\Digest\MessageDigestConfig;
@@ -24,6 +26,7 @@ use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -149,7 +152,8 @@ final readonly class SystemConfigService
                 'label' => 'Routing',
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
-                    'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
+                    'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED', 'WORKFLOWS_BUILDER_ENABLED']],
+                    'assistants' => ['label' => 'AI assistants', 'fields' => ['AGENTS_ENABLED', 'AGENTS_ROUTABLE_ENABLED']],
                     'tools' => ['label' => 'Tools and approvals', 'fields' => [
                         'TOOLS_REGISTRY_ENABLED',
                         'TOOLS_APPROVALS_ENABLED',
@@ -187,6 +191,7 @@ final readonly class SystemConfigService
                 'label' => 'Interface',
                 'sections' => [
                     'usage_display' => ['label' => 'Usage display', 'fields' => ['USAGE_TAXIMETER_ENABLED']],
+                    'portability' => ['label' => 'Export & import', 'fields' => ['BUNDLE_ENABLED']],
                 ],
             ],
             'guest_landing' => [
@@ -530,105 +535,54 @@ final readonly class SystemConfigService
      */
     private function applyConfigSideEffects(string $group, string $key, string $value, ?int $actingUserId = null): void
     {
-        // Multi-task routing master switch: a per-user row overrides this global
-        // flag (the Version20260607000000 grandfather rows are gone since
-        // Version20260706130000, but hand-set overrides can still exist). Drop
-        // the acting admin's own override so the value they just set actually
-        // applies to their own account immediately.
-        if (SavedTaskConfig::CONFIG_GROUP === $group
-            && SavedTaskConfig::KEY_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    SavedTaskConfig::CONFIG_GROUP,
-                    SavedTaskConfig::KEY_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user saved-tasks override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user saved-tasks override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
+        // Every flag below resolves the per-user row before the global one, so an
+        // admin still carrying an own override would not see the value they just
+        // set. Some of those rows come from a migration (async media,
+        // Version20260629120000; multi-task grandfathering from
+        // Version20260607000000, dropped again in Version20260706130000), others
+        // were set by hand.
+        /** @var list<array{string, string, string}> $perUserOverrides */
+        $perUserOverrides = [
+            [SavedTaskConfig::CONFIG_GROUP, SavedTaskConfig::KEY_ENABLED, 'saved-tasks'],
+            [WorkflowsConfig::CONFIG_GROUP, WorkflowsConfig::KEY_BUILDER_ENABLED, 'workflow builder'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ENABLED, 'assistants'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ROUTABLE_ENABLED, 'routable assistants'],
+            [BundleConfig::CONFIG_GROUP, BundleConfig::KEY_ENABLED, 'bundle export'],
+            [McpClientConfig::CONFIG_GROUP, McpClientConfig::KEY_CLIENT_ENABLED, 'MCP client'],
+            [MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_ROUTING_ENABLED, 'multitask routing'],
+            [MediaJobConfig::CONFIG_GROUP, MediaJobConfig::KEY_ASYNC_JOBS_ENABLED, 'async media'],
+        ];
+
+        foreach ($perUserOverrides as [$overrideGroup, $overrideKey, $label]) {
+            if ($group === $overrideGroup && $key === $overrideKey) {
+                $this->clearActingUserOverride($overrideGroup, $overrideKey, $label, $value, $actingUserId);
+
+                return;
             }
         }
+    }
 
-        if (McpClientConfig::CONFIG_GROUP === $group
-            && McpClientConfig::KEY_CLIENT_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    McpClientConfig::CONFIG_GROUP,
-                    McpClientConfig::KEY_CLIENT_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user MCP client override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user MCP client override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
+    /**
+     * Drop the acting admin's own row for a flag that was just set globally.
+     */
+    private function clearActingUserOverride(string $group, string $key, string $label, string $globalValue, ?int $actingUserId): void
+    {
+        if (null === $actingUserId || $actingUserId <= 0) {
+            return;
         }
 
-        if (MultitaskRoutingConfig::CONFIG_GROUP === $group
-            && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MultitaskRoutingConfig::CONFIG_GROUP,
-                    MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user multitask routing override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
-        }
-
-        // Async media master switch: existing users were grandfathered to an
-        // explicit per-user OFF row (migration Version20260629120000), which
-        // overrides this global flag. Drop the acting admin's own override so the
-        // value they just set actually applies to their own account immediately.
-        if (MediaJobConfig::CONFIG_GROUP === $group
-            && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MediaJobConfig::CONFIG_GROUP,
-                    MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user async media override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user async media override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
+        try {
+            $removed = $this->configRepository->deleteValue($actingUserId, $group, $key);
+            $this->logger->info('SystemConfigService: cleared admin per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'removed' => $removed,
+                'globalValue' => $globalValue,
+            ]);
+        } catch (\Throwable $sideEffect) {
+            $this->logger->error('SystemConfigService: failed clearing per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'error' => $sideEffect->getMessage(),
+            ]);
         }
     }
 
@@ -1249,6 +1203,37 @@ final readonly class SystemConfigService
                 'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
                 'dbKey' => SavedTaskConfig::KEY_ENABLED,
             ],
+            'WORKFLOWS_BUILDER_ENABLED' => [
+                'tab' => 'routing', 'section' => 'saved_tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the Steps editor on a Saved Task, so a user can chain skills, tools and assistants into one workflow, and accept the inbound webhook trigger. When OFF, Saved Tasks keep their single-prompt form, step graphs are rejected by the validator and webhook calls are refused. Needs Saved Tasks. Off by default.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => WorkflowsConfig::CONFIG_GROUP,
+                'dbKey' => WorkflowsConfig::KEY_BUILDER_ENABLED,
+            ],
+            // === Assistants / Agent Builder (database-backed, no restart required) ===
+            // BCONFIG group AGENTS (ownerId=0) — the rows AgentConfig reads. Both
+            // flags resolve per user first, so switching one here also drops the
+            // acting admin's own override (see applyConfigSideEffects).
+            'AGENTS_ENABLED' => [
+                'tab' => 'routing', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Ship the Assistants surface: the gallery under AI, the assistant builder, pinning an assistant to a chat, and sharing one through People. When OFF, /ai/assistants is not found, every /api/v1/agents route answers 404 and an agentId sent with a chat stream is ignored. Off by default — existing installs stay unchanged until you turn this on. Users have to reload the page after a change.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ENABLED,
+            ],
+            'AGENTS_ROUTABLE_ENABLED' => [
+                'tab' => 'routing', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let an assistant published as routable take part in message classification, so a question can reach it without pinning it first. Needs Assistants. Off by default — with it off the routable choice is stored but the classifier is unchanged.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ROUTABLE_ENABLED,
+            ],
             'TOOLS_REGISTRY_ENABLED' => [
                 'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
                 'sensitive' => false,
@@ -1511,6 +1496,18 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => UsageTaximeterConfig::CONFIG_GROUP,
                 'dbKey' => UsageTaximeterConfig::KEY_ENABLED,
+            ],
+            // === Interface — portability (database-backed, no restart required) ===
+            // BCONFIG group BUNDLE (ownerId=0) — the row BundleConfig reads for the
+            // synaplan-bundle.v1 export/import routes and both panels.
+            'BUNDLE_ENABLED' => [
+                'tab' => 'interface', 'section' => 'portability', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show Export & import: a user downloads their assistants and task prompts as a synaplan-bundle.v1 archive under Settings and imports it into another installation; administrators additionally get the instance scope in System config. The archive carries no secrets, keys, tokens or file contents. When OFF both panels are hidden and /api/v1/bundle answers 404. Off by default.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => BundleConfig::CONFIG_GROUP,
+                'dbKey' => BundleConfig::KEY_ENABLED,
             ],
             // === Branding (database-backed, no restart required) ===
             // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService
