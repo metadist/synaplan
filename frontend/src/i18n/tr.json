@@ -648,7 +648,7 @@
       "tabGroups": {
         "aiData": "AI ve Veri",
         "communication": "İletişim",
-        "security": "Erişim"
+        "security": "Özellikler ve Erişim"
       },
       "brandingMode": {
         "light": "AÇIK mod ayarlarını düzenliyorsunuz — burada kaydedilen renkler açık modda geçerlidir. Koyu mod renklerini düzenlemek için uygulamayı koyu moda geçirin.",
@@ -2895,8 +2895,6 @@
         "inbound_email": "gelen e-posta",
         "webhook": "başka bir sistem tarafından başlatıldı"
       },
-      "advancedSteps": "Gelişmiş adımlar",
-      "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
       "autoPauseTitle": "Otomatik olarak duraklatıldı",
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",
@@ -2905,6 +2903,7 @@
       "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
       "overviewLoading": "Kayıtlı görevler yükleniyor…",
       "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
+      "overviewEmptyAssistants": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya bir asistana zamanlama ekle:",
       "loadFailed": "Kayıtlı görevler yüklenemedi.",
       "delete": "Sil",
       "deleteConfirm": "\"{name}\" kayıtlı görevi silinsin mi? Bu görevin paylaşımları da kaldırılır.",
@@ -2912,7 +2911,7 @@
       "deleteFailed": "Kayıtlı görev silinemedi.",
       "watches": {
         "title": "İzlenen sayfalar",
-        "subtitle": "Adres başına bir kayıtlı kopya. Günlük bir görev sayfayı yeniden alıp karşılaştırabilir ve farkları e-postayla gönderebilir.",
+        "subtitle": "Web sayfalarını takip et ve nelerin değiştiğini öğren.",
         "hint": "Sohbette dene: “bu URL’yi al, kaydet, son sürümle karşılaştır ve farkları bana mail at” — sonra bunu günlük görev olarak kaydet.",
         "urlPlaceholder": "https://example.com/sayfa",
         "add": "Bu sayfayı izle",
@@ -2941,7 +2940,12 @@
         "lastFetched": "Son kayıt {when}",
         "lastCheckFailed": "Son kontrol başarısız: {reason}",
         "lastDiff": "Ne değişti",
-        "untitled": "Başlıksız sayfa"
+        "untitled": "Başlıksız sayfa",
+        "how": {
+          "step1": "Takip etmek istediğin sayfanın adresini ekle.",
+          "step2": "Synaplan bu sayfanın kayıtlı bir kopyasını tutar ve her kontrolde günceller.",
+          "step3": "Zamanlanmış bir kayıtlı görev sayfayı yeniden kontrol edebilir, kayıtlı kopyayla karşılaştırabilir ve farkları sana e-postayla gönderebilir."
+        }
       },
       "scheduleThis": "Bunu daha sonra tekrar çalıştır",
       "scheduleThisHint": "Bu göreve bir ad ver. Zamanlamayı sonraki ekranda seçersin.",
@@ -2988,7 +2992,11 @@
       "waitingApproval": "Onay bekleniyor",
       "waitingApprovalCount": "{count} çalışma onay bekliyor",
       "approvalExpired": "Onayın süresi doldu",
-      "rejectedBy": "{name} tarafından reddedildi"
+      "rejectedBy": "{name} tarafından reddedildi",
+      "tabs": {
+        "tasks": "Kayıtlı görevler",
+        "watches": "İzlenen sayfalar"
+      }
     },
     "connections": {
       "title": "Bağlantılar",
@@ -3494,7 +3502,6 @@
     "desktop": {
       "title": "Masaüstü",
       "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
-      "notAvailableYet": "Synaplan Desktop henüz indirilebilir değil. Bağlantıyı test etmek için şimdiden bir eşleme kodu oluşturabilirsiniz.",
       "pairButton": "Bu bilgisayarı bağla",
       "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
       "disconnect": "Bağlantıyı kes",
@@ -3546,6 +3553,19 @@
         "unknownSkill": "Bu bilgisayarda bu skill yok.",
         "skillDisabled": "Bu skill bu bilgisayarda kapalı.",
         "localError": "Skill bu bilgisayarda başarısız oldu."
+      },
+      "get": {
+        "title": "Synaplan Desktop'u edin",
+        "beta": "Beta",
+        "platforms": "Şu platformlar için",
+        "description": "macOS, Windows ve Linux için küçük bir uygulama. Synaplan hesabınla eşleşir ve yüklediğin becerileri kendi bilgisayarında çalıştırır; örneğin notlarından bir sunum hazırlar.",
+        "github": "GitHub'dan edin",
+        "releases": "Sürümler",
+        "betaNote": "Beta sürümleri henüz imzalı değil, bu yüzden işletim sistemin ilk açılışta onay isteyebilir. Uygulamayı kendin nasıl derleyeceğin de depoda anlatılıyor.",
+        "stepsTitle": "Üç adımda bağlan",
+        "step1": "Kullanmak istediğin bilgisayara Synaplan Desktop'u yükle.",
+        "step2": "Burada “Bu bilgisayarı bağla”ya tıkla ve adres ile kodu kopyala.",
+        "step3": "İkisini de uygulamaya gir. Bilgisayar ardından aşağıdaki listede görünür."
       }
     },
     "phoneVerification": {

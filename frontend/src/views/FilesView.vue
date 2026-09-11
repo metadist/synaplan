@@ -765,29 +765,33 @@
                     >
                       <TrashIcon class="w-3.5 h-3.5" />
                     </button>
+                    <!-- Share is the one action people look for on a tile, so it
+                         stays visible in the top-left corner; "use in chat"
+                         sits next to it and appears on hover like delete. -->
+                    <button
+                      v-if="iamSharingEnabled && !folder.pending && !folder.shared"
+                      type="button"
+                      class="absolute top-1 left-1 p-1.5 icon-contrast"
+                      :title="$t('iam.share')"
+                      :aria-label="$t('iam.share')"
+                      :data-testid="`btn-share-folder-${folder.name}`"
+                      @click.stop="openFolderShare(folder.name)"
+                    >
+                      <ShareIcon class="w-4 h-4" />
+                    </button>
                     <!-- §4.8 #2: close the loop with chat — open a chat with
                          this knowledge folder preselected in the picker. -->
                     <button
                       v-if="!folder.pending"
                       type="button"
-                      class="absolute top-1 left-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      class="absolute top-1 p-1.5 rounded-lg text-[var(--brand)] bg-black/[0.03] dark:bg-white/[0.04] opacity-0 group-hover/f:opacity-100 focus:opacity-100 hover:bg-[var(--brand)]/15 transition-all"
+                      :class="iamSharingEnabled && !folder.shared ? 'left-9' : 'left-1'"
                       :title="$t('files.useInChat')"
                       :aria-label="$t('files.useInChat')"
                       :data-testid="`btn-use-in-chat-${folder.name}`"
                       @click.stop="useFolderInChat(folder)"
                     >
                       <ChatBubbleLeftRightIcon class="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      v-if="iamSharingEnabled && !folder.pending && !folder.shared"
-                      type="button"
-                      class="absolute bottom-1 left-1 icon-ghost opacity-0 group-hover/f:opacity-100 focus:opacity-100"
-                      :title="$t('iam.share')"
-                      :aria-label="$t('iam.share')"
-                      :data-testid="`btn-share-folder-${folder.name}`"
-                      @click.stop="openFolderShare(folder.name)"
-                    >
-                      <ShareIcon class="w-3.5 h-3.5" />
                     </button>
                     <span
                       v-if="folder.shared && !filterSharedWithMe"

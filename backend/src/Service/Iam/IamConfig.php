@@ -6,6 +6,7 @@ namespace App\Service\Iam;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Service\Feature\FeatureFlagEnv;
 
 /**
  * Feature-flag resolver for IAM (groups, sharing, directory sync, policies).
@@ -16,12 +17,15 @@ use App\Repository\ConfigRepository;
  *   - DIRECTORY_SYNC_ENABLED — OIDC group claim upsert (S4)
  *   - GROUP_POLICIES_ENABLED — People → Policies and group-layer defaults (S5)
  *
- * Resolution mirrors {@see \App\Service\Desktop\DesktopAgentConfig}: a per-user
- * row (BOWNERID = userId) overrides the global row (BOWNERID = 0), which
- * overrides the built-in code default (OFF).
+ * Resolution mirrors {@see \App\Service\Desktop\DesktopAgentConfig}: an
+ * explicit `FEATURE_IAM_*` environment variable pins the flag
+ * ({@see FeatureFlagEnv}); otherwise a per-user row (BOWNERID = userId)
+ * overrides the global row (BOWNERID = 0), which overrides the built-in code
+ * fallback (OFF, only reached when no row was ever seeded).
  *
- * The whole IAM track ships to `main` with these flags OFF. Turning them on
- * is an explicit operator / per-user action.
+ * Since 4.8 the seeder writes the flags ON. Operators change them under
+ * Operate → System configuration → Features, or pin them off for an automated
+ * deployment with `FEATURE_IAM_*=false`.
  */
 final readonly class IamConfig
 {
@@ -45,10 +49,12 @@ final readonly class IamConfig
     public const DEFAULT_DIRECTORY_GROUPS_CLAIM = 'groups';
     public const DEFAULT_AUDIT_RETENTION_DAYS = 365;
 
+    /** Code fallback when no BCONFIG row exists at all; the seeder writes ON rows. */
     private const DEFAULT_ENABLED = false;
 
     public function __construct(
         private ConfigRepository $configRepository,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -177,6 +183,10 @@ final readonly class IamConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
         if (null !== $userId && $userId > 0) {
             $perUser = $this->configRepository->getValue($userId, self::CONFIG_GROUP, $setting);
             if (null !== $perUser) {

@@ -10,8 +10,8 @@ use Doctrine\DBAL\Connection;
 /**
  * Idempotent seeder for TOOLS.* flags (BCONFIG, ownerId=0).
  *
- * Insert-if-missing only. Registry defaults ON (S1 kill switch). Approvals
- * and custom HTTP stay OFF until an operator enables them.
+ * Insert-if-missing only. Registry, approvals and custom HTTP seed ON since
+ * 4.8; System configuration → Features or `FEATURE_TOOLS_*=false` turns them off.
  */
 final readonly class ToolsConfigSeeder
 {
@@ -24,8 +24,8 @@ final readonly class ToolsConfigSeeder
     {
         $rows = [
             ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_REGISTRY_ENABLED, 'value' => '1'],
-            ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_APPROVALS_ENABLED, 'value' => '0'],
-            ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_APPROVALS_ENABLED, 'value' => '1'],
+            ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED, 'value' => '1'],
             ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_POLICY_READ, 'value' => 'auto'],
             ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_POLICY_WRITE, 'value' => 'approve'],
             ['ownerId' => 0, 'group' => ToolsConfig::CONFIG_GROUP, 'setting' => ToolsConfig::KEY_POLICY_DESTRUCTIVE, 'value' => 'block'],

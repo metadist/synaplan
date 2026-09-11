@@ -6,6 +6,7 @@ namespace App\Service\Tool;
 
 use App\Repository\ConfigRepository;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\Feature\FeatureFlagEnv;
 use App\Service\Tool\Policy\PolicyOutcome;
 
 /**
@@ -43,6 +44,7 @@ final readonly class ToolsConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -163,6 +165,10 @@ final readonly class ToolsConfig
 
     private function resolveFlag(string $setting, ?int $userId, bool $default): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
         if (null !== $this->layeredConfigResolver) {
             return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
         }
