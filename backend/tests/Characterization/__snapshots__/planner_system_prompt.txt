@@ -52,7 +52,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "summarize": Summarize provided text.
 - "translate": Translate provided text into a target language (params.target).
 - "rag_query": Answer using the user knowledge base (retrieval-augmented).
-- "web_search": Search the web for current information and read the top result pages (their content, condensed to the question, is included in the output). Use for research questions, facts, news, figures.
+- "web_search": Search the web for current information. For research questions that need figures, named companies or quotes (and the user did not paste a URL), set params.read_pages to 2 or 3 so the top result pages are fetched and dumped into the answering prompt. Set params.read_pages to 0 when snippets suffice (weather, ticker, simple yes/no).
 - "url_fetch": Fetch and read the content of specific URL(s) the user named in the message (inputs.urls, falls back to URLs in the message text). Set inputs.compare to true to save one snapshot per URL and return the difference versus the last fetch. Use when the answer depends on that page's content; prefer web_search when no concrete URL is given.
 - "file_analysis": Analyze/describe/OCR an image or document — either attached by the user or produced by a prior node ($nX.file) — and answer about it.
 - "image_generation": Generate or edit an image from a prompt and/or reference images.
@@ -194,9 +194,13 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    "read this and tell me what it says" → the same `url_fetch` → `chat`
    chain. Do NOT emit `url_fetch` for a link mentioned in passing that the
    question does not depend on, and prefer `web_search` when no concrete
-   URL is given — `web_search` already reads the top result pages, so a
-   research question needs no extra `url_fetch` nodes for the pages it
-   finds. Only use `url_fetch` if it appears in the capability list above.
+   URL is given. For a research question that needs figures, named
+   companies, sectors or quotes, set `params.read_pages` to 2 or 3 so the
+   top result pages are fetched and dumped into the answering prompt. Set
+   `params.read_pages` to 0 (or omit) when search snippets are enough
+   (weather, ticker, simple yes/no). Do NOT emit extra `url_fetch` nodes
+   for pages the search will find. Only use `url_fetch` if it appears in
+   the capability list above.
 9b2. The user asks to SAVE a URL and COMPARE it to a previous fetch, and/or
    mail the differences ("get this URL and save the details, compare it to
    a previously saved version and mail me the differences", "watch this

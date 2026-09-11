@@ -64,7 +64,7 @@ final readonly class PlugConfigService
 
     /** Deep research: read the top result pages after a search (not just snippets). */
     public const DEFAULT_WEB_SEARCH_READ_PAGES_ENABLED = true;
-    public const DEFAULT_WEB_SEARCH_READ_PAGES_MAX = 4;
+    public const DEFAULT_WEB_SEARCH_READ_PAGES_MAX = 3;
     public const MAX_WEB_SEARCH_READ_PAGES = 8;
 
     /** Total characters of page evidence handed to the answering model per search. */

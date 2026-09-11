@@ -951,6 +951,8 @@ class MessageProcessorTest extends TestCase
                 $this->callback(static fn (array $r): bool => $r['results'] === $rawResults['results'] && $r['query'] === $rawResults['query']),
                 'Die VAE wollen 40 Mrd. in Deutschland investieren — in welche Sektoren?',
                 1,
+                $this->isInstanceOf(\Closure::class),
+                3,
             )
             ->willReturn($deepened);
 
@@ -964,6 +966,7 @@ class MessageProcessorTest extends TestCase
             'language' => 'de',
             'source' => 'ai_sorting',
             'web_search' => true,
+            'read_pages' => 3,
         ]);
         $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
         $this->braveSearchService->method('isEnabled')->willReturn(true);
@@ -992,6 +995,64 @@ class MessageProcessorTest extends TestCase
         $pagesRead = $events[array_search('pages_read', $statuses, true)][1];
         $this->assertSame(1, $pagesRead['pages_read']);
         $this->assertTrue($pagesRead['results'][0]['fetched']);
+    }
+
+    public function testResearchQuestionSkipsPageDumpsWhenRouterVotesZero(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(79);
+        $message->method('getText')->willReturn('Was ist das aktuelle Wetter in Berlin?');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([]);
+
+        $rawResults = ['query' => 'Wetter Berlin', 'results' => [
+            ['title' => 'DWD', 'url' => 'https://www.dwd.de/a', 'description' => '18°C'],
+        ]];
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->expects($this->never())->method('deepen');
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'read_pages' => 0,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Wetter Berlin');
+        $this->braveSearchService->method('search')->willReturn($rawResults);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification, $chunk, $status, $options) {
+                $this->assertArrayNotHasKey('page_content', $options['search_results']['results'][0]);
+                $this->assertArrayNotHasKey('pages_read', $options['search_results']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $events = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$events): void {
+            $events[] = $event['status'];
+        });
+
+        $this->assertContains('search_complete', $events);
+        $this->assertNotContains('pages_read', $events);
     }
 
     private function processorWith(UrlContentService $urlContent, WebResearchService $research): MessageProcessor

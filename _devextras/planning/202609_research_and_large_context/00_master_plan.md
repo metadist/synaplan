@@ -109,8 +109,9 @@ usage action `CONDENSE`.
      `SearchQueryGenerator`, so a thin message with a link searches for the
      article's topic, not the URL (R5).
    - **2.5 search** unchanged → `search_complete` (sources render immediately).
-   - **2.6 deepen** → progress `reading_pages` → `pages_read` (results with
-     `fetched` flags + count).
+   - **2.6 deepen** only when the sorter's `BREADPAGES` vote is 2 or 3
+     (or the field was omitted on a running search — fallback 2). A vote
+     of 0 leaves snippets only. Pasted URLs already read skip this step.
 4. **Formatters** show page content: `SearchResultSet::formatForAi()`,
    `ChatHandler::formatSearchResultsForPrompt()` (with an instruction to use
    page content as authoritative evidence and to say what is missing rather
@@ -139,7 +140,7 @@ usage action `CONDENSE`.
 | `CONTEXT` | `ROUTING_FULL_TEXT_MAX_CHARS` | `12000` | Attachment text passed verbatim to SORT/PLAN |
 | `CONTEXT` | `ROUTING_DIGEST_CHARS` | `1800` | Digest size above that |
 | `PLUGS` | `WEB_SEARCH.READ_PAGES_ENABLED` | `1` | Read result pages after a search |
-| `PLUGS` | `WEB_SEARCH.READ_PAGES_MAX` | `4` (max 8) | Pages per search |
+| `PLUGS` | `WEB_SEARCH.READ_PAGES_MAX` | `3` (max 8) | Ceiling; the sorter votes 0 / 2 / 3 per turn |
 | `PLUGS` | `WEB_SEARCH.READ_PAGES_BUDGET_CHARS` | `28000` | Evidence budget per search |
 | `PLUGS` | `URL_READ.ENABLED` | `1` | Read links pasted into the chat |
 | `PLUGS` | `URL_READ.MAX` | `3` (max 6) | Links per message |

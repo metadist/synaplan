@@ -537,10 +537,38 @@ class MessageSorterTest extends TestCase
         $this->assertSame('mediamaker', $result['topic']);
         $this->assertSame('de', $result['language']);
         $this->assertFalse($result['web_search']);
+        $this->assertSame(0, $result['read_pages']);
         $this->assertSame('video', $result['media_type']);
         $this->assertSame(6, $result['duration']);
         $this->assertSame('4K', $result['resolution']);
         $this->assertSame('text_only', $result['input_mode']);
+    }
+
+    public function testParseResponseReadsBreadpagesWhenSearchIsVoted(): void
+    {
+        $response = '{"BTOPIC":"general","BLANG":"de","BWEBSEARCH":1,"BREADPAGES":3}';
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, ['BTOPIC' => 'general', 'BLANG' => 'de']);
+
+        $this->assertTrue($result['web_search']);
+        $this->assertSame(3, $result['read_pages']);
+    }
+
+    public function testParseResponseForcesReadPagesZeroWhenSearchIsOff(): void
+    {
+        $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":0,"BREADPAGES":3}';
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, ['BTOPIC' => 'general', 'BLANG' => 'en']);
+
+        $this->assertFalse($result['web_search']);
+        $this->assertSame(0, $result['read_pages']);
+    }
+
+    public function testParseResponseLeavesReadPagesNullWhenTheFieldIsOmitted(): void
+    {
+        $response = '{"BTOPIC":"general","BLANG":"en","BWEBSEARCH":1}';
+        $result = $this->parseResponseMethod->invoke($this->sorter, $response, ['BTOPIC' => 'general', 'BLANG' => 'en']);
+
+        $this->assertTrue($result['web_search']);
+        $this->assertNull($result['read_pages']);
     }
 
     // ===========================================

@@ -507,6 +507,7 @@ final readonly class MessageClassifier
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            'read_pages' => $result['read_pages'] ?? null,
             'multi_step' => $result['multi_step'] ?? null,
             'media_type' => $result['media_type'] ?? null,
             'duration' => $result['duration'] ?? null,
@@ -520,6 +521,10 @@ final readonly class MessageClassifier
             'topic' => $canonicalTopic,
             'language' => $result['language'],
             'web_search' => $result['web_search'] ?? false,
+            // Sorter's BREADPAGES vote: 0 = snippets only, 2 or 3 = dump
+            // that many result pages into the answer prompt. Null = no vote
+            // (fast-path / older prompt). ReadPagesPolicy fills the gap.
+            'read_pages' => $result['read_pages'] ?? null,
             // Sorter's BMULTI vote: true = needs several steps, false = one
             // step, null = no vote (older prompt row / model dropped the
             // field). TaskPlanExecutor uses it to skip the planner round-trip

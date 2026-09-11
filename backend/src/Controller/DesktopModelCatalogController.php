@@ -40,9 +40,15 @@ final class DesktopModelCatalogController extends AbstractController
         response: 200,
         description: 'Capability catalog',
         content: new OA\JsonContent(
-            required: ['object', 'capabilities'],
+            required: ['object', 'capabilities', 'defaults'],
             properties: [
                 new OA\Property(property: 'object', type: 'string', example: 'catalog'),
+                new OA\Property(
+                    property: 'defaults',
+                    type: 'object',
+                    description: 'Workspace DEFAULTMODEL catalog keys per capability. VECTORIZE is the platform index model (Ollama bge-m3 unless the operator changed it) — Desktop binds an unset Embed slot to this, not the highest-quality available embed.',
+                    example: ['VECTORIZE' => 'ollama:bge-m3:vectorize'],
+                ),
                 new OA\Property(
                     property: 'capabilities',
                     type: 'object',

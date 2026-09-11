@@ -412,6 +412,7 @@ final readonly class MessageProcessor
                 'classification_topic' => $topic,
                 'needs_attachment_context' => $needsAttachmentContext,
                 'linked_pages_read' => $classification['url_pages_read'] ?? 0,
+                'read_pages_vote' => $classification['read_pages'] ?? null,
                 'brave_enabled' => $braveEnabled,
             ]);
 
@@ -511,7 +512,7 @@ final readonly class MessageProcessor
                         // evidence it needs. Sources were already streamed above
                         // so the client renders them while pages load.
                         $perfTimer->start('search_read_pages');
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $statusCallback);
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
                         $perfTimer->stop('search_read_pages');
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
@@ -919,6 +920,7 @@ final readonly class MessageProcessor
                 'classification_topic' => $topic,
                 'needs_attachment_context' => $needsAttachmentContext,
                 'linked_pages_read' => $classification['url_pages_read'] ?? 0,
+                'read_pages_vote' => $classification['read_pages'] ?? null,
                 'brave_enabled' => $braveEnabled,
                 'pipeline' => 'process',
             ]);
@@ -995,7 +997,7 @@ final readonly class MessageProcessor
                         ]);
 
                         // Step 2.6: read the top result pages (see processStream()).
-                        $searchResults = $this->deepenSearchResults($searchResults, $message, $statusCallback);
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
@@ -1290,15 +1292,38 @@ final readonly class MessageProcessor
     /**
      * Read the top result pages and attach their condensed content to the
      * search results (`page_content`, `fetched`, `final_url`), reporting
-     * progress to the client. Any failure leaves the snippet-only results.
+     * progress to the client. The sorter's BREADPAGES vote decides how
+     * many pages (0 / 2 / 3). Any failure leaves the snippet-only results.
      *
      * @param array<string, mixed> $searchResults
+     * @param array<string, mixed> $classification
      *
      * @return array<string, mixed>
      */
-    private function deepenSearchResults(array $searchResults, Message $message, ?callable $statusCallback): array
-    {
+    private function deepenSearchResults(
+        array $searchResults,
+        Message $message,
+        array $classification,
+        bool $userRequestedSearch,
+        ?bool $promptToolInternet,
+        ?callable $statusCallback,
+    ): array {
         if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled()) {
+            return $searchResults;
+        }
+
+        $vote = $classification['read_pages'] ?? null;
+        $maxPages = ReadPagesPolicy::pagesToRead(
+            is_int($vote) ? $vote : null,
+            ($classification['url_pages_read'] ?? 0) >= 1,
+            $userRequestedSearch || true === $promptToolInternet,
+        );
+        if ($maxPages <= 0) {
+            $this->logger->info('MessageProcessor: skipping page dumps — router voted snippets only', [
+                'message_id' => $message->getId(),
+                'read_pages_vote' => $vote,
+            ]);
+
             return $searchResults;
         }
 
@@ -1308,6 +1333,7 @@ final readonly class MessageProcessor
                 (string) $message->getText(),
                 $message->getUserId(),
                 fn (string $status, string $text, array $meta) => $this->notify($statusCallback, $status, $text, $meta),
+                $maxPages,
             );
         } catch (\Throwable $e) {
             $this->logger->warning('MessageProcessor: reading search result pages failed', [
