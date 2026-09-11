@@ -524,8 +524,9 @@ ON DUPLICATE KEY UPDATE BVALUE = '1';
 ### Publishing an assistant to a group
 
 1. Turn groups and sharing on (both flags above).
-2. Create a custom assistant under **AI → Instructions** (system assistants
-   with owner `0` cannot be shared — everyone can already use them).
+2. Create a custom assistant under **AI → Assistants** (**AI → Instructions**
+   while `FEATURE_AGENTS_ENABLED` is off). System assistants with owner `0`
+   cannot be shared — everyone can already use them.
 3. Open **Share** and grant **Can use** to the group (for example Sales).
 4. Members of that group see the assistant in their list and the classifier
    may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the

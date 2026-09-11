@@ -75,6 +75,29 @@ final class MessagesModelResolverTest extends TestCase
         $this->assertSame('claude-sonnet-4-6', $resolved['aliased_from']);
     }
 
+    public function testResolveAppliesAliasToOpenAiCatalogModel(): void
+    {
+        $this->config = $this->createMock(MessagesGatewayConfig::class);
+        $this->config->method('modelAliases')->willReturn([
+            'claude-sonnet-4-6' => 'gpt-4o',
+        ]);
+        $this->resolver = new MessagesModelResolver(
+            $this->modelRepository,
+            $this->config,
+            $this->createMock(LoggerInterface::class),
+        );
+
+        $model = $this->makeModel(11, 'OpenAI', 'gpt-4o', 'GPT-4o');
+        $this->expectLookupSequence([$model, null]);
+
+        $resolved = $this->resolver->resolve('claude-sonnet-4-6');
+
+        $this->assertNotNull($resolved);
+        $this->assertSame('openai', $resolved['provider']);
+        $this->assertSame('gpt-4o', $resolved['providerModelId']);
+        $this->assertSame('claude-sonnet-4-6', $resolved['aliased_from']);
+    }
+
     public function testResolveStripsDatedSuffix(): void
     {
         // First lookup (dated id) misses both providerId and name;

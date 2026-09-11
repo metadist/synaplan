@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Model;
 
 use App\AI\Credential\ChatReadinessService;
+use App\Entity\Model;
 use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\Iam\Policy\GroupPolicyService;
+use App\Service\ModelConfigService;
 
 /**
  * Capability-grouped selectable models for machine clients (Synaplan Desktop).
@@ -34,15 +36,24 @@ final readonly class CapabilityCatalog
         'ANALYZE',
     ];
 
+    /**
+     * Platform index model Desktop locks the Embed slot to when the workspace
+     * has no DEFAULTMODEL.VECTORIZE binding (or the catalog is built without
+     * {@see ModelConfigService}). Keep in lockstep with
+     * {@see \App\Seed\DefaultModelConfigSeeder} (`ollama:bge-m3:vectorize`).
+     */
+    public const PLATFORM_VECTORIZE_KEY = 'ollama:bge-m3:vectorize';
+
     public function __construct(
         private ModelRepository $modelRepository,
         private ChatReadinessService $chatReadiness,
         private ?GroupPolicyService $groupPolicyService = null,
+        private ?ModelConfigService $modelConfigService = null,
     ) {
     }
 
     /**
-     * @return array{object: 'catalog', capabilities: array<string, list<array<string, mixed>>>}
+     * @return array{object: 'catalog', capabilities: array<string, list<array<string, mixed>>>, defaults: array<string, string>}
      */
     public function forUser(User $user): array
     {
@@ -112,7 +123,45 @@ final readonly class CapabilityCatalog
         return [
             'object' => 'catalog',
             'capabilities' => $capabilities,
+            'defaults' => $this->defaultsFor($user),
         ];
+    }
+
+    /**
+     * Workspace DEFAULTMODEL catalog keys. VECTORIZE is always present so
+     * Desktop can bind an unset Embed slot to the platform index model.
+     *
+     * @return array<string, string>
+     */
+    private function defaultsFor(User $user): array
+    {
+        $defaults = [
+            'VECTORIZE' => self::PLATFORM_VECTORIZE_KEY,
+        ];
+
+        if (null === $this->modelConfigService) {
+            return $defaults;
+        }
+
+        foreach (self::GROUPS as $group) {
+            $modelId = $this->modelConfigService->getConfiguredDefaultModel($group, $user->getId());
+            if (null === $modelId) {
+                continue;
+            }
+
+            $model = $this->modelRepository->find($modelId);
+            if (!$model instanceof Model) {
+                continue;
+            }
+
+            $defaults[$group] = GroupPolicyService::catalogKey(
+                $model->getService(),
+                $model->getProviderId(),
+                $model->getTag(),
+            );
+        }
+
+        return $defaults;
     }
 
     /**

@@ -16,6 +16,7 @@ use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PerfTimer;
 use App\Service\PromptService;
+use App\Service\Research\WebResearchService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
@@ -65,6 +66,7 @@ final readonly class MessageProcessor
         private TaskPlanExecutor $taskPlanExecutor,
         private ConversationSummaryService $conversationSummaryService,
         private AgentConfig $agentConfig,
+        private ?WebResearchService $webResearch = null,
     ) {
     }
 
@@ -384,6 +386,18 @@ final readonly class MessageProcessor
             $needsAttachmentContext = $shouldSearch && $message->hasFiles()
                 && WebSearchTopicPolicy::refersToAttachment($messageText);
 
+            // Step 2.4: Read the links the user pasted BEFORE searching, so a
+            // bare link is answered from the page itself and a research
+            // question that cites a page searches for the page's topic — not
+            // for the URL string.
+            $perfTimer->start('url_read');
+            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
+            $perfTimer->stop('url_read');
+            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
+                $shouldSearch = false;
+                $triggerReason = 'link_only_message_answered_from_page';
+            }
+
             // Consolidated decision log: lets us diagnose "search didn't trigger"
             // reports without correlating multiple log lines from different services.
             $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
@@ -397,6 +411,8 @@ final readonly class MessageProcessor
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
                 'needs_attachment_context' => $needsAttachmentContext,
+                'linked_pages_read' => $classification['url_pages_read'] ?? 0,
+                'read_pages_vote' => $classification['read_pages'] ?? null,
                 'brave_enabled' => $braveEnabled,
             ]);
 
@@ -432,12 +448,14 @@ final readonly class MessageProcessor
                 $this->notify($statusCallback, 'searching', 'Searching the web...');
 
                 try {
-                    // Generate optimized search query using AI
+                    // Generate optimized search query using AI. A linked page
+                    // the system just read is the best hint for what the user
+                    // actually wants to know when the message itself is thin.
                     $perfTimer->start('search_query');
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
                         $message->getUserId(),
-                        $attachmentContext
+                        $attachmentContext ?? $this->linkedPageContext($classification)
                     );
                     $perfTimer->stop('search_query');
 
@@ -487,6 +505,15 @@ final readonly class MessageProcessor
                             'query' => $searchQuery,
                             'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
+
+                        // Step 2.6: Read the top result pages. Snippets alone
+                        // made the model hedge ("I cannot confirm the figure");
+                        // the page bodies, condensed to the question, are the
+                        // evidence it needs. Sources were already streamed above
+                        // so the client renders them while pages load.
+                        $perfTimer->start('search_read_pages');
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
+                        $perfTimer->stop('search_read_pages');
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
@@ -506,9 +533,6 @@ final readonly class MessageProcessor
                     $this->notify($statusCallback, 'search_failed', 'Web search failed, continuing without results');
                 }
             }
-
-            // Step 2.7: URL Content Extraction (prompt tool or Saved Task rerun)
-            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
 
             // Step 2.9: Rolling conversation summary (read-only on the hot path).
             [$options, $conversationHistory] = $this->applyRollingSummary(
@@ -877,6 +901,13 @@ final readonly class MessageProcessor
             $needsAttachmentContext = $shouldSearch && $message->hasFiles()
                 && WebSearchTopicPolicy::refersToAttachment($messageText);
 
+            // Step 2.4: read pasted links first (see processStream()).
+            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
+            if ($shouldSearch && $this->linkOnlyMessageWasRead($classification, $messageText, $userRequestedSearch, $promptToolInternet)) {
+                $shouldSearch = false;
+                $triggerReason = 'link_only_message_answered_from_page';
+            }
+
             $braveEnabled = $this->webSearch->isEnabled($message->getUserId());
             $this->logger->info('MessageProcessor: Web search decision', [
                 'message_id' => $message->getId(),
@@ -888,6 +919,8 @@ final readonly class MessageProcessor
                 'classification_source' => $classification['source'] ?? null,
                 'classification_topic' => $topic,
                 'needs_attachment_context' => $needsAttachmentContext,
+                'linked_pages_read' => $classification['url_pages_read'] ?? 0,
+                'read_pages_vote' => $classification['read_pages'] ?? null,
                 'brave_enabled' => $braveEnabled,
                 'pipeline' => 'process',
             ]);
@@ -923,7 +956,7 @@ final readonly class MessageProcessor
                     $searchQuery = $this->searchQueryGenerator->generate(
                         $message->getText(),
                         $message->getUserId(),
-                        $attachmentContext
+                        $attachmentContext ?? $this->linkedPageContext($classification)
                     );
 
                     $language = $this->resolveSearchLanguage($classification, $message);
@@ -962,6 +995,9 @@ final readonly class MessageProcessor
                             'query' => $searchQuery,
                             'results' => $this->formatSearchResultsForClient($searchResults['results']),
                         ]);
+
+                        // Step 2.6: read the top result pages (see processStream()).
+                        $searchResults = $this->deepenSearchResults($searchResults, $message, $classification, $userRequestedSearch, $promptToolInternet, $statusCallback);
                     } else {
                         $this->logger->warning('No search results found or repository not available', [
                             'query' => empty($options['incognito']) ? $searchQuery : '[incognito]',
@@ -984,9 +1020,6 @@ final readonly class MessageProcessor
             if ($searchResults) {
                 $classification['search_results'] = $searchResults;
             }
-
-            // Step 2.7: URL Content Extraction (prompt tool or Saved Task rerun)
-            $classification = $this->maybeFetchUrlContent($message, $promptMetadata, $classification, $statusCallback);
 
             // Step 2.9: Rolling conversation summary — the same read-only
             // injection as processStream(), so email / MCP / webhook turns get
@@ -1184,13 +1217,17 @@ final readonly class MessageProcessor
     }
 
     /**
-     * Prefetch named URLs into classification['url_content'] so ChatHandler
-     * (and UrlFetchRunner reuse) can read the page.
+     * Read the URLs named in the message into classification['url_content']
+     * so ChatHandler (and UrlFetchRunner reuse) can answer from the page.
      *
-     * The prompt flag `tool_url_screenshot` is the existing opt-in. Saved Task
-     * reruns also fetch: they pin a user instruction that often wraps the URL
-     * in markdown (`[label](url)`, `**url**`) and skip the sorter, so the
-     * planner can miss `url_fetch` and the page would never be loaded.
+     * With {@see WebResearchService} available (production wiring) every
+     * pasted link is read by default (`URL_READ.ENABLED`): redirects and
+     * shortlink interstitials are followed, login walls are reported instead
+     * of silently yielding nothing, and large pages are condensed to the
+     * question. Without it, the legacy light fetch runs for the prompt flag
+     * `tool_url_screenshot` and for Saved Task reruns (which pin a user
+     * instruction that often wraps the URL in markdown and skip the sorter,
+     * so the planner can miss `url_fetch`).
      *
      * @param array<string, mixed> $promptMetadata
      * @param array<string, mixed> $classification
@@ -1200,7 +1237,9 @@ final readonly class MessageProcessor
     private function maybeFetchUrlContent(Message $message, array $promptMetadata, array $classification, ?callable $statusCallback): array
     {
         $savedTask = 'saved_task' === ($classification['source'] ?? null) || !empty($classification['saved_task_id']);
-        if (!$savedTask && empty($promptMetadata['tool_url_screenshot'])) {
+        $promptOptIn = !empty($promptMetadata['tool_url_screenshot']);
+        $autoRead = null !== $this->webResearch && $this->webResearch->isUrlReadEnabled();
+        if (!$savedTask && !$promptOptIn && !$autoRead) {
             return $classification;
         }
 
@@ -1209,17 +1248,142 @@ final readonly class MessageProcessor
             return $classification;
         }
 
-        $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
+        if (null === $this->webResearch) {
+            $this->notify($statusCallback, 'fetching_urls', sprintf('Fetching content from %d URL(s)...', count($urls)));
 
-        $urlContentResults = $this->urlContentService->fetchMultiple($urls);
-        $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
+            $urlContentResults = $this->urlContentService->fetchMultiple($urls);
+            $successCount = count(array_filter($urlContentResults, static fn ($r) => $r->success));
 
-        if ($successCount > 0) {
-            $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
-            $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
+            if ($successCount > 0) {
+                $classification['url_content'] = $this->urlContentService->formatForPrompt($urlContentResults);
+                $this->notify($statusCallback, 'urls_fetched', sprintf('Extracted content from %d URL(s)', $successCount));
+            }
+
+            return $classification;
         }
 
+        try {
+            $read = $this->webResearch->readMentionedUrls(
+                $urls,
+                (string) $message->getText(),
+                $message->getUserId(),
+                fn (string $status, string $text, array $meta) => $this->notify($statusCallback, $status, $text, $meta),
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessageProcessor: reading linked pages failed', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $classification;
+        }
+
+        $prompt = $this->webResearch->formatMentionedUrlsForPrompt($read);
+        if ('' !== $prompt) {
+            $classification['url_content'] = $prompt;
+        }
+        $classification['url_pages'] = $read->toClientList();
+        $classification['url_pages_read'] = $read->successCount();
+        $classification['url_page_context'] = $read->contextForQuery();
+
         return $classification;
+    }
+
+    /**
+     * Read the top result pages and attach their condensed content to the
+     * search results (`page_content`, `fetched`, `final_url`), reporting
+     * progress to the client. The sorter's BREADPAGES vote decides how
+     * many pages (0 / 2 / 3). Any failure leaves the snippet-only results.
+     *
+     * @param array<string, mixed> $searchResults
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function deepenSearchResults(
+        array $searchResults,
+        Message $message,
+        array $classification,
+        bool $userRequestedSearch,
+        ?bool $promptToolInternet,
+        ?callable $statusCallback,
+    ): array {
+        if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled()) {
+            return $searchResults;
+        }
+
+        $vote = $classification['read_pages'] ?? null;
+        $maxPages = ReadPagesPolicy::pagesToRead(
+            is_int($vote) ? $vote : null,
+            ($classification['url_pages_read'] ?? 0) >= 1,
+            $userRequestedSearch || true === $promptToolInternet,
+        );
+        if ($maxPages <= 0) {
+            $this->logger->info('MessageProcessor: skipping page dumps — router voted snippets only', [
+                'message_id' => $message->getId(),
+                'read_pages_vote' => $vote,
+            ]);
+
+            return $searchResults;
+        }
+
+        try {
+            $deepened = $this->webResearch->deepen(
+                $searchResults,
+                (string) $message->getText(),
+                $message->getUserId(),
+                fn (string $status, string $text, array $meta) => $this->notify($statusCallback, $status, $text, $meta),
+                $maxPages,
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('MessageProcessor: reading search result pages failed', [
+                'message_id' => $message->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return $searchResults;
+        }
+
+        $pagesRead = (int) ($deepened['pages_read'] ?? 0);
+        $this->notify($statusCallback, 'pages_read', sprintf('Read %d web page%s', $pagesRead, 1 === $pagesRead ? '' : 's'), [
+            'pages_read' => $pagesRead,
+            'pages_attempted' => (int) ($deepened['pages_attempted'] ?? 0),
+            'results' => $this->formatSearchResultsForClient($deepened['results'] ?? []),
+        ]);
+
+        return $deepened;
+    }
+
+    /**
+     * A message that is nothing but link(s) whose page the system just read
+     * needs no vote-triggered web search: the answer comes from the page.
+     * Explicit requests (chat toggle, `/search`, prompt opt-in) still search.
+     *
+     * @param array<string, mixed> $classification
+     */
+    private function linkOnlyMessageWasRead(array $classification, ?string $messageText, bool $userRequestedSearch, ?bool $promptToolInternet): bool
+    {
+        if ($userRequestedSearch || true === $promptToolInternet) {
+            return false;
+        }
+        if (($classification['url_pages_read'] ?? 0) < 1) {
+            return false;
+        }
+
+        $withoutUrls = preg_replace('#https?://\S+#i', '', (string) $messageText) ?? '';
+        $remaining = preg_replace('/[^\p{L}\p{N}]+/u', '', $withoutUrls) ?? '';
+
+        return mb_strlen($remaining) < 12;
+    }
+
+    /**
+     * @param array<string, mixed> $classification
+     */
+    private function linkedPageContext(array $classification): ?string
+    {
+        $context = $classification['url_page_context'] ?? null;
+
+        return is_string($context) && '' !== trim($context) ? $context : null;
     }
 
     /**
@@ -1423,6 +1587,8 @@ final readonly class MessageProcessor
                 'published' => $result['age'] ?? null,
                 'source' => is_array($profile) ? ($profile['name'] ?? null) : null,
                 'thumbnail' => $result['thumbnail'] ?? null,
+                'fetched' => (bool) ($result['fetched'] ?? false),
+                'final_url' => is_string($result['final_url'] ?? null) ? $result['final_url'] : null,
             ];
         }
 

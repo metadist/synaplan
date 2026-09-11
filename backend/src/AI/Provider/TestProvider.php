@@ -361,7 +361,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
     {
         $data = json_decode($userContent, true);
         if (!is_array($data)) {
-            $fallback = ['BTOPIC' => 'general', 'BLANG' => 'en', 'BWEBSEARCH' => false];
+            $fallback = ['BTOPIC' => 'general', 'BLANG' => 'en', 'BWEBSEARCH' => false, 'BREADPAGES' => 0];
             if (null !== $schema) {
                 $this->assertMatchesSchema($fallback, $schema);
             }
@@ -376,6 +376,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         // heuristic cannot confidently detect a language from the text.
         $data['BLANG'] = $this->detectLanguage($text ?: $fileText, is_string($data['BLANG'] ?? null) ? $data['BLANG'] : 'en');
         $data['BWEBSEARCH'] = $this->needsWebSearch($text);
+        $data['BREADPAGES'] = $data['BWEBSEARCH'] ? $this->needsReadPages($text) : 0;
         // Always set BMULTI explicitly. The inbound JSON omits it (so a real
         // model that echoes without deciding leaves multi_step = null and the
         // planner still runs). The test stub must vote, from the same
@@ -627,6 +628,22 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
             '/\b(aktuell|current|news|wetter|weather|preis|price|heute|today|gestern|yesterday|2024|2025|2026|börse|stock|restaurant|öffnungszeiten|opening hours)\b/u',
             $text
         );
+    }
+
+    /**
+     * Sorter stub for BREADPAGES: dump 2–3 result pages only when the
+     * question needs figures / names / sectors and has no pasted URL.
+     */
+    private function needsReadPages(string $text): int
+    {
+        if (preg_match('#https?://#i', $text)) {
+            return 0;
+        }
+        if (preg_match('/(which|welche|who|wer|sektor|sector|compan|unternehmen|mrd|billion|quote|figure|wieviel|how much|list|liste)/i', $text)) {
+            return 3;
+        }
+
+        return 0;
     }
 
     /**

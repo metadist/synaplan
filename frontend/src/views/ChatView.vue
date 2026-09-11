@@ -1067,6 +1067,10 @@ type StreamingProcessingMetadata = {
   language?: string
   customMessage?: string
   results_count?: number
+  pages_total?: number
+  pages_read?: number
+  urls_total?: number
+  urls_read?: number
   handler?: string
   stage?: string
   filename?: string
@@ -1091,6 +1095,42 @@ const PIPELINE_PROGRESS_STATUSES = [
 
 const isPipelineProgressStatus = (status: string | undefined): status is string =>
   typeof status === 'string' && PIPELINE_PROGRESS_STATUSES.includes(status)
+
+// Web research steps: the backend reads the links the user pasted
+// (`fetching_urls` → `urls_fetched`) and the top result pages of a web search
+// (`reading_pages` → `pages_read`). `pages_read` also refreshes the sources
+// with their `fetched` flag and the count shown on the Web Search badge.
+// Shared by the guest and the authenticated stream handler.
+const RESEARCH_STATUSES = ['fetching_urls', 'urls_fetched', 'reading_pages', 'pages_read']
+
+const applyResearchStatus = (messageId: string, data: StreamUpdatePayload): boolean => {
+  if (typeof data.status !== 'string' || !RESEARCH_STATUSES.includes(data.status)) {
+    return false
+  }
+  const meta = data.metadata || {}
+  processingStatus.value = data.status
+  processingMetadata.value = {
+    customMessage: data.message || undefined,
+    pages_total: meta.pages_total,
+    pages_read: meta.pages_read,
+    urls_total: meta.urls_total,
+    urls_read: meta.urls_read,
+  }
+
+  if (data.status === 'pages_read') {
+    const searchMsg = historyStore.messages.find((m) => m.id === messageId)
+    if (searchMsg) {
+      const results = meta.results
+      if (Array.isArray(results) && results.length > 0) {
+        searchMsg.searchResults = results as NonNullable<Message['searchResults']>
+      }
+      const pagesRead = typeof meta.pages_read === 'number' ? meta.pages_read : 0
+      searchMsg.webSearch = { ...(searchMsg.webSearch || {}), pagesRead }
+    }
+  }
+
+  return true
+}
 
 // Phase 3e: non-blocking pill that surfaces when backgrounded memory
 // extraction (Phase 2) completes after the assistant message has already
@@ -2825,6 +2865,8 @@ const streamAIResponse = async (
                 }
               }
             }
+          } else if (applyResearchStatus(messageId, data)) {
+            // handled: linked pages / result pages being read
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             processingMetadata.value = {
@@ -3380,6 +3422,8 @@ const streamAIResponse = async (
                 }
               }
             }
+          } else if (applyResearchStatus(messageId, data)) {
+            // handled: linked pages / result pages being read
           } else if (data.status === 'generating') {
             processingStatus.value = 'generating'
             // Use custom message from backend if available, otherwise default

@@ -447,6 +447,34 @@ final readonly class ModelConfigService
     }
 
     /**
+     * The stored DEFAULTMODEL binding (user, then group, then global) without
+     * the "first usable by quality" fallback {@see getDefaultModel()} uses
+     * when the bound provider has no key.
+     *
+     * Desktop uses this so an unset Embed slot binds the workspace VECTORIZE
+     * default (Ollama bge-m3), not the highest-rated cloud embed that happens
+     * to have a key. Test-stub BIDs (< 1) are treated as unset.
+     */
+    public function getConfiguredDefaultModel(string $capability, ?int $userId = null): ?int
+    {
+        foreach ($this->eachDefaultModelId($userId, strtoupper($capability)) as $modelId) {
+            if ($modelId < 1) {
+                continue;
+            }
+            if (!$this->isAllowedModel($userId, $modelId)) {
+                continue;
+            }
+
+            $model = $this->modelRepository->find($modelId);
+            if ($model instanceof Model && 1 === $model->getActive()) {
+                return $modelId;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Best live model for a DEFAULTMODEL capability, used only when no binding
      * resolves. Selectable models win over hidden ones so an emergency pick
      * lands on something the user could have chosen themselves; the MEM tag has

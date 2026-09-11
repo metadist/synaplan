@@ -117,6 +117,10 @@ final readonly class MessageApiFormatter
                     'query' => $searchQuery,
                     'resultsCount' => $searchResultsCount ? (int) $searchResultsCount : 0,
                 ];
+                $pagesRead = (int) ($m->getMeta('web_search_pages_read') ?? 0);
+                if ($pagesRead > 0) {
+                    $webSearchData['pagesRead'] = $pagesRead;
+                }
 
                 // Load actual search results from DB.
                 // Search results are stored on the INCOMING (user) message, but we need to display them

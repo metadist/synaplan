@@ -1962,10 +1962,15 @@ class StreamController extends AbstractController
                     $incomingMessage->setMeta('web_search_results_count', (string) $searchCount);
                     $outgoingMessage->setMeta('web_search_query', $searchQuery);
                     $outgoingMessage->setMeta('web_search_results_count', (string) $searchCount);
+                    $pagesRead = (int) ($effectiveSearchResults['pages_read'] ?? 0);
+                    if ($pagesRead > 0) {
+                        $outgoingMessage->setMeta('web_search_pages_read', (string) $pagesRead);
+                    }
 
                     $this->logger->info('StreamController: Stored search results metadata', [
                         'query' => $searchQuery,
                         'results_count' => $searchCount,
+                        'pages_read' => $pagesRead,
                     ]);
                 }
 
@@ -2872,6 +2877,10 @@ class StreamController extends AbstractController
                 $message->setMeta('web_search_results_count', (string) $searchCount);
                 $outgoingMessage->setMeta('web_search_query', $searchQuery);
                 $outgoingMessage->setMeta('web_search_results_count', (string) $searchCount);
+                $pagesRead = (int) ($effectiveSearchResults['pages_read'] ?? 0);
+                if ($pagesRead > 0) {
+                    $outgoingMessage->setMeta('web_search_pages_read', (string) $pagesRead);
+                }
             }
 
             $message->setTopic((string) ($classification['topic'] ?? $message->getTopic()));
@@ -3166,6 +3175,8 @@ class StreamController extends AbstractController
                 'published' => $result['age'] ?? null,
                 'source' => $result['profile']['name'] ?? null,
                 'thumbnail' => $result['thumbnail'] ?? null,
+                'fetched' => (bool) ($result['fetched'] ?? false),
+                'final_url' => is_string($result['final_url'] ?? null) ? $result['final_url'] : null,
             ];
         }, $rawSearchResults['results']);
     }

@@ -32,10 +32,10 @@ use Symfony\Contracts\Cache\CacheInterface;
  */
 final class AiFacadeStructuredOutputRecoveryTest extends TestCase
 {
-    private const VALID = '{"BTOPIC":"general","BLANG":"de","BWEBSEARCH":false,"BMULTI":false,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
+    private const VALID = '{"BTOPIC":"general","BLANG":"de","BWEBSEARCH":false,"BREADPAGES":0,"BMULTI":false,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
 
     /** The valid answer with the sorter's input fields echoed beside it — salvageable. */
-    private const ECHOED = '{"BDATETIME":"20260903124200","BTEXT":"ok","BFILE":0,"BTOPIC":"general","BLANG":"de","BWEBSEARCH":false,"BMULTI":false,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
+    private const ECHOED = '{"BDATETIME":"20260903124200","BTEXT":"ok","BFILE":0,"BTOPIC":"general","BLANG":"de","BWEBSEARCH":false,"BREADPAGES":0,"BMULTI":false,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
 
     /** Echoed input AND a missing required key — pruning cannot fix this. */
     private const BROKEN = '{"BTEXT":"ok","BTOPIC":"general","BWEBSEARCH":false}';
@@ -109,7 +109,7 @@ final class AiFacadeStructuredOutputRecoveryTest extends TestCase
 
         self::assertSame(StructuredOutputRecovery::RECOVERY_SALVAGED, $result[StructuredOutputRecovery::RESPONSE_KEY]);
         self::assertSame(
-            ['BTOPIC' => 'general', 'BLANG' => 'de', 'BWEBSEARCH' => false, 'BMULTI' => false, 'BMEDIA' => null, 'BINPUTMODE' => null, 'BDURATION' => null, 'BRESOLUTION' => null],
+            ['BTOPIC' => 'general', 'BLANG' => 'de', 'BWEBSEARCH' => false, 'BREADPAGES' => 0, 'BMULTI' => false, 'BMEDIA' => null, 'BINPUTMODE' => null, 'BDURATION' => null, 'BRESOLUTION' => null],
             json_decode($result['content'], true, 512, JSON_THROW_ON_ERROR),
         );
         self::assertSame(0, $result['usage']['total_tokens'], 'a 400 carries no usage; nothing is guessed');

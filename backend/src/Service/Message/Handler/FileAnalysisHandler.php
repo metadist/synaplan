@@ -2,9 +2,13 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ChatFailureClassifier;
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Context\ContextCondenser;
+use App\Service\Context\ModelContextWindow;
 use App\Service\File\FileTypeResolver;
 use App\Service\Message\MessagePreProcessor;
 use App\Service\ModelConfigService;
@@ -32,11 +36,20 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.message.handler')]
 final readonly class FileAnalysisHandler implements MessageHandlerInterface
 {
+    /** Historical flat completion budget; still the floor for models without catalog metadata. */
+    private const MIN_ANSWER_OUTPUT_TOKENS = 4000;
+
+    /** Upper bound for the requested completion budget (reasoning tokens count against it). */
+    private const MAX_ANSWER_OUTPUT_TOKENS = 16000;
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?ContextCondenser $contextCondenser = null,
+        private ?ModelContextWindow $modelContextWindow = null,
+        private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
     ) {
     }
 
@@ -572,9 +585,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
 
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
-        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
-
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -598,20 +608,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'document_count' => count($documents),
         ]);
 
-        try {
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $finalPrompt],
-            ];
+        $outputTokens = $this->answerOutputTokens($modelId);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
+        $languageDirective = $this->buildLanguageDirective($classification);
+        $fitted = $this->fitDocumentsToModel($documents, $finalPrompt, $modelId, $message->getUserId(), $outputTokens, $progressCallback);
 
-            $result = $this->aiFacade->chat(
-                $messages,
+        try {
+            $result = $this->chatWithOverflowRetry(
+                $fitted,
+                $finalPrompt,
+                $languageDirective,
                 $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000,
-                ]
+                ['provider' => $provider, 'model' => $modelName, 'max_tokens' => $outputTokens],
+                null,
             );
 
             $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -664,9 +673,6 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             count($documents) > 1 ? 'Analyzing document contents...' : 'Analyzing document content...',
         );
 
-        $systemPrompt = $this->buildDocumentsSystemPrompt($documents).$this->buildLanguageDirective($classification);
-        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
-
         // Model priority: Again model_id > Task-prompt aiModel > DB default (ANALYZE → CHAT)
         $effectiveUserId = $this->modelConfigService->getEffectiveUserIdForMessage($message);
         $modelId = $classification['model_id']
@@ -690,21 +696,19 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             'document_count' => count($documents),
         ]);
 
-        try {
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $finalPrompt],
-            ];
+        $outputTokens = $this->answerOutputTokens($modelId);
+        $finalPrompt = $this->buildDocumentsUserPrompt($userPrompt, $documents);
+        $languageDirective = $this->buildLanguageDirective($classification);
+        $fitted = $this->fitDocumentsToModel($documents, $finalPrompt, $modelId, $message->getUserId(), $outputTokens, $progressCallback);
 
-            $result = $this->aiFacade->chatStream(
-                $messages,
-                $streamCallback,
+        try {
+            $result = $this->chatWithOverflowRetry(
+                $fitted,
+                $finalPrompt,
+                $languageDirective,
                 $message->getUserId(),
-                [
-                    'provider' => $provider,
-                    'model' => $modelName,
-                    'max_tokens' => 4000,
-                ]
+                ['provider' => $provider, 'model' => $modelName, 'max_tokens' => $outputTokens],
+                $streamCallback,
             );
 
             $this->notify($progressCallback, 'complete', 'Analysis complete.');
@@ -734,6 +738,134 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'model' => $modelName,
                 ],
             ];
+        }
+    }
+
+    /**
+     * Completion budget for the analysis answer. Reasoning models (GPT-6 Astra
+     * & co.) spend hidden thinking tokens against `max_tokens`, so the old
+     * flat 4 000 left a few hundred tokens for the visible reply — the "short
+     * or weird" answers users reported on big spreadsheets.
+     */
+    private function answerOutputTokens(?int $modelId): int
+    {
+        if (null === $this->modelContextWindow) {
+            return self::MIN_ANSWER_OUTPUT_TOKENS;
+        }
+
+        return $this->modelContextWindow->answerOutputTokens($modelId, self::MIN_ANSWER_OUTPUT_TOKENS, self::MAX_ANSWER_OUTPUT_TOKENS);
+    }
+
+    /**
+     * Fit every document's text into the answering model's window. The budget
+     * is derived from the model's catalog context window; documents share it
+     * proportionally to their size. Oversized texts go through the
+     * question-aware condenser (stacked map-reduce) so the model sees a
+     * focused view instead of a hard cut — or, without a condenser, a
+     * head/tail trim that at least never overflows the provider.
+     *
+     * @param list<array<string, mixed>> $documents
+     *
+     * @return list<array<string, mixed>> documents with `text` fitted and `fit_strategy` set
+     */
+    private function fitDocumentsToModel(array $documents, string $question, ?int $modelId, ?int $userId, int $outputTokens, ?callable $progressCallback): array
+    {
+        if (null === $this->contextCondenser || null === $this->modelContextWindow) {
+            return $documents;
+        }
+
+        $allText = implode("\n", array_map(static fn (array $doc): string => (string) ($doc['text'] ?? ''), $documents));
+        $totalChars = mb_strlen($allText);
+        if (0 === $totalChars) {
+            return $documents;
+        }
+
+        $totalBudget = $this->modelContextWindow->attachmentCharBudget($modelId, $allText, $userId, $outputTokens);
+        if ($totalChars <= $totalBudget) {
+            return $documents;
+        }
+
+        $this->notify($progressCallback, 'generating', count($documents) > 1
+            ? 'Documents are large — condensing them for the model...'
+            : 'Document is large — condensing it for the model...');
+
+        $fitted = [];
+        foreach ($documents as $doc) {
+            $text = (string) ($doc['text'] ?? '');
+            $docChars = mb_strlen($text);
+            $docBudget = max(1000, (int) floor($totalBudget * ($docChars / $totalChars)));
+
+            $result = $this->contextCondenser->fit($text, $question, $docBudget, $userId, function (array $progress) use ($progressCallback, $doc): void {
+                $this->notify($progressCallback, 'generating', sprintf(
+                    'Condensing %s — part %d of %d%s...',
+                    (string) ($doc['name'] ?? 'document'),
+                    $progress['chunk'],
+                    $progress['chunks'],
+                    $progress['level'] > 1 ? sprintf(' (round %d)', $progress['level']) : '',
+                ));
+            });
+
+            $note = $result->provenanceNote();
+            $doc['text'] = null !== $note ? $note."\n\n".$result->text : $result->text;
+            $doc['fit_strategy'] = $result->strategy;
+            $fitted[] = $doc;
+
+            $this->logger->info('FileAnalysisHandler: fitted document to model window', $result->toLogContext() + [
+                'file' => $doc['name'] ?? '',
+                'model_id' => $modelId,
+            ]);
+        }
+
+        return $fitted;
+    }
+
+    /**
+     * One analysis call, retried ONCE with a halved attachment budget when the
+     * provider rejects the request for size (context_length_exceeded / 413).
+     * Token estimates are approximate; this is the safety net for the cases
+     * where the estimate was still too generous.
+     *
+     * @param list<array<string, mixed>> $documents
+     * @param array<string, mixed>       $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function chatWithOverflowRetry(array $documents, string $finalPrompt, string $languageDirective, ?int $userId, array $aiOptions, ?callable $streamCallback): array
+    {
+        $messages = [
+            ['role' => 'system', 'content' => $this->buildDocumentsSystemPrompt($documents).$languageDirective],
+            ['role' => 'user', 'content' => $finalPrompt],
+        ];
+
+        try {
+            return null !== $streamCallback
+                ? $this->aiFacade->chatStream($messages, $streamCallback, $userId, $aiOptions)
+                : $this->aiFacade->chat($messages, $userId, $aiOptions);
+        } catch (\Throwable $e) {
+            $reason = $this->failureClassifier->classify($e);
+            if (null === $this->contextCondenser || !in_array($reason, [ChatFailureReason::ContextLengthExceeded, ChatFailureReason::RequestTooLarge], true)) {
+                throw $e;
+            }
+
+            $this->logger->warning('FileAnalysisHandler: provider rejected request size, retrying with halved attachment budget', [
+                'reason' => $reason->value,
+                'error' => $e->getMessage(),
+            ]);
+
+            $retryDocs = [];
+            foreach ($documents as $doc) {
+                $text = (string) ($doc['text'] ?? '');
+                $halved = $this->contextCondenser->trimmed($text, max(1000, (int) floor(mb_strlen($text) / 2)));
+                $doc['text'] = $halved->text;
+                $doc['fit_strategy'] = 'retry_'.$halved->strategy;
+                $retryDocs[] = $doc;
+            }
+
+            $messages[0]['content'] = $this->buildDocumentsSystemPrompt($retryDocs).$languageDirective;
+
+            return null !== $streamCallback
+                ? $this->aiFacade->chatStream($messages, $streamCallback, $userId, $aiOptions)
+                : $this->aiFacade->chat($messages, $userId, $aiOptions);
         }
     }
 

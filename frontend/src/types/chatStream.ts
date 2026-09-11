@@ -24,6 +24,10 @@ export interface StreamSearchResult {
   published?: string
   source?: string
   thumbnail?: string
+  /** True when the page body was read for the answer (deep research). */
+  fetched?: boolean
+  /** Where the URL actually resolved to (redirects / shortlinks), if different. */
+  final_url?: string | null
   [key: string]: unknown
 }
 
@@ -106,6 +110,13 @@ export interface StreamEventMetadata {
   results_count?: number
   query?: string
   results?: StreamSearchResult[]
+  /** Deep research (status === 'reading_pages' / 'pages_read'): result pages read. */
+  pages_total?: number
+  pages_read?: number
+  pages_attempted?: number
+  /** Linked pages (status === 'fetching_urls' / 'urls_fetched'). */
+  urls_total?: number
+  urls_read?: number
   [key: string]: unknown
 }
 

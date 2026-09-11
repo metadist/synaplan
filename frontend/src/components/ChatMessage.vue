@@ -223,6 +223,52 @@
                   </span>
                 </div>
               </template>
+              <template v-else-if="processingStatus === 'reading_pages'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.readingPagesTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    processingMetadata?.pages_total
+                      ? $t('processing.readingPagesProgress', {
+                          read: processingMetadata.pages_read ?? 0,
+                          total: processingMetadata.pages_total,
+                        })
+                      : $t('processing.readingPagesDesc')
+                  }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'pages_read'">
+                <div class="font-medium">{{ $t('processing.pagesReadTitle') }}</div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    $t(
+                      'processing.pagesReadDesc',
+                      { count: processingMetadata?.pages_read ?? 0 },
+                      processingMetadata?.pages_read ?? 0
+                    )
+                  }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'fetching_urls'">
+                <div class="font-medium animate-pulse">
+                  {{ $t('processing.fetchingUrlsTitle') }}
+                </div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{ $t('processing.fetchingUrlsDesc') }}
+                </div>
+              </template>
+              <template v-else-if="processingStatus === 'urls_fetched'">
+                <div class="font-medium">{{ $t('processing.urlsFetchedTitle') }}</div>
+                <div class="text-sm txt-tertiary mt-0.5">
+                  {{
+                    $t('processing.urlsFetchedDesc', {
+                      read: processingMetadata?.urls_read ?? 0,
+                      total: processingMetadata?.urls_total ?? 0,
+                    })
+                  }}
+                </div>
+              </template>
               <template v-else-if="processingStatus === 'analyzing'">
                 <div class="font-medium animate-pulse">{{ $t('processing.analyzingTitle') }}</div>
                 <div class="text-sm txt-tertiary mt-0.5">
@@ -471,6 +517,20 @@
                 >
                 <span v-if="webSearch.resultsCount" class="text-xs opacity-80 font-semibold">
                   · {{ webSearch.resultsCount }}
+                </span>
+                <span
+                  v-if="webSearch.pagesRead"
+                  class="text-xs opacity-80"
+                  :title="
+                    $t(
+                      'processing.pagesReadDesc',
+                      { count: webSearch.pagesRead },
+                      webSearch.pagesRead
+                    )
+                  "
+                  data-testid="badge-web-search-pages-read"
+                >
+                  · {{ $t('processing.pagesReadBadge', { count: webSearch.pagesRead }) }}
                 </span>
               </div>
 
@@ -1243,6 +1303,12 @@ interface Props {
     language?: string
     customMessage?: string
     results_count?: number
+    /** Deep research progress (status === 'reading_pages' / 'pages_read'). */
+    pages_total?: number
+    pages_read?: number
+    /** Linked pages the user pasted (status === 'fetching_urls' / 'urls_fetched'). */
+    urls_total?: number
+    urls_read?: number
     handler?: string
     /** Document generation progress (status === 'generating_file'). */
     stage?: string
@@ -1296,6 +1362,7 @@ interface Props {
     enabled?: boolean
     query?: string
     resultsCount?: number
+    pagesRead?: number
   } | null // Web search metadata
   tool?: {
     command?: string

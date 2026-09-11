@@ -36,6 +36,8 @@ final class SortClassificationSchemaTest extends TestCase
         $schema = SortClassificationSchema::build(['general'], ['en']);
         $properties = $schema->schema['properties'];
 
+        $this->assertSame('integer', $properties['BREADPAGES']['type']);
+        $this->assertSame([0, 2, 3], $properties['BREADPAGES']['enum']);
         $this->assertSame(['boolean', 'null'], $properties['BMULTI']['type']);
         $this->assertSame(['string', 'null'], $properties['BMEDIA']['type']);
         $this->assertSame(['string', 'null'], $properties['BINPUTMODE']['type']);
@@ -52,7 +54,7 @@ final class SortClassificationSchemaTest extends TestCase
         $schema = SortClassificationSchema::build(['general'], ['en']);
 
         $this->assertSame(
-            ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
+            ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
             $schema->schema['required'],
         );
         $this->assertSame(array_keys($schema->schema['properties']), $schema->schema['required']);

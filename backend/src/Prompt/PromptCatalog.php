@@ -383,7 +383,7 @@ If there are attached files, their types are listed in BATTACHED_FILES and the c
 
 You will respond only with a valid JSON object containing ONLY the
 classification fields listed under "Answer format" below (BTOPIC, BLANG,
-BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
+BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, BRESOLUTION). Never echo
 BTEXT, BFILETEXT, BFILEPATH, BDATETIME, or any other field from the message
 you received — those are input only.
 
@@ -454,6 +454,25 @@ This is the list, use only this:
 
    When in doubt and the message is conversational or answerable from general knowledge, set BWEBSEARCH to 0.
 
+6b. **Decide whether to dump the top search-result pages into the answer prompt (BREADPAGES)**:
+   Constrained by BWEBSEARCH — this is the router's second vote, not an automatic fetch.
+   - If BWEBSEARCH is 0 → BREADPAGES MUST be 0.
+   - If the message contains a concrete URL (https://…, lnkd.in, t.co, bit.ly) → BREADPAGES MUST be 0.
+     The system already fetches that page; do not also dump search-result pages.
+   - If BWEBSEARCH is 1 and the message has NO URL, decide whether search *snippets* are enough
+     or whether the answering model needs the first 2–3 result pages fetched and dumped into
+     its system prompt:
+     Set BREADPAGES to **3** when the answer needs figures, named companies, sectors, quotes,
+     lists, or "which / who / how much / in welche" detail that a 200-character teaser cannot
+     carry. Example: "VAE wollen 40 Mrd. € in Deutschland investieren — welche Sektoren/Unternehmen?"
+     → BWEBSEARCH: 1, BREADPAGES: 3
+     Set BREADPAGES to **2** when a couple of article bodies would help (current events with
+     specifics, "what exactly was announced") but a third page is unlikely to add more.
+     Set BREADPAGES to **0** when snippets suffice: weather, a stock ticker, "is X still CEO",
+     opening hours, a simple yes/no fact, "latest news from Berlin" as a headline roundup.
+   When in doubt on a research question with no URL, prefer 3 over 0 — a hedged
+   "I cannot confirm the figure" is worse than reading three pages.
+
 7. **Classify image attachments correctly**: When the message has image attachments (BATTACHED_FILES contains image types like jpg, jpeg, png, gif, webp, or BFILETYPE is an image type), you must distinguish between two intents:
 
    **Route to "mediamaker"** (BTOPIC = "mediamaker", BMEDIA = "image") when the user wants to:
@@ -487,8 +506,8 @@ This is the list, use only this:
    - "What is in this image?" → general
    - "What is that?" → general, BWEBSEARCH: 0 ("that" is the attached image — vision answers from the file)
    - "Was ist das?" → general, BWEBSEARCH: 0
-   - "How much does this cost?" → general, BWEBSEARCH: 1 (needs live prices for the thing shown — the system searches using the file's content)
-   - "Wo kann ich das kaufen?" → general, BWEBSEARCH: 1
+   - "How much does this cost?" → general, BWEBSEARCH: 1, BREADPAGES: 2 (needs live prices — a couple of shop/review pages)
+   - "Wo kann ich das kaufen?" → general, BWEBSEARCH: 1, BREADPAGES: 2
    - "Describe this photo" → general
    - "Read the text from this document" → general
    - "What differences do you see?" → general
@@ -613,6 +632,7 @@ BDATETIME, BATTACHED_FILES, ...):
 * "BTOPIC": [KEYLIST]
 * "BLANG": [LANGLIST]
 * "BWEBSEARCH": 0 | 1
+* "BREADPAGES": 0 | 2 | 3
 * "BMULTI": 0 | 1
 * "BMEDIA": "image" | "video" | "audio" (only when BTOPIC is "mediamaker")
 * "BINPUTMODE": "text_only" | "reference_images" (only when BTOPIC is "mediamaker" AND BMEDIA is "image")
@@ -627,7 +647,7 @@ If BTEXT is empty, but BFILETEXT is set, use BFILETEXT primarily to define the t
 
 If the user changes topics mid-conversation, update BTOPIC to match the new topic in your next response.
 
-Do not include any field beyond BTOPIC, BLANG, BWEBSEARCH, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
+Do not include any field beyond BTOPIC, BLANG, BWEBSEARCH, BREADPAGES, BMULTI, BMEDIA, BINPUTMODE, BDURATION, and BRESOLUTION.
 Do not add any additional text beyond the JSON.
 **Do not answer the question of the user.**
 Only send the JSON object with the classification fields above — nothing else.
@@ -809,10 +829,18 @@ Allowed topic keys: [KEYLIST]
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
-   mention the question does not depend on, and prefer `web_search` when no
-   concrete URL is given. Only use `url_fetch` if it appears in the
-   capability list above.
+   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
+   "read this and tell me what it says" → the same `url_fetch` → `chat`
+   chain. Do NOT emit `url_fetch` for a link mentioned in passing that the
+   question does not depend on, and prefer `web_search` when no concrete
+   URL is given. For a research question that needs figures, named
+   companies, sectors or quotes, set `params.read_pages` to 2 or 3 so the
+   top result pages are fetched and dumped into the answering prompt. Set
+   `params.read_pages` to 0 (or omit) when search snippets are enough
+   (weather, ticker, simple yes/no). Do NOT emit extra `url_fetch` nodes
+   for pages the search will find. Only use `url_fetch` if it appears in
+   the capability list above.
 9b2. The user asks to SAVE a URL and COMPARE it to a previous fetch, and/or
    mail the differences ("get this URL and save the details, compare it to
    a previously saved version and mail me the differences", "watch this

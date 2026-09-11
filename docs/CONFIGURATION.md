@@ -807,7 +807,11 @@ platforms, desktop client, office document tools, optional module gates — is a
 configuration → Features**. Automated deployments pin a flag with
 `FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.
 The complete table with keys, defaults and shipping PRs is in
-[FEATURE_FLAGS.md](FEATURE_FLAGS.md).
+[FEATURE_FLAGS.md](FEATURE_FLAGS.md). For flags that resolve the per-user row
+first (assistants, bundle export, workflow builder, Saved Tasks, MCP client,
+multitask routing, async media), a global write from the admin page also drops
+the acting administrator's own row, otherwise they would not see their own
+change.
 
 ---
 

@@ -104,14 +104,25 @@ final readonly class UrlFetchRunner implements TaskRunner
             ]);
         }
 
+        // Plain reads follow redirects/shortlink interstitials and report login
+        // walls (reader mode); compare mode keeps the robots-compliant crawl
+        // because its snapshots are stored and re-fetched over time.
         $results = [];
         foreach ($urls as $url) {
-            $results[] = $this->urlContentService->fetchForCrawling($url);
+            $results[] = $compare
+                ? $this->urlContentService->fetchForCrawling($url)
+                : $this->urlContentService->fetchForReading($url);
         }
 
         $successful = array_values(array_filter($results, static fn (UrlContentResult $r): bool => $r->success));
         if ([] === $successful) {
-            $firstError = $results[0]->error ?? 'fetch failed';
+            $first = $results[0];
+            $firstError = match ($first->blockedReason) {
+                'login_wall' => 'the page requires a login',
+                'bot_blocked' => 'the site refused automated access',
+                'unsupported_content' => 'the link is not a readable web page',
+                default => $first->error ?? 'fetch failed',
+            };
 
             return NodeResult::failed('could not read the page: '.$firstError);
         }

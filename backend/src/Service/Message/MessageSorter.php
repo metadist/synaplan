@@ -186,6 +186,8 @@ final readonly class MessageSorter
                     // WebSearchTopicPolicy in MessageProcessor (a custom topic
                     // that needs live data can set tool_internet=true).
                     'web_search' => false,
+                    // No LLM ran, so there is no BREADPAGES vote either.
+                    'read_pages' => null,
                     // Likewise no BMULTI vote — null keeps the planner's own
                     // decision in charge for rule-matched turns.
                     'multi_step' => null,
@@ -362,6 +364,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
+                'read_pages' => $parsed['read_pages'] ?? null,
                 'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
@@ -402,6 +405,7 @@ final readonly class MessageSorter
                 'topic' => $parsed['topic'],
                 'language' => $parsed['language'],
                 'web_search' => $parsed['web_search'] ?? false,
+                'read_pages' => $parsed['read_pages'] ?? null,
                 'multi_step' => $parsed['multi_step'] ?? null,
                 'media_type' => $parsed['media_type'] ?? null,
                 'duration' => $parsed['duration'] ?? null,
@@ -441,6 +445,7 @@ final readonly class MessageSorter
                 'topic' => 'general',
                 'language' => $messageData['BLANG'] ?? 'en',
                 'web_search' => false,
+                'read_pages' => null,
                 'multi_step' => null,
                 'raw_response' => '',
                 'sorting_model_id' => $modelId,
@@ -697,6 +702,7 @@ final readonly class MessageSorter
                 'parse_failed' => true,
                 'language' => $originalData['BLANG'] ?? 'en',
                 'web_search' => false,
+                'read_pages' => null,
                 'multi_step' => null,
                 'media_type' => null,
                 'duration' => null,
@@ -711,6 +717,18 @@ final readonly class MessageSorter
         $webSearch = false;
         if (isset($data['BWEBSEARCH'])) {
             $webSearch = (bool) $data['BWEBSEARCH'];
+        }
+
+        // Parse BREADPAGES (0 = snippets only, 2 or 3 = dump that many
+        // result pages into the answer prompt). Null when the model omitted
+        // the field (older prompt / dropped key) so ReadPagesPolicy can
+        // tell "no vote" from an explicit 0. A search vote of 0 forces 0.
+        $readPages = null;
+        if (array_key_exists('BREADPAGES', $data) && null !== $data['BREADPAGES'] && is_numeric($data['BREADPAGES'])) {
+            $readPages = ReadPagesPolicy::clamp((int) $data['BREADPAGES']);
+        }
+        if (!$webSearch) {
+            $readPages = 0;
         }
 
         // Parse BMULTI — the sorter's vote on whether answering this
@@ -769,6 +787,7 @@ final readonly class MessageSorter
             'parse_failed' => false,
             'language' => $data['BLANG'] ?? $originalData['BLANG'] ?? 'en',
             'web_search' => $webSearch,
+            'read_pages' => $readPages,
             'multi_step' => $multiStep,
             'media_type' => $mediaType,
             'duration' => $duration,
