@@ -9,7 +9,9 @@ use App\Service\Config\LayeredConfigResolver;
 use App\Service\Feature\FeatureFlagEnv;
 
 /**
- * BCONFIG DOCUMENT_TOOLS.* — all flags default OFF / conservative.
+ * BCONFIG DOCUMENT_TOOLS.* — ENABLED is seeded ON and pinnable with
+ * FEATURE_DOCUMENT_TOOLS_ENABLED; the code fallback without a row and every
+ * other flag stay OFF / conservative.
  */
 final readonly class DocumentToolsConfig
 {

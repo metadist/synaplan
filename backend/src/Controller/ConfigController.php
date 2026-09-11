@@ -27,6 +27,7 @@ use App\Service\Client\MobileVersionService;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
+use App\Service\Document\DocumentToolsConfig;
 use App\Service\Embedding\EmbeddingMetadataService;
 use App\Service\Embedding\EmbeddingModelChangeGuard;
 use App\Service\Embedding\Exception\PremiumRequiredException;
@@ -108,6 +109,7 @@ class ConfigController extends AbstractController
         private readonly ?BundleConfig $bundleConfig = null,
         private readonly ?ToolsConfig $toolsConfig = null,
         private readonly ?WorkflowsConfig $workflowsConfig = null,
+        private readonly ?DocumentToolsConfig $documentToolsConfig = null,
     ) {
     }
 
@@ -526,10 +528,7 @@ class ConfigController extends AbstractController
             'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
             'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
-            'documentToolsEnabled' => true === filter_var(
-                $this->configRepository->getValue(0, 'DOCUMENT_TOOLS', 'ENABLED') ?? '0',
-                \FILTER_VALIDATE_BOOL
-            ),
+            'documentToolsEnabled' => null !== $this->documentToolsConfig && $this->documentToolsConfig->isEnabled($user?->getId()),
             'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
             'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
             'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
