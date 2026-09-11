@@ -10,6 +10,7 @@ import UrlWatchPanel from '@/components/config/UrlWatchPanel.vue'
 import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
 import { iamApi, type IamSharedItem } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { isAgentsEnabled } from '@/composables/useAgentsFeature'
 
 type OverviewTab = 'tasks' | 'watches'
 
@@ -24,6 +25,8 @@ const activeTab = ref<OverviewTab>('tasks')
 const watchesAvailable = ref(true)
 const watchCount = ref(0)
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
+/** With Assistants on, tasks are born from assistant triggers, not the Instructions page. */
+const agentsEnabled = computed(() => isAgentsEnabled())
 
 const tabs = computed<TabNavItem[]>(() => {
   const items: TabNavItem[] = [
@@ -167,10 +170,18 @@ onMounted(() => {
           class="surface-card p-5 txt-secondary text-sm"
           data-testid="saved-tasks-empty"
         >
-          {{ $t('config.savedTasks.overviewEmpty') }}
-          <RouterLink to="/ai/instructions" class="txt-primary underline">
-            {{ $t('nav.configTaskPrompts') }}
-          </RouterLink>
+          <template v-if="agentsEnabled">
+            {{ $t('config.savedTasks.overviewEmptyAssistants') }}
+            <RouterLink to="/ai/assistants" class="txt-primary underline">
+              {{ $t('nav.assistants') }}
+            </RouterLink>
+          </template>
+          <template v-else>
+            {{ $t('config.savedTasks.overviewEmpty') }}
+            <RouterLink to="/ai/instructions" class="txt-primary underline">
+              {{ $t('nav.configTaskPrompts') }}
+            </RouterLink>
+          </template>
         </p>
 
         <ul v-else-if="filterShared" class="space-y-4" data-testid="section-shared-tasks">

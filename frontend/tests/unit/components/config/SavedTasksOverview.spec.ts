@@ -3,8 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import type { SavedTask } from '@/services/api/savedTasksApi'
 
-const { mockList } = vi.hoisted(() => ({
+const { mockList, mockAgentsEnabled } = vi.hoisted(() => ({
   mockList: vi.fn(),
+  mockAgentsEnabled: vi.fn(() => false),
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -17,6 +18,10 @@ vi.mock('@/composables/useNotification', () => ({
 
 vi.mock('@/composables/useIamFeature', () => ({
   isIamSharingEnabled: () => false,
+}))
+
+vi.mock('@/composables/useAgentsFeature', () => ({
+  isAgentsEnabled: () => mockAgentsEnabled(),
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -72,7 +77,7 @@ const mountPage = async () => {
     global: {
       stubs: {
         Icon: true,
-        RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        RouterLink: { template: '<a :to="to"><slot /></a>', props: ['to'] },
         TabNav: TabNavStub,
         SavedTaskCard: { template: '<div data-testid="saved-task-card" />', props: ['task'] },
         UrlWatchPanel: UrlWatchPanelStub,
@@ -91,7 +96,20 @@ describe('SavedTasksOverview', () => {
   it('shows the empty state when nothing is saved', async () => {
     mockList.mockResolvedValue([])
     const wrapper = await mountPage()
-    expect(wrapper.get('[data-testid="saved-tasks-empty"]').text()).toContain('Nothing scheduled')
+    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
+    expect(empty.text()).toContain('Nothing scheduled')
+    expect(empty.text()).toContain('save a custom instruction')
+    expect(empty.get('a').attributes('to')).toBe('/ai/instructions')
+  })
+
+  it('points the empty state at Assistants while the Assistants flag is on', async () => {
+    mockAgentsEnabled.mockReturnValue(true)
+    mockList.mockResolvedValue([])
+    const wrapper = await mountPage()
+    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
+    expect(empty.text()).toContain('add a schedule to an assistant')
+    expect(empty.get('a').attributes('to')).toBe('/ai/assistants')
+    mockAgentsEnabled.mockReturnValue(false)
   })
 
   it('lists each saved task', async () => {
@@ -113,7 +131,7 @@ describe('SavedTasksOverview', () => {
       global: {
         stubs: {
           Icon: true,
-          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+          RouterLink: { template: '<a :to="to"><slot /></a>', props: ['to'] },
           TabNav: TabNavStub,
           SavedTaskCard: {
             props: ['task'],

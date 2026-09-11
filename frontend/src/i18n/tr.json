@@ -2903,6 +2903,7 @@
       "overviewSubtitle": "İstediğinde veya daha sonra bir zamanlamayla çalışan talimatlar.",
       "overviewLoading": "Kayıtlı görevler yükleniyor…",
       "overviewEmpty": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya özel bir talimat kaydet:",
+      "overviewEmptyAssistants": "Henüz zamanlanmış bir şey yok. Sohbette bir plan bitince saati kullan — veya bir asistana zamanlama ekle:",
       "loadFailed": "Kayıtlı görevler yüklenemedi.",
       "delete": "Sil",
       "deleteConfirm": "\"{name}\" kayıtlı görevi silinsin mi? Bu görevin paylaşımları da kaldırılır.",

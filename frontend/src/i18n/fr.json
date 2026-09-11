@@ -2001,6 +2001,7 @@
       "overviewSubtitle": "Instructions qui s’exécutent quand vous le demandez, ou plus tard selon un planning.",
       "overviewLoading": "Chargement des tâches enregistrées…",
       "overviewEmpty": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou enregistrez une instruction personnalisée sous",
+      "overviewEmptyAssistants": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou ajoutez une planification à un assistant sous",
       "loadFailed": "Impossible de charger les tâches enregistrées.",
       "delete": "Supprimer",
       "deleteConfirm": "Supprimer la tâche enregistrée « {name} » ? Les partages de cette tâche sont aussi retirés.",

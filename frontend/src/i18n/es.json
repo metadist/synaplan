@@ -2902,6 +2902,7 @@
       "overviewSubtitle": "Instrucciones que se ejecutan cuando las pides, o más tarde según un horario.",
       "overviewLoading": "Cargando tareas guardadas…",
       "overviewEmpty": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o guarda una instrucción propia en",
+      "overviewEmptyAssistants": "Aún no hay nada programado. Cuando termine un plan en el chat, usa el reloj — o añade una programación a un asistente en",
       "loadFailed": "No se pudieron cargar las tareas guardadas.",
       "delete": "Eliminar",
       "deleteConfirm": "¿Eliminar la tarea guardada \"{name}\"? También se quitan los usos compartidos de esta tarea.",

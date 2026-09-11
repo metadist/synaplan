@@ -2113,6 +2113,7 @@
       "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
       "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
       "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
+      "overviewEmptyAssistants": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder einem Assistenten einen Zeitplan geben unter",
       "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
       "delete": "Löschen",
       "deleteConfirm": "Die gespeicherte Aufgabe \"{name}\" löschen? Freigaben dieser Aufgabe werden ebenfalls entfernt.",

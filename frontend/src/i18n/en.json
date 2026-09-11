@@ -2003,6 +2003,7 @@
       "overviewSubtitle": "Instructions that run when you ask, or later on a schedule.",
       "overviewLoading": "Loading saved tasks…",
       "overviewEmpty": "Nothing scheduled yet. After a chat plan finishes, use the clock — or save a custom instruction under",
+      "overviewEmptyAssistants": "Nothing scheduled yet. After a chat plan finishes, use the clock — or add a schedule to an assistant under",
       "loadFailed": "Could not load saved tasks.",
       "delete": "Delete",
       "deleteConfirm": "Delete the saved task \"{name}\"? Shares of this task are removed too.",
