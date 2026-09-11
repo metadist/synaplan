@@ -55,6 +55,26 @@ x-app-environment: &app-environment
   # registration off; SSO-/OIDC-only deployments set both to "false".
   REGISTRATION_ENABLED: "${REGISTRATION_ENABLED:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
+  # Feature-flag pins (docs/FEATURE_FLAGS.md). Every flag is ON by default and
+  # managed under Operate > System configuration > Features; an empty value here
+  # keeps it that way. "false" pins the feature off for this deployment and
+  # locks the admin toggle. Module gates (FEATURE_MODULES_GATE_<ID>) are per
+  # module and go into a compose override when a deployment needs one.
+  FEATURE_IAM_GROUPS_ENABLED: "${FEATURE_IAM_GROUPS_ENABLED:-}"
+  FEATURE_IAM_SHARING_ENABLED: "${FEATURE_IAM_SHARING_ENABLED:-}"
+  FEATURE_IAM_GROUP_POLICIES_ENABLED: "${FEATURE_IAM_GROUP_POLICIES_ENABLED:-}"
+  FEATURE_IAM_DIRECTORY_SYNC_ENABLED: "${FEATURE_IAM_DIRECTORY_SYNC_ENABLED:-}"
+  FEATURE_AGENTS_ENABLED: "${FEATURE_AGENTS_ENABLED:-}"
+  FEATURE_AGENTS_ROUTABLE_ENABLED: "${FEATURE_AGENTS_ROUTABLE_ENABLED:-}"
+  FEATURE_BUNDLE_ENABLED: "${FEATURE_BUNDLE_ENABLED:-}"
+  FEATURE_WORKFLOWS_BUILDER_ENABLED: "${FEATURE_WORKFLOWS_BUILDER_ENABLED:-}"
+  FEATURE_MULTITASK_URL_FETCH_ENABLED: "${FEATURE_MULTITASK_URL_FETCH_ENABLED:-}"
+  FEATURE_TOOLS_REGISTRY_ENABLED: "${FEATURE_TOOLS_REGISTRY_ENABLED:-}"
+  FEATURE_TOOLS_APPROVALS_ENABLED: "${FEATURE_TOOLS_APPROVALS_ENABLED:-}"
+  FEATURE_TOOLS_CUSTOM_HTTP_ENABLED: "${FEATURE_TOOLS_CUSTOM_HTTP_ENABLED:-}"
+  FEATURE_DOCUMENT_TOOLS_ENABLED: "${FEATURE_DOCUMENT_TOOLS_ENABLED:-}"
+  FEATURE_DESKTOP_AGENT_ENABLED: "${FEATURE_DESKTOP_AGENT_ENABLED:-}"
+  FEATURE_PLATFORM_LINKS_ENABLED: "${FEATURE_PLATFORM_LINKS_ENABLED:-}"
   # First-run setup wizard. Empty keeps it enabled, which is what a deployment
   # without BOOTSTRAP_ADMIN_* needs: the API stays closed with 503 SETUP_REQUIRED
   # until someone creates the first administrator at /setup. It never appears once

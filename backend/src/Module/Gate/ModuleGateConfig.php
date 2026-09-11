@@ -6,6 +6,7 @@ namespace App\Module\Gate;
 
 use App\Entity\Config;
 use App\Repository\ConfigRepository;
+use App\Service\Feature\FeatureFlagEnv;
 use Symfony\Contracts\Service\ResetInterface;
 
 /**
@@ -15,7 +16,8 @@ use Symfony\Contracts\Service\ResetInterface;
  * uniform 404 on the module's routes while the module is absent. Every flag is
  * seeded OFF ({@see \App\Seed\ModuleGateSeeder}) and an unknown or malformed
  * value also reads as OFF, so an installation never gates anything it did not
- * opt into.
+ * opt into. Operators flip a gate under Operate → System configuration →
+ * Features, or pin it with `FEATURE_MODULES_GATE_<ID>` ({@see FeatureFlagEnv}).
  *
  * Not `readonly`: the whole group is loaded with one query on first use and
  * memoized for the rest of the request; {@see ResetInterface} clears the memo
@@ -31,6 +33,7 @@ final class ModuleGateConfig implements ResetInterface
 
     public function __construct(
         private readonly ConfigRepository $configRepository,
+        private readonly ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -42,7 +45,13 @@ final class ModuleGateConfig implements ResetInterface
 
     public function isGated(string $moduleId): bool
     {
-        return $this->flags()[self::settingFor($moduleId)] ?? false;
+        $setting = self::settingFor($moduleId);
+        $pinned = $this->featureFlagEnv?->forced(self::GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
+
+        return $this->flags()[$setting] ?? false;
     }
 
     public function reset(): void

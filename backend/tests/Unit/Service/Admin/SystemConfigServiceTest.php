@@ -10,6 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Service\Admin\SystemConfigService;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\EncryptionService;
+use App\Service\Feature\FeatureFlagEnv;
 use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
@@ -390,8 +391,8 @@ final class SystemConfigServiceTest extends TestCase
                 }
             );
 
-        $groups = $this->service->setValue('IAM_GROUPS_ENABLED', 'true', 1);
-        $sharing = $this->service->setValue('IAM_SHARING_ENABLED', 'true', 1);
+        $groups = $this->service->setValue('FEATURE_IAM_GROUPS_ENABLED', 'true', 1);
+        $sharing = $this->service->setValue('FEATURE_IAM_SHARING_ENABLED', 'true', 1);
 
         $this->assertTrue($groups['success']);
         $this->assertFalse($groups['requiresRestart']);
@@ -416,8 +417,68 @@ final class SystemConfigServiceTest extends TestCase
 
         $values = $this->service->getValues();
 
-        $this->assertSame('true', $values['IAM_GROUPS_ENABLED']['value']);
-        $this->assertTrue($values['IAM_GROUPS_ENABLED']['isSet']);
+        $this->assertSame('true', $values['FEATURE_IAM_GROUPS_ENABLED']['value']);
+        $this->assertTrue($values['FEATURE_IAM_GROUPS_ENABLED']['isSet']);
+    }
+
+    /**
+     * Every toggle on the Features tab is keyed by the environment variable
+     * that pins it, so the "locked by {key}" hint names a variable that exists
+     * and docs/FEATURE_FLAGS.md can be derived from the schema.
+     */
+    public function testFeatureTabKeysAreTheirOwnEnvironmentVariable(): void
+    {
+        $schema = $this->service->getSchema();
+
+        $this->assertArrayHasKey('features', $schema['tabs']);
+
+        $seen = [];
+        foreach ($schema['tabs']['features']['sections'] as $section) {
+            foreach ($section['fields'] as $key) {
+                $field = $schema['fields'][$key];
+                $this->assertSame('features', $field['tab'], $key);
+                $this->assertSame('boolean', $field['type'], $key);
+                $this->assertSame('database', $field['source'] ?? null, $key);
+                $this->assertSame(FeatureFlagEnv::envVarFor($field['dbGroup'] ?? '', $field['dbKey'] ?? ''), $key);
+                $seen[] = $key;
+            }
+        }
+
+        foreach ([
+            'FEATURE_IAM_GROUPS_ENABLED', 'FEATURE_IAM_SHARING_ENABLED', 'FEATURE_IAM_GROUP_POLICIES_ENABLED',
+            'FEATURE_IAM_DIRECTORY_SYNC_ENABLED', 'FEATURE_AGENTS_ENABLED', 'FEATURE_AGENTS_ROUTABLE_ENABLED',
+            'FEATURE_BUNDLE_ENABLED', 'FEATURE_WORKFLOWS_BUILDER_ENABLED', 'FEATURE_MULTITASK_URL_FETCH_ENABLED',
+            'FEATURE_TOOLS_REGISTRY_ENABLED', 'FEATURE_TOOLS_APPROVALS_ENABLED', 'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
+            'FEATURE_DOCUMENT_TOOLS_ENABLED', 'FEATURE_DESKTOP_AGENT_ENABLED', 'FEATURE_PLATFORM_LINKS_ENABLED',
+        ] as $expected) {
+            $this->assertContains($expected, $seen);
+            $this->assertSame('true', $schema['fields'][$expected]['default'], $expected.' ships ON');
+        }
+    }
+
+    public function testFeatureFlagPinnedByTheEnvironmentIsReportedAsLocked(): void
+    {
+        $this->configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'WORKFLOWS' === $group ? '1' : null
+        );
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: new ProviderKeyStore($this->configRepository, new EncryptionService('test-secret', new NullLogger()), new NullLogger()),
+            encryption: new EncryptionService('test-secret', new NullLogger()),
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+            featureFlagEnv: new FeatureFlagEnv(['FEATURE_WORKFLOWS_BUILDER_ENABLED' => 'false']),
+        );
+
+        $values = $service->getValues();
+
+        $this->assertTrue($values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['envOverride']);
+        $this->assertSame('false', $values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['effectiveValue']);
+        $this->assertSame('true', $values['FEATURE_WORKFLOWS_BUILDER_ENABLED']['value'], 'the stored row is still shown');
+        $this->assertArrayNotHasKey('envOverride', $values['FEATURE_AGENTS_ENABLED']);
     }
 
     public function testConversationSummaryDefaultsMirrorTheConstants(): void
@@ -477,9 +538,9 @@ final class SystemConfigServiceTest extends TestCase
     }
 
     /**
-     * Assistants, the workflow builder and bundle export shipped seeded OFF with
-     * no way to turn them on other than raw SQL. Each one has to reach its own
-     * BCONFIG group, not the default QDRANT_SEARCH group.
+     * Assistants, the workflow builder and bundle export write their own
+     * BCONFIG group, not the default QDRANT_SEARCH group. The Features-tab
+     * keys are the FEATURE_* pins that #1827 introduced.
      */
     public function testProductFeatureFlagsWriteToTheirOwnGroupRow(): void
     {
@@ -494,7 +555,12 @@ final class SystemConfigServiceTest extends TestCase
                 }
             );
 
-        foreach (['AGENTS_ENABLED', 'AGENTS_ROUTABLE_ENABLED', 'BUNDLE_ENABLED', 'WORKFLOWS_BUILDER_ENABLED'] as $key) {
+        foreach ([
+            'FEATURE_AGENTS_ENABLED',
+            'FEATURE_AGENTS_ROUTABLE_ENABLED',
+            'FEATURE_BUNDLE_ENABLED',
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+        ] as $key) {
             $this->assertTrue($this->service->setValue($key, 'true', 1)['success'], $key);
         }
 
@@ -517,31 +583,32 @@ final class SystemConfigServiceTest extends TestCase
             ->method('deleteValue')
             ->with(7, 'AGENTS', 'ENABLED');
 
-        $this->service->setValue('AGENTS_ENABLED', 'true', 7);
+        $this->service->setValue('FEATURE_AGENTS_ENABLED', 'true', 7);
     }
 
     public function testBundleFlagWriteWithoutActingUserDoesNotDeleteAnything(): void
     {
         $this->configRepository->expects($this->never())->method('deleteValue');
 
-        $this->service->setValue('BUNDLE_ENABLED', 'true');
+        $this->service->setValue('FEATURE_BUNDLE_ENABLED', 'true');
     }
 
-    public function testAssistantsAndPortabilityFlagsAreReachableFromTheirTab(): void
+    public function testAssistantsAndWorkflowFlagsLiveOnTheFeaturesTab(): void
     {
         $schema = $this->service->getSchema();
 
         self::assertSame(
-            ['AGENTS_ENABLED', 'AGENTS_ROUTABLE_ENABLED'],
-            $schema['tabs']['routing']['sections']['assistants']['fields'],
+            ['FEATURE_AGENTS_ENABLED', 'FEATURE_AGENTS_ROUTABLE_ENABLED', 'FEATURE_BUNDLE_ENABLED'],
+            $schema['tabs']['features']['sections']['assistants']['fields'],
         );
-        self::assertSame(
-            ['BUNDLE_ENABLED'],
-            $schema['tabs']['interface']['sections']['portability']['fields'],
+        self::assertContains(
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+            $schema['tabs']['features']['sections']['tasks']['fields'],
         );
-        self::assertContains('WORKFLOWS_BUILDER_ENABLED', $schema['tabs']['routing']['sections']['saved_tasks']['fields']);
-        self::assertSame('false', $schema['fields']['AGENTS_ENABLED']['default']);
-        self::assertSame('boolean', $schema['fields']['BUNDLE_ENABLED']['type']);
+        self::assertSame('true', $schema['fields']['FEATURE_AGENTS_ENABLED']['default']);
+        self::assertSame('boolean', $schema['fields']['FEATURE_BUNDLE_ENABLED']['type']);
+        self::assertArrayNotHasKey('assistants', $schema['tabs']['routing']['sections']);
+        self::assertArrayNotHasKey('portability', $schema['tabs']['interface']['sections']);
     }
 
     /**

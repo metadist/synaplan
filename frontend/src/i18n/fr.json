@@ -657,7 +657,7 @@
       "tabGroups": {
         "aiData": "IA et données",
         "communication": "Communication",
-        "security": "Accès"
+        "security": "Fonctions et accès"
       },
       "liveBadge": "En direct",
       "liveHint": "Les modifications prennent effet immédiatement, sans redémarrage.",
@@ -1993,8 +1993,6 @@
         "inbound_email": "e-mail entrant",
         "webhook": "lancée par un autre système"
       },
-      "advancedSteps": "Étapes avancées",
-      "advancedHint": "Laissez ceci fermé sauf si vous voulez figer des étapes précises. La plupart des tâches n’ont besoin que de Lancer maintenant et d’un planning.",
       "autoPauseTitle": "En pause automatiquement",
       "autoPauseBody": "Cette tâche a échoué trois fois de suite. Corrigez le problème, puis reprenez.",
       "createFailed": "Impossible d’enregistrer ceci comme tâche.",
@@ -2003,6 +2001,7 @@
       "overviewSubtitle": "Instructions qui s’exécutent quand vous le demandez, ou plus tard selon un planning.",
       "overviewLoading": "Chargement des tâches enregistrées…",
       "overviewEmpty": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou enregistrez une instruction personnalisée sous",
+      "overviewEmptyAssistants": "Rien n’est encore planifié. Après un plan de chat, utilisez l’horloge — ou ajoutez une planification à un assistant sous",
       "loadFailed": "Impossible de charger les tâches enregistrées.",
       "delete": "Supprimer",
       "deleteConfirm": "Supprimer la tâche enregistrée « {name} » ? Les partages de cette tâche sont aussi retirés.",
@@ -2010,7 +2009,7 @@
       "deleteFailed": "Impossible de supprimer la tâche enregistrée.",
       "watches": {
         "title": "Pages surveillées",
-        "subtitle": "Une copie enregistrée par adresse. Une tâche quotidienne peut relire la page, la comparer et vous envoyer les différences par e-mail.",
+        "subtitle": "Surveillez des pages web et soyez informé de ce qui a changé.",
         "hint": "Dans le chat : « récupère cette URL, enregistre-la, compare-la à la dernière version et envoie-moi les différences » — puis enregistrez cela comme tâche quotidienne.",
         "urlPlaceholder": "https://exemple.com/page",
         "add": "Surveiller cette page",
@@ -2039,7 +2038,12 @@
         "lastFetched": "Dernier enregistrement {when}",
         "lastCheckFailed": "Dernière vérification échouée : {reason}",
         "lastDiff": "Ce qui a changé",
-        "untitled": "Page sans titre"
+        "untitled": "Page sans titre",
+        "how": {
+          "step1": "Ajoutez l’adresse d’une page que vous voulez surveiller.",
+          "step2": "Synaplan conserve une copie de cette page et la met à jour à chaque vérification.",
+          "step3": "Une tâche enregistrée planifiée peut revérifier la page, la comparer à la copie et vous envoyer les différences par e-mail."
+        }
       },
       "scheduleThis": "Relancer plus tard",
       "scheduleThisHint": "Donnez un nom à cette tâche. Vous pourrez définir le planning à l’écran suivant.",
@@ -2086,7 +2090,11 @@
       "waitingApproval": "En attente d’approbation",
       "waitingApprovalCount": "{count} exécution en attente d’approbation | {count} exécutions en attente d’approbation",
       "approvalExpired": "Approbation expirée",
-      "rejectedBy": "Refusé par {name}"
+      "rejectedBy": "Refusé par {name}",
+      "tabs": {
+        "tasks": "Tâches enregistrées",
+        "watches": "Pages surveillées"
+      }
     },
     "connections": {
       "title": "Connexions",
@@ -2405,7 +2413,6 @@
     "desktop": {
       "title": "Ordinateur",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
-      "notAvailableYet": "Synaplan Desktop n'est pas encore disponible au téléchargement. Vous pouvez déjà créer un code d'association pour tester la connexion.",
       "pairButton": "Associer cet ordinateur",
       "loadFailed": "Impossible de charger les ordinateurs connectés.",
       "disconnect": "Déconnecter",
@@ -2457,6 +2464,19 @@
         "unknownSkill": "Cet ordinateur n'a pas ce skill.",
         "skillDisabled": "Ce skill est désactivé sur cet ordinateur.",
         "localError": "Le skill a échoué sur cet ordinateur."
+      },
+      "get": {
+        "title": "Obtenir Synaplan Desktop",
+        "beta": "Bêta",
+        "platforms": "Disponible pour",
+        "description": "Une petite application pour macOS, Windows et Linux. Elle s’associe à votre compte Synaplan et exécute sur votre propre ordinateur les compétences que vous installez, par exemple créer une présentation à partir de vos notes.",
+        "github": "Obtenir sur GitHub",
+        "releases": "Versions",
+        "betaNote": "Les versions bêta ne sont pas encore signées ; votre système peut donc demander une confirmation au premier démarrage. Le dépôt explique aussi comment compiler l’application vous-même.",
+        "stepsTitle": "Se connecter en trois étapes",
+        "step1": "Installez Synaplan Desktop sur l’ordinateur que vous voulez utiliser.",
+        "step2": "Cliquez ici sur « Associer cet ordinateur » et copiez l’adresse et le code.",
+        "step3": "Saisissez les deux dans l’application. L’ordinateur apparaît ensuite dans la liste ci-dessous."
       }
     },
     "phoneVerification": {

@@ -42,8 +42,16 @@ final class DesktopControllerTest extends WebTestCase
         $this->em->flush();
     }
 
+    private function disableFlag(): void
+    {
+        static::getContainer()->get(ConfigRepository::class)
+            ->setValue(0, DesktopAgentConfig::CONFIG_GROUP, DesktopAgentConfig::KEY_ENABLED, '0');
+        $this->em->flush();
+    }
+
     public function testCreatePairingCodeIs404WhenFlagOff(): void
     {
+        $this->disableFlag();
         $user = $this->createUser('desktop-rest-off@synaplan.internal');
         $this->authenticateClient($this->client, $user);
 
@@ -54,6 +62,7 @@ final class DesktopControllerTest extends WebTestCase
 
     public function testEnqueueJobIs404WhenFlagOff(): void
     {
+        $this->disableFlag();
         $user = $this->createUser('desktop-rest-enq-off@synaplan.internal');
         $this->authenticateClient($this->client, $user);
 

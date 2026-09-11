@@ -38,9 +38,9 @@ Every data node obeys the same rules (plan 09 §2):
 | `mcp_action` | `McpActionRunner` | WRITE actions (create/update — e.g. Confluence pages, Jira tickets) on connected MCP servers whose owner enabled **allow write actions** (`BMCPSERVERS.BALLOWWRITE`); destructive tools always refused | `MCP.CLIENT_ENABLED` + `MULTITASK.MCP_ACTION_ENABLED` + per-topic `tool_mcp` + per-server `allow_write` | **on** (seeded), write opt-in per server **off** |
 | `email_search` | `EmailSearchRunner` | Live read-only search over the user's IMAP accounts (`InboundEmailHandler`) **and** Microsoft 365 connections (`GraphMailboxSearcher`, delegated `Mail.Read`) | `MULTITASK.EMAIL_SEARCH_ENABLED` | **on** (seeded) |
 | `rag_query` | `ChatRunner` | User knowledge base (Qdrant) | – | on |
-| `tool_call` | `ToolCallRunner` | A registered custom or MCP tool from an authored Saved Task. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **off** |
-| `outbound_webhook` | `OutboundWebhookRunner` | HMAC-signed HTTPS POST of a step result. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **off** |
-| `condition` | `ConditionRunner` | Gate: on false the node stops and later steps skip; the run completes. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **off** |
+| `tool_call` | `ToolCallRunner` | A registered custom or MCP tool from an authored Saved Task. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
+| `outbound_webhook` | `OutboundWebhookRunner` | HMAC-signed HTTPS POST of a step result. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
+| `condition` | `ConditionRunner` | Gate: on false the node stops and later steps skip; the run completes. Hidden from the planner. | `WORKFLOWS.BUILDER_ENABLED` | **on** (seeded; `FEATURE_WORKFLOWS_BUILDER_ENABLED`) |
 
 Authored step inputs (`params.inputs`) are `{ "literal": "…" }`,
 `{ "from": "step_2", "field": "summary" }`, or

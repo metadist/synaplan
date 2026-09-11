@@ -66,19 +66,19 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  14. messages-gateway (BCONFIG: MESSAGES_GATEWAY Anthropic-compatible API flags, ownerId=0 — default OFF)
  *  15. saved-tasks   (BCONFIG: SAVEDTASKS.ENABLED, ownerId=0 — default ON for new/local installs)
  *  16. file-context  (BCONFIG: FILE_CONTEXT conversation-file flags, ownerId=0 — default OFF)
- *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default OFF until GA)
- *  17b. iam          (BCONFIG: IAM.* flags, ownerId=0 — default OFF)
- *  17c. agents       (BCONFIG: AGENTS.ENABLED, ownerId=0 — default OFF)
- *  17d. platform-links (BCONFIG: PLATFORM_LINKS.ENABLED, ownerId=0 — default OFF)
- *  17e. bundle       (BCONFIG: BUNDLE.ENABLED, ownerId=0 — default OFF)
+ *  17. desktop-agent (BCONFIG: DESKTOP_AGENT.ENABLED, ownerId=0 — default ON)
+ *  17b. iam          (BCONFIG: IAM.* flags, ownerId=0 — feature flags default ON)
+ *  17c. agents       (BCONFIG: AGENTS.ENABLED, ownerId=0 — default ON)
+ *  17d. platform-links (BCONFIG: PLATFORM_LINKS.ENABLED, ownerId=0 — default ON)
+ *  17e. bundle       (BCONFIG: BUNDLE.ENABLED, ownerId=0 — default ON)
  *  18. self-aware    (BCONFIG: SELF_AWARE flags, ownerId=0 — default ON)
  *  19. structured-output (BCONFIG: STRUCTURED_OUTPUT.ENABLED, ownerId=0 — default ON)
  *  20. embedding-router (BCONFIG: EMBEDDING_ROUTER.ENABLED + CONFIDENCE_THRESHOLD, ownerId=0 — default OFF)
  *  21. native-tool-routing (BCONFIG: NATIVE_TOOL_ROUTING.ENABLED, ownerId=0 — default OFF)
- *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — default OFF)
+ *  22. document-tools (BCONFIG: DOCUMENT_TOOLS flags, ownerId=0 — ENABLED default ON)
  *  23. plugs         (BCONFIG: PLUGS extraction/search/rerank defaults, ownerId=0)
  *  24. tools         (BCONFIG: TOOLS registry/approvals/custom-HTTP flags, ownerId=0)
- *  24b. workflows    (BCONFIG: WORKFLOWS.BUILDER_ENABLED, ownerId=0 — default OFF)
+ *  24b. workflows    (BCONFIG: WORKFLOWS.BUILDER_ENABLED, ownerId=0 — default ON)
  *  25. module-gates  (BCONFIG: MODULES.GATE_<ID> all OFF, ownerId=0)
  *  26. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
@@ -149,19 +149,19 @@ final class SeedAllCommand extends Command
             "  14. messages gateway flags     (BCONFIG, group=MESSAGES_GATEWAY, ownerId=0 — default OFF)\n".
             "  15. saved-tasks flag           (BCONFIG, group=SAVEDTASKS, ownerId=0 — default ON for new/local)\n".
             "  16. file-context flags         (BCONFIG, group=FILE_CONTEXT, ownerId=0 — default OFF)\n".
-            "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default OFF until GA)\n".
-            "  17b. iam flags                 (BCONFIG, group=IAM, ownerId=0 — default OFF)\n".
-            "  17c. agents flag               (BCONFIG, group=AGENTS, ownerId=0 — default OFF)\n".
-            "  17d. platform-links flag       (BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default OFF)\n".
-            "  17e. bundle flag               (BCONFIG, group=BUNDLE, ownerId=0 — default OFF)\n".
+            "  17. desktop-agent flag         (BCONFIG, group=DESKTOP_AGENT, ownerId=0 — default ON)\n".
+            "  17b. iam flags                 (BCONFIG, group=IAM, ownerId=0 — feature flags default ON)\n".
+            "  17c. agents flag               (BCONFIG, group=AGENTS, ownerId=0 — default ON)\n".
+            "  17d. platform-links flag       (BCONFIG, group=PLATFORM_LINKS, ownerId=0 — default ON)\n".
+            "  17e. bundle flag               (BCONFIG, group=BUNDLE, ownerId=0 — default ON)\n".
             "  18. self-aware flags           (BCONFIG, group=SELF_AWARE, ownerId=0 — default ON)\n".
             "  19. structured-output flag     (BCONFIG, group=STRUCTURED_OUTPUT, ownerId=0 — default ON)\n".
             "  20. embedding-router flags     (BCONFIG, group=EMBEDDING_ROUTER, ownerId=0 — default OFF)\n".
             "  21. native-tool-routing flag   (BCONFIG, group=NATIVE_TOOL_ROUTING, ownerId=0 — default OFF)\n".
-            "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — default OFF)\n".
+            "  22. document-tools flags       (BCONFIG, group=DOCUMENT_TOOLS, ownerId=0 — ENABLED default ON)\n".
             "  23. plugs defaults             (BCONFIG, group=PLUGS, ownerId=0 — today's FileProcessor + Brave)\n".
             "  24. tools flags                (BCONFIG, group=TOOLS, ownerId=0)\n".
-            "  24b. workflows builder flag    (BCONFIG, group=WORKFLOWS, ownerId=0 — default OFF)\n".
+            "  24b. workflows builder flag    (BCONFIG, group=WORKFLOWS, ownerId=0 — default ON)\n".
             "  25. module-gates               (BCONFIG, group=MODULES, GATE_<ID>=0 for every declared module)\n".
             "  26. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'

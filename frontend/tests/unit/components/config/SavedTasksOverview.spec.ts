@@ -3,8 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import SavedTasksOverview from '@/components/config/SavedTasksOverview.vue'
 import type { SavedTask } from '@/services/api/savedTasksApi'
 
-const { mockList } = vi.hoisted(() => ({
+const { mockList, mockAgentsEnabled } = vi.hoisted(() => ({
   mockList: vi.fn(),
+  mockAgentsEnabled: vi.fn(() => false),
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -17,6 +18,10 @@ vi.mock('@/composables/useNotification', () => ({
 
 vi.mock('@/composables/useIamFeature', () => ({
   isIamSharingEnabled: () => false,
+}))
+
+vi.mock('@/composables/useAgentsFeature', () => ({
+  isAgentsEnabled: () => mockAgentsEnabled(),
 }))
 
 vi.mock('@/services/api/iamApi', () => ({
@@ -45,14 +50,37 @@ const task: SavedTask = {
   waitingApprovalCount: 0,
 }
 
+const TabNavStub = {
+  props: ['modelValue', 'tabs'],
+  emits: ['update:modelValue'],
+  template: `
+    <nav data-testid="tab-nav">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        type="button"
+        :data-testid="tab.testid"
+        :data-badge="tab.badge"
+        @click="$emit('update:modelValue', tab.id)"
+      >{{ tab.label }}</button>
+    </nav>`,
+}
+
+const UrlWatchPanelStub = {
+  emits: ['unavailable', 'count'],
+  template:
+    '<div data-testid="url-watch-panel"><button type="button" data-testid="emit-unavailable" @click="$emit(\'unavailable\')" /><button type="button" data-testid="emit-count" @click="$emit(\'count\', 2)" /></div>',
+}
+
 const mountPage = async () => {
   const wrapper = mount(SavedTasksOverview, {
     global: {
       stubs: {
         Icon: true,
-        RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+        RouterLink: { template: '<a :to="to"><slot /></a>', props: ['to'] },
+        TabNav: TabNavStub,
         SavedTaskCard: { template: '<div data-testid="saved-task-card" />', props: ['task'] },
-        UrlWatchPanel: { template: '<div data-testid="url-watch-panel" />' },
+        UrlWatchPanel: UrlWatchPanelStub,
       },
     },
   })
@@ -68,7 +96,20 @@ describe('SavedTasksOverview', () => {
   it('shows the empty state when nothing is saved', async () => {
     mockList.mockResolvedValue([])
     const wrapper = await mountPage()
-    expect(wrapper.get('[data-testid="saved-tasks-empty"]').text()).toContain('Nothing scheduled')
+    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
+    expect(empty.text()).toContain('Nothing scheduled')
+    expect(empty.text()).toContain('save a custom instruction')
+    expect(empty.get('a').attributes('to')).toBe('/ai/instructions')
+  })
+
+  it('points the empty state at Assistants while the Assistants flag is on', async () => {
+    mockAgentsEnabled.mockReturnValue(true)
+    mockList.mockResolvedValue([])
+    const wrapper = await mountPage()
+    const empty = wrapper.get('[data-testid="saved-tasks-empty"]')
+    expect(empty.text()).toContain('add a schedule to an assistant')
+    expect(empty.get('a').attributes('to')).toBe('/ai/assistants')
+    mockAgentsEnabled.mockReturnValue(false)
   })
 
   it('lists each saved task', async () => {
@@ -90,13 +131,14 @@ describe('SavedTasksOverview', () => {
       global: {
         stubs: {
           Icon: true,
-          RouterLink: { template: '<a><slot /></a>', props: ['to'] },
+          RouterLink: { template: '<a :to="to"><slot /></a>', props: ['to'] },
+          TabNav: TabNavStub,
           SavedTaskCard: {
             props: ['task'],
             template:
               '<button type="button" data-testid="emit-deleted" @click="$emit(\'deleted\', task.id)" />',
           },
-          UrlWatchPanel: { template: '<div data-testid="url-watch-panel" />' },
+          UrlWatchPanel: UrlWatchPanelStub,
         },
       },
     })
@@ -104,5 +146,37 @@ describe('SavedTasksOverview', () => {
     await wrapper.get('[data-testid="emit-deleted"]').trigger('click')
     expect(wrapper.find('[data-testid="emit-deleted"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="saved-tasks-empty"]').exists()).toBe(true)
+  })
+
+  it('starts on Saved tasks and switches to Watched pages', async () => {
+    mockList.mockResolvedValue([task])
+    const wrapper = await mountPage()
+    const tasksPane = wrapper.get('[data-testid="saved-tasks-pane"]')
+    const watchesPane = wrapper.get('[data-testid="watched-pages-pane"]')
+    const hidden = (pane: typeof tasksPane) =>
+      (pane.attributes('style') ?? '').includes('display: none')
+    expect(hidden(tasksPane)).toBe(false)
+    expect(hidden(watchesPane)).toBe(true)
+    expect(wrapper.get('[data-testid="tab-saved-tasks"]').attributes('data-badge')).toBe('1')
+
+    await wrapper.get('[data-testid="tab-watched-pages"]').trigger('click')
+    expect(hidden(tasksPane)).toBe(true)
+    expect(hidden(watchesPane)).toBe(false)
+
+    await wrapper.get('[data-testid="emit-count"]').trigger('click')
+    expect(wrapper.get('[data-testid="tab-watched-pages"]').attributes('data-badge')).toBe('2')
+  })
+
+  it('drops the Watched pages tab when the feature is off on this instance', async () => {
+    mockList.mockResolvedValue([task])
+    const wrapper = await mountPage()
+    await wrapper.get('[data-testid="tab-watched-pages"]').trigger('click')
+    await wrapper.get('[data-testid="emit-unavailable"]').trigger('click')
+    expect(wrapper.find('[data-testid="tab-nav"]').exists()).toBe(false)
+    expect(
+      (wrapper.get('[data-testid="saved-tasks-pane"]').attributes('style') ?? '').includes(
+        'display: none'
+      )
+    ).toBe(false)
   })
 })

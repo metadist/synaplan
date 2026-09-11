@@ -115,10 +115,27 @@ test.describe('@ci Admin panel', () => {
         timeout: TIMEOUTS.STANDARD,
       })
     } else {
+      // No groups, policies or audit to show: the old URL lands on the Operate
+      // user list instead of a 404.
+      await expect(page.locator(selectors.pages.admin)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
+      await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
+      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
+    }
+
+    await page.goto('/groups')
+    if (iamGroups) {
+      await expect(page.locator('[data-testid="view-my-groups"]')).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+    } else {
+      // Its only action links into People, so the page itself stays unroutable.
       await expect(page.locator('[data-testid="page-not-found"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
+      await expect(page.locator('[data-testid="view-my-groups"]')).toHaveCount(0)
     }
 
     await page.goto('/admin?tab=users')

@@ -24,6 +24,7 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
 | `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
 | `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `FEATURE_<GROUP>_<SETTING>` | *unset* | Pins one wave feature flag (`FEATURE_IAM_SHARING_ENABLED=false`, `FEATURE_DESKTOP_AGENT_ENABLED=false`, …); **overrides** the toggle on Admin → System Configuration → Features. All flags default **on**. Full list: [FEATURE_FLAGS.md](FEATURE_FLAGS.md) |
 | `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
 
 ---
@@ -655,17 +656,20 @@ AUTH_COOKIE_SECURE=
 
 ## People, sharing and directory (`IAM`)
 
-These live in **Operate → System configuration → Access → Sharing** (`BCONFIG`
-group `IAM`, owner 0). They take effect immediately — no restart. All flags
-seed **off** so an existing install stays unchanged until you turn them on.
+The four feature switches live in **Operate → System configuration → Features
+→ People & sharing**, the remaining settings under **Access → Sharing**
+(`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
+The switches are **on by default**; pin one off for an automated deployment
+with its `FEATURE_*` environment variable (see
+[Feature flags](FEATURE_FLAGS.md)).
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
-| `IAM.GROUPS_ENABLED` | `0` | People page, groups, audit tab |
-| `IAM.SHARING_ENABLED` | `0` | Share dialog and “Shared with me” (requires groups) |
-| `IAM.GROUP_POLICIES_ENABLED` | `0` | People → Policies and group-layer defaults (requires groups) |
+| `IAM.GROUPS_ENABLED` | `1` | People page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
+| `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
+| `IAM.GROUP_POLICIES_ENABLED` | `1` | People → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
 | `IAM.EVERYONE_SHARES` | `any_owner` | Who may share with everyone (`any_owner` / `admins_only`) |
-| `IAM.DIRECTORY_SYNC_ENABLED` | `0` | Put people into groups from the OIDC groups claim at sign-in |
+| `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put people into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
 | `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
 | `IAM.ADMIN_IMPERSONATION` | `audited` | `audited` writes an audit row; `disabled` blocks “View as user” |
@@ -689,38 +693,17 @@ See [People and groups](ADMIN.md#people-and-groups) in the admin guide.
 
 ---
 
-## Assistants, workflows and portability (`AGENTS`, `WORKFLOWS`, `BUNDLE`)
-
-Product features that shipped switched off. They live in **Operate → System
-configuration**: Assistants and the workflow builder under *Routing*,
-Export & import under *Interface*. Each row is `BCONFIG` owner 0 and takes
-effect immediately — the browser has to reload, because the frontend reads the
-flags from `/api/v1/config/runtime`.
-
-| Setting | Default | Meaning |
-| ------- | ------- | ------- |
-| `AGENTS.ENABLED` | `0` | Assistants gallery, builder, pin-to-chat and assistant shares. Off = `/ai/assistants` is not found, `/api/v1/agents*` returns 404 and a streamed `agentId` is ignored |
-| `AGENTS.ROUTABLE_ENABLED` | `0` | Lets an assistant published as routable be picked by message classification. Requires `AGENTS.ENABLED` |
-| `WORKFLOWS.BUILDER_ENABLED` | `0` | Steps editor on a Saved Task and the inbound webhook trigger. Off = step graphs are rejected and webhook calls refused. Requires `SAVEDTASKS.ENABLED` |
-| `BUNDLE.ENABLED` | `0` | `synaplan-bundle.v1` Export & import in Settings (own resources) and System configuration (instance). Off = both panels hidden, `/api/v1/bundle*` returns 404 |
-
-All four resolve the per-user row before the global one, so a single account
-can be opted in with a `BOWNERID = <userId>` row. Setting the global switch
-from the admin page drops the acting administrator's own row, otherwise they
-would not see their own change.
-
----
-
 ## Linked platforms (`PLATFORM_LINKS`)
 
 Lets users of a registered Nextcloud / ownCloud / OpenCloud instance link the
 Synaplan account they already have instead of getting a provisioned one
-(`BCONFIG` group `PLATFORM_LINKS`, owner 0). Seeded off; toggling needs no
+(`BCONFIG` group `PLATFORM_LINKS`, owner 0). On by default (**Features →
+Platforms & desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); toggling needs no
 restart. The Outlook add-in bridge is not affected by this flag.
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
-| `PLATFORM_LINKS.ENABLED` | `0` | `/api/v1/platform-links/*`, `/api/v1/me/platform-links*`, the **Linked platforms** page and the admin tab. Off = those routes return 404 |
+| `PLATFORM_LINKS.ENABLED` | `1` | `/api/v1/platform-links/*`, `/api/v1/me/platform-links*`, the **Linked platforms** page and the admin tab. Off = those routes return 404 |
 
 Fixed limits (constants, not settings): link codes expire after 300 s and are
 single-use; 20 codes per user per hour; 10 anonymous instance registrations
@@ -798,6 +781,23 @@ Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
 OpenAI-compatible endpoint with the `rerank` capability. With rerank
 off, storage `limit` stays exactly `k`. See [RAG.md](RAG.md#reranking)
 and [AI plugs](ADMIN.md#ai-plugs-s1-s4).
+
+---
+
+## Feature flags (`FEATURE_*`)
+
+Every feature from the September 2026 waves — people & sharing, AI assistants,
+tool registry and approvals, saved-task steps, watched pages, linked
+platforms, desktop client, office document tools, optional module gates — is a
+`BCONFIG` flag that is **on by default** and editable under **Operate → System
+configuration → Features**. Automated deployments pin a flag with
+`FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.
+The complete table with keys, defaults and shipping PRs is in
+[FEATURE_FLAGS.md](FEATURE_FLAGS.md). For flags that resolve the per-user row
+first (assistants, bundle export, workflow builder, Saved Tasks, MCP client,
+multitask routing, async media), a global write from the admin page also drops
+the acting administrator's own row, otherwise they would not see their own
+change.
 
 ---
 

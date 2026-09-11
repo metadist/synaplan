@@ -285,22 +285,45 @@ Rotate `APP_SECRET`:
 
 1. Generate new secret: `openssl rand -hex 16`
 2. Update ENV var, restart backend
-3. Existing JWT tokens are invalidated — users must re-login
+3. Signed-in users stay signed in: only the 5-minute `access_token` cookies
+   stop verifying, and the browser silently obtains new ones through
+   `/auth/refresh` because the refresh tokens in `BTOKENS` do not depend on
+   `APP_SECRET`. To force everyone out, clear `BTOKENS` as described under
+   *Sessions survive restarts*. Provider API keys encrypted with the old
+   secret become unreadable and must be re-entered.
 
 ### CORS
 
 `CORS_ALLOW_ORIGIN` must match your frontend domain exactly. Never use `*` in production.
 
-### JWT Keys
+### Sessions survive restarts
 
-Auto-generated on first start at `backend/config/jwt/`. To regenerate:
+There is no JWT keypair to generate. Sign-in uses two HttpOnly cookies minted
+by `App\Service\TokenService`:
 
-```bash
-docker compose --env-file deploy/.env -f deploy/compose.yaml \
-  exec backend php bin/console lexik:jwt:generate-keypair --overwrite
-```
+| Cookie | Lifetime | Where it lives | What a restart does |
+| ------ | -------- | -------------- | ------------------- |
+| `access_token` | 5 minutes | HMAC-signed with `APP_SECRET`, not stored | Nothing — the signature still verifies |
+| `refresh_token` | 30 days, sliding on every refresh | `BTOKENS` in MariaDB | Nothing — the row is still there |
 
-All active sessions are invalidated on key rotation.
+Restarting or redeploying the backend, worker, Redis or the whole compose
+stack therefore keeps every browser and mobile-app session; the web app
+retries `/auth/refresh` through a 5xx/network blip instead of treating it as a
+sign-out, and only a definitive `401`/`403` ends the session. Two things must
+stay stable for that to hold:
+
+- **`APP_SECRET`** — the self-hosted stack persists it in
+  `deploy/data/secrets.env` (see `deploy/README.md`); Helm and other
+  automated deployments must inject the same value on every rollout. A new
+  secret invalidates every access cookie at once (sessions recover through
+  `/auth/refresh`, see *Token Rotation*) and makes the provider API keys
+  stored in the database unreadable.
+- **The MariaDB volume** — `BTOKENS` holds the refresh tokens. Wiping the
+  database signs everyone out.
+
+To sign every user out deliberately, delete their rows from `BTOKENS`
+(`DELETE FROM BTOKENS WHERE BTYPE = 'refresh'`). Rotating `APP_SECRET` alone
+does **not** do that — the refresh tokens are plain database rows.
 
 ### HTTPS
 
@@ -371,14 +394,19 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 ## People and groups
 
 Groups, the People page under Operate, and the group API are gated by
-`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The seeder inserts the
-flag as `0`. Existing installs stay unchanged until an operator turns it on
-in **Operate → System configuration → Access → Sharing**
-(`/admin/config?tab=sharing`).
+`IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The flag is **on by
+default** (seeded `1`; a migration turns it on for existing installs). Operators
+switch it in **Operate → System configuration → Features → People & sharing**
+(`/admin/config?tab=features`, field `FEATURE_IAM_GROUPS_ENABLED`) or pin it
+for automated deployments with the environment variable
+`FEATURE_IAM_GROUPS_ENABLED=false`. See [Feature flags](FEATURE_FLAGS.md) for
+the full list.
 
 When the flag is off:
 
-- Operate has no People child.
+- The Operate **People** child opens the Operate **Users** tab
+  (`/admin?tab=users`); `/admin/people` redirects there.
+- `/groups` is not routable and shows the not-found page.
 - `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.
 - The Operate Overview **Users** tab is unchanged.
 
@@ -396,8 +424,9 @@ When the flag is on:
 
 ## Sharing
 
-Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
-`1`. When they are on:
+Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
+(both are on by default; **Features → People & sharing** or
+`FEATURE_IAM_SHARING_ENABLED`). When they are on:
 
 - An owner can share a knowledge folder, a conversation, an **AI assistant**,
   a **saved task**, or a **chat widget** with a person, a group, or everyone
@@ -417,15 +446,17 @@ Sharing is off until both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` are
   Revoking the share closes them again on the next request.
 - The public link token of a conversation is only returned to its owner; a
   group share never exposes it.
-- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `0`) puts people into groups from the
+- `IAM.DIRECTORY_SYNC_ENABLED` (seeded `1`) puts people into groups from the
   company login (OIDC groups claim) at sign-in. Role mapping is unchanged.
   Directory groups show **From your login** on People; you can still add extra
   people by hand. Login-managed memberships update at the next sign-in.
 
 ### Directory groups
 
-Turn **Directory groups** on under **Operate → System configuration → Access →
-Sharing** (`IAM_DIRECTORY_SYNC_ENABLED`). Optional settings:
+**Directory groups** is on by default; switch it under **Operate → System
+configuration → Features → People & sharing**
+(`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings stay under
+**Access → Sharing**. Optional settings:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -452,10 +483,10 @@ to hide that action.
 
 ### Group policies and locked defaults
 
-Turn **Group policies** on under **Operate → System configuration → Access →
-Sharing** (`IAM_GROUP_POLICIES_ENABLED`). People & groups must already be on.
-The seeder inserts the flag as `0`. Off means every resolver still reads only
-`[user, global]` and never touches `BGROUPCONFIG`.
+**Group policies** is switched under **Operate → System configuration →
+Features → People & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). People &
+groups must also be on. The seeder inserts the flag as `1`. Off means every
+resolver reads only `[user, global]` and never touches `BGROUPCONFIG`.
 
 When the flag is on, People shows a **Policies** tab. Pick one group at a
 time and set:
@@ -478,10 +509,11 @@ row.
 
 Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
 
-Enable the People, sharing, and (optionally) policy switches under
-**Operate → System configuration → Access → Sharing**. The page reloads the
-runtime config so People, Share, and Policies appear without a restart.
-SQL remains available for automation:
+The People, sharing, and policy switches live under
+**Operate → System configuration → Features → People & sharing**. The page
+reloads the runtime config so People, Share, and Policies appear without a
+restart. For automated deployments pin a flag with its `FEATURE_*` environment
+variable (the toggle then shows as locked); SQL remains available too:
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
@@ -489,29 +521,12 @@ VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
 ON DUPLICATE KEY UPDATE BVALUE = '1';
 ```
 
-### Turning Assistants, workflows and Export & import on
-
-Three product features ship switched off and are switched on in **Operate →
-System configuration**, no SQL and no restart:
-
-| Feature | Where | Setting |
-| ------- | ----- | ------- |
-| Assistants (gallery, builder, pin to chat) | Routing → AI assistants | `AGENTS.ENABLED` |
-| Routable assistants (classifier may pick one) | Routing → AI assistants | `AGENTS.ROUTABLE_ENABLED` |
-| Workflow steps on a Saved Task + webhook trigger | Routing → Saved Tasks | `WORKFLOWS.BUILDER_ENABLED` |
-| Export & import (`synaplan-bundle.v1`) | Interface → Export & import | `BUNDLE.ENABLED` |
-
-Users have to reload the page afterwards: the frontend reads these from
-`/api/v1/config/runtime` at start-up. A single account can be opted in ahead
-of the instance with a per-user `BCONFIG` row (`BOWNERID = <userId>`), which
-wins over the global one.
-
 ### Publishing an assistant to a group
 
 1. Turn groups and sharing on (both flags above).
 2. Create a custom assistant under **AI → Assistants** (**AI → Instructions**
-   while `AGENTS.ENABLED` is off). System assistants with owner `0` cannot be
-   shared — everyone can already use them.
+   while `FEATURE_AGENTS_ENABLED` is off). System assistants with owner `0`
+   cannot be shared — everyone can already use them.
 3. Open **Share** and grant **Can use** to the group (for example Sales).
 4. Members of that group see the assistant in their list and the classifier
    may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the
@@ -553,9 +568,10 @@ Public token links are unchanged. Admins do not see other people's chats,
 files, assistants, tasks, or widget transcripts unless those items are shared
 with them.
 
-Turn **People & groups** on from the same Sharing page (`IAM_GROUPS_ENABLED`).
-Members then see **Account → My groups**. Rollback is the same toggle (or
-SQL with `'0'`). Group rows stay in the database.
+**People & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
+Features tab). Members see **Account → My groups**. Rollback is the same toggle
+(or SQL with `'0'`, or `FEATURE_IAM_GROUPS_ENABLED=false`). Group rows stay in
+the database.
 
 API keys: empty or legacy webhook-only scopes keep full access. A key that
 opts into `iam:read` or `iam:manage` is limited to those People routes.
@@ -641,8 +657,9 @@ Synaplan. The result is a scoped API key (`chat`, `files`, `rag`, optionally
 time. The Outlook add-in (Synamail) uses the same bridge page and is always on.
 
 Everything under `/api/v1/platform-links/*` and `/api/v1/me/platform-links*`
-is gated by `PLATFORM_LINKS.ENABLED` (seeded `0`); with the flag off those
-routes answer **404** and nothing in the UI changes.
+is gated by `PLATFORM_LINKS.ENABLED` (on by default — **Features → Platforms
+& desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); with the flag off those routes
+answer **404** and nothing in the UI changes.
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)

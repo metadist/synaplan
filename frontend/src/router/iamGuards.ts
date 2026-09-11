@@ -2,15 +2,27 @@ import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 
 /**
- * Flag off: /admin/people is treated as unknown (U5 / U11).
- * Nav already hides the People child; this stops the URL and the
- * `/admin?tab=users` redirect from offering a surface whose APIs 404.
+ * Flag off: People has no groups, policies or audit to show, so the route
+ * lands on the Operate user list instead of a dead end. The Operate nav entry
+ * points there directly.
  */
-export function peopleRouteGuard(to?: RouteLocationNormalized): true | RouteLocationRaw {
+export function peopleRouteGuard(): true | RouteLocationRaw {
   if (isIamGroupsEnabled()) {
     return true
   }
-  const path = to?.path.replace(/^\//, '') ?? 'admin/people'
+  return { name: 'admin', query: { tab: 'users' } }
+}
+
+/**
+ * Flag off: /groups has no data, its APIs 404 (U5 / U11) and its only action
+ * links into People, so the route is treated as unknown. Nav already hides the
+ * entry; this covers a bookmark or a hand-typed URL.
+ */
+export function groupsRouteGuard(to?: RouteLocationNormalized): true | RouteLocationRaw {
+  if (isIamGroupsEnabled()) {
+    return true
+  }
+  const path = to?.path.replace(/^\//, '') ?? 'groups'
   return {
     name: 'not-found',
     params: { pathMatch: path.split('/') },

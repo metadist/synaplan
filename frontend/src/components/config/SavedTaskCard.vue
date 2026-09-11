@@ -41,7 +41,6 @@ const hmacSaving = ref(false)
 
 const running = ref(false)
 const showRuns = ref(false)
-const showAdvanced = ref(false)
 const runs = ref<SavedTaskRun[]>([])
 const scheduleKind = ref('off')
 const scheduleAt = ref('07:00')
@@ -498,15 +497,6 @@ const onRunCopy = async () => {
       >
         {{ $t('workflows.steps') }}
       </button>
-      <button
-        v-else-if="!workflowsEnabled"
-        type="button"
-        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
-        data-testid="btn-advanced-steps"
-        @click="showAdvanced = !showAdvanced"
-      >
-        {{ $t('config.savedTasks.advancedSteps') }}
-      </button>
     </div>
 
     <ul v-if="showRuns" class="space-y-2 text-sm" data-testid="saved-task-runs">
@@ -529,10 +519,6 @@ const onRunCopy = async () => {
       </li>
       <li v-else class="text-xs txt-secondary">{{ $t('config.savedTasks.runsEmpty') }}</li>
     </ul>
-
-    <p v-if="showAdvanced && !workflowsEnabled" class="text-xs txt-secondary">
-      {{ $t('config.savedTasks.advancedHint') }}
-    </p>
 
     <div
       v-if="workflowsEnabled && task.triggerType === 'webhook' && !sharedView"

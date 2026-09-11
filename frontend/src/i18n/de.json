@@ -652,7 +652,7 @@
       "tabGroups": {
         "aiData": "KI & Daten",
         "communication": "Kommunikation",
-        "security": "Zugang"
+        "security": "Funktionen & Zugang"
       },
       "liveBadge": "Live",
       "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",
@@ -2105,8 +2105,6 @@
         "inbound_email": "eingehende E-Mail",
         "webhook": "von einem anderen System gestartet"
       },
-      "advancedSteps": "Erweiterte Schritte",
-      "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
       "autoPauseTitle": "Automatisch pausiert",
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",
@@ -2115,6 +2113,7 @@
       "overviewSubtitle": "Anweisungen, die auf Zuruf oder später nach Zeitplan laufen.",
       "overviewLoading": "Gespeicherte Aufgaben werden geladen…",
       "overviewEmpty": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder eine eigene Anweisung speichern unter",
+      "overviewEmptyAssistants": "Noch nichts geplant. Nach einem Chat-Plan das Uhr-Symbol nutzen — oder einem Assistenten einen Zeitplan geben unter",
       "loadFailed": "Gespeicherte Aufgaben konnten nicht geladen werden.",
       "delete": "Löschen",
       "deleteConfirm": "Die gespeicherte Aufgabe \"{name}\" löschen? Freigaben dieser Aufgabe werden ebenfalls entfernt.",
@@ -2122,7 +2121,7 @@
       "deleteFailed": "Die gespeicherte Aufgabe konnte nicht gelöscht werden.",
       "watches": {
         "title": "Beobachtete Seiten",
-        "subtitle": "Eine gespeicherte Kopie pro Adresse. Eine tägliche Aufgabe kann die Seite erneut holen, vergleichen und dir die Unterschiede mailen.",
+        "subtitle": "Webseiten im Blick behalten und erfahren, was sich geändert hat.",
         "hint": "Im Chat z. B.: „hol diese URL, speichere sie, vergleiche mit der letzten Version und maile mir die Unterschiede“ — dann als tägliche Aufgabe speichern.",
         "urlPlaceholder": "https://example.com/seite",
         "add": "Seite beobachten",
@@ -2151,7 +2150,12 @@
         "lastFetched": "Zuletzt gespeichert {when}",
         "lastCheckFailed": "Letzte Prüfung fehlgeschlagen: {reason}",
         "lastDiff": "Was sich geändert hat",
-        "untitled": "Seite ohne Titel"
+        "untitled": "Seite ohne Titel",
+        "how": {
+          "step1": "Trage die Adresse einer Seite ein, die du im Blick behalten willst.",
+          "step2": "Synaplan behält eine gespeicherte Kopie dieser Seite und aktualisiert sie bei jeder Prüfung.",
+          "step3": "Eine geplante gespeicherte Aufgabe kann die Seite erneut prüfen, mit der Kopie vergleichen und dir die Unterschiede mailen."
+        }
       },
       "scheduleThis": "Später erneut ausführen",
       "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
@@ -2198,7 +2202,11 @@
       "waitingApproval": "Wartet auf Freigabe",
       "waitingApprovalCount": "{count} Ausführung wartet auf Freigabe | {count} Ausführungen warten auf Freigabe",
       "approvalExpired": "Freigabe abgelaufen",
-      "rejectedBy": "Abgelehnt von {name}"
+      "rejectedBy": "Abgelehnt von {name}",
+      "tabs": {
+        "tasks": "Gespeicherte Aufgaben",
+        "watches": "Beobachtete Seiten"
+      }
     },
     "connections": {
       "title": "Verbindungen",
@@ -2504,7 +2512,6 @@
     "desktop": {
       "title": "Desktop",
       "description": "Synaplan Desktop ist eine separate App für diesen Computer. Sie nutzt dein Synaplan-Konto und kann Skills ausführen, die du installierst.",
-      "notAvailableYet": "Synaplan Desktop steht noch nicht zum Download bereit. Du kannst aber schon einen Verbindungscode erstellen, um die Verbindung zu testen.",
       "pairButton": "Diesen Computer verbinden",
       "loadFailed": "Die verbundenen Computer konnten nicht geladen werden.",
       "disconnect": "Trennen",
@@ -2556,6 +2563,19 @@
         "unknownSkill": "Dieser Computer hat diesen Skill nicht.",
         "skillDisabled": "Dieser Skill ist auf diesem Computer deaktiviert.",
         "localError": "Der Skill ist auf diesem Computer fehlgeschlagen."
+      },
+      "get": {
+        "title": "Synaplan Desktop holen",
+        "beta": "Beta",
+        "platforms": "Verfügbar für",
+        "description": "Eine kleine App für macOS, Windows und Linux. Sie verbindet sich mit deinem Synaplan-Konto und führt die Skills, die du installierst, auf deinem eigenen Computer aus – zum Beispiel eine Präsentation aus deinen Notizen bauen.",
+        "github": "Auf GitHub holen",
+        "releases": "Releases",
+        "betaNote": "Beta-Builds sind noch nicht signiert, dein Betriebssystem fragt beim ersten Start deshalb möglicherweise nach. Im Repository steht auch, wie du die App selbst baust.",
+        "stepsTitle": "In drei Schritten verbinden",
+        "step1": "Installiere Synaplan Desktop auf dem Computer, den du nutzen willst.",
+        "step2": "Klicke hier auf „Diesen Computer verbinden“ und kopiere Adresse und Code.",
+        "step3": "Gib beides in der App ein. Der Computer erscheint dann in der Liste unten."
       }
     },
     "phoneVerification": {

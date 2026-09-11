@@ -84,13 +84,14 @@ final readonly class ProviderDefaultsService
             'PIC2TEXT' => 'anthropic:claude-sonnet-5:pic2text',
         ],
         'google' => [
-            'CHAT' => 'google:gemini-3.5-flash:chat',
-            'TOOLS' => 'google:gemini-3.5-flash:chat',
-            'ANALYZE' => 'google:gemini-3.5-flash:chat',
+            'CHAT' => 'google:gemini-3.8-flash:chat',
+            'TOOLS' => 'google:gemini-3.8-flash:chat',
+            'ANALYZE' => 'google:gemini-3.8-flash:chat',
             'SORT' => 'google:gemini-3.1-flash-lite:chat',
             'PLAN' => 'google:gemini-3.1-flash-lite:chat',
             'SUMMARIZE' => 'google:gemini-3.1-flash-lite:chat',
-            'PIC2TEXT' => 'google:gemini-3.5-flash:pic2text',
+            'PIC2TEXT' => 'google:gemini-3.8-flash:pic2text',
+            'SOUND2TEXT' => 'google:gemini-3.5-transcribe:sound2text',
         ],
         'mistral' => [
             'CHAT' => 'mistral:mistral-medium-latest:chat',

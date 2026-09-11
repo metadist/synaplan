@@ -58,6 +58,7 @@ const testingService = ref<string | null>(null)
 
 // Tab icons
 const tabIcons: Record<string, string> = {
+  features: 'mdi:toggle-switch-outline',
   ai: 'mdi:robot',
   email: 'mdi:email-outline',
   auth: 'mdi:shield-key',
@@ -102,7 +103,7 @@ const groupDefs = [
     id: 'security',
     icon: 'mdi:shield-key',
     labelKey: 'admin.config.tabGroups.security',
-    tabIds: ['auth', 'sharing'],
+    tabIds: ['features', 'auth', 'sharing'],
   },
 ]
 
@@ -275,7 +276,9 @@ async function handleUpdate(key: string, value: string) {
       if (result.requiresRestart) {
         showRestartBanner.value = true
       }
-      if (key === 'IAM_GROUPS_ENABLED' || key === 'IAM_SHARING_ENABLED') {
+      // Feature flags feed the runtime config (navigation, share buttons,
+      // Steps editor, …) — reload it so the change is visible at once.
+      if (schema.value?.fields[key]?.tab === 'features') {
         await configStore.reload()
       }
     }

@@ -51,6 +51,10 @@ final readonly class MultitaskConfigSeeder
             // mailbox or Microsoft 365 account (dynamic availability note).
             // Insert-if-missing: an operator's explicit OFF row survives.
             ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_EMAIL_SEARCH_ENABLED, 'value' => '1'],
+            // url_fetch / URL watch (Wave 3): ON so "watch this page and mail me
+            // the differences" works out of the box. Explicit row so the toggle
+            // under System configuration → Features has something to show.
+            ['ownerId' => 0, 'group' => MultitaskRoutingConfig::CONFIG_GROUP, 'setting' => MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED, 'value' => '1'],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'multitask_config', $rows);
