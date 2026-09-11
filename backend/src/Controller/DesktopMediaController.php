@@ -66,7 +66,7 @@ final class DesktopMediaController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         if (!\is_array($data)) {
-            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+            return new JsonResponse(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
         $prompt = trim((string) ($data['prompt'] ?? ''));
@@ -74,13 +74,13 @@ final class DesktopMediaController extends AbstractController
         $model = trim((string) ($data['model'] ?? ''));
 
         try {
-            return $this->json($this->media->generate($user, $prompt, $type, $model));
+            return new JsonResponse($this->media->generate($user, $prompt, $type, $model));
         } catch (\InvalidArgumentException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         } catch (NoModelAvailableException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (ProviderException $e) {
             $this->logger->error('Desktop media generation provider error', [
                 'user_id' => $user->getId(),
@@ -88,14 +88,14 @@ final class DesktopMediaController extends AbstractController
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {
             $this->logger->error('Desktop media generation failed', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -130,34 +130,34 @@ final class DesktopMediaController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         if (!\is_array($data)) {
-            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+            return new JsonResponse(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
         }
 
         $text = trim((string) ($data['text'] ?? ''));
         $model = trim((string) ($data['model'] ?? ''));
 
         try {
-            return $this->json($this->media->speak($user, $text, $model));
+            return new JsonResponse($this->media->speak($user, $text, $model));
         } catch (\InvalidArgumentException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_TOO_MANY_REQUESTS);
         } catch (NoModelAvailableException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         } catch (ProviderException $e) {
             $this->logger->error('Desktop speech generation provider error', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         } catch (\RuntimeException $e) {
             $this->logger->error('Desktop speech generation failed', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
