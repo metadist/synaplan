@@ -285,7 +285,12 @@ Rotate `APP_SECRET`:
 
 1. Generate new secret: `openssl rand -hex 16`
 2. Update ENV var, restart backend
-3. Existing JWT tokens are invalidated — users must re-login
+3. Signed-in users stay signed in: only the 5-minute `access_token` cookies
+   stop verifying, and the browser silently obtains new ones through
+   `/auth/refresh` because the refresh tokens in `BTOKENS` do not depend on
+   `APP_SECRET`. To force everyone out, clear `BTOKENS` as described under
+   *Sessions survive restarts*. Provider API keys encrypted with the old
+   secret become unreadable and must be re-entered.
 
 ### CORS
 
@@ -310,14 +315,15 @@ stay stable for that to hold:
 - **`APP_SECRET`** — the self-hosted stack persists it in
   `deploy/data/secrets.env` (see `deploy/README.md`); Helm and other
   automated deployments must inject the same value on every rollout. A new
-  secret invalidates every access cookie at once and also makes the provider
-  API keys stored in the database unreadable.
+  secret invalidates every access cookie at once (sessions recover through
+  `/auth/refresh`, see *Token Rotation*) and makes the provider API keys
+  stored in the database unreadable.
 - **The MariaDB volume** — `BTOKENS` holds the refresh tokens. Wiping the
   database signs everyone out.
 
 To sign every user out deliberately, delete their rows from `BTOKENS`
-(`DELETE FROM BTOKENS WHERE BTYPE = 'refresh'`); rotating `APP_SECRET` has the
-same effect with the side effects above.
+(`DELETE FROM BTOKENS WHERE BTYPE = 'refresh'`). Rotating `APP_SECRET` alone
+does **not** do that — the refresh tokens are plain database rows.
 
 ### HTTPS
 
