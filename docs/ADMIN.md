@@ -378,7 +378,9 @@ in **Operate → System configuration → Access → Sharing**
 
 When the flag is off:
 
-- Operate has no People child.
+- The Operate **People** child opens the Operate **Users** tab
+  (`/admin?tab=users`); `/admin/people` redirects there.
+- `/groups` is not routable and shows the not-found page.
 - `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.
 - The Operate Overview **Users** tab is unchanged.
 
