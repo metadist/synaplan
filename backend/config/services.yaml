@@ -444,6 +444,7 @@ services:
             - { name: 'app.ai.vision', key: 'google' }
             - { name: 'app.ai.image_generation', key: 'google' }
             - { name: 'app.ai.video_generation', key: 'google' }
+            - { name: 'app.ai.speech_to_text', key: 'google' }
             - { name: 'app.ai.text_to_speech', key: 'google' }
 
     App\AI\Provider\TheHiveProvider:
