@@ -61,6 +61,12 @@ describe('Provider Icons Utility', () => {
     expect(getProviderIcon('trusted tokens')).toBe('mdi:shield-check')
   })
 
+  it('should return a gateway icon for A2Agent', () => {
+    expect(getProviderIcon('A2Agent')).toBe('mdi:transit-connection-variant')
+    expect(getProviderIcon('a2agent')).toBe('mdi:transit-connection-variant')
+    expect(getProviderIcon('a2-agent')).toBe('mdi:transit-connection-variant')
+  })
+
   it('should return default robot icon for unknown service', () => {
     expect(getProviderIcon('unknown')).toBe('mdi:robot')
     expect(getProviderIcon('')).toBe('mdi:robot')
@@ -94,11 +100,18 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('trusted-tokens')).toBe('circle-flags:de')
   })
 
+  it('should return the Chinese flag for A2Agent', () => {
+    expect(getProviderFlag('A2Agent')).toBe('circle-flags:cn')
+    expect(getProviderFlag('a2agent')).toBe('circle-flags:cn')
+    expect(getProviderFlag('a2-agent')).toBe('circle-flags:cn')
+  })
+
   it('should classify only self-hosted engines as local', () => {
     expect(isLocalSelfHostedProvider('ollama')).toBe(true)
     expect(isLocalSelfHostedProvider('whisper')).toBe(true)
     expect(isLocalSelfHostedProvider('triton')).toBe(true)
     expect(isLocalSelfHostedProvider('TrustedTokens')).toBe(false)
+    expect(isLocalSelfHostedProvider('A2Agent')).toBe(false)
     expect(isLocalSelfHostedProvider('openai')).toBe(false)
   })
 })

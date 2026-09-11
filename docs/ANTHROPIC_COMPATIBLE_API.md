@@ -173,6 +173,8 @@ Cost depends on whose key serves the request:
 - **OpenAI** — Chat Completions (`/v1/chat/completions`), not the Responses API
 - **Google/Gemini** — `generateContent` / `streamGenerateContent` with `parametersJsonSchema` for tools
 
+In-app chat also talks Chat Completions to other OpenAI-compatible hosts (Groq, Mistral, xAI, TrustedTokens, A2Agent, HuggingFace). Those are not Messages-gateway translators today — Claude Code aliases still resolve through OpenAI or Gemini as above.
+
 Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before the upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
 
 ## Related

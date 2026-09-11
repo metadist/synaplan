@@ -77,6 +77,8 @@ parameters:
     env(HUGGINGFACE_API_KEY): ''
     # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
     env(TRUSTEDTOKENS_API_KEY): ''
+    # A2Agent — Chinese frontier models (Qwen, DeepSeek, MiniMax) via gateway.
+    env(A2AGENT_API_KEY): ''
     # xAI (Grok chat/vision, Grok Imagine image/video, Grok voice TTS/STT).
     env(XAI_API_KEY): ''
     env(PERPLEXITY_API_KEY): ''
@@ -331,6 +333,7 @@ services:
                     - '%env(default::GOOGLE_API_KEY)%'
                 mistral: '%env(MISTRAL_API_KEY)%'
                 trustedtokens: '%env(TRUSTEDTOKENS_API_KEY)%'
+                a2agent: '%env(A2AGENT_API_KEY)%'
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
                 perplexity: '%env(PERPLEXITY_API_KEY)%'
@@ -413,6 +416,14 @@ services:
         tags:
             - { name: 'app.ai.chat', key: 'trustedtokens' }
             - { name: 'app.ai.vision', key: 'trustedtokens' }
+
+    App\AI\Provider\A2AgentProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+        tags:
+            - { name: 'app.ai.chat', key: 'a2agent' }
+            - { name: 'app.ai.vision', key: 'a2agent' }
 
     App\AI\Provider\XaiProvider:
         arguments:

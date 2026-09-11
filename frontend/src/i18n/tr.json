@@ -64,6 +64,7 @@
       "anthropic": "Claude Fable Karışımı",
       "google": "Google Gemini Karışımı",
       "xai": "Grok Karışımı",
+      "a2agent": "A2Agent Karışımı",
       "europe": "Avrupa Karışımı"
     },
     "defaultDescription": "Bu kurulumun önerdiği modeller",
@@ -1373,6 +1374,10 @@
     "trustedtokens": {
       "title": "TrustedTokens API anahtarı",
       "message": "TrustedTokens'ta (Hesap → API Erişimi) bir API anahtarı oluşturun ve buraya yapıştırın. Çıkarım, AB veri yerleşimli Alman GPU'larda çalışır."
+    },
+    "a2agent": {
+      "title": "A2Agent API anahtarı",
+      "message": "A2Agent'ta (pano → API anahtarları) kullanıma göre ücretlendirilen bir API anahtarı oluşturun ve buraya yapıştırın. İstemler, bu ağ geçidi üzerinden Çin anakarasındaki model sağlayıcıları (Qwen, DeepSeek, MiniMax) tarafından işlenir. A2Agent, Çin anakarası dışındaki kullanıcılara hizmet verir. AB kişisel verisi işleyen işletmeciler bunu kendi DPA'larına göre kararlaştırmalıdır."
     },
     "huggingface": {
       "title": "HuggingFace API jetonu",

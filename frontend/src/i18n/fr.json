@@ -64,6 +64,7 @@
       "anthropic": "Claude Fable Mix",
       "google": "Google Gemini Mix",
       "xai": "Grok Mix",
+      "a2agent": "A2Agent Mix",
       "europe": "Europe Mix"
     },
     "defaultDescription": "Les modèles recommandés par cette installation",
@@ -3102,6 +3103,10 @@
     "trustedtokens": {
       "title": "Clé API TrustedTokens",
       "message": "Créez une clé API chez TrustedTokens (Account → API Access), puis collez-la ici. L’inférence s’exécute sur des GPU allemands avec résidence des données dans l’UE."
+    },
+    "a2agent": {
+      "title": "Clé API A2Agent",
+      "message": "Créez une clé API en paiement à l’usage chez A2Agent (tableau de bord → clés API), puis collez-la ici. Les invites sont traitées par des fournisseurs de modèles de Chine continentale (Qwen, DeepSeek, MiniMax) via cette passerelle. A2Agent s’adresse aux utilisateurs hors de Chine continentale. Les opérateurs qui traitent des données personnelles de l’UE décident selon leur DPA."
     },
     "huggingface": {
       "title": "Jeton API HuggingFace",

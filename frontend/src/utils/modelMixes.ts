@@ -18,7 +18,8 @@ import type { AIModel, Capability } from '@/types/ai-models'
  * locally on Ollama) opt out.
  */
 
-export type ModelMixId = 'default' | 'openai' | 'anthropic' | 'google' | 'xai' | 'europe'
+export type ModelMixId =
+  'default' | 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe'
 
 export type ModelMixIcon =
   /** The installation's brand icon (Synaplan bird unless white-labeled). */
@@ -52,6 +53,10 @@ const mistral = (providerId: string): MixCandidate => ({ service: 'Mistral', pro
 const ollama = (providerId: string): MixCandidate => ({ service: 'Ollama', providerId })
 const trustedTokens = (providerId: string): MixCandidate => ({
   service: 'TrustedTokens',
+  providerId,
+})
+const a2agent = (providerId: string): MixCandidate => ({
+  service: 'A2Agent',
   providerId,
 })
 
@@ -151,6 +156,17 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
       TEXT2PIC: [xai('grok-imagine-image')],
       TEXT2VID: [xai('grok-imagine-video')],
       IMG2VID: [xai('grok-imagine-video-1.5')],
+    },
+  },
+  {
+    id: 'a2agent',
+    icon: { kind: 'service', service: 'A2Agent' },
+    resetsToRecommended: false,
+    candidates: {
+      CHAT: [a2agent('deepseek-v4-pro'), a2agent('qwen3.8-max'), a2agent('MiniMax-M3')],
+      ANALYZE: [a2agent('deepseek-v4-pro'), a2agent('qwen3.8-max'), a2agent('MiniMax-M3')],
+      SORT: [a2agent('qwen3.8-flash'), a2agent('deepseek-v4-flash')],
+      PIC2TEXT: [a2agent('qwen3.8-flash')],
     },
   },
   {

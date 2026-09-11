@@ -64,6 +64,7 @@
       "anthropic": "Claude Fable Mix",
       "google": "Google Gemini Mix",
       "xai": "Grok Mix",
+      "a2agent": "A2Agent-Mix",
       "europe": "Europa-Mix"
     },
     "defaultDescription": "Die von dieser Installation empfohlenen Modelle",
@@ -3194,6 +3195,10 @@
     "trustedtokens": {
       "title": "TrustedTokens-API-Schlüssel",
       "message": "Erstelle einen API-Schlüssel bei TrustedTokens (Konto → API-Zugang) und füge ihn hier ein. Die Inferenz läuft auf deutschen GPUs mit EU-Datenresidenz."
+    },
+    "a2agent": {
+      "title": "A2Agent-API-Schlüssel",
+      "message": "Erstelle einen Pay-as-you-go-API-Schlüssel bei A2Agent (Dashboard → API-Schlüssel) und füge ihn hier ein. Prompts werden von Modellbetreibern in Festlandchina (Qwen, DeepSeek, MiniMax) über dieses Gateway verarbeitet. A2Agent bedient Nutzer außerhalb Festlandchinas. Wer EU-Personenbezogene Daten verarbeitet, entscheidet das anhand der eigenen DPA."
     },
     "huggingface": {
       "title": "HuggingFace-API-Token",

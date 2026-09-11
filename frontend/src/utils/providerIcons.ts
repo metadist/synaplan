@@ -49,6 +49,10 @@ export const getProviderIcon = (provider: string): string => {
     // TNG TrustedTokens — German sovereign inference. No brand glyph in
     // simple-icons; use a shield that reads as "sovereign / secured".
     return 'mdi:shield-check'
+  } else if (providerCompact.includes('a2agent')) {
+    // A2Agent gateway — no brand glyph in Iconify; a transit hub reads as
+    // "routed through a reseller" rather than a vendor logo.
+    return 'mdi:transit-connection-variant'
   }
 
   return 'mdi:robot'
@@ -90,6 +94,9 @@ export const getProviderFlag = (provider: string): string => {
   } else if (p.replace(/[\s_-]/g, '').includes('trustedtokens')) {
     // TNG TrustedTokens — German sovereign inference, actually hosted in DE.
     return 'circle-flags:de'
+  } else if (p.replace(/[\s_-]/g, '').includes('a2agent')) {
+    // Mainland-China model vendors behind the A2Agent gateway.
+    return 'circle-flags:cn'
   } else if (p.includes('mistral')) {
     return 'circle-flags:fr'
   } else if (

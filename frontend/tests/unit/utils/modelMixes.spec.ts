@@ -23,7 +23,9 @@ const model = (
   ...overrides,
 })
 
-const mixDefinition = (id: 'openai' | 'anthropic' | 'google' | 'xai' | 'europe' | 'default') => {
+const mixDefinition = (
+  id: 'openai' | 'anthropic' | 'google' | 'xai' | 'a2agent' | 'europe' | 'default'
+) => {
   const definition = MODEL_MIXES.find((mix) => mix.id === id)
   if (!definition) throw new Error(`mix ${id} missing`)
   return definition
@@ -245,6 +247,44 @@ describe('resolveModelMix', () => {
     expect(resolveModelMix(mixDefinition('europe'), trustedTokensOnly).defaults.SORT).toBe(330)
     expect(resolveModelMix(mixDefinition('europe'), neither).defaults.SORT).toBeUndefined()
   })
+
+  it('resolves the A2Agent mix when the installation serves those models', () => {
+    const chat = model({
+      id: 362,
+      service: 'A2Agent',
+      providerId: 'deepseek-v4-pro',
+      name: 'DeepSeek V4 Pro',
+    })
+    const sort = model({
+      id: 365,
+      service: 'A2Agent',
+      providerId: 'qwen3.8-flash',
+      name: 'Qwen3.8 Flash',
+    })
+    const vision = model({
+      id: 366,
+      service: 'A2Agent',
+      providerId: 'qwen3.8-flash',
+      name: 'Qwen3.8 Flash (Vision)',
+      tag: 'pic2text',
+    })
+
+    const withA2 = resolveModelMix(mixDefinition('a2agent'), {
+      CHAT: [chat],
+      ANALYZE: [chat],
+      SORT: [sort],
+      PIC2TEXT: [vision],
+    })
+    expect(withA2.available).toBe(true)
+    expect(withA2.defaults.CHAT).toBe(362)
+    expect(withA2.defaults.SORT).toBe(365)
+    expect(withA2.defaults.PIC2TEXT).toBe(366)
+
+    const withoutA2 = resolveModelMix(mixDefinition('a2agent'), {
+      CHAT: [model({ id: 204, service: 'OpenAI', providerId: 'gpt-5.5', name: 'GPT-5.5' })],
+    })
+    expect(withoutA2.available).toBe(false)
+  })
 })
 
 describe('resolveModelMixes', () => {
@@ -257,6 +297,7 @@ describe('resolveModelMixes', () => {
       'anthropic',
       'google',
       'xai',
+      'a2agent',
       'europe',
     ])
   })
