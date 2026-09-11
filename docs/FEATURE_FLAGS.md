@@ -119,6 +119,10 @@ everyone-shares policy, tool policies per class, approval expiry) stay on the
 - The code fallback when **no row exists at all** stays `false` for most
   flags, so unit tests and the routing characterization snapshots run with
   the features off unless they opt in.
+- Assistants, routable assistants, bundle export, the workflow builder, Saved
+  Tasks, the MCP client, multitask routing and async media all resolve the
+  per-user row first. Writing the global switch from System configuration
+  therefore also deletes the acting administrator's own row for that flag.
 
 See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md) and
 [DESKTOP.md](DESKTOP.md).

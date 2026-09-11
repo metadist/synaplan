@@ -536,4 +536,108 @@ final class SystemConfigServiceTest extends TestCase
             }
         }
     }
+
+    /**
+     * Assistants, the workflow builder and bundle export write their own
+     * BCONFIG group, not the default QDRANT_SEARCH group. The Features-tab
+     * keys are the FEATURE_* pins that #1827 introduced.
+     */
+    public function testProductFeatureFlagsWriteToTheirOwnGroupRow(): void
+    {
+        $calls = [];
+        $this->configRepository->expects($this->exactly(4))
+            ->method('setValue')
+            ->willReturnCallback(
+                static function (int $owner, string $group, string $setting, string $value) use (&$calls): Config {
+                    $calls[] = [$owner, $group, $setting, $value];
+
+                    return new Config();
+                }
+            );
+
+        foreach ([
+            'FEATURE_AGENTS_ENABLED',
+            'FEATURE_AGENTS_ROUTABLE_ENABLED',
+            'FEATURE_BUNDLE_ENABLED',
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+        ] as $key) {
+            $this->assertTrue($this->service->setValue($key, 'true', 1)['success'], $key);
+        }
+
+        $this->assertSame([
+            [0, 'AGENTS', 'ENABLED', 'true'],
+            [0, 'AGENTS', 'ROUTABLE_ENABLED', 'true'],
+            [0, 'BUNDLE', 'ENABLED', 'true'],
+            [0, 'WORKFLOWS', 'BUILDER_ENABLED', 'true'],
+        ], $calls);
+    }
+
+    /**
+     * AgentConfig resolves the per-user row before the global one, and a per-user
+     * row is exactly how these features were enabled while there was no UI. An
+     * admin who has one would otherwise not see their own change.
+     */
+    public function testEnablingAssistantsClearsActingAdminPerUserOverride(): void
+    {
+        $this->configRepository->expects($this->once())
+            ->method('deleteValue')
+            ->with(7, 'AGENTS', 'ENABLED');
+
+        $this->service->setValue('FEATURE_AGENTS_ENABLED', 'true', 7);
+    }
+
+    public function testBundleFlagWriteWithoutActingUserDoesNotDeleteAnything(): void
+    {
+        $this->configRepository->expects($this->never())->method('deleteValue');
+
+        $this->service->setValue('FEATURE_BUNDLE_ENABLED', 'true');
+    }
+
+    public function testAssistantsAndWorkflowFlagsLiveOnTheFeaturesTab(): void
+    {
+        $schema = $this->service->getSchema();
+
+        self::assertSame(
+            ['FEATURE_AGENTS_ENABLED', 'FEATURE_AGENTS_ROUTABLE_ENABLED', 'FEATURE_BUNDLE_ENABLED'],
+            $schema['tabs']['features']['sections']['assistants']['fields'],
+        );
+        self::assertContains(
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+            $schema['tabs']['features']['sections']['tasks']['fields'],
+        );
+        self::assertSame('true', $schema['fields']['FEATURE_AGENTS_ENABLED']['default']);
+        self::assertSame('boolean', $schema['fields']['FEATURE_BUNDLE_ENABLED']['type']);
+        self::assertArrayNotHasKey('assistants', $schema['tabs']['routing']['sections']);
+        self::assertArrayNotHasKey('portability', $schema['tabs']['interface']['sections']);
+    }
+
+    /**
+     * A field naming a tab or section that does not exist is invisible in the
+     * admin UI while still looking configured in the schema — the exact state
+     * the assistants flags were in before they were listed here.
+     */
+    public function testEveryFieldIsRenderedByAnExistingTabSection(): void
+    {
+        $schema = $this->service->getSchema();
+
+        $placed = [];
+        foreach ($schema['tabs'] as $tabId => $tab) {
+            foreach ($tab['sections'] as $sectionId => $section) {
+                foreach ($section['fields'] as $field) {
+                    self::assertArrayHasKey($field, $schema['fields'], \sprintf('%s.%s lists unknown field %s', $tabId, $sectionId, $field));
+                    $placed[$field] = true;
+                }
+            }
+        }
+
+        foreach ($schema['fields'] as $key => $field) {
+            self::assertArrayHasKey($field['tab'], $schema['tabs'], $key.' points at an unknown tab');
+            self::assertArrayHasKey(
+                $field['section'],
+                $schema['tabs'][$field['tab']]['sections'],
+                $key.' points at an unknown section',
+            );
+            self::assertArrayHasKey($key, $placed, $key.' is defined but no tab section lists it');
+        }
+    }
 }

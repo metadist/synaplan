@@ -641,105 +641,54 @@ final readonly class SystemConfigService
      */
     private function applyConfigSideEffects(string $group, string $key, string $value, ?int $actingUserId = null): void
     {
-        // Multi-task routing master switch: a per-user row overrides this global
-        // flag (the Version20260607000000 grandfather rows are gone since
-        // Version20260706130000, but hand-set overrides can still exist). Drop
-        // the acting admin's own override so the value they just set actually
-        // applies to their own account immediately.
-        if (SavedTaskConfig::CONFIG_GROUP === $group
-            && SavedTaskConfig::KEY_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    SavedTaskConfig::CONFIG_GROUP,
-                    SavedTaskConfig::KEY_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user saved-tasks override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user saved-tasks override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
+        // Every flag below resolves the per-user row before the global one, so an
+        // admin still carrying an own override would not see the value they just
+        // set. Some of those rows come from a migration (async media,
+        // Version20260629120000; multi-task grandfathering from
+        // Version20260607000000, dropped again in Version20260706130000), others
+        // were set by hand.
+        /** @var list<array{string, string, string}> $perUserOverrides */
+        $perUserOverrides = [
+            [SavedTaskConfig::CONFIG_GROUP, SavedTaskConfig::KEY_ENABLED, 'saved-tasks'],
+            [WorkflowsConfig::CONFIG_GROUP, WorkflowsConfig::KEY_BUILDER_ENABLED, 'workflow builder'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ENABLED, 'assistants'],
+            [AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ROUTABLE_ENABLED, 'routable assistants'],
+            [BundleConfig::CONFIG_GROUP, BundleConfig::KEY_ENABLED, 'bundle export'],
+            [McpClientConfig::CONFIG_GROUP, McpClientConfig::KEY_CLIENT_ENABLED, 'MCP client'],
+            [MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_ROUTING_ENABLED, 'multitask routing'],
+            [MediaJobConfig::CONFIG_GROUP, MediaJobConfig::KEY_ASYNC_JOBS_ENABLED, 'async media'],
+        ];
+
+        foreach ($perUserOverrides as [$overrideGroup, $overrideKey, $label]) {
+            if ($group === $overrideGroup && $key === $overrideKey) {
+                $this->clearActingUserOverride($overrideGroup, $overrideKey, $label, $value, $actingUserId);
+
+                return;
             }
         }
+    }
 
-        if (McpClientConfig::CONFIG_GROUP === $group
-            && McpClientConfig::KEY_CLIENT_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    McpClientConfig::CONFIG_GROUP,
-                    McpClientConfig::KEY_CLIENT_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user MCP client override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user MCP client override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
+    /**
+     * Drop the acting admin's own row for a flag that was just set globally.
+     */
+    private function clearActingUserOverride(string $group, string $key, string $label, string $globalValue, ?int $actingUserId): void
+    {
+        if (null === $actingUserId || $actingUserId <= 0) {
+            return;
         }
 
-        if (MultitaskRoutingConfig::CONFIG_GROUP === $group
-            && MultitaskRoutingConfig::KEY_ROUTING_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MultitaskRoutingConfig::CONFIG_GROUP,
-                    MultitaskRoutingConfig::KEY_ROUTING_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user multitask routing override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user multitask override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
-        }
-
-        // Async media master switch: existing users were grandfathered to an
-        // explicit per-user OFF row (migration Version20260629120000), which
-        // overrides this global flag. Drop the acting admin's own override so the
-        // value they just set actually applies to their own account immediately.
-        if (MediaJobConfig::CONFIG_GROUP === $group
-            && MediaJobConfig::KEY_ASYNC_JOBS_ENABLED === $key
-            && null !== $actingUserId && $actingUserId > 0
-        ) {
-            try {
-                $removed = $this->configRepository->deleteValue(
-                    $actingUserId,
-                    MediaJobConfig::CONFIG_GROUP,
-                    MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
-                );
-                $this->logger->info('SystemConfigService: cleared admin per-user async media override', [
-                    'userId' => $actingUserId,
-                    'removed' => $removed,
-                    'globalValue' => $value,
-                ]);
-            } catch (\Throwable $sideEffect) {
-                $this->logger->error('SystemConfigService: failed clearing per-user async media override', [
-                    'userId' => $actingUserId,
-                    'error' => $sideEffect->getMessage(),
-                ]);
-            }
+        try {
+            $removed = $this->configRepository->deleteValue($actingUserId, $group, $key);
+            $this->logger->info('SystemConfigService: cleared admin per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'removed' => $removed,
+                'globalValue' => $globalValue,
+            ]);
+        } catch (\Throwable $sideEffect) {
+            $this->logger->error('SystemConfigService: failed clearing per-user '.$label.' override', [
+                'userId' => $actingUserId,
+                'error' => $sideEffect->getMessage(),
+            ]);
         }
     }
 
