@@ -14,6 +14,8 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Agent\AgentPinResolver;
 use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\AgentService;
+use App\Service\Context\AttachmentDigest;
+use App\Service\Context\TokenEstimator;
 use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\File\ConversationFile;
@@ -96,6 +98,7 @@ final readonly class MessageClassifier
         private ?AgentService $agentService = null,
         private ?AgentRuntimeResolver $agentRuntimeResolver = null,
         private ?UserRepository $users = null,
+        private ?AttachmentDigest $attachmentDigest = null,
     ) {
     }
 
@@ -773,16 +776,28 @@ final readonly class MessageClassifier
 
     /**
      * Build message data array for sorter.
+     *
+     * BFILETEXT is the ROUTING view of the attachment: verbatim for ordinary
+     * files, a structural digest for large ones. The sorter only decides
+     * what to do with the file; a 250 kB spreadsheet as JSON overflows the
+     * (small) routing model and turns every such upload into the fallback
+     * topic. The answering handler still receives the full text.
      */
     private function buildMessageData(Message $message): array
     {
+        $fileText = $message->getFileText() ?: '';
+        if ('' !== $fileText) {
+            $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
+            $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
+        }
+
         $data = [
             'BDATETIME' => $message->getDateTime(),
             'BFILEPATH' => $message->getFilePath(),
             'BTOPIC' => $message->getTopic() ?: '',
             'BLANG' => $message->getLanguage() ?: 'en',
             'BTEXT' => $message->getText(),
-            'BFILETEXT' => $message->getFileText() ?: '',
+            'BFILETEXT' => $fileText,
             'BFILE' => $message->getFile(),
             'BWEBSEARCH' => 0,
             // Intentionally omit BMULTI. The sorter prompt asks the model to

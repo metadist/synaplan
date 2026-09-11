@@ -16,6 +16,8 @@ use App\Message\ExtractMemoriesCommand;
 use App\Prompt\PromptCatalog;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Context\ContextCondenser;
+use App\Service\Context\ModelContextWindow;
 use App\Service\Digest\DigestSearchService;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\Document\DocumentEditCoordinator;
@@ -72,6 +74,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
 {
     /** Maximum length of a quoted-reference excerpt injected into the prompt. */
     private const MAX_QUOTED_REFERENCE_LENGTH = 4000;
+
+    /** Flat attachment cut used only when no context budget is available. */
+    private const LEGACY_ATTACHMENT_CHARS = 10000;
 
     /**
      * Maximum base64 payload length (characters) for a single inline vision
@@ -131,6 +136,8 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ?SelfAwarePromptDecorator $selfAwarePromptDecorator = null,
         #[Autowire(lazy: true)]
         private ?PlatformDocsRetriever $platformDocsRetriever = null,
+        private ?ContextCondenser $contextCondenser = null,
+        private ?ModelContextWindow $modelContextWindow = null,
     ) {
         $this->pluginContextProviders = $pluginContextProviders;
     }
@@ -819,6 +826,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'include_generated_images' => $options['include_generated_images'],
             'quoted_text' => $options['quoted_text'] ?? null,
             'quoted_message_id' => $options['quoted_message_id'] ?? null,
+            'attachment_text' => $this->fitAttachmentText($message, $modelId, null),
         ]);
 
         if (null !== $systemPromptFallback) {
@@ -1555,7 +1563,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
 
         // Build conversation history (TEXT only for streaming)
+        $options['attachment_text'] = $this->fitAttachmentText($message, $modelId, is_int($options['max_tokens'] ?? null) ? $options['max_tokens'] : null);
         $messages = $this->buildStreamingMessages($systemPrompt, $thread, $message, $options);
+        unset($options['attachment_text']);
 
         if (null !== $systemPromptFallback) {
             $messages = $this->prependSystemPromptToFirstUserMessage($messages, $systemPromptFallback);
@@ -2036,6 +2046,41 @@ final readonly class ChatHandler implements MessageHandlerInterface
     }
 
     /**
+     * Attachment text of the current message fitted to the answering model's
+     * context window (question-aware condensing when it does not fit — see
+     * ContextCondenser). Returns null when there is no attachment text or no
+     * budget service is wired, in which case the callers keep the legacy cut.
+     */
+    private function fitAttachmentText(Message $message, ?int $modelId, ?int $reservedOutputTokens): ?string
+    {
+        if (null === $this->contextCondenser || null === $this->modelContextWindow) {
+            return null;
+        }
+
+        $text = $message->getAllFilesText();
+        if ('' === trim($text)) {
+            return null;
+        }
+
+        try {
+            $budget = $this->modelContextWindow->attachmentCharBudget($modelId, $text, $message->getUserId(), $reservedOutputTokens);
+            $fitted = $this->contextCondenser->fit($text, $message->getText(), $budget, $message->getUserId());
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatHandler: attachment fitting failed, using legacy cut', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        if (!$fitted->isVerbatim()) {
+            $this->logger->info('ChatHandler: attachment fitted to model window', $fitted->toLogContext() + ['model_id' => $modelId]);
+        }
+
+        $note = $fitted->provenanceNote();
+
+        return null !== $note ? $note."\n\n".$fitted->text : $fitted->text;
+    }
+
+    /**
      * Build the content for the current user message (files, search results, images).
      *
      * @param list<string> $extraImageUrls generated-image data URLs to attach
@@ -2072,8 +2117,14 @@ final readonly class ChatHandler implements MessageHandlerInterface
                 $fileInfo = $currentMessage->getFileType().' file';
             }
 
+            // Fitted to the answering model's window by fitAttachmentText();
+            // the flat 10 000-char cut is only the fallback without a budget.
+            $attachmentText = is_string($options['attachment_text'] ?? null)
+                ? $options['attachment_text']
+                : substr($allFilesText, 0, self::LEGACY_ATTACHMENT_CHARS);
+
             $content .= "\n\n\n---\n\n\nUser provided $fileInfo:\n\n".
-                       substr($allFilesText, 0, 10000).
+                       $attachmentText.
                        "\n\n";
         }
 
@@ -2291,7 +2342,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'BTOPIC' => $currentMessage->getTopic(),
             'BLANG' => $currentMessage->getLanguage(),
             'BTEXT' => $currentMessage->getText(),
-            'BFILETEXT' => $currentMessage->getFileText() ?: '',
+            'BFILETEXT' => is_string($options['attachment_text'] ?? null)
+                ? $options['attachment_text']
+                : ($currentMessage->getFileText() ?: ''),
         ];
 
         $ragContext = $options['rag_context'] ?? '';

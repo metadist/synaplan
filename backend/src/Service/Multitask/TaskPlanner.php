@@ -13,6 +13,8 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
+use App\Service\Context\AttachmentDigest;
+use App\Service\Context\TokenEstimator;
 use App\Service\File\Office\OfficePdfRoutingDecorator;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\Plan\TaskPlan;
@@ -69,6 +71,7 @@ final readonly class TaskPlanner
         private ?SelfAwareConfig $selfAwareConfig = null,
         private ?OfficePdfRoutingDecorator $officePdfRouting = null,
         private JsonResponseDecoder $jsonDecoder = new JsonResponseDecoder(),
+        private ?AttachmentDigest $attachmentDigest = null,
     ) {
     }
 
@@ -428,12 +431,25 @@ final readonly class TaskPlanner
         return $messages;
     }
 
+    /**
+     * BFILETEXT is the ROUTING view of the attachment (verbatim for ordinary
+     * files, a structural digest for large ones — see AttachmentDigest). The
+     * planner only needs to know what the file is to pick capabilities; the
+     * full text overflowed the PLAN/SORT model on large spreadsheets and
+     * degraded every such turn to the single-`chat` fallback plan.
+     */
     private function buildCurrentMessageJson(Message $message): string
     {
+        $fileText = $message->getFileText() ?: '';
+        if ('' !== $fileText) {
+            $digest = $this->attachmentDigest ?? new AttachmentDigest(new TokenEstimator());
+            $fileText = $digest->forRoutingWithConfig($fileText, $message->getUserId(), $message->getFileType());
+        }
+
         $data = [
             'BTEXT' => $message->getText(),
             'BLANG' => $message->getLanguage() ?: 'en',
-            'BFILETEXT' => $message->getFileText() ?: '',
+            'BFILETEXT' => $fileText,
         ];
 
         $attached = [];
