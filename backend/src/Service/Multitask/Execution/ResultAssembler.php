@@ -60,7 +60,7 @@ final class ResultAssembler
                     $jobKeys[$node->id] = $mediaJob['job_id'];
                 }
             }
-            if (NodeStatus::Done === $status) {
+            if (NodeStatus::Done === $status || NodeStatus::Stopped === $status) {
                 ++$successCount;
             } elseif (NodeStatus::Failed === $status) {
                 ++$failureCount;

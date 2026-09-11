@@ -48,6 +48,14 @@ final readonly class NodeResult
     }
 
     /**
+     * A condition evaluated false. Dependents skip; the run itself completed.
+     */
+    public static function stopped(string $reason = 'Condition was not met'): self
+    {
+        return new self(NodeStatus::Stopped, error: $reason);
+    }
+
+    /**
      * Media detached to a background {@see \App\Service\Media\MediaJob} — no file
      * yet; Sprint C completes the card when the job reaches a terminal state.
      *
@@ -92,7 +100,14 @@ final readonly class NodeResult
 
     public function isSettledUnsuccessful(): bool
     {
-        return NodeStatus::Failed === $this->status || NodeStatus::Skipped === $this->status;
+        return NodeStatus::Failed === $this->status
+            || NodeStatus::Skipped === $this->status
+            || NodeStatus::Stopped === $this->status;
+    }
+
+    public function isStopped(): bool
+    {
+        return NodeStatus::Stopped === $this->status;
     }
 
     public function isWaitingApproval(): bool

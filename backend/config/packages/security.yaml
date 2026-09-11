@@ -197,6 +197,7 @@ security:
         # Webhook endpoints (email webhook is public, WhatsApp requires verification)
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
+        - { path: ^/api/v1/webhooks/saved-tasks/, roles: PUBLIC_ACCESS }
 
         # Stripe webhook (public - secured by signature verification)
         - { path: ^/api/v1/stripe/webhook, roles: PUBLIC_ACCESS }

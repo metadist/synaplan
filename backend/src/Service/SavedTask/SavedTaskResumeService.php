@@ -13,11 +13,20 @@ use App\Repository\SavedTaskRepository;
 use App\Repository\SavedTaskRunRepository;
 use App\Repository\UserRepository;
 use App\Service\Multitask\Execution\DagExecutor;
+use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeContextRehydrator;
+use App\Service\Multitask\Plan\Capability;
+use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
+use App\Service\SavedTask\Graph\StepInputResolver;
+use App\Service\Tool\ApprovalArgsRedactor;
+use App\Service\Tool\ApprovalReference;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\ApprovalPolicy;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\ToolRegistry;
 use Psr\Log\LoggerInterface;
 
@@ -35,6 +44,9 @@ final readonly class SavedTaskResumeService
         private RateLimitService $rateLimits,
         private ToolRegistry $registry,
         private LoggerInterface $logger,
+        private ApprovalPolicy $approvalPolicy,
+        private StepInputResolver $inputs,
+        private ApprovalArgsRedactor $redactor = new ApprovalArgsRedactor(),
     ) {
     }
 
@@ -59,6 +71,14 @@ final readonly class SavedTaskResumeService
         if (!$approval instanceof Approval) {
             throw new SavedTaskNotFoundException();
         }
+        // The approval must be the one this run paused for: same owner, decided,
+        // and requested by exactly this run and step. Anything else is not a match.
+        if ($approval->getOwnerId() !== $task->getOwnerId()
+            || Approval::STATUS_APPROVED !== $approval->getStatus()
+            || $approval->getRequestedBy() !== ApprovalReference::taskRun($runId, $nodeId)->raw
+            || $run->getWaitingNode() !== $nodeId) {
+            throw new SavedTaskNotWaitingException();
+        }
 
         $limit = $this->rateLimits->checkLimit($user, 'MESSAGES');
         if (empty($limit['allowed'])) {
@@ -71,20 +91,28 @@ final readonly class SavedTaskResumeService
 
         $descriptor = $this->registry->get($task->getOwnerId(), $approval->getTool());
         if (null === $descriptor) {
-            $run->markFailed((new ToolNotRegisteredException($approval->getTool()))->getMessage());
-            $run->clearWaitingNode();
-            $this->runs->save($run);
-            $approval->markFailed('tool_not_registered');
-            $this->approvals->save($approval);
-
-            throw new ToolNotRegisteredException($approval->getTool());
+            return $this->failResume($run, $task, $approval, (new ToolNotRegisteredException($approval->getTool()))->getMessage(), true);
         }
 
         $plan = $this->planFactory->fromTask($task);
-        $context = $this->rehydrator->fromRun($run, [
+        $node = $plan->nodeById($nodeId);
+        $options = [
             'saved_task_run_id' => $runId,
             'allow_unattended' => $task->allowsUnattended(),
-        ]);
+        ];
+        $triggerPayload = $run->getPlanSnapshot()['trigger_payload'] ?? null;
+        if (is_array($triggerPayload) && [] !== $triggerPayload) {
+            $options['trigger_payload'] = $triggerPayload;
+        }
+        $context = $this->rehydrator->fromRun($run, $options);
+
+        if (null !== $node && Capability::ToolCall === $node->capability) {
+            $bound = $this->recheckToolCall($node, $context, $approval, $task);
+            if (null !== $bound) {
+                return $this->failResume($run, $task, $approval, $bound);
+            }
+        }
+
         $assembled = $this->dagExecutor->resume($plan, $context, $nodeId, $approval->getArgs() ?? []);
         $messageId = $run->getMessageId();
         $statuses = $assembled['node_statuses'];
@@ -126,6 +154,104 @@ final readonly class SavedTaskResumeService
             'node_id' => $nodeId,
             'approval_id' => $approvalId,
         ]);
+
+        return $run;
+    }
+
+    /**
+     * Re-check the bound tool and arguments, and re-run policy without loosening.
+     */
+    private function recheckToolCall(TaskNode $node, NodeContext $context, Approval $approval, SavedTask $task): ?string
+    {
+        $toolName = is_string($node->params['tool'] ?? null) ? trim($node->params['tool']) : '';
+        if ($toolName !== $approval->getTool()) {
+            return 'This approval no longer matches the step.';
+        }
+        $rawInputs = is_array($node->params['inputs'] ?? null) ? $node->params['inputs'] : $node->inputs;
+        $args = $this->inputs->resolveAll($rawInputs, $context);
+        // Stored approval arguments are redacted; compare like with like.
+        if ($this->argsDiffer($this->redactor->redact($args), $approval->getArgs() ?? [])) {
+            return 'This approval no longer matches the step.';
+        }
+        $descriptor = $this->registry->get($task->getOwnerId(), $toolName);
+        if (null === $descriptor) {
+            return (new ToolNotRegisteredException($toolName))->getMessage();
+        }
+        $override = PolicyOutcome::tryFrom((string) ($node->params['approval'] ?? ''));
+        $outcome = $this->approvalPolicy->decide(
+            $descriptor,
+            $task->getOwnerId(),
+            PolicyContext::Unattended,
+            null,
+            false,
+            null,
+            $override,
+        );
+        if (PolicyOutcome::Block === $outcome) {
+            return 'I cannot do that. An administrator has turned this off.';
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
+    private function argsDiffer(array $left, array $right): bool
+    {
+        return json_encode($this->normalizeArgs($left)) !== json_encode($this->normalizeArgs($right));
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeArgs(array $args): array
+    {
+        foreach ($args as $key => $value) {
+            if (is_array($value)) {
+                $args[$key] = $this->normalizeArgs($this->stringKeyed($value));
+            }
+        }
+        ksort($args);
+
+        return $args;
+    }
+
+    /**
+     * @param array<mixed> $value
+     *
+     * @return array<string, mixed>
+     */
+    private function stringKeyed(array $value): array
+    {
+        $out = [];
+        foreach ($value as $key => $item) {
+            $out[(string) $key] = $item;
+        }
+
+        return $out;
+    }
+
+    private function failResume(
+        SavedTaskRun $run,
+        SavedTask $task,
+        Approval $approval,
+        string $error,
+        bool $throwNotRegistered = false,
+    ): SavedTaskRun {
+        $run->markFailed($error, $run->getMessageId(), $run->getPlanSnapshot());
+        $run->clearWaitingNode();
+        $task->recordFailure();
+        $this->runs->save($run);
+        $this->tasks->save($task);
+        $approval->markFailed($error);
+        $this->approvals->save($approval);
+        if ($throwNotRegistered) {
+            throw new ToolNotRegisteredException($approval->getTool());
+        }
 
         return $run;
     }

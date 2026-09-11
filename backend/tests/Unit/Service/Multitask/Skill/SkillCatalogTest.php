@@ -95,7 +95,10 @@ final class SkillCatalogTest extends TestCase
         self::assertStringNotContainsString('"save_to_folder"', $default);
         self::assertStringNotContainsString('"document_export"', $default);
         self::assertStringNotContainsString('"document_combine"', $default);
-        self::assertCount(count(Capability::cases()) - 6, explode("\n", $default));
+        self::assertStringNotContainsString('"tool_call"', $default);
+        self::assertStringNotContainsString('"outbound_webhook"', $default);
+        self::assertStringNotContainsString('"condition"', $default);
+        self::assertCount(count(Capability::cases()) - 9, explode("\n", $default));
 
         // Operator kill switch: an explicit URL_FETCH_ENABLED=0 row hides the
         // block from the planner again.

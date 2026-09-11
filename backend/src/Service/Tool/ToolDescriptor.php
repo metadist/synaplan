@@ -65,6 +65,7 @@ final readonly class ToolDescriptor
             'policy' => $policy,
             'policyException' => $this->policyException,
             'shared' => true === ($this->meta['shared'] ?? false),
+            'inputSchema' => $this->inputSchema,
         ];
     }
 }

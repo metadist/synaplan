@@ -51,6 +51,7 @@ final readonly class SavedTaskRunner
         private GeneratedFileRegistrar $generatedFiles,
         private InternalEmailService $mail,
         private LoggerInterface $logger,
+        private SavedTaskOutcomeNarrator $outcomeNarrator = new SavedTaskOutcomeNarrator(),
     ) {
     }
 
@@ -60,9 +61,11 @@ final readonly class SavedTaskRunner
      * (the pinned prompt body) is used, so "Run now" and scheduled runs never
      * need a synthetic message.
      *
+     * @param array<string, mixed> $triggerPayload JSON body from an inbound webhook, if any
+     *
      * @return array{run: SavedTaskRun, task: SavedTask}
      */
-    public function run(int $ownerId, int $taskId, string $messageText = '', string $trigger = 'manual'): array
+    public function run(int $ownerId, int $taskId, string $messageText = '', string $trigger = 'manual', array $triggerPayload = []): array
     {
         if (!$this->config->isEnabled($ownerId)) {
             throw new SavedTaskDisabledException();
@@ -103,6 +106,7 @@ final readonly class SavedTaskRunner
             return $this->fail($task, $run, 'The AI instruction for this task is empty.');
         }
 
+        $messageId = null;
         try {
             $chat = $this->ensureChat($task, $user);
             $now = time();
@@ -122,11 +126,11 @@ final readonly class SavedTaskRunner
             $message->setStatus('processing');
             $this->em->persist($message);
             $this->em->flush();
+            $messageId = $message->getId();
 
-            $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId()));
+            $result = $this->processor->process($message, $this->processorOptions($task, $prompt, (int) $run->getId(), $triggerPayload));
 
             $ok = !empty($result['success']);
-            $messageId = $message->getId();
             $snapshot = null !== $messageId ? $this->planStore->loadCards($messageId) : [];
 
             // Like the web stream: the IN row records what the sorter decided.
@@ -141,9 +145,11 @@ final readonly class SavedTaskRunner
             $this->em->flush();
 
             if (!$ok) {
-                $reason = is_string($result['error'] ?? null)
-                    ? $result['error']
-                    : 'The AI step could not complete. Nothing was sent or saved.';
+                $reason = $this->outcomeNarrator->failureMessage(
+                    $result,
+                    $snapshot,
+                    is_string($result['error'] ?? null) ? $result['error'] : null,
+                );
 
                 return $this->fail($task, $run, $reason, $messageId, $snapshot);
             }
@@ -152,7 +158,13 @@ final readonly class SavedTaskRunner
 
             $waitingNode = $this->waitingNodeFromResult($result, $snapshot);
             if (null !== $waitingNode) {
-                $run->markWaitingApproval($waitingNode, $messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
+                // The resume re-resolves step inputs; a webhook-started run needs
+                // its starting event again or `from: trigger` values come back null.
+                $waitingSnapshot = [] !== $snapshot ? ['cards' => $snapshot] : [];
+                if ([] !== $triggerPayload) {
+                    $waitingSnapshot['trigger_payload'] = $triggerPayload;
+                }
+                $run->markWaitingApproval($waitingNode, $messageId, [] !== $waitingSnapshot ? $waitingSnapshot : null);
                 $this->runs->save($run);
 
                 return ['run' => $run, 'task' => $task];
@@ -180,7 +192,32 @@ final readonly class SavedTaskRunner
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->fail($task, $run, 'The AI step could not complete. Nothing was sent or saved.');
+            // Steps may already have run before the exception; say so instead of
+            // claiming nothing happened.
+            $snapshot = $this->cardsAfterCrash($messageId);
+
+            return $this->fail(
+                $task,
+                $run,
+                $this->outcomeNarrator->failureMessage([], $snapshot),
+                $messageId,
+                [] !== $snapshot ? $snapshot : null,
+            );
+        }
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function cardsAfterCrash(?int $messageId): array
+    {
+        if (null === $messageId) {
+            return [];
+        }
+        try {
+            return $this->planStore->loadCards($messageId);
+        } catch (\Throwable) {
+            return [];
         }
     }
 
@@ -199,14 +236,19 @@ final readonly class SavedTaskRunner
      * keeps the run plannable (multi-step tasks must run their DAG, not
      * degrade to chat).
      *
+     * @param array<string, mixed> $triggerPayload
+     *
      * @return array<string, mixed>
      */
-    private function processorOptions(SavedTask $task, Prompt $prompt, ?int $runId = null): array
+    private function processorOptions(SavedTask $task, Prompt $prompt, ?int $runId = null, array $triggerPayload = []): array
     {
         $options = [
             'saved_task' => true,
             'saved_task_id' => (int) $task->getId(),
         ];
+        if ([] !== $triggerPayload) {
+            $options['trigger_payload'] = $triggerPayload;
+        }
         if (!str_starts_with($prompt->getTopic(), self::CHAT_INSTRUCTION_TOPIC_PREFIX)) {
             $options['fixed_task_prompt'] = $prompt->getTopic();
         }

@@ -9,6 +9,7 @@ use App\Entity\SavedTask;
 use App\Entity\SavedTaskRun;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRunRepository;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\SavedTask\Graph\SavedTaskSummary;
 
 final readonly class SavedTaskSerializer
@@ -27,20 +28,23 @@ final readonly class SavedTaskSerializer
     }
 
     /**
+     * @param string|null $revealWebhookSecret a freshly minted HMAC secret, shown on
+     *                                         this one response only — never stored output
+     *
      * @return array<string, mixed>
      */
-    public function task(SavedTask $task): array
+    public function task(SavedTask $task, ?string $revealWebhookSecret = null): array
     {
         $summary = $this->summary->describe($task);
 
-        return [
+        $data = [
             'id' => $task->getId(),
             'promptId' => $task->getPromptId(),
             'name' => $task->getName(),
             'enabled' => $task->isEnabled(),
             'triggerType' => $task->getTriggerType(),
-            'triggerConfig' => $task->getTriggerConfig(),
-            'graph' => $task->getGraph(),
+            'triggerConfig' => $this->publicTriggerConfig($task),
+            'graph' => $this->publicGraph($task->getGraph()),
             'allowUnattended' => $task->allowsUnattended(),
             'chatId' => $task->getChatId(),
             'nextRunAt' => $task->getNextRunAt()?->format(\DateTimeInterface::ATOM),
@@ -51,6 +55,11 @@ final readonly class SavedTaskSerializer
             'instructionPreview' => $this->instructionPreview($task->getPromptId()),
             'waitingApprovalCount' => $this->waitingApprovalCount($task),
         ];
+        if (null !== $revealWebhookSecret && '' !== $revealWebhookSecret) {
+            $data['webhookSecret'] = $revealWebhookSecret;
+        }
+
+        return $data;
     }
 
     /**
@@ -70,6 +79,54 @@ final readonly class SavedTaskSerializer
             'created' => $run->getCreated(),
             'waitingNode' => $run->getWaitingNode(),
         ];
+    }
+
+    /**
+     * Never expose HMAC secrets. The webhook URL is reconstructed by the client
+     * from the public token.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function publicTriggerConfig(SavedTask $task): ?array
+    {
+        $config = $task->getTriggerConfig();
+        if (null === $config) {
+            return null;
+        }
+        $hasSecret = is_string($config['hmacSecret'] ?? null) && '' !== $config['hmacSecret'];
+        unset($config['hmacSecret']);
+        if (SavedTask::TRIGGER_WEBHOOK === $task->getTriggerType()) {
+            $config['hmacConfigured'] = $hasSecret;
+        }
+
+        return $config;
+    }
+
+    /**
+     * An outbound step's shared secret never leaves the server. The editor sees
+     * `secretConfigured` and sends the step back without a secret to keep it.
+     *
+     * @param array<string, mixed>|null $graph
+     *
+     * @return array<string, mixed>|null
+     */
+    private function publicGraph(?array $graph): ?array
+    {
+        if (null === $graph || !is_array($graph['nodes'] ?? null)) {
+            return $graph;
+        }
+        foreach ($graph['nodes'] as $i => $node) {
+            if (!is_array($node) || Capability::OutboundWebhook->value !== ($node['capability'] ?? null)) {
+                continue;
+            }
+            $params = is_array($node['params'] ?? null) ? $node['params'] : [];
+            $secret = $params['secret'] ?? null;
+            unset($params['secret']);
+            $params['secretConfigured'] = is_string($secret) && '' !== $secret;
+            $graph['nodes'][$i]['params'] = $params;
+        }
+
+        return $graph;
     }
 
     private function instructionPreview(int $promptId): ?string

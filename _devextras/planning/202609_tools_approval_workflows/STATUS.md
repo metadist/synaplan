@@ -11,7 +11,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. Flag off. |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
 | S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). Flag off. |
-| S5 Workflow builder v1 + webhook trigger | — | planned | Wave 5. |
+| S5 Workflow builder v1 + webhook trigger | `feat/wave5-workflow-builder` | in progress | Wave 5 first strain: TL38–TL40, TL42–TL44. Flag `WORKFLOWS.BUILDER_ENABLED` off. |
 
 ## Decisions
 
@@ -24,6 +24,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-07 | **UX contract.** J-TL-1…5 binding. Card + inbox findability is the sharing lesson applied to approvals. Tool/template Share waits on IAM-UX. |
 | 2026-09-10 | Wave 4 S1–S4 implemented behind flags. Registry kill-switch defaults on; approvals and custom HTTP stay off. |
 | 2026-09-10 | Wave 4 S1–S4 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
+| 2026-09-10 | **Wave 5 decisions ticked (roadmap §7.2, first PR):** (1) Recoverable jobs — this strain ships honest per-outcome copy and keeps existing pause/resume; checkpoints and per-run spend limits stay scheduled. (2) Publish ≠ activated — stays on Agent Builder STATUS; not this PR. (3) Approvals on resume — re-check current permissions and hard blocks immediately before execute; bind the approval to tool + arguments (a change voids it). (4) Sovereignty as a job-wide setting — scheduled, not this PR. (5) Complete-workflow packs / For you landing — scheduled. Form-first assistant builder and step-list editor stay the product shape. |
 
 ## Review log
 

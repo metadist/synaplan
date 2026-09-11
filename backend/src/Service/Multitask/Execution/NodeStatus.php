@@ -20,4 +20,9 @@ enum NodeStatus: string
     case Skipped = 'skipped';
     /** A write-class tool is waiting for the owner to approve it. */
     case WaitingApproval = 'waiting_approval';
+    /**
+     * A condition step evaluated false. Dependents are skipped and the run
+     * completes — this is not a failure.
+     */
+    case Stopped = 'stopped';
 }

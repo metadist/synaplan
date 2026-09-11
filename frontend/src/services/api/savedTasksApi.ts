@@ -43,6 +43,11 @@ export interface SavedTask {
   /** First ~60 characters of the underlying instruction ("what runs"). */
   instructionPreview: string | null
   waitingApprovalCount: number
+  /**
+   * Present only on the update response that turned on "Require a signature":
+   * the new HMAC secret, shown once. Never returned by list/get.
+   */
+  webhookSecret?: string
 }
 
 export interface SavedTaskRun {
@@ -144,7 +149,9 @@ export const savedTasksApi = {
       body: JSON.stringify(patch),
       schema: PatchApiSavedTasksUpdateResponseSchema,
     })
-    return asTask(data.task)
+    const task = asTask(data.task)
+    const secret = data.task?.webhookSecret
+    return typeof secret === 'string' && secret ? { ...task, webhookSecret: secret } : task
   },
 
   /**

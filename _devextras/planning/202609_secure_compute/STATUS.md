@@ -27,6 +27,7 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-07 | **UX contract.** J-CP-1/2: chat-native run card, quota as a sentence, no new page. Wireframe `compute-run-card.md`. |
 | 2026-09-10 | A0–A2 land in this repo under `sidecars/synaplan-compute`. No PHP integration in Wave 4. |
 | 2026-09-10 | A0–A2 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
+| 2026-09-10 | **Wave 5 decisions ticked:** Desktop is not the compute runtime. A3 + B1–B4 stay the next compute strain after this Tools S5 PR. `code_run` is write-class / unattended default `approve`. Cloud stays off until T2 on a compute node. Born as a feature module when B1 starts. |
 
 ## Review log
 

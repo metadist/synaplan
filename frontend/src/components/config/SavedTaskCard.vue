@@ -5,9 +5,12 @@ import { useRouter } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
+import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
+import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
 import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
+import { getApiBaseUrl } from '@/services/api/httpClient'
 import { ApiError } from '@/services/api/httpClient'
 import type { ShareVia } from '@/utils/shareCopy'
 
@@ -30,8 +33,11 @@ const router = useRouter()
 const { success, error: showError } = useNotification()
 const dialog = useDialog()
 const iamSharingEnabled = computed(() => isIamSharingEnabled())
+const workflowsEnabled = computed(() => isWorkflowsBuilderEnabled())
 const iamShareOpen = ref(false)
+const stepsOpen = ref(false)
 const copying = ref(false)
+const hmacSaving = ref(false)
 
 const running = ref(false)
 const showRuns = ref(false)
@@ -51,6 +57,8 @@ watch(
       if (typeof at === 'string') scheduleAt.value = at
       const tz = task.triggerConfig.tz
       if (typeof tz === 'string') scheduleTz.value = tz
+    } else if (task.triggerType === 'webhook') {
+      scheduleKind.value = 'webhook'
     } else {
       scheduleKind.value = 'off'
     }
@@ -139,6 +147,76 @@ const onRunNow = async () => {
   }
 }
 
+const webhookToken = computed(() => {
+  const token = props.task.triggerConfig?.token
+  return typeof token === 'string' ? token : ''
+})
+
+const webhookUrl = computed(() => {
+  if (!webhookToken.value) return ''
+  const base = getApiBaseUrl().replace(/\/$/, '')
+  return `${base}/api/v1/webhooks/saved-tasks/${webhookToken.value}`
+})
+
+const hmacConfigured = computed(() => props.task.triggerConfig?.hmacConfigured === true)
+
+// The server mints the shared secret and returns it exactly once; keep it only
+// in memory until the user leaves or turns the signature off.
+const revealedSecret = ref('')
+watch(hmacConfigured, (on) => {
+  if (!on) revealedSecret.value = ''
+})
+
+const copyToClipboard = async (value: string, doneMessage: string) => {
+  if (!value) return
+  try {
+    await navigator.clipboard.writeText(value)
+    success(doneMessage)
+  } catch {
+    showError(t('config.savedTasks.updateFailed'))
+  }
+}
+
+const copyWebhookUrl = () => copyToClipboard(webhookUrl.value, t('workflows.urlCopied'))
+const copyWebhookSecret = () => copyToClipboard(revealedSecret.value, t('workflows.secretCopied'))
+
+const regenerateWebhook = async () => {
+  const ok = await dialog.confirm({
+    title: t('workflows.regenerate'),
+    message: t('workflows.regenerateConfirm'),
+    danger: true,
+  })
+  if (!ok) return
+  try {
+    emit(
+      'updated',
+      await savedTasksApi.update(props.task.id, {
+        triggerType: 'webhook',
+        regenerateWebhookToken: true,
+      })
+    )
+  } catch {
+    showError(t('config.savedTasks.updateFailed'))
+  }
+}
+
+const onHmacToggle = async () => {
+  hmacSaving.value = true
+  try {
+    const { webhookSecret, ...updated } = await savedTasksApi.update(props.task.id, {
+      triggerType: 'webhook',
+      hmacEnabled: !hmacConfigured.value,
+    })
+    // Show it here, once; the list state never carries the secret.
+    revealedSecret.value = webhookSecret ?? ''
+    emit('updated', updated)
+  } catch {
+    showError(t('config.savedTasks.updateFailed'))
+  } finally {
+    hmacSaving.value = false
+  }
+}
+
 const onSchedule = async () => {
   try {
     if (scheduleKind.value === 'off') {
@@ -149,6 +227,16 @@ const onSchedule = async () => {
           triggerConfig: null,
         })
       )
+      return
+    }
+    if (scheduleKind.value === 'webhook') {
+      emit(
+        'updated',
+        await savedTasksApi.update(props.task.id, {
+          triggerType: 'webhook',
+        })
+      )
+      success(t('config.savedTasks.scheduleSaved'))
       return
     }
     const triggerConfig: Record<string, unknown> = {
@@ -299,15 +387,11 @@ const onRunCopy = async () => {
       <span class="txt-secondary">{{ task.waitingApprovalCount }}</span>
     </button>
 
-    <div
-      v-if="task.autoPaused"
-      class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm"
-      data-testid="saved-task-auto-pause"
-    >
-      <p class="font-medium text-amber-800 dark:text-amber-200">
+    <div v-if="task.autoPaused" class="alert-warning text-sm" data-testid="saved-task-auto-pause">
+      <p class="alert-warning-text">
         {{ $t('config.savedTasks.autoPauseTitle') }}
       </p>
-      <p class="text-amber-800/80 dark:text-amber-200/80 mt-1">
+      <p class="alert-warning-text mt-1 font-normal">
         {{ $t('config.savedTasks.autoPauseBody') }}
       </p>
       <button
@@ -370,6 +454,9 @@ const onRunCopy = async () => {
         <option value="interval">{{ $t('config.savedTasks.schedule.hourly') }}</option>
         <option value="daily">{{ $t('config.savedTasks.schedule.daily') }}</option>
         <option value="weekly">{{ $t('config.savedTasks.schedule.weekdays') }}</option>
+        <option v-if="workflowsEnabled || scheduleKind === 'webhook'" value="webhook">
+          {{ $t('config.savedTasks.schedule.webhook') }}
+        </option>
       </select>
       <input
         v-if="!sharedView && (scheduleKind === 'daily' || scheduleKind === 'weekly')"
@@ -403,6 +490,16 @@ const onRunCopy = async () => {
         {{ showRuns ? $t('config.savedTasks.hideRuns') : $t('config.savedTasks.viewRuns') }}
       </button>
       <button
+        v-if="workflowsEnabled && !sharedView"
+        type="button"
+        class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
+        data-testid="btn-saved-task-steps"
+        @click="stepsOpen = true"
+      >
+        {{ $t('workflows.steps') }}
+      </button>
+      <button
+        v-else-if="!workflowsEnabled"
         type="button"
         class="btn-secondary inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium"
         data-testid="btn-advanced-steps"
@@ -433,9 +530,89 @@ const onRunCopy = async () => {
       <li v-else class="text-xs txt-secondary">{{ $t('config.savedTasks.runsEmpty') }}</li>
     </ul>
 
-    <p v-if="showAdvanced" class="text-xs txt-secondary">
+    <p v-if="showAdvanced && !workflowsEnabled" class="text-xs txt-secondary">
       {{ $t('config.savedTasks.advancedHint') }}
     </p>
+
+    <div
+      v-if="workflowsEnabled && task.triggerType === 'webhook' && !sharedView"
+      class="surface-card p-4 space-y-3"
+      data-testid="saved-task-webhook"
+    >
+      <p class="text-sm font-medium txt-primary">{{ $t('workflows.webhookCardTitle') }}</p>
+      <p class="text-xs txt-secondary">{{ $t('workflows.webhookCardHint') }}</p>
+      <input
+        class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        :value="webhookUrl"
+        :aria-label="$t('workflows.webhookCardTitle')"
+        readonly
+        data-testid="saved-task-webhook-url"
+      />
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-copy-webhook-url"
+          @click="copyWebhookUrl"
+        >
+          {{ $t('workflows.copyUrl') }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-regenerate-webhook"
+          @click="regenerateWebhook"
+        >
+          {{ $t('workflows.regenerate') }}
+        </button>
+      </div>
+      <label class="flex items-start gap-2 text-sm txt-primary">
+        <input
+          type="checkbox"
+          class="mt-1 accent-[var(--brand)]"
+          :checked="hmacConfigured"
+          :disabled="hmacSaving"
+          data-testid="saved-task-webhook-hmac"
+          @change="onHmacToggle"
+        />
+        <span>
+          {{ $t('workflows.hmacEnable') }}
+          <span class="block text-xs txt-secondary mt-0.5">
+            {{ hmacConfigured ? $t('workflows.hmacOn') : $t('workflows.hmacHint') }}
+          </span>
+        </span>
+      </label>
+      <div
+        v-if="revealedSecret"
+        class="alert-warning text-sm space-y-2"
+        data-testid="saved-task-webhook-secret"
+      >
+        <p class="alert-warning-text">{{ $t('workflows.secretRevealTitle') }}</p>
+        <p class="alert-warning-text font-normal">{{ $t('workflows.secretRevealHint') }}</p>
+        <input
+          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :value="revealedSecret"
+          :aria-label="$t('workflows.secretRevealTitle')"
+          readonly
+          data-testid="saved-task-webhook-secret-value"
+        />
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+          data-testid="btn-copy-webhook-secret"
+          @click="copyWebhookSecret"
+        >
+          {{ $t('workflows.copySecret') }}
+        </button>
+      </div>
+    </div>
+
+    <SavedTaskStepsEditor
+      :open="stepsOpen"
+      :task="task"
+      @close="stepsOpen = false"
+      @updated="emit('updated', $event)"
+    />
     <ShareDialog
       :is-open="iamShareOpen"
       kind="saved_task"

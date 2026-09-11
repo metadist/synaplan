@@ -1990,7 +1990,8 @@
         "manual": "lancée par vous",
         "schedule": "exécution planifiée",
         "chat": "depuis le chat",
-        "inbound_email": "e-mail entrant"
+        "inbound_email": "e-mail entrant",
+        "webhook": "lancée par un autre système"
       },
       "advancedSteps": "Étapes avancées",
       "advancedHint": "Laissez ceci fermé sauf si vous voulez figer des étapes précises. La plupart des tâches n’ont besoin que de Lancer maintenant et d’un planning.",
@@ -2055,7 +2056,8 @@
         "off": "Pas de planning",
         "hourly": "Toutes les heures",
         "daily": "Tous les jours",
-        "weekdays": "Tous les jours ouvrés"
+        "weekdays": "Tous les jours ouvrés",
+        "webhook": "Laisser un autre système le lancer"
       },
       "summary": {
         "simple": "S’exécute {when}.",
@@ -2067,7 +2069,8 @@
           "weekly": "tous les jours ouvrés à {at} ({tz})",
           "schedule": "selon un planning",
           "inboundEmail": "quand un nouveau mail arrive",
-          "chat": "quand un message de chat correspondant arrive"
+          "chat": "quand un message de chat correspondant arrive",
+          "webhook": "lorsqu’un autre système l’appelle"
         },
         "reads": {
           "instruction": "cette instruction",
@@ -6472,5 +6475,80 @@
       "howToEnable": "Comment l’activer",
       "openFeatureStatus": "Ouvrir l’état des fonctionnalités"
     }
+  },
+  "workflows": {
+    "steps": "Étapes",
+    "stepsTitle": "Étapes de cette tâche",
+    "stepsSubtitle": "Chaque étape s’exécute dans l’ordre. La plupart des tâches n’en ont besoin que d’une ou deux.",
+    "addStep": "Ajouter une étape",
+    "saveSteps": "Enregistrer les étapes",
+    "saved": "Étapes enregistrées.",
+    "saveFailed": "Impossible d’enregistrer ces étapes.",
+    "close": "Fermer",
+    "deleteStep": "Retirer cette étape",
+    "deleteStepConfirm": "Retirer l’étape {n} ?",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "askBefore": "Me demander avant cette étape",
+    "askBeforeHint": "L’étape attend votre accord. Cela ne peut que rendre la tâche plus prudente, jamais moins.",
+    "fromTrigger": "Depuis l’événement de départ",
+    "fromStep": "Depuis l’étape {n}",
+    "literal": "Saisir une valeur",
+    "inputValue": "Valeur",
+    "condition": "Ne continuer que si",
+    "operator": {
+      "equals": "est égal à",
+      "contains": "contient",
+      "matches": "correspond à",
+      "not_empty": "n’est pas vide"
+    },
+    "webhookUrl": "Adresse (https)",
+    "whatToSend": "Quoi envoyer",
+    "webhookSecret": "Secret partagé (facultatif)",
+    "secretSet": "Un secret est enregistré",
+    "secretSetHint": "Il reste tel quel. Saisissez ici pour le remplacer, ou videz le champ pour le supprimer.",
+    "pickTool": "Choisir un outil",
+    "arguments": "Ce qui est envoyé à l’outil",
+    "noArguments": "Cet outil ne demande aucune donnée.",
+    "required": "obligatoire",
+    "inputSource": "D’où vient la valeur",
+    "field": "Champ",
+    "fieldHintTrigger": "Laissez vide pour tout l’événement de départ, ou indiquez une partie comme title ou order.id.",
+    "fieldHintStep": "text est la réponse de l’étape. Aussi : summary, error ou un champ de son résultat.",
+    "compareWith": "Comparer avec",
+    "patternPlaceholder": "Motif, p. ex. ^INV-\\d+$",
+    "kinds": {
+      "email_search": "Chercher dans les e-mails",
+      "summarize": "Résumer",
+      "chat": "Rédiger une réponse",
+      "email_me": "M’envoyer le résultat",
+      "tool_call": "Utiliser un outil connecté",
+      "condition": "Ne continuer que si…",
+      "outbound_webhook": "Envoyer à un autre système"
+    },
+    "kindHints": {
+      "email_search": "Regarde dans la boîte connectée.",
+      "summarize": "Raccourcit le résultat précédent.",
+      "chat": "Utilise l’assistant de cette tâche.",
+      "email_me": "Vous envoie un e-mail.",
+      "tool_call": "Exécute un outil déjà connecté.",
+      "condition": "Arrête les étapes suivantes si la valeur ne correspond pas.",
+      "outbound_webhook": "Envoie le résultat à une adresse https."
+    },
+    "empty": "Pas encore d’étapes. Ajoutez-en une pour commencer.",
+    "stepN": "Étape {n}",
+    "webhookCardTitle": "Un autre système peut lancer ceci",
+    "webhookCardHint": "Copiez cette adresse dans n8n, Make ou un script. Quiconque a l’adresse peut lancer une exécution en votre nom.",
+    "copyUrl": "Copier l’adresse",
+    "urlCopied": "Adresse copiée.",
+    "regenerate": "Créer une nouvelle adresse",
+    "regenerateConfirm": "L’ancienne adresse ne fonctionnera plus. Continuer ?",
+    "hmacEnable": "Exiger une signature",
+    "hmacHint": "L’autre système doit envoyer une signature correspondante. Plus sûr si l’adresse fuitait.",
+    "hmacOn": "Signature exigée. Le secret a été affiché une seule fois à l’activation ; désactivez puis réactivez pour en obtenir un nouveau.",
+    "secretRevealTitle": "Votre secret partagé — copiez-le maintenant",
+    "secretRevealHint": "Collez-le dans l’autre système. Il n’est affiché que cette fois et ne pourra pas être récupéré plus tard.",
+    "copySecret": "Copier le secret",
+    "secretCopied": "Secret copié."
   }
 }

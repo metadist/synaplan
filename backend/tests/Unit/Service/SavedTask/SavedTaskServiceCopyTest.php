@@ -27,7 +27,9 @@ final class SavedTaskServiceCopyTest extends TestCase
         $source = new SavedTask(9, 5, 'Weekly');
         $source->setTrigger(SavedTask::TRIGGER_SCHEDULE, ['kind' => 'daily', 'at' => '07:00']);
         $source->setAllowUnattended(true);
-        $source->setGraph(['nodes' => []]);
+        $source->setGraph(['nodes' => [
+            ['id' => 'n1', 'capability' => 'outbound_webhook', 'depends_on' => [], 'params' => ['url' => 'https://hooks.example/in', 'secret' => 'owner-only']],
+        ]]);
         (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
 
         $prompt = new Prompt();
@@ -75,7 +77,13 @@ final class SavedTaskServiceCopyTest extends TestCase
         self::assertSame(3, $copy->getOwnerId());
         // The copied graph follows the reset trigger; a schedule-typed graph
         // on a manual task would be rejected by the factory at run time.
-        self::assertSame(['nodes' => [], 'trigger' => ['type' => SavedTask::TRIGGER_MANUAL]], $copy->getGraph());
+        // The source owner's outbound secret never travels with the copy.
+        self::assertSame([
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'outbound_webhook', 'depends_on' => [], 'params' => ['url' => 'https://hooks.example/in']],
+            ],
+            'trigger' => ['type' => SavedTask::TRIGGER_MANUAL],
+        ], $copy->getGraph());
     }
 
     public function testCopyWithoutAssistantAccessThrowsConflict(): void

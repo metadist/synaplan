@@ -41,6 +41,7 @@ use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\Plugin\PluginManager;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\SelfAware\CapabilityInventory;
 use App\Service\SelfAware\SelfAwareConfig;
 use App\Service\Setup\SetupStateService;
@@ -106,6 +107,7 @@ class ConfigController extends AbstractController
         private readonly ?GroupPolicyService $groupPolicyService = null,
         private readonly ?BundleConfig $bundleConfig = null,
         private readonly ?ToolsConfig $toolsConfig = null,
+        private readonly ?WorkflowsConfig $workflowsConfig = null,
     ) {
     }
 
@@ -204,6 +206,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'toolsRegistryEnabled', type: 'boolean', example: true, description: 'When true, GET /api/v1/tools lists the tool registry. Kill switch after the Wave 4 registry refactor.'),
                         new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. Off by default.'),
                         new OA\Property(property: 'toolsCustomHttpEnabled', type: 'boolean', example: false, description: 'When true, Connections shows Custom tools for HTTP/OpenAPI tools. Off by default.'),
+                        new OA\Property(property: 'workflowsBuilderEnabled', type: 'boolean', example: false, description: 'When true, Saved Tasks show a Steps editor and can start from another system. Off by default.'),
                     ]
                 ),
                 new OA\Property(
@@ -530,6 +533,7 @@ class ConfigController extends AbstractController
             'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
             'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),
             'toolsCustomHttpEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isCustomHttpEnabled($user?->getId()),
+            'workflowsBuilderEnabled' => null !== $this->workflowsConfig && $this->workflowsConfig->isBuilderEnabled($user?->getId()),
         ];
 
         // Speech-to-text configuration

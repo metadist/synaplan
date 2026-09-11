@@ -28,7 +28,7 @@ final class SavedTaskPlanFactory
             );
         }
 
-        $errors = $this->validator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig());
+        $errors = $this->validator->validate($graph, $task->getTriggerType(), $task->getTriggerConfig(), $task->getOwnerId());
         if ([] !== $errors) {
             throw new \InvalidArgumentException(implode('; ', $errors));
         }

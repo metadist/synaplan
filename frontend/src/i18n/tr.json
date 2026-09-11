@@ -2892,7 +2892,8 @@
         "manual": "senin tarafından başlatıldı",
         "schedule": "zamanlanmış",
         "chat": "sohbetten",
-        "inbound_email": "gelen e-posta"
+        "inbound_email": "gelen e-posta",
+        "webhook": "başka bir sistem tarafından başlatıldı"
       },
       "advancedSteps": "Gelişmiş adımlar",
       "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
@@ -2957,7 +2958,8 @@
         "off": "Zamanlama yok",
         "hourly": "Her saat",
         "daily": "Her gün",
-        "weekdays": "Her iş günü"
+        "weekdays": "Her iş günü",
+        "webhook": "Başka bir sistem başlatsın"
       },
       "summary": {
         "simple": "Ne zaman çalışır: {when}.",
@@ -2969,7 +2971,8 @@
           "weekly": "hafta içi her gün {at} ({tz})",
           "schedule": "zamanlamaya göre",
           "inboundEmail": "yeni e-posta gelince",
-          "chat": "eşleşen bir sohbet mesajı gelince"
+          "chat": "eşleşen bir sohbet mesajı gelince",
+          "webhook": "başka bir sistem çağırınca"
         },
         "reads": {
           "instruction": "bu talimat",
@@ -5487,5 +5490,80 @@
       "howToEnable": "Nasıl etkinleştirilir",
       "openFeatureStatus": "Özellik durumunu aç"
     }
+  },
+  "workflows": {
+    "steps": "Adımlar",
+    "stepsTitle": "Bu görevin adımları",
+    "stepsSubtitle": "Her adım sırayla çalışır. Çoğu görev için bir veya iki adım yeter.",
+    "addStep": "Adım ekle",
+    "saveSteps": "Adımları kaydet",
+    "saved": "Adımlar kaydedildi.",
+    "saveFailed": "Bu adımlar kaydedilemedi.",
+    "close": "Kapat",
+    "deleteStep": "Bu adımı kaldır",
+    "deleteStepConfirm": "{n}. adım kaldırılsın mı?",
+    "moveUp": "Yukarı taşı",
+    "moveDown": "Aşağı taşı",
+    "askBefore": "Bu adımdan önce bana sor",
+    "askBeforeHint": "Adım senin onayını bekler. Görevi yalnızca daha dikkatli yapar, asla daha az.",
+    "fromTrigger": "Başlangıç olayından",
+    "fromStep": "{n}. adımdan",
+    "literal": "Bir değer yaz",
+    "inputValue": "Değer",
+    "condition": "Yalnızca şu durumda devam et",
+    "operator": {
+      "equals": "eşittir",
+      "contains": "içerir",
+      "matches": "eşleşir",
+      "not_empty": "boş değil"
+    },
+    "webhookUrl": "Adres (https)",
+    "whatToSend": "Ne gönderilecek",
+    "webhookSecret": "Paylaşılan gizli anahtar (isteğe bağlı)",
+    "secretSet": "Bir gizli anahtar kayıtlı",
+    "secretSetHint": "Olduğu gibi kalır. Değiştirmek için buraya yazın veya kaldırmak için alanı boşaltın.",
+    "pickTool": "Bir araç seç",
+    "arguments": "Araca ne gönderilecek",
+    "noArguments": "Bu araç girdi almaz.",
+    "required": "zorunlu",
+    "inputSource": "Değer nereden geliyor",
+    "field": "Alan",
+    "fieldHintTrigger": "Başlangıç olayının tamamı için boş bırak ya da title veya order.id gibi bir bölüm belirt.",
+    "fieldHintStep": "text adımın yanıtıdır. Ayrıca: summary, error veya sonucunun bir alanı.",
+    "compareWith": "Şununla karşılaştır",
+    "patternPlaceholder": "Desen, örn. ^INV-\\d+$",
+    "kinds": {
+      "email_search": "Postada ara",
+      "summarize": "Özetle",
+      "chat": "Bir yanıt yaz",
+      "email_me": "Sonucu bana e-postala",
+      "tool_call": "Bağlı bir araç kullan",
+      "condition": "Yalnızca şu durumda devam et…",
+      "outbound_webhook": "Başka bir sisteme gönder"
+    },
+    "kindHints": {
+      "email_search": "Bağlı postakutuya bakar.",
+      "summarize": "Önceki sonucu kısaltır.",
+      "chat": "Bu görevin asistanını kullanır.",
+      "email_me": "Sana bir e-posta gönderir.",
+      "tool_call": "Önceden bağladığın bir aracı çalıştırır.",
+      "condition": "Değer uymazsa sonraki adımları durdurur.",
+      "outbound_webhook": "Sonucu bir https adresine gönderir."
+    },
+    "empty": "Henüz adım yok. Başlamak için bir tane ekle.",
+    "stepN": "Adım {n}",
+    "webhookCardTitle": "Başka bir sistem bunu başlatabilir",
+    "webhookCardHint": "Bu adresi n8n, Make veya bir betiğe kopyala. Adrese sahip herkes senin adına bir çalıştırma başlatabilir.",
+    "copyUrl": "Adresi kopyala",
+    "urlCopied": "Adres kopyalandı.",
+    "regenerate": "Yeni adres oluştur",
+    "regenerateConfirm": "Eski adres çalışmayı durdurur. Devam edilsin mi?",
+    "hmacEnable": "İmza iste",
+    "hmacHint": "Diğer sistem eşleşen bir imza göndermelidir. Adres sızarsa daha güvenlidir.",
+    "hmacOn": "İmza gerekli. Gizli anahtar açarken bir kez gösterildi; yenisi için kapatıp tekrar aç.",
+    "secretRevealTitle": "Paylaşılan gizli anahtarın — şimdi kopyala",
+    "secretRevealHint": "Diğer sisteme yapıştır. Yalnızca bu kez gösterilir ve sonradan alınamaz.",
+    "copySecret": "Gizli anahtarı kopyala",
+    "secretCopied": "Gizli anahtar kopyalandı."
   }
 }

@@ -58,3 +58,12 @@ framework:
             limit: 60
             interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
+        # Public Saved Task webhook (`POST /api/v1/webhooks/saved-tasks/{token}`,
+        # PUBLIC_ACCESS), keyed per task in SavedTaskWebhookIngress. One start
+        # per second is far beyond any real integration and keeps a leaked
+        # address from flooding the owner's usage quota.
+        saved_task_webhook:
+            policy: 'sliding_window'
+            limit: 60
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'

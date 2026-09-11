@@ -121,6 +121,9 @@ framework:
             'App\Message\GenerateDocumentThumbnailMessage': async_index
             'App\Message\ResumeApprovalCommand': async_ai_high
             'App\Message\ResumeSavedTaskRunCommand': async_ai_high
+            # Public webhook → Saved Task run. Accepted on the request path,
+            # executed here so proxy timeouts never trigger duplicate runs.
+            'App\Message\RunSavedTaskCommand': async_ai_high
 
 when@test:
     framework:

@@ -38,6 +38,7 @@ final class PolicyAllowList
         'TOOLS.REGISTRY_ENABLED',
         'TOOLS.APPROVALS_ENABLED',
         'TOOLS.CUSTOM_HTTP_ENABLED',
+        'WORKFLOWS.BUILDER_ENABLED',
     ];
 
     /**

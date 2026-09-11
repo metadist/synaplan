@@ -67,6 +67,9 @@ final class SavedTaskSummary
         if (SavedTask::TRIGGER_CHAT === $task->getTriggerType()) {
             return ['when' => 'chat'];
         }
+        if (SavedTask::TRIGGER_WEBHOOK === $task->getTriggerType()) {
+            return ['when' => 'webhook'];
+        }
         if (SavedTask::TRIGGER_SCHEDULE !== $task->getTriggerType()) {
             return ['when' => 'manual'];
         }
