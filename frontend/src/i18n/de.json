@@ -2105,8 +2105,6 @@
         "inbound_email": "eingehende E-Mail",
         "webhook": "von einem anderen System gestartet"
       },
-      "advancedSteps": "Erweiterte Schritte",
-      "advancedHint": "Nur öffnen, wenn du genaue Schritte festlegen willst. Die meisten Aufgaben brauchen nur „Jetzt ausführen“ und einen Zeitplan.",
       "autoPauseTitle": "Automatisch pausiert",
       "autoPauseBody": "Diese Aufgabe ist dreimal hintereinander fehlgeschlagen. Behebe das Problem und setze sie fort.",
       "createFailed": "Konnte nicht als Aufgabe gespeichert werden.",

@@ -1993,8 +1993,6 @@
         "inbound_email": "e-mail entrant",
         "webhook": "lancée par un autre système"
       },
-      "advancedSteps": "Étapes avancées",
-      "advancedHint": "Laissez ceci fermé sauf si vous voulez figer des étapes précises. La plupart des tâches n’ont besoin que de Lancer maintenant et d’un planning.",
       "autoPauseTitle": "En pause automatiquement",
       "autoPauseBody": "Cette tâche a échoué trois fois de suite. Corrigez le problème, puis reprenez.",
       "createFailed": "Impossible d’enregistrer ceci comme tâche.",

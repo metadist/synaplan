@@ -2894,8 +2894,6 @@
         "inbound_email": "correo entrante",
         "webhook": "iniciada por otro sistema"
       },
-      "advancedSteps": "Pasos avanzados",
-      "advancedHint": "Déjalo cerrado salvo que quieras fijar pasos exactos. La mayoría de las tareas solo necesitan Ejecutar ahora y una programación.",
       "autoPauseTitle": "Pausada automáticamente",
       "autoPauseBody": "Esta tarea falló tres veces seguidas. Corrige el problema y reanúdala.",
       "createFailed": "No se pudo guardar como tarea.",

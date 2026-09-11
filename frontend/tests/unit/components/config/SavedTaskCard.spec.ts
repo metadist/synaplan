@@ -291,10 +291,11 @@ describe('SavedTaskCard', () => {
     expect(wrapper.emitted('deleted')).toEqual([[7]])
   })
 
-  it('hides Steps when the builder flag is off', () => {
+  it('hides Steps entirely when the builder flag is off (no empty teaser)', () => {
     const wrapper = mountCard(task())
     expect(wrapper.find('[data-testid="btn-saved-task-steps"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('config.savedTasks.advancedSteps')
     expect(wrapper.find('[data-testid="saved-task-webhook"]').exists()).toBe(false)
   })
 
@@ -302,7 +303,6 @@ describe('SavedTaskCard', () => {
     mockWorkflowsEnabled.mockReturnValue(true)
     const wrapper = mountCard(task())
     expect(wrapper.find('[data-testid="btn-saved-task-steps"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="btn-advanced-steps"]').exists()).toBe(false)
   })
 
   it('shows the webhook address and reveals a fresh shared secret exactly once', async () => {

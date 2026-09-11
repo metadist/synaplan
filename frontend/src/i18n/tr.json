@@ -2895,8 +2895,6 @@
         "inbound_email": "gelen e-posta",
         "webhook": "başka bir sistem tarafından başlatıldı"
       },
-      "advancedSteps": "Gelişmiş adımlar",
-      "advancedHint": "Tam adımları sabitlemek istemiyorsan kapalı bırak. Çoğu görev için Şimdi çalıştır ve bir zamanlama yeter.",
       "autoPauseTitle": "Otomatik olarak duraklatıldı",
       "autoPauseBody": "Bu görev üst üste üç kez başarısız oldu. Sorunu gider, sonra devam et.",
       "createFailed": "Görev olarak kaydedilemedi.",

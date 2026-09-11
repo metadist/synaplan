@@ -1995,8 +1995,6 @@
         "inbound_email": "incoming email",
         "webhook": "started by another system"
       },
-      "advancedSteps": "Advanced steps",
-      "advancedHint": "Leave this closed unless you want to pin exact steps. Most tasks only need Run now and a schedule.",
       "autoPauseTitle": "Paused automatically",
       "autoPauseBody": "This task failed three times in a row. Fix the issue, then resume.",
       "createFailed": "Could not save this as a task.",
