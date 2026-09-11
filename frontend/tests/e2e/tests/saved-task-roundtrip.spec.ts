@@ -1,8 +1,9 @@
 import { test, expect } from '../test-setup'
-import { openApp } from '../helpers/auth'
+import { getAuthHeaders, openApp } from '../helpers/auth'
 import { ChatHelper } from '../helpers/chat'
+import { isAgentsEnabled } from '../helpers/features'
 import { selectors } from '../helpers/selectors'
-import { TIMEOUTS } from '../config/config'
+import { getApiUrl, TIMEOUTS } from '../config/config'
 
 const PROMPTS = selectors.taskPrompts
 const TASKS = selectors.savedTasks
@@ -20,40 +21,75 @@ const TASKS = selectors.savedTasks
  * "Save as task" is only offered on a CUSTOM prompt, so we create one first
  * (same modal flow as task-prompts.spec.ts). The worker user is disposable, so
  * no explicit cleanup — teardown cascades the prompt, task, chat and messages.
+ *
+ * While AGENTS.ENABLED is on (the seeded default) the Instructions editor is
+ * not reachable — /ai/instructions forwards to the Assistants gallery, and
+ * tasks are born from assistant triggers instead. The prompt → task seam is
+ * then exercised through the same two API calls the editor makes, so the
+ * Saved Tasks page, Run now and the chat landing keep their coverage.
  */
 test.describe('@ci Saved Task roundtrip', () => {
-  test('create task from a prompt, run it, and land in its chat', async ({ page }) => {
+  test('create task from a prompt, run it, and land in its chat', async ({
+    page,
+    request,
+    credentials,
+  }) => {
     // Arrange + synchronous /run + chat land exceeds the 60s default under
     // CI shard load. VERY_LONG covers the run; EXTREME is headroom for setup.
     test.setTimeout(TIMEOUTS.EXTREME + TIMEOUTS.VERY_LONG)
     const topic = `e2e-task-${Date.now()}`
     const taskName = `E2E Task ${topic}`
+    const promptContent = 'You are an E2E saved task. Reply with a short confirmation sentence.'
     const card = page.locator(TASKS.card).filter({ hasText: taskName })
+    const agentsEnabled = await isAgentsEnabled(request, credentials)
 
-    await test.step('Arrange: create a custom prompt', async () => {
-      await openApp(page)
-      await page.goto('/ai/instructions')
-      await expect(page.locator(PROMPTS.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    if (agentsEnabled) {
+      await test.step('Arrange: create a custom prompt and its task via the API', async () => {
+        await openApp(page)
+        // A fresh API login: the worker's access cookie may have expired and
+        // the request context has no refresh logic of its own.
+        const headers = await getAuthHeaders(request, credentials)
+        const promptRes = await request.post(`${getApiUrl()}/api/v1/prompts`, {
+          headers,
+          data: { topic, shortDescription: taskName, prompt: promptContent },
+        })
+        expect(promptRes.ok(), await promptRes.text()).toBeTruthy()
+        const { prompt } = (await promptRes.json()) as { prompt: { id: number } }
 
-      await page.locator(PROMPTS.btnCreate).click()
-      await page.locator(PROMPTS.createModal).waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
-      await page.locator(PROMPTS.inputNewTopic).fill(topic)
-      await page.locator(PROMPTS.inputNewName).fill(taskName)
-      await page
-        .locator(PROMPTS.inputNewContent)
-        .fill('You are an E2E saved task. Reply with a short confirmation sentence.')
-      await page.locator(PROMPTS.btnConfirmCreate).click()
-      await page
-        .locator(PROMPTS.createModal)
-        .waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
-      await expect(page.locator(PROMPTS.promptDetails)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    })
+        const taskRes = await request.post(`${getApiUrl()}/api/v1/saved-tasks`, {
+          headers,
+          data: { promptId: prompt.id, name: taskName },
+        })
+        expect(taskRes.ok(), await taskRes.text()).toBeTruthy()
+      })
+    } else {
+      await test.step('Arrange: create a custom prompt', async () => {
+        await openApp(page)
+        await page.goto('/ai/instructions')
+        await expect(page.locator(PROMPTS.overview)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
-    await test.step('Act: save the prompt as a task', async () => {
-      await page.locator(PROMPTS.btnSaveAsTask).click()
-      // The editor renders the task inline once it exists — the create seam worked.
-      await expect(page.locator(TASKS.card)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    })
+        await page.locator(PROMPTS.btnCreate).click()
+        await page
+          .locator(PROMPTS.createModal)
+          .waitFor({ state: 'visible', timeout: TIMEOUTS.SHORT })
+        await page.locator(PROMPTS.inputNewTopic).fill(topic)
+        await page.locator(PROMPTS.inputNewName).fill(taskName)
+        await page.locator(PROMPTS.inputNewContent).fill(promptContent)
+        await page.locator(PROMPTS.btnConfirmCreate).click()
+        await page
+          .locator(PROMPTS.createModal)
+          .waitFor({ state: 'hidden', timeout: TIMEOUTS.STANDARD })
+        await expect(page.locator(PROMPTS.promptDetails)).toBeVisible({
+          timeout: TIMEOUTS.STANDARD,
+        })
+      })
+
+      await test.step('Act: save the prompt as a task', async () => {
+        await page.locator(PROMPTS.btnSaveAsTask).click()
+        // The editor renders the task inline once it exists — the create seam worked.
+        await expect(page.locator(TASKS.card)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      })
+    }
 
     await test.step('Assert: the task is listed on the Saved Tasks page', async () => {
       await page.goto('/channels/tasks')

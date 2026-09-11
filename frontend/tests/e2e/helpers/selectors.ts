@@ -463,6 +463,11 @@ export const selectors = {
     page: '[data-testid="page-config-inbound"]',
     resetDefaults: '[data-testid="btn-reset-defaults"]',
   },
+  assistants: {
+    /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
+    gallery: '[data-testid="section-assistant-gallery"]',
+  },
+
   taskPrompts: {
     page: '[data-testid="page-config-task-prompts"]',
     overview: '[data-testid="section-task-prompts-overview"]',
