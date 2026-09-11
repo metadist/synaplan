@@ -27,7 +27,7 @@ import {
 import { i18n } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
-import { adminUsersTabRedirect, peopleRouteGuard } from '@/router/iamGuards'
+import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
 
@@ -499,6 +499,7 @@ const router = createRouter({
       name: 'my-groups',
       component: () => import('@/views/MyGroupsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.myGroups' },
+      beforeEnter: groupsRouteGuard,
     },
     {
       // Conversations other people or groups shared with me ("incoming").
