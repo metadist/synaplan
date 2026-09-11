@@ -9,6 +9,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
+use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
 use App\Service\Message\MessagePreProcessor;
@@ -124,6 +125,89 @@ class MessageProcessorTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertArrayHasKey('response', $result);
         $this->assertArrayHasKey('classification', $result);
+    }
+
+    /**
+     * A handler that answered under a different route (MediaGenerationHandler
+     * handing a misrouted "audio" turn to the chat answer) reports it via
+     * `effective_classification`. The classification returned to the
+     * persistence layer must reflect that — otherwise the stored turn is a
+     * mediamaker/audio row for a chat answer.
+     */
+    public function testProcessFoldsEffectiveClassificationReportedByHandler(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'intent' => 'image_generation',
+            'media_type' => 'audio',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->router->method('route')->willReturn([
+            'content' => 'Sefr, yek, do …',
+            'metadata' => [
+                'provider' => 'test',
+                'model' => 'test',
+                MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY => [
+                    'topic' => 'general',
+                    'intent' => 'chat',
+                    'media_type' => null,
+                    'rerouted_from' => 'mediamaker:audio',
+                ],
+            ],
+        ]);
+
+        $result = $this->processor->process($message);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('general', $result['classification']['topic']);
+        $this->assertSame('chat', $result['classification']['intent']);
+        $this->assertArrayNotHasKey('media_type', $result['classification']);
+        $this->assertSame('mediamaker:audio', $result['classification']['rerouted_from']);
+        $this->assertSame('de', $result['classification']['language'], 'untouched keys survive');
+    }
+
+    public function testProcessStreamFoldsEffectiveClassificationReportedByHandler(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'mediamaker',
+            'intent' => 'image_generation',
+            'media_type' => 'audio',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+        ]);
+
+        $this->router->method('routeStream')->willReturn([
+            'metadata' => [
+                MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY => ['topic' => 'general', 'intent' => 'chat', 'media_type' => null],
+            ],
+        ]);
+
+        $result = $this->processor->processStream($message, static function (string $chunk): void {});
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('general', $result['classification']['topic']);
+        $this->assertSame('chat', $result['classification']['intent']);
+        $this->assertArrayNotHasKey('media_type', $result['classification']);
     }
 
     public function testProcessCallsStatusCallback(): void

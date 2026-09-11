@@ -114,6 +114,34 @@ final class PromptCatalogTest extends TestCase
     }
 
     /**
+     * The sorter sees the topics through `[DYNAMICLIST]`, which is rendered
+     * from each topic's runtime `shortDescription` — BEFORE the rules above.
+     * A description that still advertises "audio" wholesale hands the model a
+     * contradiction, so the mediamaker description must carry the same
+     * boundary: TTS of existing text only, songs/poems/lessons are `general`.
+     */
+    public function testMediamakerDescriptionLimitsAudioToExistingText(): void
+    {
+        $description = $this->catalogShortDescription('mediamaker');
+
+        $this->assertStringContainsString('images and videos', $description);
+        $this->assertStringContainsString('text-to-speech of text that ALREADY EXISTS', $description);
+        $this->assertStringContainsString('NOT for songs, poems, stories or lessons', $description);
+        $this->assertStringNotContainsString('images, videos and audio', $description);
+    }
+
+    private function catalogShortDescription(string $topic): string
+    {
+        foreach (PromptCatalog::all() as $entry) {
+            if ($topic === $entry['topic']) {
+                return $entry['shortDescription'];
+            }
+        }
+
+        $this->fail(sprintf('catalog has no entry for topic "%s"', $topic));
+    }
+
+    /**
      * When the sorter still mis-votes audio, the extraction prompts are the
      * next line of defence: the script must be what the listener should hear —
      * written on the spot if the message only describes it — and never the

@@ -14,11 +14,14 @@ namespace App\Service\Message;
  * the exact failure this guard exists to catch before any provider is called.
  *
  * Deliberately conservative: a delimited payload ("read aloud: …", quotes) is
- * always trusted, short messages are never flagged, and a script only counts as
- * an echo when nearly all of its words come from the request AND it covers most
- * of the request. A legitimately WRITTEN script (a poem, a greeting) introduces
- * new words and passes; a legitimately EXTRACTED one is much shorter than the
- * instruction around it and passes too.
+ * always trusted, short messages are never flagged, and a script that differs
+ * from the request only counts as an echo when it (a) still OPENS with a
+ * request verb ("teach me…", "bring mir… bei", "erkläre…"), (b) is built
+ * almost entirely from the request's words and (c) covers most of the
+ * request. A legitimately WRITTEN script (a poem, a greeting) introduces new
+ * words and passes; a legitimately EXTRACTED one ("say hello world now" →
+ * "hello world now") no longer starts with the instruction verb and passes
+ * too, however short the surrounding instruction was.
  */
 final readonly class TtsScriptGuard
 {
@@ -30,6 +33,34 @@ final readonly class TtsScriptGuard
 
     /** Share of the request the script must cover to count as the whole instruction. */
     private const MIN_REQUEST_COVERAGE = 0.7;
+
+    /**
+     * Imperatives that ask for content to be produced. A TTS script that still
+     * begins with one of these is the instruction, not the text to speak.
+     * "say"/"read"/"speak" are deliberately absent: those introduce a payload,
+     * and stripping them is exactly what a correct extraction does.
+     *
+     * @var list<string>
+     */
+    private const REQUEST_VERBS = [
+        // en
+        'teach', 'explain', 'write', 'create', 'make', 'generate', 'compose', 'tell', 'give',
+        'show', 'help', 'describe', 'translate', 'summarize', 'summarise', 'invent', 'draft', 'list',
+        // de
+        'bring', 'bringe', 'lehre', 'lehr', 'erkläre', 'erklär', 'schreib', 'schreibe', 'erstelle',
+        'erstell', 'mach', 'mache', 'generiere', 'generier', 'erzähl', 'erzähle', 'gib', 'zeig',
+        'zeige', 'hilf', 'beschreib', 'beschreibe', 'übersetze', 'übersetz', 'fasse', 'erfinde', 'entwirf',
+        // fr / es / tr
+        'apprends', 'explique', 'écris', 'crée', 'fais', 'raconte', 'enséñame', 'explica', 'escribe',
+        'crea', 'haz', 'cuéntame', 'öğret', 'açıkla', 'yaz', 'oluştur', 'anlat',
+    ];
+
+    /**
+     * Politeness openers skipped before looking for the request verb.
+     *
+     * @var list<string>
+     */
+    private const POLITE_OPENERS = ['please', 'bitte', 'kindly', 'lütfen'];
 
     /**
      * Whether speaking `$script` would read the user's own request back to them.
@@ -65,6 +96,14 @@ final readonly class TtsScriptGuard
             return false;
         }
 
+        // "hello world now" for "Say hello world now" is a payload with the
+        // instruction verb removed — the shape a correct extraction has. Only
+        // a script that still opens with a content-producing imperative can be
+        // the instruction itself.
+        if (!self::opensWithRequestVerb($scriptWords)) {
+            return false;
+        }
+
         $requestVocabulary = array_fill_keys($requestWords, true);
         $copied = 0;
         foreach ($scriptWords as $word) {
@@ -77,6 +116,22 @@ final readonly class TtsScriptGuard
         $requestCoverage = count($scriptWords) / count($requestWords);
 
         return $copiedShare >= self::MIN_COPIED_WORD_SHARE && $requestCoverage >= self::MIN_REQUEST_COVERAGE;
+    }
+
+    /**
+     * @param list<string> $scriptWords normalized words of the script
+     */
+    private static function opensWithRequestVerb(array $scriptWords): bool
+    {
+        foreach ($scriptWords as $word) {
+            if (in_array($word, self::POLITE_OPENERS, true)) {
+                continue;
+            }
+
+            return in_array($word, self::REQUEST_VERBS, true);
+        }
+
+        return false;
     }
 
     private static function hasDelimitedPayload(string $text): bool

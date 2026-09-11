@@ -77,7 +77,7 @@ class PromptCatalog
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it").',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images and videos — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it") — and text-to-speech of text that ALREADY EXISTS (typed or quoted in the message, the previous answer, an attached document). NOT for songs, poems, stories or lessons that still have to be written, even "as a song" or "read aloud": those are "general" (with a spoken step only when the user asks to hear the result).',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 

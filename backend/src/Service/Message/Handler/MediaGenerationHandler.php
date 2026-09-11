@@ -45,6 +45,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 #[AutoconfigureTag('app.message.handler')]
 final readonly class MediaGenerationHandler implements MessageHandlerInterface
 {
+    /** Marker stored on a turn that TtsScriptGuard handed to the chat answer. */
+    public const REROUTED_FROM_AUDIO = 'mediamaker:audio';
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -146,14 +149,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         // Send initial status based on detected media type (will be refined later)
         $this->notify($progressCallback, 'analyzing', 'Understanding your request...');
 
-        // Dispatch background memory extraction on the user's prompt before
-        // we start the (slow, possibly-failing) provider call. Mirrors the
-        // pattern in ChatHandler::handleStream(): memories must be picked
-        // up from any user turn that carries personal information, not just
-        // text-chat turns (issue #880). Doing it up-front means a failed
-        // image generation still saves "ich liebe Hunde" — and the queue
-        // dispatch is cheap (a few ms) so the user doesn't notice.
-        $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
+        // Background memory extraction on the user's prompt is dispatched
+        // further down, once the turn is confirmed to stay on the media path
+        // (after the TtsScriptGuard re-route decision) but still BEFORE the
+        // slow, possibly-failing provider call. Mirrors ChatHandler: memories
+        // must be picked up from any user turn that carries personal
+        // information (issue #880), and a failed image generation still saves
+        // "ich liebe Hunde". A turn handed to ChatHandler instead is extracted
+        // there — dispatching here as well would queue the same message twice.
 
         // Collect attached image paths for pic2pic. Besides the message's own
         // uploads we also accept reference images passed explicitly via options
@@ -379,6 +382,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                         .'Please use one of the following commands: `/pic` for images, `/vid` for videos, `/tts` for audio.';
 
                 $streamCallback($clarification);
+                $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
                 return [
                     'metadata' => [
@@ -401,6 +405,10 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         ) {
             return $this->answerAsChatInstead($message, $thread, $classification, $streamCallback, $progressCallback, $options, $prompt);
         }
+
+        // The turn stays on the media path: queue memory extraction now (see
+        // the note at the top of this method).
+        $this->maybeDispatchMemoryExtraction($message, $thread, $classification, $options);
 
         // Resolve model ID to provider + model name + config
         $modelConfig = [];
@@ -1471,10 +1479,11 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                 ? 'Ich habe in deiner Nachricht keinen Text gefunden, den ich vorlesen könnte. Formuliere die Anfrage bitte als normale Frage, oder gib den Text an, den ich sprechen soll (z. B. „Lies vor: …“).'
                 : 'I could not find any text in your message to read aloud. Please ask the question as a normal chat message, or tell me the exact text to speak (e.g. "Read aloud: …").');
 
+            // No `media_type` here on purpose: StreamController bills any
+            // response carrying one as generated media, and nothing was made.
             return [
                 'metadata' => [
                     'error' => 'tts_script_echoes_request',
-                    'media_type' => 'audio',
                 ],
             ];
         }
@@ -1482,7 +1491,7 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $chatClassification = $classification;
         $chatClassification['topic'] = 'general';
         $chatClassification['intent'] = 'chat';
-        $chatClassification['rerouted_from'] = 'mediamaker:audio';
+        $chatClassification['rerouted_from'] = self::REROUTED_FROM_AUDIO;
         unset(
             $chatClassification['media_type'],
             $chatClassification['input_mode'],
@@ -1499,7 +1508,16 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
 
         $result = $this->chatHandler->handleStream($message, $thread, $chatClassification, $streamCallback, $progressCallback, $chatOptions);
         $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
-        $metadata['rerouted_from'] = 'mediamaker:audio';
+        $metadata['rerouted_from'] = self::REROUTED_FROM_AUDIO;
+        // MessageProcessor folds this into the classification it hands back,
+        // so the persisted topic / media meta and the voice-reply guard see
+        // the chat answer that was actually produced, not the audio vote.
+        $metadata[MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY] = [
+            'topic' => 'general',
+            'intent' => 'chat',
+            'media_type' => null,
+            'rerouted_from' => self::REROUTED_FROM_AUDIO,
+        ];
         $result['metadata'] = $metadata;
 
         return $result;

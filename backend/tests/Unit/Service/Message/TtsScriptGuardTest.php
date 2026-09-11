@@ -21,9 +21,13 @@ final class TtsScriptGuardTest extends TestCase
             'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',
             'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',
         ];
-        yield 'kinderlied request minus the first word' => [
-            'Mit einem Kinderlied die persischen Zahlen 0 bis 10 bei',
-            'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',
+        yield 'kinderlied request with the politeness word dropped' => [
+            'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei',
+            'Bring mir bitte mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',
+        ];
+        yield 'german explain request lightly rephrased' => [
+            'Erkläre mir die persischen Zahlen in einem Lied',
+            'Erkläre mir bitte die persischen Zahlen in einem Lied!',
         ];
         yield 'english teach request with punctuation and casing changed' => [
             'teach me the first ten persian numbers in a childrens song',
@@ -58,6 +62,18 @@ final class TtsScriptGuardTest extends TestCase
             'Erstelle eine Audio wo du Hallo sagst',
         ];
         yield 'one word from a short message' => ['Hallo Welt', 'Sage Hallo Welt'];
+        // Copilot review: an unquoted payload that is most of a short
+        // instruction must still be spoken — the verb was stripped, so the
+        // script no longer opens with an imperative.
+        yield 'unquoted payload covering most of the request' => ['hello world now', 'Say hello world now'];
+        yield 'unquoted german payload covering most of the request' => ['Hallo Welt wie geht es euch', 'Sag Hallo Welt wie geht es euch'];
+        yield 'payload that itself contains a request verb mid-sentence' => ['we make it happen together', 'Say we make it happen together'];
+        // Accepted trade-off: without its leading verb the remainder cannot be
+        // told from a payload, and never blocking a valid payload wins.
+        yield 'request minus its leading verb is not flagged' => [
+            'mit einem Kinderlied die persischen Zahlen 0 bis 10 bei',
+            'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',
+        ];
         yield 'content written for the request' => [
             'Sefr ist die Null, so fängt es an. Yek ist eins, das kann jeder Mann. Do ist zwei, se ist drei, chahar ist vier, sing mit dabei!',
             'Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.',

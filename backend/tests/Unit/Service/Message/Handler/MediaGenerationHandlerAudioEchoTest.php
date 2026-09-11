@@ -21,6 +21,7 @@ use App\Service\Media\MediaJobService;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use App\Service\Message\Handler\MediaGenerationHandler;
+use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\Message\MediaPromptExtractor;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
@@ -32,6 +33,7 @@ use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -50,6 +52,8 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
     private RateLimitService&MockObject $rateLimitService;
     private GeneratedFileRegistrar&MockObject $generatedFileRegistrar;
     private ChatHandler&MockObject $chatHandler;
+    private MessageBusInterface&MockObject $messageBus;
+    private PerfPipelineFlag&MockObject $perfPipelineFlag;
 
     protected function setUp(): void
     {
@@ -60,6 +64,10 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         $this->rateLimitService = $this->createMock(RateLimitService::class);
         $this->generatedFileRegistrar = $this->createMock(GeneratedFileRegistrar::class);
         $this->chatHandler = $this->createMock(ChatHandler::class);
+        $this->messageBus = $this->createMock(MessageBusInterface::class);
+        // Memory extraction fully enabled so the dispatch (or its absence) is observable.
+        $this->perfPipelineFlag = $this->createMock(PerfPipelineFlag::class);
+        $this->perfPipelineFlag->method('isEnabled')->willReturn(true);
 
         $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(7);
         $this->modelConfigService->method('getDefaultModel')->with('TEXT2SOUND', 7)->willReturn(42);
@@ -79,6 +87,9 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
 
         $this->aiFacade->expects(self::never())->method('synthesize');
         $this->generatedFileRegistrar->expects(self::never())->method('register');
+        // ChatHandler queues its own extraction for this turn; the media path
+        // must not queue a second ExtractMemoriesCommand for the same message.
+        $this->messageBus->expects(self::never())->method('dispatch');
 
         $seenClassification = null;
         $seenOptions = null;
@@ -110,6 +121,15 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         self::assertSame('Sefr, yek, do, se …', $result['content']);
         self::assertSame('mediamaker:audio', $result['metadata']['rerouted_from'] ?? null);
         self::assertSame('chat-model', $result['metadata']['model'] ?? null);
+        self::assertArrayNotHasKey('media_type', $result['metadata'], 'nothing was generated, so nothing may look billable');
+
+        // The persistence layer must learn that this turn became a chat answer.
+        $effective = $result['metadata'][MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY] ?? null;
+        self::assertIsArray($effective);
+        self::assertSame('general', $effective['topic']);
+        self::assertSame('chat', $effective['intent']);
+        self::assertArrayHasKey('media_type', $effective);
+        self::assertNull($effective['media_type']);
 
         self::assertIsArray($seenClassification);
         self::assertSame('general', $seenClassification['topic']);
@@ -139,12 +159,15 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
             ->method('synthesize')
             ->with('Guten Morgen zusammen.', 7, self::anything())
             ->willReturn(['relativePath' => '7/tts.mp3', 'provider' => 'openai', 'model' => 'tts-1', 'text_length' => 22]);
+        // The media path still extracts memories from the user turn — exactly once.
+        $this->messageBus->expects(self::once())->method('dispatch')->willReturn(new Envelope(new \stdClass()));
 
         $result = $handler->handle($message, [], ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']);
 
         self::assertSame('__AUDIO_GENERATED__', $result['content']);
         self::assertSame('audio', $result['metadata']['media_type'] ?? null);
         self::assertArrayNotHasKey('rerouted_from', $result['metadata']);
+        self::assertArrayNotHasKey(MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY, $result['metadata']);
     }
 
     public function testSlashTtsCommandSpeaksExactlyWhatWasTyped(): void
@@ -182,6 +205,7 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
         $result = $handler->handle($message, [], ['topic' => 'mediamaker', 'language' => 'de', 'media_type' => 'audio']);
 
         self::assertSame('tts_script_echoes_request', $result['metadata']['error'] ?? null);
+        self::assertArrayNotHasKey('media_type', $result['metadata'], 'a failed turn must not be billed as generated audio');
         self::assertStringContainsString('Lies vor', $result['content']);
     }
 
@@ -200,8 +224,8 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
             $this->createMock(ThumbnailService::class),
             $this->rateLimitService,
             new MediaErrorMessageBuilder(),
-            $this->createMock(MessageBusInterface::class),
-            $this->createMock(PerfPipelineFlag::class),
+            $this->messageBus,
+            $this->perfPipelineFlag,
             $this->createMock(MediaCancellationStore::class),
             $mediaJobConfig,
             $this->createMock(MediaJobService::class),
@@ -220,6 +244,7 @@ final class MediaGenerationHandlerAudioEchoTest extends TestCase
     private function bootstrapAudioModel(): void
     {
         $user = $this->createMock(User::class);
+        $user->method('isMemoriesEnabled')->willReturn(true);
         $userRepo = $this->createMock(EntityRepository::class);
         $userRepo->method('find')->willReturn($user);
 
