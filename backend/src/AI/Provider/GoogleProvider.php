@@ -1401,14 +1401,23 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         $method = $this->isOmniOperation($operationName) ? 'DELETE' : 'POST';
 
         try {
-            $this->httpClient->request($method, $cancelUrl, [
+            $response = $this->httpClient->request($method, $cancelUrl, [
                 'headers' => ['x-goog-api-key' => $key],
                 'timeout' => 30,
             ]);
-            $this->logger->info('Google video: cancel request sent to provider', [
-                'operation' => $operationName,
-                'method' => $method,
-            ]);
+            $statusCode = $response->getStatusCode();
+            if ($statusCode >= 200 && $statusCode < 300) {
+                $this->logger->info('Google video: cancel request sent to provider', [
+                    'operation' => $operationName,
+                    'method' => $method,
+                ]);
+            } else {
+                $this->logger->warning('Google video: cancel request failed (already walking away)', [
+                    'operation' => $operationName,
+                    'status' => $statusCode,
+                    'error' => substr($response->getContent(false), 0, 500),
+                ]);
+            }
         } catch (\Throwable $e) {
             $this->logger->warning('Google video: cancel request failed (already walking away)', [
                 'operation' => $operationName,
@@ -2123,7 +2132,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
             return $wavSeconds;
         }
 
-        return 0.0;
+        throw new ProviderException(sprintf('Google Gemini Transcribe response omitted audio token usage, and local duration fallback is not implemented for non-WAV format: %s', basename($fullPath)), 'google');
     }
 
     private function wavDurationSeconds(string $path): ?float

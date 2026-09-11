@@ -3190,10 +3190,10 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Gemini 3.5 Transcribe - speech-to-text with automatic language detection, speaker diarization, word-level timestamps, and custom vocabulary. ~$0.003/min of audio.',
+                'description' => 'Google Gemini 3.5 Transcribe - speech-to-text. ~$0.003/min of audio.',
                 'pricing_mode' => 'per_second',
                 'params' => ['model' => 'gemini-3.5-transcribe'],
-                'features' => ['multilingual', 'diarization', 'timestamps'],
+                'features' => [],
             ],
         ],
         [
