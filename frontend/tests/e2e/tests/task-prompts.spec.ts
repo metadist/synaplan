@@ -35,15 +35,14 @@ test.describe('@ci Task Prompts', () => {
     })
   })
 
-  test('admin can edit AI model, rules and content on system prompt', async ({
-    page,
-    request,
-    credentials,
-  }) => {
-    test.skip(await isAgentsEnabled(request, credentials), LEGACY_PAGE_REPLACED)
+  test('admin can edit AI model, rules and content on system prompt', async ({ page, request }) => {
+    // The flag resolves per user (per-user and group rows win over the global
+    // row), so probe with the account this test actually browses as.
+    const admin = CREDENTIALS.getAdminCredentials()
+    test.skip(await isAgentsEnabled(request, admin), LEGACY_PAGE_REPLACED)
 
     await test.step('Arrange: login as admin and pick the first card', async () => {
-      await login(page, CREDENTIALS.getAdminCredentials())
+      await login(page, admin)
       await page.goto(PAGE)
 
       // Wait until at least one topic card is rendered before interacting

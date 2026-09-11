@@ -231,6 +231,7 @@ export const selectors = {
     shareButton: '[data-testid="btn-chat-share"]',
     shareModal: '[data-testid="modal-chat-share"]',
     iamShareModal: '[data-testid="modal-iam-share"]',
+    iamShareClose: '[data-testid="btn-iam-share-close"]',
     iamPublicLink: '[data-testid="btn-iam-public-link"]',
     modalRoot: '[data-testid="modal-chat-share-root"]',
     shareCreate: '[data-testid="btn-chat-share-make-public"]',
@@ -289,6 +290,8 @@ export const selectors = {
     folderCard: (name: string) => `[data-testid="folder-card-${name}"]`,
     /** Folder card hover action: open a chat scoped to this folder */
     btnUseInChat: (name: string) => `[data-testid="btn-use-in-chat-${name}"]`,
+    /** Folder card, always visible top-left (IAM sharing on): open the share dialog */
+    btnShareFolder: (name: string) => `[data-testid="btn-share-folder-${name}"]`,
     /** Folder view: back to the root file list */
     btnBackToRoot: '[data-testid="btn-back-to-root"]',
     /** Folder view: shown when the open folder has no files left */
