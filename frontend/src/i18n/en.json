@@ -2010,7 +2010,7 @@
       "deleteFailed": "Could not delete the saved task.",
       "watches": {
         "title": "Watched pages",
-        "subtitle": "One saved copy per address. A daily Saved Task can fetch the page again, compare it, and mail you the differences.",
+        "subtitle": "Keep an eye on web pages and get told what changed.",
         "hint": "In chat, try: “get this URL, save it, compare it to the last version and mail me the differences” — then save that as a daily task.",
         "urlPlaceholder": "https://example.com/page",
         "add": "Watch this page",
@@ -2039,7 +2039,12 @@
         "lastFetched": "Last saved {when}",
         "lastCheckFailed": "Last check failed: {reason}",
         "lastDiff": "What changed",
-        "untitled": "Untitled page"
+        "untitled": "Untitled page",
+        "how": {
+          "step1": "Add the address of a page you want to keep an eye on.",
+          "step2": "Synaplan keeps one saved copy of that page and refreshes it on every check.",
+          "step3": "A scheduled saved task can check the page again, compare it with the saved copy and mail you the differences."
+        }
       },
       "scheduleThis": "Run this again later",
       "scheduleThisHint": "Name this task. You can set the schedule on the next screen.",
@@ -2086,7 +2091,11 @@
       "waitingApproval": "Waiting for approval",
       "waitingApprovalCount": "{count} run waiting for approval | {count} runs waiting for approval",
       "approvalExpired": "Approval expired",
-      "rejectedBy": "Rejected by {name}"
+      "rejectedBy": "Rejected by {name}",
+      "tabs": {
+        "tasks": "Saved tasks",
+        "watches": "Watched pages"
+      }
     },
     "connections": {
       "title": "Connections",

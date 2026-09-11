@@ -2120,7 +2120,7 @@
       "deleteFailed": "Die gespeicherte Aufgabe konnte nicht gelöscht werden.",
       "watches": {
         "title": "Beobachtete Seiten",
-        "subtitle": "Eine gespeicherte Kopie pro Adresse. Eine tägliche Aufgabe kann die Seite erneut holen, vergleichen und dir die Unterschiede mailen.",
+        "subtitle": "Webseiten im Blick behalten und erfahren, was sich geändert hat.",
         "hint": "Im Chat z. B.: „hol diese URL, speichere sie, vergleiche mit der letzten Version und maile mir die Unterschiede“ — dann als tägliche Aufgabe speichern.",
         "urlPlaceholder": "https://example.com/seite",
         "add": "Seite beobachten",
@@ -2149,7 +2149,12 @@
         "lastFetched": "Zuletzt gespeichert {when}",
         "lastCheckFailed": "Letzte Prüfung fehlgeschlagen: {reason}",
         "lastDiff": "Was sich geändert hat",
-        "untitled": "Seite ohne Titel"
+        "untitled": "Seite ohne Titel",
+        "how": {
+          "step1": "Trage die Adresse einer Seite ein, die du im Blick behalten willst.",
+          "step2": "Synaplan behält eine gespeicherte Kopie dieser Seite und aktualisiert sie bei jeder Prüfung.",
+          "step3": "Eine geplante gespeicherte Aufgabe kann die Seite erneut prüfen, mit der Kopie vergleichen und dir die Unterschiede mailen."
+        }
       },
       "scheduleThis": "Später erneut ausführen",
       "scheduleThisHint": "Gib der Aufgabe einen Namen. Den Zeitplan setzt du auf der nächsten Seite.",
@@ -2196,7 +2201,11 @@
       "waitingApproval": "Wartet auf Freigabe",
       "waitingApprovalCount": "{count} Ausführung wartet auf Freigabe | {count} Ausführungen warten auf Freigabe",
       "approvalExpired": "Freigabe abgelaufen",
-      "rejectedBy": "Abgelehnt von {name}"
+      "rejectedBy": "Abgelehnt von {name}",
+      "tabs": {
+        "tasks": "Gespeicherte Aufgaben",
+        "watches": "Beobachtete Seiten"
+      }
     },
     "connections": {
       "title": "Verbindungen",

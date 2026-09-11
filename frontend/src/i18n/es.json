@@ -2909,7 +2909,7 @@
       "deleteFailed": "No se pudo eliminar la tarea guardada.",
       "watches": {
         "title": "Páginas vigiladas",
-        "subtitle": "Una copia guardada por dirección. Una tarea diaria puede volver a obtener la página, compararla y enviarte las diferencias por correo.",
+        "subtitle": "Vigila páginas web y entérate de lo que ha cambiado.",
         "hint": "En el chat, prueba: «obtén esta URL, guárdala, compárala con la última versión y envíame las diferencias» — y guarda eso como tarea diaria.",
         "urlPlaceholder": "https://example.com/pagina",
         "add": "Vigilar esta página",
@@ -2938,7 +2938,12 @@
         "lastFetched": "Último guardado {when}",
         "lastCheckFailed": "La última comprobación falló: {reason}",
         "lastDiff": "Qué cambió",
-        "untitled": "Página sin título"
+        "untitled": "Página sin título",
+        "how": {
+          "step1": "Añade la dirección de una página que quieras vigilar.",
+          "step2": "Synaplan guarda una copia de esa página y la actualiza en cada comprobación.",
+          "step3": "Una tarea guardada programada puede volver a comprobar la página, compararla con la copia guardada y enviarte las diferencias por correo."
+        }
       },
       "scheduleThis": "Volver a ejecutar esto más tarde",
       "scheduleThisHint": "Ponle un nombre a esta tarea. El horario lo eliges en la siguiente pantalla.",
@@ -2985,7 +2990,11 @@
       "waitingApproval": "Esperando aprobación",
       "waitingApprovalCount": "{count} ejecución esperando aprobación | {count} ejecuciones esperando aprobación",
       "approvalExpired": "La aprobación caducó",
-      "rejectedBy": "Rechazado por {name}"
+      "rejectedBy": "Rechazado por {name}",
+      "tabs": {
+        "tasks": "Tareas guardadas",
+        "watches": "Páginas vigiladas"
+      }
     },
     "connections": {
       "title": "Conexiones",

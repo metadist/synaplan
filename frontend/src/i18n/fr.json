@@ -2008,7 +2008,7 @@
       "deleteFailed": "Impossible de supprimer la tâche enregistrée.",
       "watches": {
         "title": "Pages surveillées",
-        "subtitle": "Une copie enregistrée par adresse. Une tâche quotidienne peut relire la page, la comparer et vous envoyer les différences par e-mail.",
+        "subtitle": "Surveillez des pages web et soyez informé de ce qui a changé.",
         "hint": "Dans le chat : « récupère cette URL, enregistre-la, compare-la à la dernière version et envoie-moi les différences » — puis enregistrez cela comme tâche quotidienne.",
         "urlPlaceholder": "https://exemple.com/page",
         "add": "Surveiller cette page",
@@ -2037,7 +2037,12 @@
         "lastFetched": "Dernier enregistrement {when}",
         "lastCheckFailed": "Dernière vérification échouée : {reason}",
         "lastDiff": "Ce qui a changé",
-        "untitled": "Page sans titre"
+        "untitled": "Page sans titre",
+        "how": {
+          "step1": "Ajoutez l’adresse d’une page que vous voulez surveiller.",
+          "step2": "Synaplan conserve une copie de cette page et la met à jour à chaque vérification.",
+          "step3": "Une tâche enregistrée planifiée peut revérifier la page, la comparer à la copie et vous envoyer les différences par e-mail."
+        }
       },
       "scheduleThis": "Relancer plus tard",
       "scheduleThisHint": "Donnez un nom à cette tâche. Vous pourrez définir le planning à l’écran suivant.",
@@ -2084,7 +2089,11 @@
       "waitingApproval": "En attente d’approbation",
       "waitingApprovalCount": "{count} exécution en attente d’approbation | {count} exécutions en attente d’approbation",
       "approvalExpired": "Approbation expirée",
-      "rejectedBy": "Refusé par {name}"
+      "rejectedBy": "Refusé par {name}",
+      "tabs": {
+        "tasks": "Tâches enregistrées",
+        "watches": "Pages surveillées"
+      }
     },
     "connections": {
       "title": "Connexions",
