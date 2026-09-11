@@ -13,7 +13,6 @@ use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -62,11 +61,7 @@ final class VectorizationServiceHintTest extends TestCase
         $this->assertFalse($result['success']);
     }
 
-    /**
-     * @param MockObject&ModelConfigService $modelConfig
-     * @param MockObject&EntityRepository   $modelRepo
-     */
-    private function service(MockObject $modelConfig, MockObject $modelRepo): VectorizationService
+    private function service(ModelConfigService $modelConfig, EntityRepository $modelRepo): VectorizationService
     {
         $aiFacade = $this->createMock(AiFacade::class);
         $chunker = $this->createMock(TextChunker::class);

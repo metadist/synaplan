@@ -44,7 +44,7 @@ final readonly class DesktopGeneratedMediaService
 
         $modelId = $this->requireModelId($catalogKey);
         $result = $this->media->generate($user, $prompt, $type, $modelId);
-        $result['file']['id'] = $this->fileIdFromUrl((string) ($result['file']['url'] ?? ''));
+        $result['file']['id'] = $this->fileIdFromUrl($result['file']['url']);
 
         return $result;
     }
