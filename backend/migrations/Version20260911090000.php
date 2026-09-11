@@ -13,31 +13,34 @@ use Doctrine\Migrations\AbstractMigration;
  * The seeders now write these BCONFIG rows as `1`, but seeding is
  * insert-if-missing and never touches a row that already exists. Installs that
  * upgraded through the waves therefore still carry the `0` those releases
- * shipped — no admin toggle existed for most of them, so the value is the
- * shipped default, not an operator decision. This migration flips exactly the
- * seeded OFF values (`0`, `false`, ``) to `1`; an explicit `true`/`1` is left
- * alone, and any value that is not a recognised OFF is left alone too.
+ * shipped. This release turns the wave features on for every install, so the
+ * global row (BOWNERID = 0) of each flag is set to `1` whenever it holds a
+ * recognised OFF spelling (`0`, `false`, `off`, `no`, ``). BCONFIG records no
+ * provenance, so a `0` an operator set by hand cannot be told apart from the
+ * seeded one and is flipped as well — this is the documented upgrade
+ * behaviour, not an oversight. Anything else (`1`, `true`, garbage) and every
+ * per-user or group row is left untouched, and no row is created.
  *
- * Operators who want a feature off again use System configuration → Features
- * or pin it for automated deployments with `FEATURE_<GROUP>_<SETTING>=false`
- * (see docs/FEATURE_FLAGS.md). Module gates (`MODULES.GATE_*`) intentionally
- * stay as they are: the Intermezzo plan ships them default-off.
+ * Deployments that need a feature to stay off pin it before upgrading with
+ * `FEATURE_<GROUP>_<SETTING>=false` (the environment wins over the database,
+ * so the flipped row is inert) or switch it off again afterwards under System
+ * configuration → Features (see docs/FEATURE_FLAGS.md). Module gates
+ * (`MODULES.GATE_*`) and the `TOOLS.REGISTRY_ENABLED` kill switch are not
+ * touched: gates ship default-off, and the registry has seeded ON since Wave 4,
+ * so an OFF there is an operator decision by construction.
  *
- * Galera-safe: raw idempotent UPDATEs on the global row (BOWNERID = 0), no
- * Schema API.
+ * Galera-safe: raw idempotent UPDATEs on the global row, no Schema API.
  */
 final class Version20260911090000 extends AbstractMigration
 {
     /** @var list<array{0: string, 1: string}> BGROUP, BSETTING */
-    private const FLAGS = [
+    public const FLAGS = [
         ['IAM', 'GROUPS_ENABLED'],
         ['IAM', 'SHARING_ENABLED'],
         ['IAM', 'DIRECTORY_SYNC_ENABLED'],
         ['IAM', 'GROUP_POLICIES_ENABLED'],
         ['AGENTS', 'ENABLED'],
         ['AGENTS', 'ROUTABLE_ENABLED'],
-        // TOOLS.REGISTRY_ENABLED already seeds ON and has been an operator
-        // kill switch since Wave 4 — an explicit OFF there is a decision.
         ['TOOLS', 'APPROVALS_ENABLED'],
         ['TOOLS', 'CUSTOM_HTTP_ENABLED'],
         ['WORKFLOWS', 'BUILDER_ENABLED'],

@@ -6,6 +6,16 @@ them on, and the migration `Version20260911090000` turns the existing global
 rows on for installs that were created earlier. This page lists the flags,
 where to switch them, and how an automated deployment pins one off.
 
+> **Upgrading an existing install:** the migration sets every listed flag
+> whose global row reads as off (`0`, `false`, `off`, `no`, empty) to on. It
+> cannot tell a value the seeder wrote from one an administrator chose, so a
+> feature you switched off before this release comes back on. If it must stay
+> off, pin it with `FEATURE_<GROUP>_<SETTING>=false` **before** deploying (the
+> environment wins over the database, so the flipped row has no effect) or
+> switch it off again afterwards under **Operate → System configuration →
+> Features**. Per-user and group rows, module gates and the
+> `TOOLS.REGISTRY_ENABLED` kill switch are not touched.
+
 ## Three ways to switch a flag
 
 | Where | Who | Notes |
