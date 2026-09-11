@@ -23,6 +23,7 @@ use App\Service\Media\MediaJobDispatcher;
 use App\Service\Media\MediaJobMessageSync;
 use App\Service\Media\MediaJobService;
 use App\Service\Message\MediaPromptExtractor;
+use App\Service\Message\TtsScriptGuard;
 use App\Service\ModelConfigService;
 use App\Service\PerfPipelineFlag;
 use App\Service\PremiumFeatureGate;
@@ -73,6 +74,9 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         #[Autowire('%env(APP_URL)%')]
         private string $publicBaseUrl = '',
         private ?RequestedFolderDelivery $folderDelivery = null,
+        // Answers the turn as normal chat when a sorter-routed audio request
+        // turns out to carry nothing speakable (see TtsScriptGuard).
+        private ?ChatHandler $chatHandler = null,
     ) {
     }
 
@@ -382,6 +386,20 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
                     ],
                 ];
             }
+        }
+
+        // A sorter-routed audio turn whose "script" is just the user's request
+        // ("teach me the Persian numbers with a children's song") has nothing
+        // to read out: the sorter mistook a content request for TTS. Speaking
+        // it would play the user's own question back as an MP3, so answer the
+        // request as ordinary chat instead. `/tts` and "Again" re-runs are
+        // exempt — there the user explicitly chose to hear that exact text.
+        if ('audio' === $mediaType
+            && !$isSlashCommand
+            && null === $message->getMeta('media_prompt_override')
+            && TtsScriptGuard::echoesInstruction($prompt, $message->getText())
+        ) {
+            return $this->answerAsChatInstead($message, $thread, $classification, $streamCallback, $progressCallback, $options, $prompt);
         }
 
         // Resolve model ID to provider + model name + config
@@ -1417,6 +1435,74 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         $catalog = $this->conversationFileCatalog->build($message, $thread, [], ConversationFile::CATEGORY_IMAGE);
 
         return $this->conversationFileCatalog->latestImage($catalog);
+    }
+
+    /**
+     * Route a misclassified "audio" turn to the general chat answer.
+     *
+     * The mediamaker classification (topic, BMEDIA, model override, the
+     * pre-resolved mediamaker prompt bundle) is replaced by a plain `general`
+     * chat classification so the reply is written by the chat model with the
+     * user's default prompt — the answer the sorter should have produced.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private function answerAsChatInstead(
+        Message $message,
+        array $thread,
+        array $classification,
+        callable $streamCallback,
+        ?callable $progressCallback,
+        array $options,
+        string $rejectedScript,
+    ): array {
+        $this->logger->warning('MediaGenerationHandler: audio script only repeats the user request, answering as chat instead', [
+            'message_id' => $message->getId(),
+            'topic' => $classification['topic'] ?? null,
+            'script_preview' => mb_substr($rejectedScript, 0, 120),
+        ]);
+
+        if (null === $this->chatHandler) {
+            $lang = $classification['language'] ?? 'en';
+            $streamCallback('de' === $lang
+                ? 'Ich habe in deiner Nachricht keinen Text gefunden, den ich vorlesen könnte. Formuliere die Anfrage bitte als normale Frage, oder gib den Text an, den ich sprechen soll (z. B. „Lies vor: …“).'
+                : 'I could not find any text in your message to read aloud. Please ask the question as a normal chat message, or tell me the exact text to speak (e.g. "Read aloud: …").');
+
+            return [
+                'metadata' => [
+                    'error' => 'tts_script_echoes_request',
+                    'media_type' => 'audio',
+                ],
+            ];
+        }
+
+        $chatClassification = $classification;
+        $chatClassification['topic'] = 'general';
+        $chatClassification['intent'] = 'chat';
+        $chatClassification['rerouted_from'] = 'mediamaker:audio';
+        unset(
+            $chatClassification['media_type'],
+            $chatClassification['input_mode'],
+            $chatClassification['duration'],
+            $chatClassification['resolution'],
+            $chatClassification['model_id'],
+            $chatClassification['prompt_metadata'],
+        );
+
+        $chatOptions = $options;
+        unset($chatOptions['resolved_prompt_data']);
+
+        $this->notify($progressCallback, 'analyzing', 'Answering your request…');
+
+        $result = $this->chatHandler->handleStream($message, $thread, $chatClassification, $streamCallback, $progressCallback, $chatOptions);
+        $metadata = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];
+        $metadata['rerouted_from'] = 'mediamaker:audio';
+        $result['metadata'] = $metadata;
+
+        return $result;
     }
 
     /**

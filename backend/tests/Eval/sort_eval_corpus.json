@@ -78,6 +78,30 @@
     "expect": { "topic": "general", "lang": "en", "multi_step": true }
   },
   {
+    "id": "general_song_lesson_de",
+    "text": "Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei.",
+    "language": "de",
+    "expect": { "topic": "general", "lang": "de", "multi_step": false }
+  },
+  {
+    "id": "general_song_lesson_en",
+    "text": "Teach me the first ten Persian numbers with a children's song.",
+    "language": "en",
+    "expect": { "topic": "general", "lang": "en", "multi_step": false }
+  },
+  {
+    "id": "general_song_lyrics_en",
+    "text": "Make a song about my cat.",
+    "language": "en",
+    "expect": { "topic": "general", "lang": "en", "multi_step": false }
+  },
+  {
+    "id": "general_song_then_mp3_de",
+    "text": "Schreib ein Kinderlied \u00fcber die Zahlen 1 bis 10 und lies es mir als MP3 vor.",
+    "language": "de",
+    "expect": { "topic": "general", "lang": "de", "multi_step": true }
+  },
+  {
     "id": "officemaker_docx_de",
     "text": "Erstelle mir ein Word-Dokument mit einem Anschreiben f\u00fcr eine Bewerbung als Softwareentwickler.",
     "language": "de",
