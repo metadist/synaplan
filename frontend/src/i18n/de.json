@@ -2511,7 +2511,6 @@
     "desktop": {
       "title": "Desktop",
       "description": "Synaplan Desktop ist eine separate App für diesen Computer. Sie nutzt dein Synaplan-Konto und kann Skills ausführen, die du installierst.",
-      "notAvailableYet": "Synaplan Desktop steht noch nicht zum Download bereit. Du kannst aber schon einen Verbindungscode erstellen, um die Verbindung zu testen.",
       "pairButton": "Diesen Computer verbinden",
       "loadFailed": "Die verbundenen Computer konnten nicht geladen werden.",
       "disconnect": "Trennen",
@@ -2563,6 +2562,19 @@
         "unknownSkill": "Dieser Computer hat diesen Skill nicht.",
         "skillDisabled": "Dieser Skill ist auf diesem Computer deaktiviert.",
         "localError": "Der Skill ist auf diesem Computer fehlgeschlagen."
+      },
+      "get": {
+        "title": "Synaplan Desktop holen",
+        "beta": "Beta",
+        "platforms": "Verfügbar für",
+        "description": "Eine kleine App für macOS, Windows und Linux. Sie verbindet sich mit deinem Synaplan-Konto und führt die Skills, die du installierst, auf deinem eigenen Computer aus – zum Beispiel eine Präsentation aus deinen Notizen bauen.",
+        "github": "Auf GitHub holen",
+        "releases": "Releases",
+        "betaNote": "Beta-Builds sind noch nicht signiert, dein Betriebssystem fragt beim ersten Start deshalb möglicherweise nach. Im Repository steht auch, wie du die App selbst baust.",
+        "stepsTitle": "In drei Schritten verbinden",
+        "step1": "Installiere Synaplan Desktop auf dem Computer, den du nutzen willst.",
+        "step2": "Klicke hier auf „Diesen Computer verbinden“ und kopiere Adresse und Code.",
+        "step3": "Gib beides in der App ein. Der Computer erscheint dann in der Liste unten."
       }
     },
     "phoneVerification": {

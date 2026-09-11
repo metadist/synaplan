@@ -2412,7 +2412,6 @@
     "desktop": {
       "title": "Ordinateur",
       "description": "Synaplan Desktop est une application distincte pour cet ordinateur. Elle utilise votre compte Synaplan et peut exécuter les skills que vous installez.",
-      "notAvailableYet": "Synaplan Desktop n'est pas encore disponible au téléchargement. Vous pouvez déjà créer un code d'association pour tester la connexion.",
       "pairButton": "Associer cet ordinateur",
       "loadFailed": "Impossible de charger les ordinateurs connectés.",
       "disconnect": "Déconnecter",
@@ -2464,6 +2463,19 @@
         "unknownSkill": "Cet ordinateur n'a pas ce skill.",
         "skillDisabled": "Ce skill est désactivé sur cet ordinateur.",
         "localError": "Le skill a échoué sur cet ordinateur."
+      },
+      "get": {
+        "title": "Obtenir Synaplan Desktop",
+        "beta": "Bêta",
+        "platforms": "Disponible pour",
+        "description": "Une petite application pour macOS, Windows et Linux. Elle s’associe à votre compte Synaplan et exécute sur votre propre ordinateur les compétences que vous installez, par exemple créer une présentation à partir de vos notes.",
+        "github": "Obtenir sur GitHub",
+        "releases": "Versions",
+        "betaNote": "Les versions bêta ne sont pas encore signées ; votre système peut donc demander une confirmation au premier démarrage. Le dépôt explique aussi comment compiler l’application vous-même.",
+        "stepsTitle": "Se connecter en trois étapes",
+        "step1": "Installez Synaplan Desktop sur l’ordinateur que vous voulez utiliser.",
+        "step2": "Cliquez ici sur « Associer cet ordinateur » et copiez l’adresse et le code.",
+        "step3": "Saisissez les deux dans l’application. L’ordinateur apparaît ensuite dans la liste ci-dessous."
       }
     },
     "phoneVerification": {

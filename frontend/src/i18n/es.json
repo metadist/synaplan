@@ -3500,7 +3500,6 @@
     "desktop": {
       "title": "Escritorio",
       "description": "Synaplan Desktop es una app independiente para este equipo. Usa tu cuenta de Synaplan y puede ejecutar skills que instales.",
-      "notAvailableYet": "Synaplan Desktop aún no está disponible para descargar. Ya puedes crear un código de vinculación para probar la conexión.",
       "pairButton": "Vincular este equipo",
       "loadFailed": "No se pudieron cargar los equipos conectados.",
       "disconnect": "Desconectar",
@@ -3552,6 +3551,19 @@
         "unknownSkill": "Este equipo no tiene ese skill.",
         "skillDisabled": "Ese skill está desactivado en este equipo.",
         "localError": "El skill falló en este equipo."
+      },
+      "get": {
+        "title": "Obtener Synaplan Desktop",
+        "beta": "Beta",
+        "platforms": "Disponible para",
+        "description": "Una pequeña aplicación para macOS, Windows y Linux. Se vincula con tu cuenta de Synaplan y ejecuta en tu propio equipo las habilidades que instales, por ejemplo crear una presentación a partir de tus notas.",
+        "github": "Obtener en GitHub",
+        "releases": "Versiones",
+        "betaNote": "Las versiones beta aún no están firmadas, así que tu sistema operativo puede pedirte confirmación en el primer inicio. El repositorio también explica cómo compilar la aplicación tú mismo.",
+        "stepsTitle": "Conectar en tres pasos",
+        "step1": "Instala Synaplan Desktop en el equipo que quieras usar.",
+        "step2": "Pulsa aquí «Vincular este equipo» y copia la dirección y el código.",
+        "step3": "Introduce ambos en la aplicación. El equipo aparecerá en la lista de abajo."
       }
     },
     "phoneVerification": {

@@ -3501,7 +3501,6 @@
     "desktop": {
       "title": "Masaüstü",
       "description": "Synaplan Desktop, bu bilgisayar için ayrı bir uygulamadır. Synaplan hesabınızı kullanır ve yüklediğiniz skill'leri çalıştırabilir.",
-      "notAvailableYet": "Synaplan Desktop henüz indirilebilir değil. Bağlantıyı test etmek için şimdiden bir eşleme kodu oluşturabilirsiniz.",
       "pairButton": "Bu bilgisayarı bağla",
       "loadFailed": "Bağlı bilgisayarlar yüklenemedi.",
       "disconnect": "Bağlantıyı kes",
@@ -3553,6 +3552,19 @@
         "unknownSkill": "Bu bilgisayarda bu skill yok.",
         "skillDisabled": "Bu skill bu bilgisayarda kapalı.",
         "localError": "Skill bu bilgisayarda başarısız oldu."
+      },
+      "get": {
+        "title": "Synaplan Desktop'u edin",
+        "beta": "Beta",
+        "platforms": "Şu platformlar için",
+        "description": "macOS, Windows ve Linux için küçük bir uygulama. Synaplan hesabınla eşleşir ve yüklediğin becerileri kendi bilgisayarında çalıştırır; örneğin notlarından bir sunum hazırlar.",
+        "github": "GitHub'dan edin",
+        "releases": "Sürümler",
+        "betaNote": "Beta sürümleri henüz imzalı değil, bu yüzden işletim sistemin ilk açılışta onay isteyebilir. Uygulamayı kendin nasıl derleyeceğin de depoda anlatılıyor.",
+        "stepsTitle": "Üç adımda bağlan",
+        "step1": "Kullanmak istediğin bilgisayara Synaplan Desktop'u yükle.",
+        "step2": "Burada “Bu bilgisayarı bağla”ya tıkla ve adres ile kodu kopyala.",
+        "step3": "İkisini de uygulamaya gir. Bilgisayar ardından aşağıdaki listede görünür."
       }
     },
     "phoneVerification": {
