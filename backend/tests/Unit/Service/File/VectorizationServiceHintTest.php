@@ -18,24 +18,57 @@ use Psr\Log\NullLogger;
 
 final class VectorizationServiceHintTest extends TestCase
 {
-    public function testExplicitEmbeddingBidSkipsAccountDefault(): void
+    public function testDesktopFolderIgnoresHintAndUsesSearchDefault(): void
+    {
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelRepo = $this->createMock(EntityRepository::class);
+
+        $modelConfig->expects($this->once())
+            ->method('getDefaultModel')
+            ->with('VECTORIZE', 1)
+            ->willReturn(13);
+        $modelRepo->method('find')->willReturn($this->embeddingModel());
+
+        $result = $this->service($modelConfig, $modelRepo)->vectorizeAndStore(
+            'some text',
+            1,
+            46,
+            'DESKTOP:p',
+            0,
+            null,
+            42,
+        );
+        $this->assertFalse($result['success']);
+    }
+
+    public function testNonDesktopExplicitBidSkipsAccountDefault(): void
+    {
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelRepo = $this->createMock(EntityRepository::class);
+
+        $modelConfig->expects($this->never())->method('getDefaultModel');
+        $modelRepo->method('find')->willReturn($this->embeddingModel());
+
+        $result = $this->service($modelConfig, $modelRepo)->vectorizeAndStore(
+            'some text',
+            1,
+            46,
+            'WIDGET:x',
+            0,
+            null,
+            42,
+        );
+        $this->assertFalse($result['success']);
+    }
+
+    private function service(ModelConfigService $modelConfig, EntityRepository $modelRepo): VectorizationService
     {
         $aiFacade = $this->createMock(AiFacade::class);
         $chunker = $this->createMock(TextChunker::class);
-        $modelConfig = $this->createMock(ModelConfigService::class);
         $storage = $this->createMock(VectorStorageFacade::class);
         $em = $this->createMock(EntityManagerInterface::class);
 
-        $model = $this->createMock(Model::class);
-        $model->method('getProviderId')->willReturn('bge-m3');
-        $model->method('getService')->willReturn('ollama');
-
-        $modelRepo = $this->createMock(EntityRepository::class);
-        $modelRepo->method('find')->willReturn($model);
         $em->method('getRepository')->willReturn($modelRepo);
-
-        $modelConfig->expects($this->never())->method('getDefaultModel');
-
         $chunker->method('chunkify')->willReturn([
             ['content' => 'chunk', 'start_line' => 1, 'end_line' => 1],
         ]);
@@ -49,7 +82,7 @@ final class VectorizationServiceHintTest extends TestCase
         ]);
         $storage->method('getProviderName')->willReturn('mariadb');
 
-        $service = new VectorizationService(
+        return new VectorizationService(
             $aiFacade,
             $chunker,
             $modelConfig,
@@ -58,8 +91,14 @@ final class VectorizationServiceHintTest extends TestCase
             $em,
             new NullLogger(),
         );
+    }
 
-        $result = $service->vectorizeAndStore('some text', 1, 46, 'DESKTOP:p', 0, null, 42);
-        $this->assertFalse($result['success']);
+    private function embeddingModel(): Model
+    {
+        $model = $this->createMock(Model::class);
+        $model->method('getProviderId')->willReturn('bge-m3');
+        $model->method('getService')->willReturn('ollama');
+
+        return $model;
     }
 }

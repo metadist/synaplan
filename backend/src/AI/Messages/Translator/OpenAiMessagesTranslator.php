@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\AI\Messages\Translator;
 
+use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -18,6 +20,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * Strips Anthropic-only fields (`thinking`, beta body keys) that Claude Code
  * sends to gateway aliases. Tool schemas map `input_schema` → `parameters`;
  * image blocks map to `image_url` parts so vision survives the alias route.
+ *
+ * Hosts: OpenAI plus every other catalog chat provider that already speaks
+ * Chat Completions (Groq, Mistral, xAI, HuggingFace, TrustedTokens,
+ * Perplexity, Ollama, admin-registered OpenAI-compatible endpoints).
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInterface
@@ -38,18 +44,31 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        #[Autowire('%env(string:default::OLLAMA_BASE_URL)%')]
+        private string $ollamaBaseUrl = '',
+        private ?OpenAiCompatibleEndpointRegistry $openAiCompatibleEndpoints = null,
     ) {
     }
 
     public function supports(string $providerName): bool
     {
-        return 'openai' === strtolower($providerName);
+        return ChatCompletionsUpstreams::supports($providerName);
     }
 
     public function complete(array $requestBody, array $context): array
     {
+        $url = $this->resolveCompletionsUrl($context);
+        if (null === $url) {
+            return [
+                'status' => 502,
+                'headers' => [],
+                'body' => $this->toAnthropicError(null, $this->unresolvedUpstreamMessage($context), 502),
+                'usage' => new MessagesUsage(),
+            ];
+        }
+
         $payload = $this->toOpenAiRequest($requestBody, stream: false, imageDetail: $this->imageDetail($context));
-        $response = $this->request($payload, $context, stream: false);
+        $response = $this->request($payload, $context, $url, stream: false);
         $status = $response->getStatusCode();
         $headers = $response->getHeaders(false);
         $raw = $response->getContent(false);
@@ -88,8 +107,18 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
 
     public function stream(array $requestBody, array $context, callable $emit): MessagesUsage
     {
+        $url = $this->resolveCompletionsUrl($context);
+        if (null === $url) {
+            $emit([
+                'event' => 'error',
+                'data' => $this->toAnthropicError(null, $this->unresolvedUpstreamMessage($context), 502),
+            ]);
+
+            return new MessagesUsage();
+        }
+
         $payload = $this->toOpenAiRequest($requestBody, stream: true, imageDetail: $this->imageDetail($context));
-        $response = $this->request($payload, $context, stream: true);
+        $response = $this->request($payload, $context, $url, stream: true);
         $status = $response->getStatusCode();
 
         if ($status >= 400) {
@@ -395,23 +424,130 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
+     * Full Chat Completions URL for this turn, or null when the host cannot
+     * be resolved (misconfigured Ollama / missing OpenAI-compatible endpoint).
+     *
+     * @param array<string, mixed> $context
+     */
+    public function resolveCompletionsUrl(array $context): ?string
+    {
+        if (isset($context['openai_completions_url']) && \is_string($context['openai_completions_url']) && '' !== $context['openai_completions_url']) {
+            return rtrim($context['openai_completions_url'], '/');
+        }
+
+        if (isset($context['openai_upstream_url']) && \is_string($context['openai_upstream_url']) && '' !== $context['openai_upstream_url']) {
+            return rtrim($context['openai_upstream_url'], '/').'/v1/chat/completions';
+        }
+
+        $provider = strtolower((string) ($context['provider'] ?? 'openai'));
+        $fixed = ChatCompletionsUpstreams::fixedUrl($provider);
+        if (null !== $fixed) {
+            return $fixed;
+        }
+
+        if ('ollama' === $provider) {
+            $base = trim($this->ollamaBaseUrl);
+            if ('' === $base) {
+                return null;
+            }
+
+            return rtrim($base, '/').'/v1/chat/completions';
+        }
+
+        if (OpenAiCompatibleEndpointRegistry::PROVIDER_NAME === $provider) {
+            $endpoint = $this->resolveOpenAiCompatibleEndpoint($context);
+            if (null === $endpoint || '' === $endpoint['base_url']) {
+                return null;
+            }
+
+            return rtrim($endpoint['base_url'], '/').'/chat/completions';
+        }
+
+        return self::DEFAULT_UPSTREAM.'/v1/chat/completions';
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @param array<string, mixed> $context
      */
-    private function request(array $payload, array $context, bool $stream): ResponseInterface
+    private function request(array $payload, array $context, string $url, bool $stream): ResponseInterface
     {
-        $upstream = rtrim((string) ($context['openai_upstream_url'] ?? self::DEFAULT_UPSTREAM), '/');
-        $url = $upstream.'/v1/chat/completions';
+        $auth = $this->resolveAuth($context);
 
         return $this->httpClient->request('POST', $url, [
-            'headers' => [
-                'authorization' => 'Bearer '.$context['api_key'],
-                'content-type' => 'application/json',
-            ],
+            'headers' => $auth['headers'],
             'json' => $payload,
             'timeout' => self::DEFAULT_TIMEOUT,
             'buffer' => !$stream,
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @return array{headers: array<string, string>}
+     */
+    private function resolveAuth(array $context): array
+    {
+        $apiKey = (string) ($context['api_key'] ?? '');
+        $headers = [
+            'authorization' => 'Bearer '.$apiKey,
+            'content-type' => 'application/json',
+        ];
+
+        $endpoint = $this->resolveOpenAiCompatibleEndpoint($context);
+        if (null !== $endpoint) {
+            if ('' !== $endpoint['api_key']) {
+                $headers['authorization'] = 'Bearer '.$endpoint['api_key'];
+            }
+            foreach ($endpoint['headers'] as $name => $value) {
+                if ('' === $value) {
+                    continue;
+                }
+                $headers[strtolower($name)] = $value;
+            }
+        }
+
+        return ['headers' => $headers];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     *
+     * @return array{name: string, label: string, base_url: string, api_key: string, headers: array<string, string>, capabilities: string[]}|null
+     */
+    private function resolveOpenAiCompatibleEndpoint(array $context): ?array
+    {
+        if (null === $this->openAiCompatibleEndpoints) {
+            return null;
+        }
+
+        $provider = strtolower((string) ($context['provider'] ?? ''));
+        if (OpenAiCompatibleEndpointRegistry::PROVIDER_NAME !== $provider) {
+            return null;
+        }
+
+        $providerModelId = isset($context['provider_model_id']) && \is_string($context['provider_model_id'])
+            ? $context['provider_model_id']
+            : null;
+
+        return $this->openAiCompatibleEndpoints->resolveForModel($providerModelId);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function unresolvedUpstreamMessage(array $context): string
+    {
+        $provider = strtolower((string) ($context['provider'] ?? 'openai'));
+        if ('ollama' === $provider) {
+            return 'Ollama is not configured (OLLAMA_BASE_URL is empty).';
+        }
+        if (OpenAiCompatibleEndpointRegistry::PROVIDER_NAME === $provider) {
+            return 'No OpenAI-compatible endpoint is configured for this model.';
+        }
+
+        return 'No Chat Completions upstream for provider `'.$provider.'`.';
     }
 
     /**

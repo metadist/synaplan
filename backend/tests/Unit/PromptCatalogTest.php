@@ -86,7 +86,9 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringContainsString('Attachment + live information = search', $prompt);
         $this->assertStringContainsString('"What is that?" → general, BWEBSEARCH: 0', $prompt);
         $this->assertStringContainsString('"Was ist das?" → general, BWEBSEARCH: 0', $prompt);
-        $this->assertStringContainsString('"How much does this cost?" → general, BWEBSEARCH: 1', $prompt);
+        $this->assertStringContainsString('"How much does this cost?" → general, BWEBSEARCH: 1, BREADPAGES: 2', $prompt);
+        $this->assertStringContainsString('BREADPAGES', $prompt);
+        $this->assertStringContainsString('welche Sektoren/Unternehmen', $prompt);
     }
 
     /**

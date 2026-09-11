@@ -21,7 +21,10 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanner;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\PromptService;
+use App\Service\Research\ReadPagesResult;
+use App\Service\Research\WebResearchService;
 use App\Service\Search\BraveSearchService;
+use App\Service\UrlContentResult;
 use App\Service\UrlContentService;
 use App\Tests\Support\WebSearchGatewayFactory;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -848,6 +851,233 @@ class MessageProcessorTest extends TestCase
         ]);
 
         $this->processor->process($message);
+    }
+
+    /**
+     * A message that is nothing but a link: the page is read (redirects and
+     * interstitials resolved by the research service), its content rides on
+     * the classification for the answer model, and the sorter's search vote
+     * is dropped — searching for a URL string is useless, the page IS the
+     * answer source.
+     */
+    public function testLinkOnlyMessageIsAnsweredFromTheReadPageInsteadOfSearchingTheUrl(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(77);
+        $message->method('getText')->willReturn('https://lnkd.in/p/d_-_Y6Ye');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn(['https://lnkd.in/p/d_-_Y6Ye']);
+        $urlContent->expects($this->never())->method('fetchMultiple');
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $page = new UrlContentResult('https://lnkd.in/p/d_-_Y6Ye', 'Article about hydrogen hubs in Hamburg.', 'Hydrogen hubs', 'lnkd.in', true, null, 'https://www.example.com/hydrogen');
+        $read = new ReadPagesResult([$page], ['https://lnkd.in/p/d_-_Y6Ye' => 'Article about hydrogen hubs in Hamburg.']);
+        $research->expects($this->once())->method('readMentionedUrls')
+            ->with(['https://lnkd.in/p/d_-_Y6Ye'], 'https://lnkd.in/p/d_-_Y6Ye', 1)
+            ->willReturn($read);
+        $research->method('formatMentionedUrlsForPrompt')->willReturn("## Linked Pages\nArticle about hydrogen hubs in Hamburg.");
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'en',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->braveSearchService->expects($this->never())->method('search');
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification) {
+                $this->assertStringContainsString('hydrogen hubs', $classification['url_content']);
+                $this->assertSame(1, $classification['url_pages_read']);
+                $this->assertSame('https://www.example.com/hydrogen', $classification['url_pages'][0]['final_url']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $statuses = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$statuses): void {
+            $statuses[] = $event['status'];
+        });
+
+        $this->assertNotContains('searching', $statuses);
+    }
+
+    /**
+     * A research question: the search runs, and its results are deepened
+     * with the read pages before the answer model sees them. The sources
+     * are streamed first (fast), the pages-read update follows.
+     */
+    public function testResearchQuestionSearchesAndReadsTheResultPages(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(78);
+        $message->method('getText')->willReturn('Die VAE wollen 40 Mrd. in Deutschland investieren — in welche Sektoren?');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([]);
+
+        $rawResults = ['query' => 'VAE 40 Milliarden Deutschland Sektoren', 'results' => [
+            ['title' => 'Handelsblatt', 'url' => 'https://www.handelsblatt.com/a', 'description' => 'teaser'],
+        ]];
+        $deepened = $rawResults + ['pages_read' => 1, 'pages_attempted' => 1];
+        $deepened['results'][0]['page_content'] = 'Wasserstoff, Chemie, Häfen, Halbleiter.';
+        $deepened['results'][0]['fetched'] = true;
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->expects($this->once())->method('deepen')
+            ->with(
+                $this->callback(static fn (array $r): bool => $r['results'] === $rawResults['results'] && $r['query'] === $rawResults['query']),
+                'Die VAE wollen 40 Mrd. in Deutschland investieren — in welche Sektoren?',
+                1,
+                $this->isInstanceOf(\Closure::class),
+                3,
+            )
+            ->willReturn($deepened);
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'read_pages' => 3,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('VAE 40 Milliarden Deutschland Sektoren');
+        $this->braveSearchService->method('search')->willReturn($rawResults);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification, $chunk, $status, $options) {
+                $this->assertSame('Wasserstoff, Chemie, Häfen, Halbleiter.', $options['search_results']['results'][0]['page_content']);
+                $this->assertSame(1, $options['search_results']['pages_read']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $events = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$events): void {
+            $events[] = [$event['status'], $event['metadata']];
+        });
+
+        $statuses = array_column($events, 0);
+        $this->assertContains('search_complete', $statuses);
+        $this->assertContains('pages_read', $statuses);
+        $this->assertLessThan(array_search('pages_read', $statuses, true), array_search('search_complete', $statuses, true));
+        $pagesRead = $events[array_search('pages_read', $statuses, true)][1];
+        $this->assertSame(1, $pagesRead['pages_read']);
+        $this->assertTrue($pagesRead['results'][0]['fetched']);
+    }
+
+    public function testResearchQuestionSkipsPageDumpsWhenRouterVotesZero(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getTrackingId')->willReturn(123);
+        $message->method('getFile')->willReturn(0);
+        $message->method('getId')->willReturn(79);
+        $message->method('getText')->willReturn('Was ist das aktuelle Wetter in Berlin?');
+        $message->method('hasFiles')->willReturn(false);
+
+        $urlContent = $this->createMock(UrlContentService::class);
+        $urlContent->method('extractUrls')->willReturn([]);
+
+        $rawResults = ['query' => 'Wetter Berlin', 'results' => [
+            ['title' => 'DWD', 'url' => 'https://www.dwd.de/a', 'description' => '18°C'],
+        ]];
+
+        $research = $this->createMock(WebResearchService::class);
+        $research->method('isUrlReadEnabled')->willReturn(true);
+        $research->method('isDeepSearchEnabled')->willReturn(true);
+        $research->expects($this->never())->method('deepen');
+
+        $processor = $this->processorWith($urlContent, $research);
+
+        $this->preProcessor->method('process')->willReturn($message);
+        $this->messageRepository->method('findConversationHistory')->willReturn([]);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+        $this->classifier->method('classify')->willReturn([
+            'topic' => 'general',
+            'language' => 'de',
+            'source' => 'ai_sorting',
+            'web_search' => true,
+            'read_pages' => 0,
+        ]);
+        $this->promptService->method('getPromptWithMetadata')->willReturn(['metadata' => []]);
+        $this->braveSearchService->method('isEnabled')->willReturn(true);
+        $this->searchQueryGenerator->method('generate')->willReturn('Wetter Berlin');
+        $this->braveSearchService->method('search')->willReturn($rawResults);
+
+        $this->router
+            ->expects($this->once())
+            ->method('routeStream')
+            ->willReturnCallback(function ($msg, $history, $classification, $chunk, $status, $options) {
+                $this->assertArrayNotHasKey('page_content', $options['search_results']['results'][0]);
+                $this->assertArrayNotHasKey('pages_read', $options['search_results']);
+
+                return ['metadata' => ['provider' => 'test', 'model' => 'test']];
+            });
+
+        $events = [];
+        $processor->processStream($message, static function (): void {}, static function (array $event) use (&$events): void {
+            $events[] = $event['status'];
+        });
+
+        $this->assertContains('search_complete', $events);
+        $this->assertNotContains('pages_read', $events);
+    }
+
+    private function processorWith(UrlContentService $urlContent, WebResearchService $research): MessageProcessor
+    {
+        return new MessageProcessor(
+            $this->messageRepository,
+            $this->searchResultRepository,
+            $this->preProcessor,
+            $this->classifier,
+            $this->router,
+            $this->modelConfigService,
+            $this->promptService,
+            WebSearchGatewayFactory::fromBrave($this->braveSearchService),
+            $this->searchQueryGenerator,
+            $this->createMock(AttachmentSearchContextResolver::class),
+            $urlContent,
+            $this->logger,
+            $this->createMock(MultitaskRoutingConfig::class),
+            $this->createMock(TaskPlanner::class),
+            $this->createMock(TaskPlanStore::class),
+            $this->createMock(TaskPlanExecutor::class),
+            $this->conversationSummaryService,
+            $this->createMock(AgentConfig::class),
+            $research,
+        );
     }
 
     public function testSavedTaskPrefetchesMarkdownWrappedUrlWithoutScreenshotFlag(): void

@@ -22,8 +22,10 @@ use App\Service\Message\Capability\SystemCapabilityRegistry;
  * `BMULTI`) are modelled as nullable types (`["string", "null"]`) rather than
  * omittable keys: OpenAI/Groq strict mode requires `additionalProperties:
  * false` and every property listed in `required`, which is incompatible with
- * "leave the key out when not applicable". A provider without schema support
- * still receives an omitted key from its prose-only response, which
+ * "leave the key out when not applicable". `BREADPAGES` is required and
+ * non-nullable (0 | 2 | 3): when `BWEBSEARCH` is false it must be 0.
+ * A provider without schema support still receives an omitted key from its
+ * prose-only response, which
  * {@see \App\Service\Message\MessageSorter::parseResponse()} already treats
  * as "no vote" via `array_key_exists()` / `isset()` checks.
  */
@@ -60,13 +62,14 @@ final class SortClassificationSchema
                         ? ['type' => 'string', 'enum' => $languageEnum]
                         : ['type' => 'string'],
                     'BWEBSEARCH' => ['type' => 'boolean'],
+                    'BREADPAGES' => ['type' => 'integer', 'enum' => [0, 2, 3]],
                     'BMULTI' => ['type' => ['boolean', 'null']],
                     'BMEDIA' => ['type' => ['string', 'null'], 'enum' => [...self::MEDIA_TYPES, null]],
                     'BINPUTMODE' => ['type' => ['string', 'null'], 'enum' => [...self::INPUT_MODES, null]],
                     'BDURATION' => ['type' => ['integer', 'null']],
                     'BRESOLUTION' => ['type' => ['string', 'null'], 'enum' => [...self::VIDEO_RESOLUTIONS, null]],
                 ],
-                'required' => ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
+                'required' => ['BTOPIC', 'BLANG', 'BWEBSEARCH', 'BREADPAGES', 'BMULTI', 'BMEDIA', 'BINPUTMODE', 'BDURATION', 'BRESOLUTION'],
             ],
         );
     }

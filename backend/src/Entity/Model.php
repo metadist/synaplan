@@ -391,6 +391,40 @@ class Model
     }
 
     /**
+     * Total context window (input + output tokens) from `BJSON.meta.context_window`.
+     *
+     * The catalog authors this per model (see ModelCatalog); `SyncModelPricesCommand`
+     * refreshes it from LiteLLM. Returns null when the row carries no usable value
+     * so callers can apply their own conservative fallback.
+     */
+    public function getContextWindowTokens(): ?int
+    {
+        $value = $this->json['meta']['context_window'] ?? null;
+
+        if (null === $value || !is_numeric($value)) {
+            return null;
+        }
+
+        $intValue = (int) $value;
+
+        return $intValue > 0 ? $intValue : null;
+    }
+
+    /**
+     * Provider-side output ceiling from `BJSON.meta.max_output` (falls back to
+     * `max_tokens`). Null when unknown.
+     */
+    public function getMaxOutputTokens(): ?int
+    {
+        $value = $this->json['meta']['max_output'] ?? null;
+        if (null !== $value && is_numeric($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return $this->getMaxTokens();
+    }
+
+    /**
      * Native output dimension for embedding/vectorize models.
      *
      * Read from `BJSON.meta.dimensions` (the catalog field) so the

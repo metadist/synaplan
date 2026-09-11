@@ -153,7 +153,22 @@ final readonly class SearchResultSet
                 }
             }
 
+            // Present only when WebResearchService read the page: the
+            // condensed body is the evidence, the snippet just the teaser.
+            if (\is_string($result['page_content'] ?? null) && '' !== trim($result['page_content'])) {
+                $formatted .= "Page content (read by the system, condensed to the question where long):\n";
+                $formatted .= $result['page_content']."\n";
+            }
+
             $formatted .= "\n";
+        }
+
+        $pagesRead = (int) ($legacy['pages_read'] ?? 0);
+        if ($pagesRead > 0) {
+            $formatted .= sprintf(
+                "The full text of %d of these pages was read (marked \"Page content\"). Base the answer on that content and cite the matching [n]; a snippet alone is weak evidence. If the pages do not contain what was asked, say what they do say and what is missing instead of hedging in general terms.\n\n",
+                $pagesRead,
+            );
         }
 
         if ($wantAnswer && null !== $this->answer && '' !== trim($this->answer->text)) {

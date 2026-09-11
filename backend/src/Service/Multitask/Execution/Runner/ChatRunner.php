@@ -102,6 +102,7 @@ final readonly class ChatRunner implements TaskRunner
             $ragContext = $this->ragContext($text, $context, $ragChunks);
             $systemPrompt .= $ragContext;
         }
+        $systemPrompt .= $this->linkedPagesContext($context);
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -292,6 +293,25 @@ final readonly class ChatRunner implements TaskRunner
         $chunks = count($results);
 
         return $this->knowledgeContextFormatter->formatRagContext($results);
+    }
+
+    /**
+     * Pages the processor already read for the links in this message. When
+     * the planner placed a `url_fetch` node, that node carries the content
+     * into the chat input and nothing is appended here; otherwise a pasted
+     * link would be fetched and then dropped before the model answers.
+     */
+    private function linkedPagesContext(NodeContext $context): string
+    {
+        $urlContent = $context->classification['url_content'] ?? null;
+        if (!is_string($urlContent) || '' === trim($urlContent)) {
+            return '';
+        }
+        if (in_array(Capability::UrlFetch->value, $context->planCapabilities, true)) {
+            return '';
+        }
+
+        return "\n\n".$urlContent;
     }
 
     private function decorateSelfAwareTopic(string $systemPrompt, TaskNode $node, NodeContext $context, string $query): string

@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\ModelRepository;
 use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\Model\CapabilityCatalog;
+use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -78,9 +79,43 @@ final class CapabilityCatalogTest extends TestCase
         $this->assertFalse($embedRows[0]['available']);
         $this->assertSame('not_pulled', $embedRows[0]['unavailableReason']);
 
+        $this->assertSame(
+            CapabilityCatalog::PLATFORM_VECTORIZE_KEY,
+            $payload['defaults']['VECTORIZE'],
+        );
+
         foreach (['SOUND2TEXT', 'TEXT2SOUND', 'PIC2TEXT', 'TEXT2PIC', 'TEXT2VID'] as $empty) {
             $this->assertSame([], $payload['capabilities'][$empty]);
         }
+    }
+
+    public function testDefaultsPreferConfiguredVectorizeOverQualityOrder(): void
+    {
+        $chat = $this->model(11, 'Ollama', 'llama3.2', 'Llama 3.2', 'chat', selectable: 1);
+        $embed = $this->model(13, 'Ollama', 'bge-m3', 'bge-m3', 'vectorize', selectable: 1);
+
+        $models = $this->createMock(ModelRepository::class);
+        $models->method('findBy')->willReturn([$chat, $embed]);
+        $models->method('find')->willReturnCallback(
+            fn (int|string $id): Model => 13 === (int) $id ? $embed : $chat,
+        );
+
+        $readiness = $this->createMock(ChatReadinessService::class);
+        $readiness->method('providerAvailability')->willReturn(['ollama' => true, 'openai' => true]);
+        $readiness->method('modelAvailability')->willReturn(['available' => true, 'reason' => null]);
+
+        $modelConfig = $this->createMock(ModelConfigService::class);
+        $modelConfig->method('getConfiguredDefaultModel')->willReturnCallback(
+            static fn (string $capability): ?int => 'VECTORIZE' === $capability ? 13 : null,
+        );
+
+        $catalog = new CapabilityCatalog($models, $readiness, null, $modelConfig);
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $payload = $catalog->forUser($user);
+        $this->assertSame('ollama:bge-m3:vectorize', $payload['defaults']['VECTORIZE']);
+        $this->assertArrayNotHasKey('CHAT', $payload['defaults']);
     }
 
     public function testForUserAppliesGroupAllowList(): void
@@ -121,6 +156,7 @@ final class CapabilityCatalogTest extends TestCase
         $model->method('getName')->willReturn($name);
         $model->method('getTag')->willReturn($tag);
         $model->method('getSelectable')->willReturn($selectable);
+        $model->method('getActive')->willReturn(1);
         $model->method('isHiddenBecauseFree')->willReturn(false);
         $model->method('getFeatures')->willReturn([]);
 

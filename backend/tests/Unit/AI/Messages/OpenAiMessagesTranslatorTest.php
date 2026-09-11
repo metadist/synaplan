@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Messages;
 
+use App\AI\Credential\OpenAiCompatibleEndpointRegistry;
+use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Translator\OpenAiMessagesTranslator;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 final class OpenAiMessagesTranslatorTest extends TestCase
 {
@@ -160,5 +163,100 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame('tool_use', $anthropic['content'][0]['type']);
         $this->assertSame(['q' => 'test'], $anthropic['content'][0]['input']);
         $this->assertSame(10, $anthropic['usage']['input_tokens']);
+    }
+
+    public function testSupportsEveryOpenAiCompatibleChatProvider(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $this->assertTrue($t->supports('openai'));
+        $this->assertTrue($t->supports('groq'));
+        $this->assertTrue($t->supports('mistral'));
+        $this->assertTrue($t->supports('xai'));
+        $this->assertTrue($t->supports('huggingface'));
+        $this->assertTrue($t->supports('trustedtokens'));
+        $this->assertTrue($t->supports('perplexity'));
+        $this->assertTrue($t->supports('ollama'));
+        $this->assertTrue($t->supports(OpenAiCompatibleEndpointRegistry::PROVIDER_NAME));
+        $this->assertFalse($t->supports('anthropic'));
+        $this->assertFalse($t->supports('google'));
+        $this->assertFalse($t->supports('gemini'));
+        $this->assertFalse($t->supports('triton'));
+    }
+
+    public function testResolvesFixedCloudCompletionsUrls(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $this->assertSame(
+            ChatCompletionsUpstreams::URLS['groq'],
+            $t->resolveCompletionsUrl(['provider' => 'groq']),
+        );
+        $this->assertSame(
+            ChatCompletionsUpstreams::URLS['mistral'],
+            $t->resolveCompletionsUrl(['provider' => 'mistral']),
+        );
+        $this->assertSame(
+            ChatCompletionsUpstreams::URLS['openai'],
+            $t->resolveCompletionsUrl(['provider' => 'openai']),
+        );
+        $this->assertSame(
+            'https://api.openai.com/v1/chat/completions',
+            $t->resolveCompletionsUrl(['openai_upstream_url' => 'https://api.openai.com']),
+        );
+    }
+
+    public function testResolvesOllamaFromConfiguredBaseUrl(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient(), 'http://ollama:11434');
+
+        $this->assertSame(
+            'http://ollama:11434/v1/chat/completions',
+            $t->resolveCompletionsUrl(['provider' => 'ollama']),
+        );
+    }
+
+    public function testUnconfiguredOllamaHasNoUpstream(): void
+    {
+        $t = new OpenAiMessagesTranslator(new MockHttpClient());
+
+        $this->assertNull($t->resolveCompletionsUrl(['provider' => 'ollama']));
+    }
+
+    public function testCompletePostsGroqTurnsToGroq(): void
+    {
+        $seenUrl = null;
+        $client = new MockHttpClient(static function (string $method, string $url) use (&$seenUrl): MockResponse {
+            $seenUrl = $url;
+
+            return new MockResponse((string) json_encode([
+                'id' => 'chatcmpl_1',
+                'model' => 'llama-3.3-70b-versatile',
+                'choices' => [[
+                    'finish_reason' => 'stop',
+                    'message' => ['role' => 'assistant', 'content' => 'hi'],
+                ]],
+                'usage' => ['prompt_tokens' => 3, 'completion_tokens' => 1],
+            ]));
+        });
+        $t = new OpenAiMessagesTranslator($client);
+
+        $result = $t->complete(
+            [
+                'model' => 'llama-3.3-70b-versatile',
+                'max_tokens' => 64,
+                'messages' => [['role' => 'user', 'content' => 'hi']],
+            ],
+            [
+                'api_key' => 'gsk_test',
+                'upstream_url' => 'https://api.anthropic.com',
+                'provider' => 'groq',
+            ],
+        );
+
+        $this->assertSame(ChatCompletionsUpstreams::URLS['groq'], $seenUrl);
+        $this->assertSame(200, $result['status']);
+        $this->assertIsArray($result['body']);
+        $this->assertSame('hi', $result['body']['content'][0]['text']);
     }
 }

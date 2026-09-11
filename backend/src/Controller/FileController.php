@@ -210,7 +210,7 @@ class FileController extends AbstractController
                         new OA\Property(property: 'source_etag', type: 'string', example: 'a1b2c3', description: 'External version/etag captured at ingest; a differing value reported later marks the knowledge copy stale.'),
                         new OA\Property(property: 'overwrite', type: 'boolean', example: true, description: 'Replace the existing file matching (source, source_id) — or (group_key, original_name) — in place instead of creating a duplicate. Keeps the file id stable.'),
                         new OA\Property(property: 'retain_source', type: 'boolean', example: true, description: 'When false, the stored binary is discarded after successful vectorization; the row, extracted text and vectors are kept. Defaults to true.'),
-                        new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional catalog key for this file\'s embedding model. Omitted uses the account VECTORIZE default. Unknown or non-VECTORIZE keys return 400.'),
+                        new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional catalog key for this file\'s embedding model. Omitted uses the account VECTORIZE default. Ignored on DESKTOP: knowledge folders so index and search stay on the same model. Unknown or non-VECTORIZE keys return 400.'),
                         new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Optional ANALYZE catalog key. Unknown or non-ANALYZE keys return 400. The extract+vectorize pipeline does not run document analysis, so this value is not applied for process_level=vectorize.'),
                     ]
                 )
@@ -405,7 +405,7 @@ class FileController extends AbstractController
         requestBody: new OA\RequestBody(
             required: false,
             content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize'),
+                new OA\Property(property: 'vectorize_model', type: 'string', example: 'ollama:bge-m3:vectorize', description: 'Optional VECTORIZE catalog key. Ignored when the file lives in a DESKTOP: folder (index uses the workspace search default).'),
                 new OA\Property(property: 'analyze_model', type: 'string', example: 'anthropic:claude-sonnet-4:chat', description: 'Validated as an ANALYZE catalog key (400 if unknown). Not applied on extract+vectorize.'),
             ])
         ),

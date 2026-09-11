@@ -189,6 +189,8 @@ export interface Message {
     enabled?: boolean
     query?: string
     resultsCount?: number
+    // Result pages whose full text was read for the answer (deep research).
+    pagesRead?: number
   } | null // Web search metadata
   tool?: {
     command?: string
@@ -469,7 +471,12 @@ export const useHistoryStore = defineStore('history', () => {
     againData?: AgainData,
     backendMessageId?: number,
     originalMessageId?: number,
-    webSearch?: { enabled?: boolean; query?: string; resultsCount?: number } | null,
+    webSearch?: {
+      enabled?: boolean
+      query?: string
+      resultsCount?: number
+      pagesRead?: number
+    } | null,
     tool?: { command: string; label: string; icon: string } | null,
     quotedText?: string | null,
     quotedMessageId?: number | null

@@ -18,7 +18,7 @@ final class StructuredOutputRecoveryTest extends TestCase
      * 2026-09-03 (strict: true requested): a complete, valid classification
      * with the sorter's INPUT fields echoed next to it.
      */
-    private const ECHOED_SORT_GENERATION = '{"BDATETIME":"20260903124200","BDURATION":null,"BFILE":0,"BFILEPATH":"","BFILETEXT":"","BINPUTMODE":null,"BLANG":"de","BMEDIA":null,"BMULTI":false,"BRESOLUTION":null,"BTEXT":"ok, mach mir ein PDF mit dem Bild","BTOPIC":"general","BWEBSEARCH":false}';
+    private const ECHOED_SORT_GENERATION = '{"BDATETIME":"20260903124200","BDURATION":null,"BFILE":0,"BFILEPATH":"","BFILETEXT":"","BINPUTMODE":null,"BLANG":"de","BMEDIA":null,"BMULTI":false,"BREADPAGES":0,"BRESOLUTION":null,"BTEXT":"ok, mach mir ein PDF mit dem Bild","BTOPIC":"general","BWEBSEARCH":false}';
 
     private StructuredOutputRecovery $recovery;
 
@@ -44,7 +44,7 @@ final class StructuredOutputRecoveryTest extends TestCase
         $data = json_decode($salvaged, true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(
-            ['BDURATION', 'BINPUTMODE', 'BLANG', 'BMEDIA', 'BMULTI', 'BRESOLUTION', 'BTOPIC', 'BWEBSEARCH'],
+            ['BDURATION', 'BINPUTMODE', 'BLANG', 'BMEDIA', 'BMULTI', 'BREADPAGES', 'BRESOLUTION', 'BTOPIC', 'BWEBSEARCH'],
             array_keys($data),
             'exactly the schema keys survive, in the order the model emitted them',
         );
@@ -59,7 +59,7 @@ final class StructuredOutputRecoveryTest extends TestCase
     {
         // Echoed input fields AND a missing BLANG: pruning alone cannot make
         // this conform, and a made-up language would be worse than a retry.
-        $generation = '{"BTEXT":"hi","BTOPIC":"general","BWEBSEARCH":false,"BMULTI":null,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
+        $generation = '{"BTEXT":"hi","BTOPIC":"general","BWEBSEARCH":false,"BREADPAGES":0,"BMULTI":null,"BMEDIA":null,"BINPUTMODE":null,"BDURATION":null,"BRESOLUTION":null}';
 
         self::assertNull($this->recovery->salvage($generation, self::sortSchema()));
     }
@@ -218,7 +218,7 @@ final class StructuredOutputRecoveryTest extends TestCase
         self::assertSame(['role' => 'assistant', 'content' => '{"BTEXT":"hi","BTOPIC":"general"}'], $repaired[2]);
         self::assertSame('user', $repaired[3]['role']);
         self::assertStringContainsString("additionalProperties 'BTEXT' not allowed", $repaired[3]['content']);
-        self::assertStringContainsString('"BTOPIC", "BLANG", "BWEBSEARCH", "BMULTI", "BMEDIA", "BINPUTMODE", "BDURATION", "BRESOLUTION"', $repaired[3]['content']);
+        self::assertStringContainsString('"BTOPIC", "BLANG", "BWEBSEARCH", "BREADPAGES", "BMULTI", "BMEDIA", "BINPUTMODE", "BDURATION", "BRESOLUTION"', $repaired[3]['content']);
         self::assertStringContainsString('Do not repeat or echo any field', $repaired[3]['content']);
     }
 
