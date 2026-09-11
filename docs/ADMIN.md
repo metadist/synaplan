@@ -291,16 +291,33 @@ Rotate `APP_SECRET`:
 
 `CORS_ALLOW_ORIGIN` must match your frontend domain exactly. Never use `*` in production.
 
-### JWT Keys
+### Sessions survive restarts
 
-Auto-generated on first start at `backend/config/jwt/`. To regenerate:
+There is no JWT keypair to generate. Sign-in uses two HttpOnly cookies minted
+by `App\Service\TokenService`:
 
-```bash
-docker compose --env-file deploy/.env -f deploy/compose.yaml \
-  exec backend php bin/console lexik:jwt:generate-keypair --overwrite
-```
+| Cookie | Lifetime | Where it lives | What a restart does |
+| ------ | -------- | -------------- | ------------------- |
+| `access_token` | 5 minutes | HMAC-signed with `APP_SECRET`, not stored | Nothing — the signature still verifies |
+| `refresh_token` | 30 days, sliding on every refresh | `BTOKENS` in MariaDB | Nothing — the row is still there |
 
-All active sessions are invalidated on key rotation.
+Restarting or redeploying the backend, worker, Redis or the whole compose
+stack therefore keeps every browser and mobile-app session; the web app
+retries `/auth/refresh` through a 5xx/network blip instead of treating it as a
+sign-out, and only a definitive `401`/`403` ends the session. Two things must
+stay stable for that to hold:
+
+- **`APP_SECRET`** — the self-hosted stack persists it in
+  `deploy/data/secrets.env` (see `deploy/README.md`); Helm and other
+  automated deployments must inject the same value on every rollout. A new
+  secret invalidates every access cookie at once and also makes the provider
+  API keys stored in the database unreadable.
+- **The MariaDB volume** — `BTOKENS` holds the refresh tokens. Wiping the
+  database signs everyone out.
+
+To sign every user out deliberately, delete their rows from `BTOKENS`
+(`DELETE FROM BTOKENS WHERE BTYPE = 'refresh'`); rotating `APP_SECRET` has the
+same effect with the side effects above.
 
 ### HTTPS
 
