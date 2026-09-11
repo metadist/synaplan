@@ -4264,8 +4264,9 @@ class ModelCatalog
         // ==================== A2AGENT (Omnimodel, Chinese frontier models) ====================
         // Snapshot 2026-09-11 from https://a2agent.me/models (USD per 1M, public
         // group rate; final billing follows the key's group — see PRICING_MAINTENANCE.md).
-        // OpenAI-compatible API at https://a2agent.me/v1; model ids are lowercase and
-        // case-sensitive. Not covered by LiteLLM sync — verify manually against
+        // OpenAI-compatible API at https://a2agent.me/v1; model ids are
+        // case-sensitive (MiniMax is `MiniMax-M3`, not `minimax-m3`). Not covered
+        // by LiteLLM sync — verify manually against
         // GET https://a2agent.me/v1/models. Upstream operators are mainland-China
         // model vendors; jurisdiction is recorded as CN so the badge tells users where
         // the prompt goes.

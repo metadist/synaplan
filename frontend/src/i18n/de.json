@@ -3208,7 +3208,7 @@
     },
     "a2agent": {
       "title": "A2Agent-API-Schlüssel",
-      "message": "Erstelle einen Pay-as-you-go-API-Schlüssel bei A2Agent (Dashboard → API-Schlüssel) und füge ihn hier ein. Prompts werden von Modellbetreibern in Festlandchina (Qwen, DeepSeek, MiniMax) über dieses Gateway verarbeitet. A2Agent bedient Nutzer außerhalb Festlandchinas. Wer EU-Personenbezogene Daten verarbeitet, entscheidet das anhand der eigenen DPA."
+      "message": "Erstelle einen Pay-as-you-go-API-Schlüssel bei A2Agent (Dashboard → API-Schlüssel) und füge ihn hier ein. Prompts werden von Modellbetreibern in Festlandchina (Qwen, DeepSeek, MiniMax) über dieses Gateway verarbeitet. A2Agent bedient Nutzer außerhalb Festlandchinas. Wer personenbezogene Daten aus der EU verarbeitet, entscheidet das anhand der eigenen DPA."
     },
     "huggingface": {
       "title": "HuggingFace-API-Token",

@@ -10,7 +10,7 @@ namespace App\AI\Provider;
  *
  * Prompts are processed by mainland-China model vendors through this reseller.
  * A2Agent serves users and entities outside mainland China. Model ids are
- * lowercase and case-sensitive.
+ * case-sensitive; MiniMax uses the mixed-case id `MiniMax-M3`.
  *
  * @see https://a2agent.me/integrations
  * @see https://a2agent.me/v1
@@ -63,5 +63,45 @@ class A2AgentProvider extends AbstractChatCompletionsCloudProvider
     protected function envVarHint(): string
     {
         return 'Get your API key from https://a2agent.me/ (dashboard → API keys)';
+    }
+
+    /**
+     * A2Agent reasoning models think by default. ChatHandler's Thinking toggle
+     * arrives as `$options['reasoning']`; the gateway only honours
+     * `thinking: {type: "disabled"}` (not `enable_thinking`). TrustedTokens
+     * does not accept this field — keep the mapping off the shared builder.
+     *
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $request = parent::buildChatOptions($messages, $options, $stream);
+
+        if (!array_key_exists('reasoning', $options)) {
+            return $request;
+        }
+
+        $features = $options['modelFeatures'] ?? null;
+        if (is_array($features) && !in_array('reasoning', $features, true)) {
+            return $request;
+        }
+
+        if (!$this->isReasoningEnabled($options['reasoning'])) {
+            $request['thinking'] = ['type' => 'disabled'];
+        }
+
+        return $request;
+    }
+
+    private function isReasoningEnabled(mixed $reasoning): bool
+    {
+        if (is_array($reasoning)) {
+            return [] !== $reasoning;
+        }
+
+        return (bool) $reasoning;
     }
 }

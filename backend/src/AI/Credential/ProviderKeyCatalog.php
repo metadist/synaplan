@@ -102,7 +102,7 @@ final class ProviderKeyCatalog
             'displayName' => 'A2Agent',
             'envVar' => 'A2AGENT_API_KEY',
             'consoleUrl' => 'https://a2agent.me/',
-            'freeTier' => true,
+            'freeTier' => false,
             'recommended' => false,
             'validation' => [
                 'method' => 'GET',

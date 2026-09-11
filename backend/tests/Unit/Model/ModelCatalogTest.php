@@ -820,8 +820,9 @@ class ModelCatalogTest extends TestCase
 
     /**
      * A2Agent — Chinese frontier models via the a2agent.me gateway (BIDs 361–366).
-     * Model ids are lowercase and case-sensitive. Prices are USD/1M public group
-     * rates from the 2026-09-11 snapshot. Jurisdiction is CN.
+     * Model ids are case-sensitive; MiniMax is the mixed-case exception
+     * (`MiniMax-M3`). Prices are USD/1M public group rates from the 2026-09-11
+     * snapshot. Jurisdiction is CN.
      */
     public function testA2AgentModelsAreAvailableWithExpectedApiIds(): void
     {

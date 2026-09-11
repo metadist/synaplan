@@ -108,6 +108,16 @@ class TrustedTokensProviderTest extends TestCase
         $this->assertArrayNotHasKey('response_format', $request);
     }
 
+    public function testChatOptionsNeverSendA2AgentThinkingField(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'zai-org/GLM-5.2',
+            'reasoning' => false,
+        ], false);
+
+        $this->assertArrayNotHasKey('thinking', $request);
+    }
+
     private function makeProvider(?string $apiKey = 'test-key'): TrustedTokensProvider
     {
         return new TrustedTokensProvider(new NullLogger(), $apiKey);

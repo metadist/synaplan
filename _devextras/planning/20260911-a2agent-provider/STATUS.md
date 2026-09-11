@@ -10,7 +10,7 @@ the PR column is filled when the branch is opened. Decisions are in the plan's
 | ---- | ---- | ----- | ----------- | ----- |
 | S0 | Zero-code spike via the OpenAI-compatible endpoint registry | skipped | — | Decided 2026-09-11 (§4 row 11). Its checks run as S1b step 0. |
 | S1a | Base-class refactor (`AbstractChatCompletionsCloudProvider`, TrustedTokens moved onto it) | done | `plan/new-token-provider` / #1832 | Same branch as S1b–S3 per product request. TrustedTokens tests kept. |
-| S1b | `A2AgentProvider` + key catalog + defaults + six catalog rows (BIDs 361–366) + data migration | done | `plan/new-token-provider` / #1832 | `ChatCompletionsUpstreams` does not exist in this tree; Messages-gateway translators stay OpenAI/Gemini/Anthropic. In-app chat uses the new provider. |
+| S1b | `A2AgentProvider` + key catalog + defaults + six catalog rows (BIDs 361–366) + data migration | done | `plan/new-token-provider` / #1832 | `ChatCompletionsUpstreams` registers `a2agent` so Desktop / Claude Code aliases reach these models. In-app chat uses the new provider. |
 | S2 | Frontend: icon, CN badge, key help (5 locales), `a2agent` mix, regenerated schemas | done | `plan/new-token-provider` / #1832 | |
 | S3 | Docs (`CONFIGURATION`, `PRICING_MAINTENANCE`, `PRICE_DRIFT_PROCEDURE`, `ANTHROPIC_COMPATIBLE_API`, `README`) | done | `plan/new-token-provider` / #1832 | Platform `.env` change remains ops in `synaplan-platform`, never committed. |
 
@@ -31,7 +31,7 @@ the PR column is filled when the branch is opened. Decisions are in the plan's
 
 ## Findings
 
-- `AI/Messages/Translator/ChatCompletionsUpstreams` is not in this codebase. The Messages gateway only translates OpenAI, Gemini and Anthropic. A2Agent is wired as a first-class in-app Chat Completions provider (same shape as TrustedTokens), not as a new Messages translator.
+- `AI/Messages/Translator/ChatCompletionsUpstreams` registers `a2agent` at `https://a2agent.me/v1/chat/completions`. The Messages gateway translates Anthropic Messages to Chat Completions for Desktop / Claude Code aliases; in-app chat uses `A2AgentProvider` directly.
 - New BIDs 361–366 land via `ModelSeeder` and `Version20260911180000` (INSERT if absent, fingerprint-safe upsert). Operator toggles are never overwritten.
 - Live model id for MiniMax is **`MiniMax-M3`** (case-sensitive). The marketing slug `minimax-m3` is not in `GET /v1/models`.
-- Thinking can be turned off on DeepSeek V4 Pro with `thinking: {type: "disabled"}`. Not wired into the provider yet; MAIN default stays as decided.
+- Thinking can be turned off on DeepSeek V4 Pro with `thinking: {type: "disabled"}`. `A2AgentProvider` maps ChatHandler's `reasoning` toggle to that field (off → disabled; on → omit so the gateway default stays on). TrustedTokens does not receive the field.

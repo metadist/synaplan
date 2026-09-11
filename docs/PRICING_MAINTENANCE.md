@@ -257,7 +257,7 @@ Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl h
 
 ### A2Agent (verified 2026-09-11)
 
-OpenAI-compatible gateway at `https://a2agent.me/v1`. Catalog stores the **public group** USD per 1M rate from https://a2agent.me/models. Final billing follows the API key's group — compare the first invoices against `GET /v1/usage`. A2Agent publishes no cache-read rate, so `cache_read_price_per_1M` is omitted. Model ids are lowercase and case-sensitive. Not in LiteLLM → `unmatched` bucket; re-verify via `GET https://a2agent.me/v1/models` and the `/models` page.
+OpenAI-compatible gateway at `https://a2agent.me/v1`. Catalog stores the **public group** USD per 1M rate from https://a2agent.me/models. Final billing follows the API key's group — compare the first invoices against `GET /v1/usage`. A2Agent publishes no cache-read rate, so `cache_read_price_per_1M` is omitted. Model ids are case-sensitive; MiniMax is the mixed-case exception (`MiniMax-M3`). Not in LiteLLM → `unmatched` bucket; re-verify via `GET https://a2agent.me/v1/models` and the `/models` page.
 
 | BID | Model | Catalog in/out | Official (public group) | Context |
 | --- | ----- | -------------- | ----------------------- | ------- |

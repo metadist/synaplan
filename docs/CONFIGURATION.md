@@ -278,7 +278,7 @@ A2AGENT_API_KEY=your_key_here
 Qwen, DeepSeek and MiniMax through the A2Agent gateway (`https://a2agent.me/v1`).
 Prompts are processed by mainland-China model vendors; A2Agent serves users
 outside mainland China. Operators handling EU personal data decide per their DPA.
-Model ids are lowercase and case-sensitive. Use a pay-as-you-go key — daily-capped
+Model ids are case-sensitive (MiniMax is `MiniMax-M3`). Use a pay-as-you-go key — daily-capped
 subscription plans are unsuitable for a production platform key. Get a key at
 [a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
 guides: [a2agent.me/integrations](https://a2agent.me/integrations).

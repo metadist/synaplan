@@ -106,6 +106,37 @@ class A2AgentProviderTest extends TestCase
         $this->assertArrayNotHasKey('response_format', $request);
     }
 
+    public function testChatOptionsDisableThinkingWhenReasoningToggleIsOff(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'deepseek-v4-pro',
+            'reasoning' => false,
+        ], false);
+
+        $this->assertSame(['type' => 'disabled'], $request['thinking']);
+    }
+
+    public function testChatOptionsOmitThinkingWhenReasoningToggleIsOn(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'deepseek-v4-pro',
+            'reasoning' => true,
+        ], false);
+
+        $this->assertArrayNotHasKey('thinking', $request);
+    }
+
+    public function testChatOptionsOmitThinkingWhenModelHasNoReasoningFeature(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'qwen3.8-flash',
+            'reasoning' => false,
+            'modelFeatures' => ['vision'],
+        ], false);
+
+        $this->assertArrayNotHasKey('thinking', $request);
+    }
+
     private function makeProvider(?string $apiKey = 'test-key'): A2AgentProvider
     {
         return new A2AgentProvider(new NullLogger(), $apiKey);

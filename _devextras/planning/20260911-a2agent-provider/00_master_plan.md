@@ -58,7 +58,7 @@ not listed here is measured in S1b step 0.
 | Usage | `GET /v1/usage` (per-key usage and balance) |
 | Images | `/v1/images/generations` and `/edits` answer 404 for every platform sold here — **no media models** |
 | Auth | `Authorization: Bearer sk-…` (OpenAI face), `x-api-key` (Anthropic face) |
-| Model ids | **Lowercase, case-sensitive, exact match** (`glm-5.3` works, `GLM-5.3` may not). Copy ids from the models page. |
+| Model ids | **Case-sensitive, exact match.** Most ids are lowercase (`glm-5.3` works, `GLM-5.3` may not). MiniMax is the mixed-case exception: `MiniMax-M3`, not `minimax-m3`. Copy ids from the models page. |
 | Routing | The gateway resolves the upstream "group" from the model id on every request; a key with no group assigned is rejected with a structured error before any upstream call |
 | Billing | Per token, USD, against a prepaid balance (Stripe / card); balance never expires; no minimum. Prices "include public group rate multipliers — final billing follows the actual API key group" |
 | Subscriptions | Basic $19.90 (≈$5/day, $20/month cap), Plus $59.90, Pro $99 — daily caps make subscriptions unsuitable for a production key; the platform key is **pay-as-you-go** (§4 row 9) |
@@ -89,7 +89,7 @@ not listed here is measured in S1b step 0.
 | `qwen3.8-max` | 1M | reasoning | 2.00 | 6.00 | **no — selected** |
 | `minimax-m2.5` | 1M | coding | 0.30 | 1.20 | no |
 | `minimax-m2.7` | 200K | coding | 0.30 | 1.20 | no |
-| `minimax-m3` | 1M | agent | 0.30 | 1.20 | **no — selected** |
+| `MiniMax-M3` (marketing slug `minimax-m3`) | 1M | agent | 0.30 | 1.20 | **no — selected** |
 
 Two whole vendor families are missing from the catalog today: **Alibaba's
 commercial Qwen line** (MAX / Plus / Flash — the catalog only has the small
@@ -126,7 +126,7 @@ open-weight Qwen3.6 27B/35B) and **MiniMax** (nothing at all).
 | 1 | 361 | **Qwen3.8 MAX** | `qwen3.8-max` | `chat` | 2.00 / 6.00 | 1M | `reasoning`, `tool_use`, `code`, `multilingual` | Alibaba's current flagship. The most-used commercial model family in the Asian market and entirely absent from the catalog (only the small open-weight 27B/35B exist). The "we offer Qwen" headline model. |
 | 2 | 362 | **DeepSeek V4 Pro** | `deepseek-v4-pro` | `chat` | 0.435 / 0.87 | 1M | `reasoning`, `tool_use`, `code`, `multilingual` | The best-known Chinese brand. The existing route (TrustedTokens BID 337) costs **5× more** ($2.25/$6.75) with a 200K window; this is the direct upstream tier at 1M. **MAIN default** (§4 row 5). |
 | 3 | 363 | **DeepSeek V4 Flash** | `deepseek-v4-flash` | `chat` | 0.14 / 0.28 | 1M | `reasoning`, `tool_use`, `code`, `multilingual` | The cheapest 1M-context model on the gateway. The TrustedTokens route (BID 336, Flash-0731) is EU-hosted but capped at 400K; this is the full window at the same price. |
-| 4 | 364 | **MiniMax M3** | `minimax-m3` | `chat` | 0.30 / 1.20 | 1M | `tool_use`, `reasoning`, `code`, `multilingual` | A whole vendor the catalog lacks. Agent-tagged, 1M context, very cheap — the natural TOOLS / agentic pick. |
+| 4 | 364 | **MiniMax M3** | `MiniMax-M3` | `chat` | 0.30 / 1.20 | 1M | `tool_use`, `reasoning`, `code`, `multilingual` | A whole vendor the catalog lacks. Agent-tagged, 1M context, very cheap — the natural TOOLS / agentic pick. Live `GET /v1/models` id is mixed-case. |
 | 5 | 365 | **Qwen3.8 Flash** | `qwen3.8-flash` | `chat` | 0.15 / 0.47 | 1M | `reasoning`, `tool_use`, `vision`, `multilingual` | The FAST tier (SORT / PLAN / SUMMARIZE) — the only vision-tagged model in the set, so FAST and PIC2TEXT share one vendor. DeepSeek V4 Flash is the cheaper-output fallback in the mix. |
 | 5b | 366 | **Qwen3.8 Flash (Vision)** | `qwen3.8-flash` | `pic2text` | 0.15 / 0.47 | — | `vision`, `ocr`, `multilingual` | Twin row so PIC2TEXT can bind (same pattern as BID 333 / 311). Without it the provider has no vision default and `getCapabilities()` must not claim `vision`. |
 
@@ -153,8 +153,9 @@ TrustedTokens (EU-hosted), Kimi via HuggingFace/DeepInfra.
 // ==================== A2AGENT (Omnimodel, Chinese frontier models) ====================
 // Snapshot 2026-09-11 from https://a2agent.me/models (USD per 1M, public
 // group rate; final billing follows the key's group — see PRICING_MAINTENANCE.md).
-// OpenAI-compatible API at https://a2agent.me/v1; model ids are lowercase and
-// case-sensitive. Not covered by LiteLLM sync — verify manually against
+// OpenAI-compatible API at https://a2agent.me/v1; model ids are
+// case-sensitive (MiniMax is `MiniMax-M3`, not `minimax-m3`). Not covered
+// by LiteLLM sync — verify manually against
 // GET https://a2agent.me/v1/models. Upstream operators are mainland-China
 // model vendors; jurisdiction is recorded as CN so the badge tells users where
 // the prompt goes.
@@ -277,8 +278,8 @@ decided; record results in `STATUS.md`):
    (~l. 333); service definition with `$keyStore`, `$uploadDir`, tags
    `app.ai.chat` and `app.ai.vision`, `key: 'a2agent'`.
 3. `AI/Credential/ProviderKeyCatalog::PROVIDERS['a2agent']`: `envVar`
-   `A2AGENT_API_KEY`, `consoleUrl` `https://a2agent.me/`, `freeTier: true`
-   (trial credit on sign-up), `recommended: false`, validation `GET
+   `A2AGENT_API_KEY`, `consoleUrl` `https://a2agent.me/`, `freeTier: false`
+   (pay-as-you-go; subscription plans are unsuitable for the platform key), `recommended: false`, validation `GET
    https://a2agent.me/v1/models` with `Authorization: Bearer {key}`.
 4. `AI/Credential/ProviderKeyStore::SUPPORTED_PROVIDERS` + class docblock.
 5. `AI/Credential/ProviderDefaultsService`: `PROVIDER_DEFAULTS['a2agent']`
@@ -300,7 +301,8 @@ decided; record results in `STATUS.md`):
 11. `backend/.env.example`: replace the interim `A2AGENT_API_KEY=sk-` (l. 149)
     with the house block after TrustedTokens — comment lines (what it serves,
     get-key URL, "docs: the integration guides at
-    https://a2agent.me/integrations", lowercase model ids, CN jurisdiction)
+    https://a2agent.me/integrations", case-sensitive model ids including
+    `MiniMax-M3`, CN jurisdiction)
     and an **empty** value like every other key.
 12. Tests (§6). Gate: `make -C backend lint && make -C backend phpstan &&
     make -C backend test` — unfiltered. Routing snapshots in
@@ -335,7 +337,7 @@ decided; record results in `STATUS.md`):
 
 - `docs/CONFIGURATION.md`: an "A2Agent (Chinese frontier models, gateway)"
   section after TrustedTokens — env var, what it serves, base URL, the
-  jurisdiction sentence, the lowercase-id rule, PAYG note.
+  jurisdiction sentence, the case-sensitive-id rule (`MiniMax-M3`), PAYG note.
 - `docs/PRICING_MAINTENANCE.md`: source = `GET https://a2agent.me/v1/models`
   + the `/models` page; "not in LiteLLM → `unmatched` bucket, verify
   manually"; **the key-group caveat** ("public rate; billed rate follows the
@@ -387,7 +389,7 @@ decided; record results in `STATUS.md`):
 | **Jurisdiction / GDPR.** Prompts reach mainland-China model vendors; A2Agent's "no payload persistence" says nothing about upstream retention. | `CN` badge on every row and in the picker (§4 row 4); explicit copy in key help and docs (§4 row 8); `europe` mix untouched; the "Approved providers only" sovereignty setting planned for Wave 5 §7.2 will cover it install-wide. |
 | **Small reseller, thin docs** (`/docs` 404, group-based routing, "operator can pin a Claude Code version range"). Outage or model churn is plausible. | Hourly `PlatformKeyModelListProbe` already flags a missing id; `ModelCatalog::RETIREMENTS` is the exit path; `PREFERENCE_ORDER` last among cloud providers so no install is auto-repaired onto it. |
 | **Billed rate ≠ catalog rate** ("final billing follows the actual API key group"). | Catalog stores the public rate (same as every provider); `PRICING_MAINTENANCE.md` caveat + a first-invoice check against `/v1/usage` in S3. If the production key's group differs materially, adjust `priceIn/Out` in a follow-up (`ModelPriceHistoryRepository` keeps billing time-travel intact). |
-| **Case-sensitive model ids.** | Catalog `providerId` is the exact lowercase id; the section comment says so; step 0 verifies each. |
+| **Case-sensitive model ids.** | Catalog `providerId` is the exact upstream id (MiniMax is `MiniMax-M3`); the section comment says so; step 0 verifies each. |
 | **Thinking output format differs per vendor** (`reasoning_content` vs inline `<think>`). | Step 0 check; the frontend handles both today; `features.reasoning` set per measured behaviour. |
 | **Base-class refactor regresses TrustedTokens.** | Its test file keeps every assertion; the refactor PR is separate and lands green before any A2Agent code; no Mistral/Groq/xAI migration in scope. |
 | **Skipped spike moves discovery into S1b.** | Step 0 is the first task of S1b and gates steps 9–10; findings go to `STATUS.md` before the PR is opened. |
