@@ -175,6 +175,7 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
         utility class on the button itself and make on and off look identical.
       -->
       <button
+        :id="fieldKey"
         type="button"
         :disabled="disabled || isPinnedByEnv"
         :class="[
