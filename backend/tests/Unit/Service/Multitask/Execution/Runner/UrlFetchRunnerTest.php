@@ -83,9 +83,10 @@ final class UrlFetchRunnerTest extends TestCase
 
     public function testFetchesUrlFromInputsAndReturnsFormattedContent(): void
     {
+        // Plain reads use reader mode: no robots.txt round-trip, the page is
+        // the first (and only) request.
         $html = '<html><head><title>Example Article</title></head><body><p>The quick brown fox article body.</p></body></html>';
         $runner = $this->runner([
-            new MockResponse('', ['http_code' => 404]), // robots.txt
             new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         ]);
 
@@ -105,7 +106,6 @@ final class UrlFetchRunnerTest extends TestCase
     {
         $html = '<html><head><title>T</title></head><body>fallback body content here</body></html>';
         $runner = $this->runner([
-            new MockResponse('', ['http_code' => 404]),
             new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         ]);
 
@@ -224,7 +224,6 @@ final class UrlFetchRunnerTest extends TestCase
         $watches->expects(self::never())->method('remember');
 
         $runner = $this->runner([
-            new MockResponse('', ['http_code' => 404]),
             new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         ], watches: $watches);
 
@@ -242,7 +241,6 @@ final class UrlFetchRunnerTest extends TestCase
     {
         $html = '<html><head><title>News</title></head><body>markdown fetched body</body></html>';
         $runner = $this->runner([
-            new MockResponse('', ['http_code' => 404]),
             new MockResponse($html, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         ]);
 
@@ -259,7 +257,6 @@ final class UrlFetchRunnerTest extends TestCase
     public function testHttpErrorFailsTheNodeInIsolation(): void
     {
         $runner = $this->runner([
-            new MockResponse('', ['http_code' => 404]), // robots.txt
             new MockResponse('', ['http_code' => 500]),
         ]);
 

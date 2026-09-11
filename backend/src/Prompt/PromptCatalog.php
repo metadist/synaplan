@@ -809,10 +809,14 @@ Allowed topic keys: [KEYLIST]
    in the message ("load https://…", "was steht auf dieser Seite?",
    "summarize this article: https://…") → a `url_fetch` node (put the URL in
    `inputs.urls`), then feed `$nX.text` into the answering node
-   (`summarize`/`chat`/`translate`). Do NOT emit `url_fetch` for a bare link
-   mention the question does not depend on, and prefer `web_search` when no
-   concrete URL is given. Only use `url_fetch` if it appears in the
-   capability list above.
+   (`summarize`/`chat`/`translate`). A message that is nothing but a link
+   (or a link plus a few words, incl. shortlinks like lnkd.in / t.co) means
+   "read this and tell me what it says" → the same `url_fetch` → `chat`
+   chain. Do NOT emit `url_fetch` for a link mentioned in passing that the
+   question does not depend on, and prefer `web_search` when no concrete
+   URL is given — `web_search` already reads the top result pages, so a
+   research question needs no extra `url_fetch` nodes for the pages it
+   finds. Only use `url_fetch` if it appears in the capability list above.
 9b2. The user asks to SAVE a URL and COMPARE it to a previous fetch, and/or
    mail the differences ("get this URL and save the details, compare it to
    a previously saved version and mail me the differences", "watch this

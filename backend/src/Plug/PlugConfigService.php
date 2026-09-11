@@ -33,6 +33,11 @@ final readonly class PlugConfigService
     public const KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED = 'WEB_SEARCH.USER_OVERRIDE_ALLOWED';
     public const KEY_WEB_SEARCH_TIMEOUT_MS = 'WEB_SEARCH.TIMEOUT_MS';
     public const KEY_WEB_SEARCH_MAX_CONTENT_CHARS = 'WEB_SEARCH.MAX_CONTENT_CHARS';
+    public const KEY_WEB_SEARCH_READ_PAGES_ENABLED = 'WEB_SEARCH.READ_PAGES_ENABLED';
+    public const KEY_WEB_SEARCH_READ_PAGES_MAX = 'WEB_SEARCH.READ_PAGES_MAX';
+    public const KEY_WEB_SEARCH_READ_PAGES_BUDGET_CHARS = 'WEB_SEARCH.READ_PAGES_BUDGET_CHARS';
+    public const KEY_URL_READ_ENABLED = 'URL_READ.ENABLED';
+    public const KEY_URL_READ_MAX = 'URL_READ.MAX';
     public const KEY_RERANK_ENABLED = 'RERANK.ENABLED';
     public const KEY_RERANK_CANDIDATES_MULTIPLIER = 'RERANK.CANDIDATES_MULTIPLIER';
     public const KEY_RERANK_LATENCY_BUDGET_MS = 'RERANK.LATENCY_BUDGET_MS';
@@ -56,6 +61,19 @@ final readonly class PlugConfigService
     public const DEFAULT_WEB_SEARCH_TIMEOUT_MS = 8000;
     public const DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS = 4000;
     public const DEFAULT_WEB_SEARCH_USER_OVERRIDE_ALLOWED = false;
+
+    /** Deep research: read the top result pages after a search (not just snippets). */
+    public const DEFAULT_WEB_SEARCH_READ_PAGES_ENABLED = true;
+    public const DEFAULT_WEB_SEARCH_READ_PAGES_MAX = 4;
+    public const MAX_WEB_SEARCH_READ_PAGES = 8;
+
+    /** Total characters of page evidence handed to the answering model per search. */
+    public const DEFAULT_WEB_SEARCH_READ_PAGES_BUDGET_CHARS = 28000;
+
+    /** Links the user pastes into the chat are read automatically. */
+    public const DEFAULT_URL_READ_ENABLED = true;
+    public const DEFAULT_URL_READ_MAX = 3;
+    public const MAX_URL_READ = 6;
 
     /** @var list<string> */
     public const WEB_SEARCH_PROVIDERS = [
@@ -325,6 +343,40 @@ final readonly class PlugConfigService
     public function webSearchMaxContentChars(): int
     {
         return $this->readInt(self::KEY_WEB_SEARCH_MAX_CONTENT_CHARS, self::DEFAULT_WEB_SEARCH_MAX_CONTENT_CHARS);
+    }
+
+    /** Whether a web search also READS the top result pages (deep research). */
+    public function isWebSearchReadPagesEnabled(): bool
+    {
+        $raw = $this->readGlobal(self::KEY_WEB_SEARCH_READ_PAGES_ENABLED, '1');
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_WEB_SEARCH_READ_PAGES_ENABLED;
+    }
+
+    /** How many result pages one search may read (0 disables). */
+    public function webSearchReadPagesMax(): int
+    {
+        return max(0, min(self::MAX_WEB_SEARCH_READ_PAGES, $this->readInt(self::KEY_WEB_SEARCH_READ_PAGES_MAX, self::DEFAULT_WEB_SEARCH_READ_PAGES_MAX)));
+    }
+
+    /** Character budget for all page evidence of one search combined. */
+    public function webSearchReadPagesBudgetChars(): int
+    {
+        return max(4000, min(200000, $this->readInt(self::KEY_WEB_SEARCH_READ_PAGES_BUDGET_CHARS, self::DEFAULT_WEB_SEARCH_READ_PAGES_BUDGET_CHARS)));
+    }
+
+    /** Whether links pasted into the chat are read automatically. */
+    public function isUrlReadEnabled(): bool
+    {
+        $raw = $this->readGlobal(self::KEY_URL_READ_ENABLED, '1');
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_URL_READ_ENABLED;
+    }
+
+    /** How many pasted links one message may read. */
+    public function urlReadMax(): int
+    {
+        return max(1, min(self::MAX_URL_READ, $this->readInt(self::KEY_URL_READ_MAX, self::DEFAULT_URL_READ_MAX)));
     }
 
     /**

@@ -13,6 +13,7 @@ use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Research\WebResearchService;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,7 +22,9 @@ use Psr\Log\LoggerInterface;
  * search) instead of adding new search code.
  *
  * The node output is the formatted, source-cited results block
- * ({@see WebSearchGateway::formatResultsForAI()}). A downstream `chat`/
+ * ({@see WebSearchGateway::formatResultsForAI()}), deepened by
+ * {@see WebResearchService} with the condensed text of the top result pages
+ * (`params.read_pages: false` opts a node out). A downstream `chat`/
  * `summarize` node typically consumes `$nX.text` to write the final answer; when
  * web_search is the reply node, the user sees the result list directly. The raw
  * structured results also ride in metadata for any later consumer.
@@ -33,6 +36,7 @@ final readonly class WebSearchRunner implements TaskRunner
         private WebSearchGateway $webSearch,
         private LoggerInterface $logger,
         private ?SearchResultRepository $searchResultRepository = null,
+        private ?WebResearchService $webResearch = null,
     ) {
     }
 
@@ -47,7 +51,7 @@ final readonly class WebSearchRunner implements TaskRunner
     public function describe(): array
     {
         return [
-            new SkillDescriptor(Capability::WebSearch, 'Search the web for current information.'),
+            new SkillDescriptor(Capability::WebSearch, 'Search the web for current information and read the top result pages (their content, condensed to the question, is included in the output). Use for research questions, facts, news, figures.'),
         ];
     }
 
@@ -110,6 +114,7 @@ final readonly class WebSearchRunner implements TaskRunner
             return NodeResult::failed('web_search failed: '.$e->getMessage());
         }
 
+        $results = $this->readTopPages($results, $request, $node, $context);
         $text = $this->webSearch->formatResultsForAI($results);
 
         // Persist the structured results to the DB so MessageApiFormatter can
@@ -130,7 +135,44 @@ final readonly class WebSearchRunner implements TaskRunner
             'web_search' => true,
             'query' => $query,
             'search_results' => $results,
+            'pages_read' => (int) ($results['pages_read'] ?? 0),
         ]);
+    }
+
+    /**
+     * Read the top result pages so the node output carries evidence, not
+     * just teasers. Best-effort: any failure keeps the snippet-only results.
+     *
+     * @param array<string, mixed> $results
+     *
+     * @return array<string, mixed>
+     */
+    private function readTopPages(array $results, string $request, TaskNode $node, NodeContext $context): array
+    {
+        if (null === $this->webResearch || !$this->webResearch->isDeepSearchEnabled() || empty($results['results'])) {
+            return $results;
+        }
+        $flag = $node->params['read_pages'] ?? true;
+        if (false === $flag || 0 === $flag || '0' === $flag || 'false' === $flag) {
+            return $results;
+        }
+
+        try {
+            return $this->webResearch->deepen(
+                $results,
+                $request,
+                $context->userId,
+                static function (string $status, string $message, array $meta) use ($node, $context): void {
+                    $context->emitProgress($node->id, ['status' => $status, 'message' => $message] + $meta);
+                },
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('WebSearchRunner: reading result pages failed (ignored)', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $results;
+        }
     }
 
     private function stringInput(mixed $value): ?string

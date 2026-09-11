@@ -9,6 +9,7 @@ use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\WebFetchPolicy;
 use App\AI\Messages\Translator\AnthropicPassthroughTranslator;
+use App\AI\Messages\Translator\ChatCompletionsUpstreams;
 use App\AI\Messages\Vision\VisionPolicy;
 use App\Entity\Model;
 use App\Entity\User;
@@ -101,8 +102,14 @@ final readonly class MessagesGateway
      */
     public const BYO_ALLOWED_LEVELS = PremiumFeatureGate::PAID_LEVELS;
 
-    /** Providers the Messages gateway can translate to. */
-    private const GATEWAY_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
+    /**
+     * PIC2TEXT rewrite hosts. Claude Code image turns must stay on Anthropic
+     * (or the original OpenAI / Gemini alias) — never be stolen onto Groq /
+     * Ollama / other Chat Completions hosts that Desktop may use for chat.
+     *
+     * @var list<string>
+     */
+    private const VISION_REWRITE_PROVIDERS = ['anthropic', 'openai', 'google', 'gemini'];
 
     /**
      * @param iterable<MessagesTranslatorInterface> $translators
@@ -205,7 +212,7 @@ final readonly class MessagesGateway
         }
 
         $allowOperator = $this->config->allowOperatorKey($user->getId());
-        $credential = $this->keyResolver->resolve($resolved['provider'], $user->getId(), $allowOperator);
+        $credential = $this->resolveCredential($resolved['provider'], $user->getId(), $allowOperator);
         if (null === $credential) {
             return $this->err(
                 401,
@@ -249,7 +256,7 @@ final readonly class MessagesGateway
                 400,
                 'invalid_request_error',
                 sprintf(
-                    'Provider `%s` is not supported by the Messages gateway. Use Anthropic, OpenAI, or Google (Gemini), or add a MODEL_ALIASES entry.',
+                    'Provider `%s` cannot be used through the Messages gateway. Use a catalog chat model on Anthropic, Gemini, or an OpenAI-compatible API (OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, Perplexity, Ollama, or an admin-registered endpoint), or add a MODEL_ALIASES entry.',
                     $resolved['provider'],
                 ),
             );
@@ -338,6 +345,8 @@ final readonly class MessagesGateway
         $translatorContext = [
             'api_key' => $credential['key'],
             'upstream_url' => $this->config->upstreamUrl(),
+            'provider' => $resolved['provider'],
+            'provider_model_id' => $resolved['providerModelId'],
             'anthropic_version' => $request->headers->get('anthropic-version'),
             'anthropic_beta' => $webFetch['anthropic_beta'],
             'x_fixture' => $request->headers->get('x-fixture'),
@@ -636,7 +645,7 @@ final readonly class MessagesGateway
         }
 
         $provider = strtolower($visionModel->getService());
-        if (!\in_array($provider, self::GATEWAY_PROVIDERS, true)) {
+        if (!\in_array($provider, self::VISION_REWRITE_PROVIDERS, true)) {
             $this->logger->info('MessagesGateway: vision model provider not supported by gateway, funneling images upstream', [
                 'user_id' => $user->getId(),
                 'provider' => $provider,
@@ -709,19 +718,38 @@ final readonly class MessagesGateway
         return false;
     }
 
+    /**
+     * @return array{key: string, source: 'user'|'operator'}|null
+     */
+    private function resolveCredential(string $provider, ?int $userId, bool $allowOperator): ?array
+    {
+        if (ChatCompletionsUpstreams::isLocal($provider)) {
+            // Ollama and admin-registered OpenAI-compatible endpoints do not
+            // use ProviderKeyStore. The translator attaches a real endpoint
+            // key when one exists; a placeholder is enough to pass this gate.
+            return ['key' => 'local', 'source' => 'operator'];
+        }
+
+        return $this->keyResolver->resolve($provider, $userId, $allowOperator);
+    }
+
     private function pickTranslator(string $provider): ?MessagesTranslatorInterface
     {
         $provider = strtolower($provider);
+
+        // Claude Code / Anthropic must never be captured by a Chat Completions
+        // translator, regardless of AutowireIterator order.
+        if ($this->anthropicPassthrough->supports($provider)) {
+            return $this->anthropicPassthrough;
+        }
+
         foreach ($this->translators as $translator) {
+            if ($translator === $this->anthropicPassthrough) {
+                continue;
+            }
             if ($translator->supports($provider)) {
                 return $translator;
             }
-        }
-
-        // Fallback: Anthropic passthrough is always registered even if the
-        // iterator tag is missing during early boot/tests.
-        if ($this->anthropicPassthrough->supports($provider)) {
-            return $this->anthropicPassthrough;
         }
 
         return null;

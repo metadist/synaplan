@@ -135,10 +135,10 @@ Image blocks are forwarded on every route: unchanged on the Anthropic passthroug
 
 Two independent layers decide what an image turn costs and who reads it.
 
-**`VISION_MODE` — which model reads the images.** Default `auto` mixes in Synaplan’s own vision models:
+**`VISION_MODE` — which model reads the images.** Default `auto` mixes in Synaplan's own vision models:
 
 - If the resolved chat model already has `vision`, images stay on the wire (Anthropic keeps its eyes).
-- If it does not, Synaplan rewrites the turn onto the user’s PIC2TEXT / catalog vision model when that model’s provider is Anthropic, OpenAI, or Google — same fallback order as normal chat.
+- If it does not, Synaplan rewrites the turn onto the user’s PIC2TEXT / catalog vision model when that model’s provider is Anthropic, OpenAI, or Google — same fallback order as before this gateway grew Chat Completions hosts. Groq / Ollama PIC2TEXT is not used to rewrite a Claude Code image turn.
 - If Synaplan has no usable vision model, images are still forwarded upstream (`x-synaplan-vision: passthrough`).
 - When Synaplan vision is available, the gateway also offers an `analyze_image` tool (OCR/describe via PIC2TEXT) in the same server-side tool loop as `web_search`. Explicit `off` skips both the rewrite and the tool.
 
@@ -168,12 +168,15 @@ Cost depends on whose key serves the request:
 
 ## Multi-provider aliases
 
-`MODEL_ALIASES` can point Claude Code model IDs at OpenAI or Gemini catalog models. The gateway translates the Anthropic wire format:
+`MODEL_ALIASES` can point Claude Code model IDs at any catalog chat model. The gateway translates the Anthropic wire format:
 
-- **OpenAI** — Chat Completions (`/v1/chat/completions`), not the Responses API
+- **Anthropic** — passthrough to the Messages API
+- **OpenAI-compatible Chat Completions** — OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, Perplexity, Ollama (`{OLLAMA_BASE_URL}/v1/chat/completions`), and admin-registered OpenAI-compatible endpoints. Not the Responses API.
 - **Google/Gemini** — `generateContent` / `streamGenerateContent` with `parametersJsonSchema` for tools
 
-Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before the upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
+Desktop sends the project's catalog chat key (`service:providerId:tag`) on `/v1/messages`. That path uses the same translators, so any chat-capable catalog model on those protocols works — a Groq or Ollama pick does **not** need a `MODEL_ALIASES` entry.
+
+Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before a non-Anthropic upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
 
 ## Related
 
