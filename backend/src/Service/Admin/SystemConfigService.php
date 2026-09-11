@@ -14,6 +14,7 @@ use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\Document\DocumentToolsConfig;
@@ -64,6 +65,7 @@ final readonly class SystemConfigService
         private readonly GuestChatConfig $guestChatConfig,
         private readonly FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
         private readonly ?ModuleRegistry $modules = null,
+        private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -617,6 +619,9 @@ final readonly class SystemConfigService
             $this->logChange($key, $value);
 
             $this->applyConfigSideEffects($group, $setting, $value, $actingUserId);
+            // Resolvers memoize per request; the admin's own follow-up reads in
+            // this request (and the next worker-mode request) must see the write.
+            $this->layeredConfigResolver?->reset();
 
             return ['success' => true, 'requiresRestart' => false];
         } catch (\Throwable $e) {
