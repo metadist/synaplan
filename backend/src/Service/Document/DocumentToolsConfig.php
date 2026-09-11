@@ -6,6 +6,7 @@ namespace App\Service\Document;
 
 use App\Repository\ConfigRepository;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\Feature\FeatureFlagEnv;
 
 /**
  * BCONFIG DOCUMENT_TOOLS.* — all flags default OFF / conservative.
@@ -22,6 +23,7 @@ final readonly class DocumentToolsConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
@@ -52,6 +54,10 @@ final readonly class DocumentToolsConfig
 
     private function flag(string $setting, ?int $userId, bool $default): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $setting);
+        if (null !== $pinned) {
+            return $pinned;
+        }
         if (null !== $this->layeredConfigResolver) {
             return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $setting, $default);
         }

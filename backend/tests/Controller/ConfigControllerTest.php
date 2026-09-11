@@ -6,7 +6,12 @@ namespace App\Tests\Controller;
 
 use App\Entity\Config;
 use App\Module\Gate\ModuleGateConfig;
+use App\Repository\ConfigRepository;
+use App\Service\Agent\AgentConfig;
+use App\Service\Document\DocumentToolsConfig;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 /**
@@ -58,12 +63,52 @@ final class ConfigControllerTest extends WebTestCase
         $this->assertIsBool($data['features']['memoryService']);
         $this->assertArrayHasKey('officeConvertEnabled', $data['features']);
         $this->assertFalse($data['features']['officeConvertEnabled']);
-        $this->assertArrayHasKey('documentToolsEnabled', $data['features']);
-        $this->assertFalse($data['features']['documentToolsEnabled']);
-        $this->assertArrayHasKey('platformLinksEnabled', $data['features']);
-        $this->assertFalse($data['features']['platformLinksEnabled']);
-        $this->assertArrayHasKey('agentsEnabled', $data['features']);
-        $this->assertFalse($data['features']['agentsEnabled']);
+        foreach (['documentToolsEnabled', 'platformLinksEnabled', 'agentsEnabled'] as $feature) {
+            $this->assertArrayHasKey($feature, $data['features']);
+            $this->assertIsBool($data['features'][$feature]);
+        }
+    }
+
+    /**
+     * The wave feature flags ship ON, so the runtime payload has to follow the
+     * stored global row in both directions rather than a code default.
+     *
+     * @return iterable<string, array{string, string, string}>
+     */
+    public static function provideWaveFeatureFlags(): iterable
+    {
+        yield 'document tools' => ['documentToolsEnabled', DocumentToolsConfig::CONFIG_GROUP, DocumentToolsConfig::KEY_ENABLED];
+        yield 'platform links' => ['platformLinksEnabled', PlatformLinksConfig::CONFIG_GROUP, PlatformLinksConfig::KEY_ENABLED];
+        yield 'assistants' => ['agentsEnabled', AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ENABLED];
+    }
+
+    #[DataProvider('provideWaveFeatureFlags')]
+    public function testRuntimeConfigFollowsTheStoredWaveFeatureFlag(string $feature, string $group, string $setting): void
+    {
+        $client = static::createClient();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $repository = static::getContainer()->get(ConfigRepository::class);
+
+        $previous = $repository->getValue(0, $group, $setting);
+
+        try {
+            foreach (['0' => false, '1' => true] as $stored => $expected) {
+                $repository->setValue(0, $group, $setting, (string) $stored);
+                $em->flush();
+                $em->clear();
+
+                $client->request('GET', '/api/v1/config/runtime');
+                $this->assertResponseIsSuccessful();
+                $data = json_decode((string) $client->getResponse()->getContent(), true);
+                $this->assertIsArray($data);
+                $this->assertSame($expected, $data['features'][$feature], sprintf('%s should be %s when the global row is "%s"', $feature, var_export($expected, true), $stored));
+            }
+        } finally {
+            if (null !== $previous) {
+                $repository->setValue(0, $group, $setting, $previous);
+                $em->flush();
+            }
+        }
     }
 
     /**

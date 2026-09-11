@@ -657,7 +657,7 @@
       "tabGroups": {
         "aiData": "AI & Data",
         "communication": "Communication",
-        "security": "Access"
+        "security": "Features & Access"
       },
       "liveBadge": "Live",
       "liveHint": "Changes take effect immediately, no restart required.",

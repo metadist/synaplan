@@ -40,8 +40,16 @@ final class PlatformLinkControllerTest extends WebTestCase
         $this->em->flush();
     }
 
+    private function disableFlag(): void
+    {
+        static::getContainer()->get(ConfigRepository::class)
+            ->setValue(0, PlatformLinksConfig::CONFIG_GROUP, PlatformLinksConfig::KEY_ENABLED, '0');
+        $this->em->flush();
+    }
+
     public function testAllRoutes404WhenFlagOff(): void
     {
+        $this->disableFlag();
         $user = $this->createUser('pl-flag-off@synaplan.internal');
         $this->authenticateClient($this->client, $user);
 

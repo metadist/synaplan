@@ -652,7 +652,7 @@
       "tabGroups": {
         "aiData": "KI & Daten",
         "communication": "Kommunikation",
-        "security": "Zugang"
+        "security": "Funktionen & Zugang"
       },
       "liveBadge": "Live",
       "liveHint": "Änderungen werden sofort wirksam, kein Neustart erforderlich.",

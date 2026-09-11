@@ -657,7 +657,7 @@
       "tabGroups": {
         "aiData": "IA et données",
         "communication": "Communication",
-        "security": "Accès"
+        "security": "Fonctions et accès"
       },
       "liveBadge": "En direct",
       "liveHint": "Les modifications prennent effet immédiatement, sans redémarrage.",

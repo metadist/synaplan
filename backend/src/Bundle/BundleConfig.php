@@ -6,11 +6,13 @@ namespace App\Bundle;
 
 use App\Repository\ConfigRepository;
 use App\Service\Config\LayeredConfigResolver;
+use App\Service\Feature\FeatureFlagEnv;
 
 /**
  * Feature flag for synaplan-bundle.v1 export/import routes.
  *
- * Seeded OFF. Bundle endpoints 404 until an operator turns this on.
+ * Seeded ON since 4.8; `FEATURE_BUNDLE_ENABLED=false` or the Features tab
+ * under System configuration turns it off. Bundle endpoints 404 while off.
  */
 final readonly class BundleConfig
 {
@@ -22,11 +24,16 @@ final readonly class BundleConfig
     public function __construct(
         private ConfigRepository $configRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
+        private ?FeatureFlagEnv $featureFlagEnv = null,
     ) {
     }
 
     public function isEnabled(?int $userId): bool
     {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, self::KEY_ENABLED);
+        if (null !== $pinned) {
+            return $pinned;
+        }
         if (null !== $this->layeredConfigResolver) {
             return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, self::KEY_ENABLED, self::DEFAULT_ENABLED);
         }

@@ -7,12 +7,19 @@ namespace App\Service\Admin;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Credential\SecretValueGuard;
+use App\Bundle\BundleConfig;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Client\MobileVersionService;
+use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Digest\MessageDigestConfig;
+use App\Service\Document\DocumentToolsConfig;
 use App\Service\Dropbox\DropboxOAuthConfig;
 use App\Service\EncryptionService;
+use App\Service\Feature\FeatureFlagEnv;
 use App\Service\FeedbackConstants;
 use App\Service\GuestChatConfig;
 use App\Service\Iam\IamConfig;
@@ -22,8 +29,10 @@ use App\Service\Media\MediaJobConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\Multitask\MultitaskRoutingConfig;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\RegistrationConfig;
 use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\WorkflowsConfig;
 use App\Service\Tool\ToolsConfig;
 use App\Service\UsageTaximeterConfig;
 use Psr\Log\LoggerInterface;
@@ -53,8 +62,90 @@ final readonly class SystemConfigService
         private readonly EncryptionService $encryption,
         private readonly RegistrationConfig $registrationConfig,
         private readonly GuestChatConfig $guestChatConfig,
+        private readonly FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
+        private readonly ?ModuleRegistry $modules = null,
     ) {
         $this->schema = $this->buildSchema();
+    }
+
+    /**
+     * The Features tab: every wave feature flag in one place, grouped by what
+     * the user sees. Field keys double as the environment variable that pins
+     * the flag for automated deployments ({@see FeatureFlagEnv::envVarFor}).
+     *
+     * @return array<string, array{label: string, fields: array<string>}>
+     */
+    private function featureSections(): array
+    {
+        $sections = [
+            'people' => ['label' => 'People & sharing', 'fields' => [
+                'FEATURE_IAM_GROUPS_ENABLED',
+                'FEATURE_IAM_SHARING_ENABLED',
+                'FEATURE_IAM_GROUP_POLICIES_ENABLED',
+                'FEATURE_IAM_DIRECTORY_SYNC_ENABLED',
+            ]],
+            'assistants' => ['label' => 'AI assistants', 'fields' => [
+                'FEATURE_AGENTS_ENABLED',
+                'FEATURE_AGENTS_ROUTABLE_ENABLED',
+                'FEATURE_BUNDLE_ENABLED',
+            ]],
+            'tasks' => ['label' => 'Saved tasks & watched pages', 'fields' => [
+                'FEATURE_WORKFLOWS_BUILDER_ENABLED',
+                'FEATURE_MULTITASK_URL_FETCH_ENABLED',
+            ]],
+            'tools' => ['label' => 'Tools & approvals', 'fields' => [
+                'FEATURE_TOOLS_REGISTRY_ENABLED',
+                'FEATURE_TOOLS_APPROVALS_ENABLED',
+                'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED',
+            ]],
+            'documents' => ['label' => 'Office documents', 'fields' => [
+                'FEATURE_DOCUMENT_TOOLS_ENABLED',
+            ]],
+            'platforms' => ['label' => 'Desktop & partner platforms', 'fields' => [
+                'FEATURE_DESKTOP_AGENT_ENABLED',
+                'FEATURE_PLATFORM_LINKS_ENABLED',
+            ]],
+        ];
+
+        $gateKeys = array_keys($this->moduleGateFields());
+        if ([] !== $gateKeys) {
+            $sections['modules'] = ['label' => 'Optional modules — hide what is not configured', 'fields' => $gateKeys];
+        }
+
+        return $sections;
+    }
+
+    /**
+     * One boolean per declared feature module: `MODULES.GATE_<ID>` (seeded OFF
+     * by the Intermezzo plan). ON answers 404 on the module's routes and hides
+     * its cards while the module is not configured.
+     *
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source: string, dbGroup: string, dbKey: string}>
+     */
+    private function moduleGateFields(): array
+    {
+        if (null === $this->modules) {
+            return [];
+        }
+
+        $fields = [];
+        foreach ($this->modules->ids() as $id) {
+            $setting = ModuleGateConfig::settingFor($id);
+            $fields[FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, $setting)] = [
+                'tab' => 'features', 'section' => 'modules', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => sprintf(
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. Off (the shipped default) keeps the module visible with a "needs setup" state. Configure the module first — see Operate → Feature status.',
+                    $id,
+                ),
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ModuleGateConfig::GROUP,
+                'dbKey' => $setting,
+            ];
+        }
+
+        return $fields;
     }
 
     /**
@@ -136,12 +227,15 @@ final readonly class SystemConfigService
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
                 ],
             ],
+            'features' => [
+                'label' => 'Features',
+                'sections' => $this->featureSections(),
+            ],
             'sharing' => [
                 'label' => 'Sharing',
                 'sections' => [
-                    'features' => ['label' => 'People & sharing', 'fields' => ['IAM_GROUPS_ENABLED', 'IAM_SHARING_ENABLED', 'IAM_GROUP_POLICIES_ENABLED']],
                     'everyone' => ['label' => 'Everyone', 'fields' => ['IAM_EVERYONE_SHARES']],
-                    'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_SYNC_ENABLED', 'IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
+                    'directory' => ['label' => 'Directory groups', 'fields' => ['IAM_DIRECTORY_GROUPS_CLAIM', 'IAM_DIRECTORY_GROUP_NAMES']],
                     'audit' => ['label' => 'People & audit', 'fields' => ['IAM_ADMIN_IMPERSONATION', 'IAM_AUDIT_RETENTION_DAYS']],
                 ],
             ],
@@ -150,10 +244,7 @@ final readonly class SystemConfigService
                 'sections' => [
                     'multitask' => ['label' => 'Multi-task routing', 'fields' => ['MULTITASK_ROUTING_ENABLED']],
                     'saved_tasks' => ['label' => 'Saved Tasks', 'fields' => ['SAVEDTASKS_ENABLED']],
-                    'tools' => ['label' => 'Tools and approvals', 'fields' => [
-                        'TOOLS_REGISTRY_ENABLED',
-                        'TOOLS_APPROVALS_ENABLED',
-                        'TOOLS_CUSTOM_HTTP_ENABLED',
+                    'tools' => ['label' => 'Tool policies', 'fields' => [
                         'TOOLS_POLICY_READ',
                         'TOOLS_POLICY_WRITE',
                         'TOOLS_POLICY_DESTRUCTIVE',
@@ -307,6 +398,21 @@ final readonly class SystemConfigService
 
             $values[$key]['envOverride'] = true;
             $values[$key]['effectiveValue'] = $envOverride ? 'true' : 'false';
+        }
+
+        // Same rule for every wave feature flag on the Features tab: an
+        // automated deployment pins it with FEATURE_<GROUP>_<SETTING>, and the
+        // toggle must show that instead of pretending to be movable.
+        foreach ($this->schema as $key => $field) {
+            if ('features' !== $field['tab'] || 'boolean' !== $field['type'] || !isset($values[$key], $field['dbGroup'], $field['dbKey'])) {
+                continue;
+            }
+            $pinned = $this->featureFlagEnv->forced($field['dbGroup'], $field['dbKey']);
+            if (null === $pinned) {
+                continue;
+            }
+            $values[$key]['envOverride'] = true;
+            $values[$key]['effectiveValue'] = $pinned ? 'true' : 'false';
         }
 
         // #1079: surface effective multitask routing for the acting admin so the
@@ -1023,32 +1129,146 @@ final readonly class SystemConfigService
                 'dbGroup' => GuestChatConfig::CONFIG_GROUP,
                 'dbKey' => GuestChatConfig::KEY_ENABLED,
             ],
-            'IAM_GROUPS_ENABLED' => [
-                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+
+            // === Features (database-backed, no restart required) ===
+            // Every wave feature flag (docs/FEATURE_FLAGS.md). Seeded ON since
+            // 4.8; the field key is also the environment variable that pins the
+            // flag for automated deployments (FEATURE_<GROUP>_<SETTING>=false),
+            // which getValues() reports as `envOverride`.
+            'FEATURE_IAM_GROUPS_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Show People under Operate and let administrators create groups. Members see their groups under Account. Off by default — existing installs stay unchanged until you turn this on.',
-                'default' => 'false',
+                'description' => 'People & groups: show People under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
+                'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_GROUPS_ENABLED,
             ],
-            'IAM_SHARING_ENABLED' => [
-                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+            'FEATURE_IAM_SHARING_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Requires People & groups to be on. Share buttons and "Shared with me" stay hidden until both flags are on.',
-                'default' => 'false',
+                'description' => 'Sharing: let owners share a knowledge folder, chat, AI assistant, saved task or chat widget with a person, a group or everyone. Adds Share buttons and "Shared with me" filters. Requires People & groups.',
+                'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_SHARING_ENABLED,
             ],
-            'IAM_GROUP_POLICIES_ENABLED' => [
-                'tab' => 'sharing', 'section' => 'features', 'type' => 'boolean',
+            'FEATURE_IAM_GROUP_POLICIES_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Let administrators set default models, allowed models, feature flags and a rate-limit tier per group. Locked global defaults cannot be overridden. Requires People & groups. Off by default.',
-                'default' => 'false',
+                'description' => 'Group policies: let administrators set default models, allowed models, feature flags and a rate-limit tier per group (People → Policies). Locked global defaults cannot be overridden. Requires People & groups.',
+                'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_GROUP_POLICIES_ENABLED,
+            ],
+            'FEATURE_IAM_DIRECTORY_SYNC_ENABLED' => [
+                'tab' => 'features', 'section' => 'people', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Directory groups: at sign-in, put people into groups from the company login (OIDC groups claim). Does nothing without OIDC. The claim path and display names live under Sharing → Directory groups.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => IamConfig::CONFIG_GROUP,
+                'dbKey' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED,
+            ],
+            'FEATURE_AGENTS_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'AI assistants: the assistant builder (instructions, knowledge folders, tools, publish as chat widget) and the /api/v1/agents API. When off, every assistant route answers 404 and the builder is hidden.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ENABLED,
+            ],
+            'FEATURE_AGENTS_ROUTABLE_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Assistants in routing: let the message sorter pick an assistant that was marked "reachable from chat" as the answer for a matching request. Off keeps assistants reachable only by explicit selection.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => AgentConfig::CONFIG_GROUP,
+                'dbKey' => AgentConfig::KEY_ROUTABLE_ENABLED,
+            ],
+            'FEATURE_BUNDLE_ENABLED' => [
+                'tab' => 'features', 'section' => 'assistants', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Export and import: move assistants, instructions and saved tasks between installs as a synaplan-bundle file (/api/v1/bundles). The instance scope is admin-only.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => BundleConfig::CONFIG_GROUP,
+                'dbKey' => BundleConfig::KEY_ENABLED,
+            ],
+            'FEATURE_WORKFLOWS_BUILDER_ENABLED' => [
+                'tab' => 'features', 'section' => 'tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Steps editor and webhook trigger for Saved Tasks: pin the exact steps a task runs, ask before a tool step, and start a task from an incoming webhook. When off, saved tasks keep Run now and the schedule only.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => WorkflowsConfig::CONFIG_GROUP,
+                'dbKey' => WorkflowsConfig::KEY_BUILDER_ENABLED,
+            ],
+            'FEATURE_MULTITASK_URL_FETCH_ENABLED' => [
+                'tab' => 'features', 'section' => 'tasks', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Watched pages: fetch a web address, keep one saved copy per address, and let a scheduled Saved Task compare it and mail the differences. Also powers "get this URL" in chat. When off, the Watched pages tab is hidden.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => MultitaskRoutingConfig::CONFIG_GROUP,
+                'dbKey' => MultitaskRoutingConfig::KEY_URL_FETCH_ENABLED,
+            ],
+            'FEATURE_TOOLS_REGISTRY_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Tool registry: list every callable (MCP, custom HTTP, built-in) in one registry the assistant and Saved Tasks pick from. Off restores the previous per-loop catalogs — a kill switch, not a feature to leave off.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_REGISTRY_ENABLED,
+            ],
+            'FEATURE_TOOLS_APPROVALS_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Approvals: ask before a tool that changes or deletes something runs — in chat and in unattended Saved Tasks, which pause under Approvals until you decide. Defaults per tool class live under Routing → Tool policies.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_APPROVALS_ENABLED,
+            ],
+            'FEATURE_TOOLS_CUSTOM_HTTP_ENABLED' => [
+                'tab' => 'features', 'section' => 'tools', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Custom tools: let users declare their own HTTP / OpenAPI tools under Connections and use them from chat and Saved Tasks.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ToolsConfig::CONFIG_GROUP,
+                'dbKey' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED,
+            ],
+            'FEATURE_DOCUMENT_TOOLS_ENABLED' => [
+                'tab' => 'features', 'section' => 'documents', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Office document tools: let the assistant build and revise Word, Excel and PowerPoint files step by step (with revisions) instead of the one-shot generator. Editing files a user uploaded stays a separate, off-by-default setting.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => DocumentToolsConfig::CONFIG_GROUP,
+                'dbKey' => DocumentToolsConfig::KEY_ENABLED,
+            ],
+            'FEATURE_DESKTOP_AGENT_ENABLED' => [
+                'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Synaplan Desktop: show the Desktop page, pairing codes, connected computers and the job queue the desktop client (public beta on GitHub) works from. When off, every desktop route answers 404.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => DesktopAgentConfig::CONFIG_GROUP,
+                'dbKey' => DesktopAgentConfig::KEY_ENABLED,
+            ],
+            'FEATURE_PLATFORM_LINKS_ENABLED' => [
+                'tab' => 'features', 'section' => 'platforms', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Linked platforms, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => PlatformLinksConfig::CONFIG_GROUP,
+                'dbKey' => PlatformLinksConfig::KEY_ENABLED,
             ],
             'IAM_EVERYONE_SHARES' => [
                 'tab' => 'sharing', 'section' => 'everyone', 'type' => 'select',
@@ -1059,15 +1279,6 @@ final readonly class SystemConfigService
                 'dbGroup' => IamConfig::CONFIG_GROUP,
                 'dbKey' => IamConfig::KEY_EVERYONE_SHARES,
                 'options' => [IamConfig::EVERYONE_SHARES_ANY_OWNER, IamConfig::EVERYONE_SHARES_ADMINS_ONLY],
-            ],
-            'IAM_DIRECTORY_SYNC_ENABLED' => [
-                'tab' => 'sharing', 'section' => 'directory', 'type' => 'boolean',
-                'sensitive' => false,
-                'description' => 'At sign-in, put people into groups from the company login (OIDC groups claim). Off by default. Role mapping is unchanged.',
-                'default' => 'false',
-                'source' => 'database',
-                'dbGroup' => IamConfig::CONFIG_GROUP,
-                'dbKey' => IamConfig::KEY_DIRECTORY_SYNC_ENABLED,
             ],
             'IAM_DIRECTORY_GROUPS_CLAIM' => [
                 'tab' => 'sharing', 'section' => 'directory', 'type' => 'text',
@@ -1248,33 +1459,6 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => SavedTaskConfig::CONFIG_GROUP,
                 'dbKey' => SavedTaskConfig::KEY_ENABLED,
-            ],
-            'TOOLS_REGISTRY_ENABLED' => [
-                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
-                'sensitive' => false,
-                'description' => 'List every callable in one tool registry. Off restores the previous per-loop catalogs. Default on (kill switch).',
-                'default' => 'true',
-                'source' => 'database',
-                'dbGroup' => ToolsConfig::CONFIG_GROUP,
-                'dbKey' => ToolsConfig::KEY_REGISTRY_ENABLED,
-            ],
-            'TOOLS_APPROVALS_ENABLED' => [
-                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
-                'sensitive' => false,
-                'description' => 'Ask before write-class tools run, including in Saved Tasks. Off by default.',
-                'default' => 'false',
-                'source' => 'database',
-                'dbGroup' => ToolsConfig::CONFIG_GROUP,
-                'dbKey' => ToolsConfig::KEY_APPROVALS_ENABLED,
-            ],
-            'TOOLS_CUSTOM_HTTP_ENABLED' => [
-                'tab' => 'routing', 'section' => 'tools', 'type' => 'boolean',
-                'sensitive' => false,
-                'description' => 'Let users declare HTTP/OpenAPI tools on Connections. Off by default.',
-                'default' => 'false',
-                'source' => 'database',
-                'dbGroup' => ToolsConfig::CONFIG_GROUP,
-                'dbKey' => ToolsConfig::KEY_CUSTOM_HTTP_ENABLED,
             ],
             'TOOLS_POLICY_READ' => [
                 'tab' => 'routing', 'section' => 'tools', 'type' => 'select',
@@ -2116,7 +2300,7 @@ final readonly class SystemConfigService
                 'default' => '5',
                 'source' => 'database',
             ],
-        ];
+        ] + $this->moduleGateFields();
     }
 
     /**
