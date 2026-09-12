@@ -13,6 +13,7 @@ use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
@@ -280,6 +281,11 @@ final readonly class SystemConfigService
                 'label' => 'Interface',
                 'sections' => [
                     'usage_display' => ['label' => 'Usage display', 'fields' => ['USAGE_TAXIMETER_ENABLED']],
+                    'progress_narration' => ['label' => 'Chat progress narration', 'fields' => [
+                        'PROGRESS_SHOW_STEPS',
+                        'PROGRESS_SHOW_MODELS',
+                        'PROGRESS_SHOW_TIMINGS',
+                    ]],
                 ],
             ],
             'guest_landing' => [
@@ -1649,6 +1655,36 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => UsageTaximeterConfig::CONFIG_GROUP,
                 'dbKey' => UsageTaximeterConfig::KEY_ENABLED,
+            ],
+            // === Interface — chat progress narration (database-backed, no restart) ===
+            // Three switches (BCONFIG group PROGRESS_NARRATION, ownerId=0) for how much
+            // the chat tells the user while a turn runs. All default ON.
+            'PROGRESS_SHOW_STEPS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show the step-by-step progress of an answer while it is being prepared: understanding the request, web search, pages read, request sent to the model, model thinking, memory check. Finished steps stay listed until the answer streams, then fold into a one-line summary. When OFF, only the current phase is shown (one line, no history). On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_STEPS,
+            ],
+            'PROGRESS_SHOW_MODELS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Name the model and provider doing the work in the progress lines ("Sending your request to Claude Opus 4.8 by Anthropic…", "Creating your audio with tts-1 by OpenAI…"). Turn OFF for white-label deployments that must not reveal which vendors are used; the lines then read generically ("Sending your request…"). On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_MODELS,
+            ],
+            'PROGRESS_SHOW_TIMINGS' => [
+                'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Show how long each finished step took and a live elapsed counter on the running step. When OFF, steps are listed without durations. On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,
+                'dbKey' => ProgressNarrationConfig::KEY_TIMINGS,
             ],
             // === Branding (database-backed, no restart required) ===
             // Stored in BCONFIG group BRANDING (ownerId=0) — the rows BrandingService

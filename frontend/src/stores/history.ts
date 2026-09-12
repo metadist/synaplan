@@ -547,20 +547,36 @@ export const useHistoryStore = defineStore('history', () => {
         }
       }
 
-      // #1058: convert live wall-clock start → thinkingTime seconds, then clear
-      // the ephemeral startedAt so history payloads stay lean.
-      const now = Date.now()
-      for (const part of message.parts) {
-        if (part.type !== 'thinking') continue
-        if (part.isStreaming) {
-          delete part.isStreaming
-        }
-        if (typeof part.thinkingStartedAt === 'number' && !part.thinkingTime) {
-          part.thinkingTime = Math.max(1, Math.round((now - part.thinkingStartedAt) / 1000))
-        }
-        delete part.thinkingStartedAt
-      }
+      closeThinkingParts(message.parts)
     }
+  }
+
+  // #1058: convert live wall-clock start → thinkingTime seconds, then clear
+  // the ephemeral startedAt so history payloads stay lean.
+  const closeThinkingParts = (parts: Part[]) => {
+    const now = Date.now()
+    for (const part of parts) {
+      if (part.type !== 'thinking') continue
+      if (part.isStreaming) {
+        delete part.isStreaming
+      }
+      if (typeof part.thinkingStartedAt === 'number' && !part.thinkingTime) {
+        part.thinkingTime = Math.max(1, Math.round((now - part.thinkingStartedAt) / 1000))
+      }
+      delete part.thinkingStartedAt
+    }
+  }
+
+  /**
+   * The answer started: the live reasoning block is finished even though the
+   * message keeps streaming. Lets the thinking panel fold away on the first
+   * answer token instead of staying open until `complete`.
+   */
+  const finishLiveThinking = (id: string) => {
+    const message = messages.value.find((m) => m.id === id)
+    if (!message) return
+    if (!message.parts.some((part) => part.type === 'thinking' && part.isStreaming)) return
+    closeThinkingParts(message.parts)
   }
 
   const removeMessage = (id: string) => {
@@ -805,6 +821,7 @@ export const useHistoryStore = defineStore('history', () => {
     addStreamingMessage,
     updateStreamingMessage,
     finishStreamingMessage,
+    finishLiveThinking,
     markSuperseded,
     removeMessage,
     setMessageStatus,

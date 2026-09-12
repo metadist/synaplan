@@ -224,6 +224,8 @@
               :quoted-message-id="message.quotedMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
+              :processing-steps="message.isStreaming ? processingTimeline.steps : undefined"
+              :processing-model="message.isStreaming ? processingTimeline.model : undefined"
               :files="message.files"
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
@@ -562,6 +564,11 @@ import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
 import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import type { StreamUpdatePayload } from '@/types/chatStream'
+import {
+  createTimelineState,
+  ingestTimelineEvent,
+  type TimelineState,
+} from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
 import { chatApi } from '@/services/api'
@@ -1082,6 +1089,15 @@ type StreamingProcessingMetadata = {
 }
 
 const processingMetadata = ref<StreamingProcessingMetadata>({})
+
+// Ordered record of the running turn's pipeline steps. `processingStatus`
+// above keeps only the latest phase; this keeps all of them so the bubble can
+// show what is done, what is running and for how long (`ProcessingTimeline`).
+const processingTimeline = ref<TimelineState>(createTimelineState())
+
+const ingestTimeline = (data: StreamUpdatePayload) => {
+  ingestTimelineEvent(processingTimeline.value, data)
+}
 
 // Backend pipeline steps that only need a label in the thinking indicator:
 // no metadata, no side effects. Kept in one list so the guest and the
@@ -2692,6 +2708,7 @@ const streamAIResponse = async (
   streamingAbortController = new AbortController()
 
   const attach = options?.attach
+  processingTimeline.value = createTimelineState()
 
   const currentModel =
     aiConfigStore.models.CHAT?.find((model) => model.id === options?.modelId) ??
@@ -2773,6 +2790,8 @@ const streamAIResponse = async (
         quotedMessageId: options?.quotedMessageId,
         onUpdate: (data: StreamUpdatePayload) => {
           if (streamingAbortController?.signal.aborted) return
+
+          ingestTimeline(data)
 
           // Recognised here rather than in each terminal branch below, which
           // exist per error kind and would each need their own reset.
@@ -2889,6 +2908,11 @@ const streamAIResponse = async (
             processingMetadata.value = data.metadata || {}
           } else if (data.status === 'document_step') {
             applyDocumentStep(messageId, data)
+          } else if (data.status === 'thinking') {
+            // Reasoning models: same live "thinking" phase as the
+            // authenticated handler, so guests are not left on "generating".
+            processingStatus.value = 'thinking'
+            processingMetadata.value = {}
           } else if (data.status === 'processing') {
             // Processing/routing — no UI update needed
           } else if (data.status === 'plan') {
@@ -2998,6 +3022,8 @@ const streamAIResponse = async (
               processingStatus.value = ''
               processingMetadata.value = {}
             }
+            // First answer token: the live thinking panel folds away.
+            historyStore.finishLiveThinking(messageId)
             fullContent += data.chunk
 
             streamingDirty = true
@@ -3317,6 +3343,8 @@ const streamAIResponse = async (
             return
           }
 
+          ingestTimeline(data)
+
           if (data.status === 'run_started') {
             noteRunStarted(data.runId)
             return
@@ -3602,6 +3630,8 @@ const streamAIResponse = async (
               processingStatus.value = ''
               processingMetadata.value = {}
             }
+            // First answer token: the live thinking panel folds away.
+            historyStore.finishLiveThinking(messageId)
 
             fullContent += data.chunk
 

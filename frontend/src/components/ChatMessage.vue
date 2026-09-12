@@ -126,294 +126,23 @@
             class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
           ></div>
 
-          <div class="flex items-center gap-3">
-            <!-- Icon: Brain for memory-related, otherwise spinner -->
-            <svg
-              v-if="processingStatus.includes('memories')"
-              class="w-5 h-5 txt-brand flex-shrink-0"
-              :class="{
-                'animate-pulse':
-                  processingStatus === 'analyzing_memories' ||
-                  processingStatus === 'checking_memories',
-              }"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-              />
-            </svg>
-            <svg
-              v-else
-              class="w-5 h-5 animate-spin txt-brand flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-            <div class="flex-1 min-w-0">
-              <template v-if="processingStatus === 'started'">
-                <div class="font-medium">{{ $t('processing.startedTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">{{ $t('processing.startedDesc') }}</div>
-              </template>
-              <template v-else-if="processingStatus === 'preprocessing'">
-                <div class="font-medium">{{ $t('processing.preprocessingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.preprocessingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'classifying'">
-                <div class="font-medium animate-pulse">{{ $t('processing.classifyingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.classifyingDesc') }}
-                  <span
-                    v-if="processingMetadata?.model_name || processingMetadata?.provider"
-                    class="txt-brand"
-                  >
-                    · {{ processingMetadata.model_name || processingMetadata.provider }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'classified'">
-                <div class="font-medium">{{ $t('processing.classifiedTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5 flex items-center gap-1.5 flex-wrap">
-                  <span>{{ $t('processing.topic') }}:</span>
-                  <span class="txt-brand font-medium">{{
-                    processingMetadata?.topic || 'general'
-                  }}</span>
-                  <span v-if="processingMetadata?.language" class="opacity-50">·</span>
-                  <span v-if="processingMetadata?.language">
-                    {{ $t('processing.language') }}:
-                    <span class="font-medium">{{ processingMetadata.language.toUpperCase() }}</span>
-                  </span>
-                  <span v-if="processingMetadata?.model_name" class="opacity-50">·</span>
-                  <span v-if="processingMetadata?.model_name" class="txt-tertiary text-xs">
-                    via {{ processingMetadata.model_name }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'searching'">
-                <div class="font-medium animate-pulse">{{ $t('processing.searchingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.searchingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'search_complete'">
-                <div class="font-medium">{{ $t('processing.searchCompleteTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.searchCompleteDesc') }}
-                  <span v-if="processingMetadata?.results_count" class="txt-brand font-medium">
-                    · {{ processingMetadata.results_count }} {{ $t('processing.results') }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'reading_pages'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.readingPagesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{
-                    processingMetadata?.pages_total
-                      ? $t('processing.readingPagesProgress', {
-                          read: processingMetadata.pages_read ?? 0,
-                          total: processingMetadata.pages_total,
-                        })
-                      : $t('processing.readingPagesDesc')
-                  }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'pages_read'">
-                <div class="font-medium">{{ $t('processing.pagesReadTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{
-                    $t(
-                      'processing.pagesReadDesc',
-                      { count: processingMetadata?.pages_read ?? 0 },
-                      processingMetadata?.pages_read ?? 0
-                    )
-                  }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'fetching_urls'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.fetchingUrlsTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.fetchingUrlsDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'urls_fetched'">
-                <div class="font-medium">{{ $t('processing.urlsFetchedTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{
-                    $t('processing.urlsFetchedDesc', {
-                      read: processingMetadata?.urls_read ?? 0,
-                      total: processingMetadata?.urls_total ?? 0,
-                    })
-                  }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing'">
-                <div class="font-medium animate-pulse">{{ $t('processing.analyzingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.analyzingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'editing'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.editingImageTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{
-                    processingMetadata?.edit_source_name
-                      ? $t('processing.editingImageNamed', {
-                          filename: processingMetadata.edit_source_name,
-                        })
-                      : $t('processing.editingImageDesc')
-                  }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing_prompt'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.analyzingPromptTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.analyzingPromptDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'planning'">
-                <div class="font-medium animate-pulse">{{ $t('processing.planningTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.planningDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'searching_files'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.searchingFilesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.searchingFilesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'checking_memories'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.checkingMemoriesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.checkingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'processing'">
-                <div class="font-medium">{{ $t('processing.routingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ $t('processing.routingDesc') }}
-                  <span v-if="processingMetadata?.handler" class="txt-brand font-medium">
-                    {{ processingMetadata.handler }}
-                  </span>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'generating'">
-                <div class="font-medium animate-pulse">{{ $t('processing.generatingTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  <template v-if="processingMetadata?.customMessage">
-                    {{ processingMetadata.customMessage }}
-                  </template>
-                  <template v-else>
-                    {{ $t('processing.generatingDesc') }}
-                    <span
-                      v-if="processingMetadata?.model_name || processingMetadata?.provider"
-                      class="txt-brand"
-                    >
-                      · {{ processingMetadata.model_name || processingMetadata.provider }}
-                    </span>
-                  </template>
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'generating_file'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.generatingFileTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  <template v-if="processingMetadata?.stage === 'writing'">
-                    {{
-                      processingMetadata?.filename
-                        ? $t('processing.generatingFileWritingNamed', {
-                            filename: processingMetadata.filename,
-                          })
-                        : $t('processing.generatingFileWriting')
-                    }}
-                  </template>
-                  <template v-else-if="processingMetadata?.stage === 'converting'">
-                    {{
-                      $t('processing.generatingFileConverting', {
-                        filename: processingMetadata?.filename ?? '',
-                      })
-                    }}
-                  </template>
-                  <template v-else>
-                    {{ processingMetadata?.customMessage || $t('processing.generatingFileDesc') }}
-                  </template>
-                </div>
-                <ul
-                  v-if="documentStepList.length > 0"
-                  class="mt-2 space-y-1"
-                  data-testid="document-step-list"
+          <ProcessingTimeline :steps="visibleTimelineSteps" :model="timelineModel">
+            <template #active-extra="{ step }">
+              <ul
+                v-if="step.key === 'file' && documentStepList.length > 0"
+                class="mt-2 space-y-1"
+                data-testid="document-step-list"
+              >
+                <li
+                  v-for="(docStep, idx) in documentStepList"
+                  :key="idx"
+                  class="text-xs txt-tertiary surface-chip rounded-md px-2 py-1"
                 >
-                  <li
-                    v-for="(step, idx) in documentStepList"
-                    :key="idx"
-                    class="text-xs txt-tertiary surface-chip rounded-md px-2 py-1"
-                  >
-                    {{ stepLabel(step) }}
-                  </li>
-                </ul>
-              </template>
-              <template v-else-if="processingStatus === 'thinking'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.thinkingTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.thinkingDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'analyzing_memories'">
-                <div class="font-medium animate-pulse">
-                  {{ $t('processing.analyzingMemoriesTitle') }}
-                </div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.analyzingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'saving_memories'">
-                <div class="font-medium">{{ $t('processing.savingMemoriesTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.savingMemoriesDesc') }}
-                </div>
-              </template>
-              <template v-else-if="processingStatus === 'memories_complete'">
-                <div class="font-medium">{{ $t('processing.memoriesCompleteTitle') }}</div>
-                <div class="text-sm txt-tertiary mt-0.5">
-                  {{ processingMetadata?.customMessage || $t('processing.memoriesCompleteDesc') }}
-                </div>
-              </template>
-            </div>
-          </div>
+                  {{ stepLabel(docStep) }}
+                </li>
+              </ul>
+            </template>
+          </ProcessingTimeline>
           <Transition name="long-running">
             <div
               v-if="longRunning"
@@ -435,6 +164,25 @@
               {{ $t('processing.longRunningHint') }}
             </div>
           </Transition>
+        </div>
+
+        <!--
+          Once the answer streams, the steps that led to it fold into one
+          muted line (expandable) so the work stays visible without pushing
+          the text down. Gone on complete — the footer badges keep the record.
+        -->
+        <div
+          v-if="
+            isStreaming &&
+            !processingStatus &&
+            role === 'assistant' &&
+            hasAnswerContent &&
+            collapsedTimelineSteps.length > 0
+          "
+          class="px-4 pt-3"
+          data-testid="processing-timeline-summary"
+        >
+          <ProcessingTimeline :steps="collapsedTimelineSteps" :model="timelineModel" collapsed />
         </div>
 
         <!-- Bubble content (only non-thinking parts) -->
@@ -1235,6 +983,14 @@ import { aggregateTurnUsage, type MessageUsage } from '@/stores/usageTaximeter'
 import { formatCostDisplay, formatTokens } from '@/utils/usageFormat'
 import TaskPlanBubble from '@/components/multitask/TaskPlanBubble.vue'
 import MediaJobStatus from '@/components/MediaJobStatus.vue'
+import ProcessingTimeline from '@/components/chat/ProcessingTimeline.vue'
+import {
+  timelineFromStatus,
+  type TimelineModel,
+  type TimelineStep,
+} from '@/utils/processingTimeline'
+import { progressNarrationSwitches } from '@/utils/progressNarrationConfig'
+import type { StreamEventMetadata } from '@/types/chatStream'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
@@ -1321,6 +1077,13 @@ interface Props {
     /** Picture of the conversation this turn edits (status === 'editing'). */
     edit_source_name?: string
   } | null
+  /**
+   * Ordered pipeline steps of the running turn (see `utils/processingTimeline`).
+   * When absent, a one-step timeline is derived from `processingStatus`.
+   */
+  processingSteps?: TimelineStep[] | null
+  /** Model the running turn is generated with, once the backend named it. */
+  processingModel?: TimelineModel | null
   files?: MessageFile[] // Attached files
   documentChanges?: Array<{
     labelKey: string
@@ -1615,6 +1378,49 @@ const contentParts = computed(() => {
     return part
   })
 })
+
+// Timeline source: the parent's accumulated steps when it feeds the reducer,
+// otherwise a single step built from the bare status (keeps callers that only
+// know the current status — and the existing tests — working unchanged).
+const fallbackTimeline = computed(() => {
+  if (props.processingSteps || !props.processingStatus) return null
+  return timelineFromStatus(
+    props.processingStatus,
+    (props.processingMetadata ?? undefined) as StreamEventMetadata | undefined
+  )
+})
+
+const allTimelineSteps = computed<TimelineStep[]>(
+  () => props.processingSteps ?? fallbackTimeline.value?.steps ?? []
+)
+
+const timelineModel = computed<TimelineModel>(
+  () => props.processingModel ?? fallbackTimeline.value?.model ?? {}
+)
+
+// A streaming message is born with an EMPTY text part, so "parts exist" says
+// nothing about whether the answer started. Only real content counts.
+const hasAnswerContent = computed(() =>
+  contentParts.value.some((part) => part.type !== 'text' || (part.content?.trim() ?? '') !== '')
+)
+
+// Before the first token every step so far is shown; once the answer is on
+// screen only the post-answer pass (memory extraction) belongs in this slot —
+// the pre-answer steps move to the collapsed summary line.
+const visibleTimelineSteps = computed<TimelineStep[]>(() => {
+  const postAnswer = allTimelineSteps.value.filter((step) => step.afterAnswer)
+  const steps =
+    postAnswer.length > 0 ? postAnswer : hasAnswerContent.value ? [] : allTimelineSteps.value
+  if (progressNarrationSwitches().steps) return steps
+  // Admin switched the history off: only the phase that is running right now.
+  return steps.filter((step) => step.state === 'active')
+})
+
+const collapsedTimelineSteps = computed<TimelineStep[]>(() =>
+  progressNarrationSwitches().steps
+    ? allTimelineSteps.value.filter((step) => !step.afterAnswer && step.state === 'done')
+    : []
+)
 
 // Multitask routing, #1229 smart collapse: mark a task card's prose redundant
 // when that text is already part of the final answer in the message body —

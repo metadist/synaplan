@@ -8,6 +8,7 @@ use App\Service\File\FileHelper;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final readonly class UrlContentResult
 {
@@ -339,7 +340,7 @@ final readonly class UrlContentService
      *  - the text cap is the caller's budget (default 24 000 chars), large
      *    enough for a full article to be condensed downstream.
      */
-    public function fetchForReading(string $url, int $maxChars = self::DEFAULT_READ_TEXT_LENGTH): UrlContentResult
+    public function fetchForReading(string $url, int $maxChars = self::DEFAULT_READ_TEXT_LENGTH, ?ResponseInterface $firstHop = null): UrlContentResult
     {
         $hostname = $this->getHostname($url);
         $current = $url;
@@ -355,15 +356,12 @@ final readonly class UrlContentService
             $visited[$current] = true;
 
             try {
-                $response = $this->httpClient->request('GET', $current, [
-                    'timeout' => self::READ_TIMEOUT_SECONDS,
-                    'max_redirects' => 0,
-                    'headers' => [
-                        'User-Agent' => self::READER_USER_AGENT,
-                        'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5',
-                        'Accept-Language' => 'en,de;q=0.8,*;q=0.5',
-                    ],
-                ]);
+                // A caller that reads several pages starts every first hop up
+                // front (see startReading()) so the transfers overlap instead
+                // of queueing behind each other's timeout.
+                $response = 0 === $hop && null !== $firstHop
+                    ? $firstHop
+                    : $this->startReadingRequest($current);
 
                 $statusCode = $response->getStatusCode();
                 $headers = $response->getHeaders(false);
@@ -463,6 +461,45 @@ final readonly class UrlContentService
         }
 
         return $this->readFailure($url, $hostname, $current, 'Too many redirects', 'redirect_loop');
+    }
+
+    /**
+     * Start the first hop of a page read without consuming it.
+     *
+     * Symfony's HTTP client runs every started request concurrently in the
+     * background; reading three result pages sequentially therefore costs the
+     * slowest page, not the sum. Pass the response to {@see fetchForReading()}.
+     * Blocked addresses are not started — fetchForReading() rejects them first.
+     */
+    public function startReading(string $url): ?ResponseInterface
+    {
+        if ($this->isBlockedUrl($url)) {
+            return null;
+        }
+
+        try {
+            return $this->startReadingRequest($url);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to start URL read', [
+                'url' => FileHelper::redactUrlForLogging($url),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function startReadingRequest(string $url): ResponseInterface
+    {
+        return $this->httpClient->request('GET', $url, [
+            'timeout' => self::READ_TIMEOUT_SECONDS,
+            'max_redirects' => 0,
+            'headers' => [
+                'User-Agent' => self::READER_USER_AGENT,
+                'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.5',
+                'Accept-Language' => 'en,de;q=0.8,*;q=0.5',
+            ],
+        ]);
     }
 
     /**

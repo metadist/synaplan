@@ -61,8 +61,10 @@ final class WebResearchServiceTest extends TestCase
         });
 
         $progress = [];
-        $out = $this->service()->deepen($results, 'Which sectors get the money?', 7, static function (string $status, string $message, array $meta) use (&$progress): void {
+        $progressMeta = [];
+        $out = $this->service()->deepen($results, 'Which sectors get the money?', 7, static function (string $status, string $message, array $meta) use (&$progress, &$progressMeta): void {
             $progress[] = $status;
+            $progressMeta[] = $meta;
         });
 
         self::assertSame([
@@ -87,6 +89,14 @@ final class WebResearchServiceTest extends TestCase
 
         self::assertSame('reading_pages', $progress[0]);
         self::assertContains('reading_pages', $progress);
+
+        // The progress line names the sites so the user sees what is being read.
+        self::assertSame(['handelsblatt.com', 'reuters.com', 'tagesschau.de', 'faz.net'], $progressMeta[0]['hosts']);
+        self::assertSame('fetching', $progressMeta[0]['stage']);
+        self::assertSame('handelsblatt.com', $progressMeta[1]['current_host']);
+        $last = end($progressMeta);
+        self::assertSame(4, $last['pages_read']);
+        self::assertSame('faz.net', $last['current_host']);
     }
 
     public function testDeepenCondensesEachPageToItsShareOfTheBudgetWithTheQuestionAsLens(): void

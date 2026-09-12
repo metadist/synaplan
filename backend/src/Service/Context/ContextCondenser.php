@@ -61,9 +61,15 @@ final class ContextCondenser
     /**
      * Fit `$text` into `$budgetChars`, using `$question` as the relevance lens.
      *
+     * `$preferFastModel` picks the router (SORT) model before Text Analytics.
+     * Condensing is mechanical work — keep the facts, drop the boilerplate —
+     * and it sits on the critical path of a live chat turn: a frontier model
+     * chosen for document analysis took 30 s to condense one news page,
+     * while the router model does the same in a few seconds.
+     *
      * @param callable(array{level:int,chunk:int,chunks:int}):void|null $onProgress
      */
-    public function fit(string $text, string $question, int $budgetChars, ?int $userId, ?callable $onProgress = null): CondensedText
+    public function fit(string $text, string $question, int $budgetChars, ?int $userId, ?callable $onProgress = null, bool $preferFastModel = false): CondensedText
     {
         $originalChars = mb_strlen($text);
         $budgetChars = max(1, $budgetChars);
@@ -76,7 +82,7 @@ final class ContextCondenser
             return $this->trimmed($text, $budgetChars, $originalChars, 0, [], 0);
         }
 
-        $condenserModelId = $this->resolveCondenserModel($userId);
+        $condenserModelId = $this->resolveCondenserModel($userId, $preferFastModel);
         if (null === $condenserModelId) {
             $this->logger->warning('ContextCondenser: no condenser model available, trimming instead', [
                 'user_id' => $userId,
@@ -208,9 +214,10 @@ final class ContextCondenser
         );
     }
 
-    private function resolveCondenserModel(?int $userId): ?int
+    private function resolveCondenserModel(?int $userId, bool $preferFastModel): ?int
     {
-        foreach (['ANALYZE', 'SORT', 'CHAT'] as $capability) {
+        $order = $preferFastModel ? ['SORT', 'ANALYZE', 'CHAT'] : ['ANALYZE', 'SORT', 'CHAT'];
+        foreach ($order as $capability) {
             try {
                 $modelId = $this->modelConfigService->getDefaultModel($capability, $userId);
             } catch (\Throwable) {

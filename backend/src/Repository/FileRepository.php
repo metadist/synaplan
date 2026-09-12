@@ -269,11 +269,26 @@ class FileRepository extends ServiceEntityRepository
     }
 
     /**
+     * Every file linked to the given chat messages, without a result cap.
+     *
+     * Used by conversation cleanup, where truncating the result would leave
+     * rows pointing at deleted messages (#1826).
+     *
      * @param list<int> $messageIds
      *
      * @return list<File>
      */
-    private function findByMessageIds(int $userId, array $messageIds, int $limit, bool $imagesOnly): array
+    public function findAllFilesByMessageIds(int $userId, array $messageIds): array
+    {
+        return $this->findByMessageIds($userId, $messageIds, null, false);
+    }
+
+    /**
+     * @param list<int> $messageIds
+     *
+     * @return list<File>
+     */
+    private function findByMessageIds(int $userId, array $messageIds, ?int $limit, bool $imagesOnly): array
     {
         if ([] === $messageIds) {
             return [];
@@ -284,8 +299,11 @@ class FileRepository extends ServiceEntityRepository
             ->andWhere('f.messageId IN (:messageIds)')
             ->setParameter('userId', $userId)
             ->setParameter('messageIds', $messageIds)
-            ->orderBy('f.id', 'DESC')
-            ->setMaxResults($limit);
+            ->orderBy('f.id', 'DESC');
+
+        if (null !== $limit) {
+            $qb->setMaxResults($limit);
+        }
 
         if ($imagesOnly) {
             $qb->andWhere('f.fileMime LIKE :imageMime OR f.fileType IN (:imageTypes)')

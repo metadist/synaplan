@@ -39,6 +39,30 @@ final class ProviderDisplayNames
     }
 
     /**
+     * Add `provider_label` next to a `provider` service key in a progress
+     * event's metadata, so the chat can say "claude-opus-4-8 by Anthropic".
+     * Metadata without a provider, or with a label already set, is unchanged.
+     *
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    public function enrich(array $metadata): array
+    {
+        if (isset($metadata['provider_label'])) {
+            return $metadata;
+        }
+        $provider = $metadata['provider'] ?? null;
+        if (!is_string($provider) || '' === trim($provider) || 'test' === strtolower(trim($provider))) {
+            return $metadata;
+        }
+
+        $metadata['provider_label'] = $this->forService($provider);
+
+        return $metadata;
+    }
+
+    /**
      * @return array<string, string> branded name, keyed by normalised service
      */
     public function all(): array
