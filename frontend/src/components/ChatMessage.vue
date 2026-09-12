@@ -92,9 +92,7 @@
           that anything is happening.
         -->
         <div
-          v-if="
-            isStreaming && !processingStatus && role === 'assistant' && !hasAnswerContent
-          "
+          v-if="isStreaming && !processingStatus && role === 'assistant' && !hasAnswerContent"
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-initial-indicator"
           role="status"
