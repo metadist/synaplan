@@ -22,6 +22,7 @@ use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Config\FeatureStatusReporter;
@@ -82,6 +83,7 @@ class ConfigController extends AbstractController
         private MobileVersionService $mobileVersionService,
         private MarketingNewsConfig $marketingNewsConfig,
         private UsageTaximeterConfig $usageTaximeterConfig,
+        private ProgressNarrationConfig $progressNarrationConfig,
         private RegistrationConfig $registrationConfig,
         private GuestChatConfig $guestChatConfig,
         private WebSpeechConfig $webSpeechConfig,
@@ -440,6 +442,16 @@ class ConfigController extends AbstractController
                     ]
                 ),
                 new OA\Property(
+                    property: 'progressNarration',
+                    type: 'object',
+                    description: 'Admin-controlled switches for how much the chat narrates while an answer is prepared (all default true). Affects the web chat display only; the SSE stream always carries the full metadata.',
+                    properties: [
+                        new OA\Property(property: 'steps', type: 'boolean', example: true, description: 'Show the ordered step list with finished phases (false: only the current phase).'),
+                        new OA\Property(property: 'models', type: 'boolean', example: true, description: 'Name the model and provider doing the work (false: generic wording).'),
+                        new OA\Property(property: 'timings', type: 'boolean', example: true, description: 'Show step durations and the live elapsed counter.'),
+                    ]
+                ),
+                new OA\Property(
                     property: 'aiProviders',
                     type: 'array',
                     description: 'Display names of the AI providers a user\'s input can reach on this instance, for the disclosure App Store Review Guideline 5.1.2(i) requires. Empty when none are configured.',
@@ -705,6 +717,7 @@ class ConfigController extends AbstractController
             'usageTaximeter' => [
                 'enabled' => $this->usageTaximeterConfig->isEnabled(),
             ],
+            'progressNarration' => $this->progressNarrationConfig->toRuntimeConfig(),
             'modules' => $this->moduleStates(),
         ];
 

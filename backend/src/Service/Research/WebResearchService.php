@@ -93,10 +93,22 @@ final readonly class WebResearchService
         $started = microtime(true);
         $attempted = 0;
         $read = 0;
+        $hosts = array_map(fn (string $url): string => $this->hostLabel($url), $selected);
+
+        // Start every page's first hop now: the transfers overlap in the HTTP
+        // client while the loop below consumes them one by one, so three
+        // slow news sites cost the slowest one, not the sum of all three.
+        $firstHops = [];
+        foreach ($selected as $index => $url) {
+            $firstHops[$index] = $this->urlContentService->startReading($url);
+        }
 
         if (null !== $onProgress) {
             $onProgress('reading_pages', sprintf('Reading %d web page%s...', count($selected), 1 === count($selected) ? '' : 's'), [
                 'pages_total' => count($selected),
+                'pages_read' => 0,
+                'hosts' => array_values($hosts),
+                'stage' => 'fetching',
             ]);
         }
 
@@ -110,7 +122,16 @@ final readonly class WebResearchService
             }
 
             ++$attempted;
-            $page = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH));
+            if (null !== $onProgress) {
+                $onProgress('reading_pages', sprintf('Reading %s...', $hosts[$index]), [
+                    'pages_total' => count($selected),
+                    'pages_read' => $read,
+                    'hosts' => array_values($hosts),
+                    'current_host' => $hosts[$index],
+                    'stage' => 'fetching',
+                ]);
+            }
+            $page = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index]);
 
             if (!$page->success || mb_strlen($page->extractedText) < self::MIN_USEFUL_PAGE_CHARS) {
                 $results[$index]['fetched'] = false;
@@ -120,7 +141,17 @@ final readonly class WebResearchService
                 continue;
             }
 
-            $fitted = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId);
+            if (null !== $onProgress && mb_strlen($page->extractedText) > $perPageBudget) {
+                $onProgress('reading_pages', sprintf('Condensing %s...', $hosts[$index]), [
+                    'pages_total' => count($selected),
+                    'pages_read' => $read,
+                    'hosts' => array_values($hosts),
+                    'current_host' => $hosts[$index],
+                    'stage' => 'condensing',
+                ]);
+            }
+
+            $fitted = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true);
             $results[$index]['page_content'] = $fitted->text;
             $results[$index]['page_content_strategy'] = $fitted->strategy;
             $results[$index]['final_url'] = $page->finalUrl ?? $url;
@@ -134,6 +165,9 @@ final readonly class WebResearchService
                 $onProgress('reading_pages', sprintf('Read %d of %d web pages...', $read, count($selected)), [
                     'pages_total' => count($selected),
                     'pages_read' => $read,
+                    'hosts' => array_values($hosts),
+                    'current_host' => $hosts[$index],
+                    'stage' => 'fetching',
                 ]);
             }
         }
@@ -181,7 +215,7 @@ final readonly class WebResearchService
             $page = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH));
             $pages[] = $page;
             if ($page->success && '' !== $page->extractedText) {
-                $fitted[$url] = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId)->text;
+                $fitted[$url] = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true)->text;
             }
         }
 
@@ -196,6 +230,17 @@ final readonly class WebResearchService
         }
 
         return $result;
+    }
+
+    /** "www.finanzen.net" → "finanzen.net": what the progress line shows while a page loads. */
+    private function hostLabel(string $url): string
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        if (str_starts_with($host, 'www.')) {
+            $host = substr($host, 4);
+        }
+
+        return '' !== $host ? $host : $url;
     }
 
     /**

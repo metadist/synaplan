@@ -26,6 +26,7 @@ use App\Seed\MultitaskConfigSeeder;
 use App\Seed\NativeToolRoutingConfigSeeder;
 use App\Seed\PlatformLinksConfigSeeder;
 use App\Seed\PlugsConfigSeeder;
+use App\Seed\ProgressNarrationConfigSeeder;
 use App\Seed\PromptSeeder;
 use App\Seed\RateLimitConfigSeeder;
 use App\Seed\SavedTaskConfigSeeder;
@@ -106,6 +107,7 @@ final class SeedAllCommand extends Command
         private readonly MobileConfigSeeder $mobileConfigSeeder,
         private readonly MarketingNewsConfigSeeder $marketingNewsConfigSeeder,
         private readonly UsageTaximeterConfigSeeder $usageTaximeterConfigSeeder,
+        private readonly ProgressNarrationConfigSeeder $progressNarrationConfigSeeder,
         private readonly UpdateConfigSeeder $updateConfigSeeder,
         private readonly MessagesGatewayConfigSeeder $messagesGatewayConfigSeeder,
         private readonly SavedTaskConfigSeeder $savedTaskConfigSeeder,
@@ -187,6 +189,7 @@ final class SeedAllCommand extends Command
             ['mobile',      fn (): SeedResult => $this->mobileConfigSeeder->seed()],
             ['marketing-news', fn (): SeedResult => $this->marketingNewsConfigSeeder->seed()],
             ['usage-taximeter', fn (): SeedResult => $this->usageTaximeterConfigSeeder->seed()],
+            ['progress-narration', fn (): SeedResult => $this->progressNarrationConfigSeeder->seed()],
             ['updates',      fn (): SeedResult => $this->updateConfigSeeder->seed()],
             ['messages-gateway', fn (): SeedResult => $this->messagesGatewayConfigSeeder->seed()],
             ['saved-tasks', fn (): SeedResult => $this->savedTaskConfigSeeder->seed()],

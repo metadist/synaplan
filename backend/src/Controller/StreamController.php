@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\AI\Service\AiFacade;
+use App\AI\Service\ProviderDisplayNames;
 use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\GuestSession;
@@ -137,6 +138,7 @@ class StreamController extends AbstractController
         private AgentRuntimeResolver $agentRuntimeResolver,
         private ?DocumentThumbnailDispatcher $documentThumbnailDispatcher = null,
         private ?GeneratedDocumentStore $generatedDocumentStore = null,
+        private ?ProviderDisplayNames $providerDisplayNames = null,
     ) {
     }
 
@@ -1285,6 +1287,15 @@ class StreamController extends AbstractController
                                     ]);
                                 }
                                 $reasoningBuffer .= $content;
+                                // Stream the reasoning as it is produced so the
+                                // client can show the model thinking live. The
+                                // buffered <think> block still follows with the
+                                // first answer token: it is what gets persisted
+                                // and what the client reconciles the live part
+                                // against, so nothing is rendered twice.
+                                if ('' !== $content) {
+                                    $this->sendSSE('reasoning', ['chunk' => $content]);
+                                }
                             } else {
                                 // If we have buffered reasoning, close it and send
                                 if ($hasReasoningStarted) {
@@ -1411,9 +1422,16 @@ class StreamController extends AbstractController
                             return;
                         }
 
+                        $metadata = is_array($statusUpdate['metadata'] ?? null) ? $statusUpdate['metadata'] : [];
+                        // "claude-opus-4-8 by Anthropic": the narration names
+                        // the vendor, routing only knows the service key.
+                        if (null !== $this->providerDisplayNames) {
+                            $metadata = $this->providerDisplayNames->enrich($metadata);
+                        }
+
                         $this->sendSSE($statusUpdate['status'], [
                             'message' => $statusUpdate['message'],
-                            'metadata' => $statusUpdate['metadata'] ?? [],
+                            'metadata' => $metadata,
                             'timestamp' => $statusUpdate['timestamp'],
                         ]);
                     },
@@ -1669,12 +1687,16 @@ class StreamController extends AbstractController
                         // The document text is complete — now convert it into the
                         // actual office file. The frontend translates the stage;
                         // never send hardcoded user-facing strings from here.
-                        $this->sendSSE('generating_file', [
-                            'metadata' => [
-                                'stage' => 'converting',
-                                'filename' => $fileEnvelope['filename'],
-                            ],
-                        ]);
+                        $convertingMeta = [
+                            'stage' => 'converting',
+                            'filename' => $fileEnvelope['filename'],
+                        ];
+                        if (null !== $this->generatedDocumentStore
+                            && $this->generatedDocumentStore->willExportPdf($fileEnvelope, $incomingMessage)) {
+                            $convertingMeta['export'] = 'pdf';
+                            $convertingMeta['tool'] = GeneratedDocumentStore::CONVERTER_LABEL;
+                        }
+                        $this->sendSSE('generating_file', ['metadata' => $convertingMeta]);
 
                         $generatedBundle = $this->storeGeneratedDocumentInStream($fileEnvelope, $incomingMessage, $incognito);
                         $generatedFile = $generatedBundle?->primary();
@@ -2635,9 +2657,14 @@ class StreamController extends AbstractController
                         return;
                     }
 
+                    $metadata = is_array($statusUpdate['metadata'] ?? null) ? $statusUpdate['metadata'] : [];
+                    if (null !== $this->providerDisplayNames) {
+                        $metadata = $this->providerDisplayNames->enrich($metadata);
+                    }
+
                     $this->sendSSE($statusUpdate['status'], [
                         'message' => $statusUpdate['message'],
-                        'metadata' => $statusUpdate['metadata'] ?? [],
+                        'metadata' => $metadata,
                         'timestamp' => $statusUpdate['timestamp'],
                     ]);
                 }

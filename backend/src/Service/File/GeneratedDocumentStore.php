@@ -40,6 +40,27 @@ final readonly class GeneratedDocumentStore
     }
 
     /**
+     * Whether {@see store()} will hand this document to the office converter
+     * for a PDF export — lets the stream say so while the user waits.
+     *
+     * @param array<string, mixed> $fileData
+     */
+    public function willExportPdf(array $fileData, Message $message): bool
+    {
+        if (!$this->converter->isEnabled()) {
+            return false;
+        }
+        if (isset($fileData['export'])) {
+            return 'pdf' === strtolower((string) $fileData['export']);
+        }
+
+        return $this->conversationWantsPdf($message);
+    }
+
+    /** Name of the office conversion engine, for progress narration. */
+    public const CONVERTER_LABEL = 'Collabora CODE';
+
+    /**
      * @param array{filename: string, content: string, extension: string, export?: string} $fileData
      */
     public function store(array $fileData, Message $message, bool $ephemeral = false): ?GeneratedDocumentBundle

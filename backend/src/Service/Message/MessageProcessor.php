@@ -316,6 +316,11 @@ final readonly class MessageProcessor
                     'sorting_model_id' => $sortingModelId,
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
+                    // What the sorter understood, in terms the client can turn
+                    // into plain words ("this is an image request", "this needs
+                    // a web search", "this takes several steps") — the raw topic
+                    // slug alone reads as jargon in the progress timeline.
+                    ...$this->classificationSummary($classification),
                 ]);
 
                 // Shadow mode (Sprint 1): generate + persist a task plan for
@@ -864,6 +869,11 @@ final readonly class MessageProcessor
                     'sorting_model_id' => $sortingModelId,
                     'sorting_provider' => $sortingProvider,
                     'sorting_model_name' => $sortingModelName,
+                    // What the sorter understood, in terms the client can turn
+                    // into plain words ("this is an image request", "this needs
+                    // a web search", "this takes several steps") — the raw topic
+                    // slug alone reads as jargon in the progress timeline.
+                    ...$this->classificationSummary($classification),
                 ]);
 
                 // Shadow mode (Sprint 1): see processStream() for rationale.
@@ -1718,6 +1728,33 @@ final readonly class MessageProcessor
         ]);
 
         return $classification;
+    }
+
+    /**
+     * The classifier's verdict reduced to the keys the progress timeline
+     * narrates: intent, media type, web-search vote and the multi-step hint.
+     * Only keys with a value are included so older clients see no change.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function classificationSummary(array $classification): array
+    {
+        $summary = [];
+        foreach (['intent', 'media_type'] as $key) {
+            $value = $classification[$key] ?? null;
+            if (is_string($value) && '' !== $value) {
+                $summary[$key] = $value;
+            }
+        }
+        foreach (['web_search', 'multi_step'] as $key) {
+            if (is_bool($classification[$key] ?? null)) {
+                $summary[$key] = $classification[$key];
+            }
+        }
+
+        return $summary;
     }
 
     private function notify(?callable $callback, string $status, string $message, array $metadata = []): void

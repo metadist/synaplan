@@ -530,7 +530,14 @@ final readonly class MediaGenerationHandler implements MessageHandlerInterface
         };
 
         $statusMessage = "AI is crafting your $mediaTypeLabel with $providerName $modelName";
-        $this->notify($progressCallback, 'generating', $statusMessage);
+        // Structured fields let the client narrate this in the user's language
+        // ("Generating your image with …") instead of echoing the English text.
+        $this->notify($progressCallback, 'generating', $statusMessage, [
+            'provider' => $provider,
+            'model_name' => $modelName,
+            'media_type' => $mediaTypeLabel,
+            'stage' => 'request_sent',
+        ]);
 
         // Check rate limit for media type BEFORE generating (IMAGES, VIDEOS, AUDIOS)
         $mediaAction = match ($mediaType) {

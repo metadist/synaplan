@@ -20,6 +20,7 @@ use App\Service\Auth\DemoLoginHint;
 use App\Service\BillingService;
 use App\Service\Branding\BrandingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
 use App\Service\Config\FeatureStatusReporter;
@@ -83,6 +84,7 @@ final class ConfigControllerSummaryModelTest extends TestCase
             $this->createStub(MobileVersionService::class),
             $this->createStub(MarketingNewsConfig::class),
             $this->createStub(UsageTaximeterConfig::class),
+            $this->createStub(ProgressNarrationConfig::class),
             $this->createStub(RegistrationConfig::class),
             $this->createStub(GuestChatConfig::class),
             $this->createStub(WebSpeechConfig::class),

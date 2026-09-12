@@ -1626,8 +1626,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
         // Announced here, not at the top of the method: everything above
         // (knowledge-base lookup, memories, prompt assembly) reports its own
         // step, and claiming "generating" before them would show the last
-        // stage first and then appear to go backwards.
-        $this->notify($progressCallback, 'generating', 'Generating response...');
+        // stage first and then appear to go backwards. Carries the model that
+        // is actually called (override / agent pin / topic default resolved),
+        // so the progress timeline can say "Sending your request to X".
+        $this->notify($progressCallback, 'generating', 'Generating response...', [
+            'provider' => $provider ?? null,
+            'model_name' => $modelName ?? null,
+            'model_id' => $modelId,
+            'stage' => 'request_sent',
+        ]);
 
         $fullResponseText = '';
         $sawFirstToken = false;
@@ -1729,7 +1736,9 @@ final readonly class ChatHandler implements MessageHandlerInterface
             'response_length' => strlen($fullResponseText),
         ]);
 
-        $this->notify($progressCallback, 'generating', 'Response generated.');
+        // A distinct status: re-announcing `generating` after the last token
+        // made the client show the spinner again below the finished answer.
+        $this->notify($progressCallback, 'generated', 'Response generated.');
 
         // Phase 2b: dispatch memory extraction to the messenger worker
         // instead of running it inline. This frees the SSE stream to send
@@ -2413,13 +2422,17 @@ final readonly class ChatHandler implements MessageHandlerInterface
         return $messages;
     }
 
-    private function notify(?callable $callback, string $status, string $message): void
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function notify(?callable $callback, string $status, string $message, array $metadata = []): void
     {
         if ($callback) {
             $callback([
                 'status' => $status,
                 'message' => $message,
-                'timestamp' => time(),
+                'metadata' => $metadata,
+                'timestamp' => microtime(true),
             ]);
         }
     }
