@@ -121,7 +121,8 @@ final class WebResearchServiceTest extends TestCase
         $out = $service->deepen($results, 'What is the figure?', 42, null, 2, 10000);
 
         self::assertSame([['What is the figure?', 5000, 42], ['What is the figure?', 5000, 42]], $calls, 'budget split evenly, question and user passed through');
-        self::assertSame('condensed: long text long text ', $out['results'][0]['page_content']);
+        $fitted = new CondensedText('condensed: long text long text ', 'condensed', 50000, 5000, 1, [1], false, 1);
+        self::assertSame($fitted->provenanceNote()."\n\n".$fitted->text, $out['results'][0]['page_content']);
         self::assertSame('condensed', $out['results'][0]['page_content_strategy']);
     }
 
@@ -198,6 +199,32 @@ final class WebResearchServiceTest extends TestCase
             'fit',
         ], $order, 'all pages are fetched before any page is fitted');
         self::assertSame([[true, true], [true, true]], $flags, 'web pages use the extractive, fast-model path');
+    }
+
+    public function testDeepenPrependsTheExtractiveProvenanceNote(): void
+    {
+        $results = ['query' => 'q', 'results' => [
+            ['title' => 'A', 'url' => 'https://alpha.example/', 'description' => ''],
+        ]];
+        $this->urlContent->method('fetchForReading')->willReturn(
+            new UrlContentResult('https://alpha.example/', str_repeat('long text ', 5000), 'T', 'h', true)
+        );
+
+        $condenser = $this->createMock(ContextCondenser::class);
+        $condenser->method('fit')->willReturn(new CondensedText(
+            'kept passage',
+            CondensedText::STRATEGY_EXTRACTED,
+            50000,
+            280,
+        ));
+
+        $out = (new WebResearchService($this->urlContent, $condenser, $this->plugConfig, new NullLogger()))
+            ->deepen($results, 'What is the figure?', 42, null, 1, 10000);
+
+        $content = (string) $out['results'][0]['page_content'];
+        self::assertStringContainsString('kept verbatim', $content);
+        self::assertStringContainsString('kept passage', $content);
+        self::assertStringStartsWith('[Note:', $content);
     }
 
     public function testDeepenRecordsBlockedPagesWithoutBreakingTheResults(): void

@@ -572,8 +572,8 @@ import {
   cloneTimelineModel,
   cloneTimelineSteps,
   createTimelineState,
+  consumeVisibleAnswer,
   ingestTimelineEvent,
-  visibleAnswerText,
   type TimelineState,
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
@@ -2786,6 +2786,7 @@ const streamAIResponse = async (
       const trackId = attach?.trackId ?? Date.now()
       currentTrackId = trackId
       let fullContent = ''
+      let insideThink = false
 
       processingStatus.value = 'started'
       processingMetadata.value = {}
@@ -3031,8 +3032,11 @@ const streamAIResponse = async (
             // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
-            // A buffered `<think>...</think>` data chunk is not the answer.
-            if (visibleAnswerText(data.chunk) !== '') {
+            // A buffered `<think>` block, including one split across chunks,
+            // is not the answer.
+            const visible = consumeVisibleAnswer(data.chunk, insideThink)
+            insideThink = visible.insideThink
+            if (visible.text.trim() !== '') {
               if (processingStatus.value) {
                 processingStatus.value = ''
                 processingMetadata.value = {}
@@ -3316,6 +3320,7 @@ const streamAIResponse = async (
       let spokenLength = 0
       let audioText = ''
       let insideThinkBlock = false
+      let answerThinkOpen = false
       // Frontend language selects the Piper voice. Seed English, then adopt
       // the backend-detected reply language (meta.language) — the request
       // already sent locale.value. Piper maps en/de/es/tr to the four voices
@@ -3642,8 +3647,11 @@ const streamAIResponse = async (
             // on reload.
           } else if (data.status === 'data' && data.chunk) {
             // First visible answer token: the live thinking panel folds away.
-            // A buffered `<think>...</think>` data chunk is not the answer.
-            if (visibleAnswerText(data.chunk) !== '') {
+            // A buffered `<think>` block, including one split across chunks,
+            // is not the answer.
+            const visible = consumeVisibleAnswer(data.chunk, answerThinkOpen)
+            answerThinkOpen = visible.insideThink
+            if (visible.text.trim() !== '') {
               if (processingStatus.value) {
                 processingStatus.value = ''
                 processingMetadata.value = {}

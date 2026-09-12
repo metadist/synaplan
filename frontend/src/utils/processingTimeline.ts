@@ -70,6 +70,8 @@ export interface TimelineState {
   /** The model the answer is generated with, once the backend names it. */
   model: TimelineModel
   nextId: number
+  /** True while a `<think>` block is still open across SSE data chunks. */
+  insideThink?: boolean
 }
 
 const STEP_BY_STATUS: Record<string, TimelineStepKey> = {
@@ -208,12 +210,44 @@ function rememberModel(state: TimelineState, metadata: StreamEventMetadata | und
   }
 }
 
+/**
+ * Strip `<think>` markup from one SSE chunk, carrying open-block state so a
+ * tag split across chunks is not treated as visible answer text.
+ */
+export function consumeVisibleAnswer(
+  chunk: string,
+  insideThink = false
+): { text: string; insideThink: boolean } {
+  let rest = chunk
+  let out = ''
+  let inside = insideThink
+
+  while (rest.length > 0) {
+    if (inside) {
+      const close = /<\/think>/i.exec(rest)
+      if (!close || close.index === undefined) {
+        return { text: out, insideThink: true }
+      }
+      rest = rest.slice(close.index + close[0].length)
+      inside = false
+      continue
+    }
+    const open = /<think>/i.exec(rest)
+    if (!open || open.index === undefined) {
+      out += rest
+      return { text: out, insideThink: false }
+    }
+    out += rest.slice(0, open.index)
+    rest = rest.slice(open.index + open[0].length)
+    inside = true
+  }
+
+  return { text: out, insideThink: inside }
+}
+
 /** Visible answer text after stripping buffered `<think>` blocks. */
-export function visibleAnswerText(chunk: string): string {
-  return chunk
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .replace(/<think>[\s\S]*$/i, '')
-    .trim()
+export function visibleAnswerText(chunk: string, insideThink = false): string {
+  return consumeVisibleAnswer(chunk, insideThink).text.trim()
 }
 
 function annotateMemoryStep(state: TimelineState, field: string, count: number): void {
@@ -264,7 +298,9 @@ export function ingestTimelineEvent(
   }
 
   if (status === 'data' && typeof payload.chunk === 'string' && payload.chunk !== '') {
-    if (visibleAnswerText(payload.chunk) === '') {
+    const visible = consumeVisibleAnswer(payload.chunk, state.insideThink ?? false)
+    state.insideThink = visible.insideThink
+    if (visible.text.trim() === '') {
       return state
     }
     if (state.answerStartedAt === undefined) {

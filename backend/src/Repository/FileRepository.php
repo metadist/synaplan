@@ -303,12 +303,13 @@ class FileRepository extends ServiceEntityRepository
             ->from(Message::class, 'msg')
             ->innerJoin('msg.files', 'attached')
             ->where('msg.id IN (:messageIds)')
+            ->andWhere('attached.userId = :userId')
             ->getDQL();
 
         $qb = $this->createQueryBuilder('f')
             ->distinct()
             ->where('f.userId = :userId')
-            ->andWhere('f.messageId IN (:messageIds) OR f.id IN ('.$attachedIds.')')
+            ->andWhere('(f.messageId IN (:messageIds) OR f.id IN ('.$attachedIds.'))')
             ->setParameter('userId', $userId)
             ->setParameter('messageIds', $messageIds)
             ->orderBy('f.id', 'DESC');

@@ -47,4 +47,31 @@ final class ProviderDisplayNamesEnrichTest extends TestCase
 
         self::assertSame('Custom', $out['provider_label']);
     }
+
+    public function testForServiceDoesNotMarkTheFullMapComplete(): void
+    {
+        $anthropic = $this->createStub(ChatProviderInterface::class);
+        $anthropic->method('getDisplayName')->willReturn('Anthropic');
+        $groq = $this->createStub(ChatProviderInterface::class);
+        $groq->method('getDisplayName')->willReturn('Groq');
+
+        $registry = $this->createMock(ProviderRegistry::class);
+        $registry->method('getChatProvider')->willReturn($anthropic);
+        $registry->expects($this->once())->method('getUniqueProviders')
+            ->willReturn(['anthropic' => $anthropic, 'groq' => $groq]);
+
+        $names = new ProviderDisplayNames($registry);
+        self::assertSame('Anthropic', $names->forService('anthropic'));
+        self::assertSame(['anthropic' => 'Anthropic', 'groq' => 'Groq'], $names->all());
+    }
+
+    public function testUnknownServiceDoesNotEnumerateEveryProvider(): void
+    {
+        $registry = $this->createMock(ProviderRegistry::class);
+        $registry->method('getChatProvider')->willThrowException(new \RuntimeException('no chat provider'));
+        $registry->expects($this->never())->method('getUniqueProviders');
+
+        $names = new ProviderDisplayNames($registry);
+        self::assertSame('mystery', $names->forService('mystery'));
+    }
 }

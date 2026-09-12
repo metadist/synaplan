@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Research;
 
 use App\Plug\PlugConfigService;
+use App\Service\Context\CondensedText;
 use App\Service\Context\ContextCondenser;
 use App\Service\UrlContentService;
 use Psr\Log\LoggerInterface;
@@ -159,7 +160,7 @@ final readonly class WebResearchService
             }
 
             $fitted = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true, preferExtractive: true);
-            $results[$index]['page_content'] = $fitted->text;
+            $results[$index]['page_content'] = $this->fittedPageText($fitted);
             $results[$index]['page_content_strategy'] = $fitted->strategy;
             $results[$index]['final_url'] = $page->finalUrl ?? $url;
             $results[$index]['fetched'] = true;
@@ -229,7 +230,9 @@ final readonly class WebResearchService
         $fitted = [];
         foreach ($pages as $page) {
             if ($page->success && '' !== $page->extractedText) {
-                $fitted[$page->url] = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true, preferExtractive: true)->text;
+                $fitted[$page->url] = $this->fittedPageText(
+                    $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true, preferExtractive: true)
+                );
             }
         }
 
@@ -244,6 +247,13 @@ final readonly class WebResearchService
         }
 
         return $result;
+    }
+
+    private function fittedPageText(CondensedText $fitted): string
+    {
+        $note = $fitted->provenanceNote();
+
+        return null !== $note ? $note."\n\n".$fitted->text : $fitted->text;
     }
 
     /** "www.finanzen.net" → "finanzen.net": what the progress line shows while a page loads. */
