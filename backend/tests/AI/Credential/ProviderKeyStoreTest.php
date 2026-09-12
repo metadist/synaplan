@@ -338,4 +338,12 @@ final class ProviderKeyStoreTest extends TestCase
             self::assertTrue(ProviderKeyCatalog::has($provider), sprintf('ProviderKeyCatalog is missing metadata for "%s"', $provider));
         }
     }
+
+    public function testA2AgentCatalogUsesBearerKeyPlaceholderAndPaidTier(): void
+    {
+        $meta = ProviderKeyCatalog::get('a2agent');
+
+        self::assertFalse($meta['freeTier']);
+        self::assertSame('Bearer {key}', $meta['validation']['headers']['Authorization']);
+    }
 }

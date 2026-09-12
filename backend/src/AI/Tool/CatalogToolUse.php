@@ -31,6 +31,7 @@ final class CatalogToolUse
         'mistral',
         'huggingface',
         'trustedtokens',
+        'a2agent',
     ];
 
     /**

@@ -269,6 +269,20 @@ Technology Consulting, under German jurisdiction with zero data retention. Synap
 its OpenAI-compatible API at `https://api.trustedtokens.eu/v1`. Get a key at
 [trustedtokens.eu](https://trustedtokens.eu/) under **Account → API Access**.
 
+### A2Agent (Chinese frontier models, gateway)
+
+```bash
+A2AGENT_API_KEY=your_key_here
+```
+
+Qwen, DeepSeek and MiniMax through the A2Agent gateway (`https://a2agent.me/v1`).
+Prompts are processed by mainland-China model vendors; A2Agent serves users
+outside mainland China. Operators handling EU personal data decide per their DPA.
+Model ids are case-sensitive (MiniMax is `MiniMax-M3`). Use a pay-as-you-go key — daily-capped
+subscription plans are unsuitable for a production platform key. Get a key at
+[a2agent.me](https://a2agent.me/) under **dashboard → API keys**. Integration
+guides: [a2agent.me/integrations](https://a2agent.me/integrations).
+
 ### HuggingFace
 
 ```bash

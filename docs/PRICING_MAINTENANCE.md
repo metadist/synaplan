@@ -174,6 +174,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalo
 - Kimi direct: https://platform.kimi.ai/docs/pricing/chat
 - Jina (JSON catalog, `pricing.prompt` is USD per token — multiply by 1e6): https://api.jina.ai/v1/models · marketing page https://jina.ai/reranker/
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
+- A2Agent (models page + `GET /v1/models`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
 - xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
 
 **Tooling / cross-checks:**
@@ -196,6 +197,7 @@ Per-provider blocks in `ModelCatalog.php`. Status:
 | **Mistral** | ✅ verified 2026-07-13 — all correct | https://mistral.ai/pricing/api/ |
 | **Cloudflare** | ✅ verified 2026-07-13 — all correct | https://developers.cloudflare.com/workers-ai/platform/pricing/ |
 | **TrustedTokens** | ✅ verified 2026-09-08 (V4 Flash retired) | https://trustedtokens.eu/api/billing/models |
+| **A2Agent** | ✅ verified 2026-09-11 (public group rate) | https://a2agent.me/models |
 | **xAI Grok Imagine + voice** | ✅ verified 2026-07-29 (chat rows are synced) | https://docs.x.ai/developers/pricing |
 | Piper / Triton | n/a — free/local | — |
 
@@ -252,6 +254,18 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 | 312 | `openai/gpt-oss-120b` | $0.15 / $0.60 | $0.15 / $0.60 (cache $0.05) | 131k |
 
 Not in LiteLLM → lands in the sync's `unmatched` bucket; re-verify via `curl https://trustedtokens.eu/api/billing/models`. New BIDs land on existing installs through `ModelSeeder` (`app:seed` on container start) — no data migration is required for additive catalog rows.
+
+### A2Agent (verified 2026-09-11)
+
+OpenAI-compatible gateway at `https://a2agent.me/v1`. Catalog stores the **public group** USD per 1M rate from https://a2agent.me/models. Final billing follows the API key's group — compare the first invoices against `GET /v1/usage`. A2Agent publishes no cache-read rate, so `cache_read_price_per_1M` is omitted. Model ids are case-sensitive; MiniMax is the mixed-case exception (`MiniMax-M3`). Not in LiteLLM → `unmatched` bucket; re-verify via `GET https://a2agent.me/v1/models` and the `/models` page.
+
+| BID | Model | Catalog in/out | Official (public group) | Context |
+| --- | ----- | -------------- | ----------------------- | ------- |
+| 361 | `qwen3.8-max` | $2.00 / $6.00 | $2.00 / $6.00 | 1M |
+| 362 | `deepseek-v4-pro` | $0.435 / $0.87 | $0.435 / $0.87 | 1M |
+| 363 | `deepseek-v4-flash` | $0.14 / $0.28 | $0.14 / $0.28 | 1M |
+| 364 | `MiniMax-M3` | $0.30 / $1.20 | $0.30 / $1.20 | 1M |
+| 365 / 366 | `qwen3.8-flash` (chat + vision) | $0.15 / $0.47 | $0.15 / $0.47 | 1M |
 
 ### TheHive (verified 2026-07-13)
 

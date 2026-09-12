@@ -175,6 +175,7 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertTrue($t->supports('xai'));
         $this->assertTrue($t->supports('huggingface'));
         $this->assertTrue($t->supports('trustedtokens'));
+        $this->assertTrue($t->supports('a2agent'));
         $this->assertTrue($t->supports('perplexity'));
         $this->assertTrue($t->supports('ollama'));
         $this->assertTrue($t->supports(OpenAiCompatibleEndpointRegistry::PROVIDER_NAME));
@@ -199,6 +200,10 @@ final class OpenAiMessagesTranslatorTest extends TestCase
         $this->assertSame(
             ChatCompletionsUpstreams::URLS['openai'],
             $t->resolveCompletionsUrl(['provider' => 'openai']),
+        );
+        $this->assertSame(
+            ChatCompletionsUpstreams::URLS['a2agent'],
+            $t->resolveCompletionsUrl(['provider' => 'a2agent']),
         );
         $this->assertSame(
             'https://api.openai.com/v1/chat/completions',

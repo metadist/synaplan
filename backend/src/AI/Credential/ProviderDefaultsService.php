@@ -112,6 +112,15 @@ final readonly class ProviderDefaultsService
             'SUMMARIZE' => 'trustedtokens:openai/gpt-oss-120b:chat',
             'PIC2TEXT' => 'trustedtokens:Qwen/Qwen3.6-35B-A3B-FP8:pic2text',
         ],
+        'a2agent' => [
+            'CHAT' => 'a2agent:deepseek-v4-pro:chat',
+            'TOOLS' => 'a2agent:deepseek-v4-pro:chat',
+            'ANALYZE' => 'a2agent:deepseek-v4-pro:chat',
+            'SORT' => 'a2agent:qwen3.8-flash:chat',
+            'PLAN' => 'a2agent:qwen3.8-flash:chat',
+            'SUMMARIZE' => 'a2agent:qwen3.8-flash:chat',
+            'PIC2TEXT' => 'a2agent:qwen3.8-flash:pic2text',
+        ],
         // NB: colons inside a catalog providerId are normalized to dashes by
         // ModelCatalog::modelKey() — hence "Kimi-K2.6-deepinfra", not ":deepinfra".
         'huggingface' => [
@@ -172,6 +181,7 @@ final readonly class ProviderDefaultsService
         'trustedtokens',
         'huggingface',
         'xai',
+        'a2agent',
         'ollama',
     ];
 

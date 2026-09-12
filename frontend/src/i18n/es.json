@@ -64,6 +64,7 @@
       "anthropic": "Mix Claude Fable",
       "google": "Mix Google Gemini",
       "xai": "Mix Grok",
+      "a2agent": "Mix A2Agent",
       "europe": "Mix Europa"
     },
     "defaultDescription": "Los modelos recomendados por esta instalación",
@@ -1373,6 +1374,10 @@
     "trustedtokens": {
       "title": "Clave API de TrustedTokens",
       "message": "Crea una clave API en TrustedTokens (Cuenta → Acceso API) y pégala aquí. La inferencia se ejecuta en GPUs alemanas con residencia de datos en la UE."
+    },
+    "a2agent": {
+      "title": "Clave API de A2Agent",
+      "message": "Crea una clave API de pago por uso en A2Agent (panel → claves API) y pégala aquí. Los prompts los procesan proveedores de modelos de China continental (Qwen, DeepSeek, MiniMax) a través de este gateway. A2Agent atiende a usuarios fuera de China continental. Quien trate datos personales de la UE debe decidirlo según su DPA."
     },
     "huggingface": {
       "title": "Token API de HuggingFace",

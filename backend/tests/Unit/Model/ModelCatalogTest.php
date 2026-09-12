@@ -818,6 +818,63 @@ class ModelCatalogTest extends TestCase
         }
     }
 
+    /**
+     * A2Agent — Chinese frontier models via the a2agent.me gateway (BIDs 361–366).
+     * Model ids are case-sensitive; MiniMax is the mixed-case exception
+     * (`MiniMax-M3`). Prices are USD/1M public group rates from the 2026-09-11
+     * snapshot. Jurisdiction is CN.
+     */
+    public function testA2AgentModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $qwenMax = ModelCatalog::find('a2agent:qwen3.8-max:chat');
+        $v4Pro = ModelCatalog::find('a2agent:deepseek-v4-pro:chat');
+        $v4Flash = ModelCatalog::find('a2agent:deepseek-v4-flash:chat');
+        $minimax = ModelCatalog::find('a2agent:minimax-m3:chat'); // catalog id is MiniMax-M3; lookup is case-insensitive
+        $qwenFlash = ModelCatalog::find('a2agent:qwen3.8-flash:chat');
+        $qwenVision = ModelCatalog::find('a2agent:qwen3.8-flash:pic2text');
+
+        $this->assertCount(1, $qwenMax);
+        $this->assertCount(1, $v4Pro);
+        $this->assertCount(1, $v4Flash);
+        $this->assertCount(1, $minimax);
+        $this->assertCount(1, $qwenFlash);
+        $this->assertCount(1, $qwenVision);
+
+        $this->assertSame(361, $qwenMax[0]['id']);
+        $this->assertSame(362, $v4Pro[0]['id']);
+        $this->assertSame(363, $v4Flash[0]['id']);
+        $this->assertSame(364, $minimax[0]['id']);
+        $this->assertSame(365, $qwenFlash[0]['id']);
+        $this->assertSame(366, $qwenVision[0]['id']);
+
+        $this->assertSame('qwen3.8-max', $qwenMax[0]['providerId']);
+        $this->assertSame('deepseek-v4-pro', $v4Pro[0]['providerId']);
+        $this->assertSame('deepseek-v4-flash', $v4Flash[0]['providerId']);
+        $this->assertSame('MiniMax-M3', $minimax[0]['providerId']);
+        $this->assertSame('qwen3.8-flash', $qwenFlash[0]['providerId']);
+        $this->assertSame('qwen3.8-flash', $qwenVision[0]['providerId']);
+
+        $this->assertEqualsWithDelta(2.00, (float) $qwenMax[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(6.00, (float) $qwenMax[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.435, (float) $v4Pro[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.87, (float) $v4Pro[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.14, (float) $v4Flash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.28, (float) $v4Flash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.30, (float) $minimax[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(1.20, (float) $minimax[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $qwenFlash[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.47, (float) $qwenFlash[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.15, (float) $qwenVision[0]['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(0.47, (float) $qwenVision[0]['priceOut'], 1e-9);
+
+        $rows = [$qwenMax[0], $v4Pro[0], $v4Flash[0], $minimax[0], $qwenFlash[0], $qwenVision[0]];
+        foreach ($rows as $row) {
+            $this->assertSame('A2Agent', $row['service']);
+            $this->assertSame('CN', $row['json']['meta']['jurisdiction'] ?? null);
+            $this->assertSame('a2agent.me', $row['json']['meta']['host'] ?? null);
+        }
+    }
+
     public function testClaudeOpus5ModelsAreAvailableWithExpectedApiIds(): void
     {
         $opus5 = ModelCatalog::find('anthropic:claude-opus-5');

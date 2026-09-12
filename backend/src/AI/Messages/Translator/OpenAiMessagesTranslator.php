@@ -23,7 +23,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  *
  * Hosts: OpenAI plus every other catalog chat provider that already speaks
  * Chat Completions (Groq, Mistral, xAI, HuggingFace, TrustedTokens,
- * Perplexity, Ollama, admin-registered OpenAI-compatible endpoints).
+ * A2Agent, Perplexity, Ollama, admin-registered OpenAI-compatible endpoints).
  */
 #[AutoconfigureTag('app.messages.translator')]
 final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInterface

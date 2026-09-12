@@ -83,6 +83,7 @@ final class ModuleOwnershipTest extends TestCase
             'GROQ_API_KEY',
             'MISTRAL_API_KEY',
             'TRUSTEDTOKENS_API_KEY',
+            'A2AGENT_API_KEY',
             'HUGGINGFACE_API_KEY',
             'XAI_API_KEY',
             'PERPLEXITY_API_KEY',

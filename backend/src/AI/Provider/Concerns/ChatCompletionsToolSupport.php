@@ -8,7 +8,7 @@ use App\AI\Tool\CatalogToolUse;
 
 /**
  * Shared Chat Completions tool wiring for Groq, Mistral, xAI, TrustedTokens,
- * HuggingFace and OpenAI-compatible endpoints.
+ * HuggingFace, A2Agent and OpenAI-compatible endpoints.
  *
  * Request: forwards `tools`, `tool_choice`, `parallel_tool_calls`.
  * Non-stream: reads `choices[0].message.tool_calls` and `finish_reason`.

@@ -98,6 +98,18 @@ final class ProviderKeyCatalog
                 'headers' => ['Authorization' => 'Bearer {key}'],
             ],
         ],
+        'a2agent' => [
+            'displayName' => 'A2Agent',
+            'envVar' => 'A2AGENT_API_KEY',
+            'consoleUrl' => 'https://a2agent.me/',
+            'freeTier' => false,
+            'recommended' => false,
+            'validation' => [
+                'method' => 'GET',
+                'url' => 'https://a2agent.me/v1/models',
+                'headers' => ['Authorization' => 'Bearer {key}'],
+            ],
+        ],
         'huggingface' => [
             'displayName' => 'HuggingFace',
             'envVar' => 'HUGGINGFACE_API_KEY',

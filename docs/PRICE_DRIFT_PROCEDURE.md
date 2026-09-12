@@ -17,7 +17,7 @@ Step-by-step procedure for resolving a model price drift reported by the daily `
    from: (a) the `source:` URL printed on each flagged line of the report (LiteLLM's own
    reference), (b) a machine-readable provider catalog where one exists
    (`docs/PRICING_MAINTENANCE.md` § "Maintenance links" lists them, e.g. Jina `/v1/models`,
-   TrustedTokens `/api/billing/models`), (c) the provider pages linked in that same section.
+   TrustedTokens `/api/billing/models`, A2Agent `GET /v1/models` and `/models`), (c) the provider pages linked in that same section.
 
 ## Step 0 — Reproduce locally
 

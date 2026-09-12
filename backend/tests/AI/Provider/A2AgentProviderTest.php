@@ -5,28 +5,28 @@ declare(strict_types=1);
 namespace App\Tests\AI\Provider;
 
 use App\AI\Exception\ProviderException;
-use App\AI\Provider\TrustedTokensProvider;
+use App\AI\Provider\A2AgentProvider;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Unit tests for TrustedTokensProvider.
+ * Unit tests for A2AgentProvider.
  *
  * Chat/vision run through the openai-php client built internally, so only
  * metadata and preconditions (missing model / missing API key) are asserted
- * here — matching the Mistral/Groq unit-test pattern.
+ * here — matching the TrustedTokens unit-test pattern.
  */
-class TrustedTokensProviderTest extends TestCase
+class A2AgentProviderTest extends TestCase
 {
     public function testMetadata(): void
     {
         $provider = $this->makeProvider();
 
-        $this->assertSame('trustedtokens', $provider->getName());
-        $this->assertSame('TrustedTokens', $provider->getDisplayName());
+        $this->assertSame('a2agent', $provider->getName());
+        $this->assertSame('A2Agent', $provider->getDisplayName());
         $this->assertTrue($provider->isAvailable());
-        $this->assertStringContainsString('German', $provider->getDescription());
+        $this->assertStringContainsString('mainland-China', $provider->getDescription());
     }
 
     public function testCapabilities(): void
@@ -42,8 +42,8 @@ class TrustedTokensProviderTest extends TestCase
     {
         $defaults = $this->makeProvider()->getDefaultModels();
 
-        $this->assertSame('zai-org/GLM-5.2', $defaults['chat']);
-        $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $defaults['vision']);
+        $this->assertSame('deepseek-v4-pro', $defaults['chat']);
+        $this->assertSame('qwen3.8-flash', $defaults['vision']);
     }
 
     public function testStatusHealthyWhenConfigured(): void
@@ -65,8 +65,8 @@ class TrustedTokensProviderTest extends TestCase
     {
         $vars = $this->makeProvider()->getRequiredEnvVars();
 
-        $this->assertArrayHasKey('TRUSTEDTOKENS_API_KEY', $vars);
-        $this->assertTrue($vars['TRUSTEDTOKENS_API_KEY']['required']);
+        $this->assertArrayHasKey('A2AGENT_API_KEY', $vars);
+        $this->assertTrue($vars['A2AGENT_API_KEY']['required']);
     }
 
     public function testChatRequiresModel(): void
@@ -83,16 +83,14 @@ class TrustedTokensProviderTest extends TestCase
 
         $this->makeProvider(apiKey: null)->chat(
             [['role' => 'user', 'content' => 'hi']],
-            ['model' => 'zai-org/GLM-5.2'],
+            ['model' => 'deepseek-v4-pro'],
         );
     }
-
-    // ==================== STRUCTURED OUTPUT (Phase 2a) ====================
 
     public function testChatOptionsMergeStructuredOutputAsJsonSchema(): void
     {
         $request = $this->buildChatOptions([], [
-            'model' => 'zai-org/GLM-5.2',
+            'model' => 'deepseek-v4-pro',
             'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
         ], false);
 
@@ -103,24 +101,45 @@ class TrustedTokensProviderTest extends TestCase
 
     public function testChatOptionsWithoutStructuredOutputOmitResponseFormat(): void
     {
-        $request = $this->buildChatOptions([], ['model' => 'zai-org/GLM-5.2'], false);
+        $request = $this->buildChatOptions([], ['model' => 'deepseek-v4-pro'], false);
 
         $this->assertArrayNotHasKey('response_format', $request);
     }
 
-    public function testChatOptionsNeverSendA2AgentThinkingField(): void
+    public function testChatOptionsDisableThinkingWhenReasoningToggleIsOff(): void
     {
         $request = $this->buildChatOptions([], [
-            'model' => 'zai-org/GLM-5.2',
+            'model' => 'deepseek-v4-pro',
             'reasoning' => false,
+        ], false);
+
+        $this->assertSame(['type' => 'disabled'], $request['thinking']);
+    }
+
+    public function testChatOptionsOmitThinkingWhenReasoningToggleIsOn(): void
+    {
+        $request = $this->buildChatOptions([], [
+            'model' => 'deepseek-v4-pro',
+            'reasoning' => true,
         ], false);
 
         $this->assertArrayNotHasKey('thinking', $request);
     }
 
-    private function makeProvider(?string $apiKey = 'test-key'): TrustedTokensProvider
+    public function testChatOptionsOmitThinkingWhenModelHasNoReasoningFeature(): void
     {
-        return new TrustedTokensProvider(new NullLogger(), $apiKey);
+        $request = $this->buildChatOptions([], [
+            'model' => 'qwen3.8-flash',
+            'reasoning' => false,
+            'modelFeatures' => ['vision'],
+        ], false);
+
+        $this->assertArrayNotHasKey('thinking', $request);
+    }
+
+    private function makeProvider(?string $apiKey = 'test-key'): A2AgentProvider
+    {
+        return new A2AgentProvider(new NullLogger(), $apiKey);
     }
 
     /**

@@ -34,7 +34,7 @@ final class StructuredOutputCapability
      * dialect. All are openai-php/client-based and forward `$parameters`
      * unfiltered (verified against the vendored SDK — see plan).
      */
-    private const OPENAI_JSON_SCHEMA_PROVIDERS = ['groq', 'mistral', 'xai', 'trustedtokens', 'openaicompatible', 'huggingface'];
+    private const OPENAI_JSON_SCHEMA_PROVIDERS = ['groq', 'mistral', 'xai', 'trustedtokens', 'a2agent', 'openaicompatible', 'huggingface'];
 
     private const OPENAI_RESPONSES_PROVIDERS = ['openai'];
 

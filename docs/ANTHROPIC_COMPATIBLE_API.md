@@ -171,10 +171,10 @@ Cost depends on whose key serves the request:
 `MODEL_ALIASES` can point Claude Code model IDs at any catalog chat model. The gateway translates the Anthropic wire format:
 
 - **Anthropic** — passthrough to the Messages API
-- **OpenAI-compatible Chat Completions** — OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, Perplexity, Ollama (`{OLLAMA_BASE_URL}/v1/chat/completions`), and admin-registered OpenAI-compatible endpoints. Not the Responses API.
+- **OpenAI-compatible Chat Completions** — OpenAI, Groq, Mistral, xAI, HuggingFace, TrustedTokens, A2Agent, Perplexity, Ollama (`{OLLAMA_BASE_URL}/v1/chat/completions`), and admin-registered OpenAI-compatible endpoints. Not the Responses API.
 - **Google/Gemini** — `generateContent` / `streamGenerateContent` with `parametersJsonSchema` for tools
 
-Desktop sends the project's catalog chat key (`service:providerId:tag`) on `/v1/messages`. That path uses the same translators, so any chat-capable catalog model on those protocols works — a Groq or Ollama pick does **not** need a `MODEL_ALIASES` entry.
+Desktop sends the project's catalog chat key (`service:providerId:tag`) on `/v1/messages`. That path uses the same translators, so any chat-capable catalog model on those protocols works — a Groq, A2Agent, or Ollama pick does **not** need a `MODEL_ALIASES` entry.
 
 Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped before a non-Anthropic upstream call. This routing works technically; Anthropic does not officially support Claude Code against non-Claude models through a gateway.
 

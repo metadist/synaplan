@@ -63,6 +63,7 @@ final class StructuredOutputCapabilityTest extends TestCase
             'mistral' => ['mistral', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'xai' => ['xai', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'trustedtokens' => ['trustedtokens', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
+            'a2agent' => ['a2agent', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openaicompatible' => ['openaicompatible', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'huggingface' => ['huggingface', StructuredOutputDialect::OPENAI_JSON_SCHEMA],
             'openai' => ['openai', StructuredOutputDialect::OPENAI_RESPONSES_TEXT_FORMAT],
