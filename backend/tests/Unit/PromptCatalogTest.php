@@ -92,6 +92,85 @@ final class PromptCatalogTest extends TestCase
     }
 
     /**
+     * "Teach me the Persian numbers with a children's song" was voted
+     * mediamaker/audio and the legacy TTS path read the request back as an
+     * MP3. Songs, poems and lessons are CONTENT: they route to `general`,
+     * and only an explicit "read it to me" adds a spoken step (BMULTI 1).
+     * Pin the rule and the worked examples the sorter pattern-matches on,
+     * and make sure the old contradictory example (poem+MP3 → mediamaker)
+     * cannot creep back in.
+     */
+    public function testSortPromptKeepsSongAndPoemRequestsOutOfAudioMediamaker(): void
+    {
+        $prompt = $this->catalogPrompt('tools:sort');
+
+        $this->assertStringContainsString('spoken output never wins over the text it', $prompt);
+        $this->assertStringContainsString('"Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → BTOPIC: "general", BMULTI: 0', $prompt);
+        $this->assertStringContainsString('"Make a song about my cat" → BTOPIC: "general", BMULTI: 0', $prompt);
+        $this->assertStringContainsString('"Write a poem and read it to me as MP3" → BTOPIC: "general", BMULTI: 1', $prompt);
+        $this->assertStringNotContainsString('"Write a poem and read it to me as MP3" → BTOPIC: "mediamaker"', $prompt);
+        $this->assertStringContainsString('"audio" means READING OUT text that is already there', $prompt);
+        $this->assertStringContainsString('"Sing me a song about the sea" → NOT mediamaker', $prompt);
+    }
+
+    /**
+     * The sorter sees the topics through `[DYNAMICLIST]`, which is rendered
+     * from each topic's runtime `shortDescription` — BEFORE the rules above.
+     * A description that still advertises "audio" wholesale hands the model a
+     * contradiction, so the mediamaker description must carry the same
+     * boundary: TTS of existing text only, songs/poems/lessons are `general`.
+     */
+    public function testMediamakerDescriptionLimitsAudioToExistingText(): void
+    {
+        $description = $this->catalogShortDescription('mediamaker');
+
+        $this->assertStringContainsString('images and videos', $description);
+        $this->assertStringContainsString('text-to-speech of text that ALREADY EXISTS', $description);
+        $this->assertStringContainsString('NOT for songs, poems, stories or lessons', $description);
+        $this->assertStringNotContainsString('images, videos and audio', $description);
+    }
+
+    private function catalogShortDescription(string $topic): string
+    {
+        foreach (PromptCatalog::all() as $entry) {
+            if ($topic === $entry['topic']) {
+                return $entry['shortDescription'];
+            }
+        }
+
+        $this->fail(sprintf('catalog has no entry for topic "%s"', $topic));
+    }
+
+    /**
+     * When the sorter still mis-votes audio, the extraction prompts are the
+     * next line of defence: the script must be what the listener should hear —
+     * written on the spot if the message only describes it — and never the
+     * user's instruction itself.
+     */
+    public function testAudioExtractionPromptsNeverReturnTheInstructionItself(): void
+    {
+        $audioExtract = $this->catalogPrompt('tools:mediamaker_audio_extract');
+        $this->assertStringContainsString('NEVER return the user\'s request or instruction itself', $audioExtract);
+        $this->assertStringContainsString('WRITE that content in the user\'s language', $audioExtract);
+        $this->assertStringContainsString('Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei', $audioExtract);
+
+        $mediamaker = $this->catalogPrompt('mediamaker');
+        $this->assertStringContainsString('never the user\'s request itself', $mediamaker);
+        $this->assertStringContainsString('WRITE it in the user\'s language', $mediamaker);
+    }
+
+    private function catalogPrompt(string $topic): string
+    {
+        foreach (PromptCatalog::all() as $entry) {
+            if ($topic === $entry['topic']) {
+                return $entry['prompt'];
+            }
+        }
+
+        $this->fail(sprintf('catalog has no prompt for topic "%s"', $topic));
+    }
+
+    /**
      * The search-query prompt must resolve deictic references against the
      * "Attached file content" block SearchQueryGenerator sends — otherwise
      * "what is that?" + photo searches for the literal words again.

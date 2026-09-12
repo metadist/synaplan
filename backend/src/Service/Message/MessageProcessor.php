@@ -9,6 +9,7 @@ use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Exception\StreamCancelledException;
 use App\Service\Exception\VisionModelRequiredException;
+use App\Service\Message\Handler\MessageHandlerInterface;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\TaskPlanExecutor;
@@ -577,6 +578,8 @@ final readonly class MessageProcessor
                 : $this->router->routeStream($message, $conversationHistory, $cls, $streamCallback, $statusCallback, $options);
             $perfTimer->stop('handler_total');
 
+            $classification = $this->applyEffectiveClassification($classification, $response);
+
             // Re-add sorting model info to result (for StreamController to save)
             $classification['sorting_model_id'] = $sortingModelId;
             $classification['sorting_provider'] = $sortingProvider;
@@ -1061,6 +1064,8 @@ final readonly class MessageProcessor
                 'provider' => $response['metadata']['provider'] ?? 'unknown',
                 'model' => $response['metadata']['model'] ?? 'unknown',
             ]);
+
+            $classification = $this->applyEffectiveClassification($classification, $response);
 
             $classification['sorting_model_id'] = $sortingModelId;
             $classification['sorting_provider'] = $sortingProvider;
@@ -1670,6 +1675,47 @@ final readonly class MessageProcessor
         if ($profile instanceof RuntimeProfile) {
             $options['runtime_profile'] = $profile;
         }
+
+        return $classification;
+    }
+
+    /**
+     * Fold a handler's {@see MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY}
+     * report into the classification handed back to the caller.
+     *
+     * The classification returned from here is what StreamController persists
+     * on the IN/OUT rows (topic, `original_media_type`, …) and consults for the
+     * voice-reply guard. When a handler answered under a different route than
+     * it was dispatched with — MediaGenerationHandler handing a misrouted
+     * "audio" request to the chat answer — the stored turn must describe that
+     * chat answer, not the sorter's media vote; otherwise the bubble is
+     * rendered and re-run ("Again") as media that was never generated.
+     *
+     * @param array<string, mixed> $classification
+     * @param array<string, mixed> $response
+     *
+     * @return array<string, mixed>
+     */
+    private function applyEffectiveClassification(array $classification, array $response): array
+    {
+        $effective = $response['metadata'][MessageHandlerInterface::EFFECTIVE_CLASSIFICATION_KEY] ?? null;
+        if (!is_array($effective) || [] === $effective) {
+            return $classification;
+        }
+
+        foreach ($effective as $key => $value) {
+            if (null === $value) {
+                unset($classification[$key]);
+                continue;
+            }
+            $classification[$key] = $value;
+        }
+
+        $this->logger->info('MessageProcessor: handler reported an effective classification', [
+            'topic' => $classification['topic'] ?? null,
+            'intent' => $classification['intent'] ?? null,
+            'rerouted_from' => $classification['rerouted_from'] ?? null,
+        ]);
 
         return $classification;
     }

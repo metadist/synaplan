@@ -77,7 +77,7 @@ class PromptCatalog
             [
                 'topic' => 'mediamaker',
                 'language' => 'en',
-                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images, videos and audio — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it").',
+                'shortDescription' => 'Media-generation topic that handles all create/edit requests for images and videos — including combined requests that ALSO ask for accompanying text (e.g. "make a video invitation and write the schedule below it") — and text-to-speech of text that ALREADY EXISTS (typed or quoted in the message, the previous answer, an attached document). NOT for songs, poems, stories or lessons that still have to be written, even "as a song" or "read aloud": those are "general" (with a spoken step only when the user asks to hear the result).',
                 'prompt' => self::mediaMakerPrompt(),
             ],
 
@@ -396,18 +396,35 @@ This is the list, use only this:
 
 [DYNAMICLIST]
 
-   **Media creation wins over accompanying text work**: A request that
-   COMBINES creating media (a video, image, or audio) with writing text to go
-   with it ("make a video invitation ... and write the schedule below it",
-   "create an image of our logo and write a slogan for it") is a MEDIA
-   request: set BTOPIC "mediamaker" (with the matching BMEDIA, see rule 8).
-   The media wish defines the topic — the accompanying text is produced
-   downstream. NEVER fall back to "general" just because the message also
-   asks for written content.
+   **Image/video creation wins over accompanying text work**: A request that
+   COMBINES creating a picture or video with writing text to go with it
+   ("make a video invitation ... and write the schedule below it", "create an
+   image of our logo and write a slogan for it") is a MEDIA request: set
+   BTOPIC "mediamaker" (with the matching BMEDIA, see rule 8). The media wish
+   defines the topic — the accompanying text is produced downstream. NEVER
+   fall back to "general" just because the message also asks for written
+   content.
    Examples:
    - "Make a video invitation for a company retreat, and write the schedule below it" → BTOPIC: "mediamaker", BMEDIA: "video"
    - "Create an image of a mountain and write a short story about it" → BTOPIC: "mediamaker", BMEDIA: "image"
-   - "Write a poem and read it to me as MP3" → BTOPIC: "mediamaker", BMEDIA: "audio"
+
+   **Audio is the exception — spoken output never wins over the text it
+   speaks**: text-to-speech can only READ text that already exists. A request
+   to write, invent, teach or explain something "as a song / Lied /
+   Kinderlied / rap / poem / Gedicht / story / rhyme / lesson" asks for
+   TEXT — Synaplan cannot compose or perform music, it writes the lyrics or
+   verses. Route it to "general" (BMULTI 0). Only when the user ALSO asks to
+   HEAR the result (read it aloud, vorlesen, as MP3, Sprachnachricht) is it a
+   content step plus a spoken step: BTOPIC "general" with BMULTI 1 (rule 12)
+   — the planner writes the text first and speaks it afterwards. NEVER set
+   BTOPIC "mediamaker" / BMEDIA "audio" for these; that path would speak the
+   user's own request back to them.
+   Examples:
+   - "Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → BTOPIC: "general", BMULTI: 0
+   - "Teach me the first ten Persian numbers with a children's song" → BTOPIC: "general", BMULTI: 0
+   - "Make a song about my cat" → BTOPIC: "general", BMULTI: 0 (lyrics — no music generation exists)
+   - "Schreib ein Kinderlied über die Zahlen und lies es mir als MP3 vor" → BTOPIC: "general", BMULTI: 1
+   - "Write a poem and read it to me as MP3" → BTOPIC: "general", BMULTI: 1
 
    **Questions about Synaplan itself** — whether it can do something
    ("can you make PDFs?", "kannst du Videos erstellen?"), how a feature
@@ -520,10 +537,15 @@ This is the list, use only this:
    - "video" - if user wants a video, film, clip, animation, or moving images
    - "audio" - if user wants audio, sound, voice, speech, TTS, or text-to-speech
    - "image" - if user wants an image, picture, photo, illustration, or any image editing/composition (this is the default)
-   IMPORTANT: "audio" means CREATING speech from text the user provides or asks
-   to be written. If the message asks to DESCRIBE/analyze an ATTACHED image —
-   even when the answer should come "as audio" / "vorgelesen" — rule 7 wins:
-   BTOPIC = "general" and no BMEDIA at all.
+   IMPORTANT: "audio" means READING OUT text that is already there: text the
+   user typed (after a colon, in quotes, "this text"), the previous answer, or
+   an attached document. The message must contain or point at the words to be
+   spoken. If the words still have to be WRITTEN first (a song, poem, story,
+   lesson, explanation, greeting the user only describes), it is NOT
+   "mediamaker"/"audio" — see rule 2: BTOPIC "general", BMULTI 1 when the
+   user also wants to hear it. If the message asks to DESCRIBE/analyze an
+   ATTACHED image — even when the answer should come "as audio" /
+   "vorgelesen" — rule 7 wins: BTOPIC = "general" and no BMEDIA at all.
    Examples:
    - "Create a video of a car" → BMEDIA: "video"
    - "Make a video of a dog running" → BMEDIA: "video"
@@ -533,6 +555,8 @@ This is the list, use only this:
    - "Combine these two photos" → BMEDIA: "image"
    - "Read this text aloud" → BMEDIA: "audio"
    - "Convert to speech" → BMEDIA: "audio"
+   - "Lies mir vor: Guten Morgen zusammen" → BMEDIA: "audio"
+   - "Sing me a song about the sea" → NOT mediamaker → BTOPIC: "general" (the lyrics are the deliverable)
 
 9. **Detect input mode (BINPUTMODE)**: If BTOPIC is "mediamaker" AND BMEDIA is "image", set BINPUTMODE:
    - "reference_images" - if the user attached image(s) to be used as input for editing, composition, or style transfer,
@@ -585,7 +609,9 @@ This is the list, use only this:
    summarize, translate, generate, schreibe, erstelle, fasse zusammen) with a
    SECOND, DIFFERENT deliverable:
    - Content plus a spoken version ("write a poem and read it to me as MP3",
-     "schreib einen Text und lies ihn vor")
+     "schreib einen Text und lies ihn vor", "schreib ein Kinderlied und lies
+     es mir vor") — BTOPIC stays "general": the spoken file is derived from
+     the written text, so the text is the main deliverable
    - Content plus a document or spreadsheet ("summarize this and put it in a DOCX")
    - Content plus a picture or video ("write the invitation and make an image for it")
    - A generated file plus a description of it ("create an image of a cat and
@@ -614,8 +640,10 @@ This is the list, use only this:
    - Any plain question, greeting or smalltalk
    - One deliverable described with several adjectives, constraints or details
      ("write a long, friendly, formal email to my landlord about the heating")
-   - One media request with accompanying text baked into it (rule 2 already
-     routes those to "mediamaker" — the text is produced downstream)
+   - One picture or video request with accompanying text baked into it (rule
+     2 already routes those to "mediamaker" — the text is produced downstream)
+   - A song, poem, story or lesson the user only wants to READ (no spoken
+     version requested) — that is one "general" answer
    - A request to redo, refine or continue the previous answer
    - A general web-search question (that is BWEBSEARCH, not BMULTI)
    - Anything you are unsure about
@@ -1350,9 +1378,12 @@ background", "mach es heller" always refers to the picture that is already there
 - Use the user's language
 
 ### For AUDIO/TTS prompts:
-- Extract ONLY the text that should be spoken
+- The output is exactly what the listener will HEAR — never the user's request itself
+- If the message contains the text to speak, extract ONLY that text
 - Remove instruction words like "read", "speak", "say", "lies vor", "erstelle audio"
-- Keep the actual content to be spoken
+- If the message only DESCRIBES what should be spoken (a greeting, a poem, a song text, a short
+  story, an explanation) and that text does not exist yet, WRITE it in the user's language and
+  return only the written text
 - Preserve original language and punctuation
 
 ## Response Format
@@ -1392,6 +1423,9 @@ Output: Hello World
 
 Input: "Create an audio saying 'Good morning!'"
 Output: Good morning!
+
+Input: "Lies mir ein kurzes Gedicht über den Regen vor"
+Output: Leise fällt der Regen nieder, tropft aufs Dach und singt uns Lieder. Jede Pfütze wird zum Meer, und die Wolken ziehen schwer.
 PROMPT;
     }
 
@@ -1399,11 +1433,15 @@ PROMPT;
     {
         return <<<'PROMPT'
 # Audio text extraction
-You receive a request to create an audio/voice output for the user.
+You receive a request to create an audio/voice output for the user. Your
+output is the script the voice will read — it is exactly what the listener
+hears.
 
 Your task:
-- Extract ONLY the exact text that should be spoken.
+- If the message contains the text to be spoken (after a colon, in quotes, "this text"), extract ONLY that exact text.
 - Remove instruction phrases like "say", "speak", "read", "please create an audio", "generate audio" etc.
+- If the message only DESCRIBES what should be spoken and that text does not exist yet (a greeting, a poem, a song text, a rhyme, a short story, an explanation, a lesson), WRITE that content in the user's language and return only the written text. Keep it short enough to be spoken comfortably.
+- NEVER return the user's request or instruction itself. A script that repeats "bring me ...", "teach me ...", "create an audio ..." is wrong — the listener would hear their own question read back.
 - Preserve the original language, punctuation, emoji, casing.
 - If the user provides quotes, return the quoted text without the quotes (unless they contain mismatched quotes, then return the meaningful text).
 - Do not add introductions like "Audio Prompt:" or explanations.
@@ -1415,6 +1453,8 @@ Examples:
 - Input: "Please say: Hello, how are you?" → Output: Hello, how are you?
 - Input: "Read this aloud: 'Good morning!'" → Output: Good morning!
 - Input: "Create an audio where you say hello" → Output: Hello
+- Input: "Sprich einen kurzen Geburtstagsgruß für Anna" → Output: Alles Liebe zum Geburtstag, Anna! Ich wünsche dir ein wunderbares neues Lebensjahr voller Freude und Gesundheit.
+- Input: "Bring mir mit einem Kinderlied die persischen Zahlen 0 bis 10 bei" → Output: Sefr ist die Null, so fängt es an. Yek ist eins, das kann jeder Mann. Do ist zwei, se ist drei, chahar ist vier, sing mit dabei! Pandsch ist fünf, schesch ist sechs, haft ist sieben, hascht ist acht. Noh ist neun und dah ist zehn — bis Persisch wir verstehen!
 PROMPT;
     }
 
