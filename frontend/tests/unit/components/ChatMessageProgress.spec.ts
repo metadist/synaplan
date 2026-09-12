@@ -117,7 +117,7 @@ describe('ChatMessage pre-answer progress indicator', () => {
       processingStatus: '',
     })
 
-    expect(wrapper.get('[data-testid="loading-initial-indicator"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="loading-initial-indicator"]').exists()).toBe(true)
   })
 
   it('shows a generic waiting row before the backend narrates anything', () => {
