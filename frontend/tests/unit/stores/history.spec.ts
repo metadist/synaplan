@@ -70,6 +70,30 @@ describe('History Store', () => {
     expect(store.messages[0].isStreaming).toBe(false)
   })
 
+  it('keeps a snapshotted processing timeline after the stream ends', () => {
+    const store = useHistoryStore()
+    const id = store.addStreamingMessage('assistant')
+    store.messages[0].processingSteps = [
+      {
+        id: 1,
+        key: 'understand',
+        status: 'classified',
+        metadata: {},
+        startedAt: 1,
+        endedAt: 2,
+        state: 'done',
+        afterAnswer: false,
+      },
+    ]
+    store.messages[0].processingModel = { name: 'Grok 4' }
+
+    store.finishStreamingMessage(id)
+
+    expect(store.messages[0].isStreaming).toBe(false)
+    expect(store.messages[0].processingSteps).toHaveLength(1)
+    expect(store.messages[0].processingModel).toEqual({ name: 'Grok 4' })
+  })
+
   // #1058: measured thinking duration from thinkingStartedAt
   it('finishStreamingMessage sets thinkingTime from thinkingStartedAt', () => {
     const store = useHistoryStore()

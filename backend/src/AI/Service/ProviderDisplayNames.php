@@ -22,8 +22,11 @@ use App\Model\ModelCatalog;
  */
 final class ProviderDisplayNames
 {
-    /** @var array<string, string>|null */
-    private ?array $names = null;
+    /** @var array<string, string>|null complete map, built only by all() */
+    private ?array $allNames = null;
+
+    /** @var array<string, string> per-service hits from forService() */
+    private array $resolved = [];
 
     public function __construct(private readonly ProviderRegistry $registry)
     {
@@ -35,7 +38,25 @@ final class ProviderDisplayNames
      */
     public function forService(string $service): string
     {
-        return $this->all()[ModelCatalog::normalizeProvider($service)] ?? $service;
+        $normalized = ModelCatalog::normalizeProvider($service);
+        if (isset($this->resolved[$normalized])) {
+            return $this->resolved[$normalized];
+        }
+        if (null !== $this->allNames && isset($this->allNames[$normalized])) {
+            return $this->resolved[$normalized] = $this->allNames[$normalized];
+        }
+
+        // Resolve one provider — do not enumerate every registered service on
+        // each SSE status. The listing path (`all()`) still builds the full map
+        // for the status page. A miss falls back to the raw key rather than
+        // walking the registry (that path instantiates every provider).
+        try {
+            $provider = $this->registry->getChatProvider($service);
+
+            return $this->resolved[$normalized] = $provider->getDisplayName();
+        } catch (\Throwable) {
+            return $this->resolved[$normalized] = $service;
+        }
     }
 
     /**
@@ -67,8 +88,8 @@ final class ProviderDisplayNames
      */
     public function all(): array
     {
-        if (null !== $this->names) {
-            return $this->names;
+        if (null !== $this->allNames) {
+            return $this->allNames;
         }
 
         $names = [];
@@ -76,6 +97,6 @@ final class ProviderDisplayNames
             $names[ModelCatalog::normalizeProvider($key)] = $provider->getDisplayName();
         }
 
-        return $this->names = $names;
+        return $this->allNames = $names;
     }
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   activeStep,
+  cloneTimelineModel,
+  cloneTimelineSteps,
+  consumeVisibleAnswer,
   createTimelineState,
   formatDurationSeconds,
   ingestTimelineEvent,
@@ -126,6 +129,50 @@ describe('ingestTimelineEvent', () => {
     expect(state.steps.map((s) => [s.key, s.state])).toEqual([['generate', 'done']])
   })
 
+  it('does not treat a <think> block split across data chunks as the answer', () => {
+    const state = play([
+      [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
+      [300, { status: 'thinking' }],
+      [400, { status: 'data', chunk: '<think>Let me' }],
+      [500, { status: 'data', chunk: ' keep thinking</think>' }],
+      [4_000, { status: 'data', chunk: 'The answer' }],
+    ])
+    expect(state.answerStartedAt).toBe(1_000_000 + 4_000)
+    expect(state.steps.map((s) => [s.key, s.state])).toEqual([
+      ['generate', 'done'],
+      ['thinking', 'done'],
+    ])
+  })
+
+  it('does not treat a reasoning-only data chunk as the answer', () => {
+    const state = play([
+      [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
+      [300, { status: 'thinking' }],
+      [400, { status: 'data', chunk: '<think>Let me think</think>' }],
+      [4_000, { status: 'data', chunk: 'The answer' }],
+    ])
+    expect(state.answerStartedAt).toBe(1_000_000 + 4_000)
+    expect(state.steps.map((s) => [s.key, s.state])).toEqual([
+      ['generate', 'done'],
+      ['thinking', 'done'],
+    ])
+  })
+
+  it('does not open a second generate row when generated arrives after reasoning', () => {
+    const state = play([
+      [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
+      [300, { status: 'thinking' }],
+      [400, { status: 'reasoning', chunk: 'hmm' }],
+      [4_000, { status: 'data', chunk: 'Hi' }],
+      [4_100, { status: 'generated' }],
+    ])
+    expect(state.steps.filter((s) => s.key === 'generate')).toHaveLength(1)
+    expect(state.steps.map((s) => [s.key, s.state])).toEqual([
+      ['generate', 'done'],
+      ['thinking', 'done'],
+    ])
+  })
+
   it('opens a thinking step from live reasoning chunks and closes generate', () => {
     const state = play([
       [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
@@ -196,6 +243,22 @@ describe('describeStep', () => {
       t
     )
     expect(done.title).toBe('processing.timeline.sentTo:{"model":"Grok 4"}')
+  })
+
+  it('does not pair a step-level metadata.model with the sorter provider', () => {
+    const copy = describeStep(
+      {
+        ...base,
+        key: 'generate',
+        status: 'generating',
+        metadata: { model: 'analyzer-v2' },
+        state: 'active',
+      },
+      { name: 'Sorter', providerLabel: 'Groq' },
+      t
+    )
+    expect(copy.title).toBe('processing.timeline.sendingTo:{"model":"analyzer-v2"}')
+    expect(copy.title).not.toContain('Groq')
   })
 
   it('names the provider next to the model when the backend resolved it', () => {
@@ -346,9 +409,49 @@ describe('describeStep', () => {
   })
 })
 
+describe('consumeVisibleAnswer', () => {
+  it('keeps an open <think> block out of the visible text until it closes', () => {
+    const first = consumeVisibleAnswer('<think>Let me', false)
+    expect(first.text.trim()).toBe('')
+    expect(first.insideThink).toBe(true)
+
+    const second = consumeVisibleAnswer(' keep thinking</think>', first.insideThink)
+    expect(second.text.trim()).toBe('')
+    expect(second.insideThink).toBe(false)
+
+    const third = consumeVisibleAnswer('The answer', second.insideThink)
+    expect(third.text.trim()).toBe('The answer')
+  })
+})
+
 describe('formatDurationSeconds', () => {
   it('uses one decimal below ten seconds', () => {
     expect(formatDurationSeconds(1_380)).toBe('1.4s')
     expect(formatDurationSeconds(12_600)).toBe('13s')
+  })
+})
+
+describe('cloneTimelineSteps', () => {
+  it('detaches steps and metadata from the live timeline', () => {
+    const state = createTimelineState()
+    state.steps.push({
+      id: 1,
+      key: 'understand',
+      status: 'classified',
+      metadata: { intent: 'chat' },
+      startedAt: 1,
+      endedAt: 2,
+      state: 'done',
+      afterAnswer: false,
+    })
+    const clone = cloneTimelineSteps(state.steps)
+    state.steps[0].metadata.intent = 'image'
+    state.steps[0].status = 'classifying'
+    expect(clone[0].metadata.intent).toBe('chat')
+    expect(clone[0].status).toBe('classified')
+    expect(cloneTimelineModel({ name: 'M', provider: 'groq' })).toEqual({
+      name: 'M',
+      provider: 'groq',
+    })
   })
 })

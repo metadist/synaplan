@@ -45,6 +45,36 @@ final class ContextCondenser
     /** Head/tail split of a hard trim: profile + start first, totals at the end. */
     private const TRIM_HEAD_SHARE = 0.7;
 
+    /**
+     * Short function words skipped when scoring extractive passages.
+     *
+     * @var array<string, true>
+     */
+    private const EXTRACT_STOP_WORDS = [
+        'the' => true, 'and' => true, 'for' => true, 'are' => true, 'was' => true, 'were' => true,
+        'this' => true, 'that' => true, 'with' => true, 'from' => true, 'about' => true, 'what' => true,
+        'which' => true, 'when' => true, 'where' => true, 'how' => true, 'why' => true, 'who' => true,
+        'into' => true, 'over' => true, 'after' => true, 'before' => true, 'could' => true, 'should' => true,
+        'would' => true, 'just' => true, 'also' => true, 'than' => true, 'then' => true, 'its' => true,
+        'have' => true, 'has' => true, 'had' => true, 'not' => true, 'but' => true, 'you' => true,
+        'your' => true, 'our' => true, 'their' => true, 'they' => true, 'will' => true, 'can' => true,
+        'all' => true, 'any' => true, 'been' => true, 'being' => true,
+        'der' => true, 'die' => true, 'das' => true, 'und' => true, 'oder' => true, 'ist' => true,
+        'sind' => true, 'war' => true, 'ein' => true, 'eine' => true, 'einer' => true, 'einem' => true,
+        'einen' => true, 'von' => true, 'mit' => true, 'auf' => true, 'aus' => true, 'bei' => true,
+        'nach' => true, 'über' => true, 'unter' => true, 'für' => true, 'als' => true, 'dem' => true,
+        'den' => true, 'des' => true, 'wie' => true, 'wer' => true, 'nicht' => true,
+        'auch' => true, 'nur' => true, 'noch' => true, 'sich' => true, 'dass' => true, 'diese' => true,
+        'dieser' => true, 'dieses' => true,
+        'que' => true, 'los' => true, 'las' => true, 'del' => true, 'una' => true, 'por' => true,
+        'con' => true, 'para' => true, 'como' => true, 'más' => true, 'este' => true, 'esta' => true,
+        'esto' => true, 'pero' => true, 'sus' => true, 'son' => true,
+        'les' => true, 'une' => true, 'dans' => true, 'pour' => true, 'qui' => true,
+        'sur' => true, 'pas' => true, 'plus' => true, 'est' => true, 'avec' => true, 'par' => true,
+        'sont' => true,
+        'bir' => true, 'ile' => true, 'için' => true,
+    ];
+
     public function __construct(
         private readonly AiFacade $aiFacade,
         private readonly ModelConfigService $modelConfigService,
@@ -67,15 +97,24 @@ final class ContextCondenser
      * chosen for document analysis took 30 s to condense one news page,
      * while the router model does the same in a few seconds.
      *
+     * `$preferExtractive` skips the model entirely and keeps the question-
+     * relevant passages verbatim. Used on the live web-research path: three
+     * news pages otherwise cost ~2.7 s each on the critical path, and the
+     * answering model is better served by exact quotes than a rewrite.
+     *
      * @param callable(array{level:int,chunk:int,chunks:int}):void|null $onProgress
      */
-    public function fit(string $text, string $question, int $budgetChars, ?int $userId, ?callable $onProgress = null, bool $preferFastModel = false): CondensedText
+    public function fit(string $text, string $question, int $budgetChars, ?int $userId, ?callable $onProgress = null, bool $preferFastModel = false, bool $preferExtractive = false): CondensedText
     {
         $originalChars = mb_strlen($text);
         $budgetChars = max(1, $budgetChars);
 
         if ($originalChars <= $budgetChars) {
             return CondensedText::verbatim($text, $budgetChars);
+        }
+
+        if ($preferExtractive) {
+            return $this->extracted($text, $question, $budgetChars, $originalChars);
         }
 
         if (!$this->config->isCondenseEnabled($userId)) {
@@ -170,6 +209,78 @@ final class ContextCondenser
     }
 
     /**
+     * Question-aware extractive fit: keep the lede and the passages that
+     * overlap the question, in original order. No model call — used on the
+     * live web-research path where an extra few seconds per page is the wait
+     * the user feels. Falls back to head/tail trim when there is no paragraph
+     * structure to rank.
+     */
+    public function extracted(string $text, string $question, int $budgetChars, ?int $originalChars = null): CondensedText
+    {
+        $originalChars ??= mb_strlen($text);
+        $budgetChars = max(1, $budgetChars);
+
+        if ($originalChars <= $budgetChars) {
+            return CondensedText::verbatim($text, $budgetChars);
+        }
+
+        $blocks = $this->splitBlocks($text);
+        if (count($blocks) <= 1) {
+            return $this->trimmed($text, $budgetChars, $originalChars);
+        }
+
+        $terms = $this->questionTerms($question);
+        $ranked = [];
+        foreach ($blocks as $index => $block) {
+            $ranked[] = [
+                'index' => $index,
+                'text' => $block,
+                'score' => $this->scoreBlock($block, $terms, 0 === $index),
+                'length' => mb_strlen($block),
+            ];
+        }
+        usort(
+            $ranked,
+            static fn (array $a, array $b): int => $b['score'] <=> $a['score'] ?: $a['index'] <=> $b['index'],
+        );
+
+        $picked = [];
+        $used = 0;
+        foreach ($ranked as $candidate) {
+            if ($candidate['score'] <= 0.0 && 0 !== $candidate['index']) {
+                continue;
+            }
+            $extra = $used > 0 ? 2 : 0;
+            if ($used + $extra + $candidate['length'] > $budgetChars) {
+                continue;
+            }
+            $picked[$candidate['index']] = $candidate['text'];
+            $used += $extra + $candidate['length'];
+        }
+
+        if ([] === $picked) {
+            return $this->trimmed($text, $budgetChars, $originalChars);
+        }
+
+        ksort($picked);
+        $extracted = implode("\n\n", $picked);
+        if (mb_strlen($extracted) > $budgetChars) {
+            return $this->trimmed($extracted, $budgetChars, $originalChars);
+        }
+
+        $result = new CondensedText(
+            text: $extracted,
+            strategy: CondensedText::STRATEGY_EXTRACTED,
+            originalChars: $originalChars,
+            budgetChars: $budgetChars,
+        );
+
+        $this->logger->info('ContextCondenser: extracted question-relevant passages', $result->toLogContext());
+
+        return $result;
+    }
+
+    /**
      * Head/tail cut with an explicit omission marker. Used when condensing is
      * off, unavailable, or did not reach the budget.
      *
@@ -212,6 +323,74 @@ final class ContextCondenser
             trimmedAfterCondense: $afterCondense,
             modelCalls: $modelCalls,
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitBlocks(string $text): array
+    {
+        $normalized = preg_replace("/\r\n?/", "\n", $text) ?? $text;
+        $parts = preg_split("/\n{2,}/", $normalized) ?: [];
+        $blocks = [];
+        foreach ($parts as $part) {
+            $trimmed = trim($part);
+            if ('' !== $trimmed) {
+                $blocks[] = $trimmed;
+            }
+        }
+
+        if (count($blocks) <= 1 && mb_strlen($normalized) > 800) {
+            $sentences = preg_split('/(?<=[.!?])\s+/u', trim($normalized)) ?: [];
+            $blocks = [];
+            foreach ($sentences as $sentence) {
+                $trimmed = trim($sentence);
+                if ('' !== $trimmed) {
+                    $blocks[] = $trimmed;
+                }
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function questionTerms(string $question): array
+    {
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question)) ?: [];
+        $terms = [];
+        foreach ($words as $word) {
+            if (mb_strlen($word) < 3 || isset(self::EXTRACT_STOP_WORDS[$word])) {
+                continue;
+            }
+            $terms[] = $word;
+        }
+
+        return array_values(array_unique($terms));
+    }
+
+    /**
+     * @param list<string> $terms
+     */
+    private function scoreBlock(string $block, array $terms, bool $isLede): float
+    {
+        $lower = mb_strtolower($block);
+        $score = $isLede ? 4.0 : 0.0;
+        foreach ($terms as $term) {
+            if (str_contains($lower, $term)) {
+                $score += 2.0;
+            }
+        }
+        if (preg_match('/\d/', $block)) {
+            $score += 1.0;
+        }
+        if (mb_strlen($block) < 40) {
+            $score -= 1.5;
+        }
+
+        return $score;
     }
 
     private function resolveCondenserModel(?int $userId, bool $preferFastModel): ?int

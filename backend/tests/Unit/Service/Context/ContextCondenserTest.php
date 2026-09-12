@@ -146,6 +146,40 @@ final class ContextCondenserTest extends TestCase
         self::assertLessThanOrEqual(800, $result->finalChars());
     }
 
+    public function testExtractiveKeepsTheQuestionRelevantPassagesAndSkipsTheModel(): void
+    {
+        $this->aiFacade->expects(self::never())->method('chat');
+
+        $text = implode("\n\n", [
+            'Berlin (dpa) — Markets opened mixed on Tuesday as investors waited for new data.',
+            'Volkswagen delivered 2.1 million cars in the first half and raised its full-year outlook.',
+            'A cooking column recommends seasonal asparagus with brown butter.',
+            'The Volkswagen group said China remained its largest single market.',
+            'Weather: sunshine in the south, rain along the North Sea coast.',
+        ]);
+
+        $result = $this->condenser()->fit($text, 'Volkswagen deliveries this year', 280, 7, preferExtractive: true);
+
+        self::assertSame(CondensedText::STRATEGY_EXTRACTED, $result->strategy);
+        self::assertLessThanOrEqual(280, $result->finalChars());
+        self::assertStringContainsString('Volkswagen delivered 2.1 million', $result->text);
+        self::assertStringContainsString('China remained its largest', $result->text);
+        self::assertStringNotContainsString('asparagus', $result->text);
+        self::assertStringNotContainsString('North Sea', $result->text);
+        self::assertStringContainsString('kept verbatim', (string) $result->provenanceNote());
+    }
+
+    public function testExtractiveFallsBackToTrimWhenThereIsNoParagraphStructure(): void
+    {
+        $this->aiFacade->expects(self::never())->method('chat');
+
+        $text = str_repeat('word ', 200);
+        $result = $this->condenser()->fit($text, 'anything', 80, 7, preferExtractive: true);
+
+        self::assertSame(CondensedText::STRATEGY_TRIMMED, $result->strategy);
+        self::assertLessThanOrEqual(80, $result->finalChars());
+    }
+
     public function testNoCondenserModelMeansTrim(): void
     {
         $this->modelConfigService->method('getDefaultModel')->willReturn(null);

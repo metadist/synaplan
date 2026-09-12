@@ -1662,7 +1662,7 @@ final readonly class SystemConfigService
             'PROGRESS_SHOW_STEPS' => [
                 'tab' => 'interface', 'section' => 'progress_narration', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Show the step-by-step progress of an answer while it is being prepared: understanding the request, web search, pages read, request sent to the model, model thinking, memory check. Finished steps stay listed until the answer streams, then fold into a one-line summary. When OFF, only the current phase is shown (one line, no history). On by default.',
+                'description' => 'Show the step-by-step progress of an answer while it is being prepared: understanding the request, web search, pages read, request sent to the model, model thinking, memory check. Finished steps stay listed until the answer streams, then fold into a one-line summary that remains on the finished message. When OFF, only the current phase is shown (one line, no history). On by default.',
                 'default' => 'true',
                 'source' => 'database',
                 'dbGroup' => ProgressNarrationConfig::CONFIG_GROUP,

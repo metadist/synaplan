@@ -13,6 +13,7 @@ import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
 import type { MessageUsage } from '@/stores/usageTaximeter'
+import type { TimelineModel, TimelineStep } from '@/utils/processingTimeline'
 
 // Re-export so existing consumers keep importing from the store module.
 // The implementation moved to utils/messageMapper.ts (issue #1070) so the
@@ -203,6 +204,12 @@ export interface Message {
   docs?: { slug: string; title: string; url: string }[]
   processingStatus?: string
   processingMetadata?: Record<string, unknown> | null
+  /**
+   * Snapshot of the turn's progress timeline. Kept on the finished message
+   * so the folded step summary stays visible after the stream ends.
+   */
+  processingSteps?: TimelineStep[] | null
+  processingModel?: TimelineModel | null
   // Multitask routing: live task-card state while a multi-node plan streams.
   // Only set when a `plan` SSE event arrives (multi-node turns). On reload the
   // turn is flattened (text + media parts), so this is a streaming-time affordance.

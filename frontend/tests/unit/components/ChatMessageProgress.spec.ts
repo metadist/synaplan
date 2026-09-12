@@ -111,6 +111,15 @@ describe('ChatMessage pre-answer progress indicator', () => {
     expect(text).toContain(fill(enTimeline.waitingFor, { model: 'Grok 4' }))
   })
 
+  it('shows the initial waiting row when the bubble has only an empty text part', () => {
+    const wrapper = mountIndicator({
+      parts: [{ type: 'text', content: '' }],
+      processingStatus: '',
+    })
+
+    expect(wrapper.find('[data-testid="loading-initial-indicator"]').exists()).toBe(true)
+  })
+
   it('shows a generic waiting row before the backend narrates anything', () => {
     const text = indicatorText('started')
 
@@ -180,6 +189,24 @@ describe('ChatMessage progress timeline', () => {
 
   it('folds the finished steps into a summary line while the answer streams', () => {
     const wrapper = mountIndicator({
+      parts: [{ type: 'text', content: 'Hello there' }],
+      processingStatus: '',
+      processingSteps: [
+        step(1, 'understand', 'classified', 'done'),
+        step(2, 'generate', 'generated', 'done', { model_name: 'M' }),
+      ],
+      processingModel: { name: 'M' },
+    })
+
+    expect(wrapper.find('[data-testid="loading-typing-indicator"]').exists()).toBe(false)
+    const summary = wrapper.get('[data-testid="processing-timeline-summary"]')
+    expect(summary.text()).toContain('2 steps')
+    expect(summary.text()).toContain('M')
+  })
+
+  it('keeps the folded summary on the finished message after the stream ends', () => {
+    const wrapper = mountIndicator({
+      isStreaming: false,
       parts: [{ type: 'text', content: 'Hello there' }],
       processingStatus: '',
       processingSteps: [

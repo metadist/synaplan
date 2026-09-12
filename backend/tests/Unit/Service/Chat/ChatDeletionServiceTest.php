@@ -101,6 +101,28 @@ final class ChatDeletionServiceTest extends TestCase
         self::assertSame([$file, $chat], $removed);
     }
 
+    public function testGeneratedDocumentsLinkedOnlyThroughAttachmentsAreReleased(): void
+    {
+        $message = $this->message(904, '');
+        $file = $this->file(95, 'generated/7/brief.docx', ephemeral: true, messageId: null);
+        $message->addFile($file);
+
+        $this->fileRepository->method('findAllFilesByMessageIds')->willReturn([]);
+
+        $this->documentRevisions->expects($this->once())->method('deleteForFile')->with(95);
+        $this->vectorStorage->expects($this->once())->method('deleteByFile')->with(self::USER_ID, 95);
+        $this->fileStorage->expects($this->once())->method('deleteFile')->with('generated/7/brief.docx')->willReturn(true);
+
+        $removed = [];
+        $this->em->method('remove')->willReturnCallback(static function (object $entity) use (&$removed): void {
+            $removed[] = $entity;
+        });
+
+        $this->service([$message])->deleteOwnedChat(self::USER_ID, $this->chat());
+
+        self::assertContains($file, $removed);
+    }
+
     public function testLegacyMessagePathWithoutLibraryFileIsStillRemoved(): void
     {
         $message = $this->message(903, 'legacy/7/voice.ogg');
@@ -163,7 +185,7 @@ final class ChatDeletionServiceTest extends TestCase
         return $message;
     }
 
-    private function file(int $id, string $path, bool $ephemeral, int $messageId): File
+    private function file(int $id, string $path, bool $ephemeral, ?int $messageId): File
     {
         $file = new File();
         $file->setUserId(self::USER_ID);

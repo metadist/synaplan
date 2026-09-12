@@ -92,9 +92,7 @@
           that anything is happening.
         -->
         <div
-          v-if="
-            isStreaming && !processingStatus && role === 'assistant' && contentParts.length === 0
-          "
+          v-if="isStreaming && !processingStatus && role === 'assistant' && !hasAnswerContent"
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-initial-indicator"
           role="status"
@@ -169,15 +167,15 @@
         <!--
           Once the answer streams, the steps that led to it fold into one
           muted line (expandable) so the work stays visible without pushing
-          the text down. Gone on complete — the footer badges keep the record.
+          the text down. The snapshot stays on the finished message for
+          the rest of the session.
         -->
         <div
           v-if="
-            isStreaming &&
-            !processingStatus &&
             role === 'assistant' &&
             hasAnswerContent &&
-            collapsedTimelineSteps.length > 0
+            collapsedTimelineSteps.length > 0 &&
+            !(isStreaming && processingStatus)
           "
           class="px-4 pt-3"
           data-testid="processing-timeline-summary"

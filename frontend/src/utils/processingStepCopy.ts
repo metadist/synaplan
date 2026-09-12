@@ -98,10 +98,10 @@ export function modelWithProvider(
   t: Translate
 ): string | undefined {
   const meta = step?.metadata ?? {}
-  const name = str(meta.model_name) ?? model.name
+  const stepModel = str(meta.model_name) ?? str(meta.model)
+  const name = stepModel ?? model.name
   if (!name) return str(meta.provider_label) ?? model.providerLabel
-  const provider =
-    str(meta.provider_label) ?? (str(meta.model_name) ? undefined : model.providerLabel)
+  const provider = str(meta.provider_label) ?? (stepModel ? undefined : model.providerLabel)
   return provider ? t('processing.timeline.modelByProvider', { model: name, provider }) : name
 }
 
