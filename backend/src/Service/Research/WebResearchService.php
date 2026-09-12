@@ -112,6 +112,10 @@ final readonly class WebResearchService
             ]);
         }
 
+        // Fetch every page first. Condensing used to sit between fetches and
+        // added ~2.7 s per extra page on the critical path; extractive fitting
+        // below is instant, so the wall clock is the slowest fetch, not the sum.
+        $fetchedPages = [];
         foreach ($selected as $index => $url) {
             if (microtime(true) - $started > self::READ_DEADLINE_SECONDS) {
                 $this->logger->info('WebResearchService: read deadline reached, skipping remaining pages', [
@@ -125,14 +129,17 @@ final readonly class WebResearchService
             if (null !== $onProgress) {
                 $onProgress('reading_pages', sprintf('Reading %s...', $hosts[$index]), [
                     'pages_total' => count($selected),
-                    'pages_read' => $read,
+                    'pages_read' => 0,
                     'hosts' => array_values($hosts),
                     'current_host' => $hosts[$index],
                     'stage' => 'fetching',
                 ]);
             }
-            $page = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index]);
+            $fetchedPages[$index] = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$index]);
+        }
 
+        foreach ($fetchedPages as $index => $page) {
+            $url = $selected[$index];
             if (!$page->success || mb_strlen($page->extractedText) < self::MIN_USEFUL_PAGE_CHARS) {
                 $results[$index]['fetched'] = false;
                 if (null !== $page->blockedReason) {
@@ -151,7 +158,7 @@ final readonly class WebResearchService
                 ]);
             }
 
-            $fitted = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true);
+            $fitted = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true, preferExtractive: true);
             $results[$index]['page_content'] = $fitted->text;
             $results[$index]['page_content_strategy'] = $fitted->strategy;
             $results[$index]['final_url'] = $page->finalUrl ?? $url;
@@ -209,13 +216,20 @@ final readonly class WebResearchService
         }
 
         $perPageBudget = max(self::MIN_PAGE_BUDGET_CHARS, (int) floor($budgetChars / count($urls)));
-        $pages = [];
-        $fitted = [];
+        $firstHops = [];
         foreach ($urls as $url) {
-            $page = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH));
-            $pages[] = $page;
+            $firstHops[$url] = $this->urlContentService->startReading($url);
+        }
+
+        $pages = [];
+        foreach ($urls as $url) {
+            $pages[] = $this->urlContentService->fetchForReading($url, max($perPageBudget * 3, UrlContentService::DEFAULT_READ_TEXT_LENGTH), $firstHops[$url]);
+        }
+
+        $fitted = [];
+        foreach ($pages as $page) {
             if ($page->success && '' !== $page->extractedText) {
-                $fitted[$url] = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true)->text;
+                $fitted[$page->url] = $this->condenser->fit($page->extractedText, $question, $perPageBudget, $userId, preferFastModel: true, preferExtractive: true)->text;
             }
         }
 

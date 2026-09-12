@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Service;
 
+use App\AI\Interface\ProviderMetadataInterface;
 use App\Model\ModelCatalog;
 
 /**
@@ -35,7 +36,24 @@ final class ProviderDisplayNames
      */
     public function forService(string $service): string
     {
-        return $this->all()[ModelCatalog::normalizeProvider($service)] ?? $service;
+        $this->names ??= [];
+        $normalized = ModelCatalog::normalizeProvider($service);
+        if (isset($this->names[$normalized])) {
+            return $this->names[$normalized];
+        }
+
+        // Resolve one provider — do not enumerate every registered service on
+        // each SSE status. The listing path (`all()`) still builds the full map
+        // for the status page.
+        try {
+            $provider = $this->registry->getChatProvider($service);
+            if ($provider instanceof ProviderMetadataInterface) {
+                return $this->names[$normalized] = $provider->getDisplayName();
+            }
+        } catch (\Throwable) {
+        }
+
+        return $this->all()[$normalized] ?? $service;
     }
 
     /**

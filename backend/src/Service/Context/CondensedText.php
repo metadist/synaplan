@@ -10,12 +10,14 @@ namespace App\Service\Context;
  *
  *   - verbatim   — fit as-is, nothing changed
  *   - condensed  — one or more question-aware map-reduce rounds
+ *   - extracted  — question-aware paragraph selection, no model call
  *   - trimmed    — hard head/tail cut (condensation disabled, exhausted or failed)
  */
 final readonly class CondensedText
 {
     public const STRATEGY_VERBATIM = 'verbatim';
     public const STRATEGY_CONDENSED = 'condensed';
+    public const STRATEGY_EXTRACTED = 'extracted';
     public const STRATEGY_TRIMMED = 'trimmed';
 
     /**
@@ -62,6 +64,10 @@ final readonly class CondensedText
                 '[Note: the original content (%s characters) was too large for the model window and was condensed in %d round(s) with focus on the user\'s question. Exact figures quoted below come from the source; state clearly when a detail is not present in this condensed view.]',
                 number_format($this->originalChars),
                 $this->levels,
+            ),
+            self::STRATEGY_EXTRACTED => sprintf(
+                '[Note: the original page (%s characters) was too large; the passages most relevant to the question were kept verbatim. Exact figures below come from the source; say so when a detail is not in this extract.]',
+                number_format($this->originalChars),
             ),
             self::STRATEGY_TRIMMED => sprintf(
                 '[Note: only the beginning and end of the original content (%s characters) are included; the middle part was cut to fit the model window. Say so when the answer depends on the omitted part.]',

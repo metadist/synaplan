@@ -125,6 +125,81 @@ final class WebResearchServiceTest extends TestCase
         self::assertSame('condensed', $out['results'][0]['page_content_strategy']);
     }
 
+    public function testDeepenStartsEveryReadBeforeTheFirstFetchIsConsumed(): void
+    {
+        $results = ['query' => 'q', 'results' => [
+            ['title' => 'A', 'url' => 'https://alpha.example/', 'description' => ''],
+            ['title' => 'B', 'url' => 'https://beta.example/', 'description' => ''],
+        ]];
+        $order = [];
+        $this->urlContent->method('startReading')->willReturnCallback(function (string $url) use (&$order): null {
+            $order[] = 'start:'.$url;
+
+            return null;
+        });
+        $this->urlContent->method('fetchForReading')->willReturnCallback(
+            static function (string $url) use (&$order): UrlContentResult {
+                $order[] = 'fetch:'.$url;
+
+                return new UrlContentResult($url, str_repeat('Article body. ', 40), 'T', 'h', true);
+            },
+        );
+
+        $this->service()->deepen($results, 'q', 7, null, 2);
+
+        $starts = array_values(array_filter($order, static fn (string $step): bool => str_starts_with($step, 'start:')));
+        $fetches = array_values(array_filter($order, static fn (string $step): bool => str_starts_with($step, 'fetch:')));
+        self::assertSame([
+            'start:https://alpha.example/',
+            'start:https://beta.example/',
+        ], $starts);
+        self::assertSame([
+            'fetch:https://alpha.example/',
+            'fetch:https://beta.example/',
+        ], $fetches);
+        self::assertLessThan(
+            array_search('fetch:https://alpha.example/', $order, true),
+            array_search('start:https://beta.example/', $order, true),
+            'every first hop is started before any page is consumed',
+        );
+    }
+
+    public function testDeepenFetchesEveryPageBeforeFittingAnyAndPrefersExtractive(): void
+    {
+        $results = ['query' => 'q', 'results' => [
+            ['title' => 'A', 'url' => 'https://alpha.example/', 'description' => ''],
+            ['title' => 'B', 'url' => 'https://beta.example/', 'description' => ''],
+        ]];
+        $order = [];
+        $this->urlContent->method('fetchForReading')->willReturnCallback(
+            static function (string $url) use (&$order): UrlContentResult {
+                $order[] = 'fetch:'.$url;
+
+                return new UrlContentResult($url, str_repeat('long text ', 5000), 'T', 'h', true);
+            },
+        );
+
+        $condenser = $this->createMock(ContextCondenser::class);
+        $flags = [];
+        $condenser->method('fit')->willReturnCallback(function (string $text, string $question, int $budget, ?int $userId, ?callable $onProgress = null, bool $preferFastModel = false, bool $preferExtractive = false) use (&$order, &$flags): CondensedText {
+            $order[] = 'fit';
+            $flags[] = [$preferFastModel, $preferExtractive];
+
+            return CondensedText::verbatim(mb_substr($text, 0, 20), $budget);
+        });
+
+        $service = new WebResearchService($this->urlContent, $condenser, $this->plugConfig, new NullLogger());
+        $service->deepen($results, 'What is the figure?', 42, null, 2, 10000);
+
+        self::assertSame([
+            'fetch:https://alpha.example/',
+            'fetch:https://beta.example/',
+            'fit',
+            'fit',
+        ], $order, 'all pages are fetched before any page is fitted');
+        self::assertSame([[true, true], [true, true]], $flags, 'web pages use the extractive, fast-model path');
+    }
+
     public function testDeepenRecordsBlockedPagesWithoutBreakingTheResults(): void
     {
         $results = ['query' => 'q', 'results' => [

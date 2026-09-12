@@ -3,9 +3,9 @@
     Progress timeline of a streaming turn.
 
     Finished steps stay on screen with their duration, the active step animates
-    and shows a live elapsed counter once it takes more than a moment. In
-    `collapsed` mode (answer already streaming) the whole thing folds into one
-    muted summary line the user can open.
+    and shows a live elapsed counter once it takes more than a moment.     In
+    `collapsed` mode (answer already streaming, and after the stream ends)
+    the whole thing folds into one muted summary line the user can open.
   -->
   <div
     class="processing-timeline"
@@ -16,7 +16,7 @@
     <template v-if="collapsed">
       <button
         type="button"
-        class="flex items-center gap-2 text-xs txt-tertiary hover:txt-secondary transition-colors"
+        class="btn-secondary px-2 py-1 rounded-lg text-xs font-medium inline-flex items-center gap-2"
         :aria-expanded="expanded"
         data-testid="btn-timeline-toggle"
         @click="expanded = !expanded"
@@ -125,6 +125,7 @@
               v-if="activeElapsedLabel"
               class="ml-auto text-xs tabular-nums txt-tertiary flex-shrink-0"
               data-testid="timeline-elapsed"
+              aria-hidden="true"
             >
               {{ activeElapsedLabel }}
             </span>
@@ -206,9 +207,10 @@ const { t } = useI18n()
 const tr: Translate = (key, params) => (params ? t(key, params) : t(key))
 
 // Admin switches (runtime config): name models/providers, show durations.
-const narration = progressNarrationSwitches()
-const copyOptions = computed(() => ({ showModels: narration.models }))
-const showTimings = computed(() => narration.timings)
+// Read through a computed so a runtime-config reload updates a mounted timeline.
+const narration = computed(() => progressNarrationSwitches())
+const copyOptions = computed(() => ({ showModels: narration.value.models }))
+const showTimings = computed(() => narration.value.timings)
 
 // A step that took no measurable time ("0.0s") is noise, not information.
 const INSTANT_STEP_MS = 100

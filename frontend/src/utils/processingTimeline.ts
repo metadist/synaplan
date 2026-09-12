@@ -145,6 +145,17 @@ function isPlaceholderGenerate(step: TimelineStep): boolean {
   )
 }
 
+export function cloneTimelineSteps(steps: TimelineStep[]): TimelineStep[] {
+  return steps.map((step) => ({
+    ...step,
+    metadata: { ...step.metadata },
+  }))
+}
+
+export function cloneTimelineModel(model: TimelineModel): TimelineModel {
+  return { ...model }
+}
+
 export function createTimelineState(): TimelineState {
   return { steps: [], model: {}, nextId: 1 }
 }
@@ -180,16 +191,29 @@ function closeActive(state: TimelineState, now: number, reason: CloseReason): vo
 
 function rememberModel(state: TimelineState, metadata: StreamEventMetadata | undefined): void {
   if (!metadata) return
-  if (typeof metadata.model_name === 'string' && metadata.model_name.trim() !== '') {
-    state.model = {
-      name: metadata.model_name,
-      provider: typeof metadata.provider === 'string' ? metadata.provider : state.model.provider,
-      providerLabel:
-        typeof metadata.provider_label === 'string'
-          ? metadata.provider_label
-          : state.model.providerLabel,
-    }
+  const named =
+    typeof metadata.model_name === 'string' && metadata.model_name.trim() !== ''
+      ? metadata.model_name
+      : typeof metadata.model === 'string' && metadata.model.trim() !== ''
+        ? metadata.model
+        : undefined
+  if (!named) return
+  state.model = {
+    name: named,
+    provider: typeof metadata.provider === 'string' ? metadata.provider : state.model.provider,
+    providerLabel:
+      typeof metadata.provider_label === 'string'
+        ? metadata.provider_label
+        : state.model.providerLabel,
   }
+}
+
+/** Visible answer text after stripping buffered `<think>` blocks. */
+export function visibleAnswerText(chunk: string): string {
+  return chunk
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*$/i, '')
+    .trim()
 }
 
 function annotateMemoryStep(state: TimelineState, field: string, count: number): void {
@@ -240,6 +264,9 @@ export function ingestTimelineEvent(
   }
 
   if (status === 'data' && typeof payload.chunk === 'string' && payload.chunk !== '') {
+    if (visibleAnswerText(payload.chunk) === '') {
+      return state
+    }
     if (state.answerStartedAt === undefined) {
       state.answerStartedAt = now
       closeActive(state, now, 'answer')
@@ -274,7 +301,10 @@ export function ingestTimelineEvent(
   const key = STEP_BY_STATUS[status]
   if (!key) return state
 
-  rememberModel(state, payload.metadata)
+  // The sorter names itself on `classifying`; that is not the answering model.
+  if (key !== 'understand') {
+    rememberModel(state, payload.metadata)
+  }
 
   const current = activeStep(state)
   if (current && current.key === key) {
@@ -290,13 +320,19 @@ export function ingestTimelineEvent(
     return state
   }
 
-  const last = state.steps[state.steps.length - 1]
-  if (CLOSING_STATUSES.has(status) && last && last.key === key && last.state === 'done') {
-    // Already closed by the answer (`generated` trails the first token):
-    // just record the final status, never a second row.
-    last.status = status
-    last.metadata = { ...last.metadata, ...(payload.metadata ?? {}) }
-    return state
+  if (CLOSING_STATUSES.has(status)) {
+    const existing = [...state.steps].reverse().find((step) => step.key === key)
+    if (existing) {
+      // Trailing `generated` after reasoning: the generate row is no longer
+      // last. Update it instead of opening a duplicate after-answer row.
+      existing.status = status
+      existing.metadata = { ...existing.metadata, ...(payload.metadata ?? {}) }
+      if (existing.state === 'active') {
+        existing.state = 'done'
+        existing.endedAt = now
+      }
+      return state
+    }
   }
 
   openStep(state, key, payload, now)

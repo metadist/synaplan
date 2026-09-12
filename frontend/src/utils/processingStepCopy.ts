@@ -98,7 +98,7 @@ export function modelWithProvider(
   t: Translate
 ): string | undefined {
   const meta = step?.metadata ?? {}
-  const name = str(meta.model_name) ?? model.name
+  const name = str(meta.model_name) ?? str(meta.model) ?? model.name
   if (!name) return str(meta.provider_label) ?? model.providerLabel
   const provider =
     str(meta.provider_label) ?? (str(meta.model_name) ? undefined : model.providerLabel)

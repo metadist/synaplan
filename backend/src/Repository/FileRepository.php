@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\File;
+use App\Entity\Message;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -294,9 +295,20 @@ class FileRepository extends ServiceEntityRepository
             return [];
         }
 
+        // Generated documents are stored with a null BMESSAGEID and linked
+        // through BMESSAGE_FILE_ATTACHMENTS (`Message::addFile()`). Cleanup
+        // and the conversation file list must see both channels.
+        $attachedIds = $this->getEntityManager()->createQueryBuilder()
+            ->select('attached.id')
+            ->from(Message::class, 'msg')
+            ->innerJoin('msg.files', 'attached')
+            ->where('msg.id IN (:messageIds)')
+            ->getDQL();
+
         $qb = $this->createQueryBuilder('f')
+            ->distinct()
             ->where('f.userId = :userId')
-            ->andWhere('f.messageId IN (:messageIds)')
+            ->andWhere('f.messageId IN (:messageIds) OR f.id IN ('.$attachedIds.')')
             ->setParameter('userId', $userId)
             ->setParameter('messageIds', $messageIds)
             ->orderBy('f.id', 'DESC');

@@ -224,8 +224,12 @@
               :quoted-message-id="message.quotedMessageId"
               :processing-status="message.isStreaming ? processingStatus : undefined"
               :processing-metadata="message.isStreaming ? processingMetadata : undefined"
-              :processing-steps="message.isStreaming ? processingTimeline.steps : undefined"
-              :processing-model="message.isStreaming ? processingTimeline.model : undefined"
+              :processing-steps="
+                message.isStreaming ? processingTimeline.steps : message.processingSteps
+              "
+              :processing-model="
+                message.isStreaming ? processingTimeline.model : message.processingModel
+              "
               :files="message.files"
               :document-changes="message.documentChanges"
               :document-fidelity-lossy="message.documentFidelityLossy"
@@ -565,8 +569,11 @@ import { useModelMixStore } from '@/stores/modelMix'
 import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 import {
+  cloneTimelineModel,
+  cloneTimelineSteps,
   createTimelineState,
   ingestTimelineEvent,
+  visibleAnswerText,
   type TimelineState,
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
@@ -1097,6 +1104,11 @@ const processingTimeline = ref<TimelineState>(createTimelineState())
 
 const ingestTimeline = (data: StreamUpdatePayload) => {
   ingestTimelineEvent(processingTimeline.value, data)
+  const message = historyStore.messages.find((m) => m.isStreaming && m.role === 'assistant')
+  if (!message) return
+  // Clone so the next turn's empty timeline cannot wipe this message's summary.
+  message.processingSteps = cloneTimelineSteps(processingTimeline.value.steps)
+  message.processingModel = cloneTimelineModel(processingTimeline.value.model)
 }
 
 // Backend pipeline steps that only need a label in the thinking indicator:
@@ -3018,12 +3030,15 @@ const streamAIResponse = async (
             // normal single-bubble media events (they still persist on the OUT
             // message and re-render from history on reload).
           } else if (data.status === 'data' && data.chunk) {
-            if (processingStatus.value) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
+            // First visible answer token: the live thinking panel folds away.
+            // A buffered `<think>...</think>` data chunk is not the answer.
+            if (visibleAnswerText(data.chunk) !== '') {
+              if (processingStatus.value) {
+                processingStatus.value = ''
+                processingMetadata.value = {}
+              }
+              historyStore.finishLiveThinking(messageId)
             }
-            // First answer token: the live thinking panel folds away.
-            historyStore.finishLiveThinking(messageId)
             fullContent += data.chunk
 
             streamingDirty = true
@@ -3626,12 +3641,15 @@ const streamAIResponse = async (
             // OUT message files persist; history renders the flattened bubble
             // on reload.
           } else if (data.status === 'data' && data.chunk) {
-            if (processingStatus.value) {
-              processingStatus.value = ''
-              processingMetadata.value = {}
+            // First visible answer token: the live thinking panel folds away.
+            // A buffered `<think>...</think>` data chunk is not the answer.
+            if (visibleAnswerText(data.chunk) !== '') {
+              if (processingStatus.value) {
+                processingStatus.value = ''
+                processingMetadata.value = {}
+              }
+              historyStore.finishLiveThinking(messageId)
             }
-            // First answer token: the live thinking panel folds away.
-            historyStore.finishLiveThinking(messageId)
 
             fullContent += data.chunk
 

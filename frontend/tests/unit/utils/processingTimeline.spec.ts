@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   activeStep,
+  cloneTimelineModel,
+  cloneTimelineSteps,
   createTimelineState,
   formatDurationSeconds,
   ingestTimelineEvent,
@@ -124,6 +126,35 @@ describe('ingestTimelineEvent', () => {
       [1_000, { status: 'data', chunk: 'Hi' }],
     ])
     expect(state.steps.map((s) => [s.key, s.state])).toEqual([['generate', 'done']])
+  })
+
+  it('does not treat a reasoning-only data chunk as the answer', () => {
+    const state = play([
+      [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
+      [300, { status: 'thinking' }],
+      [400, { status: 'data', chunk: '<think>Let me think</think>' }],
+      [4_000, { status: 'data', chunk: 'The answer' }],
+    ])
+    expect(state.answerStartedAt).toBe(1_000_000 + 4_000)
+    expect(state.steps.map((s) => [s.key, s.state])).toEqual([
+      ['generate', 'done'],
+      ['thinking', 'done'],
+    ])
+  })
+
+  it('does not open a second generate row when generated arrives after reasoning', () => {
+    const state = play([
+      [0, { status: 'generating', metadata: { model_name: 'Gemini', stage: 'request_sent' } }],
+      [300, { status: 'thinking' }],
+      [400, { status: 'reasoning', chunk: 'hmm' }],
+      [4_000, { status: 'data', chunk: 'Hi' }],
+      [4_100, { status: 'generated' }],
+    ])
+    expect(state.steps.filter((s) => s.key === 'generate')).toHaveLength(1)
+    expect(state.steps.map((s) => [s.key, s.state])).toEqual([
+      ['generate', 'done'],
+      ['thinking', 'done'],
+    ])
   })
 
   it('opens a thinking step from live reasoning chunks and closes generate', () => {
@@ -350,5 +381,30 @@ describe('formatDurationSeconds', () => {
   it('uses one decimal below ten seconds', () => {
     expect(formatDurationSeconds(1_380)).toBe('1.4s')
     expect(formatDurationSeconds(12_600)).toBe('13s')
+  })
+})
+
+describe('cloneTimelineSteps', () => {
+  it('detaches steps and metadata from the live timeline', () => {
+    const state = createTimelineState()
+    state.steps.push({
+      id: 1,
+      key: 'understand',
+      status: 'classified',
+      metadata: { intent: 'chat' },
+      startedAt: 1,
+      endedAt: 2,
+      state: 'done',
+      afterAnswer: false,
+    })
+    const clone = cloneTimelineSteps(state.steps)
+    state.steps[0].metadata.intent = 'image'
+    state.steps[0].status = 'classifying'
+    expect(clone[0].metadata.intent).toBe('chat')
+    expect(clone[0].status).toBe('classified')
+    expect(cloneTimelineModel({ name: 'M', provider: 'groq' })).toEqual({
+      name: 'M',
+      provider: 'groq',
+    })
   })
 })

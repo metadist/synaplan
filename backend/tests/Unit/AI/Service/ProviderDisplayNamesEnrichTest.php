@@ -17,6 +17,7 @@ final class ProviderDisplayNamesEnrichTest extends TestCase
         $anthropic->method('getDisplayName')->willReturn('Anthropic');
 
         $registry = $this->createStub(ProviderRegistry::class);
+        $registry->method('getChatProvider')->willReturn($anthropic);
         $registry->method('getUniqueProviders')->willReturn(['anthropic' => $anthropic]);
 
         return new ProviderDisplayNames($registry);

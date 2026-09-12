@@ -6,6 +6,7 @@ namespace App\Service\Chat;
 
 use App\Entity\Chat;
 use App\Entity\File;
+use App\Entity\Message;
 use App\Repository\ChatRepository;
 use App\Repository\ChatSummaryRepository;
 use App\Repository\DocumentRevisionRepository;
@@ -92,7 +93,7 @@ final readonly class ChatDeletionService
             }
         }
 
-        $keptPaths = $this->releaseFiles($userId, $messageIds);
+        $keptPaths = $this->releaseFiles($userId, $messageIds, $messages);
 
         // Generated media rides the legacy path channel on the message and
         // shares its disk file with the BFILES row that was just kept, so the
@@ -119,18 +120,29 @@ final readonly class ChatDeletionService
      * Detach the user's library files from the conversation and remove the
      * session-only (ephemeral) ones.
      *
-     * @param list<int> $messageIds
+     * @param list<int>     $messageIds
+     * @param list<Message> $messages
      *
      * @return array<string, true> disk paths of files that stay in the library
      */
-    private function releaseFiles(int $userId, array $messageIds): array
+    private function releaseFiles(int $userId, array $messageIds, array $messages): array
     {
-        if ([] === $messageIds) {
-            return [];
+        $files = [];
+        if ([] !== $messageIds) {
+            foreach ($this->fileRepository->findAllFilesByMessageIds($userId, $messageIds) as $file) {
+                $files[$this->fileIdentity($file)] = $file;
+            }
+        }
+        foreach ($messages as $message) {
+            foreach ($message->getFiles() as $file) {
+                if ($file->getUserId() === $userId) {
+                    $files[$this->fileIdentity($file)] = $file;
+                }
+            }
         }
 
         $keptPaths = [];
-        foreach ($this->fileRepository->findAllFilesByMessageIds($userId, $messageIds) as $file) {
+        foreach ($files as $file) {
             if ($file->isEphemeral()) {
                 $this->removeEphemeralFile($userId, $file);
                 continue;
@@ -144,6 +156,13 @@ final readonly class ChatDeletionService
         }
 
         return $keptPaths;
+    }
+
+    private function fileIdentity(File $file): string
+    {
+        $id = $file->getId();
+
+        return null !== $id ? 'id:'.$id : 'obj:'.spl_object_id($file);
     }
 
     private function removeEphemeralFile(int $userId, File $file): void
