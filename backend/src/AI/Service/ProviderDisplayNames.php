@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\AI\Service;
 
-use App\AI\Interface\ProviderMetadataInterface;
 use App\Model\ModelCatalog;
 
 /**
@@ -47,9 +46,8 @@ final class ProviderDisplayNames
         // for the status page.
         try {
             $provider = $this->registry->getChatProvider($service);
-            if ($provider instanceof ProviderMetadataInterface) {
-                return $this->names[$normalized] = $provider->getDisplayName();
-            }
+
+            return $this->names[$normalized] = $provider->getDisplayName();
         } catch (\Throwable) {
         }
 
