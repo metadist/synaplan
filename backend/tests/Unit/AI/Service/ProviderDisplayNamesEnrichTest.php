@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Service;
 
-use App\AI\Interface\ProviderMetadataInterface;
+use App\AI\Interface\ChatProviderInterface;
 use App\AI\Service\ProviderDisplayNames;
 use App\AI\Service\ProviderRegistry;
 use PHPUnit\Framework\TestCase;
@@ -13,7 +13,7 @@ final class ProviderDisplayNamesEnrichTest extends TestCase
 {
     private function names(): ProviderDisplayNames
     {
-        $anthropic = $this->createStub(ProviderMetadataInterface::class);
+        $anthropic = $this->createStub(ChatProviderInterface::class);
         $anthropic->method('getDisplayName')->willReturn('Anthropic');
 
         $registry = $this->createStub(ProviderRegistry::class);
