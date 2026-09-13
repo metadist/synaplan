@@ -5423,9 +5423,14 @@
     "resultFailed": "{count} başarısız",
     "kind": {
       "agents": "Asistanlar",
-      "prompts": "Yönergeler"
+      "prompts": "Yönergeler",
+      "saved_tasks": "Kayıtlı görevler"
     },
     "check": {
+      "needsAssistant": "Bir AI asistanı gerekli — içe aktardıktan sonra seçin ({key})",
+      "needsTool": "{detail} adlı bir araç gerekli",
+      "needsConnection": "{detail} adlı bir bağlantı gerekli",
+      "unknownKey": "Bu dosyada bu Synaplan’ın tanımadığı bir alan var ({detail})",
       "needsModel": "Bir model gerekli — içe aktardıktan sonra seçin ({key})",
       "needsKey": "Bir anahtar gerekli — Bağlantılar altına ekleyin ({key})",
       "needsMcpServer": "{detail} adlı bir MCP sunucusu gerekli",
@@ -5633,6 +5638,11 @@
     "secretRevealTitle": "Paylaşılan gizli anahtarın — şimdi kopyala",
     "secretRevealHint": "Diğer sisteme yapıştır. Yalnızca bu kez gösterilir ve sonradan alınamaz.",
     "copySecret": "Gizli anahtarı kopyala",
-    "secretCopied": "Gizli anahtar kopyalandı."
+    "secretCopied": "Gizli anahtar kopyalandı.",
+    "saveAsTemplate": "Şablon olarak kaydet",
+    "useTemplate": "Şablonu kullan",
+    "useTemplateConfirm": "Kendi kopyanız oluşturulsun mu? Siz açana kadar kapalı kalır. Başka bir sistem bunu başlatabiliyorsa yeni bir adres oluşturulur.",
+    "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
+    "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın."
   }
 }

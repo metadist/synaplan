@@ -281,6 +281,34 @@ class PromptRepository extends ServiceEntityRepository
     }
 
     /**
+     * First instruction the user can actually run: one of theirs, otherwise
+     * a system prompt. Used when a copied / imported task's assistant is not
+     * readable so the row still has a prompt id (BPROMPTID is required).
+     */
+    public function findFirstUsableForUser(int $userId): ?Prompt
+    {
+        foreach ($this->findOwnedForListing($userId) as $prompt) {
+            if ($prompt->isEnabled()) {
+                return $prompt;
+            }
+        }
+
+        /** @var list<Prompt> $system */
+        $system = $this->createQueryBuilder('p')
+            ->where('p.ownerId = 0')
+            ->andWhere('p.topic NOT LIKE :toolsPrefix')
+            ->andWhere('p.enabled = :on')
+            ->setParameter('toolsPrefix', 'tools:%')
+            ->setParameter('on', true)
+            ->orderBy('p.topic', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getResult();
+
+        return $system[0] ?? null;
+    }
+
+    /**
      * Get prompts with selection rules for automatic routing during sorting.
      * Neither system nor user prompts are filtered by language.
      * The $lang parameter is kept for backward compatibility but ignored.

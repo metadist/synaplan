@@ -291,14 +291,14 @@ final class SavedTaskController extends AbstractController
     #[Route('/{id}/copy', name: 'copy', methods: ['POST'], requirements: ['id' => '\d+'])]
     #[OA\Post(
         path: '/api/v1/saved-tasks/{id}/copy',
-        summary: 'Run a shared Saved Task as my copy',
+        summary: 'Use a shared Saved Task as my template',
         tags: ['Saved Tasks'],
         responses: [
             new OA\Response(
                 response: 201,
-                description: 'Copied task',
+                description: 'Copied task (paused) and any setup still needed',
                 content: new OA\JsonContent(
-                    required: ['success', 'task'],
+                    required: ['success', 'task', 'checklist'],
                     properties: [
                         new OA\Property(property: 'success', type: 'boolean', example: true),
                         new OA\Property(
@@ -327,6 +327,19 @@ final class SavedTaskController extends AbstractController
                                 new OA\Property(property: 'waitingApprovalCount', type: 'integer', example: 0),
                             ]
                         ),
+                        new OA\Property(
+                            property: 'checklist',
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                required: ['code', 'itemKey'],
+                                properties: [
+                                    new OA\Property(property: 'code', type: 'string', example: 'needsAssistant'),
+                                    new OA\Property(property: 'itemKey', type: 'string'),
+                                    new OA\Property(property: 'detail', type: 'string', nullable: true),
+                                ]
+                            )
+                        ),
                     ]
                 )
             ),
@@ -349,14 +362,18 @@ final class SavedTaskController extends AbstractController
         }
 
         try {
-            $copy = $this->service->copyForOwner($task, $user);
+            $result = $this->service->copyForOwner($task, $user);
         } catch (SavedTaskNotFoundException) {
             return $this->json(['error' => 'Not found'], Response::HTTP_NOT_FOUND);
         } catch (AssistantNotSharedException) {
             return $this->json(['error' => 'iam.assistantNotShared'], Response::HTTP_CONFLICT);
         }
 
-        return $this->json(['success' => true, 'task' => $this->serializer->task($copy)], Response::HTTP_CREATED);
+        return $this->json([
+            'success' => true,
+            'task' => $this->serializer->task($result->task),
+            'checklist' => $result->checklist,
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}/run', name: 'run', methods: ['POST'], requirements: ['id' => '\d+'])]

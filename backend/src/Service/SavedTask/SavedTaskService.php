@@ -17,6 +17,7 @@ use App\Service\Iam\ResourceKind\AssistantKind;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
+use App\Service\SavedTask\Graph\SavedTaskGraphPortability;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\Schedule\ScheduleParser;
 use App\Service\Tool\ToolRegistry;
@@ -36,6 +37,7 @@ final readonly class SavedTaskService
         private ?ToolsConfig $toolsConfig = null,
         private ?WorkflowsConfig $workflowsConfig = null,
         private ?ToolRegistry $toolRegistry = null,
+        private ?SavedTaskGraphPortability $portability = null,
     ) {
     }
 
@@ -68,7 +70,7 @@ final readonly class SavedTaskService
         return null;
     }
 
-    public function copyForOwner(SavedTask $source, User $user): SavedTask
+    public function copyForOwner(SavedTask $source, User $user): SavedTaskCopyResult
     {
         if (!$this->accessGate->decide($user, SavedTaskKind::KEY, (string) $source->getId(), Permission::Use)) {
             throw new SavedTaskNotFoundException();
@@ -88,19 +90,53 @@ final readonly class SavedTaskService
                     Permission::Use,
                 )
             );
+
+        $checklist = [];
+        $promptId = $source->getPromptId();
         if (!$assistantOk) {
-            throw new AssistantNotSharedException();
+            $fallback = $this->prompts->findFirstUsableForUser($userId);
+            if (!$fallback instanceof Prompt) {
+                throw new AssistantNotSharedException();
+            }
+            $promptId = (int) $fallback->getId();
+            $topic = $prompt instanceof Prompt ? $prompt->getTopic() : (string) $source->getPromptId();
+            $checklist[] = ['code' => 'needsAssistant', 'itemKey' => $topic, 'detail' => $topic];
         }
 
-        $copy = new SavedTask($userId, $source->getPromptId(), $source->getName());
-        $copy->setTrigger(SavedTask::TRIGGER_MANUAL, null);
-        // The recipient gets the steps, never the source owner's shared secrets.
-        $sourceGraph = $source->getGraph();
-        $copy->setGraph(null !== $sourceGraph ? $this->withoutOutboundSecrets($this->withTriggerType($sourceGraph, SavedTask::TRIGGER_MANUAL)) : null);
+        $copy = new SavedTask($userId, $promptId, $source->getName());
+        $copy->setEnabled(false);
         $copy->setAllowUnattended(false);
+
+        $triggerType = $source->getTriggerType();
+        $config = $this->portability?->exportTriggerConfig($source->getTriggerConfig()) ?? $source->getTriggerConfig();
+        if (is_array($config)) {
+            unset($config['token'], $config['hmacSecret'], $config['hmacConfigured']);
+        }
+        if (SavedTask::TRIGGER_WEBHOOK === $triggerType) {
+            $config = is_array($config) ? $config : [];
+            $config['token'] = $this->randomToken();
+        }
+        $copy->setTrigger($triggerType, $config);
+
+        $sourceGraph = $source->getGraph();
+        if (null !== $sourceGraph) {
+            $graph = $this->withoutOutboundSecrets($this->withTriggerType($sourceGraph, $triggerType));
+            if (!$assistantOk) {
+                $graph = $this->retargetChatPrompt($graph, (string) $promptId);
+            }
+            $copy->setGraph($graph);
+            if (null !== $this->toolRegistry) {
+                foreach ($this->toolNames($graph) as $toolName) {
+                    if (null === $this->toolRegistry->get($userId, $toolName)) {
+                        $checklist[] = ['code' => 'needsTool', 'itemKey' => $toolName, 'detail' => $toolName];
+                    }
+                }
+            }
+        }
+
         $this->tasks->save($copy);
 
-        return $copy;
+        return new SavedTaskCopyResult($copy, $checklist);
     }
 
     public function findForPrompt(int $promptId, int $ownerId): ?SavedTask
@@ -446,6 +482,56 @@ final readonly class SavedTaskService
         }
 
         return $graph;
+    }
+
+    /**
+     * @param array<string, mixed> $graph
+     *
+     * @return array<string, mixed>
+     */
+    private function retargetChatPrompt(array $graph, string $promptId): array
+    {
+        if (null !== $this->portability) {
+            return $this->portability->retargetChatPrompt($graph, $promptId);
+        }
+        if (!is_array($graph['nodes'] ?? null)) {
+            return $graph;
+        }
+        foreach ($graph['nodes'] as $i => $node) {
+            if (!is_array($node) || Capability::Chat->value !== ($node['capability'] ?? null)) {
+                continue;
+            }
+            $params = is_array($node['params'] ?? null) ? $node['params'] : [];
+            $params['prompt_id'] = $promptId;
+            $graph['nodes'][$i]['params'] = $params;
+        }
+
+        return $graph;
+    }
+
+    /**
+     * @param array<string, mixed> $graph
+     *
+     * @return list<string>
+     */
+    private function toolNames(array $graph): array
+    {
+        if (null !== $this->portability) {
+            return $this->portability->toolNames($graph);
+        }
+        $names = [];
+        foreach (is_array($graph['nodes'] ?? null) ? $graph['nodes'] : [] as $node) {
+            if (!is_array($node) || Capability::ToolCall->value !== ($node['capability'] ?? null)) {
+                continue;
+            }
+            $params = is_array($node['params'] ?? null) ? $node['params'] : [];
+            $tool = is_string($params['tool'] ?? null) ? trim($params['tool']) : '';
+            if ('' !== $tool) {
+                $names[] = $tool;
+            }
+        }
+
+        return $names;
     }
 
     /**

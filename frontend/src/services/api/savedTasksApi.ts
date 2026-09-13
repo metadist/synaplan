@@ -50,6 +50,17 @@ export interface SavedTask {
   webhookSecret?: string
 }
 
+export interface SavedTaskCopyChecklistItem {
+  code: string
+  itemKey: string
+  detail: string | null
+}
+
+export interface SavedTaskCopyResult {
+  task: SavedTask
+  checklist: SavedTaskCopyChecklistItem[]
+}
+
 export interface SavedTaskRun {
   id: number
   status: string
@@ -177,12 +188,17 @@ export const savedTasksApi = {
     }
   },
 
-  async copy(id: number): Promise<SavedTask> {
+  async copy(id: number): Promise<SavedTaskCopyResult> {
     const data = await httpClient(`/api/v1/saved-tasks/${id}/copy`, {
       method: 'POST',
       schema: PostApiSavedTasksCopyResponseSchema,
     })
-    return asTask(data.task)
+    const checklist = (data.checklist ?? []).map((row) => ({
+      code: row.code ?? '',
+      itemKey: row.itemKey ?? '',
+      detail: row.detail ?? null,
+    }))
+    return { task: asTask(data.task), checklist }
   },
 
   async remove(id: number): Promise<void> {

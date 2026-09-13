@@ -44,3 +44,13 @@ The secret is stored on the server and never shown again after you type it;
 the editor only tells you that one is set.
 n8n can receive that with a Webhook node, do its work, then call back to the
 Saved Task inbound address if another run should start.
+
+## Templates and moving a task
+
+**Save as template** shares the Saved Task (`use`). **Use template** makes a
+paused copy for the new owner — a new inbound address is minted, secrets are
+not copied, and the response lists anything still to connect.
+
+Export / import (`saved_tasks` in the bundle file) behaves the same way:
+schedules and webhooks arrive off, tokens and HMAC secrets are never in the
+file, and unknown fields are rejected.

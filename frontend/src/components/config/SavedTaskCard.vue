@@ -312,16 +312,33 @@ const onDelete = async () => {
   }
 }
 
+const copyTitle = computed(() =>
+  workflowsEnabled.value ? t('workflows.useTemplate') : t('iam.runCopy')
+)
+const copyMessage = computed(() =>
+  workflowsEnabled.value ? t('workflows.useTemplateConfirm') : t('iam.runCopyConfirm')
+)
+const shareLabel = computed(() =>
+  workflowsEnabled.value ? t('workflows.saveAsTemplate') : t('iam.share')
+)
+
 const onRunCopy = async () => {
   const ok = await dialog.confirm({
-    title: t('iam.runCopy'),
-    message: t('iam.runCopyConfirm'),
+    title: copyTitle.value,
+    message: copyMessage.value,
   })
   if (!ok) return
   copying.value = true
   try {
-    emit('copied', await savedTasksApi.copy(props.task.id))
-    success(t('iam.runCopy'))
+    const result = await savedTasksApi.copy(props.task.id)
+    emit('copied', result.task)
+    if (result.checklist.length > 0) {
+      success(t('workflows.useTemplateNeedsSetup'))
+    } else if (workflowsEnabled.value) {
+      success(t('workflows.useTemplateDone'))
+    } else {
+      success(t('iam.runCopy'))
+    }
   } catch (err) {
     const message = err instanceof ApiError ? err.message : ''
     showError(
@@ -411,7 +428,7 @@ const onRunCopy = async () => {
         data-testid="btn-run-copy"
         @click="onRunCopy"
       >
-        {{ $t('iam.runCopy') }}
+        {{ copyTitle }}
       </button>
       <button
         v-else
@@ -430,7 +447,7 @@ const onRunCopy = async () => {
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
-        {{ $t('iam.share') }}
+        {{ shareLabel }}
       </button>
       <button
         v-if="!sharedView"

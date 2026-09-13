@@ -43,6 +43,11 @@ class McpServerConfigRepository extends ServiceEntityRepository
         return $this->findOneBy(['id' => $id, 'userId' => $userId]);
     }
 
+    public function findByUserAndName(int $userId, string $name): ?McpServerConfig
+    {
+        return $this->findOneBy(['userId' => $userId, 'name' => $name]);
+    }
+
     public function save(McpServerConfig $config, bool $flush = true): void
     {
         $this->getEntityManager()->persist($config);
