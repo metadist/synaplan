@@ -1,11 +1,6 @@
 {
   "announcements": {
-    "later": "Pas maintenant",
-    "mobileApp": {
-      "title": "Synaplan est désormais disponible sur iPhone et Android",
-      "body": "L’application emporte vos chats, documents et assistants dans votre poche. Même compte, mêmes données — dictez une question en chemin et reprenez n’importe quelle conversation là où vous l’avez laissée.",
-      "getTheApp": "Télécharger l’app"
-    }
+    "later": "Pas maintenant"
   },
   "updates": {
     "runningVersion": "Version {version}",

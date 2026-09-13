@@ -65,37 +65,4 @@ export interface Announcement {
   image?: string
 }
 
-const MARKETING_SITE = 'https://www.synaplan.com'
-
-/**
- * Official download chooser on the marketing site. German UI gets `/de/app`;
- * every other locale lands on the default English page — the website only
- * ships those two languages.
- */
-function marketingAppUrl(locale: string): string {
-  const prefix = locale.toLowerCase().startsWith('de') ? '/de' : ''
-
-  return `${MARKETING_SITE}${prefix}/app`
-}
-
-/** One button to the chooser page, so nobody is sent to the wrong store. */
-function marketingAppActions({ locale }: AnnouncementContext): AnnouncementAction[] {
-  return [{ labelKey: 'getTheApp', url: marketingAppUrl(locale) }]
-}
-
-export const announcements: Announcement[] = [
-  {
-    id: 'mobile-apps-launch',
-    i18nKey: 'announcements.mobileApp',
-    until: '2026-11-30',
-    // Only where there is something to install: the operator published at
-    // least one app, and the reader is not already looking at this from
-    // inside it.
-    applies: ({ iosAppUrl, androidAppUrl, isNativeApp }) =>
-      ('' !== iosAppUrl || '' !== androidAppUrl) && !isNativeApp,
-    actions: marketingAppActions,
-    // No illustration: the one we have is an iPhone-only mockup, which would
-    // misrepresent the announcement for an Android visitor. The modal falls
-    // back to the instance's own brand mark instead (see `image` above).
-  },
-]
+export const announcements: Announcement[] = []

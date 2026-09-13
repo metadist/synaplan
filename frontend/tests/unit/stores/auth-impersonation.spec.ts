@@ -15,6 +15,8 @@ vi.mock('@/services/api/httpClient', () => ({
   beginAuthMutation: vi.fn(),
   endAuthMutation: vi.fn(),
   getInFlightRefresh: vi.fn().mockReturnValue(null),
+  isAuthMutationInProgress: vi.fn().mockReturnValue(false),
+  awaitAuthMutation: vi.fn().mockResolvedValue(undefined),
 }))
 
 // auth.logout() dynamically imports the realtime store so it can disconnect

@@ -17,6 +17,37 @@ const runtime = vi.hoisted(() => ({
   path: '/',
 }))
 
+/**
+ * The live catalogue is empty so login lands on chat. These tests still cover
+ * the modal shell with a fixture that matches the retired mobile-app entry.
+ */
+vi.mock('@/data/announcements', () => ({
+  announcements: [
+    {
+      id: 'mobile-apps-launch',
+      i18nKey: 'announcements.mobileApp',
+      until: '2026-11-30',
+      applies: ({
+        iosAppUrl,
+        androidAppUrl,
+        isNativeApp,
+      }: {
+        iosAppUrl: string
+        androidAppUrl: string
+        isNativeApp: boolean
+      }) => ('' !== iosAppUrl || '' !== androidAppUrl) && !isNativeApp,
+      actions: ({ locale }: { locale: string }) => [
+        {
+          labelKey: 'getTheApp',
+          url: locale.toLowerCase().startsWith('de')
+            ? 'https://www.synaplan.com/de/app'
+            : 'https://www.synaplan.com/app',
+        },
+      ],
+    },
+  ],
+}))
+
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({
     mobile: {

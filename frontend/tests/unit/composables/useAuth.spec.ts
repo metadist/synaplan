@@ -8,6 +8,11 @@ vi.mock('@/services/api/httpClient', () => ({
   getApiBaseUrl: () => 'http://localhost:8000',
   refreshAccessToken: vi.fn().mockResolvedValue({ success: true }),
   getConfigSync: () => ({ realtime: { enabled: false, wsUrl: '' } }),
+  beginAuthMutation: vi.fn(),
+  endAuthMutation: vi.fn(),
+  getInFlightRefresh: vi.fn().mockReturnValue(null),
+  isAuthMutationInProgress: vi.fn().mockReturnValue(false),
+  awaitAuthMutation: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/stores/realtime', () => ({

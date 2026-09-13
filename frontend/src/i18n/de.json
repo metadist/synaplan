@@ -1,11 +1,6 @@
 {
   "announcements": {
-    "later": "Später",
-    "mobileApp": {
-      "title": "Synaplan gibt es jetzt für iPhone und Android",
-      "body": "Die App bringt deine Chats, Dokumente und Assistenten aufs Handy. Gleicher Zugang, gleiche Daten — unterwegs sprichst du deine Frage einfach ein und setzt jedes Gespräch dort fort, wo du aufgehört hast.",
-      "getTheApp": "App laden"
-    }
+    "later": "Später"
   },
   "updates": {
     "runningVersion": "Version {version}",

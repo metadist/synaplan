@@ -330,7 +330,18 @@ export const authService = {
     }
   },
 
+  /**
+   * Refresh already in flight, if any. Login awaits this so a 401 handler
+   * cannot clear the session hint after the new cookies are written.
+   */
+  getInFlightRefresh(): Promise<boolean> | null {
+    return isRefreshing.value ? refreshPromise : null
+  },
+
   async _doRefresh(): Promise<boolean> {
+    const { awaitAuthMutation, isAuthMutationInProgress } = await import('@/services/api/httpClient')
+    await awaitAuthMutation()
+
     try {
       const native = isNativeApp()
       const response = await authFetch(
@@ -356,6 +367,9 @@ export const authService = {
         // and let the caller retry once the node is back. This matches the
         // network-error branch below, which also preserves the session.
         if (401 === response.status || 403 === response.status) {
+          if (isAuthMutationInProgress()) {
+            return false
+          }
           clearSessionHint()
           await this.logout(true) // Silent logout
         }

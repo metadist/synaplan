@@ -209,7 +209,26 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
 
+    const { beginAuthMutation, endAuthMutation, getInFlightRefresh } = await import(
+      '@/services/api/httpClient'
+    )
+    // Same cookie-swap lock as impersonation: a refresh that started on the
+    // expired-session login page still carries the dead cookie. If it lands
+    // after this POST, it 401s and logout() clears the hint — the new session
+    // looks logged out even though the cookies were just set.
+    beginAuthMutation()
     try {
+      // Only the httpClient pool: authService._doRefresh waits on this lock
+      // before fetching, so joining it here would deadlock.
+      const pendingHttpRefresh = getInFlightRefresh()
+      if (pendingHttpRefresh) {
+        try {
+          await pendingHttpRefresh
+        } catch {
+          /* a failed stale refresh must not abort login */
+        }
+      }
+
       const result = await authService.login(email, password, recaptchaToken)
 
       if (result.success) {
@@ -231,6 +250,7 @@ export const useAuthStore = defineStore('auth', () => {
       error.value = 'Network error'
       return false
     } finally {
+      endAuthMutation()
       loading.value = false
     }
   }
