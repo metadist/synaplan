@@ -15,6 +15,7 @@ use App\Service\Iam\Exception\AssistantNotSharedException;
 use App\Service\Iam\Permission;
 use App\Service\Iam\ResourceKind\SavedTaskKind;
 use App\Service\SavedTask\Graph\SavedTaskGraphCapture;
+use App\Service\SavedTask\Graph\SavedTaskGraphPortability;
 use App\Service\SavedTask\Graph\SavedTaskGraphValidator;
 use App\Service\SavedTask\SavedTaskService;
 use App\Service\SavedTask\Schedule\ScheduleParser;
@@ -300,5 +301,231 @@ final class SavedTaskServiceCopyTest extends TestCase
         self::assertNotSame('old-token', $config['token'] ?? null);
         self::assertArrayNotHasKey('hmacSecret', $config);
         self::assertFalse($copy->isEnabled());
+    }
+
+    public function testCopyPortsMcpToolsThroughServerNames(): void
+    {
+        $source = new SavedTask(9, 5, 'Ticket');
+        $source->setGraph([
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'tool_call', 'depends_on' => [], 'params' => ['tool' => 'mcp:9:create']],
+            ],
+        ]);
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(3);
+        $prompt->setTopic('support');
+        $prompt->setPrompt('Help.');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturn(true);
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+
+        $portability = $this->createMock(SavedTaskGraphPortability::class);
+        $portability->method('importTriggerConfig')->willReturnCallback(
+            static fn (?array $c): array => ['config' => $c, 'checklist' => []]
+        );
+        $portability->expects(self::once())->method('exportGraph')->willReturn([
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'tool_call', 'depends_on' => [], 'params' => ['tool' => 'mcp:Helpdesk:create']],
+            ],
+            'trigger' => ['type' => SavedTask::TRIGGER_MANUAL],
+        ]);
+        $portability->expects(self::once())->method('importGraph')->willReturn([
+            'graph' => [
+                'nodes' => [
+                    ['id' => 'n1', 'capability' => 'tool_call', 'depends_on' => [], 'params' => ['tool' => 'mcp:22:create']],
+                ],
+                'trigger' => ['type' => SavedTask::TRIGGER_MANUAL],
+            ],
+            'checklist' => [],
+        ]);
+        $portability->method('toolNames')->willReturn(['mcp:22:create']);
+
+        $registry = $this->createMock(ToolRegistry::class);
+        $registry->expects(self::once())->method('get')->with(3, 'mcp:22:create')->willReturn(null);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('save');
+
+        $service = new SavedTaskService(
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $this->createStub(SavedTaskGraphValidator::class),
+            $this->createStub(ScheduleParser::class),
+            $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
+            null,
+            null,
+            $registry,
+            $portability,
+        );
+
+        $result = $service->copyForOwner($source, $user);
+
+        self::assertSame('mcp:22:create', $result->task->getGraph()['nodes'][0]['params']['tool'] ?? null);
+        self::assertSame([
+            ['code' => 'needsTool', 'itemKey' => 'mcp:22:create', 'detail' => 'mcp:22:create'],
+        ], $result->checklist);
+    }
+
+    public function testCopyStripsInboundAccountIdAndChecklistsMailbox(): void
+    {
+        $source = new SavedTask(9, 5, 'Inbox');
+        $source->setTrigger(SavedTask::TRIGGER_INBOUND_EMAIL, ['accountId' => 77, 'folder' => 'INBOX']);
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(3);
+        $prompt->setTopic('support');
+        $prompt->setPrompt('Help.');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturn(true);
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('save');
+
+        $copy = $this->service($tasks, $prompts, $gate)->copyForOwner($source, $user);
+
+        self::assertSame(['folder' => 'INBOX'], $copy->task->getTriggerConfig());
+        self::assertSame([
+            ['code' => 'needsMailbox', 'itemKey' => 'inbound_email', 'detail' => 'inbound_email'],
+        ], $copy->checklist);
+    }
+
+    public function testCopyRetargetsTopicIdWhenAssistantIsReplaced(): void
+    {
+        $source = new SavedTask(9, 5, 'Weekly');
+        $source->setGraph([
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'chat', 'depends_on' => [], 'params' => ['topic_id' => 'sales']],
+            ],
+        ]);
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(9);
+        $prompt->setTopic('sales');
+        $prompt->setPrompt('Help.');
+
+        $fallback = new Prompt();
+        $fallback->setOwnerId(3);
+        $fallback->setTopic('general');
+        $fallback->setPrompt('Hi.');
+        (new \ReflectionProperty(Prompt::class, 'id'))->setValue($fallback, 88);
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturnCallback(
+            static function (User $_user, string $kind, string $_id, Permission $_perm): bool {
+                return SavedTaskKind::KEY === $kind;
+            }
+        );
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturnCallback(static function (int $id) use ($prompt, $fallback): ?Prompt {
+            return match ($id) {
+                5 => $prompt,
+                88 => $fallback,
+                default => null,
+            };
+        });
+        $prompts->method('findByTopicAndUser')->willReturn(null);
+        $prompts->expects(self::any())->method('findFirstUsableForUser')->with(3)->willReturn($fallback);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('save');
+
+        $portability = new SavedTaskGraphPortability(
+            $prompts,
+            $this->createStub(\App\Repository\McpServerConfigRepository::class),
+        );
+
+        $service = new SavedTaskService(
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $this->createStub(SavedTaskGraphValidator::class),
+            $this->createStub(ScheduleParser::class),
+            $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
+            null,
+            null,
+            null,
+            $portability,
+        );
+
+        $result = $service->copyForOwner($source, $user);
+        $params = $result->task->getGraph()['nodes'][0]['params'] ?? [];
+
+        self::assertSame('88', $params['prompt_id'] ?? null);
+        self::assertSame('general', $params['topic_id'] ?? null);
+        self::assertContains('needsAssistant', array_column($result->checklist, 'code'));
+    }
+
+    public function testCopyComputesNextRunAtForASchedule(): void
+    {
+        $source = new SavedTask(9, 5, 'Weekly');
+        $source->setTrigger(SavedTask::TRIGGER_SCHEDULE, ['kind' => 'daily', 'at' => '07:00']);
+        (new \ReflectionProperty(SavedTask::class, 'id'))->setValue($source, 11);
+
+        $prompt = new Prompt();
+        $prompt->setOwnerId(3);
+        $prompt->setTopic('sales');
+        $prompt->setPrompt('Help.');
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(3);
+
+        $gate = $this->createMock(AccessGate::class);
+        $gate->method('decide')->willReturn(true);
+
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+
+        $next = new \DateTimeImmutable('+1 day', new \DateTimeZone('UTC'));
+        $parser = $this->createMock(ScheduleParser::class);
+        $parser->expects(self::once())->method('nextRunAt')->willReturn($next);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('save');
+
+        $copy = $this->service($tasks, $prompts, $gate, $parser)->copyForOwner($source, $user)->task;
+
+        self::assertEquals($next, $copy->getNextRunAt());
+        self::assertFalse($copy->isEnabled());
+    }
+
+    private function service(
+        SavedTaskRepository $tasks,
+        PromptRepository $prompts,
+        AccessGate $gate,
+        ?ScheduleParser $parser = null,
+    ): SavedTaskService {
+        return new SavedTaskService(
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $this->createStub(SavedTaskGraphValidator::class),
+            $parser ?? $this->createStub(ScheduleParser::class),
+            $gate,
+            $this->createStub(SavedTaskGraphCapture::class),
+        );
     }
 }

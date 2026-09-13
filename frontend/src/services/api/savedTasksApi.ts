@@ -50,11 +50,8 @@ export interface SavedTask {
   webhookSecret?: string
 }
 
-export interface SavedTaskCopyChecklistItem {
-  code: string
-  itemKey: string
-  detail: string | null
-}
+type CopyResponse = z.infer<typeof PostApiSavedTasksCopyResponseSchema>
+export type SavedTaskCopyChecklistItem = NonNullable<NonNullable<CopyResponse['checklist']>[number]>
 
 export interface SavedTaskCopyResult {
   task: SavedTask

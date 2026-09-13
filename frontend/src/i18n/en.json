@@ -6628,6 +6628,7 @@
     "useTemplate": "Use template",
     "useTemplateConfirm": "Create your own copy? It stays off until you turn it on. A new address is created if another system can start this task.",
     "useTemplateDone": "Copy created. It is off until you turn it on.",
-    "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on."
+    "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
+    "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}."
   }
 }

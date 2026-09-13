@@ -319,6 +319,22 @@ describe('SavedTaskCard', () => {
     expect(wrapper.get('[data-testid="btn-run-copy"]').text()).toContain('Use template')
   })
 
+  it('uses template wording for a shared copy when the builder is off', async () => {
+    mockWorkflowsEnabled.mockReturnValue(false)
+    mockConfirm.mockResolvedValue(true)
+    mockCopy.mockResolvedValue({ task: task({ id: 99, enabled: false }), checklist: [] })
+    const wrapper = mountCard(task(), { sharedView: true })
+    expect(wrapper.get('[data-testid="btn-run-copy"]').text()).toContain('Use template')
+    await wrapper.get('[data-testid="btn-run-copy"]').trigger('click')
+    await flushPromises()
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Use template',
+      })
+    )
+    expect(mockSuccess).toHaveBeenCalledWith('Copy created. It is off until you turn it on.')
+  })
+
   it('labels Share as Save as template when the builder is on', () => {
     mockWorkflowsEnabled.mockReturnValue(true)
     mockIamSharing.mockReturnValue(true)
@@ -340,9 +356,7 @@ describe('SavedTaskCard', () => {
     expect(wrapper.emitted('copied')).toEqual([
       [expect.objectContaining({ id: 99, enabled: false })],
     ])
-    expect(mockSuccess).toHaveBeenCalledWith(
-      'Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.'
-    )
+    expect(mockSuccess).toHaveBeenCalledWith('Copy created and left off. Still needed: sales.')
   })
 
   it('confirms a ready template copy stays off', async () => {

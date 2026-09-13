@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\SavedTask\Graph;
 
+use App\Entity\InboundEmailHandler;
 use App\Entity\Prompt;
+use App\Entity\SavedTask;
+use App\Repository\InboundEmailHandlerRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\PromptRepository;
 use App\Service\Multitask\Plan\Capability;
@@ -19,9 +22,12 @@ final readonly class SavedTaskGraphPortability
 {
     public const ITEM_KEYS = ['key', 'name', 'prompt', 'triggerType', 'triggerConfig', 'graph', 'settings'];
 
+    public const MISSING_MCP_SERVER = 'missing-connection';
+
     public function __construct(
         private PromptRepository $prompts,
         private McpServerConfigRepository $mcpServers,
+        private ?InboundEmailHandlerRepository $inboundEmail = null,
     ) {
     }
 
@@ -52,9 +58,39 @@ final readonly class SavedTaskGraphPortability
         if (null === $config) {
             return null;
         }
-        unset($config['token'], $config['hmacSecret'], $config['hmacConfigured']);
+        unset($config['token'], $config['hmacSecret'], $config['hmacConfigured'], $config['accountId']);
 
         return $config;
+    }
+
+    /**
+     * Strip secrets and owner-bound mailbox ids, then remap inbound email
+     * when the destination user already owns that mailbox (or exactly one).
+     *
+     * @param array<string, mixed>|null $config
+     *
+     * @return array{config: array<string, mixed>|null, checklist: list<ChecklistRow>}
+     */
+    public function importTriggerConfig(?array $config, string $triggerType, int $userId): array
+    {
+        $accountId = is_array($config) ? ($config['accountId'] ?? null) : null;
+        $config = $this->exportTriggerConfig($config);
+        if (SavedTask::TRIGGER_INBOUND_EMAIL !== $triggerType) {
+            return ['config' => $config, 'checklist' => []];
+        }
+
+        $config = is_array($config) ? $config : [];
+        $resolved = $this->resolveInboundAccount($accountId, $userId);
+        if (null !== $resolved) {
+            $config['accountId'] = $resolved;
+
+            return ['config' => $config, 'checklist' => []];
+        }
+
+        return [
+            'config' => $config,
+            'checklist' => [['code' => 'needsMailbox', 'itemKey' => 'inbound_email', 'detail' => 'inbound_email']],
+        ];
     }
 
     /**
@@ -77,13 +113,11 @@ final readonly class SavedTaskGraphPortability
             }
             $params = is_array($node['params'] ?? null) ? $node['params'] : [];
             if (Capability::Chat->value === ($node['capability'] ?? null)) {
-                $promptId = $params['prompt_id'] ?? null;
-                if (is_numeric($promptId)) {
-                    $prompt = $this->prompts->find((int) $promptId);
-                    if ($prompt instanceof Prompt) {
-                        $params['prompt_topic'] = $prompt->getTopic();
-                        unset($params['prompt_id']);
-                    }
+                $topic = $this->chatTopicFromParams($params);
+                if ('' !== $topic) {
+                    $params['prompt_topic'] = $topic;
+                    $params['topic_id'] = $topic;
+                    unset($params['prompt_id']);
                 }
             }
             if (Capability::ToolCall->value === ($node['capability'] ?? null)) {
@@ -117,13 +151,16 @@ final readonly class SavedTaskGraphPortability
             }
             $params = is_array($node['params'] ?? null) ? $node['params'] : [];
             if (Capability::Chat->value === ($node['capability'] ?? null)) {
-                $topic = is_string($params['prompt_topic'] ?? null) ? $params['prompt_topic'] : '';
+                $topic = $this->chatTopicFromParams($params);
                 if ('' !== $topic) {
-                    $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
+                    $params['topic_id'] = $topic;
+                    $prompt = $this->usablePromptByTopic($topic, $userId);
                     if ($prompt instanceof Prompt) {
                         $params['prompt_id'] = (string) $prompt->getId();
                         unset($params['prompt_topic']);
                     } else {
+                        $params['prompt_topic'] = $topic;
+                        unset($params['prompt_id']);
                         $checklist[] = ['code' => 'needsAssistant', 'itemKey' => $topic, 'detail' => $topic];
                     }
                 }
@@ -175,6 +212,10 @@ final readonly class SavedTaskGraphPortability
             }
             $params = is_array($node['params'] ?? null) ? $node['params'] : [];
             $params['prompt_id'] = $promptId;
+            $fallback = is_numeric($promptId) ? $this->prompts->find((int) $promptId) : null;
+            if ($fallback instanceof Prompt) {
+                $params['topic_id'] = $fallback->getTopic();
+            }
             unset($params['prompt_topic']);
             $graph['nodes'][$i]['params'] = $params;
         }
@@ -202,6 +243,35 @@ final readonly class SavedTaskGraphPortability
         return $names;
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
+    private function chatTopicFromParams(array $params): string
+    {
+        foreach (['prompt_topic', 'topic_id'] as $key) {
+            $value = $params[$key] ?? null;
+            if (is_string($value) && '' !== trim($value) && !ctype_digit(trim($value))) {
+                return trim($value);
+            }
+        }
+        $promptId = $params['prompt_id'] ?? null;
+        if (is_numeric($promptId)) {
+            $prompt = $this->prompts->find((int) $promptId);
+            if ($prompt instanceof Prompt) {
+                return $prompt->getTopic();
+            }
+        }
+
+        return '';
+    }
+
+    public function usablePromptByTopic(string $topic, int $userId): ?Prompt
+    {
+        $prompt = $this->prompts->findByTopicAndUser($topic, $userId);
+
+        return $prompt instanceof Prompt && $prompt->isEnabled() ? $prompt : null;
+    }
+
     private function exportToolName(string $tool, int $ownerId): string
     {
         if (1 !== preg_match('/^mcp:(\d+):(.+)$/', $tool, $m)) {
@@ -209,7 +279,9 @@ final readonly class SavedTaskGraphPortability
         }
         $server = $this->mcpServers->findByIdAndUser((int) $m[1], $ownerId);
 
-        return null !== $server ? 'mcp:'.$server->getName().':'.$m[2] : $tool;
+        return null !== $server
+            ? 'mcp:'.$server->getName().':'.$m[2]
+            : 'mcp:'.self::MISSING_MCP_SERVER.':'.$m[2];
     }
 
     /**
@@ -217,17 +289,46 @@ final readonly class SavedTaskGraphPortability
      */
     private function importToolName(string $tool, int $userId): array
     {
-        if (1 !== preg_match('/^mcp:([^:]+):(.+)$/', $tool, $m) || ctype_digit($m[1])) {
+        if (1 !== preg_match('/^mcp:([^:]+):(.+)$/', $tool, $m)) {
             return ['tool' => $tool, 'checklist' => []];
         }
-        $server = $this->mcpServers->findByUserAndName($userId, $m[1]);
-        if (null === $server) {
+        $serverName = $m[1];
+        $toolName = $m[2];
+        if (ctype_digit($serverName) || self::MISSING_MCP_SERVER === $serverName) {
             return [
-                'tool' => $tool,
-                'checklist' => [['code' => 'needsConnection', 'itemKey' => $m[1], 'detail' => $m[1]]],
+                'tool' => 'mcp:'.self::MISSING_MCP_SERVER.':'.$toolName,
+                'checklist' => [['code' => 'needsConnection', 'itemKey' => self::MISSING_MCP_SERVER, 'detail' => self::MISSING_MCP_SERVER]],
+            ];
+        }
+        $server = $this->mcpServers->findByUserAndName($userId, $serverName);
+        if (null === $server || !$server->isEnabled()) {
+            return [
+                'tool' => 'mcp:'.$serverName.':'.$toolName,
+                'checklist' => [['code' => 'needsConnection', 'itemKey' => $serverName, 'detail' => $serverName]],
             ];
         }
 
-        return ['tool' => sprintf('mcp:%d:%s', (int) $server->getId(), $m[2]), 'checklist' => []];
+        return ['tool' => sprintf('mcp:%d:%s', (int) $server->getId(), $toolName), 'checklist' => []];
+    }
+
+    private function resolveInboundAccount(mixed $accountId, int $userId): ?int
+    {
+        if (null === $this->inboundEmail) {
+            return null;
+        }
+        $id = is_numeric($accountId) ? (int) $accountId : 0;
+        if ($id > 0) {
+            $owned = $this->inboundEmail->findByIdAndUser($id, $userId);
+            if ($owned instanceof InboundEmailHandler) {
+                return $id;
+            }
+        }
+        $active = $this->inboundEmail->findActiveByUser($userId);
+        if (1 !== count($active) || !$active[0] instanceof InboundEmailHandler) {
+            return null;
+        }
+        $only = $active[0]->getId();
+
+        return is_numeric($only) ? (int) $only : null;
     }
 }

@@ -5643,6 +5643,7 @@
     "useTemplate": "Şablonu kullan",
     "useTemplateConfirm": "Kendi kopyanız oluşturulsun mu? Siz açana kadar kapalı kalır. Başka bir sistem bunu başlatabiliyorsa yeni bir adres oluşturulur.",
     "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
-    "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın."
+    "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın.",
+    "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}."
   }
 }

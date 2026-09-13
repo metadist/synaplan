@@ -48,9 +48,10 @@ Saved Task inbound address if another run should start.
 ## Templates and moving a task
 
 **Save as template** shares the Saved Task (`use`). **Use template** makes a
-paused copy for the new owner — a new inbound address is minted, secrets are
-not copied, and the response lists anything still to connect.
+paused copy for the new owner — a new inbound address is minted, secrets and
+mailbox ids are not copied, and the response lists anything still to connect.
 
 Export / import (`saved_tasks` in the bundle file) behaves the same way:
-schedules and webhooks arrive off, tokens and HMAC secrets are never in the
-file, and unknown fields are rejected.
+schedules and webhooks arrive off, tokens, HMAC secrets and mailbox ids are
+never in the file, MCP tools travel by server name, and unknown fields are
+rejected.

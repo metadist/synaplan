@@ -5642,6 +5642,7 @@
     "useTemplate": "Usar plantilla",
     "useTemplateConfirm": "¿Crear tu propia copia? Permanecerá apagada hasta que la actives. Se crea una dirección nueva si otro sistema puede iniciar esta tarea.",
     "useTemplateDone": "Copia creada. Está apagada hasta que la actives.",
-    "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el asistente, la herramienta o la conexión que falte antes de activarla."
+    "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el asistente, la herramienta o la conexión que falte antes de activarla.",
+    "useTemplateNeedsSetupItems": "Copia creada y dejada apagada. Aún falta: {items}."
   }
 }

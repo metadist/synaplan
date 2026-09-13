@@ -52,6 +52,12 @@ digest. Interactive chat approvals still execute the tool on approve but do
 **2026-09-13 (S5 remainder):** Templates are IAM shares (`saved_task` + `use`).
 Copy/import stay paused, strip secrets, regenerate webhook tokens, and return a
 checklist instead of 409 when the assistant or a tool is missing. The
-`saved_tasks` bundle section depends on `prompts`. Five-step fixture
+`saved_tasks` bundle section depends on `prompts` and `mcp_servers`. Five-step fixture
 `builder_five_step.json` plus the shipped graphs load through the validator and
 plan factory. Track directory stays here until this branch is on `main`.
+
+**2026-09-13 (S5 Copilot follow-up):** Copy/import strip inbound-email `accountId`
+(remap only when the destination owns that mailbox or has exactly one), refuse
+disabled assistants/MCP servers, keep remappable `mcp:ServerName:tool` names,
+never export a dangling numeric MCP id, recompute `nextRunAt` on copy/import
+and when a schedule is enabled, and always use template wording for Use template.

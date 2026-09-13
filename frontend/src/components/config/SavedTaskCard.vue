@@ -9,7 +9,12 @@ import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
-import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
+import {
+  savedTasksApi,
+  type SavedTask,
+  type SavedTaskCopyChecklistItem,
+  type SavedTaskRun,
+} from '@/services/api/savedTasksApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { ApiError } from '@/services/api/httpClient'
 import type { ShareVia } from '@/utils/shareCopy'
@@ -312,12 +317,14 @@ const onDelete = async () => {
   }
 }
 
-const copyTitle = computed(() =>
-  workflowsEnabled.value ? t('workflows.useTemplate') : t('iam.runCopy')
-)
-const copyMessage = computed(() =>
-  workflowsEnabled.value ? t('workflows.useTemplateConfirm') : t('iam.runCopyConfirm')
-)
+const checklistItems = (rows: SavedTaskCopyChecklistItem[]): string =>
+  rows
+    .map((row) => (row.detail || row.itemKey || row.code || '').trim())
+    .filter((item) => item !== '')
+    .join(', ')
+
+const copyTitle = computed(() => t('workflows.useTemplate'))
+const copyMessage = computed(() => t('workflows.useTemplateConfirm'))
 const shareLabel = computed(() =>
   workflowsEnabled.value ? t('workflows.saveAsTemplate') : t('iam.share')
 )
@@ -333,11 +340,11 @@ const onRunCopy = async () => {
     const result = await savedTasksApi.copy(props.task.id)
     emit('copied', result.task)
     if (result.checklist.length > 0) {
-      success(t('workflows.useTemplateNeedsSetup'))
-    } else if (workflowsEnabled.value) {
-      success(t('workflows.useTemplateDone'))
+      success(
+        t('workflows.useTemplateNeedsSetupItems', { items: checklistItems(result.checklist) })
+      )
     } else {
-      success(t('iam.runCopy'))
+      success(t('workflows.useTemplateDone'))
     }
   } catch (err) {
     const message = err instanceof ApiError ? err.message : ''

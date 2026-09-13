@@ -18,6 +18,7 @@ use App\Repository\SavedTaskRepository;
 use App\Repository\UserRepository;
 use App\Service\SavedTask\Graph\SavedTaskGraphPortability;
 use App\Service\SavedTask\SavedTaskConfig;
+use App\Service\SavedTask\Schedule\ScheduleParser;
 use App\Service\Tool\ToolRegistry;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
@@ -31,6 +32,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         private PromptRepository $prompts,
         private UserRepository $users,
         private ?ToolRegistry $toolRegistry = null,
+        private ?ScheduleParser $schedules = null,
     ) {
     }
 
@@ -51,7 +53,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
 
     public function dependsOn(): array
     {
-        return ['prompts'];
+        return ['prompts', 'mcp_servers'];
     }
 
     public function export(int $userId, BundleScope $scope, array $include = []): array
@@ -82,8 +84,17 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
                 $rows[] = new ChecklistItem('unknownKey', $key, $unknown);
             }
             $topic = is_string($item['prompt'] ?? null) ? $item['prompt'] : '';
-            if ('' !== $topic && !$this->prompts->findByTopicAndUser($topic, $userId) instanceof Prompt) {
+            if ('' !== $topic && !$this->portability->usablePromptByTopic($topic, $userId) instanceof Prompt) {
                 $rows[] = new ChecklistItem('needsAssistant', $key, $topic);
+            }
+            $trigger = is_string($item['triggerType'] ?? null) ? $item['triggerType'] : SavedTask::TRIGGER_MANUAL;
+            $importedTrigger = $this->portability->importTriggerConfig(
+                is_array($item['triggerConfig'] ?? null) ? $item['triggerConfig'] : null,
+                $trigger,
+                $userId,
+            );
+            foreach ($importedTrigger['checklist'] as $row) {
+                $rows[] = new ChecklistItem($row['code'], $key, $row['detail']);
             }
             $imported = $this->portability->importGraph(is_array($item['graph'] ?? null) ? $item['graph'] : null, $userId);
             foreach ($imported['checklist'] as $row) {
@@ -96,7 +107,6 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
                     }
                 }
             }
-            $trigger = is_string($item['triggerType'] ?? null) ? $item['triggerType'] : SavedTask::TRIGGER_MANUAL;
             if (in_array($trigger, [SavedTask::TRIGGER_SCHEDULE, SavedTask::TRIGGER_WEBHOOK], true)) {
                 $rows[] = new ChecklistItem('schedulesOff', $key, $trigger);
             }
@@ -145,7 +155,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
     {
         $name = is_string($item['name'] ?? null) && '' !== trim($item['name']) ? trim($item['name']) : 'Imported task';
         $topic = is_string($item['prompt'] ?? null) ? $item['prompt'] : '';
-        $prompt = '' !== $topic ? $this->prompts->findByTopicAndUser($topic, $userId) : null;
+        $prompt = '' !== $topic ? $this->portability->usablePromptByTopic($topic, $userId) : null;
         if (!$prompt instanceof Prompt) {
             $prompt = $this->prompts->findFirstUsableForUser($userId);
         }
@@ -157,7 +167,12 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         if (!in_array($triggerType, SavedTask::TRIGGER_TYPES, true)) {
             throw new \InvalidArgumentException('Unknown trigger');
         }
-        $config = $this->portability->exportTriggerConfig(is_array($item['triggerConfig'] ?? null) ? $item['triggerConfig'] : null);
+        $importedTrigger = $this->portability->importTriggerConfig(
+            is_array($item['triggerConfig'] ?? null) ? $item['triggerConfig'] : null,
+            $triggerType,
+            $userId,
+        );
+        $config = $importedTrigger['config'];
         if (SavedTask::TRIGGER_WEBHOOK === $triggerType) {
             $config = is_array($config) ? $config : [];
             $config['token'] = $this->randomToken();
@@ -174,6 +189,7 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
         $task->setAllowUnattended(false);
         $task->setTrigger($triggerType, $config);
         $task->setGraph($graph);
+        $this->refreshSchedule($task);
         $this->tasks->save($task);
     }
 
@@ -188,5 +204,20 @@ final readonly class SavedTasksBundleSection implements BundleSectionInterface
     private function randomToken(): string
     {
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
+    }
+
+    private function refreshSchedule(SavedTask $task): void
+    {
+        if (SavedTask::TRIGGER_SCHEDULE !== $task->getTriggerType() || null === $this->schedules) {
+            return;
+        }
+        try {
+            $task->setNextRunAt($this->schedules->nextRunAt(
+                $task->getTriggerConfig(),
+                new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            ));
+        } catch (\InvalidArgumentException) {
+            $task->setNextRunAt(null);
+        }
     }
 }

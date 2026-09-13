@@ -108,19 +108,35 @@ final readonly class SavedTaskService
         $copy->setAllowUnattended(false);
 
         $triggerType = $source->getTriggerType();
-        $config = $this->portability?->exportTriggerConfig($source->getTriggerConfig()) ?? $source->getTriggerConfig();
-        if (is_array($config)) {
-            unset($config['token'], $config['hmacSecret'], $config['hmacConfigured']);
+        if (null !== $this->portability) {
+            $importedTrigger = $this->portability->importTriggerConfig($source->getTriggerConfig(), $triggerType, $userId);
+            $config = $importedTrigger['config'];
+            $checklist = array_merge($checklist, $importedTrigger['checklist']);
+        } else {
+            $config = $source->getTriggerConfig();
+            if (is_array($config)) {
+                unset($config['token'], $config['hmacSecret'], $config['hmacConfigured'], $config['accountId']);
+            }
+            if (SavedTask::TRIGGER_INBOUND_EMAIL === $triggerType) {
+                $checklist[] = ['code' => 'needsMailbox', 'itemKey' => 'inbound_email', 'detail' => 'inbound_email'];
+            }
         }
         if (SavedTask::TRIGGER_WEBHOOK === $triggerType) {
             $config = is_array($config) ? $config : [];
             $config['token'] = $this->randomToken();
         }
         $copy->setTrigger($triggerType, $config);
+        $this->refreshSchedule($copy);
 
         $sourceGraph = $source->getGraph();
         if (null !== $sourceGraph) {
             $graph = $this->withoutOutboundSecrets($this->withTriggerType($sourceGraph, $triggerType));
+            if (null !== $this->portability) {
+                $exported = $this->portability->exportGraph($graph, $source->getOwnerId());
+                $imported = $this->portability->importGraph($exported, $userId);
+                $graph = $imported['graph'] ?? $graph;
+                $checklist = array_merge($checklist, $imported['checklist']);
+            }
             if (!$assistantOk) {
                 $graph = $this->retargetChatPrompt($graph, (string) $promptId);
             }
@@ -270,9 +286,7 @@ final readonly class SavedTaskService
         }
 
         $this->assertUnattendedAllowed($task);
-        if (SavedTask::TRIGGER_SCHEDULE === $task->getTriggerType()) {
-            $task->setNextRunAt($this->scheduleParser->nextRunAt($task->getTriggerConfig(), new \DateTimeImmutable('now', new \DateTimeZone('UTC'))));
-        }
+        $this->refreshSchedule($task, persistNull: false);
 
         $this->tasks->save($task);
 
@@ -310,9 +324,7 @@ final readonly class SavedTaskService
     {
         $task->resume();
         $this->assertUnattendedAllowed($task);
-        if (SavedTask::TRIGGER_SCHEDULE === $task->getTriggerType()) {
-            $task->setNextRunAt($this->scheduleParser->nextRunAt($task->getTriggerConfig(), new \DateTimeImmutable('now', new \DateTimeZone('UTC'))));
-        }
+        $this->refreshSchedule($task, persistNull: false);
         $this->tasks->save($task);
 
         return $task;
@@ -503,6 +515,11 @@ final readonly class SavedTaskService
             }
             $params = is_array($node['params'] ?? null) ? $node['params'] : [];
             $params['prompt_id'] = $promptId;
+            $fallback = is_numeric($promptId) ? $this->prompts->find((int) $promptId) : null;
+            if ($fallback instanceof Prompt) {
+                $params['topic_id'] = $fallback->getTopic();
+            }
+            unset($params['prompt_topic']);
             $graph['nodes'][$i]['params'] = $params;
         }
 
@@ -532,6 +549,25 @@ final readonly class SavedTaskService
         }
 
         return $names;
+    }
+
+    private function refreshSchedule(SavedTask $task, bool $persistNull = true): void
+    {
+        if (SavedTask::TRIGGER_SCHEDULE !== $task->getTriggerType()) {
+            return;
+        }
+        try {
+            $task->setNextRunAt($this->scheduleParser->nextRunAt(
+                $task->getTriggerConfig(),
+                new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            ));
+        } catch (\InvalidArgumentException $e) {
+            if ($persistNull) {
+                $task->setNextRunAt(null);
+            } else {
+                throw $e;
+            }
+        }
     }
 
     /**

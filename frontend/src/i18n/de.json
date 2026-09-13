@@ -6562,6 +6562,7 @@
     "useTemplate": "Vorlage verwenden",
     "useTemplateConfirm": "Eigene Kopie anlegen? Sie bleibt aus, bis Sie sie einschalten. Eine neue Adresse wird erzeugt, wenn ein anderes System diese Aufgabe starten kann.",
     "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
-    "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten."
+    "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
+    "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}."
   }
 }

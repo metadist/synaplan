@@ -6628,6 +6628,7 @@
     "useTemplate": "Utiliser le modèle",
     "useTemplateConfirm": "Créer votre propre copie ? Elle reste désactivée jusqu’à ce que vous l’activiez. Une nouvelle adresse est créée si un autre système peut démarrer cette tâche.",
     "useTemplateDone": "Copie créée. Elle est désactivée jusqu’à ce que vous l’activiez.",
-    "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer."
+    "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer.",
+    "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}."
   }
 }

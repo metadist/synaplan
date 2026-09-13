@@ -70,4 +70,32 @@ final class ToolRegistryTest extends TestCase
         $this->assertNotNull($found);
         $this->assertSame('mcp:1:search', $found->name);
     }
+
+    public function testGetByNamedMcpServer(): void
+    {
+        $source = new class implements ToolSourceInterface {
+            public function source(): ToolSource
+            {
+                return ToolSource::Mcp;
+            }
+
+            public function describe(int $userId, array $context = []): array
+            {
+                return [new ToolDescriptor(
+                    'mcp:1:search',
+                    'Search',
+                    '',
+                    [],
+                    SideEffect::Read,
+                    ToolSource::Mcp,
+                    0,
+                    meta: ['gatewayName' => 'search', 'serverName' => 'Helpdesk', 'tool' => 'search'],
+                )];
+            }
+        };
+        $registry = new ToolRegistry([$source]);
+        $found = $registry->get(1, 'mcp:Helpdesk:search');
+        $this->assertNotNull($found);
+        $this->assertSame('mcp:1:search', $found->name);
+    }
 }
