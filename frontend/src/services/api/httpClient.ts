@@ -244,14 +244,12 @@ let isRefreshing = false
 let refreshPromise: Promise<RefreshResult> | null = null
 
 // --- Auth-mutation lock -----------------------------------------------------
-// A deliberate principal swap (admin impersonation start/stop) rewrites the
-// session cookies out-of-band. While it runs, the automatic 401 -> refresh
-// path must NOT fire its own /auth/refresh: a refresh triggered by a request
-// that still carries the PRE-swap cookies mints a token for the old principal
-// and clobbers the just-installed session cookie (the impersonation banner
-// then never mounts — a real cookie race, see stores/auth.ts). The lock is
-// inert outside a swap, so normal login/logout/refresh/OIDC/native behaviour
-// is byte-for-byte unchanged.
+// A deliberate cookie rewrite (login, admin impersonation start/stop) must be
+// the last writer of the session cookies. While it runs, the automatic 401 ->
+// refresh path must NOT fire its own /auth/refresh: a refresh that still
+// carries the PRE-swap cookies either mints a token for the old principal
+// (impersonation banner never mounts) or 401s and tears down a login that
+// just succeeded. The lock is inert outside those windows.
 let authMutationPromise: Promise<void> | null = null
 let authMutationResolve: (() => void) | null = null
 let authMutationTimer: ReturnType<typeof setTimeout> | null = null
@@ -307,6 +305,11 @@ function forceReleaseAuthMutation(): void {
  */
 function getInFlightRefresh(): Promise<RefreshResult> | null {
   return refreshPromise
+}
+
+/** True while login / impersonation holds the cookie-swap lock. */
+function isAuthMutationInProgress(): boolean {
+  return null !== authMutationPromise
 }
 
 /**
@@ -465,9 +468,13 @@ async function refreshAccessToken(
 
       // Refresh definitively failed - the stored cookie is dead. Clear the
       // hint so future visits don't keep retrying against a closed session.
-      clearSessionHint()
-      if (native) {
-        clearNativeTokens()
+      // Skip during login / impersonation: those flows are about to write
+      // (or just wrote) a new hint, and wiping it makes /auth/me look empty.
+      if (!isAuthMutationInProgress()) {
+        clearSessionHint()
+        if (native) {
+          clearNativeTokens()
+        }
       }
 
       // Check if this was an OIDC session expiry (user logged out from Keycloak)
@@ -508,14 +515,6 @@ async function handleAuthFailure(): Promise<never> {
     throw new Error('Authentication failed (loop detected)')
   }
 
-  const { useAuthStore } = await import('@/stores/auth')
-  const authStore = useAuthStore()
-
-  // Logout handles all user-scoped state cleanup (SSE tokens, chats,
-  // memories, feedback, realtime) plus the server-side session teardown.
-  // Using silent=true avoids a network call — the session is already dead.
-  await authStore.logout(true)
-
   // Use Vue Router instead of window.location.href to avoid full page reload loops
   // Support subfolder deployments via BASE_URL (from vite.config base option)
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
@@ -529,6 +528,22 @@ async function handleAuthFailure(): Promise<never> {
     `${basePath}/setup`,
   ]
   const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
+
+  // A 401 that started before login / impersonation took the cookie-swap
+  // lock must not call logout(): that clears the session hint and the user,
+  // so the session the swap just wrote looks logged out. The request that
+  // failed simply loses; the swap's own /auth/me settles the real state.
+  if (isAuthMutationInProgress()) {
+    throw new Error('Authentication required')
+  }
+
+  const { useAuthStore } = await import('@/stores/auth')
+  const authStore = useAuthStore()
+
+  // Logout handles all user-scoped state cleanup (SSE tokens, chats,
+  // memories, feedback, realtime) plus the server-side session teardown.
+  // Using silent=true avoids a network call — the session is already dead.
+  await authStore.logout(true)
 
   let sendToSetup = true === getConfigSync().setup?.wizardRequired
   try {
@@ -769,5 +784,6 @@ export {
   beginAuthMutation,
   endAuthMutation,
   getInFlightRefresh,
+  isAuthMutationInProgress,
   awaitAuthMutation,
 }

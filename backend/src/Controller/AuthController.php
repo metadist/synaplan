@@ -490,12 +490,13 @@ class AuthController extends AbstractController
         $result = $this->tokenService->refreshTokens($refreshTokenString);
 
         if (!$result) {
-            $response = new JsonResponse([
+            // Do not Set-Cookie-clear here. A failed refresh that started
+            // before a concurrent login would otherwise wipe the cookies that
+            // login just wrote, and the user lands back on /login as a guest.
+            return new JsonResponse([
                 'error' => 'Invalid or expired refresh token',
                 'code' => 'INVALID_REFRESH_TOKEN',
             ], Response::HTTP_UNAUTHORIZED);
-
-            return $this->tokenService->clearAuthCookies($response);
         }
 
         $this->logger->info('Token refreshed', ['user_id' => $result['user']->getId()]);

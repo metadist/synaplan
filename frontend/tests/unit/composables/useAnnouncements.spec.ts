@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { selectAnnouncement } from '@/composables/useAnnouncements'
 import { announcements, type Announcement, type AnnouncementContext } from '@/data/announcements'
+
+vi.mock('@/services/api/nativeAuth', () => ({
+  getNativeAccessToken: () => null,
+  getNativeRefreshToken: () => null,
+  setNativeTokens: () => undefined,
+  clearNativeTokens: () => undefined,
+  hasNativeTokens: () => false,
+}))
 
 const NOW = Date.parse('2026-08-17T10:00:00Z')
 
@@ -63,60 +71,8 @@ describe('selectAnnouncement', () => {
 })
 
 describe('the shipped catalogue', () => {
-  const mobileApp = announcements.find((entry) => 'mobile-apps-launch' === entry.id)
-
-  it('contains the mobile app announcement', () => {
-    expect(mobileApp).toBeDefined()
-  })
-
-  it('never advertises an app the operator has not published', () => {
-    expect(mobileApp?.applies(visitor({ iosAppUrl: '', androidAppUrl: '' }))).toBe(false)
-  })
-
-  it('reaches an operator who only published the iOS app', () => {
-    expect(mobileApp?.applies(visitor({ androidAppUrl: '' }))).toBe(true)
-  })
-
-  it('reaches an operator who only published the Android app', () => {
-    expect(mobileApp?.applies(visitor({ iosAppUrl: '' }))).toBe(true)
-  })
-
-  it('does not advertise the app to someone already using it', () => {
-    expect(mobileApp?.applies(visitor({ isNativeApp: true }))).toBe(false)
-  })
-
-  it('reaches web visitors of an instance that has an app', () => {
-    expect(mobileApp?.applies(visitor())).toBe(true)
-  })
-
-  it('sends every visitor to the marketing chooser instead of a single store', () => {
-    const actions = mobileApp?.actions?.(visitor()) ?? []
-
-    expect(actions).toEqual([{ labelKey: 'getTheApp', url: 'https://www.synaplan.com/app' }])
-  })
-
-  it('uses the German marketing page when the UI is German', () => {
-    const actions = mobileApp?.actions?.(visitor({ locale: 'de' })) ?? []
-
-    expect(actions[0]?.url).toBe('https://www.synaplan.com/de/app')
-  })
-
-  it('treats regional German locales as German', () => {
-    const actions = mobileApp?.actions?.(visitor({ locale: 'de-AT' })) ?? []
-
-    expect(actions[0]?.url).toBe('https://www.synaplan.com/de/app')
-  })
-
-  it('keeps other locales on the default English marketing page', () => {
-    const actions = mobileApp?.actions?.(visitor({ locale: 'fr' })) ?? []
-
-    expect(actions[0]?.url).toBe('https://www.synaplan.com/app')
-  })
-
-  it('still offers the chooser when the operator published only one store', () => {
-    const actions = mobileApp?.actions?.(visitor({ androidAppUrl: '' })) ?? []
-
-    expect(actions.map((action) => action.labelKey)).toEqual(['getTheApp'])
+  it('has no live announcements, so login lands on chat without a modal', () => {
+    expect(announcements).toEqual([])
   })
 
   it('gives every entry an id and expiry that the modal can rely on', () => {

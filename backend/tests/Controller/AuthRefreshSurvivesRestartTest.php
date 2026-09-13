@@ -137,6 +137,62 @@ final class AuthRefreshSurvivesRestartTest extends WebTestCase
         $this->assertSame($userId, $payload['user']['id'] ?? null);
     }
 
+    public function testInvalidRefreshDoesNotClearExistingAuthCookies(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = $client->getContainer()->get('doctrine')->getManager();
+
+        $this->persistUser($em, 'refresh-must-not-wipe@example.com', withFirstName: false);
+
+        $client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'refresh-must-not-wipe@example.com',
+                'password' => 'RestartPass123!',
+            ]),
+        );
+        $this->assertResponseIsSuccessful();
+
+        $jar = $client->getCookieJar();
+        $accessBefore = $jar->get(TokenService::ACCESS_COOKIE)?->getValue();
+        $this->assertNotNull($accessBefore);
+        $liveRefresh = $jar->get(TokenService::REFRESH_COOKIE);
+        $this->assertNotNull($liveRefresh);
+
+        // Replace the refresh cookie in place: the jar keys cookies by
+        // name+domain+path, so a mismatching domain would ADD a second cookie
+        // and the request would still carry the live token.
+        $jar->set(new BrowserKitCookie(
+            TokenService::REFRESH_COOKIE,
+            'dead-refresh-from-previous-tab',
+            (string) (time() + 3600),
+            $liveRefresh->getPath(),
+            (string) $liveRefresh->getDomain(),
+            $liveRefresh->isSecure(),
+            true,
+        ));
+        $this->assertSame(
+            'dead-refresh-from-previous-tab',
+            $jar->get(TokenService::REFRESH_COOKIE)?->getValue(),
+            'test setup: the dead token must be the only refresh cookie sent',
+        );
+
+        $client->request('POST', '/api/v1/auth/refresh');
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertSame('INVALID_REFRESH_TOKEN', $payload['code'] ?? null);
+
+        $accessAfter = $jar->get(TokenService::ACCESS_COOKIE);
+        $this->assertNotNull($accessAfter, 'a failed refresh must not expire the access cookie');
+        $this->assertSame($accessBefore, $accessAfter->getValue());
+    }
+
     public function testRefreshRejectsSuspendedAccountAndDoesNotExtendToken(): void
     {
         self::ensureKernelShutdown();
