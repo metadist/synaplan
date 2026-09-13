@@ -320,6 +320,11 @@ does, a stale access cookie — expired during downtime, or signed with a
 previous `APP_SECRET` — returns `401 AUTH_FAILED` before the controller can
 read `BTOKENS`, and every user looks logged out after a restart.
 
+Because refresh is public, the firewall `AccountStatusChecker` does not run
+on that request. `TokenService::refreshTokens()` and the OIDC refresh branch
+still refuse suspended or banned accounts and do not slide `BTOKENS`, so a
+leftover 30-day refresh row cannot keep a blocked user signed in.
+
 Two things must stay stable for that to hold:
 
 - **`APP_SECRET`** — the self-hosted stack persists it in

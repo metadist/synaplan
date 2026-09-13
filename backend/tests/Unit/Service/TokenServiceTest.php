@@ -82,6 +82,27 @@ final class TokenServiceTest extends TestCase
         self::assertNotNull($service->validateAccessToken($result['access_token']));
     }
 
+    public function testRefreshTokensRefusesSuspendedUserAndDoesNotSlideExpiry(): void
+    {
+        $user = $this->makeUser(active: false);
+        $originalExpiry = time() + 3600;
+        $refresh = new Token();
+        $refresh->setUser($user);
+        $refresh->setType(TokenService::TYPE_REFRESH);
+        $refresh->setToken('refresh-suspended');
+        $refresh->setExpires($originalExpiry);
+        $refresh->setUsed(false);
+
+        $tokenRepository = $this->createMock(TokenRepository::class);
+        $tokenRepository->method('findValidToken')->willReturn($refresh);
+        $tokenRepository->expects(self::never())->method('save');
+
+        $service = $this->makeService(self::SECRET_A, $tokenRepository);
+
+        self::assertNull($service->refreshTokens('refresh-suspended'));
+        self::assertSame($originalExpiry, $refresh->getExpires());
+    }
+
     public function testRefreshCookieLifetimeMatchesRefreshTtl(): void
     {
         $before = time();
@@ -104,13 +125,14 @@ final class TokenServiceTest extends TestCase
         );
     }
 
-    private function makeUser(): User&MockObject
+    private function makeUser(bool $active = true): User&MockObject
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(7);
         $user->method('getMail')->willReturn('ada@example.com');
         $user->method('getRoles')->willReturn(['ROLE_USER']);
         $user->method('getUserLevel')->willReturn('PRO');
+        $user->method('isActive')->willReturn($active);
 
         return $user;
     }

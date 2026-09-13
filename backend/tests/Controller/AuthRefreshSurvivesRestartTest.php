@@ -7,8 +7,10 @@ namespace App\Tests\Controller;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Service\TokenService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\BrowserKit\Cookie as BrowserKitCookie;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * After a container restart the 5-minute access cookie is typically stale:
@@ -19,22 +21,24 @@ use Symfony\Component\BrowserKit\Cookie as BrowserKitCookie;
  */
 final class AuthRefreshSurvivesRestartTest extends WebTestCase
 {
+    /** @var list<int> */
+    private array $createdUserIds = [];
+
+    protected function tearDown(): void
+    {
+        $this->cleanupCreatedUsers();
+        self::ensureKernelShutdown();
+        parent::tearDown();
+    }
+
     public function testRefreshSucceedsWhenAccessCookieNoLongerVerifies(): void
     {
         self::ensureKernelShutdown();
         $client = static::createClient();
+        /** @var EntityManagerInterface $em */
         $em = $client->getContainer()->get('doctrine')->getManager();
 
-        $user = new User();
-        $user->setMail('restart-session@example.com');
-        $user->setPw(password_hash('RestartPass123!', PASSWORD_BCRYPT));
-        $user->setUserLevel('PRO');
-        $user->setProviderId('local');
-        $user->setCreated(date('YmdHis'));
-        $user->setEmailVerified(true);
-        $user->setUserDetails(['firstName' => 'Restart']);
-        $em->persist($user);
-        $em->flush();
+        $user = $this->persistUser($em, 'restart-session@example.com');
         $userId = (int) $user->getId();
 
         $client->request(
@@ -91,34 +95,16 @@ final class AuthRefreshSurvivesRestartTest extends WebTestCase
         $ttl = $rewrittenRefresh->getExpiresTime() - time();
         $this->assertGreaterThan(29 * 86400, $ttl);
         $this->assertLessThanOrEqual(TokenService::REFRESH_TOKEN_TTL + 5, $ttl);
-
-        $em->clear();
-        foreach ($em->getRepository(Token::class)->findBy(['user' => $userId]) as $token) {
-            $em->remove($token);
-        }
-        $em->flush();
-        $entity = $em->getRepository(User::class)->find($userId);
-        if ($entity) {
-            $em->remove($entity);
-            $em->flush();
-        }
     }
 
     public function testLoginSucceedsWhenStaleAccessCookieIsStillSent(): void
     {
         self::ensureKernelShutdown();
         $client = static::createClient();
+        /** @var EntityManagerInterface $em */
         $em = $client->getContainer()->get('doctrine')->getManager();
 
-        $user = new User();
-        $user->setMail('restart-relogin@example.com');
-        $user->setPw(password_hash('RestartPass123!', PASSWORD_BCRYPT));
-        $user->setUserLevel('PRO');
-        $user->setProviderId('local');
-        $user->setCreated(date('YmdHis'));
-        $user->setEmailVerified(true);
-        $em->persist($user);
-        $em->flush();
+        $user = $this->persistUser($em, 'restart-relogin@example.com', withFirstName: false);
         $userId = (int) $user->getId();
 
         $client->getCookieJar()->set(new BrowserKitCookie(
@@ -149,16 +135,98 @@ final class AuthRefreshSurvivesRestartTest extends WebTestCase
         $payload = json_decode((string) $client->getResponse()->getContent(), true);
         $this->assertTrue($payload['success'] ?? false);
         $this->assertSame($userId, $payload['user']['id'] ?? null);
+    }
+
+    public function testRefreshRejectsSuspendedAccountAndDoesNotExtendToken(): void
+    {
+        self::ensureKernelShutdown();
+        $client = static::createClient();
+        /** @var EntityManagerInterface $em */
+        $em = $client->getContainer()->get('doctrine')->getManager();
+
+        $user = $this->persistUser($em, 'restart-suspended@example.com', withFirstName: false);
+        $userId = (int) $user->getId();
+
+        $client->request(
+            'POST',
+            '/api/v1/auth/login',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => 'restart-suspended@example.com',
+                'password' => 'RestartPass123!',
+            ]),
+        );
+        $this->assertResponseIsSuccessful('login must succeed before the account is suspended');
 
         $em->clear();
-        foreach ($em->getRepository(Token::class)->findBy(['user' => $userId]) as $token) {
-            $em->remove($token);
+        $tokens = $em->getRepository(Token::class)->findBy(['user' => $userId]);
+        $this->assertNotEmpty($tokens);
+        $expiryBefore = $tokens[0]->getExpires();
+
+        $suspended = $em->getRepository(User::class)->find($userId);
+        $this->assertNotNull($suspended);
+        $suspended->setAccountStatus(User::ACCOUNT_STATUS_SUSPENDED);
+        $em->flush();
+
+        $client->request('POST', '/api/v1/auth/refresh');
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertSame('ACCOUNT_SUSPENDED', $payload['code'] ?? null);
+
+        $em->clear();
+        $tokensAfter = $em->getRepository(Token::class)->findBy(['user' => $userId]);
+        $this->assertNotEmpty($tokensAfter);
+        $this->assertSame($expiryBefore, $tokensAfter[0]->getExpires());
+    }
+
+    private function persistUser(EntityManagerInterface $em, string $email, bool $withFirstName = true): User
+    {
+        $user = new User();
+        $user->setMail($email);
+        $user->setPw(password_hash('RestartPass123!', PASSWORD_BCRYPT));
+        $user->setUserLevel('PRO');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
+        if ($withFirstName) {
+            $user->setUserDetails(['firstName' => 'Restart']);
+        }
+        $em->persist($user);
+        $em->flush();
+        $this->createdUserIds[] = (int) $user->getId();
+
+        return $user;
+    }
+
+    private function cleanupCreatedUsers(): void
+    {
+        if ([] === $this->createdUserIds) {
+            return;
+        }
+
+        try {
+            /** @var EntityManagerInterface $em */
+            $em = static::getContainer()->get('doctrine')->getManager();
+        } catch (\Throwable) {
+            $this->createdUserIds = [];
+
+            return;
+        }
+
+        $em->clear();
+        foreach ($this->createdUserIds as $userId) {
+            foreach ($em->getRepository(Token::class)->findBy(['user' => $userId]) as $token) {
+                $em->remove($token);
+            }
+            $entity = $em->getRepository(User::class)->find($userId);
+            if ($entity) {
+                $em->remove($entity);
+            }
         }
         $em->flush();
-        $entity = $em->getRepository(User::class)->find($userId);
-        if ($entity) {
-            $em->remove($entity);
-            $em->flush();
-        }
+        $this->createdUserIds = [];
     }
 }
