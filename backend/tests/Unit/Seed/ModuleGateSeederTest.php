@@ -17,7 +17,7 @@ final class ModuleGateSeederTest extends TestCase
 {
     use BuildsAllModules;
 
-    public function testOneGlobalRowPerModuleWithTikaOn(): void
+    public function testOneGlobalRowPerModuleWithTikaAndDoclingOn(): void
     {
         $ids = array_keys($this->allModules());
         sort($ids);
@@ -47,8 +47,9 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
         $this->assertSame('1', $bySetting['GATE_TIKA']);
+        $this->assertSame('1', $bySetting['GATE_DOCLING']);
         foreach ($bySetting as $setting => $value) {
-            if ('GATE_TIKA' === $setting) {
+            if (in_array($setting, ['GATE_TIKA', 'GATE_DOCLING'], true)) {
                 continue;
             }
             $this->assertSame('0', $value, $setting);
@@ -63,8 +64,12 @@ final class ModuleGateSeederTest extends TestCase
             ModuleGateSeeder::defaultRows(['tika']),
         );
         $this->assertSame(
-            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_DOCLING', 'value' => '0']],
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_DOCLING', 'value' => '1']],
             ModuleGateSeeder::defaultRows(['docling']),
+        );
+        $this->assertSame(
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_SEARXNG', 'value' => '0']],
+            ModuleGateSeeder::defaultRows(['searxng']),
         );
     }
 }

@@ -14,8 +14,8 @@ use Symfony\Contracts\Service\ResetInterface;
  *
  * A gate that is ON lets {@see \App\Module\Http\ModuleGateListener} answer a
  * uniform 404 on the module's routes while the module is absent. New installs
- * seed gates from {@see \App\Seed\ModuleGateSeeder} (tika ON, the rest OFF
- * until each FM21 PR). An unknown or malformed value also reads as OFF.
+ * seed gates from {@see \App\Seed\ModuleGateSeeder} (tika and docling ON,
+ * the rest OFF until each FM21 PR). An unknown or malformed value also reads as OFF.
  * Existing rows are never overwritten. Operators flip a gate under Operate → System configuration →
  * Features, or pin it with `FEATURE_MODULES_GATE_<ID>` ({@see FeatureFlagEnv}).
  *
