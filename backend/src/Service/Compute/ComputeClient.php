@@ -95,6 +95,36 @@ final readonly class ComputeClient
     }
 
     /**
+     * Snapshot of captured streams after the run is terminal. Never stored
+     * on the audit row.
+     *
+     * @return array{stdout: string, stderr: string}
+     */
+    public function collectLogs(string $runId, int $maxChars = 8000): array
+    {
+        $stdout = '';
+        $stderr = '';
+        try {
+            $this->streamLogs($runId, static function (array $event) use (&$stdout, &$stderr): void {
+                $data = json_decode($event['data'], true);
+                $text = is_array($data) ? (string) ($data['text'] ?? '') : '';
+                if ('stdout' === $event['event']) {
+                    $stdout .= $text;
+                } elseif ('stderr' === $event['event']) {
+                    $stderr .= $text;
+                }
+            });
+        } catch (\Throwable) {
+            return ['stdout' => '', 'stderr' => ''];
+        }
+
+        return [
+            'stdout' => mb_substr($stdout, 0, $maxChars),
+            'stderr' => mb_substr($stderr, 0, $maxChars),
+        ];
+    }
+
+    /**
      * @param callable(array{event: string, data: string, id: ?string}): void $onEvent
      */
     public function streamLogs(string $runId, callable $onEvent, ?string $lastEventId = null): void

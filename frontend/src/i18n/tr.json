@@ -3557,9 +3557,10 @@
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "usageCount": "istek",
       "scopes": {
-        "hint": "Tam erişim için işaretlemeyin. Bir kutuyu işaretlemek bu anahtarı Kişiler ile sınırlar.",
+        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, tam erişimli bir anahtara eklenebilir.",
         "iamRead": "Kişiler — grupları görüntüle",
-        "iamManage": "Kişiler — grupları yönet"
+        "iamManage": "Kişiler — grupları yönet",
+        "computeRun": "Dosya işi — dosyalarınızın kopyalarında kısa betikler çalıştır"
       }
     },
     "desktop": {

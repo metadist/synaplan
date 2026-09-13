@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\SavedTask;
 use App\Repository\PromptRepository;
 use App\Repository\SavedTaskRepository;
+use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Message\InferenceRouter;
 use App\Service\ModelConfigService;
@@ -1040,6 +1041,6 @@ final readonly class TaskPlanExecutor
             return null;
         }
 
-        return SkillPolicy::allowedCapabilities($profile);
+        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
     }
 }

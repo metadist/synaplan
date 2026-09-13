@@ -44,9 +44,17 @@ final readonly class ComputeArtefactStore
      */
     public function ingest(string $runId, Message $message, int $maxBytes): array
     {
+        return $this->ingestForUser($runId, $message->getUserId(), $maxBytes, $message->getId());
+    }
+
+    /**
+     * @return list<File>
+     */
+    public function ingestForUser(string $runId, int $userId, int $maxBytes, ?int $messageId = null): array
+    {
         $stored = [];
         foreach ($this->client->listArtefacts($runId) as $artefact) {
-            $file = $this->storeOne($runId, $artefact, $message, $maxBytes);
+            $file = $this->storeOne($runId, $artefact, $userId, $maxBytes, $messageId);
             if ($file instanceof File) {
                 $stored[] = $file;
             }
@@ -60,7 +68,7 @@ final readonly class ComputeArtefactStore
         return in_array($mime, self::MIME_ALLOW, true);
     }
 
-    private function storeOne(string $runId, ComputeArtefact $artefact, Message $message, int $maxBytes): ?File
+    private function storeOne(string $runId, ComputeArtefact $artefact, int $userId, int $maxBytes, ?int $messageId): ?File
     {
         if (null !== $artefact->rejected || !$this->allowsMime($artefact->mime)) {
             $this->logger->info('ComputeArtefactStore: skipped artefact', [
@@ -86,7 +94,6 @@ final readonly class ComputeArtefactStore
         $ext = strtolower(pathinfo($safe, PATHINFO_EXTENSION) ?: 'bin');
         $basename = pathinfo($safe, PATHINFO_FILENAME);
         $filename = $basename.'_'.time().'.'.$ext;
-        $userId = $message->getUserId();
         $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
         $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
         if (!FileHelper::ensureParentDirectory($absolute)) {
@@ -107,7 +114,7 @@ final readonly class ComputeArtefactStore
         $file->setSource('compute');
         $file->setOriginKind('artefact');
         $file->setVectorState(File::VECTOR_STATE_NONE);
-        $file->setMessageId($message->getId());
+        $file->setMessageId($messageId);
         $this->em->persist($file);
         $this->em->flush();
 

@@ -94,6 +94,10 @@ final class ComputeModule implements FeatureModuleInterface
             'App\Service\Compute\ComputeConfig',
             'App\Service\Compute\ComputeArtefactStore',
             'App\Service\Multitask\Execution\Runner\CodeRunRunner',
+            'App\AI\Messages\Tools\CodeExecutionTool',
+            'App\AI\Messages\Tools\CodeExecutionInvoker',
+            'App\Service\Compute\ComputeToolSource',
+            'App\Service\Compute\ComputeRunGrant',
         ];
     }
 

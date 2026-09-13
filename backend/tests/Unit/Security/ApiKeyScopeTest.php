@@ -68,6 +68,23 @@ final class ApiKeyScopeTest extends TestCase
         ], ApiKeyScope::pairingScopes());
     }
 
+    public function testComputeRunIsAToolGrantNotAPathScope(): void
+    {
+        self::assertFalse(ApiKeyScope::grantsComputeRun([]));
+        self::assertFalse(ApiKeyScope::grantsComputeRun(['webhooks:*']));
+        self::assertFalse(ApiKeyScope::grantsComputeRun(['webhooks:email']));
+        self::assertFalse(ApiKeyScope::grantsComputeRun(ApiKeyScope::pairingScopes()));
+        self::assertFalse(ApiKeyScope::grantsComputeRun(ApiKeyScope::addinScopes()));
+        self::assertTrue(ApiKeyScope::grantsComputeRun(['compute:run']));
+        self::assertTrue(ApiKeyScope::grantsComputeRun(['*']));
+        self::assertTrue(ApiKeyScope::grantsComputeRun(['desktop:messages', 'compute:run']));
+        self::assertSame(
+            [ApiKeyScope::DESKTOP_MESSAGES],
+            ApiKeyScope::requiredScopesForPath('/v1/messages'),
+        );
+        self::assertFalse(\in_array(ApiKeyScope::COMPUTE_RUN, ApiKeyScope::pairingScopes(), true));
+    }
+
     public function testWildcardAllowsEverything(): void
     {
         self::assertTrue(ApiKeyScope::allows(['*'], '/api/v1/admin/config/values'));

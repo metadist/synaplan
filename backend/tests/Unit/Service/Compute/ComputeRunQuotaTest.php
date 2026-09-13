@@ -53,7 +53,7 @@ final class ComputeRunQuotaTest extends TestCase
         );
         $context = new NodeContext($this->createStub(Message::class), [], 7, []);
 
-        $result = $runner->run(new TaskNode('n1', Capability::CodeRun), $context);
+        $result = $runner->run(new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']), $context);
 
         $this->assertFalse($result->isSuccessful());
         $this->assertSame(CodeRunRunner::QUOTA_COPY, $result->error);

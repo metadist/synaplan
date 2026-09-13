@@ -2562,9 +2562,10 @@
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
       "usageCount": "Anfragen",
       "scopes": {
-        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen begrenzt diesen Schlüssel auf Personen.",
+        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit kann auf einem Schlüssel mit vollem Zugriff ergänzt werden.",
         "iamRead": "Personen — Gruppen ansehen",
-        "iamManage": "Personen — Gruppen verwalten"
+        "iamManage": "Personen — Gruppen verwalten",
+        "computeRun": "Dateiarbeit — kurze Skripte auf Kopien Ihrer Dateien ausführen"
       }
     },
     "desktop": {

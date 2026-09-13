@@ -79,6 +79,13 @@ final class ApiKeyScope
     public const AGENTS_ALL = 'agents:*';
 
     /**
+     * Tool grant for `code_execution` / `code_run`. Not a path scope: `/v1/*`
+     * stays gated by {@see DESKTOP_MESSAGES}. Empty-scope and webhook-only
+     * keys do not receive it; only an explicit `compute:run` or `*` does.
+     */
+    public const COMPUTE_RUN = 'compute:run';
+
+    /**
      * Paths any authenticated key may reach regardless of scopes: identity
      * introspection of the key's own account ("who am I"), needed by every
      * integration for its ping/health check. Read-only and owner-scoped.
@@ -325,6 +332,30 @@ final class ApiKeyScope
     private static function matchesPrefix(string $path, string $prefix): bool
     {
         return $path === $prefix || str_starts_with($path, $prefix.'/');
+    }
+
+    /**
+     * Whether $scopes grant a tool (not a path). Unlike {@see allows()},
+     * legacy empty and webhook-only lists do not inherit new tools.
+     *
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    public static function grantsTool(array $scopes, string $required): bool
+    {
+        $normalized = self::normalize($scopes);
+        if (\in_array(self::WILDCARD, $normalized, true)) {
+            return true;
+        }
+
+        return \in_array($required, $normalized, true);
+    }
+
+    /**
+     * @param list<string>|array<int|string, mixed> $scopes
+     */
+    public static function grantsComputeRun(array $scopes): bool
+    {
+        return self::grantsTool($scopes, self::COMPUTE_RUN);
     }
 
     /**

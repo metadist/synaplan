@@ -23,8 +23,16 @@ final readonly class ComputeConfig
     public const KEY_DEFAULT_PIDS = 'DEFAULT_PIDS';
     public const KEY_DEFAULT_OUTPUT_MB = 'DEFAULT_OUTPUT_MB';
     public const KEY_MAX_TIMEOUT_SEC = 'MAX_TIMEOUT_SEC';
+    public const KEY_POLICY_INTERACTIVE = 'POLICY_INTERACTIVE';
+    public const KEY_POLICY_UNATTENDED = 'POLICY_UNATTENDED';
+
+    public const POLICY_AUTO = 'auto';
+    public const POLICY_APPROVE = 'approve';
+    public const POLICY_BLOCK = 'block';
 
     private const DEFAULT_ENABLED = false;
+    private const DEFAULT_POLICY_INTERACTIVE = self::POLICY_AUTO;
+    private const DEFAULT_POLICY_UNATTENDED = self::POLICY_APPROVE;
 
     public function __construct(
         private ConfigRepository $configRepository,
@@ -75,6 +83,26 @@ final readonly class ComputeConfig
     public function maxTimeoutSec(): int
     {
         return $this->intSetting(self::KEY_MAX_TIMEOUT_SEC, 300);
+    }
+
+    public function policyInteractive(): string
+    {
+        return $this->policySetting(self::KEY_POLICY_INTERACTIVE, self::DEFAULT_POLICY_INTERACTIVE);
+    }
+
+    public function policyUnattended(): string
+    {
+        return $this->policySetting(self::KEY_POLICY_UNATTENDED, self::DEFAULT_POLICY_UNATTENDED);
+    }
+
+    private function policySetting(string $key, string $default): string
+    {
+        $raw = strtolower(trim((string) ($this->configRepository->getValue(0, self::CONFIG_GROUP, $key) ?? '')));
+        if (\in_array($raw, [self::POLICY_AUTO, self::POLICY_APPROVE, self::POLICY_BLOCK], true)) {
+            return $raw;
+        }
+
+        return $default;
     }
 
     /**

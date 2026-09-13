@@ -6,15 +6,18 @@ namespace App\Service\Multitask\Execution\Runner;
 
 use App\Entity\ComputeRun;
 use App\Entity\File;
+use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\ComputeRunRepository;
 use App\Repository\FileRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Compute\ComputeRefusedException;
 use App\Service\Compute\Contract\ComputeRunRequest;
+use App\Service\Compute\Contract\ComputeRunStatus;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -22,14 +25,21 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\ToolExecutionGate;
 use Psr\Log\LoggerInterface;
 
 /**
  * Planner-visible file-work step. Hidden when compute is off (C1).
+ * Every door (planner, both gateways, saved tasks) writes the same audit row.
  */
 final readonly class CodeRunRunner implements TaskRunner
 {
     public const QUOTA_COPY = 'You have used this week\'s file-work limit. Nothing new was saved.';
+    public const FORBID_COPY = AssistantSkillGate::REFUSAL;
 
     public function __construct(
         private ComputeConfig $computeConfig,
@@ -41,6 +51,7 @@ final readonly class CodeRunRunner implements TaskRunner
         private RateLimitService $rateLimits,
         private LoggerInterface $logger,
         private string $uploadDir,
+        private ?ToolExecutionGate $executionGate = null,
     ) {
     }
 
@@ -63,47 +74,154 @@ final readonly class CodeRunRunner implements TaskRunner
     public function run(TaskNode $node, NodeContext $context): NodeResult
     {
         $userId = $context->userId ?? 0;
-        if (!$this->computeEnabled($userId)) {
-            return NodeResult::failed('File work is not available on this installation.');
-        }
-
         $user = $this->users->find($userId);
         if (!$user instanceof User) {
             return NodeResult::failed('File work is not available on this installation.');
         }
 
-        $quota = $this->rateLimits->checkLimit($user, 'COMPUTE_RUNS');
-        if (!(bool) ($quota['allowed'] ?? false)) {
-            return NodeResult::failed(self::QUOTA_COPY);
-        }
-        if ($this->runs->countActiveForUser($userId) >= $this->concurrentCap($user)) {
-            return NodeResult::failed(self::QUOTA_COPY);
-        }
-
-        $inputs = $context->resolveInputs($node);
-        $script = $this->script($node, $inputs);
+        $script = $this->script($node, $context->resolveInputs($node));
         if (null === $script) {
             return NodeResult::failed('The file-work step had no script to run. Nothing new was saved.');
         }
 
-        $image = $this->image($node);
-        $program = 'node' === $image ? 'node' : 'python';
-        $scriptName = 'node' === $image ? 'main.js' : 'main.py';
-        $limits = $this->computeConfig->clampLimits(is_array($node->params['limits'] ?? null) ? $node->params['limits'] : []);
-        try {
-            $parts = $this->inputFiles($node, $userId);
-        } catch (ComputeRefusedException $e) {
-            return NodeResult::failed($e->isQuota() ? self::QUOTA_COPY : $e->getMessage());
+        $savedTaskRunId = is_numeric($context->options['saved_task_run_id'] ?? null)
+            ? (int) $context->options['saved_task_run_id']
+            : null;
+        $invokedVia = null !== $savedTaskRunId ? ComputeRun::VIA_SAVED_TASK : ComputeRun::VIA_PLANNER;
+        $policyContext = null !== $savedTaskRunId ? PolicyContext::Unattended : PolicyContext::Interactive;
+        $profile = $this->profileFrom($context);
+        $timeout = is_array($node->params['limits'] ?? null)
+            ? (int) ($node->params['limits']['timeoutSec'] ?? 0)
+            : 0;
+        $inputIds = [];
+        foreach ($node->params['inputFileIds'] ?? [] as $id) {
+            if (is_numeric($id)) {
+                $inputIds[] = (int) $id;
+            }
         }
-        $parts[] = ['name' => $scriptName, 'contents' => $script];
+
+        $result = $this->executeDirect(
+            $user,
+            $this->image($node),
+            $script,
+            $inputIds,
+            $timeout > 0 ? $timeout : null,
+            $invokedVia,
+            $profile,
+            $context->message,
+            is_numeric($context->classification['prompt_id'] ?? null) ? (int) $context->classification['prompt_id'] : $profile?->promptId,
+            $savedTaskRunId,
+            null,
+            $policyContext,
+            true === ($context->options['allow_unattended'] ?? false),
+            $context->isApproved($node->id),
+            $context->message->getId(),
+            $node,
+        );
+
+        return $this->toNodeResult($result);
+    }
+
+    /**
+     * Shared executor for the planner, both gateways, and saved tasks.
+     *
+     * @param list<int> $inputFileIds
+     *
+     * @return array{
+     *     outcome: string,
+     *     status: string,
+     *     exit_code: ?int,
+     *     stdout: string,
+     *     stderr: string,
+     *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
+     *     error: ?string,
+     *     approval_id: ?int,
+     *     compute_run_id: ?string
+     * }
+     */
+    public function executeDirect(
+        User $user,
+        string $language,
+        string $code,
+        array $inputFileIds,
+        ?int $timeoutSec,
+        string $invokedVia,
+        ?RuntimeProfile $assistant = null,
+        ?Message $message = null,
+        ?int $promptId = null,
+        ?int $savedTaskRunId = null,
+        ?int $approvalId = null,
+        PolicyContext $policyContext = PolicyContext::Interactive,
+        bool $allowUnattended = false,
+        bool $alreadyApproved = false,
+        ?int $messageId = null,
+        ?TaskNode $node = null,
+    ): array {
+        $userId = (int) $user->getId();
+        if (!$this->computeEnabled($userId)) {
+            return $this->failedOutcome('File work is not available on this installation.');
+        }
+
+        if (!AssistantSkillGate::allows($assistant, Capability::CodeRun->value)) {
+            return $this->failedOutcome(self::FORBID_COPY, AssistantSkillGate::REASON);
+        }
+
+        if (!$alreadyApproved) {
+            $gated = $this->consultPolicy(
+                $user,
+                $language,
+                $code,
+                $inputFileIds,
+                $timeoutSec,
+                $invokedVia,
+                $policyContext,
+                $allowUnattended,
+                $savedTaskRunId,
+                $messageId,
+                $node,
+            );
+            if (null !== $gated) {
+                return $gated;
+            }
+        }
+
+        $quota = $this->rateLimits->checkLimit($user, 'COMPUTE_RUNS');
+        if (!(bool) ($quota['allowed'] ?? false)) {
+            return $this->failedOutcome(self::QUOTA_COPY);
+        }
+        if ($this->runs->countActiveForUser($userId) >= $this->concurrentCap($user)) {
+            return $this->failedOutcome(self::QUOTA_COPY);
+        }
+
+        $image = 'node' === $language ? 'node' : 'python';
+        $program = $image;
+        $scriptName = 'node' === $image ? 'main.js' : 'main.py';
+        $limits = $this->computeConfig->clampLimits(
+            null !== $timeoutSec ? ['timeoutSec' => $timeoutSec] : [],
+        );
+
+        try {
+            $parts = $this->inputFilesFromIds($inputFileIds, $userId);
+        } catch (ComputeRefusedException $e) {
+            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $e->getMessage(), $e->errorCode());
+        }
+        $parts[] = ['name' => $scriptName, 'contents' => $code];
         $fileRefs = [];
         foreach ($parts as $part) {
             $fileRefs[] = ['name' => $part['name'], 'role' => 'input'];
         }
 
         $placeholder = 'q'.bin2hex(random_bytes(12));
-        $audit = new ComputeRun($userId, $placeholder, 'chat', $image, $program, $limits);
-        $audit->setMessageId($context->message->getId());
+        $audit = null !== $approvalId ? $this->runs->findQueuedByApproval($approvalId) : null;
+        if (!$audit instanceof ComputeRun) {
+            $audit = new ComputeRun($userId, $placeholder, $invokedVia, $image, $program, $limits);
+        }
+        $audit->setMessageId($messageId ?? $message?->getId());
+        $audit->setPromptId($promptId ?? $assistant?->promptId);
+        $audit->setSavedTaskRunId($savedTaskRunId);
+        if (null !== $approvalId) {
+            $audit->setApprovalId($approvalId);
+        }
         $this->runs->save($audit);
 
         try {
@@ -128,25 +246,39 @@ final readonly class CodeRunRunner implements TaskRunner
             $audit->setDurationMs($status->durationMs);
             $audit->setBytesIn($status->usage['bytesIn']);
             $audit->setBytesOut($status->usage['bytesOut']);
+            $logs = $this->client->collectLogs($runId);
 
             if ('succeeded' !== $status->status) {
                 $audit->markFinished(ComputeRun::STATUS_FAILED);
                 $this->runs->save($audit);
 
-                return NodeResult::failed($this->failureCopy($status->reason));
+                return [
+                    'outcome' => 'failed',
+                    'status' => ComputeRun::STATUS_FAILED,
+                    'exit_code' => $status->exitCode,
+                    'stdout' => $logs['stdout'],
+                    'stderr' => $logs['stderr'],
+                    'artefacts' => [],
+                    'error' => $this->failureCopy($status->reason),
+                    'approval_id' => $audit->getApprovalId(),
+                    'compute_run_id' => $runId,
+                ];
             }
 
-            $stored = $this->artefacts->ingest($runId, $context->message, $limits['outputMb'] * 1024 * 1024);
+            $stored = null !== $message
+                ? $this->artefacts->ingest($runId, $message, $limits['outputMb'] * 1024 * 1024)
+                : $this->artefacts->ingestForUser($runId, $userId, $limits['outputMb'] * 1024 * 1024, $messageId);
             $ids = [];
-            $descriptors = [];
+            $artefacts = [];
             foreach ($stored as $file) {
                 $id = $file->getId();
                 if (null !== $id) {
                     $ids[] = $id;
-                    $descriptors[] = [
-                        'path' => '/api/v1/files/'.$id,
-                        'type' => $file->getFileType(),
+                    $artefacts[] = [
+                        'file_id' => $id,
                         'name' => $file->getFileName(),
+                        'mime' => $file->getFileMime(),
+                        'size' => $file->getFileSize(),
                     ];
                 }
             }
@@ -155,25 +287,207 @@ final readonly class CodeRunRunner implements TaskRunner
             $this->runs->save($audit);
             $this->rateLimits->recordUsage($user, 'COMPUTE_RUNS', ['cpuSec' => $status->usage['cpuSec']]);
 
-            return NodeResult::ok(
-                [] === $stored ? 'File work finished. No new files were saved.' : 'File work finished.',
-                $descriptors,
-                ['compute_run_id' => $runId, 'exit_code' => $status->exitCode],
-            );
+            return [
+                'outcome' => 'ok',
+                'status' => ComputeRun::STATUS_SUCCEEDED,
+                'exit_code' => $status->exitCode,
+                'stdout' => $logs['stdout'],
+                'stderr' => $logs['stderr'],
+                'artefacts' => $artefacts,
+                'error' => null,
+                'approval_id' => $audit->getApprovalId(),
+                'compute_run_id' => $runId,
+            ];
         } catch (ComputeRefusedException $e) {
             $audit->setReason($e->errorCode());
             $audit->markFinished(ComputeRun::STATUS_FAILED);
             $this->runs->save($audit);
             $this->logger->info('CodeRunRunner: sidecar refused', ['code' => $e->errorCode()]);
 
-            return NodeResult::failed($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode()));
+            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode()), $e->errorCode());
         } catch (\Throwable $e) {
             $audit->markFinished(ComputeRun::STATUS_FAILED);
             $this->runs->save($audit);
             $this->logger->error('CodeRunRunner: run failed', ['error' => $e->getMessage()]);
 
-            return NodeResult::failed('File work could not finish. Nothing new was saved.');
+            return $this->failedOutcome('File work could not finish. Nothing new was saved.');
         }
+    }
+
+    /**
+     * @param list<int> $inputFileIds
+     *
+     * @return array{
+     *     outcome: string,
+     *     status: string,
+     *     exit_code: ?int,
+     *     stdout: string,
+     *     stderr: string,
+     *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
+     *     error: ?string,
+     *     approval_id: ?int,
+     *     compute_run_id: ?string
+     * }|null
+     */
+    private function consultPolicy(
+        User $user,
+        string $language,
+        string $code,
+        array $inputFileIds,
+        ?int $timeoutSec,
+        string $invokedVia,
+        PolicyContext $policyContext,
+        bool $allowUnattended,
+        ?int $savedTaskRunId,
+        ?int $messageId,
+        ?TaskNode $node,
+    ): ?array {
+        if (null === $this->executionGate) {
+            return null;
+        }
+
+        $userId = (int) $user->getId();
+        $args = [
+            'language' => $language,
+            'code' => $code,
+            'input_file_ids' => $inputFileIds,
+            'timeout_sec' => $timeoutSec,
+        ];
+        $requestedBy = null !== $savedTaskRunId && null !== $node
+            ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
+            : 'chat:'.(int) ($messageId ?? 0);
+        $override = is_string($node?->params['approval'] ?? null) ? $node->params['approval'] : null;
+
+        try {
+            $decision = $this->executionGate->inspect(
+                $userId,
+                Capability::CodeRun->value,
+                $args,
+                $user,
+                $policyContext,
+                $requestedBy,
+                null,
+                $allowUnattended,
+                null,
+                $override,
+            );
+        } catch (ToolNotRegisteredException) {
+            return null;
+        }
+
+        if (PolicyOutcome::Block === $decision['outcome']) {
+            return $this->failedOutcome((string) $decision['refusal']);
+        }
+
+        if (PolicyOutcome::Approve === $decision['outcome'] && null !== $decision['approval']) {
+            $approvalId = (int) $decision['approval']->getId();
+            $image = 'node' === $language ? 'node' : 'python';
+            $limits = $this->computeConfig->clampLimits(null !== $timeoutSec ? ['timeoutSec' => $timeoutSec] : []);
+            $audit = new ComputeRun(
+                $userId,
+                'q'.bin2hex(random_bytes(12)),
+                $invokedVia,
+                $image,
+                $image,
+                $limits,
+            );
+            $audit->setApprovalId($approvalId);
+            $audit->setMessageId($messageId);
+            $audit->setSavedTaskRunId($savedTaskRunId);
+            $this->runs->save($audit);
+
+            return [
+                'outcome' => 'waiting_approval',
+                'status' => ComputeRun::STATUS_QUEUED,
+                'exit_code' => null,
+                'stdout' => '',
+                'stderr' => '',
+                'artefacts' => [],
+                'error' => null,
+                'approval_id' => $approvalId,
+                'compute_run_id' => $audit->getRunId(),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array{
+     *     outcome: string,
+     *     status: string,
+     *     exit_code: ?int,
+     *     stdout: string,
+     *     stderr: string,
+     *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
+     *     error: ?string,
+     *     approval_id: ?int,
+     *     compute_run_id: ?string
+     * } $result
+     */
+    private function toNodeResult(array $result): NodeResult
+    {
+        if ('waiting_approval' === $result['outcome'] && null !== $result['approval_id']) {
+            return NodeResult::waitingApproval($result['approval_id'], [], [
+                'tool' => Capability::CodeRun->value,
+                'compute_run_id' => $result['compute_run_id'],
+            ]);
+        }
+        if ('ok' !== $result['outcome']) {
+            return NodeResult::failed((string) $result['error']);
+        }
+
+        $descriptors = [];
+        foreach ($result['artefacts'] as $artefact) {
+            $descriptors[] = [
+                'path' => '/api/v1/files/'.$artefact['file_id'],
+                'type' => $artefact['mime'],
+                'name' => $artefact['name'],
+            ];
+        }
+
+        return NodeResult::ok(
+            [] === $descriptors ? 'File work finished. No new files were saved.' : 'File work finished.',
+            $descriptors,
+            ['compute_run_id' => $result['compute_run_id'], 'exit_code' => $result['exit_code']],
+        );
+    }
+
+    /**
+     * @return array{
+     *     outcome: 'failed',
+     *     status: string,
+     *     exit_code: null,
+     *     stdout: string,
+     *     stderr: string,
+     *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
+     *     error: string,
+     *     approval_id: null,
+     *     compute_run_id: null
+     * }
+     */
+    private function failedOutcome(string $error, ?string $reason = null): array
+    {
+        unset($reason);
+
+        return [
+            'outcome' => 'failed',
+            'status' => ComputeRun::STATUS_FAILED,
+            'exit_code' => null,
+            'stdout' => '',
+            'stderr' => '',
+            'artefacts' => [],
+            'error' => $error,
+            'approval_id' => null,
+            'compute_run_id' => null,
+        ];
+    }
+
+    private function profileFrom(NodeContext $context): ?RuntimeProfile
+    {
+        $profile = $context->options['runtime_profile'] ?? $context->classification['runtime_profile'] ?? null;
+
+        return $profile instanceof RuntimeProfile ? $profile : null;
     }
 
     /**
@@ -198,20 +512,15 @@ final readonly class CodeRunRunner implements TaskRunner
     }
 
     /**
+     * @param list<int> $ids
+     *
      * @return list<array{name: string, contents: string}>
      */
-    private function inputFiles(TaskNode $node, int $userId): array
+    private function inputFilesFromIds(array $ids, int $userId): array
     {
-        $ids = $node->params['inputFileIds'] ?? [];
-        if (!is_array($ids)) {
-            return [];
-        }
         $parts = [];
         foreach ($ids as $id) {
-            if (!is_numeric($id)) {
-                continue;
-            }
-            $file = $this->files->find((int) $id);
+            $file = $this->files->find($id);
             if (!$file instanceof File || $file->getUserId() !== $userId) {
                 throw new ComputeRefusedException('workspace_not_owned', 'A selected file is not yours. Nothing new was saved.');
             }
@@ -241,7 +550,7 @@ final readonly class CodeRunRunner implements TaskRunner
         return rtrim($this->uploadDir, '/').'/'.$path;
     }
 
-    private function wait(string $runId, int $timeoutSec): \App\Service\Compute\Contract\ComputeRunStatus
+    private function wait(string $runId, int $timeoutSec): ComputeRunStatus
     {
         $deadline = time() + max(1, $timeoutSec) + 5;
         $status = $this->client->status($runId);

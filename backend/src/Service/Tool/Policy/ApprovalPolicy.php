@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Tool\Policy;
 
+use App\Service\Compute\ComputeConfig;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolsConfig;
@@ -22,6 +24,7 @@ final readonly class ApprovalPolicy
         private ToolsConfig $toolsConfig,
         private GroupPolicyProviderInterface $groupPolicy,
         private AssistantPolicyProviderInterface $assistantPolicy,
+        private ?ComputeConfig $computeConfig = null,
     ) {
     }
 
@@ -39,7 +42,7 @@ final readonly class ApprovalPolicy
     ): PolicyOutcome {
         $class = $tool->sideEffect;
         $resolved = $this->mostRestrictive([
-            $this->baseOutcome($tool, $actorId, $class),
+            $this->baseOutcome($tool, $actorId, $class, $context),
             $this->groupPolicy->outcomeFor($actorId, $tool, $class),
             $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class),
             $this->hardBlock($tool, $class),
@@ -63,13 +66,26 @@ final readonly class ApprovalPolicy
         return PolicyOutcome::Approve === $resolved;
     }
 
-    private function baseOutcome(ToolDescriptor $tool, int $actorId, SideEffect $class): PolicyOutcome
+    private function baseOutcome(ToolDescriptor $tool, int $actorId, SideEffect $class, PolicyContext $context): PolicyOutcome
     {
         if (ToolDescriptor::POLICY_OWN_ARTEFACT === $tool->policyException && $actorId === $tool->ownerId) {
             return PolicyOutcome::Auto;
         }
 
+        if (Capability::CodeRun->value === $tool->name || ToolSource::Compute === $tool->source) {
+            return $this->computeBaseOutcome($context);
+        }
+
         return $this->toolsConfig->defaultOutcome($class, $actorId);
+    }
+
+    private function computeBaseOutcome(PolicyContext $context): PolicyOutcome
+    {
+        $raw = PolicyContext::Unattended === $context
+            ? ($this->computeConfig?->policyUnattended() ?? ComputeConfig::POLICY_APPROVE)
+            : ($this->computeConfig?->policyInteractive() ?? ComputeConfig::POLICY_AUTO);
+
+        return PolicyOutcome::tryFrom($raw) ?? PolicyOutcome::Approve;
     }
 
     private function hardBlock(ToolDescriptor $tool, SideEffect $class): ?PolicyOutcome

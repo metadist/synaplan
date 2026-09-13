@@ -3556,9 +3556,10 @@
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "usageCount": "solicitudes",
       "scopes": {
-        "hint": "Déjelo sin marcar para acceso completo. Marcar una casilla limita esta clave a Personas.",
+        "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos se puede añadir a una clave de acceso completo.",
         "iamRead": "Personas — ver grupos",
-        "iamManage": "Personas — administrar grupos"
+        "iamManage": "Personas — administrar grupos",
+        "computeRun": "Trabajo con archivos — ejecutar scripts cortos sobre copias de tus archivos"
       }
     },
     "desktop": {

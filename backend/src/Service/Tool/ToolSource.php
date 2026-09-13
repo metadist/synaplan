@@ -12,4 +12,5 @@ enum ToolSource: string
     case Skill = 'skill';
     case Plugin = 'plugin';
     case Custom = 'custom';
+    case Compute = 'compute';
 }

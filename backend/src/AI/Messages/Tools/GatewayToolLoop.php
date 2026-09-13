@@ -8,12 +8,14 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
+use App\Entity\ComputeRun;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\ToolExecutionGate;
@@ -65,6 +67,7 @@ final readonly class GatewayToolLoop
         private ?ToolExecutionGate $executionGate = null,
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
+        private ?CodeExecutionTool $codeExecutionTool = null,
     ) {
     }
 
@@ -124,9 +127,13 @@ final readonly class GatewayToolLoop
         }
 
         $dropWebSearch = \in_array(WebSearchTool::NAME, $replacedServerTools, true);
+        $dropCodeExecution = \in_array(CodeExecutionTool::NAME, $replacedServerTools, true);
         $kept = [];
         foreach ($requestBody['tools'] as $tool) {
             if (\is_array($tool) && $dropWebSearch && AnthropicServerTools::isWebSearch($tool)) {
+                continue;
+            }
+            if (\is_array($tool) && $dropCodeExecution && AnthropicServerTools::isCodeExecution($tool)) {
                 continue;
             }
             $kept[] = $tool;
@@ -222,7 +229,7 @@ final readonly class GatewayToolLoop
                 break;
             }
 
-            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user);
+            $toolResults = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, null, $this->assistantFrom($translatorContext));
             $body = $this->appendToolTurn($body, $content, $toolResults);
         }
 
@@ -315,6 +322,7 @@ final readonly class GatewayToolLoop
                 ping: static function () use ($emitter): void {
                     $emitter->emitPing();
                 },
+                assistant: $this->assistantFrom($translatorContext),
             );
             $body = $this->appendToolTurn($body, $turn['content'], $toolResults);
         }
@@ -559,7 +567,7 @@ final readonly class GatewayToolLoop
      *
      * @return list<array<string, mixed>> tool_result content blocks
      */
-    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null): array
+    private function executeOurs(array $toolUses, array $dispatch, User $user, ?callable $ping = null, ?RuntimeProfile $assistant = null): array
     {
         if (count($toolUses) > self::MAX_TOOLS_PER_TURN) {
             $toolUses = array_slice($toolUses, 0, self::MAX_TOOLS_PER_TURN);
@@ -610,7 +618,7 @@ final readonly class GatewayToolLoop
                     $results[] = $gated;
                     continue;
                 }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user);
+                $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $assistant);
                 if (null !== $ping) {
                     $ping();
                     $lastPing = microtime(true);
@@ -723,7 +731,7 @@ final readonly class GatewayToolLoop
      *
      * @return array<string, mixed> tool_result content block
      */
-    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user): array
+    private function executeNative(string $tool, array $arguments, string $toolUseId, User $user, ?RuntimeProfile $assistant = null): array
     {
         if (WebSearchTool::NAME === $tool) {
             $result = $this->webSearchTool->execute($arguments);
@@ -739,7 +747,31 @@ final readonly class GatewayToolLoop
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
 
+        if (CodeExecutionTool::NAME === $tool && null !== $this->codeExecutionTool) {
+            $result = $this->codeExecutionTool->execute(
+                $arguments,
+                $user,
+                ComputeRun::VIA_GATEWAY_ANTHROPIC,
+                $assistant,
+                null,
+                $assistant?->promptId,
+            );
+            $this->recordNativeUsage($user, 'COMPUTE_RUNS', $tool, 'file_work', $result['isError']);
+
+            return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
+        }
+
         return $this->toolResultBlock($toolUseId, sprintf('Unknown Synaplan tool `%s`.', $tool), isError: true);
+    }
+
+    /**
+     * @param array<string, mixed> $translatorContext
+     */
+    private function assistantFrom(array $translatorContext): ?RuntimeProfile
+    {
+        $profile = $translatorContext['runtime_profile'] ?? null;
+
+        return $profile instanceof RuntimeProfile ? $profile : null;
     }
 
     /**

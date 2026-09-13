@@ -287,7 +287,10 @@ final readonly class MessagesGateway
         $sessionId = $request->headers->get('x-claude-code-session-id');
         $sessionKey = $this->sessionKey($sessionId, $user, $requestBody);
 
-        $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody);
+        $desktop = DesktopTurnOptions::fromRequest($request);
+        $profile = $this->resolveDesktopProfile($user, $desktop);
+
+        $toolCatalog = $this->toolCatalog->build($user, $sessionKey, $requestBody, $profile);
         $webSearch = $toolCatalog['web_search'];
         $toolLoop = [] !== $toolCatalog['tools'];
         $replacedServerTools = $this->toolCatalog->replacedServerTools($toolCatalog);
@@ -313,8 +316,6 @@ final readonly class MessagesGateway
         if ('on' === strtolower((string) $contextOverride)) {
             $injectContext = true;
         }
-        $desktop = DesktopTurnOptions::fromRequest($request);
-        $profile = $this->resolveDesktopProfile($user, $desktop);
         // Desktop headers are an explicit per-request pin, not a bypass of
         // CONTEXT_INJECTION_ENABLED. Ambient memories stay behind that flag.
         // An explicit knowledge folder (or recipe folders) still searches RAG
@@ -352,6 +353,7 @@ final readonly class MessagesGateway
             'x_fixture' => $request->headers->get('x-fixture'),
             'raw_body' => $bodyMutated ? null : $rawBody,
             'image_detail' => $imagePolicy['detail'],
+            'runtime_profile' => $profile,
         ];
 
         $headers = array_merge(

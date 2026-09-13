@@ -28,6 +28,8 @@ final readonly class ComputeConfigSeeder
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_DEFAULT_PIDS, 'value' => '128'],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_DEFAULT_OUTPUT_MB, 'value' => '50'],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_MAX_TIMEOUT_SEC, 'value' => '300'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_POLICY_INTERACTIVE, 'value' => ComputeConfig::POLICY_AUTO],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_POLICY_UNATTENDED, 'value' => ComputeConfig::POLICY_APPROVE],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'compute_config', $rows);

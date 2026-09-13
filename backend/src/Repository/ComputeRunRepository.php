@@ -24,6 +24,16 @@ class ComputeRunRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    public function findQueuedByApproval(int $approvalId): ?ComputeRun
+    {
+        $found = $this->findOneBy([
+            'approvalId' => $approvalId,
+            'status' => ComputeRun::STATUS_QUEUED,
+        ]);
+
+        return $found instanceof ComputeRun ? $found : null;
+    }
+
     public function countActiveForUser(int $userId): int
     {
         return (int) $this->createQueryBuilder('r')

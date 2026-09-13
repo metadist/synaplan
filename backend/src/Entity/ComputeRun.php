@@ -23,6 +23,11 @@ class ComputeRun
     public const STATUS_FAILED = 'failed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const VIA_PLANNER = 'planner';
+    public const VIA_GATEWAY_ANTHROPIC = 'gateway_anthropic';
+    public const VIA_GATEWAY_OPENAI = 'gateway_openai';
+    public const VIA_SAVED_TASK = 'saved_task';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]
@@ -85,6 +90,9 @@ class ComputeRun
     #[ORM\Column(name: 'BWORKSPACEID', length: 26, nullable: true)]
     private ?string $workspaceId = null;
 
+    #[ORM\Column(name: 'BAPPROVALID', type: 'bigint', nullable: true)]
+    private ?int $approvalId = null;
+
     #[ORM\Column(name: 'BCREATED', type: 'datetime_immutable')]
     private \DateTimeImmutable $created;
 
@@ -143,6 +151,44 @@ class ComputeRun
     public function setPromptId(?int $promptId): void
     {
         $this->promptId = $promptId;
+    }
+
+    public function getPromptId(): ?int
+    {
+        return $this->promptId;
+    }
+
+    public function getInvokedVia(): string
+    {
+        return $this->invokedVia;
+    }
+
+    public function getSavedTaskRunId(): ?int
+    {
+        return $this->savedTaskRunId;
+    }
+
+    public function setSavedTaskRunId(?int $savedTaskRunId): void
+    {
+        $this->savedTaskRunId = $savedTaskRunId;
+    }
+
+    public function getApprovalId(): ?int
+    {
+        return $this->approvalId;
+    }
+
+    public function setApprovalId(?int $approvalId): void
+    {
+        $this->approvalId = $approvalId;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    public function getArtefactIds(): ?array
+    {
+        return $this->artefactIds;
     }
 
     public function setExitCode(?int $exitCode): void

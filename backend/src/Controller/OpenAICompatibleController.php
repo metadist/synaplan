@@ -13,6 +13,7 @@ use App\Entity\Model;
 use App\Entity\User;
 use App\Message\SummarizeApiSessionCommand;
 use App\Repository\ModelRepository;
+use App\Service\Agent\AgentRuntimeResolver;
 use App\Service\Agent\AssistantAliasResolver;
 use App\Service\Api\OpenAiChatCompletionRequest;
 use App\Service\Api\OpenAiChatCompletionRequestException;
@@ -54,6 +55,7 @@ class OpenAICompatibleController extends AbstractController
         private OpenAiToolCallingGate $toolCallingGate,
         private OpenAiGatewayToolLoop $toolLoop,
         private ?AssistantAliasResolver $assistantAliases = null,
+        private ?AgentRuntimeResolver $agentRuntimeResolver = null,
     ) {
     }
 
@@ -258,6 +260,7 @@ class OpenAICompatibleController extends AbstractController
     private function dispatchChatCompletion(User $user, OpenAiChatCompletionRequest $parsed): Response
     {
         $messages = $parsed->messages;
+        $optionsProfile = null;
         if ($this->assistantAliases?->isAlias($parsed->model)) {
             $alias = $this->assistantAliases->resolveAlias($user, (string) $parsed->model);
             if (null === $alias) {
@@ -273,6 +276,14 @@ class OpenAICompatibleController extends AbstractController
                 : $this->resolveModel(null, $user->getId());
             if ('' !== $alias['instruction']) {
                 array_unshift($messages, ['role' => 'system', 'content' => $alias['instruction']]);
+            }
+            $agentId = $alias['agent']->getId();
+            if (null !== $agentId && null !== $this->agentRuntimeResolver) {
+                try {
+                    $optionsProfile = $this->agentRuntimeResolver->resolve((int) $agentId, $user, false, null);
+                } catch (\Throwable) {
+                    $optionsProfile = null;
+                }
             }
         } else {
             $resolvedModel = $this->resolveModel($parsed->model, $user->getId());
@@ -303,6 +314,9 @@ class OpenAICompatibleController extends AbstractController
             'provider' => $resolvedModel['provider'],
             'include_usage' => $parsed->includeUsage,
         ], $parsed->providerToolOptions());
+        if (null !== $optionsProfile) {
+            $options['runtime_profile'] = $optionsProfile;
+        }
         if ($gateAllows && 'none' !== $parsed->toolChoice) {
             $options['server_tool_loop'] = true;
         }

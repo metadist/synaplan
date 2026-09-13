@@ -25,6 +25,7 @@ use App\Service\Capability\CapabilityService;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Client\MobileVersionService;
+use App\Service\Compute\ComputeConfig;
 use App\Service\Config\FeatureStatusReporter;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
@@ -112,6 +113,7 @@ class ConfigController extends AbstractController
         private readonly ?ToolsConfig $toolsConfig = null,
         private readonly ?WorkflowsConfig $workflowsConfig = null,
         private readonly ?DocumentToolsConfig $documentToolsConfig = null,
+        private readonly ?ComputeConfig $computeConfig = null,
     ) {
     }
 
@@ -206,6 +208,7 @@ class ConfigController extends AbstractController
                         new OA\Property(property: 'iamImpersonationDisabled', type: 'boolean', example: false, description: 'When true, administrators cannot start an impersonation session (IAM.ADMIN_IMPERSONATION=disabled).'),
                         new OA\Property(property: 'iamPolicies', type: 'boolean', example: false, description: 'When true, People shows Policies and group defaults / allowed models apply. Requires iamGroups. On by default; pin with FEATURE_IAM_GROUP_POLICIES_ENABLED.'),
                         new OA\Property(property: 'officeConvertEnabled', type: 'boolean', example: false, description: 'When true, Collabora CODE convert-to is configured (OFFICE_CONVERT_URL). Office thumbnails, PDF export, inline preview and combine stay off while this is false.'),
+                        new OA\Property(property: 'computeEnabled', type: 'boolean', example: false, description: 'When true, file work is on (sidecar URL + token and COMPUTE.ENABLED). The API-key create form then offers the compute:run grant.'),
                         new OA\Property(property: 'documentToolsEnabled', type: 'boolean', example: false, description: 'When true, structured office editing (document tools, version history, combine as DOCX/XLSX/PPTX) is available. On by default; pin with FEATURE_DOCUMENT_TOOLS_ENABLED.'),
                         new OA\Property(property: 'toolsRegistryEnabled', type: 'boolean', example: true, description: 'When true, GET /api/v1/tools lists the tool registry. Kill switch after the Wave 4 registry refactor.'),
                         new OA\Property(property: 'toolsApprovalsEnabled', type: 'boolean', example: false, description: 'When true, write-class tools ask for approval and Manage → Automations → Approvals is shown. On by default; pin with FEATURE_TOOLS_APPROVALS_ENABLED.'),
@@ -540,6 +543,7 @@ class ConfigController extends AbstractController
             'iamPolicies' => $this->iamConfig->isGroupPoliciesEnabled($user?->getId()),
             'selfAware' => null !== $this->selfAwareConfig && $this->selfAwareConfig->isEnabled($user?->getId()),
             'officeConvertEnabled' => $this->modules->get(OfficeConvertModule::ID)->isConfigured(),
+            'computeEnabled' => null !== $this->computeConfig && $this->computeConfig->isEnabled($user?->getId()),
             'documentToolsEnabled' => null !== $this->documentToolsConfig && $this->documentToolsConfig->isEnabled($user?->getId()),
             'toolsRegistryEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isRegistryEnabled($user?->getId()),
             'toolsApprovalsEnabled' => null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($user?->getId()),

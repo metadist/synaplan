@@ -2402,9 +2402,10 @@
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "usageCount": "requêtes",
       "scopes": {
-        "hint": "Laissez décoché pour un accès complet. Cocher une case limite cette clé à Personnes.",
+        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers peut être ajouté à une clé à accès complet.",
         "iamRead": "Personnes — voir les groupes",
-        "iamManage": "Personnes — gérer les groupes"
+        "iamManage": "Personnes — gérer les groupes",
+        "computeRun": "Travail sur fichiers — exécuter de courts scripts sur des copies de vos fichiers"
       }
     },
     "desktop": {

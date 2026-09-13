@@ -2404,9 +2404,10 @@
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests",
       "scopes": {
-        "hint": "Leave unchecked for full access. Checking a box limits this key to People.",
+        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work can be added on a full-access key.",
         "iamRead": "People — view groups",
-        "iamManage": "People — manage groups"
+        "iamManage": "People — manage groups",
+        "computeRun": "File work — run short scripts on copies of your files"
       }
     },
     "desktop": {
