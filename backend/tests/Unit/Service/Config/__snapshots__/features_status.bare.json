@@ -188,6 +188,31 @@
     },
     "modules": [
         {
+            "id": "compute",
+            "label_key": "modules.compute.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "COMPUTE_URL or COMPUTE_TOKEN is unset",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "COMPUTE_URL",
+                    "COMPUTE_TOKEN"
+                ],
+                "bconfig": [
+                    "COMPUTE.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [
+                "code_execution"
+            ],
+            "docs_anchor": "modules/compute",
+            "mobile_class": "ota-candidate"
+        },
+        {
             "id": "docling",
             "label_key": "modules.docling.label",
             "state": "absent",

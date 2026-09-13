@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "limits_exceed_caps",
+    "message": "requested limits exceed instance caps",
+    "details": { "field": "memoryMb", "requested": 4096, "cap": 2048 }
+  }
+}

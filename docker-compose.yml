@@ -320,6 +320,10 @@ services:
       # needs `--profile office` (it is not started by a plain `up -d`).
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      # Secure compute sidecar. Empty = absent. Set both when using --profile compute:
+      #   COMPUTE_URL=http://compute:8080 COMPUTE_TOKEN=<32+ bytes>
+      COMPUTE_URL: ${COMPUTE_URL:-}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
       AI_DEFAULT_PROVIDER: ollama
       # Token Configuration
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
@@ -496,6 +500,8 @@ services:
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-http://searxng:8080}
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
+      COMPUTE_URL: ${COMPUTE_URL:-}
+      COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
       AI_DEFAULT_PROVIDER: ollama
       TOKEN_SECRET: 'change_me_in_production_use_openssl_rand_hex_32'
       LOCK_DSN: ${LOCK_DSN:-redis://redis:6379}
@@ -1034,6 +1040,32 @@ services:
     networks:
       - synaplan-network
 
+  # Optional secure compute — short Python/Node file work for the assistant.
+  # Not started by default. Enable with:
+  #   COMPUTE_TOKEN=$(openssl rand -hex 16) COMPUTE_URL=http://compute:8080 \
+  #     docker compose --profile compute up -d
+  # Then turn COMPUTE.ENABLED on (Operate → System config). Never publish :8080.
+  compute:
+    build:
+      context: ./sidecars/synaplan-compute
+    container_name: synaplan-compute
+    profiles: [compute]
+    restart: unless-stopped
+    environment:
+      # Empty default so `docker compose` interpolates without --profile compute.
+      # The sidecar refuses to start unless the token is at least 32 bytes.
+      COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-}
+      COMPUTE_LISTEN: :8080
+      COMPUTE_SCRATCH_DIR: /scratch
+      COMPUTE_WORKSPACES_DIR: /workspaces
+      COMPUTE_MAX_CONCURRENT: ${COMPUTE_MAX_CONCURRENT:-2}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - compute_scratch:/scratch
+      - compute_workspaces:/workspaces
+    networks:
+      - synaplan-network
+
   # Qdrant Vector Database (memories + document vectors)
   qdrant:
     image: qdrant/qdrant:v1.19.1@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
@@ -1053,6 +1085,8 @@ volumes:
   qdrant_storage:
   keycloak_certs:
   tts_extra_voices:
+  compute_scratch:
+  compute_workspaces:
 
 networks:
   synaplan-network:

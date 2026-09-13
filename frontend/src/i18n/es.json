@@ -2094,7 +2094,8 @@
       "search": "Búsqueda web",
       "extract": "Extracción de texto",
       "email": "Correo",
-      "folder": "Carpeta"
+      "folder": "Carpeta",
+      "compute": "Trabajo con archivos"
     },
     "capability": {
       "extract_text": "Extrayendo texto",
@@ -2115,7 +2116,8 @@
       "document_combine": "PDF combinado",
       "calendar_event": "Invitación de calendario",
       "email_me": "Envío por correo",
-      "save_to_folder": "Guardar en carpeta"
+      "save_to_folder": "Guardar en carpeta",
+      "code_run": "Trabajando con su archivo"
     },
     "copyText": "Copiar contenido",
     "copied": "Copiado al portapapeles",
@@ -2123,6 +2125,17 @@
     "expand": "Mostrar texto",
     "collapse": "Ocultar texto",
     "redundantCollapsed": "Salida del paso oculta — expande para verla o lee la respuesta abajo."
+  },
+  "compute": {
+    "working": "Trabajando con su archivo…",
+    "done": "Archivos resultantes",
+    "failed": "No se pudo terminar",
+    "quota": "Ha usado el límite de trabajo con archivos de esta semana. Inténtelo más tarde o pregunte a un administrador. No se guardó nada nuevo.",
+    "rerun": "Volver a ejecutar con cambios",
+    "rerunHelp": "La IA lo intentará de nuevo con sus notas",
+    "details": "Detalles",
+    "preview": "Vista previa",
+    "elapsed": "{seconds}s"
   },
   "processing": {
     "timeline": {
@@ -2762,7 +2775,8 @@
       "whatsapp": "WhatsApp",
       "widget": "Widget",
       "api": "API",
-      "generated": "Generado por IA"
+      "generated": "Generado por IA",
+      "compute": "Trabajo con archivos"
     },
     "vectorState": {
       "vectorized": "Consultable por IA",
@@ -5551,6 +5565,9 @@
     },
     "whatsapp": {
       "label": "Canal de WhatsApp"
+    },
+    "compute": {
+      "label": "Cómputo seguro (trabajo con archivos)"
     },
     "state": {
       "available": "Disponible",

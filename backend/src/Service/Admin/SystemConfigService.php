@@ -16,6 +16,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
+use App\Service\Compute\ComputeConfig;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\Digest\MessageDigestConfig;
@@ -234,6 +235,15 @@ final readonly class SystemConfigService
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
+                    'compute' => ['label' => 'Secure compute', 'fields' => [
+                        'COMPUTE_ENABLED',
+                        'COMPUTE_DEFAULT_TIMEOUT_SEC',
+                        'COMPUTE_DEFAULT_MEMORY_MB',
+                        'COMPUTE_DEFAULT_CPU',
+                        'COMPUTE_DEFAULT_PIDS',
+                        'COMPUTE_DEFAULT_OUTPUT_MB',
+                        'COMPUTE_MAX_TIMEOUT_SEC',
+                    ]],
                 ],
             ],
             'features' => [
@@ -1649,6 +1659,69 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => MediaJobConfig::CONFIG_GROUP,
                 'dbKey' => MediaJobConfig::KEY_ASYNC_JOBS_ENABLED,
+            ],
+            'COMPUTE_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let the assistant do short file work (Python or Node) on copies of files you chose. Also needs COMPUTE_URL and COMPUTE_TOKEN pointing at the compute sidecar. Off by default — nothing is offered until both the sidecar and this switch are on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_ENABLED,
+            ],
+            'COMPUTE_DEFAULT_TIMEOUT_SEC' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default seconds a file-work run may take.',
+                'default' => '60',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_TIMEOUT_SEC,
+            ],
+            'COMPUTE_DEFAULT_MEMORY_MB' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default memory cap in megabytes for a file-work run.',
+                'default' => '512',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_MEMORY_MB,
+            ],
+            'COMPUTE_DEFAULT_CPU' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default CPU share for a file-work run.',
+                'default' => '1.0',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_CPU,
+            ],
+            'COMPUTE_DEFAULT_PIDS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default process cap for a file-work run.',
+                'default' => '128',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_PIDS,
+            ],
+            'COMPUTE_DEFAULT_OUTPUT_MB' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Default size cap in megabytes for files the run may create.',
+                'default' => '50',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_DEFAULT_OUTPUT_MB,
+            ],
+            'COMPUTE_MAX_TIMEOUT_SEC' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'Hard ceiling in seconds for a file-work run.',
+                'default' => '300',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_MAX_TIMEOUT_SEC,
             ],
             // === Interface — in-chat usage taximeter (database-backed, no restart) ===
             // Master switch (BCONFIG group USAGE_TAXIMETER, ownerId=0) for the in-chat

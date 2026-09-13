@@ -69,6 +69,19 @@ Route-name convention used below: `prefix` + `name` as Symfony concatenates them
 | Mobile class | backend-only; admin UI ota-candidate. No store-required match |
 | Notes / risks | Cleanest module candidate: single URL key, own client + adapter + health, explicit `isEnabled()`, dedicated featuresStatus block, already editable in the admin `.env` editor (`SystemConfigService.php` schema tab `processing.docling`) |
 
+### `compute`
+
+| Row | Value |
+| --- | --- |
+| Service ids / classes | `App\Service\Compute\ComputeConfig`, `ComputeClient`, `ComputeArtefactStore`; `App\Service\Multitask\Execution\Runner\CodeRunRunner`; `App\Entity\ComputeRun` / `ComputeRunRepository` |
+| Route names | none (sidecar is reached from PHP only; no public compute HTTP API) |
+| Env keys | `COMPUTE_URL`, `COMPUTE_TOKEN` (both required for `isConfigured()`; empty = absent) |
+| BCONFIG keys | Group `COMPUTE`: `ENABLED` (default 0), `DEFAULT_TIMEOUT_SEC`, `DEFAULT_MEMORY_MB`, `DEFAULT_CPU`, `DEFAULT_PIDS`, `DEFAULT_OUTPUT_MB`, `MAX_TIMEOUT_SEC` |
+| Capability ids | `code_execution` (inventory); planner capability `code_run` when `ComputeConfig::isEnabled()` |
+| Frontend | `ComputeRunCard.vue` (chat card, ota-candidate); Feature Status row |
+| Mobile class | PHP backend-only; run card ota-candidate |
+| Notes | First PHP feature born as a `FeatureModule`. Flag off or URL/token empty = no teaser. Compose profile `compute` is opt-in; PHP never mounts `docker.sock`. |
+
 ### `office_convert`
 
 | Row | Value |

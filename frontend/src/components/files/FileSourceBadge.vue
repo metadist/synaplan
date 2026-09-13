@@ -43,6 +43,7 @@ const icon = computed(() => {
     widget: 'mdi:puzzle-outline',
     api: 'mdi:api',
     generated: 'mdi:auto-fix',
+    compute: 'mdi:file-cog-outline',
   }
   return map[props.source] ?? 'mdi:tray-arrow-up'
 })

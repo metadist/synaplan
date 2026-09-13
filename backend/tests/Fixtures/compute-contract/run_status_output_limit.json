@@ -1,0 +1,11 @@
+{
+  "runId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "status": "failed",
+  "exitCode": 1,
+  "reason": "output_limit",
+  "startedAt": "2026-09-10T07:00:00Z",
+  "finishedAt": "2026-09-10T07:00:09Z",
+  "durationMs": 9000,
+  "usage": { "wallMs": 9000, "cpuSec": 0.0, "maxMemoryMb": 0, "bytesIn": 128, "bytesOut": 53687091 },
+  "truncated": { "stdout": false, "stderr": false }
+}

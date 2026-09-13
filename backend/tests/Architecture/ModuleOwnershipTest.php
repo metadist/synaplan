@@ -47,6 +47,7 @@ final class ModuleOwnershipTest extends TestCase
         'stripe_billing',
         'mobile_iap',
         'whatsapp',
+        'compute',
     ];
 
     /**
@@ -195,7 +196,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(12, self::MODULE_IDS);
+        $this->assertCount(13, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

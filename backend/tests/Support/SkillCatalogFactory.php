@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
+use App\Service\Multitask\Execution\Runner\CodeRunRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\Runner\ConditionRunner;
 use App\Service\Multitask\Execution\Runner\DocumentCombineRunner;
@@ -64,6 +65,7 @@ final class SkillCatalogFactory
         ToolCallRunner::class,
         OutboundWebhookRunner::class,
         ConditionRunner::class,
+        CodeRunRunner::class,
     ];
 
     public static function real(): SkillCatalog

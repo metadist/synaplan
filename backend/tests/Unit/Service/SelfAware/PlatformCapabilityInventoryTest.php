@@ -16,6 +16,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Compute\ComputeConfig;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\MailerConfig;
 use App\Service\Mcp\McpClientConfig;
@@ -143,10 +144,15 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertSame('4.2.1', $report->version);
     }
 
+    public function inventoryForCompute(ComputeConfig $compute): PlatformCapabilityInventory
+    {
+        return $this->inventory(true, [], false, false, compute: $compute);
+    }
+
     /**
      * @param array<string, int> $models
      */
-    private function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = ''): PlatformCapabilityInventory
+    protected function inventory(bool $chatReady, array $models, bool $brave, bool $billing, string $officeUrl = '', string $ttsUrl = '', ?ComputeConfig $compute = null): PlatformCapabilityInventory
     {
         $chatReadiness = $this->createMock(ChatReadinessService::class);
         $chatReadiness->method('isChatReady')->willReturn($chatReady);
@@ -224,6 +230,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
             $connections,
             $users,
             $this->modules($officeUrl, $ttsUrl),
+            $compute,
         );
     }
 

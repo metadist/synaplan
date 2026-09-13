@@ -1,0 +1,51 @@
+# Deployment — isolation tiers
+
+Compute is reachable from the Synaplan PHP backend only. Never publish
+`8080` on a public interface.
+
+Authentication: `Authorization: Bearer <COMPUTE_AUTH_TOKEN>` on every path
+except `GET /v1/health`. PHP holds the same value as `COMPUTE_TOKEN`.
+
+## T1 — same host (developer / self-host)
+
+Compose profile `compute` in `synaplan/docker-compose.yml`:
+
+```bash
+COMPUTE_TOKEN=$(openssl rand -hex 16) COMPUTE_URL=http://compute:8080 \
+  docker compose --profile compute up -d
+```
+
+`COMPUTE_TOKEN` must be at least 32 bytes. Compose interpolates the
+variable even when the profile is off, so it defaults to empty rather
+than failing `docker compose ps`. The sidecar refuses to start if the
+token is short.
+
+Honest limits: this is hardened Docker on the same machine as PHP
+(`--network none`, dropped caps, read-only rootfs). It is **not** the
+Cloud posture. Default concurrency is 2 on a 4 GB laptop.
+
+PHP never mounts `docker.sock`. Only the `compute` service does.
+
+## T2 — gVisor on a separate compute node (required for Synaplan Cloud)
+
+Install `runsc`, register it in Docker `daemon.json` `runtimes`, set
+`COMPUTE_TIER=gvisor`, and run the sidecar on a dedicated host or a
+dedicated Docker daemon. Web hosts set `COMPUTE_URL` to that node over
+the private network. The `synaplan-platform` service block lives in the
+private repo.
+
+## T3 — Kata / Firecracker
+
+Documented only. Same API; the tier is reported in `GET /v1/health`.
+
+## Images
+
+Runtime images are `python` and `node` keys, pinned by digest in the
+sidecar image map. A non-digest reference is refused at sidecar start.
+Release tags are `v1.x.y`. Do not reference `latest` in production compose.
+
+```bash
+cosign verify ghcr.io/metadist/synaplan-compute:<tag> \
+  --certificate-identity-regexp='https://github.com/metadist/synaplan/.+' \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+```

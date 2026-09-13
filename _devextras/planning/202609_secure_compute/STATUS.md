@@ -10,8 +10,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | A0 Spike & threat model | `sidecars/synaplan-compute` | implemented | Go/no-go: **own Go sidecar**. Threat model + HostConfig dump. |
 | A1 Runner MVP | same | implemented | Health, auth, Python/Node images, `TestHostConfigHardening`, hostile corpus scripts. |
 | A2 Workspaces & tiers | same | implemented | Workspace layout + contract fixtures. PHP never mounts `docker.sock`. |
-| A3 Freeze | — | planned | Wave 5. |
-| B1 Client & capability | — | planned | Wave 5 — PHP `ComputeClient` + `COMPUTE.ENABLED`. |
+| A3 Freeze | `feat/wave5-compute-a3-b1` | implemented (uncommitted) | Protocol 1 fixtures vendored + checksums; compose profile `compute` (ask recorded 2026-09-13). `COMPUTE_TOKEN` interpolates empty so `docker compose` works without the profile. |
+| B1 Client & capability | `feat/wave5-compute-a3-b1` | implemented (uncommitted) | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. B2 not started. |
 | B2 Tools & policy | — | planned | Wave 5 — `code_run` write-class tool. |
 | B3 Workspaces & egress | — | planned | Wave 5. |
 | B4 Hardening & GA | — | planned | Wave 5. |
@@ -28,6 +28,8 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-10 | A0–A2 land in this repo under `sidecars/synaplan-compute`. No PHP integration in Wave 4. |
 | 2026-09-10 | A0–A2 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
 | 2026-09-10 | **Wave 5 decisions ticked:** Desktop is not the compute runtime. A3 + B1–B4 stay the next compute strain after this Tools S5 PR. `code_run` is write-class / unattended default `approve`. Cloud stays off until T2 on a compute node. Born as a feature module when B1 starts. |
+| 2026-09-13 | **Compose ask (CP30):** `docker-compose.yml` gains an opt-in `compute` profile that builds `sidecars/synaplan-compute` and mounts `docker.sock` **only** on that service. Backend/worker `COMPUTE_URL`/`COMPUTE_TOKEN` stay empty unless the operator sets them. Recorded before the compose change landed on `feat/wave5-compute-a3-b1`. |
+| 2026-09-13 | **#1859 Copilot (S5) carried here:** four generated comments — chat nodes keep `topic_id`; copy ports MCP via `exportGraph`/`importGraph`; template toast lists checklist items; copy types from OpenAPI. Twelve suppressed comments stay S5 follow-ups, not this PR. |
 
 ## Review log
 

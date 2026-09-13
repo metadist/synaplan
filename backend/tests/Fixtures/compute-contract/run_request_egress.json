@@ -1,0 +1,14 @@
+{
+  "protocol": 1,
+  "owner": "user:123",
+  "workspace": { "kind": "run" },
+  "image": "python",
+  "entry": { "program": "python", "args": ["fetch.py"] },
+  "files": [{ "name": "fetch.py", "role": "input" }],
+  "limits": { "timeoutSec": 60, "memoryMb": 512, "cpu": 1.0, "pids": 128, "outputMb": 50 },
+  "egress": {
+    "allow": [
+      { "host": "api.example.com", "port": 443, "ips": ["93.184.216.34"] }
+    ]
+  }
+}

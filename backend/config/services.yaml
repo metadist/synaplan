@@ -159,6 +159,9 @@ parameters:
     # Office convert (Collabora CODE). Empty = disabled (OSS default).
     env(OFFICE_CONVERT_URL): ''
     env(OFFICE_CONVERT_TIMEOUT_MS): '60000'
+    # Secure compute sidecar. Empty URL or token = module absent.
+    env(COMPUTE_URL): ''
+    env(COMPUTE_TOKEN): ''
     env(OFFICE_TEXT_MAX_ROWS): '500'
     env(OFFICE_COMBINE_MAX_FILES): '20'
     env(RASTERIZE_DPI): '150'
@@ -1108,6 +1111,24 @@ services:
     App\Module\Sidecar\OfficeConvertModule:
         arguments:
             $baseUrl: '%env(OFFICE_CONVERT_URL)%'
+
+    App\Module\Sidecar\ComputeModule:
+        arguments:
+            $baseUrl: '%env(COMPUTE_URL)%'
+            $token: '%env(COMPUTE_TOKEN)%'
+
+    App\Service\Compute\ComputeConfig:
+        arguments:
+            $computeUrl: '%env(COMPUTE_URL)%'
+            $computeToken: '%env(COMPUTE_TOKEN)%'
+
+    App\Service\Compute\ComputeArtefactStore:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
+    App\Service\Multitask\Execution\Runner\CodeRunRunner:
+        arguments:
+            $uploadDir: '%kernel.project_dir%/var/uploads'
 
     App\Module\Sidecar\SearxngModule:
         arguments:

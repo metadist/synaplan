@@ -109,6 +109,12 @@ enum Capability: string
     case Condition = 'condition';
 
     /**
+     * Run a short Python or Node script on attached files (secure compute).
+     * Planner-visible only when {@see \App\Service\Compute\ComputeConfig::isEnabled()}.
+     */
+    case CodeRun = 'code_run';
+
+    /**
      * Capabilities that exist only for the Steps editor (flag-gated at validate).
      *
      * @return list<string>
@@ -151,6 +157,7 @@ enum Capability: string
             self::ToolCall => 'search',
             self::OutboundWebhook => 'email',
             self::Condition => 'text',
+            self::CodeRun => 'compute',
         };
     }
 

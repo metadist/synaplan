@@ -806,7 +806,7 @@ final class RateLimitService
     public function getUserLimits(User $user): array
     {
         $level = $user->getRateLimitLevel();
-        $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS', 'RERANK'];
+        $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS', 'RERANK', 'COMPUTE_RUNS'];
 
         $result = [
             'level' => $level,

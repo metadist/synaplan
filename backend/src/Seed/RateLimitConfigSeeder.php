@@ -47,6 +47,10 @@ final readonly class RateLimitConfigSeeder
         // receive the selected model's full max_tokens; their spend is bounded by
         // the cost-budget gate (registered) and message-count limits instead.
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'MAX_OUTPUT_TOKENS',   'value' => '2048'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_RUNS_TOTAL',  'value' => '0'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_CONCURRENT',  'value' => '0'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '0'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_WORKSPACE_MB', 'value' => '0'],
 
         // NEW (phone-verified — lifetime totals)
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'MESSAGES_TOTAL',      'value' => '50'],
@@ -56,6 +60,10 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'FILE_ANALYSIS_TOTAL', 'value' => '10'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'FILE_UPLOADS_TOTAL',  'value' => '10'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'STORAGE_MB',          'value' => '100'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'COMPUTE_RUNS_TOTAL',  'value' => '5'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'COMPUTE_CONCURRENT',  'value' => '1'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '60'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_NEW', 'setting' => 'COMPUTE_WORKSPACE_MB', 'value' => '256'],
 
         // PRO (hourly + monthly)
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'MESSAGES_HOURLY',        'value' => '100'],
@@ -66,6 +74,10 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'FILE_ANALYSIS_MONTHLY',  'value' => '200'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'FILE_UPLOADS_MONTHLY',   'value' => '200'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'STORAGE_GB',             'value' => '5'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'COMPUTE_RUNS_HOURLY',    'value' => '10'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'COMPUTE_CONCURRENT',     'value' => '2'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '300'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_PRO', 'setting' => 'COMPUTE_WORKSPACE_MB',   'value' => '512'],
 
         // TEAM
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'MESSAGES_HOURLY',       'value' => '300'],
@@ -76,6 +88,10 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'FILE_ANALYSIS_MONTHLY', 'value' => '1000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'FILE_UPLOADS_MONTHLY',  'value' => '1000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'STORAGE_GB',            'value' => '20'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'COMPUTE_RUNS_HOURLY',   'value' => '30'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'COMPUTE_CONCURRENT',    'value' => '4'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '900'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_TEAM', 'setting' => 'COMPUTE_WORKSPACE_MB',  'value' => '1024'],
 
         // BUSINESS
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'MESSAGES_HOURLY',       'value' => '1000'],
@@ -86,6 +102,10 @@ final readonly class RateLimitConfigSeeder
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'FILE_ANALYSIS_MONTHLY', 'value' => '5000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'FILE_UPLOADS_MONTHLY',  'value' => '5000'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'STORAGE_GB',            'value' => '100'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'COMPUTE_RUNS_HOURLY',   'value' => '100'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'COMPUTE_CONCURRENT',    'value' => '4'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '3600'],
+        ['ownerId' => 0, 'group' => 'RATELIMITS_BUSINESS', 'setting' => 'COMPUTE_WORKSPACE_MB',  'value' => '2048'],
     ];
 
     public function __construct(private Connection $connection)

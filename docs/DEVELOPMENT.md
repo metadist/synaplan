@@ -74,6 +74,20 @@ keys in both overlay files (the architecture test fails if either is
 missing), and never a second hand-written `isEnabled()` + feature-status
 block.
 
+### Secure compute (optional)
+
+Short Python or Node file work for the assistant. Off by default. The sidecar
+is a Compose profile; PHP never talks to Docker.
+
+```bash
+COMPUTE_TOKEN=$(openssl rand -hex 16) COMPUTE_URL=http://compute:8080 \
+  docker compose --profile compute up -d
+```
+
+Then set **COMPUTE.ENABLED** under Operate → System config (or
+`FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
+Available. Never publish port 8080. See [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
+
 ### Office conversion (optional)
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,

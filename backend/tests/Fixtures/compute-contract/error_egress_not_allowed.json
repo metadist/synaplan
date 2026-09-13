@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "egress_not_allowed",
+    "message": "egress is not available yet; every run is network-isolated"
+  }
+}

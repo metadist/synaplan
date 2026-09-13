@@ -13,6 +13,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\BillingService;
 use App\Service\Capability\CapabilityService;
+use App\Service\Compute\ComputeConfig;
 use App\Service\Desktop\DesktopAgentConfig;
 use App\Service\MailerConfig;
 use App\Service\Mcp\McpClientConfig;
@@ -106,6 +107,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         private ConnectionRepository $connectionRepository,
         private UserRepository $userRepository,
         private ModuleRegistry $modules,
+        private ?ComputeConfig $computeConfig = null,
     ) {
     }
 
@@ -378,6 +380,18 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
         );
 
         foreach (self::KNOWN_ABSENT as $row) {
+            if ('code_execution' === $row['id'] && true === $this->computeConfig?->isEnabled($userId > 0 ? $userId : null)) {
+                $facts[] = $this->fact(
+                    $row['id'],
+                    'File work',
+                    true,
+                    'Short Python or Node file-work on copies of the files you chose',
+                    $row['alternative'],
+                    'Operate → Feature status → Secure compute',
+                    'modules/compute',
+                );
+                continue;
+            }
             $alternative = $row['alternative'];
             if ('music_generation' === $row['id'] && $ttsAvailable) {
                 $alternative = 'original lyrics, read aloud as MP3';

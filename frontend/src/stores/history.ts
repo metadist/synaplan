@@ -239,6 +239,7 @@ export const TASK_CARD_KINDS = [
   'extract',
   'email',
   'folder',
+  'compute',
 ] as const
 export type TaskCardKind = (typeof TASK_CARD_KINDS)[number]
 

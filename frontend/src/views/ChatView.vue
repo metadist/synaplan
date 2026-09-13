@@ -255,6 +255,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @followup-task="handleTaskFollowup"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -4766,6 +4767,12 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
  * so only that sub-task re-runs. The result arrives as a new assistant bubble;
  * the original turn (with its successful parts) is left untouched.
  */
+const handleTaskFollowup = async (prompt: string) => {
+  if (!authStore.isAuthenticated || isGuestMode.value) return
+  if (!prompt.trim()) return
+  await streamAIResponse(prompt, { isAgain: true })
+}
+
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!payload.prompt || !payload.modelId) return
