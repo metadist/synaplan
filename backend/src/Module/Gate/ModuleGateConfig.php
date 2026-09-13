@@ -13,10 +13,10 @@ use Symfony\Contracts\Service\ResetInterface;
  * Reads the per-module gate flags `MODULES.GATE_<ID>` (BCONFIG, ownerId 0).
  *
  * A gate that is ON lets {@see \App\Module\Http\ModuleGateListener} answer a
- * uniform 404 on the module's routes while the module is absent. Every flag is
- * seeded OFF ({@see \App\Seed\ModuleGateSeeder}) and an unknown or malformed
- * value also reads as OFF, so an installation never gates anything it did not
- * opt into. Operators flip a gate under Operate → System configuration →
+ * uniform 404 on the module's routes while the module is absent. New installs
+ * seed gates from {@see \App\Seed\ModuleGateSeeder} (tika ON, the rest OFF
+ * until each FM21 PR). An unknown or malformed value also reads as OFF.
+ * Existing rows are never overwritten. Operators flip a gate under Operate → System configuration →
  * Features, or pin it with `FEATURE_MODULES_GATE_<ID>` ({@see FeatureFlagEnv}).
  *
  * Not `readonly`: the whole group is loaded with one query on first use and

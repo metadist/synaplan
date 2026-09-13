@@ -11,16 +11,26 @@ use Doctrine\DBAL\Connection;
 /**
  * Idempotent seeder for the per-module gate flags `MODULES.GATE_<ID>` (BCONFIG, ownerId=0).
  *
- * One row per declared feature module, seeded OFF (`0`): an existing install
- * keeps answering exactly as before until an operator turns a gate on.
- * Insert-if-missing only — operator overrides are never touched.
+ * One row per declared feature module. Most gates seed OFF (`0`) so an
+ * existing install keeps answering as before; Intermezzo S4 FM21 flips
+ * gates ON for new installs one module at a time ({@see DEFAULT_ON}).
+ * Insert-if-missing only — operator overrides and existing rows are never
+ * touched (no migration on upgrades).
  */
 final readonly class ModuleGateSeeder
 {
+    /** Module ids whose `MODULES.GATE_<ID>` seeds ON for new installs. */
+    private const DEFAULT_ON = ['tika'];
+
     public function __construct(
         private Connection $connection,
         private ModuleRegistry $modules,
     ) {
+    }
+
+    public static function defaultValue(string $moduleId): string
+    {
+        return in_array($moduleId, self::DEFAULT_ON, true) ? '1' : '0';
     }
 
     /**
@@ -36,7 +46,7 @@ final readonly class ModuleGateSeeder
                 'ownerId' => 0,
                 'group' => ModuleGateConfig::GROUP,
                 'setting' => ModuleGateConfig::settingFor($id),
-                'value' => '0',
+                'value' => self::defaultValue($id),
             ];
         }
 
