@@ -6,7 +6,11 @@ namespace App\Tests\Unit\Service\Admin;
 
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Module\Contract\FeatureModuleInterface;
+use App\Module\Gate\ModuleGateConfig;
+use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Seed\ModuleGateSeeder;
 use App\Service\Admin\SystemConfigService;
 use App\Service\Digest\MessageDigestConfig;
 use App\Service\EncryptionService;
@@ -15,9 +19,11 @@ use App\Service\GuestChatConfig;
 use App\Service\Message\ConversationSummaryConstants;
 use App\Service\Microsoft\MicrosoftOAuthConfig;
 use App\Service\RegistrationConfig;
+use App\Tests\Unit\Module\Fixture\BuildsAllModules;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 
 /**
  * Focused tests for SystemConfigService's database-backed config writes —
@@ -26,6 +32,8 @@ use Psr\Log\NullLogger;
  */
 final class SystemConfigServiceTest extends TestCase
 {
+    use BuildsAllModules;
+
     private ConfigRepository&MockObject $configRepository;
     private SystemConfigService $service;
 
@@ -638,6 +646,46 @@ final class SystemConfigServiceTest extends TestCase
                 $key.' points at an unknown section',
             );
             self::assertArrayHasKey($key, $placed, $key.' is defined but no tab section lists it');
+        }
+    }
+
+    /**
+     * FM21: with a module registry the Features tab must expose each
+     * MODULES.GATE_<ID> field and use the seeder's new-install default.
+     * The setUp() service omits $modules, so this path is not covered there.
+     */
+    public function testModuleGateSchemaDefaultsFollowTheSeeder(): void
+    {
+        $modules = $this->allModules();
+        $factories = [];
+        foreach ($modules as $id => $module) {
+            $factories[$id] = static fn (): FeatureModuleInterface => $module;
+        }
+
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: new ProviderKeyStore(
+                $this->configRepository,
+                new EncryptionService('test-secret', new NullLogger()),
+                new NullLogger(),
+            ),
+            encryption: new EncryptionService('test-secret', new NullLogger()),
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+            modules: new ModuleRegistry(new ServiceLocator($factories)),
+        );
+
+        $fields = $service->getSchema()['fields'];
+        foreach (array_keys($modules) as $id) {
+            $key = FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, ModuleGateConfig::settingFor($id));
+            $this->assertArrayHasKey($key, $fields, $id);
+            $expected = '1' === ModuleGateSeeder::defaultValue($id) ? 'true' : 'false';
+            $this->assertSame($expected, $fields[$key]['default'], $key);
+            $this->assertSame(ModuleGateConfig::GROUP, $fields[$key]['dbGroup']);
+            $this->assertSame(ModuleGateConfig::settingFor($id), $fields[$key]['dbKey']);
         }
     }
 }

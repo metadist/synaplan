@@ -291,34 +291,12 @@ final class ConfigControllerTest extends WebTestCase
 
     /**
      * FM14: every declared module is listed with configured/gated booleans.
-     * Seeded gates are off; flipping GATE_WHATSAPP is visible on the next request.
+     * Flipping GATE_WHATSAPP is visible on the next request. The shipped
+     * seed may now default this flag on, so the test pins the row off first.
      */
     public function testRuntimeConfigReportsModuleConfiguredAndGatedStates(): void
     {
         $client = static::createClient();
-        $client->request('GET', '/api/v1/config/runtime');
-        $this->assertResponseIsSuccessful();
-
-        $data = json_decode((string) $client->getResponse()->getContent(), true);
-        $this->assertIsArray($data);
-        $this->assertArrayHasKey('modules', $data);
-        $this->assertIsArray($data['modules']);
-        $this->assertNotEmpty($data['modules']);
-
-        foreach ($data['modules'] as $id => $state) {
-            $this->assertIsString($id);
-            $this->assertMatchesRegularExpression('/^[a-z][a-z0-9_]*$/', $id);
-            $this->assertIsArray($state);
-            $this->assertArrayHasKey('configured', $state);
-            $this->assertArrayHasKey('gated', $state);
-            $this->assertIsBool($state['configured']);
-            $this->assertIsBool($state['gated']);
-        }
-
-        $this->assertArrayHasKey('tika', $data['modules']);
-        $this->assertArrayHasKey('whatsapp', $data['modules']);
-        $this->assertFalse($data['modules']['whatsapp']['gated']);
-
         $em = static::getContainer()->get(EntityManagerInterface::class);
         $row = $em->getRepository(Config::class)->findOneBy([
             'ownerId' => 0,
@@ -335,11 +313,44 @@ final class ConfigControllerTest extends WebTestCase
             $em->flush();
         }
         $previous = $row->getValue();
-        $row->setValue('1');
+        $row->setValue('0');
         $em->flush();
         $em->clear();
 
         try {
+            $client->request('GET', '/api/v1/config/runtime');
+            $this->assertResponseIsSuccessful();
+
+            $data = json_decode((string) $client->getResponse()->getContent(), true);
+            $this->assertIsArray($data);
+            $this->assertArrayHasKey('modules', $data);
+            $this->assertIsArray($data['modules']);
+            $this->assertNotEmpty($data['modules']);
+
+            foreach ($data['modules'] as $id => $state) {
+                $this->assertIsString($id);
+                $this->assertMatchesRegularExpression('/^[a-z][a-z0-9_]*$/', $id);
+                $this->assertIsArray($state);
+                $this->assertArrayHasKey('configured', $state);
+                $this->assertArrayHasKey('gated', $state);
+                $this->assertIsBool($state['configured']);
+                $this->assertIsBool($state['gated']);
+            }
+
+            $this->assertArrayHasKey('tika', $data['modules']);
+            $this->assertArrayHasKey('whatsapp', $data['modules']);
+            $this->assertFalse($data['modules']['whatsapp']['gated']);
+
+            $row = $em->getRepository(Config::class)->findOneBy([
+                'ownerId' => 0,
+                'group' => ModuleGateConfig::GROUP,
+                'setting' => ModuleGateConfig::settingFor('whatsapp'),
+            ]);
+            $this->assertInstanceOf(Config::class, $row);
+            $row->setValue('1');
+            $em->flush();
+            $em->clear();
+
             $client->request('GET', '/api/v1/config/runtime');
             $this->assertResponseIsSuccessful();
             $gated = json_decode((string) $client->getResponse()->getContent(), true);
