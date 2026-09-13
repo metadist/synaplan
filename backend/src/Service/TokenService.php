@@ -189,8 +189,16 @@ final readonly class TokenService
             return null;
         }
 
-        // Check if user is still active/not banned
-        // Add your user status check here if needed
+        // /auth/refresh is PUBLIC_ACCESS so the firewall user_checker never
+        // runs here. Refuse before minting an access cookie or sliding the
+        // 30-day BTOKENS expiry, or a suspended account stays signed in.
+        if (!$user->isActive()) {
+            $this->logger->warning('Refresh blocked for suspended account', [
+                'user_id' => $user->getId(),
+            ]);
+
+            return null;
+        }
 
         // Generate new access token
         $accessToken = $this->generateAccessToken($user);

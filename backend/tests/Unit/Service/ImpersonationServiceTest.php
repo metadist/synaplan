@@ -592,6 +592,60 @@ final class ImpersonationServiceTest extends TestCase
         self::assertSame($adminTarget, $result['user']);
     }
 
+    public function testRefreshReturnsNullWhenAdminIsSuspended(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN', active: false);
+        $target = $this->makeUser(id: 7, level: 'PRO');
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn($refreshTokenEntity);
+
+        $this->userRepository->method('find')->willReturn($target);
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        self::assertNull($this->service->issueRefreshedImpersonationAccessToken($request));
+    }
+
+    public function testRefreshReturnsNullWhenTargetIsSuspended(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO', active: false);
+
+        $request = $this->requestWithAppTokens([
+            ImpersonationService::ADMIN_REFRESH_STASH_COOKIE => 'stashed-refresh',
+            TokenService::ACCESS_COOKIE => 'target-access',
+        ]);
+
+        $refreshTokenEntity = $this->createMock(\App\Entity\Token::class);
+        $refreshTokenEntity->method('getUser')->willReturn($admin);
+
+        $this->tokenService
+            ->method('validateRefreshToken')
+            ->willReturn($refreshTokenEntity);
+
+        $this->tokenService
+            ->method('decodeAccessTokenIgnoringExpiry')
+            ->willReturn([
+                'user_id' => 7,
+                'impersonator_id' => 1,
+                'type' => 'access',
+            ]);
+
+        $this->userRepository->method('find')->willReturn($target);
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        self::assertNull($this->service->issueRefreshedImpersonationAccessToken($request));
+    }
+
     // ---------------------------------------------------------------------
     // recoverAdminSessionFromStash()
     // ---------------------------------------------------------------------
@@ -819,13 +873,14 @@ final class ImpersonationServiceTest extends TestCase
         );
     }
 
-    private function makeUser(int $id, string $level): User
+    private function makeUser(int $id, string $level, bool $active = true): User
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn($id);
         $user->method('getMail')->willReturn(sprintf('user-%d@example.com', $id));
         $user->method('getUserLevel')->willReturn($level);
         $user->method('isAdmin')->willReturn('ADMIN' === $level);
+        $user->method('isActive')->willReturn($active);
 
         return $user;
     }

@@ -255,7 +255,7 @@ final readonly class ImpersonationService
         }
 
         $target = $this->userRepository->find($payload['user_id']);
-        if (!$target instanceof User) {
+        if (!$target instanceof User || !$target->isActive()) {
             return null;
         }
 
@@ -337,9 +337,9 @@ final readonly class ImpersonationService
 
         $admin = $this->userRepository->find($payload['impersonator_id']);
 
-        // Re-verify role on every read: the user might have been demoted
-        // since impersonation started.
-        if (!$admin instanceof User || !$admin->isAdmin()) {
+        // Re-verify role and account status on every read: the user might
+        // have been demoted or suspended since impersonation started.
+        if (!$admin instanceof User || !$admin->isAdmin() || !$admin->isActive()) {
             return null;
         }
 
@@ -448,14 +448,15 @@ final readonly class ImpersonationService
 
     /**
      * Validate the stashed refresh token against the DB and return the admin
-     * user it belongs to, or null on any failure (revoked, expired, demoted).
+     * user it belongs to, or null on any failure (revoked, expired, demoted,
+     * or suspended).
      */
     private function resolveAdminFromStashedRefresh(string $stashRefresh): ?User
     {
         $tokenEntity = $this->tokenService->validateRefreshToken($stashRefresh);
         $admin = $tokenEntity?->getUser();
 
-        if (!$admin instanceof User || !$admin->isAdmin()) {
+        if (!$admin instanceof User || !$admin->isAdmin() || !$admin->isActive()) {
             return null;
         }
 

@@ -101,6 +101,24 @@ class AuthController extends AbstractController
         return '' !== $firstName ? $firstName : null;
     }
 
+    /**
+     * Login and every refresh branch (app, OIDC, impersonation recovery)
+     * share this body so a leftover cookie cannot keep a blocked account
+     * signed in after CookieTokenAuthenticator stopped claiming those routes.
+     */
+    private function accountSuspendedResponse(User $user, string $action): JsonResponse
+    {
+        $this->logger->warning($action.' blocked for suspended account', [
+            'user_id' => $user->getId(),
+        ]);
+
+        return $this->json([
+            'error' => 'Account suspended',
+            'code' => 'ACCOUNT_SUSPENDED',
+            'message' => 'This account has been suspended. Please contact support.',
+        ], Response::HTTP_FORBIDDEN);
+    }
+
     #[Route('/native/exchange', name: 'native_exchange', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/auth/native/exchange',
@@ -354,12 +372,7 @@ class AuthController extends AbstractController
 
         // Suspended/banned accounts cannot sign in (Apple Guideline 1.2).
         if (!$user->isActive()) {
-            $this->logger->warning('Login blocked for suspended account', ['user_id' => $user->getId()]);
-
-            return $this->json([
-                'error' => 'Account suspended',
-                'message' => 'This account has been suspended. Please contact support.',
-            ], Response::HTTP_FORBIDDEN);
+            return $this->accountSuspendedResponse($user, 'Login');
         }
 
         // Generate tokens
@@ -418,6 +431,7 @@ class AuthController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Invalid or expired refresh token')]
+    #[OA\Response(response: 403, description: 'Account suspended or banned')]
     public function refresh(Request $request): Response
     {
         // Check if this is an OIDC user (has OIDC refresh token cookie)
@@ -463,6 +477,14 @@ class AuthController extends AbstractController
                 'error' => 'No refresh token',
                 'code' => 'NO_REFRESH_TOKEN',
             ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $existingRefresh = $this->tokenService->validateRefreshToken($refreshTokenString);
+        $refreshOwner = $existingRefresh?->getUser();
+        if ($refreshOwner instanceof User && !$refreshOwner->isActive()) {
+            return $this->tokenService->clearAuthCookies(
+                $this->accountSuspendedResponse($refreshOwner, 'Refresh')
+            );
         }
 
         $result = $this->tokenService->refreshTokens($refreshTokenString);
@@ -604,6 +626,18 @@ class AuthController extends AbstractController
      */
     private function refreshOidcTokens(Request $request, string $oidcRefreshToken, string $provider): Response
     {
+        $existingOidcAccess = $request->cookies->get(OidcTokenService::OIDC_ACCESS_COOKIE);
+        if (is_string($existingOidcAccess) && '' !== $existingOidcAccess) {
+            $knownUser = $this->oidcTokenService->getUserFromOidcToken($existingOidcAccess, $provider);
+            if ($knownUser instanceof User && !$knownUser->isActive()) {
+                $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
+                $this->tokenService->clearAuthCookies($response);
+                $this->oidcTokenService->clearOidcCookies($response);
+
+                return $response;
+            }
+        }
+
         $newTokens = $this->oidcTokenService->refreshOidcTokens($oidcRefreshToken, $provider);
 
         if (!$newTokens) {
@@ -634,6 +668,14 @@ class AuthController extends AbstractController
                 'code' => 'USER_NOT_FOUND',
             ], Response::HTTP_UNAUTHORIZED);
 
+            $this->tokenService->clearAuthCookies($response);
+            $this->oidcTokenService->clearOidcCookies($response);
+
+            return $response;
+        }
+
+        if (!$user->isActive()) {
+            $response = $this->accountSuspendedResponse($user, 'OIDC refresh');
             $this->tokenService->clearAuthCookies($response);
             $this->oidcTokenService->clearOidcCookies($response);
 
