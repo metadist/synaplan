@@ -80,7 +80,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *  23. plugs         (BCONFIG: PLUGS extraction/search/rerank defaults, ownerId=0)
  *  24. tools         (BCONFIG: TOOLS registry/approvals/custom-HTTP flags, ownerId=0)
  *  24b. workflows    (BCONFIG: WORKFLOWS.BUILDER_ENABLED, ownerId=0 — default ON)
- *  25. module-gates  (BCONFIG: MODULES.GATE_<ID>, tika+docling ON / rest OFF for new installs)
+ *  25. module-gates  (BCONFIG: MODULES.GATE_<ID> from ModuleGateSeeder::defaultValue())
  *  26. demo-widget   (BCONFIG: example widget for ownerId=2 — dev/test only, no-op in prod)
  *
  * Wired into the Docker entrypoint after `doctrine:migrations:migrate`, so it runs
@@ -164,7 +164,7 @@ final class SeedAllCommand extends Command
             "  23. plugs defaults             (BCONFIG, group=PLUGS, ownerId=0 — today's FileProcessor + Brave)\n".
             "  24. tools flags                (BCONFIG, group=TOOLS, ownerId=0)\n".
             "  24b. workflows builder flag    (BCONFIG, group=WORKFLOWS, ownerId=0 — default ON)\n".
-            "  25. module-gates               (BCONFIG, group=MODULES, GATE_TIKA+GATE_DOCLING=1 for new installs, others 0)\n".
+            "  25. module-gates               (BCONFIG, group=MODULES, defaults from ModuleGateSeeder)\n".
             "  26. demo widget config         (BCONFIG, group=widget_1, ownerId=2 — dev/test only)\n\n".
             'All steps are idempotent and safe to run on every deploy. The demo-widget step is a no-op in prod.'
         );

@@ -17,7 +17,7 @@ final class ModuleGateSeederTest extends TestCase
 {
     use BuildsAllModules;
 
-    public function testOneGlobalRowPerModuleWithTikaAndDoclingOn(): void
+    public function testOneGlobalRowPerModuleWithShippedDefaults(): void
     {
         $ids = array_keys($this->allModules());
         sort($ids);
@@ -46,13 +46,10 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_TIKA',
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
-        $this->assertSame('1', $bySetting['GATE_TIKA']);
-        $this->assertSame('1', $bySetting['GATE_DOCLING']);
+
+        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT'];
         foreach ($bySetting as $setting => $value) {
-            if (in_array($setting, ['GATE_TIKA', 'GATE_DOCLING'], true)) {
-                continue;
-            }
-            $this->assertSame('0', $value, $setting);
+            $this->assertSame(in_array($setting, $on, true) ? '1' : '0', $value, $setting);
         }
     }
 
@@ -66,6 +63,10 @@ final class ModuleGateSeederTest extends TestCase
         $this->assertSame(
             [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_DOCLING', 'value' => '1']],
             ModuleGateSeeder::defaultRows(['docling']),
+        );
+        $this->assertSame(
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_OFFICE_CONVERT', 'value' => '1']],
+            ModuleGateSeeder::defaultRows(['office_convert']),
         );
         $this->assertSame(
             [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_SEARXNG', 'value' => '0']],
