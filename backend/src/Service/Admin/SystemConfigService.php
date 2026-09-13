@@ -11,6 +11,7 @@ use App\Bundle\BundleConfig;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
 use App\Repository\ConfigRepository;
+use App\Seed\ModuleGateSeeder;
 use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Chat\ProgressNarrationConfig;
@@ -119,9 +120,10 @@ final readonly class SystemConfigService
     }
 
     /**
-     * One boolean per declared feature module: `MODULES.GATE_<ID>` (seeded OFF
-     * by the Intermezzo plan). ON answers 404 on the module's routes and hides
-     * its cards while the module is not configured.
+     * One boolean per declared feature module: `MODULES.GATE_<ID>`.
+     * New-install defaults come from {@see ModuleGateSeeder::defaultValue()}.
+     * ON answers 404 on the module's routes and hides its cards while the
+     * module is not configured.
      *
      * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source: string, dbGroup: string, dbKey: string}>
      */
@@ -134,14 +136,18 @@ final readonly class SystemConfigService
         $fields = [];
         foreach ($this->modules->ids() as $id) {
             $setting = ModuleGateConfig::settingFor($id);
+            $onByDefault = '1' === ModuleGateSeeder::defaultValue($id);
             $fields[FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, $setting)] = [
                 'tab' => 'features', 'section' => 'modules', 'type' => 'boolean',
                 'sensitive' => false,
                 'description' => sprintf(
-                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. Off (the shipped default) keeps the module visible with a "needs setup" state. Configure the module first — see Operate → Feature status.',
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → Feature status.',
                     $id,
+                    $onByDefault
+                        ? 'On is the shipped default for new installs.'
+                        : 'Off (the shipped default) keeps the module visible with a "needs setup" state.',
                 ),
-                'default' => 'false',
+                'default' => $onByDefault ? 'true' : 'false',
                 'source' => 'database',
                 'dbGroup' => ModuleGateConfig::GROUP,
                 'dbKey' => $setting,
