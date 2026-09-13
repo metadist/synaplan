@@ -47,7 +47,7 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
 
-        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT'];
+        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG'];
         foreach ($bySetting as $setting => $value) {
             $this->assertSame(in_array($setting, $on, true) ? '1' : '0', $value, $setting);
         }
@@ -69,8 +69,12 @@ final class ModuleGateSeederTest extends TestCase
             ModuleGateSeeder::defaultRows(['office_convert']),
         );
         $this->assertSame(
-            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_SEARXNG', 'value' => '0']],
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_SEARXNG', 'value' => '1']],
             ModuleGateSeeder::defaultRows(['searxng']),
+        );
+        $this->assertSame(
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_WHATSAPP', 'value' => '0']],
+            ModuleGateSeeder::defaultRows(['whatsapp']),
         );
     }
 }
