@@ -1,6 +1,7 @@
 # Sprint IAM-UX — Share dialog professionalization
 
 **Track 1 (IAM), follow-up after S3.** Steps `IAM-UX1`–`IAM-UX4`.
+**Status:** Closed on `main` via [#1726](https://github.com/metadist/synaplan/pull/1726).
 
 **Goal:** The sharing *capability* is on `main`. This sprint is the
 professional user-flow that S2 listed as a dialog and a chip. One-row

@@ -8,10 +8,10 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | Sprint / step | Branch / repo | State | Notes |
 | ------------- | ------------- | ----- | ----- |
 | S1 Registry refactor | `main` (#1774) | implemented | One `ToolRegistry` + tagged sources. `TOOLS.REGISTRY_ENABLED` code default ON (kill switch). Characterization snapshots untouched. |
-| S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. Flag off. |
+| S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. On for new installs (#1827). |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
-| S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). Flag off. |
-| S5 Workflow builder v1 + webhook trigger | `feat/wave5-s5-templates-and-bundle` | in progress | Steps + webhook on `main` (#1821). This branch: TL41 templates/copy checklist, TL45 `saved_tasks` bundle, TL46 C7 fixtures + five-step proof, TL47 docs. Builder flag seeded on for new installs (#1827). |
+| S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). On for new installs (#1827). |
+| S5 Workflow builder v1 + webhook trigger | `feat/wave5-s5-templates-and-bundle` | in progress | Steps + webhook on `main` (#1821). This branch: TL41 templates/copy checklist, TL45 `saved_tasks` bundle, TL46 C7 fixtures + five-step proof, TL47 docs. Builder flag seeded on for new installs (#1827). Q1 (approve continues the chat turn) stays open. |
 
 ## Decisions
 
@@ -25,6 +25,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-10 | Wave 4 S1–S4 implemented behind flags. Registry kill-switch defaults on; approvals and custom HTTP stay off. |
 | 2026-09-10 | Wave 4 S1–S4 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
 | 2026-09-10 | **Wave 5 decisions ticked (roadmap §7.2, first PR):** (1) Recoverable jobs — this strain ships honest per-outcome copy and keeps existing pause/resume; checkpoints and per-run spend limits stay scheduled. (2) Publish ≠ activated — stays on Agent Builder STATUS; not this PR. (3) Approvals on resume — re-check current permissions and hard blocks immediately before execute; bind the approval to tool + arguments (a change voids it). (4) Sovereignty as a job-wide setting — scheduled, not this PR. (5) Complete-workflow packs / For you landing — scheduled. Form-first assistant builder and step-list editor stay the product shape. |
+| 2026-09-13 | **S5 remainder is the next Tools work.** TL38–TL40, TL42–TL44 are on `main`. Do TL41, TL45–TL47 and walk J-TL-5 before Compute B1. Q1 (approve continues the chat turn) stays a Wave 5 row; it is not a substitute for closing S5. |
 
 ## Review log
 

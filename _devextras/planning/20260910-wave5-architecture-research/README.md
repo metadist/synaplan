@@ -6,10 +6,9 @@ written against the verified state of the `main` checkout on 2026-09-10
 (see the "Evidence" sections; every number was measured, not estimated).
 
 **Live roadmap:** [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md)
-— Wave 4 is on `main` (#1774); next: two production bugfixes, then
-**Intermezzo** (this research's feature-modules plan), then Wave 5. The
-2026-09-03 overview is archived at
-[`../20260903_roadmap/`](../20260903_roadmap/README.md).
+— Wave 4 and Intermezzo S1–S4 are on `main`; next coding is Wave 5
+remainder (Tools S5, then Compute A3 + B1). The 2026-09-03 overview is
+archived at [`../20260903_roadmap/`](../20260903_roadmap/README.md).
 
 | # | Question | Document | Verdict |
 | - | -------- | -------- | ------- |
@@ -19,13 +18,10 @@ written against the verified state of the `main` checkout on 2026-09-10
 
 ## Where these files belong
 
-- Document 1 is a **`synaplan-platform` planning document** (it discusses
-  Cloud topology and positioning). The agent's GitHub token cannot reach the
-  private `metadist/synaplan-platform` repository (`gh` returns 404), so it is
-  parked here. It contains no node names, IPs, credentials or private
-  endpoints and is safe in this public repository; move it to
-  `synaplan-platform/planning/20260910_compute_vs_headless_desktop.md` and
-  leave a one-line pointer here when convenient.
+- Document 1 stays in this public repo (research §7 row 6, 2026-09-13):
+  it discusses Cloud topology but contains no node names, IPs, credentials
+  or private endpoints. A copy in `synaplan-platform/planning/` is optional
+  later; this file remains the one compute STATUS links to.
 - Documents 2–3 and the Intermezzo implementation plan are `synaplan/`
   planning documents and stay in `_devextras/planning/`.
 
@@ -33,8 +29,8 @@ written against the verified state of the `main` checkout on 2026-09-10
 
 1. Tick or reject the decision rows in
    [`01_compute_vs_headless_desktop.md`](./01_compute_vs_headless_desktop.md) §7
-   (positioning + two additions to the compute A0 spike). Does not block
-   Wave 4; needed before Wave 5 compute B1.
+   — **done 2026-09-13** except row 5 (Wave 5 launch name). Does not block
+   Tools S5 or Compute A3 + B1.
 2. Tick the checklist in
    [`../20260910-feature-modules/00_master_plan.md`](../20260910-feature-modules/00_master_plan.md) §0
-   before any Intermezzo code (roadmap workflow).
+   — **done 2026-09-10**; Intermezzo S1–S4 are on `main`.

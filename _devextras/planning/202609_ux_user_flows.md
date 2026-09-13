@@ -430,11 +430,11 @@ they grow a UI step.
 
 ---
 
-## 7. IAM-UX — Share dialog professionalization (planned follow-up)
+## 7. IAM-UX — Share dialog professionalization (on `main` via #1726)
 
-**Not a new product feature.** The sharing *capability* is on `main`.
-This is the missing professional flow, required before any later track
-reuses `ShareDialog.vue`. Sprint file:
+**Not a new product feature.** The sharing *capability* shipped in S2/S3;
+the professional flow (one-row add, kind-specific consequence, find path)
+landed in [#1726](https://github.com/metadist/synaplan/pull/1726). Sprint file:
 [`202609_iam/06_sprint_ux_share_dialog.md`](./202609_iam/06_sprint_ux_share_dialog.md).
 
 | Step | Content | Class |
