@@ -11,11 +11,10 @@ use Doctrine\DBAL\Connection;
 /**
  * Idempotent seeder for the per-module gate flags `MODULES.GATE_<ID>` (BCONFIG, ownerId=0).
  *
- * One row per declared feature module. Most gates seed OFF (`0`) so an
- * existing install keeps answering as before; Intermezzo S4 FM21 flips
- * gates ON for new installs one module at a time ({@see DEFAULT_ON}).
- * Insert-if-missing only — operator overrides and existing rows are never
- * touched (no migration on upgrades).
+ * One row per declared feature module. New installs seed every gate ON
+ * ({@see DEFAULT_ON}); existing rows are never overwritten, so upgrades
+ * keep the value they already have. Insert-if-missing only — operator
+ * overrides are never touched (no migration on upgrades).
  */
 final readonly class ModuleGateSeeder
 {
