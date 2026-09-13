@@ -66,7 +66,7 @@ backend reaches it container-to-container either way.
 
 **`@ci` is the only authoritative tag.** The CI workflow runs `--grep "@ci"`
 (chromium 3 shards, one firefox cross-browser smoke, chromium-mobile,
-chromium-ollama) — a test
+chromium-ollama, chromium-minimal) — a test
 without `@ci` in its title chain does not run in CI, period. Other tags:
 
 | Tag | Meaning |
@@ -77,6 +77,7 @@ without `@ci` in its title chain does not run in CI, period. Other tags:
 | `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
 | `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
 | `@ollama` | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below. |
+| `@minimal` | Own **chromium-minimal** project and CI job on the `docker-compose.minimal.yml` overlay. Proves every optional feature module is absent (chat + text upload still work; gated WhatsApp answers the uniform 404). Excluded from the sharded chromium run. |
 | `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on

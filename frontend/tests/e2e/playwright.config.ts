@@ -53,7 +53,7 @@ export default defineConfig({
           ],
         },
       },
-      grepInvert: /@oidc-redirect|@noci|@visual|@ollama/,
+      grepInvert: /@oidc-redirect|@noci|@visual|@ollama|@minimal/,
     },
     {
       name: 'firefox',
@@ -74,6 +74,19 @@ export default defineConfig({
       name: 'chromium-oidc-redirect',
       use: { ...devices['Desktop Chrome'] },
       grep: /@oidc-redirect/,
+    },
+    {
+      // Intermezzo S4: the core stack with every optional feature module
+      // emptied. Own compose overlay + CI job so the sharded chromium run
+      // keeps talking to Tika / WhatsApp / Stripe as today.
+      name: 'chromium-minimal',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          args: ['--disable-features=LocalNetworkAccessChecks'],
+        },
+      },
+      grep: /@minimal/,
     },
     {
       // ollama-integration.spec.ts repoints the CHAT default model at the

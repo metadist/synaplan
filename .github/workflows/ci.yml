@@ -393,6 +393,124 @@ jobs:
             exit 1
           }
 
+  # Intermezzo S4 (FM18): a second backend job, not a matrix on `backend`.
+  # The full job must stay identical (C1). PHPUnit here is scoped so the
+  # extra lane stays inside the +4 min budget.
+  backend-minimal:
+    name: Backend (minimal)
+    runs-on: ubuntu-latest
+    needs: [change-scope]
+    if: needs.change-scope.outputs.mode == 'heavy'
+
+    env:
+      DATABASE_WRITE_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+      DATABASE_READ_URL: mysql://synaplan_test:synaplan_test@127.0.0.1:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
+
+    services:
+      mysql:
+        image: mariadb:12.3@sha256:dd9b303aed4f4890ed09f766d8ca9ddfd176c0c6f6267feff53b3192ec65a979
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: synaplan_test
+          MYSQL_USER: synaplan_test
+          MYSQL_PASSWORD: synaplan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, zip, gd, curl, bcmath, exif, pcntl, opcache, readline, soap, sodium, ffi, imagick, grpc, redis
+          coverage: none
+
+      - name: Cache composer dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install protoc from base image
+        run: |
+          BASE_IMAGE=$(grep -oP 'FROM \K\S+' _docker/backend/Dockerfile | head -1)
+          id=$(docker create "$BASE_IMAGE")
+          trap "docker rm $id" EXIT
+          sudo docker cp $id:/usr/local/bin/protoc /usr/local/bin/protoc
+          protoc --version
+
+      - name: Create .env file
+        working-directory: backend
+        run: cp .env.test .env
+
+      - name: Apply minimal-module overlay
+        # Real env wins over dotenv. phpunit.xml.dist still force-pins Stripe
+        # inside PHPUnit; the console command below is not PHPUnit.
+        run: bash scripts/minimal-module-env.sh --github-env
+
+      - name: Create plugins symlink
+        run: sudo ln -s ${{ github.workspace }}/plugins /plugins
+
+      - name: Install dependencies
+        working-directory: backend
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Lint the container
+        working-directory: backend
+        run: php bin/console lint:container
+
+      - name: Setup database schema
+        working-directory: backend
+        run: php bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration
+
+      - name: Seed catalogs
+        working-directory: backend
+        run: php bin/console app:seed --no-interaction
+
+      - name: Assert no feature module is configured
+        working-directory: backend
+        run: php bin/console app:modules:list --assert-none-configured
+
+      - name: Run scoped PHPUnit
+        working-directory: backend
+        run: >-
+          php bin/phpunit
+          tests/Architecture
+          tests/Unit/Module
+          tests/Characterization
+          tests/Unit/Command/ModulesListCommandTest.php
+          tests/Unit/Seed/ModuleGateSeederTest.php
+
+      - name: Generate OpenAPI spec
+        working-directory: backend
+        run: php bin/console nelmio:apidoc:dump --format=json > openapi-spec.json
+
+      - name: Upload minimal OpenAPI spec
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: openapi-spec-minimal
+          path: backend/openapi-spec.json
+          retention-days: 1
+
   frontend-build:
     name: Frontend Build
     # Head of the critical path (frontend-build → docker-build → e2e). It waits
@@ -562,6 +680,43 @@ jobs:
           name: widget-dist
           path: frontend/dist-widget/
           retention-days: 1
+
+  # Intermezzo S4 (FM19 / C2): the OpenAPI contract must not depend on which
+  # optional modules are configured. frontend-build stays off the critical
+  # path of backend-minimal — this job waits for both dumps.
+  openapi-identical:
+    name: OpenAPI identical (full vs minimal)
+    runs-on: ubuntu-latest
+    needs: [frontend-build, backend-minimal]
+    if: |
+      always() &&
+      needs.frontend-build.result == 'success' &&
+      needs.backend-minimal.result == 'success'
+    steps:
+      - name: Download full OpenAPI spec
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: openapi-spec
+          path: /tmp/openapi-full
+
+      - name: Download minimal OpenAPI spec
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: openapi-spec-minimal
+          path: /tmp/openapi-minimal
+
+      - name: Compare OpenAPI dumps
+        run: |
+          set -euo pipefail
+          FULL=/tmp/openapi-full/openapi-spec.json
+          MIN=/tmp/openapi-minimal/openapi-spec.json
+          if cmp -s "$FULL" "$MIN"; then
+            echo "OpenAPI specs are byte-identical"
+            exit 0
+          fi
+          echo "::error::OpenAPI spec differs between the full and minimal configurations (C2)"
+          diff -u "$FULL" "$MIN" | head -n 200
+          exit 1
 
   frontend-checks:
     name: Frontend (Vue/TypeScript)
@@ -821,6 +976,18 @@ jobs:
             npm_script: "test:e2e:ollama"
             grep_filter: "@ci"
             shard: ""
+          # Intermezzo S4 — core stack, every optional module emptied.
+          # Own overlay + project so the sharded chromium jobs keep today's
+          # Tika / WhatsApp / Stripe configuration.
+          - browser: chromium
+            variant: "minimal"
+            auth_method: password
+            compose_profiles: ""
+            compose_overlay: "-f docker-compose.minimal.yml"
+            playwright_project: "chromium-minimal"
+            npm_script: ""
+            grep_filter: "@minimal"
+            shard: ""
           # OIDC auth (chromium only — auth flow testing, not browser compat)
           - browser: chromium
             variant: ""
@@ -863,7 +1030,7 @@ jobs:
         # Node/Playwright, so they run in the background while the following
         # steps set up the test runner. "Wait for test services" joins on this.
         run: |
-          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ${{ matrix.compose_overlay }}"
           PROFILE="${{ matrix.compose_profiles }}"
           (
             set -e
@@ -921,7 +1088,7 @@ jobs:
 
       - name: Wait for test services
         run: |
-          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ${{ matrix.compose_overlay }}"
           PROFILE="${{ matrix.compose_profiles }}"
 
           echo "Waiting for background stack startup to finish..."
@@ -975,7 +1142,10 @@ jobs:
           echo "============================================"
           EXTRA_ARGS="${{ matrix.grep_filter && format('--grep "{0}"', matrix.grep_filter) || '' }} ${{ matrix.shard && format('--shard={0}', matrix.shard) || '' }}"
           EXTRA_ARGS=$(echo "$EXTRA_ARGS" | xargs)
-          if [ -n "$EXTRA_ARGS" ]; then
+          PROJECT="${{ matrix.playwright_project }}"
+          if [ -n "$PROJECT" ]; then
+            npx playwright test --config=tests/e2e/playwright.config.ts --project="$PROJECT" $EXTRA_ARGS
+          elif [ -n "$EXTRA_ARGS" ]; then
             npm run ${{ matrix.npm_script }} -- $EXTRA_ARGS
           else
             npm run ${{ matrix.npm_script }}
@@ -995,7 +1165,7 @@ jobs:
       - name: Stop test services
         if: always()
         run: |
-          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml"
+          COMPOSE="docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml ${{ matrix.compose_overlay }}"
           PROFILE="${{ matrix.compose_profiles }}"
           $COMPOSE $PROFILE down -v
 
@@ -2010,7 +2180,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
@@ -2024,6 +2194,8 @@ jobs:
           TEMPLATES: ${{ needs.deployment-templates.result }}
           MOBILE: ${{ needs.mobile-tooling.result }}
           BACKEND: ${{ needs.backend.result }}
+          BACKEND_MINIMAL: ${{ needs.backend-minimal.result }}
+          OPENAPI_IDENTICAL: ${{ needs.openapi-identical.result }}
           FRONTEND_BUILD: ${{ needs.frontend-build.result }}
           FRONTEND_CHECKS: ${{ needs.frontend-checks.result }}
           DOCKER_BUILD: ${{ needs.docker-build.result }}
@@ -2049,6 +2221,8 @@ jobs:
           require "Mobile Release Tooling" "$MOBILE"
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
+          allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"
+          allow_skip "OpenAPI identical (full vs minimal)" "$OPENAPI_IDENTICAL"
           allow_skip "Frontend Build" "$FRONTEND_BUILD"
           allow_skip "Frontend (Vue/TypeScript)" "$FRONTEND_CHECKS"
           allow_skip "Build Docker Image" "$DOCKER_BUILD"
@@ -2066,6 +2240,8 @@ jobs:
           case "$MODE" in
             heavy)
               require "Backend (PHP/Symfony)" "$BACKEND"
+              require "Backend (minimal)" "$BACKEND_MINIMAL"
+              require "OpenAPI identical (full vs minimal)" "$OPENAPI_IDENTICAL"
               require "Frontend Build" "$FRONTEND_BUILD"
               require "Frontend (Vue/TypeScript)" "$FRONTEND_CHECKS"
               require "Build Docker Image" "$DOCKER_BUILD"

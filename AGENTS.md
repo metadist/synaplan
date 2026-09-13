@@ -362,6 +362,7 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 
 ### Project-Specific Patterns
 
+- **Optional features are `FeatureModule`s** — never add a bare `isEnabled()` + status block again. Declare the module in `backend/src/Module/`, list its decisive env in `backend/.env.minimal` and `docker-compose.minimal.yml`, and let the registry drive feature status, runtime config, and the gate 404.
 - **Internal prompts** (not selectable by AI classification) MUST use the `tools:` prefix in `topic` (e.g. `tools:memory_extraction`). `MessageSorter` excludes them via `excludeTools: true`. A user-facing prompt without the prefix WILL be selected by the AI.
 - **Memory badges**: AI responses reference memories as `[Memory:ID]`. Only use IDs from the current memory list in the system prompt — never copy from earlier chat messages, never invent IDs. `MessageText.vue` renders the badges.
 - **Feedback categories** `feedback_negative` / `feedback_positive` / `feedback_false_positive` are hidden from the user memory list, used internally.
