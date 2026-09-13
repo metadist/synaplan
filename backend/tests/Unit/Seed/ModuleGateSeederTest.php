@@ -47,7 +47,7 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
 
-        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS'];
+        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS', 'GATE_LOCAL_AI'];
         foreach ($bySetting as $setting => $value) {
             $this->assertSame(in_array($setting, $on, true) ? '1' : '0', $value, $setting);
         }
