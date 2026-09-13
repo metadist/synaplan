@@ -57,6 +57,18 @@ vi.mock('@/stores/guest', () => ({
   useGuestStore: () => ({ $reset: vi.fn() }),
 }))
 
+// resetUserScopedClientState() loads these lazily inside login(). The real
+// chats store pulls in the generated API schemas, which is slow enough under
+// a parallel run to blow the per-test timeout — and nothing here asserts on
+// them. Stub them like the other user-scoped stores.
+vi.mock('@/stores/chats', () => ({
+  useChatsStore: () => ({ $reset: vi.fn() }),
+}))
+
+vi.mock('@/stores/history', () => ({
+  useHistoryStore: () => ({ clear: vi.fn() }),
+}))
+
 vi.mock('@/services/api/chatApi', () => ({
   clearSseToken: vi.fn(),
 }))

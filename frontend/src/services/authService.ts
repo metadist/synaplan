@@ -339,7 +339,8 @@ export const authService = {
   },
 
   async _doRefresh(): Promise<boolean> {
-    const { awaitAuthMutation, isAuthMutationInProgress } = await import('@/services/api/httpClient')
+    const { awaitAuthMutation, isAuthMutationInProgress } =
+      await import('@/services/api/httpClient')
     await awaitAuthMutation()
 
     try {

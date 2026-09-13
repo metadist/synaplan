@@ -209,9 +209,8 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
 
-    const { beginAuthMutation, endAuthMutation, getInFlightRefresh } = await import(
-      '@/services/api/httpClient'
-    )
+    const { beginAuthMutation, endAuthMutation, getInFlightRefresh } =
+      await import('@/services/api/httpClient')
     // Same cookie-swap lock as impersonation: a refresh that started on the
     // expired-session login page still carries the dead cookie. If it lands
     // after this POST, it 401s and logout() clears the hint — the new session

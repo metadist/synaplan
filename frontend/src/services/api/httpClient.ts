@@ -529,10 +529,11 @@ async function handleAuthFailure(): Promise<never> {
   ]
   const isOnPublicAuthPage = publicAuthPaths.some((p) => window.location.pathname.startsWith(p))
 
-  // A 401 that started before the user submitted the login form must not
-  // call logout(): that clears the session hint, so getCurrentUser() skips
-  // /auth/me and a just-issued cookie session looks logged out.
-  if (isOnPublicAuthPage || isAuthMutationInProgress()) {
+  // A 401 that started before login / impersonation took the cookie-swap
+  // lock must not call logout(): that clears the session hint and the user,
+  // so the session the swap just wrote looks logged out. The request that
+  // failed simply loses; the swap's own /auth/me settles the real state.
+  if (isAuthMutationInProgress()) {
     throw new Error('Authentication required')
   }
 

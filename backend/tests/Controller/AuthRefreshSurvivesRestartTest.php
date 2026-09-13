@@ -162,16 +162,26 @@ final class AuthRefreshSurvivesRestartTest extends WebTestCase
         $jar = $client->getCookieJar();
         $accessBefore = $jar->get(TokenService::ACCESS_COOKIE)?->getValue();
         $this->assertNotNull($accessBefore);
+        $liveRefresh = $jar->get(TokenService::REFRESH_COOKIE);
+        $this->assertNotNull($liveRefresh);
 
+        // Replace the refresh cookie in place: the jar keys cookies by
+        // name+domain+path, so a mismatching domain would ADD a second cookie
+        // and the request would still carry the live token.
         $jar->set(new BrowserKitCookie(
             TokenService::REFRESH_COOKIE,
             'dead-refresh-from-previous-tab',
             (string) (time() + 3600),
-            '/',
-            '',
-            false,
+            $liveRefresh->getPath(),
+            (string) $liveRefresh->getDomain(),
+            $liveRefresh->isSecure(),
             true,
         ));
+        $this->assertSame(
+            'dead-refresh-from-previous-tab',
+            $jar->get(TokenService::REFRESH_COOKIE)?->getValue(),
+            'test setup: the dead token must be the only refresh cookie sent',
+        );
 
         $client->request('POST', '/api/v1/auth/refresh');
         $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
