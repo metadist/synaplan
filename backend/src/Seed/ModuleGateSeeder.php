@@ -20,7 +20,7 @@ use Doctrine\DBAL\Connection;
 final readonly class ModuleGateSeeder
 {
     /** Module ids whose `MODULES.GATE_<ID>` seeds ON for new installs. */
-    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai'];
+    private const DEFAULT_ON = ['tika', 'docling', 'office_convert', 'searxng', 'piper_tts', 'local_ai', 'higgsfield', 'google_ai', 'thehive'];
 
     public function __construct(
         private Connection $connection,
