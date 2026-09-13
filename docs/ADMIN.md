@@ -307,10 +307,20 @@ by `App\Service\TokenService`:
 | `refresh_token` | 30 days, sliding on every refresh | `BTOKENS` in MariaDB | Nothing — the row is still there |
 
 Restarting or redeploying the backend, worker, Redis or the whole compose
-stack therefore keeps every browser and mobile-app session; the web app
-retries `/auth/refresh` through a 5xx/network blip instead of treating it as a
-sign-out, and only a definitive `401`/`403` ends the session. Two things must
-stay stable for that to hold:
+stack therefore keeps every browser and mobile-app session. Login is not a
+Redis or PHP session — the API firewall is stateless. The browser keeps the
+refresh cookie; MariaDB keeps the matching `BTOKENS` row; `/auth/refresh`
+mints a new 5-minute access cookie and slides the refresh expiry forward
+another 30 days. The web app retries `/auth/refresh` through a 5xx/network
+blip instead of treating it as a sign-out, and only a definitive `401`/`403`
+ends the session.
+
+`CookieTokenAuthenticator` must not claim `/auth/refresh` (or login). If it
+does, a stale access cookie — expired during downtime, or signed with a
+previous `APP_SECRET` — returns `401 AUTH_FAILED` before the controller can
+read `BTOKENS`, and every user looks logged out after a restart.
+
+Two things must stay stable for that to hold:
 
 - **`APP_SECRET`** — the self-hosted stack persists it in
   `deploy/data/secrets.env` (see `deploy/README.md`); Helm and other

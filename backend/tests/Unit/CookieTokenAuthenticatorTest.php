@@ -72,6 +72,30 @@ class CookieTokenAuthenticatorTest extends TestCase
         $this->assertFalse($this->authenticator->supports($request));
     }
 
+    public function testSupportsReturnsFalseOnRefreshEvenWithAccessCookie(): void
+    {
+        $request = Request::create('/api/v1/auth/refresh', 'POST');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'expired-or-unsigned');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsReturnsFalseOnLoginEvenWithAccessCookie(): void
+    {
+        $request = Request::create('/api/v1/auth/login', 'POST');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'expired-or-unsigned');
+
+        $this->assertFalse($this->authenticator->supports($request));
+    }
+
+    public function testSupportsStillClaimsProtectedAuthRoutes(): void
+    {
+        $request = Request::create('/api/v1/auth/me', 'GET');
+        $request->cookies->set(TokenService::ACCESS_COOKIE, 'app-token');
+
+        $this->assertTrue($this->authenticator->supports($request));
+    }
+
     // ========== supports() - API Key Deferral Tests ==========
 
     public function testSupportsReturnsFalseWhenXApiKeyHeaderPresent(): void

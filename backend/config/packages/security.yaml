@@ -88,6 +88,10 @@ security:
         - { path: ^/api/v1/auth/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/auth/resend-verification, roles: PUBLIC_ACCESS }
+        # Refresh is public on purpose: the 5-minute access cookie is often
+        # expired (or unsigned after an APP_SECRET rotation) when this is
+        # called. CookieTokenAuthenticator must not claim this path, or the
+        # DB-backed 30-day refresh token in BTOKENS is never consulted.
         - { path: ^/api/v1/auth/refresh, roles: PUBLIC_ACCESS }
         # Native (mobile) OAuth handoff exchange — auth IS the signed handoff token
         - { path: ^/api/v1/auth/native/exchange, roles: PUBLIC_ACCESS }
