@@ -11,7 +11,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. Flag off. |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
 | S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). Flag off. |
-| S5 Workflow builder v1 + webhook trigger | `feat/wave5-workflow-builder` | in progress | Wave 5 first strain: TL38–TL40, TL42–TL44. Flag `WORKFLOWS.BUILDER_ENABLED` off. |
+| S5 Workflow builder v1 + webhook trigger | `feat/wave5-workflow-builder` | in progress on `main` (#1821) | Wave 5: Steps + webhook trigger landed; builder flag `WORKFLOWS.BUILDER_ENABLED` still off. Approvals/custom-HTTP flags are now on by default (#1827). |
 
 ## Decisions
 

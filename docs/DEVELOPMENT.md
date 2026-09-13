@@ -60,6 +60,20 @@ answered its health endpoint. Absent modules are never probed, so the command
 is safe on a minimal stack — the `--assert-none-configured` flag is what the
 minimal CI lane uses to prove the core carries no optional feature.
 
+The CI overlay `docker-compose.minimal.yml` (on top of `docker-compose.test.yml`)
+and `backend/.env.minimal` empty every decisive module env and pin
+`FEATURE_MODULES_GATE_<ID>=true` so an absent module's routes answer the
+uniform `404 feature_not_configured`. Apply the env as a **real process
+environment** (`source scripts/minimal-module-env.sh`); Symfony dotenv will
+not override keys already set by `.env.test`. Do not confuse this overlay
+with `docker-compose-minimal.yml`, which is the product "cloud AI only"
+install file.
+
+To add a module: one descriptor in `backend/src/Module/`, the decisive env
+keys in both overlay files (the architecture test fails if either is
+missing), and never a second hand-written `isEnabled()` + feature-status
+block.
+
 ### Office conversion (optional)
 
 Office thumbnails, “Download as PDF”, inline preview, officemaker PDF output,

@@ -1,0 +1,47 @@
+# Overlay for the Intermezzo S4 "minimal" test stack.
+#
+# Applied on top of docker-compose.test.yml (+ docker-compose.test.ci.yml in CI):
+#   docker compose -f docker-compose.test.yml -f docker-compose.test.ci.yml \
+#     -f docker-compose.minimal.yml up -d
+#
+# Empties every optional feature-module env the full test stack sets, and pins
+# MODULES.GATE_<ID> on so absent-module routes answer the uniform 404.
+# Core services (MariaDB, Redis, Qdrant, MailHog, TestProvider) stay as they are.
+# Keep decisive keys in sync with backend/.env.minimal.
+
+services:
+  app_test:
+    environment:
+      TIKA_BASE_URL: ""
+      TIKA_URL: ""
+      DOCLING_BASE_URL: ""
+      OFFICE_CONVERT_URL: ""
+      SEARXNG_BASE_URL: ""
+      SYNAPLAN_TTS_URL: ""
+      OLLAMA_BASE_URL: ""
+      HIGGSFIELD_API_KEY: ""
+      HIGGSFIELD_API_SECRET: ""
+      GOOGLE_GEMINI_API_KEY: ""
+      GEMINI_API_KEY: ""
+      GOOGLE_API_KEY: ""
+      THEHIVE_API_KEY: ""
+      STRIPE_SECRET_KEY: ""
+      STRIPE_PRICE_PRO: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      IAP_PRODUCT_PRO: ""
+      IAP_PRODUCT_TEAM: ""
+      IAP_PRODUCT_BUSINESS: ""
+      WHATSAPP_ENABLED: "false"
+      WHATSAPP_ACCESS_TOKEN: ""
+      FEATURE_MODULES_GATE_TIKA: "true"
+      FEATURE_MODULES_GATE_DOCLING: "true"
+      FEATURE_MODULES_GATE_OFFICE_CONVERT: "true"
+      FEATURE_MODULES_GATE_SEARXNG: "true"
+      FEATURE_MODULES_GATE_PIPER_TTS: "true"
+      FEATURE_MODULES_GATE_LOCAL_AI: "true"
+      FEATURE_MODULES_GATE_HIGGSFIELD: "true"
+      FEATURE_MODULES_GATE_GOOGLE_AI: "true"
+      FEATURE_MODULES_GATE_THEHIVE: "true"
+      FEATURE_MODULES_GATE_STRIPE_BILLING: "true"
+      FEATURE_MODULES_GATE_MOBILE_IAP: "true"
+      FEATURE_MODULES_GATE_WHATSAPP: "true"

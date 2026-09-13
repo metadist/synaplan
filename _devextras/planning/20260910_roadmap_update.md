@@ -32,8 +32,8 @@ current row is met.
 | - | ---- | ---------- | ---- |
 | 1 | **Two bugfixes (first)** | E-mail formatting + chat memory. Production reports, not a new track. | A scheduled result mail renders as HTML. A chat still knows what was said about ten minutes ago. Both on `main`, covered by tests. |
 | 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2). **Done** on `main` via [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10). | Merged. Flags as shipped (`TOOLS.REGISTRY_ENABLED` on as kill-switch, approvals and custom HTTP off; no PHP compute client yet). |
-| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | S1–S4 of that plan done (S5 stays optional). A `minimal` CI variant proves absent modules stay absent. |
-| 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | Named in §7. Not started from this file. |
+| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | S1–S3 on `main` (#1815–#1817). S4 (minimal CI + OpenAPI identity + `@minimal` E2E) is the remaining Intermezzo exit. S5 stays optional. |
+| 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | Named in §7. Product flags and Steps/webhooks started on `main` anyway (#1821, #1823, #1827); compute Phase B is not started. |
 
 **The two bugfixes are still the next coding work.** Wave 4 merged to `main`
 first ([#1774](https://github.com/metadist/synaplan/pull/1774), 2026-09-10),
@@ -68,7 +68,7 @@ exit is met.
 | W2 | closed | IAM S3–S5 + Agent Builder S1–S3.5 + More Nextcloud S1 (#1745). Flags stay off. |
 | W3 | closed in this repo | AI Plugs S1–S6 + URL watch + Agent Builder S4–S6 on `main` (#1769). Leftover: `PL37`. |
 | W4 | closed in this repo | Tools/Approval S1–S4 + Secure Compute A0–A2 on `main` ([#1774](https://github.com/metadist/synaplan/pull/1774)). Flags: `TOOLS.REGISTRY_ENABLED` on (kill switch), `TOOLS.APPROVALS_ENABLED` and `TOOLS.CUSTOM_HTTP_ENABLED` off. Compute sidecar is not wired into PHP (Phase B). |
-| W5 | not started | After Intermezzo. |
+| W5 | started on `main` (out of the original order) | Tools S5 Steps + webhook (#1821); tool flags on by default (#1827); admin switches (#1823). Compute Phase B and Intermezzo S4 were still open when this started. |
 
 ---
 

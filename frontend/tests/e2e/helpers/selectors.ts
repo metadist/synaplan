@@ -465,6 +465,9 @@ export const selectors = {
   inboundConfig: {
     page: '[data-testid="page-config-inbound"]',
     resetDefaults: '[data-testid="btn-reset-defaults"]',
+    whatsappSection: '[data-testid="section-whatsapp"]',
+    whatsappNotice: '[data-testid="notice-feature-not-configured"][data-module="whatsapp"]',
+    emailSection: '[data-testid="section-email"]',
   },
   assistants: {
     /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */

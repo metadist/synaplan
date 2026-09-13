@@ -1,4 +1,4 @@
-.PHONY: help lint format test build deps audit test-stack-build ci-local
+.PHONY: help lint format test build deps audit test-stack-build ci-local test-e2e-minimal
 
 help: ## Show this help
 	@echo "Common commands (runs in backend and/or frontend as appropriate):"
@@ -43,6 +43,9 @@ test-e2e: ## Run e2e tests headless (fast loop, dev stack :5173 or BASE_URL). HE
 test-e2e-full: ## Build test stack + run all E2E tests (CI-like, port 8001)
 	$(MAKE) test-stack-build
 	cd frontend && BASE_URL=http://localhost:8001 npm run test:e2e
+
+test-e2e-minimal: ## @minimal suite against the test stack + docker-compose.minimal.yml
+	$(MAKE) -C frontend test-e2e-minimal
 
 test-e2e-plugin-castingdata: ## Run Casting Data plugin e2e tests (CastApp + Synaplan must be running)
 	$(MAKE) -C frontend test-e2e-plugin-castingdata
