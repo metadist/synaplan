@@ -1,25 +1,34 @@
 # Roadmap update 2026-09-10 — Wave 4, Intermezzo, Wave 5
 
-**Status:** Live plan as of 2026-09-10. Replaces
+**Status:** Live plan as of 2026-09-13. Replaces
 [`20260903_roadmap.md`](./20260903_roadmap.md) as the overview; the 2026-09-03
 text is frozen at
 [`20260903_roadmap/20260903_roadmap.md`](./20260903_roadmap/20260903_roadmap.md).
-Track directories, sprint files and
-[`202609_ux_user_flows.md`](./202609_ux_user_flows.md) stay where they are.
-**Owner:** product owner. **No Wave 5 implementation starts until the order
-in §1 is done through Intermezzo.**
+Track directories, sprint files,
+[`202609_ux_user_flows.md`](./202609_ux_user_flows.md) and
+[`20260913-use-case-research/`](./20260913-use-case-research/README.md) stay
+where they are.
+**Owner:** product owner. **§1 rows 1–3 are closed.** Next coding work is
+the remainder of Wave 5 (row 4): finish Tools S5, then Compute A3 + B1.
 
-This update exists because Wave 3 closed, Wave 4 has since landed on `main`
-([#1774](https://github.com/metadist/synaplan/pull/1774)), two production bugs
-must still ship before Intermezzo, and the 2026-09-10 research said the leaner
-architecture should land *before* Wave 5 adds more optional services.
+This update exists because Wave 3 closed, Wave 4 landed on `main`
+([#1774](https://github.com/metadist/synaplan/pull/1774)), the two production
+bugs shipped ([#1787](https://github.com/metadist/synaplan/pull/1787)), and
+the 2026-09-10 research said the leaner architecture should land *before*
+Wave 5 adds more optional services. Intermezzo S1–S4 are on `main`. Wave 5
+product flags and the Steps editor started on `main` before that exit
+([#1821](https://github.com/metadist/synaplan/pull/1821),
+[#1823](https://github.com/metadist/synaplan/pull/1823),
+[#1827](https://github.com/metadist/synaplan/pull/1827)); that order break is
+recorded in §10 #10, not re-litigated.
 
 The 2026-09-10 wave-state that Wave 4 wrote onto
 [`20260903_roadmap.md`](./20260903_roadmap.md) (W3 closed in #1769; W4
 tools/approvals S1–S4 + compute A0–A2 in progress) is superseded here: W4 is
-closed in this repo. Flags unchanged (`TOOLS.REGISTRY_ENABLED` on as
-kill-switch, `TOOLS.APPROVALS_ENABLED` and `TOOLS.CUSTOM_HTTP_ENABLED` off;
-compute sidecar not wired into PHP).
+closed in this repo. Flags as of 4.8: `TOOLS.REGISTRY_ENABLED` on as
+kill-switch; `TOOLS.APPROVALS_ENABLED`, `TOOLS.CUSTOM_HTTP_ENABLED` and
+`WORKFLOWS.BUILDER_ENABLED` on for new installs (#1827). Compute sidecar is
+not wired into PHP.
 
 ---
 
@@ -30,18 +39,16 @@ current row is met.
 
 | # | Name | What it is | Exit |
 | - | ---- | ---------- | ---- |
-| 1 | **Two bugfixes (first)** | E-mail formatting + chat memory. Production reports, not a new track. | A scheduled result mail renders as HTML. A chat still knows what was said about ten minutes ago. Both on `main`, covered by tests. |
-| 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2). **Done** on `main` via [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10). | Merged. Flags as shipped (`TOOLS.REGISTRY_ENABLED` on as kill-switch, approvals and custom HTTP off; no PHP compute client yet). |
-| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | S1–S3 on `main` (#1815–#1817). S4 (minimal CI + OpenAPI identity + `@minimal` E2E) is the remaining Intermezzo exit. S5 stays optional. |
-| 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | Named in §7. Product flags and Steps/webhooks started on `main` anyway (#1821, #1823, #1827); compute Phase B is not started. |
+| 1 | **Two bugfixes (first)** | E-mail formatting + chat memory. Production reports, not a new track. | **Done** on `main` via [#1787](https://github.com/metadist/synaplan/pull/1787) (2026-09-10). Spec stays in §4. |
+| 2 | **Wave 4** | Tools / approvals / custom tools + the compute sidecar (A0–A2). **Done** on `main` via [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10). | Merged. Approvals, custom HTTP and the workflow builder later default on for new installs (#1827). No PHP compute client yet. |
+| 3 | **Intermezzo** | Leaner architecture and faster execution: declared feature modules, lazy registries, dead-weight removal. Plan: [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md). | **Done.** S1–S4 on `main` (#1815–#1817, [#1843](https://github.com/metadist/synaplan/pull/1843), [#1856](https://github.com/metadist/synaplan/pull/1856)). S5 stays optional. |
+| 4 | **Wave 5** | Former Wave 5, plus the 10 Sep partner review. Workflow builder, compute Phase B, reliability / activation, then the complete-workflow experiences. | **In progress.** Finish Tools S5 (TL41, TL45–TL47, J-TL-5), then Compute A3 + B1. Named in §7. |
 
-**The two bugfixes are still the next coding work.** Wave 4 merged to `main`
-first ([#1774](https://github.com/metadist/synaplan/pull/1774), 2026-09-10),
-so they no longer gate a Wave 4 merge. They still go before Intermezzo and
-Wave 5. They do not wait for Intermezzo ticks or Wave 5 design.
-
-Git merge order: Wave 4 is on `main`; this planning branch merges onto that.
-Bugfix PRs still target `main` and can land at any time before Intermezzo.
+**Next coding work is Wave 5 remainder**, in that order: close Tools S5,
+then the first PHP compute module (A3 + B1). Do not start Compute B2 or
+§7.3 packs until those exits are met. The 13 Sep use-case list
+([`20260913-use-case-research/`](./20260913-use-case-research/README.md))
+feeds the Wave 5 ticks; it does not replace this order.
 
 ---
 
@@ -51,24 +58,25 @@ Bugfix PRs still target `main` and can land at any time before Intermezzo.
 | ------ | -------- |
 | Wave 3 | Closed in this repo. Agent Builder S4–S6 on `main` via [#1769](https://github.com/metadist/synaplan/pull/1769). AI Plugs S1–S6 + URL watch on `main`. Leftover: `PL37` (`model_preferences` bundle section). More Nextcloud S2–S3 remain in partner repos. |
 | Wave 4 | Unchanged in *content*: track 4 S1–S4 + track 5 A0–A2. Merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) (2026-09-10), before the two bugfixes. |
-| **Two bugfixes** | New. First work. Specified in §4. |
-| **Intermezzo** | New named release between Wave 4 and Wave 5 (the "4.5" slot). Not a new track number. Carries the lean-architecture findings so Wave 5 does not add more eager providers and hand-written feature-status blocks. |
-| Wave 5 | Same product intent as the 2026-09-03 Wave 5, plus the partner review in [`20260910-wave5-architecture-research/03_architecture_and_steps.txt`](./20260910-wave5-architecture-research/03_architecture_and_steps.txt). Starts only after Intermezzo. |
-| Six tracks, principles, UX contract, vocabulary | Unchanged. Principles and the 2026-09-03 decision log live in the archive. U1–U12 in the UX contract still bind every `ota-candidate` step. |
-| Secure Compute vs Desktop | Research verdict ([`01_compute_vs_headless_desktop.md`](./20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md)): Desktop is **not** the compute runtime. Wave 4 already put the runner in `sidecars/synaplan-compute`. Product-owner ticks on that file's §7 are still open; they do not block Wave 4. |
+| **Two bugfixes** | Shipped in [#1787](https://github.com/metadist/synaplan/pull/1787). Spec retained in §4. |
+| **Intermezzo** | Named release between Wave 4 and Wave 5 (the "4.5" slot). Not a new track number. S1–S4 on `main`; S5 optional. |
+| Wave 5 | Same product intent as the 2026-09-03 Wave 5, plus the partner review in [`20260910-wave5-architecture-research/03_architecture_and_steps.txt`](./20260910-wave5-architecture-research/03_architecture_and_steps.txt). Product slices started on `main` before Intermezzo closed; compute Phase B has not. |
+| Six tracks, principles, UX contract, vocabulary | Unchanged. Principles and the 2026-09-03 decision log live in the archive. U1–U12 in the UX contract still bind every `ota-candidate` step. The 13 Sep use-case list applies those rules to ten jobs. |
+| Secure Compute vs Desktop | Research verdict ([`01_compute_vs_headless_desktop.md`](./20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md)): Desktop is **not** the compute runtime. Wave 4 already put the runner in `sidecars/synaplan-compute`. Research §7 rows 1–4 and 6 are settled; row 5 (launch name) stays open. |
 
 Waves remain a capacity plan, not a calendar promise. A wave ends when its
 exit is met.
 
-**Wave state (2026-09-10, after #1774):**
+**Wave state (2026-09-13):**
 
 | Wave | State | Evidence |
 | ---- | ----- | -------- |
 | W1 | closed | IAM S0–S2 on `main` (#1708, #1713). |
-| W2 | closed | IAM S3–S5 + Agent Builder S1–S3.5 + More Nextcloud S1 (#1745). Flags stay off. |
+| W2 | closed | IAM S3–S5 + Agent Builder S1–S3.5 + More Nextcloud S1 (#1745). |
 | W3 | closed in this repo | AI Plugs S1–S6 + URL watch + Agent Builder S4–S6 on `main` (#1769). Leftover: `PL37`. |
-| W4 | closed in this repo | Tools/Approval S1–S4 + Secure Compute A0–A2 on `main` ([#1774](https://github.com/metadist/synaplan/pull/1774)). Flags: `TOOLS.REGISTRY_ENABLED` on (kill switch), `TOOLS.APPROVALS_ENABLED` and `TOOLS.CUSTOM_HTTP_ENABLED` off. Compute sidecar is not wired into PHP (Phase B). |
-| W5 | started on `main` (out of the original order) | Tools S5 Steps + webhook (#1821); tool flags on by default (#1827); admin switches (#1823). Compute Phase B and Intermezzo S4 were still open when this started. |
+| W4 | closed in this repo | Tools/Approval S1–S4 + Secure Compute A0–A2 on `main` ([#1774](https://github.com/metadist/synaplan/pull/1774)). |
+| Intermezzo | closed | Feature-modules S1–S4 on `main` (#1815–#1817, #1843, #1856). S5 optional. |
+| W5 | in progress | Tools S5 Steps + webhook (#1821); flags on by default (#1827); admin switches (#1823). Open: TL41, TL45–TL47, J-TL-5; Compute A3 + B1–B4; remainder of §7.2–§7.3. |
 
 ---
 
@@ -79,8 +87,8 @@ exit is met.
 | 1 | IAM | [`202609_iam/`](./202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX follow-up still open; not in this update. |
 | 2 | Agent Builder | [`202609_agent_builder/`](./202609_agent_builder/00_master_plan.md) | S1–S6 on `main`. Wave 5 may tighten publish-as-deployment (partner review). |
 | 3 | AI Plugs | [`202609_ai_plugs/`](./202609_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
-| 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 (workflow builder + webhook) = Wave 5. |
-| 5 | Secure Compute | [`202609_secure_compute/`](./202609_secure_compute/00_master_plan.md) | A0–A2 on `main` (#1774, `sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module (after Intermezzo). |
+| 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 started (#1821): Steps + webhook live; TL41, TL45–TL47 and J-TL-5 still open. |
+| 5 | Secure Compute | [`202609_secure_compute/`](./202609_secure_compute/00_master_plan.md) | A0–A2 on `main` (#1774, `sidecars/synaplan-compute`, no PHP client). A3 + B1–B4 = Wave 5. First PHP feature that must be born as a module. |
 | 6 | More Nextcloud | [`202609_more_nextcloud/`](./202609_more_nextcloud/00_master_plan.md) | S1 on `main`. S2–S3 stay in partner repos; not a Wave 4/5 blocker. |
 
 Release classes still follow `.github/mobile-impact-policy.json`. No track
@@ -88,11 +96,12 @@ here is `store-required`.
 
 ---
 
-## 4. Two bugfixes — first
+## 4. Two bugfixes — shipped
 
-These are the first coding work. Separate, reviewable PRs. Conventional
-commits `fix:`. Full pre-commit gate. They are **not** Intermezzo and **not**
-Wave 5.
+Landed on `main` in [#1787](https://github.com/metadist/synaplan/pull/1787)
+(2026-09-10) together with the other-chats digest. They are **not**
+Intermezzo and **not** Wave 5. The acceptance below is the regression
+contract; do not reopen the feature.
 
 ### 4.1 E-mail formatting — scheduled mail arrives as Markdown
 
@@ -105,11 +114,10 @@ Markdown, not as HTML.
   already run the body through Parsedown and set both `text` and `html`. If
   users still see Markdown, a caller is skipping that path or the HTML part
   is dropped in transit.
-- `GraphClient::sendMail()` sends Graph `body.contentType = text` and
-  `M365MailSender` forwards the Markdown unchanged. `email_me` prefers the
-  owner's connected Microsoft 365 mailbox
-  (`EmailMeRunner` → `M365MailSender`, SMTP only as fallback). A user with
-  M365 connected would get exactly the reported mail.
+- **Fixed:** `MarkdownEmailFormatter` converts the body; SMTP still sends
+  `multipart/alternative`; `GraphClient::sendMail()` now sends
+  `contentType: html`. `email_me` still prefers the owner's connected
+  Microsoft 365 mailbox (`EmailMeRunner` → `M365MailSender`, SMTP fallback).
 - URL-watch and Saved Task notify paths must be checked against the same
   rule: every scheduled / unattended result mail is `multipart/alternative`
   with a real `text/html` part.
@@ -144,19 +152,17 @@ characters. Once a turn leaves that window, only the stored summary can
 carry it. If the refresh never runs, fails, or the summary is not applied
 on the next request, the model has nothing.
 
-**Likely seams (starting points, not a diagnosis):**
+**What #1787 changed:** rolling summary is applied on stream and
+non-stream; `ConversationSummaryRefreshDispatcher` queues the refresh
+after persist. Characterization / routing snapshots were left untouched.
+Related plan (context only):
+[`2026-archive/20260707-rolling-conversation-summary/`](./2026-archive/20260707-rolling-conversation-summary/README.md).
+Do not rebuild that feature.
 
-- Is `RefreshConversationSummaryCommand` actually consumed in production
-  (worker up, messenger routing, no silent discard)?
-- Does a ~10 minute gap with a few long answers already exceed the 30 / 15k
-  window *before* a summary exists?
-- Is the summary applied on every chat-intent path the user hits (stream,
-  non-stream, widget, email-as-chat), or only on `processStream()`?
-- Cache / store key: a refresh that never sees the new turns, or a read
-  that ignores a valid store.
-- Related plan (context only):
-  [`2026-archive/20260707-rolling-conversation-summary/`](./2026-archive/20260707-rolling-conversation-summary/README.md).
-  Do not rebuild that feature; find why the shipped one drops context.
+**Still not evidenced:** the §4.2(1) ten-minute / leave-the-raw-window
+walk. Unit tests cover dispatch, read, and a missing store; they do not
+replace that walk. If production still drops context, start there — do
+not open a new summarizer.
 
 **Acceptance:**
 
@@ -188,20 +194,16 @@ Do not re-implement Wave 4 on this planning branch. Track STATUS files on
 | Piece | State on `main` | Flags |
 | ----- | --------------- | ----- |
 | Tools S1 — registry | Implemented | `TOOLS.REGISTRY_ENABLED` on (kill-switch) |
-| Tools S2 — interactive approval | Implemented | `TOOLS.APPROVALS_ENABLED` off |
+| Tools S2 — interactive approval | Implemented | On for new installs since #1827 |
 | Tools S3 — unattended pause / resume | Implemented | same approvals flag |
-| Tools S4 — custom HTTP / OpenAPI tools | Implemented | `TOOLS.CUSTOM_HTTP_ENABLED` off |
+| Tools S4 — custom HTTP / OpenAPI tools | Implemented | On for new installs since #1827 |
 | Compute A0–A2 | Implemented in-repo as `sidecars/synaplan-compute` (Go, Python + Node images, hostile corpus, workspaces). PHP never mounts `docker.sock`. | No `COMPUTE.ENABLED` yet — Phase B is Wave 5 |
-| Tools S5 / Compute A3 + B1–B4 | Not shipped | Wave 5 |
+| Tools S5 / Compute A3 + B1–B4 | S5 partial (#1821); compute not started | Wave 5 |
 
-**Wave 4 exit (code):** met by #1774. Approvals and custom HTTP remain
-default-off until their journeys (J-TL-1…5) are walked on a flag-on install.
-The compute sidecar is shippable as a binary / image and is **not** wired
-into PHP.
-
-**Still open after Wave 4:** the two bugfixes in §4. They were meant to
-precede this merge; they remain the next coding work and still precede
-Intermezzo.
+**Wave 4 exit (code):** met by #1774. Approvals and custom HTTP later
+defaulted on for new installs (#1827); J-TL-1…5 still need to be walked
+on a flag-on install. The compute sidecar is shippable as a binary /
+image and is **not** wired into PHP.
 
 ---
 
@@ -227,11 +229,12 @@ eager `ProviderRegistry`, the 430-line `featuresStatus()` method and the
 unconditional route surface. Intermezzo puts one descriptor and a lazy
 locator in place first; compute B1 is born as a module.
 
-**Intermezzo exit:** feature-modules S1–S4 done (vendor slimming, registry
-and descriptors, gates default-off, lazy locators, `minimal` / `full` CI).
-S5 (compile-time exclusion / plugin extraction) stays optional and is cut
-first if capacity runs out. Behaviour of configured features is unchanged.
-End users see fewer cards, never more.
+**Intermezzo exit:** **met.** Feature-modules S1–S4 are on `main`
+(vendor slimming, registry and descriptors, lazy locators, `minimal` /
+`full` CI, twelve gates on for new installs). S5 (compile-time exclusion
+/ plugin extraction) stays optional and is cut first if capacity runs
+out. Behaviour of configured features is unchanged. End users see fewer
+cards, never more.
 
 **Not Intermezzo:** the two bugfixes (§4), Wave 4 product flags, workflow
 builder, compute Phase B, sovereignty policies, assistant packs.
@@ -254,7 +257,7 @@ assistant builder and the step-list workflow editor.
 
 | Slice | Track | Notes |
 | ----- | ----- | ----- |
-| Workflow builder v1 + webhook trigger | Tools S5 | [`05_sprint_5_workflow_builder_and_webhook.md`](./202609_tools_approval_workflows/05_sprint_5_workflow_builder_and_webhook.md). Flag `WORKFLOWS.BUILDER_ENABLED` off. |
+| Workflow builder v1 + webhook trigger | Tools S5 | [`05_sprint_5_workflow_builder_and_webhook.md`](./202609_tools_approval_workflows/05_sprint_5_workflow_builder_and_webhook.md). Steps + webhook on `main` (#1821). Seeder default on (#1827). Open: TL41 templates, TL45 `saved_tasks` bundle section, TL46 C7 + five-step run, TL47 docs, J-TL-5 walk. |
 | Compute contract freeze | Compute A3 | Fixtures frozen at `protocol: 1`. |
 | PHP client + `code_run` + policy | Compute B1–B2 | Born as a feature module. Write-class; unattended default `approve`. |
 | Workspaces, egress, hardening | Compute B3–B4 | Default off. T2 (gVisor) on a separate **compute node** before Cloud enable. |
@@ -289,8 +292,12 @@ Do these *in* Wave 5, not as a substitute for §4.
   happened. Synthetic health: upload → retrieve → answer → generate file;
   verified restore on releases.
 
-Tick these as Wave 5 decision rows in the owning track `STATUS.md` before
-the first Wave 5 PR. Until ticked they are proposals, not scope.
+Track STATUS already ticked the first Wave 5 PR (#1821): honest
+per-outcome copy and resume-time permission re-check (approval bound to
+tool + arguments) are in. Checkpoints, per-run spend limits, publish ≠
+activated, sovereignty, and the §7.3 experiences stay scheduled. The
+13 Sep use-case list (`Q1`–`Q11`) is the proposed remainder — tick a
+row in the owning STATUS before coding it.
 
 ### 7.3 Complete workflows (30 % — proposed)
 
@@ -307,14 +314,15 @@ started from this file.
 
 ### 7.4 Wave 5 exit (first cut)
 
-1. Intermezzo S1–S4 are on `main`.
+1. Intermezzo S1–S4 are on `main`. **Met.**
 2. Workflow builder v1 can author a Saved Task a non-technical user can
-   re-run tomorrow (J-TL-5 walked).
+   re-run tomorrow (J-TL-5 walked). **Not met** — Steps editor is on
+   `main`; templates, bundle section, C7 proof and the walk are open.
 3. `code_run` is a write-class tool behind approvals; compute quotas and
    audit exist; Cloud stays off until T2 on a compute node.
 4. At least the resume-time permission re-check and honest run outcomes
-   from §7.2 are in. The rest of §7.2–§7.3 is scheduled in track STATUS,
-   not silently dropped.
+   from §7.2 are in. **Met** in #1821. The rest of §7.2–§7.3 is
+   scheduled in track STATUS, not silently dropped.
 
 ---
 
@@ -326,7 +334,9 @@ plans, explainable UX, security posture, mobile classification).
 
 The UX contract
 ([`202609_ux_user_flows.md`](./202609_ux_user_flows.md), U1–U12) still
-binds every `ota-candidate` step. A listed screen is not a user-flow.
+binds every `ota-candidate` step. The ten-job list
+([`20260913-use-case-research/`](./20260913-use-case-research/README.md))
+applies those rules; a listed screen is not a user-flow.
 
 Cross-track vocabulary in the archive §6 still binds. **Add:**
 
@@ -357,10 +367,11 @@ This file is the wave overview. It does not replace track STATUS.
 | 3 | Wave 4 is the tools / approvals / compute-sidecar work. It merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774) on 2026-09-10, before the two bugfixes. |
 | 4 | Insert **Intermezzo** (not "Wave 6", not Wave 5) for feature modules and faster execution. Tick [`20260910-feature-modules/00_master_plan.md`](./20260910-feature-modules/00_master_plan.md) §0 before Intermezzo code. |
 | 5 | Wave 5 keeps Tools S5 + Compute A3/B1–B4 and absorbs the partner review's reliability / activation and complete-workflow ideas as §7.2–§7.3, to be ticked per track before the first Wave 5 PR. |
-| 6 | Do not implement Secure Compute as headless Desktop. Add **compute node** to vocabulary. Open ticks remain on the research §7. |
+| 6 | Do not implement Secure Compute as headless Desktop. Add **compute node** to vocabulary. Research §7 rows 1–4 and 6 settled 2026-09-13; row 5 (launch name) stays open. |
 | 7 | Git: Wave 4 is on `main` (#1774). This planning branch merges onto that. Bugfix PRs target `main` and may land before Intermezzo. |
-| 8 | No Wave 5 and no Intermezzo implementation from this planning change. |
+| 8 | No Wave 5 and no Intermezzo implementation from this planning change. (Superseded by #10: product PRs landed afterwards.) |
 | 9 | Conflict on `20260903_roadmap.md` vs Wave 4: keep the archive stub at that path; move the 2026-09-10 wave-state (W3 closed, W4 tools/compute) into this live plan and mark W4 closed via #1774. |
+| 10 | **2026-09-13 housekeeping.** Rows 1–3 closed (#1787, #1774, #1815–#1817/#1843/#1856). Wave 5 product slices started on `main` before Intermezzo S4 (#1821, #1823, #1827) — recorded, not reversed. Next coding: Tools S5 remainder, then Compute A3 + B1. Use-case research is a companion, not a seventh track. |
 
 ---
 
@@ -370,6 +381,7 @@ This file is the wave overview. It does not replace track STATUS.
 | -------- | --- |
 | [`20260903_roadmap/20260903_roadmap.md`](./20260903_roadmap/20260903_roadmap.md) | Frozen original (tracks, inventory, 2026-09-03 decisions) |
 | [`202609_ux_user_flows.md`](./202609_ux_user_flows.md) | Binding UX |
+| [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs + Perfect-UX bar; feeds Wave 5 ticks |
 | [`20260910-wave5-architecture-research/`](./20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
-| [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record |
-| Track 4 / 5 `STATUS.md` on `main` | Tools S1–S4 and compute A0–A2 as implemented (#1774) |
+| [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |
+| Track 4 / 5 `STATUS.md` on `main` | Tools S1–S5 (S5 open) and compute A0–A2 as implemented |
