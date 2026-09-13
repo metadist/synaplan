@@ -47,7 +47,7 @@ final class ModuleGateSeederTest extends TestCase
             'GATE_WHATSAPP',
         ], array_keys($bySetting));
 
-        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS', 'GATE_LOCAL_AI', 'GATE_HIGGSFIELD', 'GATE_GOOGLE_AI', 'GATE_THEHIVE', 'GATE_STRIPE_BILLING', 'GATE_MOBILE_IAP'];
+        $on = ['GATE_TIKA', 'GATE_DOCLING', 'GATE_OFFICE_CONVERT', 'GATE_SEARXNG', 'GATE_PIPER_TTS', 'GATE_LOCAL_AI', 'GATE_HIGGSFIELD', 'GATE_GOOGLE_AI', 'GATE_THEHIVE', 'GATE_STRIPE_BILLING', 'GATE_MOBILE_IAP', 'GATE_WHATSAPP'];
         foreach ($bySetting as $setting => $value) {
             $this->assertSame(in_array($setting, $on, true) ? '1' : '0', $value, $setting);
         }
@@ -73,7 +73,7 @@ final class ModuleGateSeederTest extends TestCase
             ModuleGateSeeder::defaultRows(['searxng']),
         );
         $this->assertSame(
-            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_WHATSAPP', 'value' => '0']],
+            [['ownerId' => 0, 'group' => 'MODULES', 'setting' => 'GATE_WHATSAPP', 'value' => '1']],
             ModuleGateSeeder::defaultRows(['whatsapp']),
         );
     }
