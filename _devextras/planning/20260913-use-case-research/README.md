@@ -2,7 +2,12 @@
 
 **Status:** Research 2026-09-13, verified against `main` at 4.8
 (#1827 turned the wave flags on by default; #1821 shipped the Steps editor
-and webhook trigger; Office Phase T/A/B and IAM-UX are on `main`).
+and webhook trigger; Office Phase T/A/B on `main` via
+[#1685](https://github.com/metadist/synaplan/pull/1685); IAM-UX Share
+dialog on `main` via
+[#1726](https://github.com/metadist/synaplan/pull/1726)). Track STATUS
+ledgers for those two were still labelled pre-merge and are corrected in
+this change.
 **Purpose:** decide whether Synaplan is the right solution for a job, and
 turn that answer into work. Every case is written so a non-technical reader
 can recognise their own situation.
@@ -136,8 +141,8 @@ showcase candidate.**
 answers from approved statutes and starts a service request — without
 exposing case data.
 
-**Acceptance utterance:** *Visitor, in Turkish: "Wie melde ich einen
-Umzug an?" → sourced answer + "Start the request" → a Synaform collects
+**Acceptance utterance:** *Visitor, in Turkish: "Taşınmayı nasıl
+bildiririm?" → sourced answer + "Start the request" → a Synaform collects
 the fields → card "Send to the citizen office? Nothing has been sent" →
 Approve → custom tool creates the case; the visitor gets the reference
 number.*
@@ -321,7 +326,7 @@ make urgent. Each is one PR unless noted.
 | Q4 | **Publish ≠ activated** — after Publish show what actually came up ("website active · Monday schedule needs attention") with a targeted retry | Cases 4, 10 | Roadmap §7.2; Agent Builder STATUS |
 | Q5 | **"For you" landing** — "Two reports finished. One action needs approval. One connection needs reconnecting." Persistence exists; this is a card over three existing lists | All automation cases | Roadmap §7.3 |
 | Q6 | **AB14 "Help me write"** in the assistant builder (reuse the widget AI Setup Assistant) | Cases 4, 5, 10 | Agent Builder S2 deferral |
-| Q7 | **Approval bound to arguments + tool version; permission re-check before execute** | Cases 2, 6, 8 | **Done** in #1821 (tool + arguments). Tool *version* still open if a later PR needs it |
+| Q7 | **Approval bound to arguments + tool version; permission re-check before execute** | Cases 2, 6, 8 | **Partial** in #1821 (tool + arguments + permission re-check). Binding the grant to a tool *version* is follow-up |
 | Q8 | **Sovereignty as a job-wide setting** ("Local only" never falls back to cloud; show where processing happened) | Case 10 | Roadmap §7.2 |
 | Q9 | **PL37** `model_preferences` bundle section | Tier B packs | AI Plugs leftover |
 | Q10 | **Unmerged small UX branches to rebase or close:** `feat/file-preview-media-aware` (1 commit, 2026-09-01), `fix/files-list-searchable-status-ux` (1, 08-31), `fix/1499-consistent-file-previews` (2, 08-30), `feat/chat-history-panel` (4, 09-02), `feat/first-run-setup-wizard` (5, 08-26 — first-run matters for §1 rule 1) | Cases 3, 5, 10 | Branch list on `origin` |

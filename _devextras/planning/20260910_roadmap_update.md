@@ -84,7 +84,7 @@ exit is met.
 
 | # | Track | Directory | Wave 4 / Intermezzo / Wave 5 |
 | - | ----- | --------- | ---------------------------- |
-| 1 | IAM | [`202609_iam/`](./202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX follow-up still open; not in this update. |
+| 1 | IAM | [`202609_iam/`](./202609_iam/00_master_plan.md) | Shipped through S5. IAM-UX Share dialog on `main` via [#1726](https://github.com/metadist/synaplan/pull/1726). |
 | 2 | Agent Builder | [`202609_agent_builder/`](./202609_agent_builder/00_master_plan.md) | S1–S6 on `main`. Wave 5 may tighten publish-as-deployment (partner review). |
 | 3 | AI Plugs | [`202609_ai_plugs/`](./202609_ai_plugs/00_master_plan.md) | S1–S6 on `main`. `PL37` leftover. Intermezzo reuses the plug-declaration pattern. |
 | 4 | Tools, Approval & Workflows | [`202609_tools_approval_workflows/`](./202609_tools_approval_workflows/00_master_plan.md) | S1–S4 on `main` (#1774). S5 started (#1821): Steps + webhook live; TL41, TL45–TL47 and J-TL-5 still open. |

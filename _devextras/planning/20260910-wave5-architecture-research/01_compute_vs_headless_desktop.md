@@ -195,8 +195,10 @@ software, no user machine involved".
 
 ## 7. Decisions requested
 
-Settled 2026-09-13 against the live roadmap and compute STATUS. Rows 4–5
-stay product-owner work; they do not block Tools S5 or Compute A3 + B1.
+Settled 2026-09-13 against the live roadmap and compute STATUS. Row 4 is
+recorded (Desktop headless is a Desktop backlog item, not a compute
+runtime). Only row 5 (Wave 5 launch name / copy) stays product-owner work;
+it does not block Tools S5 or Compute A3 + B1.
 
 | # | Decision | Proposed | Agree? |
 | - | -------- | -------- | ------ |

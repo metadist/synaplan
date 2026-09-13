@@ -64,9 +64,11 @@ A user-visible change is **done** only when all seven hold:
 7. **Every theme, every size, every locale.** Light, dark, V2, 320 px, WCAG
    AA, all five locales in the same PR (U9).
 
-Planning rule: a sprint file with an `ota-candidate` step names its journey
-(§5 of the UX contract) and lists the five exit bullets from its §6 before
-implementation starts. "A listed screen is not a user-flow."
+Planning rule (sprint files opened after 2026-09-13): a sprint file with
+an `ota-candidate` step names its journey (§5 of the UX contract) and
+lists the five exit bullets from its §6 before implementation starts.
+Existing files add those bullets when next edited; they are not a
+retroactive merge block. "A listed screen is not a user-flow."
 
 ### Docker Environment
 

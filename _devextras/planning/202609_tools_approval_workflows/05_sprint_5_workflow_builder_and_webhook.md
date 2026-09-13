@@ -163,6 +163,11 @@ Frontend: `SavedTaskStepsEditor.spec.ts`, `StepInputsForm.spec.ts`, `StepPicker.
 4. n8n posts to the task's webhook URL with a valid signature; the run starts with the payload available as "from trigger"; a bad signature is refused.
 5. The last step "Send to webhook" delivers a signed POST to n8n; an attempt to point it at an internal address is refused at save.
 6. "Save as template" + "Use template" by a group member yields a paused copy with a checklist; export/import of `saved_tasks` behaves the same way.
+7. Named journey J-TL-5 walked in the browser (U10) — click, type, find, undo; a screenshot is not the proof.
+8. Recipient / later-self findability in ten seconds (U2): the copied task appears on the member's Saved Tasks list, paused, with the checklist.
+9. Kind-specific consequence copy in all five locales (U3): template share and webhook "what this URL can start" sentences.
+10. Empty + error + flag-off states (U5, U8, U11): flag off leaves the card as today; validator errors appear per step; a missing assistant/tool on Use template is a named checklist item, not a silent skip.
+11. Dark + V2 + 320 px (U9).
 
 ---
 
