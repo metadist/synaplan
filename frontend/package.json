@@ -90,7 +90,7 @@
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-vue": "10.11.0",
     "globals": "17.12.0",
-    "happy-dom": "20.14.0",
+    "happy-dom": "20.14.3",
     "openapi-zod-client": "1.18.3",
     "postcss": "8.5.28",
     "prettier": "3.9.6",
