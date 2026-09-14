@@ -79,7 +79,10 @@ final readonly class CodeExecutionInvoker
             return $this->invalid('code_execution requires a non-empty `code` script.');
         }
         if (mb_strlen($code) > CodeExecutionTool::MAX_CODE_CHARS) {
-            $code = mb_substr($code, 0, CodeExecutionTool::MAX_CODE_CHARS);
+            return $this->invalid(sprintf(
+                'code_execution `code` exceeds the %d character maximum.',
+                CodeExecutionTool::MAX_CODE_CHARS,
+            ));
         }
 
         $ids = [];
@@ -87,7 +90,13 @@ final readonly class CodeExecutionInvoker
         if (!is_array($rawIds)) {
             return $this->invalid('code_execution `input_file_ids` must be an array of integers.');
         }
-        foreach (array_slice($rawIds, 0, CodeExecutionTool::MAX_INPUT_FILES) as $id) {
+        if (\count($rawIds) > CodeExecutionTool::MAX_INPUT_FILES) {
+            return $this->invalid(sprintf(
+                'code_execution accepts at most %d input files.',
+                CodeExecutionTool::MAX_INPUT_FILES,
+            ));
+        }
+        foreach ($rawIds as $id) {
             if (!is_numeric($id)) {
                 return $this->invalid('code_execution `input_file_ids` must be integers.');
             }

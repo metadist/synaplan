@@ -1,4 +1,4 @@
-# synaplan-compute — Wave 4 Secure Compute sidecar
+# synaplan-compute — secure compute sidecar (protocol 1)
 .PHONY: build test lint format hostile images
 
 GO ?= go

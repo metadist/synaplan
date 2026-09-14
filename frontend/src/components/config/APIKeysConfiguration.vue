@@ -512,17 +512,10 @@ const createAPIKey = async () => {
       scopes.push('iam:manage')
     }
     if (includeComputeRun.value && computeEnabled.value) {
-      scopes.push('compute:run')
+      scopes.push('compute:run', 'desktop:messages', 'desktop:files')
     }
     if (scopes.length === 0) {
       scopes.push('webhooks:*')
-    } else if (
-      includeComputeRun.value &&
-      computeEnabled.value &&
-      !includeIamRead.value &&
-      !includeIamManage.value
-    ) {
-      scopes.splice(0, scopes.length, '*', 'compute:run')
     }
 
     const response = await createApiKey({

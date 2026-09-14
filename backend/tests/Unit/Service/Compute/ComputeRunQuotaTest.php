@@ -58,4 +58,88 @@ final class ComputeRunQuotaTest extends TestCase
         $this->assertFalse($result->isSuccessful());
         $this->assertSame(CodeRunRunner::QUOTA_COPY, $result->error);
     }
+
+    public function testRunnerReturnsQuotaCopyWhenDailyCpuIsExhausted(): void
+    {
+        $config = $this->createStub(ComputeConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn($user);
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('checkLimit')->willReturn(['allowed' => true]);
+        $limits->method('computeIntSetting')->willReturn(60);
+        $runs = $this->createStub(ComputeRunRepository::class);
+        $runs->method('sumDurationMsSince')->willReturn(60_000);
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->never())->method('submitRun');
+
+        $runner = new CodeRunRunner(
+            $config,
+            $client,
+            $this->createStub(ComputeArtefactStore::class),
+            $runs,
+            $this->createStub(FileRepository::class),
+            $users,
+            $limits,
+            new NullLogger(),
+            '/tmp',
+        );
+        $result = $runner->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+            new NodeContext($this->createStub(Message::class), [], 7, []),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertSame(CodeRunRunner::QUOTA_COPY, $result->error);
+    }
+
+    public function testRunnerReturnsQuotaCopyWhenConcurrentCapWouldBeExceeded(): void
+    {
+        $config = $this->createStub(ComputeConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+        $config->method('clampLimits')->willReturn([
+            'timeoutSec' => 10,
+            'memoryMb' => 512,
+            'cpu' => 1.0,
+            'pids' => 128,
+            'outputMb' => 50,
+        ]);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+        $users = $this->createStub(UserRepository::class);
+        $users->method('find')->willReturn($user);
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('checkLimit')->willReturn(['allowed' => true]);
+        $limits->method('computeIntSetting')->willReturnCallback(
+            static fn (User $_user, string $setting, int $fallback): int => 'COMPUTE_CONCURRENT' === $setting ? 1 : 60,
+        );
+        $runs = $this->createStub(ComputeRunRepository::class);
+        $runs->method('sumDurationMsSince')->willReturn(0);
+        $runs->method('countActiveForUser')->willReturn(2);
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->never())->method('submitRun');
+
+        $runner = new CodeRunRunner(
+            $config,
+            $client,
+            $this->createStub(ComputeArtefactStore::class),
+            $runs,
+            $this->createStub(FileRepository::class),
+            $users,
+            $limits,
+            new NullLogger(),
+            '/tmp',
+        );
+        $result = $runner->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+            new NodeContext($this->createStub(Message::class), [], 7, []),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertSame(CodeRunRunner::QUOTA_COPY, $result->error);
+    }
 }

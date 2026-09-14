@@ -92,8 +92,8 @@ final readonly class ComputeArtefactStore
 
         $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', $artefact->name) ?? 'artefact';
         $ext = strtolower(pathinfo($safe, PATHINFO_EXTENSION) ?: 'bin');
-        $basename = pathinfo($safe, PATHINFO_FILENAME);
-        $filename = $basename.'_'.time().'.'.$ext;
+        $basename = pathinfo($safe, PATHINFO_FILENAME) ?: 'artefact';
+        $filename = $basename.'_'.$runId.'_'.bin2hex(random_bytes(4)).'.'.$ext;
         $relative = $this->paths->buildUserBaseRelativePath($userId).'/'.date('Y').'/'.date('m').'/'.$filename;
         $absolute = rtrim($this->uploadDir, '/').'/'.$relative;
         if (!FileHelper::ensureParentDirectory($absolute)) {
@@ -101,7 +101,15 @@ final readonly class ComputeArtefactStore
 
             return null;
         }
-        file_put_contents($absolute, $bytes);
+        $written = file_put_contents($absolute, $bytes);
+        if (false === $written || $written !== strlen($bytes)) {
+            if (is_file($absolute)) {
+                unlink($absolute);
+            }
+            $this->logger->error('ComputeArtefactStore: write failed', ['path' => $relative]);
+
+            return null;
+        }
 
         $file = new File();
         $file->setUserId($userId);

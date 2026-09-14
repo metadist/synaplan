@@ -4770,7 +4770,16 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 const handleTaskFollowup = async (prompt: string) => {
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!prompt.trim()) return
-  await streamAIResponse(prompt, { isAgain: true })
+  const planMessage =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan) ??
+    [...historyStore.messages].reverse().find((m) => m.taskPlan)
+  const messageIndex = planMessage ? historyStore.messages.indexOf(planMessage) : -1
+  const userMessage =
+    messageIndex >= 0 ? findPrecedingUserMessage(historyStore.messages, messageIndex) : null
+  const fileIds = (userMessage?.files ?? [])
+    .map((file) => file.id)
+    .filter((id) => Number.isFinite(id) && id > 0)
+  await streamAIResponse(prompt.trim(), { fileIds })
 }
 
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {

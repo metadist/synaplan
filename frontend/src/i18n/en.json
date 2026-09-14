@@ -2404,7 +2404,7 @@
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests",
       "scopes": {
-        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work can be added on a full-access key.",
+        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
         "iamRead": "People — view groups",
         "iamManage": "People — manage groups",
         "computeRun": "File work — run short scripts on copies of your files"
@@ -4572,6 +4572,7 @@
     "failed": "Could not finish",
     "quota": "You have used this week's file-work limit. Try again later, or ask an administrator. Nothing new was saved.",
     "rerun": "Re-run with changes",
+    "rerunNotes": "Notes for the next attempt",
     "rerunHelp": "The AI will try again with your notes",
     "details": "Details",
     "preview": "Preview",

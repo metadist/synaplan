@@ -66,6 +66,32 @@ final class CodeExecutionInvokerTest extends TestCase
         self::assertStringContainsString('python or node', $result['text']);
     }
 
+    public function testOversizedCodeRejected(): void
+    {
+        $invoker = new CodeExecutionInvoker($this->createMock(CodeRunRunner::class));
+        $result = $invoker->invoke($this->user(1), [
+            'language' => 'python',
+            'code' => str_repeat('x', \App\AI\Messages\Tools\CodeExecutionTool::MAX_CODE_CHARS + 1),
+        ], ComputeRun::VIA_GATEWAY_OPENAI);
+
+        self::assertTrue($result['isError']);
+        self::assertStringContainsString('character maximum', $result['text']);
+    }
+
+    public function testTooManyInputFilesRejected(): void
+    {
+        $invoker = new CodeExecutionInvoker($this->createMock(CodeRunRunner::class));
+        $ids = range(1, \App\AI\Messages\Tools\CodeExecutionTool::MAX_INPUT_FILES + 1);
+        $result = $invoker->invoke($this->user(1), [
+            'language' => 'python',
+            'code' => 'print(1)',
+            'input_file_ids' => $ids,
+        ], ComputeRun::VIA_GATEWAY_OPENAI);
+
+        self::assertTrue($result['isError']);
+        self::assertStringContainsString('at most', $result['text']);
+    }
+
     private function runnerThatRefusesForeignFiles(): CodeRunRunner
     {
         $config = $this->createStub(ComputeConfig::class);
@@ -86,8 +112,10 @@ final class CodeExecutionInvokerTest extends TestCase
         $users->method('find')->willReturn($user);
         $limits = $this->createStub(RateLimitService::class);
         $limits->method('checkLimit')->willReturn(['allowed' => true]);
+        $limits->method('computeIntSetting')->willReturn(60);
         $runs = $this->createStub(ComputeRunRepository::class);
         $runs->method('countActiveForUser')->willReturn(0);
+        $runs->method('sumDurationMsSince')->willReturn(0);
 
         return new CodeRunRunner(
             $config,

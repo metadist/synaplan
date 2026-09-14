@@ -35,6 +35,18 @@ final class ComputeClientTest extends TestCase
         $this->assertStringContainsString('name="request.json"', $body);
     }
 
+    public function testSubmitRefusesDuplicateFileNames(): void
+    {
+        $client = new ComputeClient(new MockHttpClient(), $this->config());
+
+        $this->expectException(ComputeRefusedException::class);
+        $this->expectExceptionMessage('Duplicate file name');
+        $client->submitRun($this->request('user:1'), [
+            ['name' => 'data.csv', 'contents' => 'a'],
+            ['name' => 'data.csv', 'contents' => 'b'],
+        ]);
+    }
+
     public function testSubmitRefusesEmptyOwner(): void
     {
         $client = new ComputeClient(new MockHttpClient(), $this->config());

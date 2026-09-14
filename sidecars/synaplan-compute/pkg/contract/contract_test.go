@@ -169,6 +169,7 @@ func TestFixtureChecksums(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	listed := map[string]struct{}{}
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
 		if line == "" {
 			continue
@@ -178,9 +179,22 @@ func TestFixtureChecksums(t *testing.T) {
 			t.Fatalf("bad checksum line %q", line)
 		}
 		want, name := parts[0], parts[1]
+		listed[name] = struct{}{}
 		got := sha256File(t, filepath.Join(dir, name))
 		if got != want {
 			t.Fatalf("%s: got %s want %s", name, got, want)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == "CHECKSUMS.sha256" {
+			continue
+		}
+		if _, ok := listed[e.Name()]; !ok {
+			t.Fatalf("fixture %s is not in CHECKSUMS.sha256", e.Name())
 		}
 	}
 }

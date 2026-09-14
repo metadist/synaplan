@@ -801,6 +801,24 @@ final class RateLimitService
     }
 
     /**
+     * Integer compute quota from BCONFIG (`RATELIMITS_{level}.{setting}`).
+     * Missing values use $fallback. ADMIN uses $fallback (no self-serve cap).
+     */
+    public function computeIntSetting(User $user, string $setting, int $fallback): int
+    {
+        $level = $this->resolveRateLimitLevel($user);
+        if ('ADMIN' === $level) {
+            return $fallback;
+        }
+        $raw = $this->configRepository->getValue(0, "RATELIMITS_{$level}", $setting);
+        if (!is_numeric($raw)) {
+            return $fallback;
+        }
+
+        return max(0, (int) $raw);
+    }
+
+    /**
      * Get all limits for a user (for display).
      */
     public function getUserLimits(User $user): array

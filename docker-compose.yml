@@ -321,7 +321,7 @@ services:
       OFFICE_CONVERT_URL: ${OFFICE_CONVERT_URL:-http://collabora:9980}
       OFFICE_CONVERT_TIMEOUT_MS: ${OFFICE_CONVERT_TIMEOUT_MS:-60000}
       # Secure compute sidecar. Empty = absent. Set both when using --profile compute:
-      #   COMPUTE_URL=http://compute:8080 COMPUTE_TOKEN=<32+ bytes>
+      #   COMPUTE_URL=http://compute:8080 COMPUTE_TOKEN=$(openssl rand -hex 32)
       COMPUTE_URL: ${COMPUTE_URL:-}
       COMPUTE_TOKEN: ${COMPUTE_TOKEN:-}
       AI_DEFAULT_PROVIDER: ollama
@@ -1042,15 +1042,23 @@ services:
 
   # Optional secure compute — short Python/Node file work for the assistant.
   # Not started by default. Enable with:
-  #   COMPUTE_TOKEN=$(openssl rand -hex 16) COMPUTE_URL=http://compute:8080 \
+  #   COMPUTE_TOKEN=$(openssl rand -hex 32) COMPUTE_URL=http://compute:8080 \
+  #     COMPUTE_DOCKER_GID=$(stat -c %g /var/run/docker.sock) \
   #     docker compose --profile compute up -d
   # Then turn COMPUTE.ENABLED on (Operate → System config). Never publish :8080.
+  # The sidecar never pulls runtime images. Build them first:
+  #   make -C sidecars/synaplan-compute images
+  # and pin those digests in sidecars/synaplan-compute/internal/images/map.go.
   compute:
     build:
       context: ./sidecars/synaplan-compute
     container_name: synaplan-compute
     profiles: [compute]
     restart: unless-stopped
+    # Distroless nonroot (65532) cannot open a root:docker 0660 socket.
+    # Pass the host docker GID (stat -c %g /var/run/docker.sock).
+    group_add:
+      - ${COMPUTE_DOCKER_GID:-998}
     environment:
       # Empty default so `docker compose` interpolates without --profile compute.
       # The sidecar refuses to start unless the token is at least 32 bytes.

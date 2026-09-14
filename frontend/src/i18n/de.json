@@ -1470,6 +1470,7 @@
     "failed": "Konnte nicht fertigstellen",
     "quota": "Sie haben das Dateiarbeits-Kontingent dieser Woche aufgebraucht. Versuchen Sie es später erneut oder fragen Sie eine Administratorin oder einen Administrator. Es wurde nichts Neues gespeichert.",
     "rerun": "Mit Änderungen erneut ausführen",
+    "rerunNotes": "Hinweise für den nächsten Versuch",
     "rerunHelp": "Die KI versucht es mit Ihren Anmerkungen erneut",
     "details": "Details",
     "preview": "Vorschau",
@@ -2562,7 +2563,7 @@
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
       "usageCount": "Anfragen",
       "scopes": {
-        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit kann auf einem Schlüssel mit vollem Zugriff ergänzt werden.",
+        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
         "iamRead": "Personen — Gruppen ansehen",
         "iamManage": "Personen — Gruppen verwalten",
         "computeRun": "Dateiarbeit — kurze Skripte auf Kopien Ihrer Dateien ausführen"

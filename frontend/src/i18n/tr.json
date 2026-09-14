@@ -2132,6 +2132,7 @@
     "failed": "Tamamlanamadı",
     "quota": "Bu haftaki dosya çalışması sınırını kullandınız. Daha sonra tekrar deneyin veya bir yöneticiden yardım isteyin. Yeni bir şey kaydedilmedi.",
     "rerun": "Değişikliklerle yeniden çalıştır",
+    "rerunNotes": "Sonraki deneme için notlar",
     "rerunHelp": "YZ notlarınızla yeniden deneyecek",
     "details": "Ayrıntılar",
     "preview": "Önizleme",
@@ -3557,7 +3558,7 @@
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "usageCount": "istek",
       "scopes": {
-        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, tam erişimli bir anahtara eklenebilir.",
+        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
         "iamRead": "Kişiler — grupları görüntüle",
         "iamManage": "Kişiler — grupları yönet",
         "computeRun": "Dosya işi — dosyalarınızın kopyalarında kısa betikler çalıştır"

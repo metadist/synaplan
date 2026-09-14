@@ -43,8 +43,14 @@ final readonly class ComputeClient
             throw new ComputeRefusedException('missing_owner', 'owner is required');
         }
         $fields = ['request.json' => json_encode($request->toArray(), \JSON_THROW_ON_ERROR)];
+        $seen = [];
         foreach ($files as $file) {
-            $fields[$file['name']] = new DataPart($file['contents'], $file['name']);
+            $name = $file['name'];
+            if (isset($seen[$name])) {
+                throw new ComputeRefusedException('bad_file_name', 'Duplicate file name: '.$name);
+            }
+            $seen[$name] = true;
+            $fields[$name] = new DataPart($file['contents'], $name);
         }
         $form = new FormDataPart($fields);
         $response = $this->request('POST', '/v1/runs', [

@@ -33,6 +33,7 @@ final class ComputeRunAuditTest extends TestCase
             $idsAtSave = [];
             $runs = $this->createMock(ComputeRunRepository::class);
             $runs->method('countActiveForUser')->willReturn(0);
+            $runs->method('sumDurationMsSince')->willReturn(0);
             $runs->method('save')->willReturnCallback(static function (ComputeRun $run) use (&$saved, &$idsAtSave): void {
                 $idsAtSave[] = $run->getArtefactIds();
                 $saved[] = $run;
@@ -108,6 +109,7 @@ final class ComputeRunAuditTest extends TestCase
         $store->method('ingestForUser')->willReturn([]);
         $limits = $this->createStub(RateLimitService::class);
         $limits->method('checkLimit')->willReturn(['allowed' => true]);
+        $limits->method('computeIntSetting')->willReturn(60);
 
         return new CodeRunRunner(
             $config,

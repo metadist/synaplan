@@ -47,6 +47,9 @@ final readonly class RateLimitConfigSeeder
         // receive the selected model's full max_tokens; their spend is bounded by
         // the cost-budget gate (registered) and message-count limits instead.
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'MAX_OUTPUT_TOKENS',   'value' => '2048'],
+        // COMPUTE_RUNS_* is enforced by RateLimitService::checkLimit.
+        // COMPUTE_CONCURRENT and COMPUTE_CPU_SECONDS_DAILY are enforced by CodeRunRunner.
+        // COMPUTE_WORKSPACE_MB is reserved for B3 user workspaces; unused until then.
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_RUNS_TOTAL',  'value' => '0'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_CONCURRENT',  'value' => '0'],
         ['ownerId' => 0, 'group' => 'RATELIMITS_ANONYMOUS', 'setting' => 'COMPUTE_CPU_SECONDS_DAILY', 'value' => '0'],

@@ -2402,7 +2402,7 @@
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "usageCount": "requêtes",
       "scopes": {
-        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers peut être ajouté à une clé à accès complet.",
+        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
         "iamRead": "Personnes — voir les groupes",
         "iamManage": "Personnes — gérer les groupes",
         "computeRun": "Travail sur fichiers — exécuter de courts scripts sur des copies de vos fichiers"
@@ -4572,6 +4572,7 @@
     "failed": "Impossible de terminer",
     "quota": "Vous avez utilisé la limite de travail sur fichiers de cette semaine. Réessayez plus tard ou demandez à un administrateur. Rien de nouveau n’a été enregistré.",
     "rerun": "Relancer avec des modifications",
+    "rerunNotes": "Notes pour la prochaine tentative",
     "rerunHelp": "L’IA réessaiera avec vos notes",
     "details": "Détails",
     "preview": "Aperçu",

@@ -2132,6 +2132,7 @@
     "failed": "No se pudo terminar",
     "quota": "Ha usado el límite de trabajo con archivos de esta semana. Inténtelo más tarde o pregunte a un administrador. No se guardó nada nuevo.",
     "rerun": "Volver a ejecutar con cambios",
+    "rerunNotes": "Notas para el siguiente intento",
     "rerunHelp": "La IA lo intentará de nuevo con sus notas",
     "details": "Detalles",
     "preview": "Vista previa",
@@ -3556,7 +3557,7 @@
       "noKeys": "Aún no hay claves API. Crea tu primera clave para comenzar.",
       "usageCount": "solicitudes",
       "scopes": {
-        "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos se puede añadir a una clave de acceso completo.",
+        "hint": "Déjelo sin marcar para acceso completo. Marcar Personas limita esta clave. El trabajo con archivos añade ámbitos de chat y archivos para ejecutar scripts — no otorga acceso de administrador.",
         "iamRead": "Personas — ver grupos",
         "iamManage": "Personas — administrar grupos",
         "computeRun": "Trabajo con archivos — ejecutar scripts cortos sobre copias de tus archivos"

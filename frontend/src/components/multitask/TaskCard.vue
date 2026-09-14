@@ -64,13 +64,11 @@ const showSkeleton = computed(
     props.card.state !== 'cancelled'
 )
 
-// Only media steps run long enough to be worth stopping; the button shows while
-// such a step is in flight.
+// Stop is wired only for media (MediaCancellationStore). Compute cancellation
+// goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
 const isComputeKind = computed(() => props.card.kind === 'compute')
 
-const canCancel = computed(
-  () => (isMediaKind.value || isComputeKind.value) && props.card.state === 'running'
-)
+const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
 
 // Live render progress (e.g. Higgsfield video) — a moving bar instead of a
 // static spinner. Only meaningful once the backend has reported a percentage.
@@ -289,7 +287,12 @@ const handleRetry = () => {
     </div>
 
     <!-- Body -->
-    <ComputeRunCard v-if="isComputeKind" :card="card" @followup="emit('followup', $event)" />
+    <ComputeRunCard
+      v-if="isComputeKind"
+      :card="card"
+      :is-readonly="isReadonly"
+      @followup="emit('followup', $event)"
+    />
 
     <div v-else-if="card.state === 'failed'" class="space-y-2">
       <!-- Specific backend error when available, generic copy otherwise -->

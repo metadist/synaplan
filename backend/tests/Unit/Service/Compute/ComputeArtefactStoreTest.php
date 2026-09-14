@@ -55,6 +55,34 @@ final class ComputeArtefactStoreTest extends TestCase
         $this->assertSame('artefact', $file->getOriginKind());
         $this->assertSame(File::VECTOR_STATE_NONE, $file->getVectorState());
         $this->assertSame(99, $file->getMessageId());
+        $this->assertStringContainsString('run1', $file->getFileName());
+        $this->assertFileExists($dir.'/'.$file->getFilePath());
+    }
+
+    public function testDoesNotPersistWhenWriteFails(): void
+    {
+        $client = $this->createStub(ComputeClient::class);
+        $client->method('listArtefacts')->willReturn([
+            new ComputeArtefact('chart.png', 4, 'image/png', 'aa'),
+        ]);
+        $client->method('downloadArtefact')->willReturn('PNG!');
+        $persisted = [];
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            $persisted[] = $entity;
+        });
+        $blocker = sys_get_temp_dir().'/compute-artefact-notdir-'.bin2hex(random_bytes(4));
+        file_put_contents($blocker, 'not-a-directory');
+        $store = new ComputeArtefactStore($client, new UserUploadPathBuilder(), $em, new NullLogger(), $blocker);
+        $message = $this->createStub(Message::class);
+        $message->method('getUserId')->willReturn(13);
+        $message->method('getId')->willReturn(99);
+
+        $files = $store->ingest('run1', $message, 1024);
+
+        $this->assertSame([], $files);
+        $this->assertSame([], $persisted);
+        unlink($blocker);
     }
 
     private function store(ComputeClient $client): ComputeArtefactStore

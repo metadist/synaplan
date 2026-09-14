@@ -23,7 +23,7 @@ for path in root.rglob("*"):
         continue
     if "docker.sock" not in text:
         continue
-    if path.suffix in allowed_suffixes:
+    if any(path.name.endswith(suffix) for suffix in allowed_suffixes):
         continue
     if path.name == "docker-compose.yml":
         continue
@@ -34,6 +34,9 @@ for path in root.rglob("*"):
 compose = pathlib.Path("docker-compose.yml").read_text(encoding="utf-8")
 service = None
 for i, line in enumerate(compose.splitlines(), 1):
+    stripped = line.lstrip()
+    if stripped.startswith("#"):
+        continue
     if line.startswith("  ") and not line.startswith("    ") and line.rstrip().endswith(":"):
         service = line.strip()[:-1]
     if "docker.sock" in line and service != "compute":

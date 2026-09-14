@@ -1,6 +1,8 @@
 # synaplan-compute
 
-Wave 4 Secure Compute sidecar (phases A0–A2). A Go service that runs untrusted Python or Node in an ephemeral, T1-hardened container. Synaplan PHP never talks to Docker; it calls this HTTP API.
+Secure compute sidecar. A Go service that runs untrusted Python or Node in an
+ephemeral, T1-hardened container. Synaplan PHP never talks to Docker; it calls
+this HTTP API (protocol 1).
 
 **Go/no-go (A0):** own sidecar. See [docs/SPIKE.md](docs/SPIKE.md), [docs/API.md](docs/API.md), and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
@@ -24,7 +26,7 @@ Wave 4 Secure Compute sidecar (phases A0–A2). A Go service that runs untrusted
 ## Run
 
 ```bash
-export COMPUTE_AUTH_TOKEN="$(openssl rand -hex 16)"   # ≥ 32 bytes
+export COMPUTE_AUTH_TOKEN="$(openssl rand -hex 32)"   # ≥ 32 random bytes
 make build
 ./bin/synaplan-compute
 # GET http://127.0.0.1:8080/v1/health  (unauthenticated)

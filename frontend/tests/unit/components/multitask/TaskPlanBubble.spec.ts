@@ -468,6 +468,20 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.emitted('cancelTask')).toEqual([['n2']])
   })
 
+  it('does not offer a Stop button on a running compute card', () => {
+    const wrapper = mount(TaskPlanBubble, {
+      props: {
+        plan: plan([{ nodeId: 'n1', capability: 'code_run', kind: 'compute', state: 'running' }]),
+      },
+      global: {
+        ...mountOptions.global,
+        stubs: { ...mountOptions.global.stubs, ComputeRunCard: true },
+      },
+    })
+
+    expect(wrapper.find('[data-testid="task-card-stop"]').exists()).toBe(false)
+  })
+
   it('does not offer a Stop button on a running text card', () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {

@@ -45,4 +45,16 @@ class ComputeRunRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    public function sumDurationMsSince(int $userId, \DateTimeImmutable $since): int
+    {
+        return (int) $this->createQueryBuilder('r')
+            ->select('COALESCE(SUM(r.durationMs), 0)')
+            ->where('r.userId = :userId')
+            ->andWhere('r.created >= :since')
+            ->setParameter('userId', $userId)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

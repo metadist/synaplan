@@ -40,6 +40,9 @@ final readonly class CodeRunRunner implements TaskRunner
 {
     public const QUOTA_COPY = 'You have used this week\'s file-work limit. Nothing new was saved.';
     public const FORBID_COPY = AssistantSkillGate::REFUSAL;
+    private const SCRIPT_PYTHON = '_synaplan_main.py';
+    private const SCRIPT_NODE = '_synaplan_main.js';
+    private const SIDECAR_CONCURRENT_CEILING = 8;
 
     public function __construct(
         private ComputeConfig $computeConfig,
@@ -189,19 +192,21 @@ final readonly class CodeRunRunner implements TaskRunner
         if (!(bool) ($quota['allowed'] ?? false)) {
             return $this->failedOutcome(self::QUOTA_COPY);
         }
-        if ($this->runs->countActiveForUser($userId) >= $this->concurrentCap($user)) {
+        $cpuCap = $this->rateLimits->computeIntSetting($user, 'COMPUTE_CPU_SECONDS_DAILY', $this->defaultCpuCap($user));
+        $usedCpu = intdiv($this->runs->sumDurationMsSince($userId, new \DateTimeImmutable('today')), 1000);
+        if ($cpuCap <= 0 || $usedCpu >= $cpuCap) {
             return $this->failedOutcome(self::QUOTA_COPY);
         }
 
         $image = 'node' === $language ? 'node' : 'python';
         $program = $image;
-        $scriptName = 'node' === $image ? 'main.js' : 'main.py';
+        $scriptName = 'node' === $image ? self::SCRIPT_NODE : self::SCRIPT_PYTHON;
         $limits = $this->computeConfig->clampLimits(
             null !== $timeoutSec ? ['timeoutSec' => $timeoutSec] : [],
         );
 
         try {
-            $parts = $this->inputFilesFromIds($inputFileIds, $userId);
+            $parts = $this->inputFilesFromIds($inputFileIds, $userId, $scriptName);
         } catch (ComputeRefusedException $e) {
             return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $e->getMessage(), $e->errorCode());
         }
@@ -223,6 +228,13 @@ final readonly class CodeRunRunner implements TaskRunner
             $audit->setApprovalId($approvalId);
         }
         $this->runs->save($audit);
+        if ($this->runs->countActiveForUser($userId) > $this->concurrentCap($user)) {
+            $audit->setReason('capacity_exceeded');
+            $audit->markFinished(ComputeRun::STATUS_FAILED);
+            $this->runs->save($audit);
+
+            return $this->failedOutcome(self::QUOTA_COPY);
+        }
 
         try {
             $request = new ComputeRunRequest(
@@ -440,7 +452,7 @@ final readonly class CodeRunRunner implements TaskRunner
         $descriptors = [];
         foreach ($result['artefacts'] as $artefact) {
             $descriptors[] = [
-                'path' => '/api/v1/files/'.$artefact['file_id'],
+                'path' => '/api/v1/files/'.$artefact['file_id'].'/download',
                 'type' => $artefact['mime'],
                 'name' => $artefact['name'],
             ];
@@ -516,25 +528,55 @@ final readonly class CodeRunRunner implements TaskRunner
      *
      * @return list<array{name: string, contents: string}>
      */
-    private function inputFilesFromIds(array $ids, int $userId): array
+    private function inputFilesFromIds(array $ids, int $userId, string $reservedName): array
     {
         $parts = [];
+        $used = [$reservedName => true];
         foreach ($ids as $id) {
             $file = $this->files->find($id);
             if (!$file instanceof File || $file->getUserId() !== $userId) {
                 throw new ComputeRefusedException('workspace_not_owned', 'A selected file is not yours. Nothing new was saved.');
             }
             $absolute = $this->absolutePath($file);
-            if (null === $absolute || !is_file($absolute)) {
-                continue;
+            if (null === $absolute || !is_file($absolute) || !is_readable($absolute)) {
+                throw new ComputeRefusedException('internal_error', 'A selected file could not be read. Nothing new was saved.');
+            }
+            $contents = file_get_contents($absolute);
+            if (false === $contents) {
+                throw new ComputeRefusedException('internal_error', 'A selected file could not be read. Nothing new was saved.');
             }
             $parts[] = [
-                'name' => $file->getFileName(),
-                'contents' => (string) file_get_contents($absolute),
+                'name' => $this->uniquePartName($file->getFileName(), $used),
+                'contents' => $contents,
             ];
         }
 
         return $parts;
+    }
+
+    /**
+     * @param array<string, true> $used
+     */
+    private function uniquePartName(string $wanted, array &$used): string
+    {
+        $safe = preg_replace('/[^A-Za-z0-9._-]/', '_', $wanted) ?: 'file';
+        $safe = substr($safe, 0, 120);
+        if (!isset($used[$safe])) {
+            $used[$safe] = true;
+
+            return $safe;
+        }
+        $ext = pathinfo($safe, PATHINFO_EXTENSION);
+        $base = pathinfo($safe, PATHINFO_FILENAME) ?: 'file';
+        $i = 2;
+        do {
+            $suffix = '' !== $ext ? '.'.$ext : '';
+            $candidate = substr($base, 0, 110).'_'.$i.$suffix;
+            ++$i;
+        } while (isset($used[$candidate]));
+        $used[$candidate] = true;
+
+        return $candidate;
     }
 
     private function absolutePath(File $file): ?string
@@ -558,24 +600,66 @@ final readonly class CodeRunRunner implements TaskRunner
             usleep(400000);
             $status = $this->client->status($runId);
         }
+        if ($status->isTerminal()) {
+            return $status;
+        }
+        try {
+            $this->client->cancel($runId);
+        } catch (\Throwable) {
+        }
+        try {
+            $final = $this->client->status($runId);
+            if ($final->isTerminal()) {
+                return $final;
+            }
+        } catch (\Throwable) {
+        }
 
-        return $status;
+        return new ComputeRunStatus(
+            runId: $runId,
+            status: 'failed',
+            usage: $status->usage,
+            truncated: $status->truncated,
+            exitCode: $status->exitCode,
+            reason: 'timeout',
+            startedAt: $status->startedAt,
+            finishedAt: $status->finishedAt,
+            durationMs: $status->durationMs,
+        );
     }
 
     private function concurrentCap(User $user): int
     {
-        $level = strtoupper($user->getRateLimitLevel());
-        $raw = match ($level) {
+        $raw = $this->rateLimits->computeIntSetting($user, 'COMPUTE_CONCURRENT', $this->defaultConcurrentCap($user));
+
+        return max(0, min(self::SIDECAR_CONCURRENT_CEILING, $raw));
+    }
+
+    private function defaultConcurrentCap(User $user): int
+    {
+        return match (strtoupper($user->getRateLimitLevel())) {
             'PRO' => 2,
             'TEAM', 'BUSINESS', 'ADMIN' => 4,
             default => 1,
         };
+    }
 
-        return max(1, $raw);
+    private function defaultCpuCap(User $user): int
+    {
+        return match (strtoupper($user->getRateLimitLevel())) {
+            'PRO' => 300,
+            'TEAM' => 900,
+            'BUSINESS', 'ADMIN' => 3600,
+            'ANONYMOUS' => 0,
+            default => 60,
+        };
     }
 
     private function computeEnabled(?int $userId = null): bool
     {
+        // SkillCatalogFactory instantiates runners without constructors so
+        // describe() can be catalogued. File work stays hidden until DI
+        // has injected ComputeConfig.
         if (!(new \ReflectionProperty($this, 'computeConfig'))->isInitialized($this)) {
             return false;
         }

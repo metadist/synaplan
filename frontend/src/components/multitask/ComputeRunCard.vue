@@ -6,6 +6,7 @@ import type { TaskCard } from '@/stores/history'
 
 const props = defineProps<{
   card: TaskCard
+  isReadonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -29,7 +30,9 @@ const elapsed = computed(() => {
 
 const isQuota = computed(() => (props.card.error ?? '').includes("week's file-work limit"))
 
-const canRerun = computed(() => ['done', 'failed'].includes(props.card.state))
+const canRerun = computed(() => !props.isReadonly && ['done', 'failed'].includes(props.card.state))
+const notesId = computed(() => `compute-run-notes-${props.card.nodeId}`)
+const notesHelpId = computed(() => `${notesId.value}-help`)
 
 const submitRerun = () => {
   const text = notes.value.trim()
@@ -70,16 +73,19 @@ const submitRerun = () => {
         {{ $t('compute.rerun') }}
       </button>
       <div v-if="showRerun" class="space-y-2">
-        <p class="text-xs txt-muted">{{ $t('compute.rerunHelp') }}</p>
+        <label class="block text-xs txt-muted" :for="notesId">{{ $t('compute.rerunNotes') }}</label>
+        <p :id="notesHelpId" class="text-xs txt-muted">{{ $t('compute.rerunHelp') }}</p>
         <textarea
+          :id="notesId"
           v-model="notes"
           rows="3"
           class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
           data-testid="compute-run-notes"
+          :aria-describedby="notesHelpId"
         />
         <button
           type="button"
-          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium"
+          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="!notes.trim()"
           data-testid="compute-run-rerun-submit"
           @click="submitRerun"
