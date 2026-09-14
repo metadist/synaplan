@@ -239,10 +239,14 @@ field attribute), tests.
    optional string enum on the field schema.
 3. (b) `make -C frontend generate-schemas`, `vue-tsc`.
 4. (b) `AdminConfigView.vue`: in a section, if **every** field is `managedBy`,
-   render one pointer card instead of the fields: "Provider keys are managed
-   under AI infrastructure › Models & keys." + `RouterLink` `/admin/setup`.
-   If only some are, hide the managed ones and show the same sentence below
-   the remaining fields. `ConfigField.vue` never renders a `managedBy` field.
+   render one **status card** instead of the fields (D2 Helm-first): which
+   keys are set from the environment / Helm, which have a UI override, the
+   sentence "Provider keys are managed under AI infrastructure › Models &
+   keys." plus "A chart install does not need this page", and a `RouterLink`
+   to `/admin/setup` for an optional override. If only some fields are
+   managed, hide those and show the same status sentence below the remaining
+   fields. `ConfigField.vue` never renders a `managedBy` field. Never require
+   a UI save for helm-injected keys.
 5. (b) `ProviderKeyCard.vue`: support the optional secret (second password
    input, same chain of classes). Keep the 2-up grid (`md:grid-cols-2`).
 6. (b) Wording: `adminSetup.cloudProviders` becomes "Provider keys"; hint
@@ -255,14 +259,16 @@ field attribute), tests.
   `ProviderKeyCatalogTest::testEveryCatalogEnvVarIsMarkedManagedInSystemConfig`
   (the coverage lock: a new provider key added to system config without a
   catalog entry fails the suite).
-- Vitest `AdminConfigView.spec.ts`: all-managed section ⇒ pointer card;
-  mixed ⇒ hidden fields + sentence.
+- Vitest `AdminConfigView.spec.ts`: all-managed section ⇒ helm/env status
+  card (no password inputs) that still names "AI infrastructure › Models &
+  keys"; mixed ⇒ hidden fields + sentence.
 - Vitest `ProviderKeyCard.spec.ts`: secret input appears only when
-  `secretEnvVar` is set.
+  `secretEnvVar` is set; a key with `source=env` shows the helm/env badge
+  and does not look unsaved.
 - E2E `admin-panel.spec.ts` or new `provider-keys.spec.ts` (`@ci`):
-  `/admin/config?tab=ai` shows the pointer card and no `input[type=password]`
+  `/admin/config?tab=ai` shows the status card and no `input[type=password]`
   for `OPENAI_API_KEY`; `/admin/setup` shows a card for every provider in the
-  catalog.
+  catalog. A seeded env key is already "set" without a UI save.
 
 **Commit:** `feat(admin): Models & keys is the one editor for instance provider keys`
 
@@ -276,7 +282,10 @@ field attribute), tests.
 **Machine instructions**
 
 1. Group **Connections** (`connections`): `connections` (label → *Connected
-   apps*, gate unchanged — D5), `mcp-servers`, `linked-platforms`.
+   apps*, **always shown to signed-in users** — D5 ungate; drop the
+   `isSavedTasksEnabled()` wrap around this child), `mcp-servers`,
+   `linked-platforms`. Custom tools on that page stay behind their own
+   module flag (`features.toolsCustomHttpEnabled`) so U11 still holds.
 2. New group **Developer & devices** (`developer`, `t('nav.groupDeveloper')`):
    `api-keys`, `api-docs`, `ai-agents` (Coding clients — moved out of
    Automations), `desktop`.
