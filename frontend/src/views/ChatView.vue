@@ -1291,8 +1291,15 @@ onMounted(async () => {
     return
   }
 
-  // Load AI models config for Again functionality (await these - they're fast)
-  await Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
+  // The chat list needs nothing from the model catalog, so both requests go out
+  // together. Awaiting the catalog first put the list — and behind it the first
+  // chat and the composer — one extra round trip away from the user for no
+  // reason; on a slow backend that cost several seconds of staring at an empty
+  // chat.
+  const chatsLoaded = chatsStore.loadChats()
+
+  // Models config is needed for Again functionality
+  const modelsLoaded = Promise.all([aiConfigStore.loadModels(), aiConfigStore.loadDefaults()])
 
   // Start loading memories in background (don't await - non-blocking!)
   // Memories button will be disabled until loaded
@@ -1305,8 +1312,7 @@ onMounted(async () => {
     console.warn('⚠️ Failed to load feedbacks in background:', err)
   })
 
-  // Load chats first
-  await chatsStore.loadChats()
+  await Promise.all([chatsLoaded, modelsLoaded])
 
   // Deep link from Saved Tasks ("Run now" / "Show results"): /?chat=<id>
   // opens the task's chat so the user sees the run's result. Without this
