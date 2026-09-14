@@ -22,6 +22,10 @@ export function inferNavContext(path: string, meta: Record<string, unknown> = {}
     return 'operate'
   }
 
+  if (path === '/chats' || path.startsWith('/chats/')) {
+    return 'work'
+  }
+
   if (
     path.startsWith('/profile') ||
     path.startsWith('/settings') ||

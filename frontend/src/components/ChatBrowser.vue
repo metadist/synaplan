@@ -455,15 +455,28 @@
     <div
       v-else-if="filteredChats.length === 0"
       class="surface-card p-12 text-center"
-      data-testid="no-results"
+      :data-testid="isAllChatsEmpty ? 'chats-empty' : 'no-results'"
     >
       <ChatBubbleLeftRightIcon class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-50" />
-      <h3 class="text-lg font-medium txt-primary mb-2">
-        {{ $t('chat.browser.noResults') }}
-      </h3>
-      <p class="txt-secondary">
-        {{ $t('chat.browser.noResultsDesc') }}
-      </p>
+      <template v-if="isAllChatsEmpty">
+        <h3 class="text-lg font-medium txt-primary mb-2">{{ $t('chats.empty') }}</h3>
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+          data-testid="btn-chats-empty-new"
+          @click="goToNewChat"
+        >
+          {{ $t('chats.emptyAction') }}
+        </button>
+      </template>
+      <template v-else>
+        <h3 class="text-lg font-medium txt-primary mb-2">
+          {{ $t('chat.browser.noResults') }}
+        </h3>
+        <p class="txt-secondary">
+          {{ $t('chat.browser.noResultsDesc') }}
+        </p>
+      </template>
     </div>
 
     <!-- Share Modal -->
@@ -861,6 +874,8 @@ const hasActiveFilters = computed(() => {
   )
 })
 
+const isAllChatsEmpty = computed(() => !hasActiveFilters.value && totalChatsCount.value === 0)
+
 const clearAllFilters = () => {
   selectedType.value = 'all'
   selectedDateRange.value = 'all'
@@ -911,6 +926,13 @@ watch([searchQuery, selectedType, selectedDateRange, sortBy], () => {
 const openChat = (id: number) => {
   chatsStore.setActiveChat(id)
   router.push('/')
+}
+
+const goToNewChat = async () => {
+  await chatsStore.findOrCreateEmptyChat()
+  if (router.currentRoute.value.path !== '/') {
+    await router.push('/')
+  }
 }
 
 onMounted(async () => {

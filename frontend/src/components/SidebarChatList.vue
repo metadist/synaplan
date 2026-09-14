@@ -268,7 +268,7 @@ const handleDelete = async (id: string) => {
 }
 
 const navigateToStatistics = () => {
-  router.push('/statistics#chats')
+  router.push('/chats')
 }
 
 // Load chats on mount

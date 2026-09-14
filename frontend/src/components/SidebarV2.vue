@@ -598,12 +598,13 @@
 
           <!-- Footer -->
           <div
-            v-if="chatList.length > 5"
             class="flex-shrink-0 px-4 py-3 sm:px-5 border-t border-black/[0.04] dark:border-white/[0.04]"
           >
             <button
+              type="button"
               class="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-xl text-sm sm:text-xs font-medium text-[var(--brand)] bg-[var(--brand)]/[0.06] hover:bg-[var(--brand)]/[0.12] active:bg-[var(--brand)]/[0.18] transition-all duration-150 group/show"
-              @click="((chatModalOpen = false), $router.push('/statistics#chats'))"
+              data-testid="btn-chat-v2-show-all"
+              @click="((chatModalOpen = false), $router.push('/chats'))"
             >
               <ChartBarIcon class="w-4 h-4 sm:w-3.5 sm:h-3.5 opacity-70" />
               {{ $t('chat.showAll') }}

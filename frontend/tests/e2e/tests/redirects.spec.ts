@@ -75,6 +75,14 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
 
   // `/admin` is admin-only; the worker storageState is a regular user, so this
   // bookmark cannot live in the generic loop above (that user is sent home).
+  test('@ci /statistics#chats lands on All chats', async ({ page }) => {
+    await openApp(page)
+    await page.goto('/statistics#chats', { waitUntil: 'commit' })
+    await expect(page, '/statistics#chats should land on /chats').toHaveURL(/\/chats$/, {
+      timeout: TIMEOUTS.STANDARD,
+    })
+  })
+
   test('@ci /admin?tab=users lands on People for an admin', async ({ page }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
     await page.goto('/admin?tab=users', { waitUntil: 'commit' })

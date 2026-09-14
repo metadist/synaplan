@@ -133,6 +133,7 @@
     "adminPeople": "Personas",
     "myGroups": "Mis grupos",
     "incoming": "Chats entrantes",
+    "allChats": "Todos los chats",
     "subscription": "Suscripción",
     "subscriptionSuccess": "Suscripción exitosa",
     "subscriptionCancel": "Suscripción cancelada",
@@ -303,6 +304,14 @@
     "modelChanges": "Cambios de modelo: {count}",
     "allStatistics": "Todas las estadísticas",
     "lessThanCent": "< 0,01 €"
+  },
+  "chats": {
+    "tabs": {
+      "all": "Todos",
+      "incoming": "Entrantes"
+    },
+    "empty": "Aún no tienes chats.",
+    "emptyAction": "Nuevo chat"
   },
   "chat": {
     "title": "Chat",

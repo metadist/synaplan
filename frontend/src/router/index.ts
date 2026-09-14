@@ -478,6 +478,18 @@ const router = createRouter({
       name: 'statistics',
       component: () => import('@/views/StatisticsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.statistics' },
+      beforeEnter: (to) => {
+        if (to.hash === '#chats') {
+          return { path: '/chats' }
+        }
+        return true
+      },
+    },
+    {
+      path: '/chats',
+      name: 'chats',
+      component: () => import('@/views/ChatsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.allChats' },
     },
     {
       // Language and theme are stored on the device, not on the account, so a
@@ -512,7 +524,7 @@ const router = createRouter({
       // Sibling of /files/incoming, which is the file inbox.
       path: '/chats/incoming',
       name: 'chats-incoming',
-      component: () => import('@/views/IncomingChatsView.vue'),
+      component: () => import('@/views/ChatsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.incoming' },
     },
     {
