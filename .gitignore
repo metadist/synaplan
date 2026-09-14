@@ -31,9 +31,9 @@ volumes/
 # But allow frontend source data
 !frontend/src/data/
 
-# Logs
+# Logs. Anchored so sidecars/.../internal/logs/ is not ignored (#1862).
 *.log
-logs/
+/logs/
 
 # Backend cache & build
 backend/var/cache/

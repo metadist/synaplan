@@ -14,6 +14,7 @@ Wave 4 Secure Compute sidecar (phases A0–A2). A Go service that runs untrusted
 | `pkg/config` | `COMPUTE_*` environment (malformed values fail startup) |
 | `internal/runner` | The only container factory (`Hardened` + `ValidateHardened`), `Runner` interface |
 | `internal/api` | Health, runs (semaphore, cancel, janitor), workspaces |
+| `internal/logs` | Per-run stdout/stderr cap (`COMPUTE_LOG_CAP_BYTES`) for the logs SSE |
 | `internal/safepath` | Symlink-free path resolution shared by artefacts and workspaces |
 | `internal/perm` | Scratch ownership for the sandbox uid (chown or permissive fallback) |
 | `internal/auth` | Bearer token, SHA-256 + constant-time compare |
@@ -59,7 +60,7 @@ make lint    # no-shell-guard, go vet, gofmt, node --check on the corpus (+ gola
 
 ## CI
 
-The sidecar is verified with `make test lint` (`go build ./... && go vet ./... && go test -race ./... && gofmt -l cmd internal pkg tests && ./scripts/no-shell-guard.sh && node --check tests/hostile/node/*.js`). All tests are hermetic — no dockerd is required; the live hostile corpus is gated on `COMPUTE_HOSTILE_DOCKER=1`. A job in the repository-root workflow is added in Phase B (Wave 5) when the PHP side integrates the sidecar; a workflow file inside `sidecars/` is not read by GitHub and is therefore not kept here.
+The sidecar is verified with `make test lint` (`go build ./... && go vet ./... && go test -race ./... && gofmt -l cmd internal pkg tests && ./scripts/no-shell-guard.sh && node --check tests/hostile/node/*.js`). All tests are hermetic — no dockerd is required; the live hostile corpus is gated on `COMPUTE_HOSTILE_DOCKER=1`. The repository-root `CI` workflow runs that gate as **Compute Sidecar (Go)** on every push and pull request. A workflow file inside `sidecars/` is not read by GitHub and is therefore not kept here.
 
 ## Contract
 

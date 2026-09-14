@@ -229,6 +229,27 @@ jobs:
       - name: Run release tooling tests
         run: node --test "tests/*.test.mjs"
 
+  compute-sidecar:
+    name: Compute Sidecar (Go)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: sidecars/synaplan-compute/go.mod
+          cache-dependency-path: sidecars/synaplan-compute/go.sum
+
+      - name: Build, vet, and test
+        working-directory: sidecars/synaplan-compute
+        run: |
+          set -euo pipefail
+          go build ./...
+          make lint test
+
   backend:
     name: Backend (PHP/Symfony)
     # Off the critical path (done around minute 2-3 while e2e runs until
@@ -1349,13 +1370,14 @@ jobs:
     # On a promote tag the tar is already in GHCR as ci-<sha>-amd64 from the
     # main run; this job only inspects it. `always()` is required so a skipped
     # docker-build on that path does not skip the inspect.
-    needs: [change-scope, lint, mobile-tooling, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
+    needs: [change-scope, lint, mobile-tooling, compute-sidecar, backend, frontend-build, frontend-checks, docker-build, e2e, e2e-visual]
     if: >-
       always() &&
       !cancelled() &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
+      needs.compute-sidecar.result == 'success' &&
       needs.change-scope.outputs.mode != 'thin' &&
       (
         needs.change-scope.outputs.mode == 'promote' ||
@@ -1574,13 +1596,14 @@ jobs:
     # Waits for E2E even though arm64 started next to it: a failed test must
     # not move latest or a version tag. `always()` lets promote run when
     # docker-build / e2e were skipped.
-    needs: [change-scope, docker-build, docker-push-amd64, docker-push-arm64, lint, mobile-tooling, backend, frontend-checks, e2e, e2e-visual]
+    needs: [change-scope, docker-build, docker-push-amd64, docker-push-arm64, lint, mobile-tooling, compute-sidecar, backend, frontend-checks, e2e, e2e-visual]
     if: >-
       always() &&
       !cancelled() &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) &&
       needs.change-scope.result == 'success' &&
+      needs.compute-sidecar.result == 'success' &&
       needs.docker-push-amd64.result == 'success' &&
       needs.docker-push-arm64.result == 'success' &&
       (
@@ -2180,7 +2203,7 @@ jobs:
   all-checks-passed:
     name: All Checks Passed
     runs-on: ubuntu-latest
-    needs: [change-scope, lint, deployment-templates, mobile-tooling, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
+    needs: [change-scope, lint, deployment-templates, mobile-tooling, compute-sidecar, backend, backend-minimal, openapi-identical, frontend-build, frontend-checks, docker-build, e2e, e2e-visual, docker-push-amd64, docker-push-arm64, docker-manifest, release-manifest, release-version-pin, cloudflare-deploy, cloudflare-check, openapi-promote]
     if: always()
     steps:
       - name: Check for failures
@@ -2193,6 +2216,7 @@ jobs:
           LINT: ${{ needs.lint.result }}
           TEMPLATES: ${{ needs.deployment-templates.result }}
           MOBILE: ${{ needs.mobile-tooling.result }}
+          COMPUTE: ${{ needs.compute-sidecar.result }}
           BACKEND: ${{ needs.backend.result }}
           BACKEND_MINIMAL: ${{ needs.backend-minimal.result }}
           OPENAPI_IDENTICAL: ${{ needs.openapi-identical.result }}
@@ -2219,6 +2243,7 @@ jobs:
           require "PHP Code Formatting" "$LINT"
           require "Deployment Templates (AWS)" "$TEMPLATES"
           require "Mobile Release Tooling" "$MOBILE"
+          require "Compute Sidecar (Go)" "$COMPUTE"
 
           allow_skip "Backend (PHP/Symfony)" "$BACKEND"
           allow_skip "Backend (minimal)" "$BACKEND_MINIMAL"
