@@ -169,6 +169,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     await test.step('Act+Assert: Assistants submenu shows models and instructions', async () => {
       const assistants = await openManageGroup(page, 'assistants')
       await expect(assistants.locator(NAV.flyoutLinkAiModels)).toBeVisible()
+      await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toBeVisible()
       await expect(assistants.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
     })
 

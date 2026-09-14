@@ -71,4 +71,12 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
       timeout: TIMEOUTS.STANDARD,
     })
   })
+
+  test('@ci /ai/providers/higgsfield lands on Your AI accounts', async ({ page }) => {
+    await openApp(page)
+    await page.goto('/ai/providers/higgsfield', { waitUntil: 'commit' })
+    await expect(page).toHaveURL(/\/ai\/providers\?section=higgsfield/, {
+      timeout: TIMEOUTS.STANDARD,
+    })
+  })
 })

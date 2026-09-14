@@ -112,6 +112,7 @@ export const selectors = {
     flyoutLinkSavedTasks: '[data-testid="link-sidebar-v2-saved-tasks"]',
     flyoutLinkLiveSupport: '[data-testid="link-sidebar-v2-live-support"]',
     flyoutLinkAiModels: '[data-testid="link-sidebar-v2-ai-models"]',
+    flyoutLinkAiAccounts: '[data-testid="link-sidebar-v2-ai-accounts"]',
     flyoutLinkTaskPrompts: '[data-testid="link-sidebar-v2-task-prompts"]',
     flyoutLinkAdminDashboard: '[data-testid="link-sidebar-v2-admin-dashboard"]',
     /** V2 chat list modal */

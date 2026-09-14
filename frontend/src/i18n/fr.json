@@ -150,6 +150,7 @@
     "onboarding": "Bienvenue",
     "mcpServers": "Serveurs MCP",
     "aiAgents": "Clients de codage",
+    "aiAccounts": "Vos comptes IA",
     "connections": "Connexions",
     "savedTasks": "Tâches enregistrées",
     "setup": "Configuration",
@@ -753,6 +754,7 @@
     "moreDescription": "Autres sections et compte",
     "menu": "Menu",
     "aiAgents": "Clients de codage",
+    "aiAccounts": "Vos comptes IA",
     "manage": "Gérer",
     "manageDescription": "Assistants, automatisations, canaux et connexions",
     "myGroups": "Mes groupes",
@@ -1845,7 +1847,7 @@
         "replaceButton": "Remplacer",
         "testButton": "Tester la connexion",
         "clearButton": "Effacer ma clé",
-        "clearConfirm": "Retirer votre clé Higgsfield personnelle ? Vous repasserez à la clé de la plateforme (s’il y en a une).",
+        "clearConfirm": "Retirer la clé — la génération vidéo utilise à nouveau la clé du serveur.",
         "clearConfirmTitle": "Retirer la clé personnelle",
         "saveSuccess": "Clé Higgsfield enregistrée.",
         "saveError": "Impossible d’enregistrer la clé.",
@@ -5776,6 +5778,12 @@
     "allowWriteHint": "Lorsqu’elles sont activées, l’assistant peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
     "writeBadge": "Écritures autorisées"
   },
+  "aiAccounts": {
+    "title": "Vos comptes IA",
+    "subtitle": "Utilisez vos propres comptes fournisseur à la place de ceux du serveur. Les clés sont stockées chiffrées et vous seul pouvez les voir.",
+    "sectionHiggsfield": "Higgsfield — génération vidéo",
+    "sectionAnthropic": "Anthropic — clients de codage"
+  },
   "messagesGateway": {
     "title": "Clients de codage",
     "description": "Connectez Claude Code et d’autres outils d’agent compatibles Anthropic à votre espace Synaplan. Les requêtes vont vers POST /v1/messages et sont comptabilisées sur votre budget Synaplan.",
@@ -5796,7 +5804,8 @@
     "saveKey": "Enregistrer la clé",
     "clearKey": "Retirer la clé",
     "clearKeyConfirmTitle": "Retirer la clé Anthropic ?",
-    "clearKeyConfirm": "Votre clé Anthropic personnelle sera retirée. La passerelle ne fonctionnera que si une clé opérateur est autorisée et configurée.",
+    "clearKeyConfirm": "Retirer la clé — les clients de codage utilisent à nouveau la clé du serveur.",
+    "byokPointer": "Vous utilisez votre propre clé Anthropic ? Gérez-la sous Vos comptes IA.",
     "saveKeySuccess": "Clé API enregistrée",
     "saveKeyError": "Impossible d’enregistrer la clé API",
     "clearKeySuccess": "Clé API retirée",

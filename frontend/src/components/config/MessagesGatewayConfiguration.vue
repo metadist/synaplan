@@ -79,59 +79,15 @@
         </button>
       </div>
 
-      <!-- BYO Anthropic key -->
-      <div class="surface-card p-6" data-testid="section-agents-key">
-        <h3 class="text-lg font-semibold txt-primary mb-1">
-          {{ $t('messagesGateway.keyTitle') }}
-        </h3>
-        <p class="txt-secondary text-sm mb-4">{{ $t('messagesGateway.keyHint') }}</p>
-
-        <div class="flex flex-wrap items-center gap-3 text-sm mb-4">
-          <span class="txt-secondary">
-            {{ $t('messagesGateway.keySource') }}:
-            <strong class="txt-primary">{{ anthropicSourceLabel }}</strong>
-          </span>
-          <code v-if="status.keys.anthropic?.has_user_key" class="font-mono text-xs txt-secondary">
-            {{ status.keys.anthropic.user_key_masked }}
-          </code>
-        </div>
-
-        <label class="block mb-4">
-          <span class="text-sm font-medium txt-primary">{{
-            $t('messagesGateway.apiKeyLabel')
-          }}</span>
-          <input
-            v-model="apiKey"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            class="mt-1 w-full px-3 py-2 rounded surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] font-mono"
-            data-testid="input-agents-api-key"
-          />
-        </label>
-
-        <div class="flex flex-wrap gap-3">
-          <button
-            type="button"
-            class="btn-primary px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-            :disabled="!apiKey.trim() || savingKey"
-            data-testid="btn-agents-save-key"
-            @click="onSaveKey"
-          >
-            {{ $t('messagesGateway.saveKey') }}
-          </button>
-          <button
-            v-if="status.keys.anthropic?.has_user_key"
-            type="button"
-            class="px-4 py-2 rounded-lg text-sm font-medium border border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10"
-            :disabled="clearingKey"
-            data-testid="btn-agents-clear-key"
-            @click="onClearKey"
-          >
-            {{ $t('messagesGateway.clearKey') }}
-          </button>
-        </div>
-      </div>
+      <p class="txt-secondary text-sm" data-testid="text-ai-accounts-pointer">
+        <RouterLink
+          to="/ai/providers?section=anthropic"
+          class="text-[var(--brand)] hover:underline font-medium"
+          data-testid="link-ai-accounts-byok"
+        >
+          {{ $t('messagesGateway.byokPointer') }}
+        </RouterLink>
+      </p>
 
       <MessagesGatewayAdminSettings v-if="status.is_admin" :status="status" @saved="load(true)" />
     </template>
@@ -142,34 +98,23 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
-import { useDialog } from '@/composables/useDialog'
+import { RouterLink } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
 import PageHeader from '@/components/PageHeader.vue'
 import {
-  clearMessagesGatewayKey,
   getMessagesGatewayStatus,
-  saveMessagesGatewayKey,
   type MessagesGatewayStatus,
 } from '@/services/api/messagesGatewayApi'
 import MessagesGatewayAdminSettings from './messagesGateway/MessagesGatewayAdminSettings.vue'
 
 const { t } = useI18n()
-const { confirm } = useDialog()
 const { success, error } = useNotification()
 
 const loading = ref(true)
 const status = ref<MessagesGatewayStatus | null>(null)
-const apiKey = ref('')
-const savingKey = ref(false)
-const clearingKey = ref(false)
 
 // A budget of 0 means "no monthly budget configured" (unlimited), not "exhausted".
 const budgetUnlimited = computed(() => Number(status.value?.budget?.budget ?? 0) <= 0)
-
-const anthropicSourceLabel = computed(() => {
-  const source = status.value?.keys?.anthropic?.effective_source ?? 'none'
-  return t(`messagesGateway.source.${source}`)
-})
 
 const setupSnippet = computed(() => {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://web.synaplan.com'
@@ -206,41 +151,6 @@ async function copySetup() {
     success(t('messagesGateway.copySuccess'))
   } catch {
     error(t('messagesGateway.copyError'))
-  }
-}
-
-async function onSaveKey() {
-  if (!apiKey.value.trim() || savingKey.value) return
-  savingKey.value = true
-  try {
-    await saveMessagesGatewayKey('anthropic', apiKey.value.trim())
-    apiKey.value = ''
-    success(t('messagesGateway.saveKeySuccess'))
-    await load(true)
-  } catch (err) {
-    error((err as Error).message || t('messagesGateway.saveKeyError'))
-  } finally {
-    savingKey.value = false
-  }
-}
-
-async function onClearKey() {
-  const confirmed = await confirm({
-    title: t('messagesGateway.clearKeyConfirmTitle'),
-    message: t('messagesGateway.clearKeyConfirm'),
-    confirmText: t('messagesGateway.clearKey'),
-    danger: true,
-  })
-  if (!confirmed) return
-  clearingKey.value = true
-  try {
-    await clearMessagesGatewayKey('anthropic')
-    success(t('messagesGateway.clearKeySuccess'))
-    await load(true)
-  } catch (err) {
-    error((err as Error).message || t('messagesGateway.clearKeyError'))
-  } finally {
-    clearingKey.value = false
   }
 }
 

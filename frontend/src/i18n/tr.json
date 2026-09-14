@@ -149,6 +149,7 @@
     "onboarding": "Hoş geldin",
     "mcpServers": "MCP Sunucuları",
     "aiAgents": "Kodlama istemcileri",
+    "aiAccounts": "Yapay zeka hesaplarınız",
     "connections": "Bağlantılar",
     "savedTasks": "Kayıtlı görevler",
     "setup": "Kurulum",
@@ -743,6 +744,7 @@
     "moreDescription": "Diğer bölümler ve hesap",
     "menu": "Menü",
     "aiAgents": "Kodlama istemcileri",
+    "aiAccounts": "Yapay zeka hesaplarınız",
     "manage": "Yönet",
     "manageDescription": "Asistanlar, otomasyonlar, kanallar ve bağlantılar",
     "myGroups": "Gruplarım",
@@ -3376,7 +3378,7 @@
         "replaceButton": "Değiştir",
         "testButton": "Bağlantıyı test et",
         "clearButton": "Anahtarımı kaldır",
-        "clearConfirm": "Kişisel Higgsfield anahtarınız kaldırılsın mı? Platform anahtarına (varsa) geri dönersiniz.",
+        "clearConfirm": "Anahtarı kaldır — video üretimi yeniden sunucunun anahtarını kullanır.",
         "clearConfirmTitle": "Kişisel anahtarı kaldır",
         "saveSuccess": "Higgsfield anahtarı kaydedildi.",
         "saveError": "Anahtar kaydedilemedi.",
@@ -4791,6 +4793,12 @@
     "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
   },
+  "aiAccounts": {
+    "title": "Yapay zeka hesaplarınız",
+    "subtitle": "Sunucunun hesapları yerine kendi sağlayıcı hesaplarınızı kullanın. Anahtarlar şifreli saklanır ve yalnızca siz görebilirsiniz.",
+    "sectionHiggsfield": "Higgsfield — video üretimi",
+    "sectionAnthropic": "Anthropic — kodlama istemcileri"
+  },
   "messagesGateway": {
     "title": "Kodlama istemcileri",
     "description": "Claude Code ve diğer Anthropic uyumlu ajan araçlarını Synaplan çalışma alanınıza bağlayın. İstekler POST /v1/messages üzerinden gider ve Synaplan bütçenize yazılır.",
@@ -4811,7 +4819,8 @@
     "saveKey": "Anahtarı kaydet",
     "clearKey": "Anahtarı kaldır",
     "clearKeyConfirmTitle": "Anthropic anahtarı kaldırılsın mı?",
-    "clearKeyConfirm": "Kişisel Anthropic anahtarınız kaldırılacak. Ağ geçidi yalnızca operatör anahtarına izin verildiğinde ve yapılandırıldığında çalışır.",
+    "clearKeyConfirm": "Anahtarı kaldır — kodlama istemcileri yeniden sunucunun anahtarını kullanır.",
+    "byokPointer": "Kendi Anthropic anahtarınızı mı kullanıyorsunuz? Yapay zeka hesaplarınız altında yönetin.",
     "saveKeySuccess": "API anahtarı kaydedildi",
     "saveKeyError": "API anahtarı kaydedilemedi",
     "clearKeySuccess": "API anahtarı kaldırıldı",

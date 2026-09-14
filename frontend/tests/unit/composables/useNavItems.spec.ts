@@ -14,7 +14,7 @@ import {
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
 
-const runtimeFeatures = {
+const runtimeFeatures: Record<string, boolean> = {
   savedTasks: true,
   iamGroups: false,
   agentsEnabled: false,
@@ -22,10 +22,12 @@ const runtimeFeatures = {
   toolsApprovalsEnabled: false,
 }
 
+const runtimeModules: Record<string, { configured?: boolean }> = {}
+
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
   getApiBaseUrl: () => 'http://localhost:8000',
-  getConfigSync: () => ({ features: runtimeFeatures }),
+  getConfigSync: () => ({ features: runtimeFeatures, modules: runtimeModules }),
 }))
 
 const pluginList: { name: string }[] = []
@@ -68,6 +70,7 @@ const navMessages = {
     linkedPlatforms: 'Linked platforms',
     toolsDocSummary: 'Summarizer',
     configAiModels: 'Models',
+    aiAccounts: 'Your AI accounts',
     configTaskPrompts: 'Instructions',
     configSortingPrompt: 'Routing',
     liveSupport: 'Live support',
@@ -161,6 +164,10 @@ describe('useNavItems rail', () => {
     runtimeFeatures.agentsEnabled = false
     runtimeFeatures.platformLinksEnabled = false
     runtimeFeatures.toolsApprovalsEnabled = false
+    delete runtimeFeatures.messagesGateway
+    Object.keys(runtimeModules).forEach((key) => {
+      delete runtimeModules[key]
+    })
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -188,6 +195,7 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('live-support')
     expect(childKeys).toContain('chat-widget')
     expect(childKeys).toContain('doc-summary')
+    expect(childKeys).toContain('ai-accounts')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')
     expect(childKeys).not.toContain('linked-platforms')
@@ -222,6 +230,16 @@ describe('useNavItems rail', () => {
     const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     expect((onManage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
       'linked-platforms'
+    )
+  })
+
+  it('hides Your AI accounts when Higgsfield and the gateway are both off', () => {
+    runtimeFeatures.messagesGateway = false
+    runtimeModules.higgsfield = { configured: false }
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
+      'ai-accounts'
     )
   })
 
