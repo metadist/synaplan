@@ -35,8 +35,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -51,8 +51,20 @@ import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
-const activeTab = ref<'users' | 'groups' | 'policies' | 'linked-platforms' | 'audit'>('users')
+
+type PeopleTab = 'users' | 'groups' | 'policies' | 'linked-platforms' | 'audit'
+
+function isPeopleTab(id: string): id is PeopleTab {
+  return (
+    id === 'users' ||
+    id === 'groups' ||
+    id === 'policies' ||
+    id === 'linked-platforms' ||
+    id === 'audit'
+  )
+}
 
 const tabNavItems = computed<TabNavItem[]>(() => {
   const tabs: TabNavItem[] = [
@@ -98,15 +110,36 @@ const tabNavItems = computed<TabNavItem[]>(() => {
   return tabs
 })
 
-function onTabNavChange(id: string) {
+function tabFromQuery(): PeopleTab {
+  const tab = route.query.tab
   if (
-    id === 'users' ||
-    id === 'groups' ||
-    id === 'policies' ||
-    id === 'linked-platforms' ||
-    id === 'audit'
+    typeof tab === 'string' &&
+    isPeopleTab(tab) &&
+    tabNavItems.value.some((item) => item.id === tab)
   ) {
-    activeTab.value = id
+    return tab
   }
+  return 'users'
 }
+
+const activeTab = ref<PeopleTab>(tabFromQuery())
+
+function onTabNavChange(id: string) {
+  if (!isPeopleTab(id)) return
+  activeTab.value = id
+  const query = { ...route.query }
+  if (id === 'users') {
+    delete query.tab
+  } else {
+    query.tab = id
+  }
+  void router.replace({ query })
+}
+
+watch(
+  () => route.query.tab,
+  () => {
+    activeTab.value = tabFromQuery()
+  }
+)
 </script>

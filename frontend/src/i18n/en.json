@@ -265,7 +265,8 @@
     "disconnectConfirm": "Disconnect {host}? That platform will no longer be able to use this account.",
     "disconnected": "Platform disconnected.",
     "disconnectError": "The platform could not be disconnected.",
-    "loadError": "Linked platforms could not be loaded."
+    "loadError": "Linked platforms could not be loaded.",
+    "adminPointer": "Approving whole servers happens under Operate › People › Platform instances."
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",
@@ -5930,7 +5931,7 @@
       "users": "Users",
       "groups": "Groups",
       "policies": "Policies",
-      "linkedPlatforms": "Linked platforms",
+      "linkedPlatforms": "Platform instances",
       "audit": "Audit"
     },
     "openPeople": "Open People",
@@ -6020,6 +6021,7 @@
       }
     },
     "linkedPlatforms": {
+      "intro": "Nextcloud, ownCloud and Outlook servers that asked to use this Synaplan. Approve one so its users can connect their own accounts under Manage › Connections › Linked platforms.",
       "empty": "No platforms have registered yet.",
       "client": "Platform",
       "host": "Address",

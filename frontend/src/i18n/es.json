@@ -264,7 +264,8 @@
     "disconnectConfirm": "¿Desconectar {host}? Esa plataforma ya no podrá usar esta cuenta.",
     "disconnected": "Plataforma desconectada.",
     "disconnectError": "No se pudo desconectar la plataforma.",
-    "loadError": "No se pudieron cargar las plataformas vinculadas."
+    "loadError": "No se pudieron cargar las plataformas vinculadas.",
+    "adminPointer": "La aprobación de servidores enteros está en Operar › Personas › Instancias de plataforma."
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",
@@ -4944,7 +4945,7 @@
       "users": "Usuarios",
       "groups": "Grupos",
       "policies": "Políticas",
-      "linkedPlatforms": "Plataformas vinculadas",
+      "linkedPlatforms": "Instancias de plataforma",
       "audit": "Auditoría"
     },
     "openPeople": "Abrir Personas",
@@ -5034,6 +5035,7 @@
       }
     },
     "linkedPlatforms": {
+      "intro": "Servidores de Nextcloud, ownCloud y Outlook que pidieron usar este Synaplan. Aprueba uno para que sus usuarios puedan conectar sus propias cuentas en Gestionar › Conexiones › Plataformas vinculadas.",
       "empty": "Aún no se ha registrado ninguna plataforma.",
       "client": "Plataforma",
       "host": "Dirección",
