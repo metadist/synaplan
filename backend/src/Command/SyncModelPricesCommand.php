@@ -182,7 +182,7 @@ class SyncModelPricesCommand extends Command
             $litellmKey = $this->findLiteLLMKey($model, $litellmData);
             if (!$litellmKey) {
                 ++$notMatched;
-                $unmatchedList[] = sprintf('%s/%s (ID %d)', $service, $model->getProviderId(), $model->getId());
+                $unmatchedList[] = $this->describeUnmatched($model, $service, $litellmData);
                 continue;
             }
 
@@ -671,6 +671,32 @@ class SyncModelPricesCommand extends Command
         }
 
         return false;
+    }
+
+    /**
+     * One `Unmatched` line, naming the foreign vendor when LiteLLM does carry
+     * the bare id but attributes it elsewhere.
+     *
+     * "LiteLLM has never heard of this model" and "LiteLLM's only candidate
+     * prices someone else's product" are different findings with the same
+     * silent outcome, and this bucket is the one the procedure says to skip. A
+     * first-party service missing from BARE_MATCH_PROVIDERS reads exactly like
+     * the gateway case, so it says so instead of quietly dropping out of the
+     * drift check.
+     *
+     * @param array<string, array<string, mixed>> $litellmData
+     */
+    private function describeUnmatched(Model $model, string $service, array $litellmData): string
+    {
+        $providerId = $model->getProviderId();
+        $line = sprintf('%s/%s (ID %d)', $service, $providerId, $model->getId());
+        $foreignVendor = $litellmData[$providerId]['litellm_provider'] ?? null;
+
+        if (!is_string($foreignVendor) || '' === $foreignVendor) {
+            return $line;
+        }
+
+        return sprintf('%s — LiteLLM carries "%s" at vendor "%s", not ours; not compared', $line, $providerId, $foreignVendor);
     }
 
     /**

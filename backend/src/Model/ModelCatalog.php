@@ -4876,7 +4876,7 @@ class ModelCatalog
             'providerId' => 'jina-reranker-v2-base-multilingual',
             // $0.05 per 1M input tokens since Jina's May 2025 increase (was
             // $0.02) — read from https://api.jina.ai/v1/models on 2026-09-10.
-            // LiteLLM still lists 0.018; see LITELLM_DEVIATIONS.
+            // LiteLLM caught up on 2026-09-14 and now lists the same rate.
             'priceIn' => 0.05,
             'inUnit' => 'per1M',
             'priceOut' => 0,

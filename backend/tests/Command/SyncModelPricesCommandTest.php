@@ -1118,6 +1118,7 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
         $output = $this->commandTester->getDisplay();
         $this->assertStringContainsString('A2Agent/deepseek-v4-pro (ID 362)', $output);
+        $this->assertStringContainsString('at vendor "deepseek", not ours', $output);
         $this->assertStringContainsString('1 unmatched', $output);
         $this->assertStringNotContainsString('[DRY-RUN]', $output);
     }

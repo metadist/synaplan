@@ -174,7 +174,7 @@ Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalo
 - Kimi direct: https://platform.kimi.ai/docs/pricing/chat
 - Jina (JSON catalog, `pricing.prompt` is USD per token — multiply by 1e6): https://api.jina.ai/v1/models · marketing page https://jina.ai/reranker/
 - TrustedTokens (JSON catalog, not the JS marketing page): https://trustedtokens.eu/api/billing/models · docs https://trustedtokens.eu/docs/
-- A2Agent (models page + `GET /v1/models`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
+- A2Agent (models page; `GET /v1/models` is key-gated and answers `401`; not in LiteLLM): https://a2agent.me/models · https://a2agent.me/pricing
 - xAI: https://docs.x.ai/developers/pricing · models https://docs.x.ai/developers/models
 
 **Tooling / cross-checks:**
