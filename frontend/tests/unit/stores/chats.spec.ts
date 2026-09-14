@@ -470,6 +470,44 @@ describe('Chats Store', () => {
       expect(store.conversationAccess).toBeNull()
     })
 
+    it("treats a chat from the viewer's own list as owned without asking", async () => {
+      const store = useChatsStore()
+      httpClientMock.mockResolvedValueOnce(chatPayload(9))
+      await store.createChat()
+      httpClientMock.mockClear()
+
+      await store.loadConversationAccess(9)
+
+      expect(httpClientMock).not.toHaveBeenCalled()
+      expect(store.conversationAccess).toBe('owner')
+    })
+
+    it('settles as owned when nothing is open, so the composer is not withheld', () => {
+      const store = useChatsStore()
+
+      store.resolveConversationAccessAsOwn()
+
+      expect(store.conversationAccess).toBe('owner')
+      expect(store.conversationSource).toBeNull()
+    })
+
+    it('drops an in-flight probe once the answer is known to be owned', async () => {
+      const store = useChatsStore()
+      let resolveProbe: (value: unknown) => void = () => {}
+      httpClientMock.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveProbe = resolve
+        })
+      )
+      const probe = store.loadConversationAccess(4)
+      store.resolveConversationAccessAsOwn()
+
+      resolveProbe({ chat: { id: 4, access: 'read' } })
+      await probe
+
+      expect(store.conversationAccess).toBe('owner')
+    })
+
     it('ignores a stale response after a newer load started', async () => {
       const store = useChatsStore()
       let resolveFirst: (value: unknown) => void = () => {}

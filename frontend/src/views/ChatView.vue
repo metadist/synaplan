@@ -942,6 +942,8 @@ watch(
     mixPanelDismissed.value = false
     if (chatId) {
       void chatsStore.loadConversationAccess(chatId)
+    } else {
+      chatsStore.resolveConversationAccessAsOwn()
     }
   },
   { immediate: true }

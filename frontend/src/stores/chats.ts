@@ -478,10 +478,32 @@ export const useChatsStore = defineStore('chats', () => {
     return { id, name }
   }
 
+  /**
+   * Settle the access question without asking the server, for the cases where
+   * the answer can only be "the viewer's own": nothing is open at all, or the
+   * conversation sits in the viewer's own list. Deliberately distinct from the
+   * `null` "probe still running" state, which withholds the composer on
+   * purpose — leaving an unanswerable question at `null` kept the composer
+   * hidden, and on a brand-new account (no chat to open) it never came back.
+   */
+  function resolveConversationAccessAsOwn() {
+    ++conversationAccessSeq
+    conversationAccess.value = 'owner'
+    conversationSource.value = null
+  }
+
   async function loadConversationAccess(chatId: number) {
     if (!isIamSharingEnabled()) {
-      conversationAccess.value = 'owner'
-      conversationSource.value = null
+      resolveConversationAccessAsOwn()
+      return
+    }
+    // A chat in the viewer's own list can only come back as "owner":
+    // conversations other people shared arrive through the incoming store and
+    // are never part of this list (see ensureValidActiveChat). Asking anyway
+    // unmounted the composer for the length of a foregone request on every
+    // single chat switch.
+    if (chats.value.some((chat) => chat.id === chatId)) {
+      resolveConversationAccessAsOwn()
       return
     }
     const seq = ++conversationAccessSeq
@@ -622,6 +644,7 @@ export const useChatsStore = defineStore('chats', () => {
     conversationAccess,
     conversationSource,
     loadConversationAccess,
+    resolveConversationAccessAsOwn,
     activeChat,
     loading,
     error,
