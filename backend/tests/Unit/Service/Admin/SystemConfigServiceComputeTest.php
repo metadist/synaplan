@@ -49,16 +49,57 @@ final class SystemConfigServiceComputeTest extends TestCase
 
     public function testAcceptsValueAtTheCap(): void
     {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+
+        $result = $this->service($repo)->setValue('COMPUTE_DEFAULT_TIMEOUT_SEC', '300');
+
+        self::assertTrue($result['success']);
+    }
+
+    /**
+     * The fixture sidecar reports features.egress=false (as the shipped sidecar
+     * does): switching website access on must be refused with a plain sentence
+     * instead of storing a flag every run would then contradict.
+     */
+    public function testRefusesEgressFlagTheSidecarDoesNotOffer(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+
+        $result = $this->service($repo)->setValue('COMPUTE_EGRESS_ENABLED', 'true');
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('Website access', (string) ($result['message'] ?? ''));
+        self::assertStringContainsString('stays off', (string) ($result['message'] ?? ''));
+    }
+
+    public function testSwitchingEgressOffIsAlwaysAllowed(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_EGRESS_ENABLED', 'false')['success']);
+    }
+
+    public function testAcceptsWorkspacesFlagTheSidecarOffers(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->once())->method('setValue');
+
+        self::assertTrue($this->service($repo)->setValue('COMPUTE_WORKSPACES_ENABLED', 'true')['success']);
+    }
+
+    private function service(ConfigRepository $repo): SystemConfigService
+    {
         $health = ComputeHealth::fromJson((string) file_get_contents(
             dirname(__DIR__, 3).'/Fixtures/compute-contract/health.json',
         ));
         $client = $this->createStub(ComputeClient::class);
         $client->method('health')->willReturn($health);
-
-        $repo = $this->createMock(ConfigRepository::class);
-        $repo->expects($this->once())->method('setValue');
         $encryption = new EncryptionService('test-secret', new NullLogger());
-        $service = new SystemConfigService(
+
+        return new SystemConfigService(
             projectDir: sys_get_temp_dir(),
             logger: new NullLogger(),
             configRepository: $repo,
@@ -69,9 +110,5 @@ final class SystemConfigServiceComputeTest extends TestCase
             guestChatConfig: new GuestChatConfig($repo),
             computeClient: $client,
         );
-
-        $result = $service->setValue('COMPUTE_DEFAULT_TIMEOUT_SEC', '300');
-
-        self::assertTrue($result['success']);
     }
 }

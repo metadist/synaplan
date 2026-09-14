@@ -30,6 +30,15 @@ the surface is absent: no chat card, no Files tab, no API tease (U11).
 Both extra flags sit **under** `COMPUTE.ENABLED`. Turning a child on while
 file work itself is off does nothing.
 
+A child flag can only be switched on in the admin UI when the connected
+sidecar reports the feature in `GET /v1/health` (`features.workspaces`,
+`features.egress`); otherwise the save is refused with one sentence and the
+switch stays off. **The sidecar shipped in this repository reports
+`features.egress: false`** — it creates every container with
+`NetworkMode=none` and refuses any non-empty allow-list (`CP22`, the egress
+proxy, is not built yet). The PHP side (resolver, pinning, approval) is
+complete and waits for that sidecar release.
+
 Operators switch them under **Operate → System configuration → Processing →
 File work**. Seeders insert the rows as `0` when missing and never overwrite
 an existing value.

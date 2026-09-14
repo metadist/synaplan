@@ -529,7 +529,8 @@ final readonly class SystemConfigService
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
-            $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value);
+            $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value)
+                ?? $this->refuseComputeFeatureSidecarLacks($key, $value);
             if (null !== $capRefuse) {
                 return $capRefuse;
             }
@@ -702,6 +703,43 @@ final readonly class SystemConfigService
                 $cap,
                 $unit,
             ),
+        ];
+    }
+
+    /**
+     * A compute child flag may only be switched on when the connected sidecar
+     * reports the feature in `GET /v1/health`. Otherwise the UI would show a
+     * Workspace tab or promise website access that every run then refuses
+     * (U11: a flag must never be a teaser). Switching off is always allowed.
+     *
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeFeatureSidecarLacks(string $key, string $value): ?array
+    {
+        $map = [
+            'COMPUTE_WORKSPACES_ENABLED' => ['workspaces', 'Persistent file-work folders are'],
+            'COMPUTE_EGRESS_ENABLED' => ['egress', 'Website access for file work is'],
+        ];
+        if (!isset($map[$key]) || null === $this->computeClient) {
+            return null;
+        }
+        if (!in_array(strtolower(trim($value)), ['1', 'true', 'yes', 'on'], true)) {
+            return null;
+        }
+        try {
+            $features = $this->computeClient->health()->features;
+        } catch (\Throwable) {
+            return null;
+        }
+        [$featureKey, $subject] = $map[$key];
+        if ($features[$featureKey]) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => $subject.' not offered by this installation\'s compute sidecar yet. The switch stays off.',
         ];
     }
 
@@ -1733,7 +1771,7 @@ final readonly class SystemConfigService
             'COMPUTE_EGRESS_ENABLED' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
                 'sensitive' => false,
-                'description' => 'Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused.',
+                'description' => 'Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the connected compute sidecar offers website access (features.egress in its health report).',
                 'default' => 'false',
                 'source' => 'database',
                 'dbGroup' => ComputeConfig::CONFIG_GROUP,
