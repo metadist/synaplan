@@ -44,9 +44,10 @@ File work**. Seeders insert the rows as `0` when missing and never overwrite
 an existing value.
 
 ```sql
-INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
-VALUES (0, 'COMPUTE', 'ENABLED', '0')
-ON DUPLICATE KEY UPDATE BVALUE = '0';
+-- what ComputeConfigSeeder runs (BConfigSeeder::insertIfMissing): a no-op
+-- when the row exists, so an operator's value is never reset
+INSERT IGNORE INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
+VALUES (0, 'COMPUTE', 'ENABLED', '0');
 ```
 
 The runtime-config endpoint exposes `features.computeEnabled` and
@@ -119,7 +120,12 @@ never run unattended — fail closed.
 
 ## Workspaces and egress
 
-**Workspace.** One folder per user (`BCOMPUTEWORKSPACES`). PHP stores only
+**Workspace.** One folder per user (`BCOMPUTEWORKSPACES`), one run at a
+time per folder: a second run while one is using it is refused
+(`workspace_busy`, "Another file-work run is still using your folder").
+The quota holds after the run too — a run that leaves the folder above
+`COMPUTE_WORKSPACE_MB` fails with `workspace_quota_exceeded` and the sidecar
+removes what that run added; the sentence says so. PHP stores only
 the opaque id and the quota — never a host path. The sidecar allocates the
 id and enforces ownership (`owner = user:{id}`). Creation is serialised per
 user behind a `LOCK_DSN` lock so two first runs in flight cannot leave an

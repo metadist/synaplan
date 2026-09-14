@@ -44,6 +44,10 @@ type Server struct {
 	runs    map[string]*runRec
 	running int
 	queued  int
+	// busyWs maps a user workspace id to the run currently holding it. A
+	// persistent folder is mounted read-write, so two runs sharing it would
+	// race on the same files; the second is refused with workspace_busy.
+	busyWs map[string]string
 }
 
 // runRec is the mutable state of one run. Logs has its own mutex.
@@ -164,6 +168,7 @@ func New(opt Options) (*Server, error) {
 		owner:  opt.Owner,
 		sem:    make(chan struct{}, maxConc),
 		runs:   make(map[string]*runRec),
+		busyWs: make(map[string]string),
 	}
 	if s.tier.Tier == "" {
 		s.tier.Tier = rt.TierDocker

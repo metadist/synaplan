@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/metadist/synaplan-compute/internal/runner"
 	"github.com/metadist/synaplan-compute/pkg/config"
 	"github.com/metadist/synaplan-compute/pkg/contract"
 )
@@ -682,5 +683,60 @@ func TestWorkspaceDownloadAppliesMimeAllowList(t *testing.T) {
 	defer missing.Body.Close()
 	if missing.StatusCode != http.StatusNotFound {
 		t.Fatalf("missing file: %d", missing.StatusCode)
+	}
+}
+
+func TestWorkspaceBusyRefusesConcurrentRunOnSameFolder(t *testing.T) {
+	fr := newFakeRunner()
+	fr.waitDelay = 300 * time.Millisecond
+	_, ts := newTestServer(t, testOpts{runner: fr})
+	wsID := createWorkspace(t, ts, "user:123", 64)
+	body := validRun()
+	body.Workspace = contract.Workspace{Kind: "user", ID: wsID}
+
+	first := submitJSON(t, ts, body)
+	assertRunErrorOn(t, ts, body, http.StatusConflict, contract.ErrWorkspaceBusy)
+
+	// A different folder is not blocked by the first run.
+	other := validRun()
+	other.Workspace = contract.Workspace{Kind: "user", ID: createWorkspace(t, ts, "user:123", 64)}
+	submitJSON(t, ts, other)
+
+	waitFor(t, ts, first, finished)
+	// The folder is free again once its run reached a terminal state.
+	waitFor(t, ts, submitJSON(t, ts, body), finished)
+}
+
+func TestWorkspaceOverQuotaAfterRunRollsBackWhatTheRunAdded(t *testing.T) {
+	fr := newFakeRunner()
+	fr.onCreate = func(spec runner.Spec) {
+		// The script fills the read-write folder past its 1 MiB quota.
+		_ = os.WriteFile(filepath.Join(spec.WorkspaceHost, "big.bin"), bytes.Repeat([]byte("x"), 2*1024*1024), 0o644)
+		_ = os.MkdirAll(filepath.Join(spec.WorkspaceHost, "reports"), 0o755)
+		_ = os.WriteFile(filepath.Join(spec.WorkspaceHost, "reports", "new.csv"), []byte("a,b"), 0o644)
+	}
+	s, ts := newTestServer(t, testOpts{runner: fr})
+	wsID := createWorkspace(t, ts, "user:123", 1)
+	host := s.ws.HostPath(wsID)
+	if err := os.WriteFile(filepath.Join(host, "keep.txt"), []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body := validRun()
+	body.Workspace = contract.Workspace{Kind: "user", ID: wsID}
+
+	st := waitFor(t, ts, submitJSON(t, ts, body), finished)
+	if st.Status != contract.StatusFailed || st.Reason != contract.ErrWorkspaceQuota {
+		t.Fatalf("want failed/%s, got %s/%s", contract.ErrWorkspaceQuota, st.Status, st.Reason)
+	}
+	for _, gone := range []string{"big.bin", "reports/new.csv"} {
+		if _, err := os.Stat(filepath.Join(host, filepath.FromSlash(gone))); !os.IsNotExist(err) {
+			t.Fatalf("%s must be rolled back, stat err=%v", gone, err)
+		}
+	}
+	if b, err := os.ReadFile(filepath.Join(host, "keep.txt")); err != nil || string(b) != "mine" {
+		t.Fatalf("pre-existing file must survive: %v %q", err, b)
+	}
+	if over, _ := s.ws.OverQuota(wsID); over {
+		t.Fatal("folder must be back under quota")
 	}
 }

@@ -379,7 +379,7 @@ final readonly class CodeRunRunner implements TaskRunner
             $this->runs->save($audit);
             $this->logger->info('CodeRunRunner: sidecar refused', ['code' => $e->errorCode()]);
 
-            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode()), $e->errorCode());
+            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode(), ran: false), $e->errorCode());
         } catch (\Throwable $e) {
             $audit->markFinished(ComputeRun::STATUS_FAILED);
             $this->runs->save($audit);
@@ -804,11 +804,20 @@ final readonly class CodeRunRunner implements TaskRunner
         return $this->computeConfig->isEnabled($userId);
     }
 
-    private function failureCopy(?string $reason): string
+    /**
+     * One sentence per terminal reason — the same code can arrive as a
+     * refusal before the run (nothing was written) or as the reason of a
+     * finished run (the sidecar already rolled back what the run added).
+     */
+    private function failureCopy(?string $reason, bool $ran = true): string
     {
         return match ($reason) {
             'timeout' => 'File work ran out of time. Nothing new was saved.',
             'oom', 'pids_limit', 'output_limit' => 'File work hit a resource limit. Nothing new was saved.',
+            'workspace_busy' => 'Another file-work run is still using your folder. Wait for it to finish, then try again. Nothing new was saved.',
+            'workspace_quota_exceeded' => $ran
+                ? 'This run wrote more than your file-work folder allows. The files it created were removed; the rest of your folder is unchanged.'
+                : 'Your file-work folder is full. Delete files or the folder under Files → Workspace, then try again. Nothing new was saved.',
             default => 'File work could not finish. Nothing new was saved.',
         };
     }

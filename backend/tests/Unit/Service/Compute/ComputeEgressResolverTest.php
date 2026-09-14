@@ -68,6 +68,10 @@ final class ComputeEgressResolverTest extends TestCase
     public static function malformedHosts(): iterable
     {
         yield 'ipv6 literal' => ['[::ffff:8.8.8.8]'];
+        yield 'raw ipv6 loopback' => ['::1'];
+        yield 'raw ipv6 link-local' => ['fe80::1'];
+        yield 'bracketed ipv6 with port' => ['[::1]:443'];
+        yield 'only a port' => [':443'];
         yield 'shell-ish' => ['example.com;id'];
         yield 'space' => ['exam ple.com'];
         yield 'underscore' => ['bad_host.example'];
@@ -82,6 +86,21 @@ final class ComputeEgressResolverTest extends TestCase
         $this->expectException(ComputeRefusedException::class);
         $this->expectExceptionMessage('cannot reach that website');
         $this->resolver()->resolve([$host]);
+    }
+
+    public function testABadEntryNextToAGoodOneRefusesTheWholeList(): void
+    {
+        // Silently dropping "::1" would let the run proceed as if the list
+        // were clean; the whole run is refused instead.
+        $this->expectException(ComputeRefusedException::class);
+        $this->resolver()->resolve(['8.8.8.8', '::1']);
+    }
+
+    public function testBlankEntriesAreIgnoredNotRefused(): void
+    {
+        $resolved = $this->resolver()->resolve(['', '   ', '8.8.8.8']);
+
+        self::assertCount(1, $resolved['allow']);
     }
 
     private function resolver(bool $egressOn = true): ComputeEgressResolver

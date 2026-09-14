@@ -311,6 +311,16 @@ export const selectors = {
     pageGenerated: '[data-testid="page-files-generated"]',
     pageWorkspace: '[data-testid="page-files-workspace"]',
     pageVectors: '[data-testid="page-vector-storage"]',
+    /** Workspace tab (COMPUTE.WORKSPACES_ENABLED on): list, preview dialog, delete, states */
+    workspaceFiles: '[data-testid="workspace-files"]',
+    workspaceEmpty: '[data-testid="workspace-empty"]',
+    workspaceError: '[data-testid="workspace-error"]',
+    workspacePreview: '[data-testid="workspace-preview"]',
+    btnWorkspacePreview: '[data-testid="btn-workspace-preview"]',
+    btnWorkspacePreviewClose: '[data-testid="btn-workspace-preview-close"]',
+    btnWorkspaceDelete: '[data-testid="btn-workspace-delete"]',
+    btnWorkspaceRetry: '[data-testid="btn-workspace-retry"]',
+    btnWorkspaceEmptyChat: '[data-testid="btn-workspace-empty-chat"]',
   },
   fileSelection: {
     modal: '[data-testid="modal-file-selection"]',

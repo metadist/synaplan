@@ -108,4 +108,30 @@ describe('WorkspaceView', () => {
     expect(wrapper.find('[data-testid="workspace-preview"]').exists()).toBe(false)
     wrapper.unmount()
   })
+
+  it('shows the file clicked last when an earlier preview response arrives later', async () => {
+    const png = { path: 'a.png', size: 5, mime: 'image/png', modifiedAt: '' }
+    getWorkspace.mockResolvedValue(info)
+    listWorkspaceFiles.mockResolvedValue([png, csv])
+    let resolveFirst: (blob: Blob) => void = () => {}
+    loadWorkspaceFileBlob
+      .mockImplementationOnce(() => new Promise<Blob>((resolve) => (resolveFirst = resolve)))
+      .mockResolvedValueOnce(new Blob(['a,b'], { type: 'text/csv' }))
+    const createObjectURL = vi.fn(() => 'blob:stale')
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL: vi.fn() })
+    const wrapper = mountView()
+    await flushPromises()
+
+    const buttons = wrapper.findAll('[data-testid="btn-workspace-preview"]')
+    await buttons[0].trigger('click') // a.png — slow
+    await buttons[1].trigger('click') // report.csv — fast
+    await flushPromises()
+    resolveFirst(new Blob(['x'], { type: 'image/png' })) // stale answer lands last
+    await flushPromises()
+
+    expect(wrapper.find('#workspace-preview-title').text()).toBe('report.csv')
+    expect(createObjectURL).not.toHaveBeenCalled()
+    vi.unstubAllGlobals()
+    wrapper.unmount()
+  })
 })

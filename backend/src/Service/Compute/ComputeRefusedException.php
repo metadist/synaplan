@@ -28,8 +28,12 @@ final class ComputeRefusedException extends \RuntimeException
         return $this->details;
     }
 
+    /**
+     * True when the sidecar had no room for another run. A full persistent
+     * folder is not this — it has its own sentence in the runner.
+     */
     public function isQuota(): bool
     {
-        return in_array($this->errorCode, ['capacity_exceeded', 'workspace_quota_exceeded'], true);
+        return 'capacity_exceeded' === $this->errorCode;
     }
 }

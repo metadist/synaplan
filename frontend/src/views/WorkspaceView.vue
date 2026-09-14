@@ -256,22 +256,31 @@ async function onDownload(file: ComputeWorkspaceFile) {
   }
 }
 
+// Only the latest preview click may publish its result; an older response
+// arriving later is dropped without creating an object URL.
+let previewRequest = 0
+
 async function onPreview(file: ComputeWorkspaceFile) {
   closePreview()
+  const request = ++previewRequest
   try {
     const blob = await loadWorkspaceFileBlob(file.path)
+    const text = isTextPreview(file.mime) && blob.size <= 200_000 ? await blob.text() : null
+    if (request !== previewRequest) return
     const name = workspaceFileName(file.path)
     if (file.mime.startsWith('image/')) {
       preview.value = { name, kind: 'image', url: URL.createObjectURL(blob) }
       return
     }
-    if (isTextPreview(file.mime) && blob.size <= 200_000) {
-      preview.value = { name, kind: 'text', text: await blob.text() }
+    if (text !== null) {
+      preview.value = { name, kind: 'text', text }
       return
     }
     preview.value = { name, kind: 'other' }
   } catch {
-    notifyError(t('files.workspace.previewError'))
+    if (request === previewRequest) {
+      notifyError(t('files.workspace.previewError'))
+    }
   }
 }
 

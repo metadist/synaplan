@@ -49,6 +49,7 @@ const (
 	ErrWorkspaceQuota    = "workspace_quota_exceeded"
 	ErrWorkspaceNotOwned = "workspace_not_owned"
 	ErrWorkspaceNotFound = "workspace_not_found"
+	ErrWorkspaceBusy     = "workspace_busy"
 	ErrCapacityExceeded  = "capacity_exceeded"
 	ErrEgressNotAllowed  = "egress_not_allowed"
 	ErrMissingOwner      = "missing_owner"

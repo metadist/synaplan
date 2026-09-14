@@ -14,6 +14,7 @@ use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Compute\ComputeEgressResolver;
+use App\Service\Compute\ComputeRefusedException;
 use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunRequest;
 use App\Service\Compute\Contract\ComputeRunStatus;
@@ -287,6 +288,50 @@ final class CodeRunRunnerTest extends TestCase
 
         $this->assertInstanceOf(ComputeRunRequest::class, $captured);
         $this->assertSame(['allow' => []], $captured->egress);
+    }
+
+    public function testWorkspaceRefusalsGetTheirOwnSentences(): void
+    {
+        foreach ([
+            'workspace_busy' => 'Another file-work run is still using your folder.',
+            'workspace_quota_exceeded' => 'Your file-work folder is full.',
+        ] as $code => $starts) {
+            $client = $this->createMock(ComputeClient::class);
+            $client->method('submitRun')->willThrowException(new ComputeRefusedException($code, 'sidecar says no', httpStatus: 409));
+
+            $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+                new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+                $this->context(),
+            );
+
+            $this->assertFalse($result->isSuccessful());
+            $this->assertStringStartsWith($starts, (string) $result->error, $code);
+            $this->assertStringNotContainsString("week's file-work limit", (string) $result->error, $code);
+        }
+    }
+
+    public function testRunRolledBackForFolderQuotaSaysWhatWasRemoved(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'failed',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            reason: 'workspace_quota_exceeded',
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringStartsWith('This run wrote more than your file-work folder allows.', (string) $result->error);
     }
 
     private function file(int $userId, string $name, string $path): File

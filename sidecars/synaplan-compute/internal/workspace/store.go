@@ -189,6 +189,63 @@ func (s *Store) walkSize(id string) (int64, int) {
 	return used, files
 }
 
+// OverQuota reports whether the data tree is larger than the quota right now.
+// The pre-run check only sees uploaded bytes; a script can write freely to
+// /workspace while it runs, so the server calls this once the container is
+// gone.
+func (s *Store) OverQuota(id string) (bool, error) {
+	meta, err := s.Get(id)
+	if err != nil {
+		return false, err
+	}
+	used, _ := s.walkSize(id)
+	return used > int64(meta.QuotaMb)*1024*1024, nil
+}
+
+// Snapshot returns the set of non-directory entries (relative, slash-separated)
+// present in the data tree. Taken before a run, it is what RemoveNewEntries
+// keeps when that run blows the quota.
+func (s *Store) Snapshot(id string) map[string]struct{} {
+	base := s.hostPath(id)
+	out := map[string]struct{}{}
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if rel, err := filepath.Rel(base, path); err == nil {
+			out[filepath.ToSlash(rel)] = struct{}{}
+		}
+		return nil
+	})
+	return out
+}
+
+// RemoveNewEntries deletes every non-directory entry that is not in keep and
+// reports how many it removed. WalkDir never follows symlinks, so a symlink
+// the script planted is removed as an entry, not traversed. Called only
+// while no container has the tree mounted.
+func (s *Store) RemoveNewEntries(id string, keep map[string]struct{}) int {
+	base := s.hostPath(id)
+	removed := 0
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(base, path)
+		if err != nil {
+			return nil
+		}
+		if _, kept := keep[filepath.ToSlash(rel)]; kept {
+			return nil
+		}
+		if os.Remove(path) == nil {
+			removed++
+		}
+		return nil
+	})
+	return removed
+}
+
 // Listing bounds: a script can create arbitrarily deep or wide trees, and the
 // response must stay small enough for one page.
 const (
