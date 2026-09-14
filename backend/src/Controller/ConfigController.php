@@ -502,7 +502,7 @@ class ConfigController extends AbstractController
                 new OA\Property(
                     property: 'modules',
                     type: 'object',
-                    description: 'Declared feature modules keyed by module id (tika, docling, office_convert, searxng, piper_tts, local_ai, higgsfield, google_ai, thehive, stripe_billing, mobile_iap, whatsapp). `configured` is whether the installation provides the module; `gated` is whether an absent module answers 404 feature_not_configured on its routes (MODULES.GATE_<ID>). New installs seed every gate on; existing BCONFIG rows are never overwritten. Older clients ignore this key; a client that does not receive it treats every module as configured.',
+                    description: 'Declared feature modules keyed by module id (tika, docling, office_convert, searxng, piper_tts, local_ai, higgsfield, google_ai, thehive, stripe_billing, mobile_iap, whatsapp, compute). `configured` is whether the installation provides the module; `gated` is whether an absent module answers 404 feature_not_configured on its routes (MODULES.GATE_<ID>). New installs seed every gate on; existing BCONFIG rows are never overwritten. Older clients ignore this key; a client that does not receive it treats every module as configured.',
                     additionalProperties: new OA\AdditionalProperties(
                         type: 'object',
                         required: ['configured', 'gated'],

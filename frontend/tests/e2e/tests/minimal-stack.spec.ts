@@ -72,7 +72,8 @@ test.describe('@minimal @ci Minimal stack', () => {
 
     const modules = await runtimeModules(request)
     const expectedIds = Object.keys(modules).sort()
-    expect(expectedIds).toHaveLength(12)
+    expect(expectedIds).toContain('compute')
+    expect(expectedIds).toHaveLength(13)
 
     await expect(page.locator(selectors.featureStatus.summary)).toBeVisible({
       timeout: TIMEOUTS.EXTREME,
@@ -116,10 +117,12 @@ test.describe('@minimal @ci Minimal stack', () => {
   test('runtime config reports every module unconfigured and gated', async ({ request }) => {
     const modules = await runtimeModules(request)
     const ids = Object.keys(modules).sort()
-    expect(ids).toHaveLength(12)
+    expect(ids).toContain('compute')
+    expect(ids).toHaveLength(13)
     expect(modules.tika?.configured).toBe(false)
     expect(modules.higgsfield?.configured).toBe(false)
     expect(modules.whatsapp?.configured).toBe(false)
+    expect(modules.compute?.configured).toBe(false)
     for (const id of ids) {
       expect(modules[id]?.configured, `${id} configured`).toBe(false)
       expect(modules[id]?.gated, `${id} gated`).toBe(true)
