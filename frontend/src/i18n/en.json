@@ -879,11 +879,29 @@
     "infoCost": "Cost"
   },
   "chatError": {
-    "title": "The answer failed",
+    "title": "The answer did not finish",
     "retry": "Try again with another model",
     "retryWith": "Try again with {model}",
+    "retrySame": "Try again",
+    "retrySameHint": "No other model is available right now. You can try the same one again.",
+    "noRetry": "Trying another model will not help. Wait a moment, or contact support if this keeps happening.",
     "chooseModel": "Choose another model",
-    "showDetails": "Show technical details"
+    "showDetails": "Show technical details",
+    "partialDraft": "The text above is an unfinished draft. It may be incomplete, and it may not have been saved.",
+    "reason": {
+      "schema_mismatch": "The AI model could not complete this request in the expected format. Try again with a different model.",
+      "context_length_exceeded": "This request is too long for the selected model. Shorten it, or try a model with a larger context window.",
+      "request_too_large": "This request is too large for the selected model. Shorten it, or try a different model.",
+      "rate_limited": "The selected model is busy right now. Wait a moment, or try a different model.",
+      "quota_exceeded": "The selected AI service has no remaining credits. Try again later, or contact support.",
+      "auth_failed": "The selected AI service is not set up correctly right now. Try again later, or contact support.",
+      "model_unavailable": "The selected model is not available right now. Try a different model.",
+      "content_filtered": "The AI service declined this request. Rephrase it, or try a different model.",
+      "timeout": "The selected model took too long to answer. Try again, or switch to a different model.",
+      "upstream_unavailable": "The selected AI service is temporarily unavailable. Try again, or switch to a different model.",
+      "unknown": "Something went wrong while answering. Nothing new was saved as the final reply.",
+      "empty_answer": "The step looks finished, but the reply was never saved in this chat. Nothing arrived here that you can keep."
+    }
   },
   "commands": {
     "noResults": "No commands found",

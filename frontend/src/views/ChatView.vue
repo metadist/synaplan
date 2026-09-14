@@ -216,6 +216,7 @@
               :original-topic="message.originalTopic"
               :original-media-type="message.originalMediaType"
               :error-reason="message.errorReason"
+              :error-message="message.errorMessage"
               :can-retry-model="message.canRetryModel"
               :error-debug="message.errorDebug"
               :again-data="message.againData"
@@ -4165,8 +4166,11 @@ const streamAIResponse = async (
               }
               if (typeof data.errorReason === 'string' && data.errorReason !== '') {
                 message.errorReason = data.errorReason
-                message.canRetryModel = data.canRetryModel === true
+                message.canRetryModel = data.canRetryModel !== false
                 message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+                if (typeof data.error === 'string' && data.error.trim() !== '') {
+                  message.errorMessage = data.error
+                }
               }
 
               if (data.error_hint === 'vision_model_required') {
@@ -4431,8 +4435,11 @@ const streamAIResponse = async (
                 typeof data.errorReason === 'string' && data.errorReason !== ''
                   ? data.errorReason
                   : 'unknown'
-              message.canRetryModel = data.canRetryModel === true
+              message.canRetryModel = data.canRetryModel !== false
               message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+              if (typeof data.error === 'string' && data.error.trim() !== '') {
+                message.errorMessage = data.error
+              }
             }
             if (!hasContent) {
               // `errorMsg` is the localized text the backend also persists as the
@@ -4727,9 +4734,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  const assistantMessage = historyStore.messages.find(
-    (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
-  )
+  const assistantMessage =
+    backendMessageId > 0
+      ? historyStore.messages.find(
+          (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
+        )
+      : (historyStore.messages.find((m) => m.id === IN_PROGRESS_TURN_ID) ??
+        [...historyStore.messages].reverse().find((m) => m.role === 'assistant' && !!m.errorReason))
 
   if (!assistantMessage) {
     console.error('❌ Could not find assistant message with backendMessageId:', backendMessageId)

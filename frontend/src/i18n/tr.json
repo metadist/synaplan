@@ -911,11 +911,29 @@
     "infoCost": "Maliyet"
   },
   "chatError": {
-    "title": "Yanıt alınamadı",
+    "title": "Yanıt tamamlanamadı",
     "retry": "Başka bir modelle tekrar dene",
     "retryWith": "{model} ile tekrar dene",
+    "retrySame": "Tekrar dene",
+    "retrySameHint": "Şu anda başka model yok. Aynı modelle bir kez daha deneyebilirsin.",
+    "noRetry": "Başka bir model denemek işe yaramaz. Biraz bekle veya bu devam ederse destekle iletişime geç.",
     "chooseModel": "Başka bir model seç",
-    "showDetails": "Teknik ayrıntıları göster"
+    "showDetails": "Teknik ayrıntıları göster",
+    "partialDraft": "Yukarıdaki metin bitmemiş bir taslak. Eksik olabilir ve kaydedilmemiş olabilir.",
+    "reason": {
+      "schema_mismatch": "Yapay zeka modeli bu isteği beklenen biçimde tamamlayamadı. Lütfen başka bir modelle dene.",
+      "context_length_exceeded": "Bu istek seçilen model için çok uzun. Lütfen kısalt veya daha geniş bağlamı olan bir model dene.",
+      "request_too_large": "Bu istek seçilen model için çok büyük. Lütfen kısalt veya başka bir model dene.",
+      "rate_limited": "Seçilen model şu anda meşgul. Lütfen biraz bekle veya başka bir model dene.",
+      "quota_exceeded": "Seçilen yapay zeka hizmetinin kredisi kalmadı. Lütfen daha sonra dene veya destekle iletişime geç.",
+      "auth_failed": "Seçilen yapay zeka hizmeti şu anda doğru ayarlı değil. Lütfen daha sonra dene veya destekle iletişime geç.",
+      "model_unavailable": "Seçilen model şu anda kullanılamıyor. Lütfen başka bir model dene.",
+      "content_filtered": "Yapay zeka hizmeti bu isteği reddetti. Lütfen yeniden ifade et veya başka bir model dene.",
+      "timeout": "Seçilen model yanıt vermek için çok uzun sürdü. Lütfen tekrar dene veya başka bir modele geç.",
+      "upstream_unavailable": "Seçilen yapay zeka hizmeti geçici olarak kullanılamıyor. Lütfen tekrar dene veya başka bir modele geç.",
+      "unknown": "Yanıtlanırken bir sorun oluştu. Kalıcı bir yanıt kaydedilmedi.",
+      "empty_answer": "Adım bitmiş görünüyor ama yanıt bu sohbete kaydedilmedi. Burada saklayabileceğin bir şey gelmedi."
+    }
   },
   "commands": {
     "noResults": "Komut bulunamadı",

@@ -911,11 +911,29 @@
     "infoCost": "Coste"
   },
   "chatError": {
-    "title": "La respuesta falló",
+    "title": "La respuesta no se completó",
     "retry": "Intentarlo de nuevo con otro modelo",
     "retryWith": "Intentarlo de nuevo con {model}",
+    "retrySame": "Intentarlo de nuevo",
+    "retrySameHint": "Ahora mismo no hay otro modelo disponible. Puedes probar otra vez con el mismo.",
+    "noRetry": "Cambiar de modelo no ayudará. Espera un momento o contacta con soporte si sigue ocurriendo.",
     "chooseModel": "Elegir otro modelo",
-    "showDetails": "Mostrar detalles técnicos"
+    "showDetails": "Mostrar detalles técnicos",
+    "partialDraft": "El texto de arriba es un borrador inacabado. Puede estar incompleto y puede que no se haya guardado.",
+    "reason": {
+      "schema_mismatch": "El modelo de IA no pudo completar esta solicitud en el formato esperado. Prueba con otro modelo.",
+      "context_length_exceeded": "Esta solicitud es demasiado larga para el modelo seleccionado. Acórtala o prueba un modelo con más contexto.",
+      "request_too_large": "Esta solicitud es demasiado grande para el modelo seleccionado. Acórtala o prueba otro modelo.",
+      "rate_limited": "El modelo seleccionado está ocupado ahora mismo. Espera un momento o prueba otro modelo.",
+      "quota_exceeded": "El servicio de IA seleccionado no tiene crédito restante. Inténtalo más tarde o contacta con soporte.",
+      "auth_failed": "El servicio de IA seleccionado no está configurado correctamente ahora mismo. Inténtalo más tarde o contacta con soporte.",
+      "model_unavailable": "El modelo seleccionado no está disponible ahora mismo. Prueba otro modelo.",
+      "content_filtered": "El servicio de IA rechazó esta solicitud. Reformúlala o prueba otro modelo.",
+      "timeout": "El modelo seleccionado tardó demasiado en responder. Inténtalo de nuevo o cambia de modelo.",
+      "upstream_unavailable": "El servicio de IA seleccionado no está disponible temporalmente. Inténtalo de nuevo o cambia de modelo.",
+      "unknown": "Algo salió mal al responder. No se guardó una respuesta final.",
+      "empty_answer": "El paso parece terminado, pero la respuesta no se guardó en este chat. Aquí no llegó nada que puedas conservar."
+    }
   },
   "commands": {
     "noResults": "No se encontraron comandos",

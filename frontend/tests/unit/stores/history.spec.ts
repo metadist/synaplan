@@ -580,6 +580,44 @@ describe('History Store', () => {
     }
   })
 
+  it('stops waiting when a finished plan never saved a reply and no run is live', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+
+    const getChatMessages = vi.fn().mockResolvedValue({
+      success: true,
+      messages: [{ id: 1, direction: 'IN', text: 'Research that', timestamp: 1700000000 }],
+      pagination: { hasMore: false },
+      inProgressTurn: {
+        reply_node: 'n1',
+        cards: [{ nodeId: 'n1', capability: 'chat', kind: 'text', state: 'done' }],
+      },
+    })
+
+    vi.doMock('@/services/api', () => ({
+      chatApi: { getChatMessages },
+    }))
+
+    try {
+      const { useHistoryStore: useStore } = await import('@/stores/history')
+      const store = useStore()
+
+      await store.loadMessages(42)
+
+      const bubble = store.messages.at(-1)
+      expect(bubble?.id).toBe('in-progress-turn')
+      expect(bubble?.isStreaming).toBe(false)
+      expect(bubble?.errorReason).toBe('empty_answer')
+      expect(bubble?.canRetryModel).toBe(true)
+      expect(bubble?.taskPlan?.active).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(4000)
+      expect(getChatMessages).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('preserves all loaded pages when polling an in-progress turn', async () => {
     vi.useFakeTimers()
     vi.resetModules()

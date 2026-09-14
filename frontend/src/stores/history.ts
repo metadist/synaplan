@@ -9,6 +9,7 @@ import {
   parseContentWithThinking,
   reconcileLocalMessage,
 } from '@/utils/messageMapper'
+import { finalizeSettledInProgressTurn } from '@/utils/chatErrorDisplay'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
 import { isSessionTerminating } from '@/services/sessionTeardown'
@@ -146,6 +147,8 @@ export interface Message {
   // Status for failed/pending messages
   status?: 'sent' | 'failed' | 'rate_limited'
   errorReason?: string | null
+  /** Localized, non-leaky sentence from the SSE error payload. */
+  errorMessage?: string | null
   canRetryModel?: boolean
   errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -678,8 +681,17 @@ export const useHistoryStore = defineStore('history', () => {
         // multi-task turn (only sent on the first page) so returning mid-stream
         // shows the running/completed task cards, not just the user prompt.
         if (offset === 0 && response.inProgressTurn) {
-          loadedMessages.push(mapInProgressTurn(response.inProgressTurn))
-          scheduleInProgressPoll(chatId)
+          const mapped = mapInProgressTurn(response.inProgressTurn)
+          const { message: inProgress, stalled } = finalizeSettledInProgressTurn(
+            mapped,
+            response.activeRun != null
+          )
+          loadedMessages.push(inProgress)
+          if (stalled) {
+            stopInProgressPolling()
+          } else {
+            scheduleInProgressPoll(chatId)
+          }
         } else if (offset === 0 && inProgressPollChatId === chatId) {
           stopInProgressPolling()
         }
