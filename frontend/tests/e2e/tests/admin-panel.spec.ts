@@ -55,7 +55,10 @@ test.describe('@ci Admin panel', () => {
     expect(admin, `Admin ${adminCreds.user} must exist in the admin user list`).toBeTruthy()
     const adminId = admin!.id
 
-    await page.locator(selectors.admin.tabUsers).click()
+    await page.goto('/admin/people')
+    await expect(page.locator(selectors.pages.people)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
     await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
@@ -93,7 +96,7 @@ test.describe('@ci Admin panel', () => {
     })
   })
 
-  test('People route follows the IAM groups flag', async ({ page, request }) => {
+  test('People is the only users home; Groups stay flag-gated', async ({ page, request }) => {
     const adminCookie = await loginViaApi(request, CREDENTIALS.getAdminCredentials())
     const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`, {
       headers: { Cookie: adminCookie },
@@ -103,27 +106,23 @@ test.describe('@ci Admin panel', () => {
     const iamGroups = runtime.features?.iamGroups === true
 
     await page.goto('/admin/people')
+    await expect(page.locator(selectors.pages.people)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
+    await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
     if (iamGroups) {
-      await expect(page.locator(selectors.pages.people)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
       await expect(page.locator('[data-testid="tab-groups"]')).toBeVisible()
-      await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
-      await expect(page.locator(selectors.people.backToOperate)).toBeVisible()
-      await page.locator(selectors.people.backToOperate).click()
-      await expect(page.locator(selectors.pages.admin)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
     } else {
-      // No groups, policies or audit to show: the old URL lands on the Operate
-      // user list instead of a 404.
-      await expect(page.locator(selectors.pages.admin)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
-      await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
-      await expect(page.locator('[data-testid="page-not-found"]')).toHaveCount(0)
-      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
+      await expect(page.locator('[data-testid="tab-users"]')).toHaveCount(0)
+      await expect(page.locator('[data-testid="tab-groups"]')).toHaveCount(0)
     }
+    await expect(page.locator(selectors.people.backToOperate)).toBeVisible()
+    await page.locator(selectors.people.backToOperate).click()
+    await expect(page.locator(selectors.pages.admin)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.admin.tabUsers)).toHaveCount(0)
 
     await page.goto('/groups')
     if (iamGroups) {
@@ -139,17 +138,11 @@ test.describe('@ci Admin panel', () => {
     }
 
     await page.goto('/admin?tab=users')
-    if (iamGroups) {
-      await expect(page.locator(selectors.pages.people)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
-      await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
-    } else {
-      await expect(page.locator(selectors.pages.admin)).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
-      await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
-      await expect(page.locator(selectors.pages.people)).toHaveCount(0)
-    }
+    await expect(page).toHaveURL(/\/admin\/people/)
+    await expect(page.locator(selectors.pages.people)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
+    await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
   })
 })

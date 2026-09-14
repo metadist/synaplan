@@ -2,15 +2,11 @@ import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 
 /**
- * Flag off: People has no groups, policies or audit to show, so the route
- * lands on the Operate user list instead of a dead end. The Operate nav entry
- * points there directly.
+ * People is always the user list (NV01). Groups / Policies / Audit stay
+ * flag-gated on the page itself; the route is never a dead end.
  */
 export function peopleRouteGuard(): true | RouteLocationRaw {
-  if (isIamGroupsEnabled()) {
-    return true
-  }
-  return { name: 'admin', query: { tab: 'users' } }
+  return true
 }
 
 /**
@@ -32,11 +28,11 @@ export function groupsRouteGuard(to?: RouteLocationNormalized): true | RouteLoca
 }
 
 /**
- * Legacy `/admin?tab=users` only becomes a People landing when IAM groups
- * are on. Otherwise AdminView keeps its own Users table.
+ * Legacy `/admin?tab=users` always lands on People — the Operate Users tab
+ * is gone (NV01).
  */
 export function adminUsersTabRedirect(to: RouteLocationNormalized): true | RouteLocationRaw {
-  if (to.query.tab === 'users' && isIamGroupsEnabled()) {
+  if (to.query.tab === 'users') {
     return { name: 'admin-people' }
   }
   return true
