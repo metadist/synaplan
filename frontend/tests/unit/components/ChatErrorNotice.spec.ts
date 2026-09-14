@@ -180,7 +180,7 @@ describe('ChatErrorNotice', () => {
   it('hides retry when another model would not help', () => {
     const wrapper = mountNotice({
       errorReason: 'auth_failed',
-      canRetryModel: false,
+      canRetryModel: true,
       errorDebug: 'API key missing',
     })
 

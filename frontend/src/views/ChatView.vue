@@ -593,7 +593,10 @@ import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
-import { shouldFinishWithoutErrorOnTransportDrop } from '@/utils/chatErrorDisplay'
+import {
+  chatErrorSuggestsOtherModel,
+  shouldFinishWithoutErrorOnTransportDrop,
+} from '@/utils/chatErrorDisplay'
 import { httpClient } from '@/services/api/httpClient'
 import { pluginCommands } from '@/stores/commands'
 import { i18n } from '@/i18n'
@@ -4167,7 +4170,8 @@ const streamAIResponse = async (
               }
               if (typeof data.errorReason === 'string' && data.errorReason !== '') {
                 message.errorReason = data.errorReason
-                message.canRetryModel = data.canRetryModel !== false
+                message.canRetryModel =
+                  data.canRetryModel !== false && chatErrorSuggestsOtherModel(data.errorReason)
                 message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
                 if (typeof data.error === 'string' && data.error.trim() !== '') {
                   message.errorMessage = data.error
@@ -4434,9 +4438,17 @@ const streamAIResponse = async (
                 typeof data.errorReason === 'string' && data.errorReason !== ''
                   ? data.errorReason
                   : 'unknown'
-              message.canRetryModel = data.canRetryModel !== false
+              message.canRetryModel =
+                data.canRetryModel !== false && chatErrorSuggestsOtherModel(message.errorReason)
               message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
-              if (typeof data.error === 'string' && data.error.trim() !== '') {
+              // Only the backend-classified sentence is user-safe. Transport
+              // strings ("Connection failed (HTTP 500)") stay off the notice.
+              if (
+                typeof data.errorReason === 'string' &&
+                data.errorReason !== '' &&
+                typeof data.error === 'string' &&
+                data.error.trim() !== ''
+              ) {
                 message.errorMessage = data.error
               }
             }

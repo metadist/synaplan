@@ -1006,8 +1006,9 @@ import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
 const previewFile = ref<{ id: number; filename: string } | null>(null)
@@ -1687,13 +1688,14 @@ const hasPartialAnswer = computed(() => {
   if (!hasAnswerContent.value) {
     return false
   }
-  const body = copyableText.value
+  const body = copyableText.value.trim()
   const explanation = (props.errorMessage ?? '').trim()
   if (explanation !== '' && body === explanation) {
     return false
   }
-  // Reloaded ERROR row: the persisted body is the catalog sentence, not a draft.
-  if (props.topic === 'ERROR' && explanation === '') {
+  const catalogKey = chatErrorReasonKey(props.errorReason)
+  const catalog = te(catalogKey) ? t(catalogKey) : ''
+  if (catalog !== '' && body === catalog) {
     return false
   }
   return true

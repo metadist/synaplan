@@ -120,11 +120,16 @@ describe('chatErrorDisplay', () => {
     )
   })
 
-  it('lifts card draft text onto the bubble when the reply was never saved', () => {
-    const done = plan([textCard('done', 'Draft answer from the step.')])
+  it('lifts only the reply-node card and still offers recovery', () => {
+    const done = plan([
+      { ...textCard('done', 'Intermediate summary.'), nodeId: 'n0' },
+      { ...textCard('done', 'Draft answer from the step.'), nodeId: 'n1' },
+    ])
+    done.replyNode = 'n1'
     const result = finalizeSettledInProgressTurn(messageFromPlan(done), false)
     expect(result.stalled).toBe(true)
     expect(result.message.parts[0].content).toBe('Draft answer from the step.')
-    expect(result.message.errorReason).toBeUndefined()
+    expect(result.message.errorReason).toBe('empty_answer')
+    expect(result.message.canRetryModel).toBe(true)
   })
 })

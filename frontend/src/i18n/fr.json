@@ -900,7 +900,7 @@
       "timeout": "Le modèle sélectionné a mis trop de temps à répondre. Réessaie ou change de modèle.",
       "upstream_unavailable": "Le service d’IA sélectionné est temporairement indisponible. Réessaie ou change de modèle.",
       "unknown": "Un problème est survenu pendant la réponse. Aucune réponse définitive n’a été enregistrée.",
-      "empty_answer": "L’étape a l’air terminée, mais la réponse n’a pas été enregistrée dans cette conversation. Rien n’est arrivé ici que tu puisses garder."
+      "empty_answer": "L’étape a l’air terminée, mais la réponse n’a pas été enregistrée dans cette conversation."
     }
   },
   "commands": {

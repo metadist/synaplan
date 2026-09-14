@@ -69,10 +69,15 @@ export function taskPlanHasVisibleOutput(plan: TaskPlanState | null | undefined)
 }
 
 function collectTaskPlanDraftText(plan: TaskPlanState): string {
-  return plan.cards
+  const reply = plan.cards.find((card) => card.nodeId === plan.replyNode)
+  const fromReply = typeof reply?.text === 'string' ? reply.text.trim() : ''
+  if (fromReply !== '') {
+    return fromReply
+  }
+  const fallback = plan.cards
     .map((card) => (typeof card.text === 'string' ? card.text.trim() : ''))
-    .filter((text) => text !== '')
-    .join('\n\n')
+    .find((text) => text !== '')
+  return fallback ?? ''
 }
 
 export function partsHaveRenderableContent(parts: Message['parts']): boolean {
@@ -116,7 +121,6 @@ export function finalizeSettledInProgressTurn(
 
   const plan = message.taskPlan
   const draft = collectTaskPlanDraftText(plan)
-  const hasOutput = taskPlanHasVisibleOutput(plan)
   const parts =
     draft !== '' && !partsHaveRenderableContent(message.parts)
       ? [{ type: 'text' as const, content: draft }]
@@ -127,11 +131,8 @@ export function finalizeSettledInProgressTurn(
     parts,
     isStreaming: false,
     taskPlan: { ...plan, active: false },
-  }
-
-  if (!hasOutput) {
-    next.errorReason = next.errorReason ?? 'empty_answer'
-    next.canRetryModel = true
+    errorReason: message.errorReason ?? 'empty_answer',
+    canRetryModel: true,
   }
 
   return { message: next, stalled: true }

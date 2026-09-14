@@ -36,13 +36,10 @@ const detailsOpen = ref(false)
 
 const suggestsOtherModel = computed(() => chatErrorSuggestsOtherModel(props.errorReason))
 const showRetry = computed(() => {
-  if (props.canRetryModel === false) {
+  if (!suggestsOtherModel.value) {
     return false
   }
-  if (props.canRetryModel === true) {
-    return true
-  }
-  return suggestsOtherModel.value
+  return props.canRetryModel !== false
 })
 const canSeeDebug = computed(() => authStore.isAdmin && !!props.errorDebug)
 

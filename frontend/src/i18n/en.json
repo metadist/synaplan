@@ -900,7 +900,7 @@
       "timeout": "The selected model took too long to answer. Try again, or switch to a different model.",
       "upstream_unavailable": "The selected AI service is temporarily unavailable. Try again, or switch to a different model.",
       "unknown": "Something went wrong while answering. Nothing new was saved as the final reply.",
-      "empty_answer": "The step looks finished, but the reply was never saved in this chat. Nothing arrived here that you can keep."
+      "empty_answer": "The step looks finished, but the reply was never saved in this chat."
     }
   },
   "commands": {
