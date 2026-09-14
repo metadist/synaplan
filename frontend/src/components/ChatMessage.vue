@@ -41,9 +41,10 @@
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
-        <!-- E2E: visible when streaming finished so tests can wait for message-done -->
+        <!-- E2E: success terminal. Hidden on error so waitForAnswer races
+             exactly one of message-done | chat-error-notice (U8). -->
         <span
-          v-if="role === 'assistant' && !isStreaming"
+          v-if="role === 'assistant' && !isStreaming && !errorReason"
           data-testid="message-done"
           class="sr-only"
           aria-hidden="true"
@@ -92,7 +93,13 @@
           that anything is happening.
         -->
         <div
-          v-if="isStreaming && !processingStatus && role === 'assistant' && !hasAnswerContent"
+          v-if="
+            isStreaming &&
+            !processingStatus &&
+            role === 'assistant' &&
+            !hasAnswerContent &&
+            !errorReason
+          "
           class="px-4 pt-3 pb-3 processing-enter"
           data-testid="loading-initial-indicator"
           role="status"
@@ -346,7 +353,7 @@
           </div>
 
           <MessagePart
-            v-for="(part, index) in contentParts"
+            v-for="(part, index) in visibleContentParts"
             :key="part.partId ?? `${part.type}-${index}`"
             :part="part"
             :is-streaming="isStreaming"
@@ -357,11 +364,14 @@
           <ChatErrorNotice
             v-if="role === 'assistant' && errorReason"
             class="m-3"
+            :error-reason="errorReason"
+            :error-message="errorMessage"
+            :has-partial-answer="hasPartialAnswer"
             :can-retry-model="canRetryModel"
             :error-debug="errorDebug"
             :recommended-model-id="selectedModel?.id ?? null"
-            :failed-model-id="aiModels?.chat?.model_id ?? null"
-            :model-options="modelOptions"
+            :failed-model-id="failedModelId"
+            :model-options="errorRetryOptions"
             @retry="handleErrorRetry"
           />
 
@@ -996,8 +1006,9 @@ import { chatBadgeIcon } from '@/utils/chatModelBadge'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { isPurchaseAllowed } from '@/services/api/nativeServer'
+import { chatErrorReasonKey } from '@/utils/chatErrorDisplay'
 
-const { t, locale } = useI18n()
+const { t, te, locale } = useI18n()
 const guestStore = useGuestStore()
 const guestSessionId = computed(() => guestStore.sessionId)
 const previewFile = ref<{ id: number; filename: string } | null>(null)
@@ -1155,6 +1166,7 @@ interface Props {
   scheduleSource?: string
   status?: 'sent' | 'failed' | 'rate_limited'
   errorReason?: string | null
+  errorMessage?: string | null
   canRetryModel?: boolean
   errorDebug?: string | null
   errorType?: 'rate_limit' | 'connection' | 'unknown'
@@ -1652,7 +1664,7 @@ const againDataComputed = computed(() => {
 const filesComputed = computed(() => props.files)
 const currentProviderComputed = computed(() => props.aiModels?.chat?.provider ?? props.provider)
 const currentModelNameComputed = computed(() => props.aiModels?.chat?.model ?? props.modelLabel)
-const { modelOptions, predictedModel, hasModels } = useModelSelection(
+const { modelOptions, predictedModel, hasModels, currentModelId } = useModelSelection(
   againDataComputed,
   filesComputed,
   currentProviderComputed,
@@ -1662,6 +1674,39 @@ const { modelOptions, predictedModel, hasModels } = useModelSelection(
 
 // Selected model: use predicted or first available
 const selectedModel = computed(() => predictedModel.value)
+
+const failedModelId = computed(() => currentModelId.value ?? props.aiModels?.chat?.model_id ?? null)
+
+const errorRetryOptions = computed(() =>
+  modelOptions.value.map((option) => ({
+    id: option.id,
+    label: option.label || option.model,
+  }))
+)
+
+const hasPartialAnswer = computed(() => {
+  if (!hasAnswerContent.value) {
+    return false
+  }
+  const body = copyableText.value.trim()
+  const explanation = (props.errorMessage ?? '').trim()
+  if (explanation !== '' && body === explanation) {
+    return false
+  }
+  const catalogKey = chatErrorReasonKey(props.errorReason)
+  const catalog = te(catalogKey) ? t(catalogKey) : ''
+  if (catalog !== '' && body === catalog) {
+    return false
+  }
+  return true
+})
+
+const visibleContentParts = computed(() => {
+  if (!props.errorReason || hasPartialAnswer.value) {
+    return contentParts.value
+  }
+  return contentParts.value.filter((part) => part.type !== 'text')
+})
 
 const aiConfigStoreForCost = useAiConfigStore()
 const peerModelsForCost = computed((): AIModel[] => {
@@ -1758,9 +1803,7 @@ const handleSimpleAgain = () => {
 }
 
 const handleErrorRetry = (modelId?: number) => {
-  if (props.backendMessageId) {
-    emit('again', props.backendMessageId, modelId ?? selectedModel.value?.id)
-  }
+  emit('again', props.backendMessageId ?? 0, modelId)
 }
 
 const selectModel = (model: ModelOption) => {

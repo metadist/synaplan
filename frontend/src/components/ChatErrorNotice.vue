@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
+import { chatErrorReasonKey, chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 
 interface RetryModelOption {
   id: number
@@ -10,11 +11,14 @@ interface RetryModelOption {
 }
 
 /**
- * Control strip below a failed assistant turn. The explanation itself is the
- * message body the backend localized and persisted (`ai_errors` catalog) — this
- * component only frames it and offers the retry, so the sentence exists once.
+ * Control strip below a failed assistant turn. Shows a user-safe reason
+ * (never provider internals) and a recovery that prefers a *different* model
+ * than the one that just failed.
  */
 const props = defineProps<{
+  errorReason?: string | null
+  errorMessage?: string | null
+  hasPartialAnswer?: boolean
   canRetryModel?: boolean
   errorDebug?: string | null
   recommendedModelId?: number | null
@@ -26,17 +30,37 @@ const emit = defineEmits<{
   retry: [modelId?: number]
 }>()
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const authStore = useAuthStore()
 const detailsOpen = ref(false)
 
-const showRetry = computed(() => props.canRetryModel !== false)
+const suggestsOtherModel = computed(() => chatErrorSuggestsOtherModel(props.errorReason))
+const showRetry = computed(() => {
+  if (!suggestsOtherModel.value) {
+    return false
+  }
+  return props.canRetryModel !== false
+})
 const canSeeDebug = computed(() => authStore.isAdmin && !!props.errorDebug)
 
+const explanation = computed(() => {
+  const streamed = props.errorMessage?.trim() ?? ''
+  if (streamed !== '') {
+    return streamed
+  }
+  const key = chatErrorReasonKey(props.errorReason)
+  return te(key) ? t(key) : t('chatError.reason.unknown')
+})
+
+const showPartialDraft = computed(() => props.hasPartialAnswer === true)
+
 // Retrying on the model that just failed reproduces the same error, so it is
-// never offered.
+// never the default pick. It is only offered when no other model exists.
 const retryOptions = computed(() =>
   (props.modelOptions ?? []).filter((option) => option.id !== props.failedModelId)
+)
+const onlySameModel = computed(
+  () => showRetry.value && retryOptions.value.length === 0 && (props.modelOptions ?? []).length > 0
 )
 const showModelPicker = computed(() => showRetry.value && retryOptions.value.length > 1)
 
@@ -45,7 +69,13 @@ const defaultRetryId = computed(() => {
   if (recommended !== null && recommended !== props.failedModelId) {
     return recommended
   }
-  return retryOptions.value[0]?.id
+  if (retryOptions.value[0]) {
+    return retryOptions.value[0].id
+  }
+  if (onlySameModel.value) {
+    return props.failedModelId ?? props.modelOptions?.[0]?.id
+  }
+  return undefined
 })
 
 const pickedModelId = ref<number | undefined>(defaultRetryId.value)
@@ -53,12 +83,27 @@ watch(defaultRetryId, (id) => {
   pickedModelId.value = id
 })
 
-const pickedLabel = computed(
-  () => retryOptions.value.find((option) => option.id === pickedModelId.value)?.label ?? null
-)
-const retryLabel = computed(() =>
-  pickedLabel.value ? t('chatError.retryWith', { model: pickedLabel.value }) : t('chatError.retry')
-)
+const pickedLabel = computed(() => {
+  const fromOthers = retryOptions.value.find((option) => option.id === pickedModelId.value)
+  if (fromOthers) {
+    return fromOthers.label
+  }
+  if (onlySameModel.value) {
+    return (
+      (props.modelOptions ?? []).find((option) => option.id === pickedModelId.value)?.label ?? null
+    )
+  }
+  return null
+})
+
+const retryLabel = computed(() => {
+  if (onlySameModel.value) {
+    return t('chatError.retrySame')
+  }
+  return pickedLabel.value
+    ? t('chatError.retryWith', { model: pickedLabel.value })
+    : t('chatError.retry')
+})
 
 const retry = () => {
   emit('retry', pickedModelId.value)
@@ -67,18 +112,32 @@ const retry = () => {
 
 <template>
   <div class="alert-error space-y-3" data-testid="chat-error-notice">
-    <div class="flex items-center gap-2">
-      <Icon icon="mdi:alert-circle-outline" class="w-5 h-5 alert-error-text flex-shrink-0" />
-      <h3 class="text-sm font-semibold alert-error-text" data-testid="chat-error-title">
-        {{ t('chatError.title') }}
-      </h3>
+    <div class="flex items-start gap-2">
+      <Icon icon="mdi:alert-circle-outline" class="w-5 h-5 alert-error-text flex-shrink-0 mt-0.5" />
+      <div class="space-y-2 min-w-0">
+        <h3 class="text-sm font-semibold alert-error-text" data-testid="chat-error-title">
+          {{ t('chatError.title') }}
+        </h3>
+        <p class="text-sm txt-primary" data-testid="chat-error-body">
+          {{ explanation }}
+        </p>
+        <p v-if="showPartialDraft" class="text-sm txt-secondary" data-testid="chat-error-partial">
+          {{ t('chatError.partialDraft') }}
+        </p>
+        <p v-if="onlySameModel" class="text-sm txt-secondary" data-testid="chat-error-same-model">
+          {{ t('chatError.retrySameHint') }}
+        </p>
+        <p v-else-if="!showRetry" class="text-sm txt-secondary" data-testid="chat-error-no-retry">
+          {{ t('chatError.noRetry') }}
+        </p>
+      </div>
     </div>
 
     <div v-if="showRetry" class="flex flex-wrap items-center gap-2">
       <select
         v-if="showModelPicker"
         v-model="pickedModelId"
-        class="pill text-xs max-w-xs cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+        class="px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm max-w-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :aria-label="t('chatError.chooseModel')"
         data-testid="chat-error-model-select"
       >
@@ -88,7 +147,7 @@ const retry = () => {
       </select>
       <button
         type="button"
-        class="pill text-xs font-medium"
+        class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center gap-2"
         data-testid="btn-chat-error-retry"
         @click="retry"
       >
