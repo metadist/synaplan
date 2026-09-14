@@ -271,7 +271,7 @@
                         data-testid="dot-mobile-more-incoming-new"
                       />
                     </span>
-                    <span class="flex-1 truncate">{{
+                    <span class="flex-1 truncate text-left">{{
                       incomingStore.hasNew ? $t('iam.incoming.menuNew') : $t('iam.incoming.menu')
                     }}</span>
                     <span
