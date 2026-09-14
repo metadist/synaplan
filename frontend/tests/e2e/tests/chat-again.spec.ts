@@ -43,9 +43,7 @@ test.describe('@ci @smoke Chat Again', () => {
         await expect(againBtn).toBeEnabled({ timeout: TIMEOUTS.SHORT })
         await againBtn.click()
 
-        const dropdown = bubble.locator(selectors.chat.againDropdownPanel)
-        await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-        await dropdown.locator(selectors.chat.againDropdownItem).first().click()
+        await chat.pickCiAgainOption(bubble)
       }
     )
 
@@ -75,22 +73,7 @@ test.describe('@ci @smoke Chat Again', () => {
         await toggle.click()
 
         const dropdown = bubble.locator(selectors.chat.againDropdownPanel)
-        await dropdown.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
-
-        const options = dropdown.locator(selectors.chat.againDropdownItem)
-        const optionCount = await options.count()
-        expect(optionCount).toBeGreaterThan(0)
-
-        let clicked = false
-        for (let i = 0; i < optionCount; i++) {
-          const opt = options.nth(i)
-          if ((await opt.isVisible()) && (await opt.isEnabled())) {
-            await opt.click()
-            clicked = true
-            break
-          }
-        }
-        expect(clicked, 'At least one dropdown option should be visible and enabled').toBe(true)
+        await chat.pickCiAgainOption(bubble)
 
         // 'hidden' also resolves when the panel left the DOM; a timeout means
         // the dropdown is stuck open after selection — a real bug, so fail.

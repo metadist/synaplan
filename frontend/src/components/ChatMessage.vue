@@ -41,9 +41,10 @@
         ]"
         :data-testid="role === 'user' ? 'user-message-bubble' : 'assistant-message-bubble'"
       >
-        <!-- E2E: visible when streaming finished so tests can wait for message-done -->
+        <!-- E2E: success terminal. Hidden on error so waitForAnswer races
+             exactly one of message-done | chat-error-notice (U8). -->
         <span
-          v-if="role === 'assistant' && !isStreaming"
+          v-if="role === 'assistant' && !isStreaming && !errorReason"
           data-testid="message-done"
           class="sr-only"
           aria-hidden="true"
