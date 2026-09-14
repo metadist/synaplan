@@ -13,7 +13,7 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | A3 Freeze | `feat/wave5-compute-b2` (#1860) | implemented | Protocol 1 fixtures vendored + checksums; compose profile `compute`. `COMPUTE_TOKEN` interpolates empty so `docker compose` works without the profile. |
 | B1 Client & capability | same | implemented | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. |
 | B2 Tools & policy | same | implemented | `code_execution` is offered only with `compute:run`. Write-class / unattended default `approve`. |
-| B3 Workspaces & egress | — | planned | Wave 5. |
+| B3 Workspaces & egress | `feat/wave5-compute-b3` | in progress | CS18–CS25. Flags `COMPUTE.WORKSPACES_ENABLED` and `COMPUTE.EGRESS_ENABLED` default off. |
 | B4 Hardening & GA | — | planned | Wave 5. |
 
 ## Decisions
@@ -31,6 +31,7 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-13 | Research [`01_compute_vs_headless_desktop.md`](../20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md) §7: rows 1–4 and 6 settled (Desktop ≠ runtime; compute-node vocabulary; B1–B4 stay Wave 5; headless Desktop is a Desktop backlog item, not compute; doc stays in this repo). Row 5 (Wave 5 marketing name) stays open. |
 | 2026-09-13 | **Compose (CP30):** opt-in `compute` profile builds `sidecars/synaplan-compute` and mounts `docker.sock` **only** on that service. Backend/worker `COMPUTE_URL`/`COMPUTE_TOKEN` stay empty unless the operator sets them. |
 | 2026-09-14 | Review follow-up on #1860: unique artefact names, refuse oversized tool input, grant `compute:run` with `desktop:messages`/`desktop:files` (no `*`), enforce concurrent/CPU quotas, cancel the sidecar on PHP wait timeout, unique multipart names, fail missing inputs, document docker GID + runtime-image preload. Workspace MB stays B3. |
+| 2026-09-14 | B1/B2 merged as #1860. B3 starts on `feat/wave5-compute-b3` (workspaces + egress, both default off). |
 
 ## Review log
 

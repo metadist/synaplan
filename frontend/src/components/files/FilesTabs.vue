@@ -23,8 +23,9 @@ import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import filesService from '@/services/filesService'
 import { useAuthStore } from '@/stores/auth'
+import { getConfigSync } from '@/services/api/httpClient'
 
-type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated'
+type FilesTab = 'files' | 'search' | 'vectors' | 'incoming' | 'generated' | 'workspace'
 
 defineProps<{
   active: FilesTab
@@ -38,6 +39,7 @@ const pathById: Record<FilesTab, string> = {
   files: '/files',
   incoming: '/files/incoming',
   generated: '/files/generated',
+  workspace: '/files/workspace',
   search: '/files/search',
   vectors: '/files/vectors',
 }
@@ -69,6 +71,17 @@ const tabNavItems = computed<TabNavItem[]>(() => [
     testid: 'tab-files-generated',
     to: pathById.generated,
   },
+  ...(getConfigSync().features?.computeWorkspacesEnabled === true
+    ? [
+        {
+          id: 'workspace',
+          label: t('files.tabWorkspace'),
+          icon: 'heroicons:folder-plus',
+          testid: 'tab-files-workspace',
+          to: pathById.workspace,
+        } satisfies TabNavItem,
+      ]
+    : []),
   {
     id: 'search',
     label: t('files.tabSearch'),

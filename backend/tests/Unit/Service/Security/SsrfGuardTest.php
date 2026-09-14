@@ -79,4 +79,11 @@ final class SsrfGuardTest extends TestCase
         self::assertFalse($this->guard->isBlockedIp('93.184.216.34'));
         self::assertFalse($this->guard->isBlockedIp('2606:4700:4700::1111'));
     }
+
+    public function testPinnedIpsReturnsPublicLiteralAndDropsPrivate(): void
+    {
+        self::assertSame(['8.8.8.8'], $this->guard->pinnedIps('8.8.8.8'));
+        self::assertSame([], $this->guard->pinnedIps('10.1.2.3'));
+        self::assertSame([], $this->guard->pinnedIps('localhost'));
+    }
 }

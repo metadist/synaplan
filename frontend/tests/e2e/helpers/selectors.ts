@@ -304,10 +304,12 @@ export const selectors = {
     tabSearch: '[data-testid="tab-files-search"]',
     tabIncoming: '[data-testid="tab-files-incoming"]',
     tabGenerated: '[data-testid="tab-files-generated"]',
+    tabWorkspace: '[data-testid="tab-files-workspace"]',
     tabVectors: '[data-testid="tab-files-vectors"]',
     /** Sub-view page roots reached via the Files tabs */
     pageIncoming: '[data-testid="page-files-incoming"]',
     pageGenerated: '[data-testid="page-files-generated"]',
+    pageWorkspace: '[data-testid="page-files-workspace"]',
     pageVectors: '[data-testid="page-vector-storage"]',
   },
   fileSelection: {

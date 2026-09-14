@@ -155,7 +155,8 @@
     "setup": "Einrichtung",
     "assistants": "Assistenten",
     "assistantBuilder": "Assistent",
-    "approvals": "Freigaben"
+    "approvals": "Freigaben",
+    "filesWorkspace": "Arbeitsbereich"
   },
   "adminModelStatus": {
     "title": "Modell-Status",
@@ -1474,6 +1475,7 @@
     "rerunHelp": "Die KI versucht es mit Ihren Anmerkungen erneut",
     "details": "Details",
     "preview": "Vorschau",
+    "openWorkspace": "Arbeitsbereich öffnen",
     "elapsed": "{seconds}s"
   },
   "processing": {
@@ -3543,6 +3545,25 @@
     "tabBrowse": "Durchsuchen",
     "tabIncoming": "Eingang",
     "tabGenerated": "Erzeugt",
+    "tabWorkspace": "Arbeitsbereich",
+    "workspace": {
+      "title": "Arbeitsbereich",
+      "subtitle": "Dateien, die die KI bei der Dateiarbeit für Sie angelegt hat. Sie bleiben zwischen den Läufen hier.",
+      "empty": "Dateien, die die KI für Sie anlegt, erscheinen hier.",
+      "emptyAction": "Zurück zum Chat",
+      "usage": "{used} MB von {quota} MB belegt",
+      "delete": "Arbeitsbereich löschen",
+      "deleteConfirm": "Diesen Arbeitsbereich löschen? Die KI startet beim nächsten Mal mit einem leeren Ordner.",
+      "deleteDone": "Arbeitsbereich gelöscht. Die KI startet beim nächsten Mal mit einem leeren Ordner.",
+      "deleteError": "Der Arbeitsbereich konnte nicht gelöscht werden. Es wurde nichts entfernt.",
+      "loadError": "Der Arbeitsbereich konnte nicht geladen werden.",
+      "download": "Herunterladen",
+      "downloadError": "Die Datei konnte nicht heruntergeladen werden.",
+      "preview": "Vorschau",
+      "previewError": "Die Datei konnte nicht geöffnet werden.",
+      "previewUnavailable": "Diese Datei lässt sich hier nicht anzeigen. Laden Sie sie herunter, um sie zu öffnen.",
+      "closePreview": "Schließen"
+    },
     "incomingBadge": "{count} neu",
     "sourceLabel": {
       "web_upload": "Upload",

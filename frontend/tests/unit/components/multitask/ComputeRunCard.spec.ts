@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
 import type { TaskCard } from '@/stores/history'
 import en from '@/i18n/en.json'
+
+const runtimeFeatures = { computeWorkspacesEnabled: false }
+
+vi.mock('@/services/api/httpClient', () => ({
+  getConfigSync: () => ({ features: runtimeFeatures }),
+}))
 
 function mountCard(card: Partial<TaskCard>) {
   const i18n = createI18n({
@@ -21,11 +27,18 @@ function mountCard(card: Partial<TaskCard>) {
         ...card,
       },
     },
-    global: { plugins: [i18n] },
+    global: {
+      plugins: [i18n],
+      stubs: { RouterLink: { template: '<a><slot /></a>', props: ['to'] } },
+    },
   })
 }
 
 describe('ComputeRunCard', () => {
+  beforeEach(() => {
+    runtimeFeatures.computeWorkspacesEnabled = false
+  })
+
   it('shows the quota sentence, not a raw error code', () => {
     const wrapper = mountCard({
       state: 'failed',
@@ -56,7 +69,10 @@ describe('ComputeRunCard', () => {
         },
         isReadonly: true,
       },
-      global: { plugins: [i18n] },
+      global: {
+        plugins: [i18n],
+        stubs: { RouterLink: { template: '<a><slot /></a>', props: ['to'] } },
+      },
     })
 
     expect(wrapper.find('[data-testid="compute-run-rerun"]').exists()).toBe(false)
@@ -83,5 +99,17 @@ describe('ComputeRunCard', () => {
     expect(
       wrapper.get('[data-testid="compute-run-rerun-submit"]').attributes('disabled')
     ).toBeUndefined()
+  })
+
+  it('hides Open workspace when the folder flag is off', () => {
+    runtimeFeatures.computeWorkspacesEnabled = false
+    const wrapper = mountCard({ state: 'done', url: '/files/1' })
+    expect(wrapper.find('[data-testid="compute-run-workspace"]').exists()).toBe(false)
+  })
+
+  it('shows Open workspace after a finished run when the folder flag is on', () => {
+    runtimeFeatures.computeWorkspacesEnabled = true
+    const wrapper = mountCard({ state: 'done' })
+    expect(wrapper.get('[data-testid="compute-run-workspace"]').text()).toContain('Open workspace')
   })
 })

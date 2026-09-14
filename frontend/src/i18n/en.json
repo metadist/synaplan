@@ -155,7 +155,8 @@
     "setup": "Setup",
     "assistants": "Assistants",
     "assistantBuilder": "Assistant",
-    "approvals": "Approvals"
+    "approvals": "Approvals",
+    "filesWorkspace": "Workspace"
   },
   "adminModelStatus": {
     "title": "Model Status",
@@ -1293,6 +1294,25 @@
     "tabBrowse": "Browse",
     "tabIncoming": "Incoming",
     "tabGenerated": "Generated",
+    "tabWorkspace": "Workspace",
+    "workspace": {
+      "title": "Workspace",
+      "subtitle": "Files the AI created for you during file work. They stay here between runs.",
+      "empty": "Files the AI creates for you will show up here.",
+      "emptyAction": "Back to chat",
+      "usage": "{used} MB of {quota} MB used",
+      "delete": "Delete workspace",
+      "deleteConfirm": "Delete this workspace? The AI will start from an empty folder next time.",
+      "deleteDone": "Workspace deleted. The AI will start from an empty folder next time.",
+      "deleteError": "The workspace could not be deleted. Nothing was removed.",
+      "loadError": "The workspace could not be loaded.",
+      "download": "Download",
+      "downloadError": "The file could not be downloaded.",
+      "preview": "Preview",
+      "previewError": "The file could not be opened.",
+      "previewUnavailable": "This file cannot be previewed here. Download it to open it.",
+      "closePreview": "Close"
+    },
     "incomingBadge": "{count} new",
     "sourceLabel": {
       "web_upload": "Upload",
@@ -4576,6 +4596,7 @@
     "rerunHelp": "The AI will try again with your notes",
     "details": "Details",
     "preview": "Preview",
+    "openWorkspace": "Open workspace",
     "elapsed": "{seconds}s"
   },
   "processing": {

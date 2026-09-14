@@ -154,7 +154,8 @@
     "setup": "Configuración",
     "assistants": "Asistentes",
     "assistantBuilder": "Asistente",
-    "approvals": "Aprobaciones"
+    "approvals": "Aprobaciones",
+    "filesWorkspace": "Espacio de trabajo"
   },
   "adminModelStatus": {
     "title": "Estado de modelos",
@@ -2136,6 +2137,7 @@
     "rerunHelp": "La IA lo intentará de nuevo con sus notas",
     "details": "Detalles",
     "preview": "Vista previa",
+    "openWorkspace": "Abrir espacio de trabajo",
     "elapsed": "{seconds}s"
   },
   "processing": {
@@ -2766,6 +2768,25 @@
     "tabBrowse": "Explorar",
     "tabIncoming": "Entrantes",
     "tabGenerated": "Generados",
+    "tabWorkspace": "Espacio de trabajo",
+    "workspace": {
+      "title": "Espacio de trabajo",
+      "subtitle": "Archivos que la IA creó para usted en el trabajo con archivos. Permanecen aquí entre ejecuciones.",
+      "empty": "Los archivos que la IA cree para usted aparecerán aquí.",
+      "emptyAction": "Volver al chat",
+      "usage": "{used} MB de {quota} MB usados",
+      "delete": "Eliminar espacio de trabajo",
+      "deleteConfirm": "¿Eliminar este espacio de trabajo? La IA empezará con una carpeta vacía la próxima vez.",
+      "deleteDone": "Espacio de trabajo eliminado. La IA empezará con una carpeta vacía la próxima vez.",
+      "deleteError": "No se pudo eliminar el espacio de trabajo. No se eliminó nada.",
+      "loadError": "No se pudo cargar el espacio de trabajo.",
+      "download": "Descargar",
+      "downloadError": "No se pudo descargar el archivo.",
+      "preview": "Vista previa",
+      "previewError": "No se pudo abrir el archivo.",
+      "previewUnavailable": "Este archivo no se puede previsualizar aquí. Descargúelo para abrirlo.",
+      "closePreview": "Cerrar"
+    },
     "incomingBadge": "{count} nuevos",
     "sourceLabel": {
       "web_upload": "Subida",

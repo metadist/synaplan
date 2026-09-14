@@ -299,4 +299,5 @@ for the frozen-contract details.
 
 - Anthropic-compatible Messages gateway: [ANTHROPIC_COMPATIBLE_API.md](./ANTHROPIC_COMPATIBLE_API.md)
 - OpenAI-compatible API: [OPENAI_COMPATIBLE_API.md](./OPENAI_COMPATIBLE_API.md)
+- File work (secure compute on the server): [COMPUTE.md](./COMPUTE.md)
 - Plan of record: `_devextras/planning/20260829-desktop-agent-client/`

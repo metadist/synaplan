@@ -13,6 +13,7 @@ use App\Repository\UserRepository;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunRequest;
 use App\Service\Compute\Contract\ComputeRunStatus;
 use App\Service\Multitask\Execution\NodeContext;
@@ -164,6 +165,75 @@ final class CodeRunRunnerTest extends TestCase
         rmdir($dir);
     }
 
+    public function testWorkspaceOnlyWhenFlagOn(): void
+    {
+        $captured = null;
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$captured): string {
+                $captured = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $captured);
+        $this->assertSame(['kind' => 'run'], $captured->workspace);
+
+        $workspace = $this->createStub(\App\Entity\ComputeWorkspace::class);
+        $workspace->method('getWorkspaceId')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $workspaces = $this->createMock(ComputeWorkspaceService::class);
+        $workspaces->expects($this->once())->method('ensure')->willReturn($workspace);
+        $workspaces->method('forUser')->willReturn($workspace);
+
+        $capturedOn = null;
+        $clientOn = $this->createMock(ComputeClient::class);
+        $clientOn->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$capturedOn): string {
+                $capturedOn = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $clientOn->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $clientOn->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($clientOn, $this->createStub(FileRepository::class), null, true, $workspaces)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $capturedOn);
+        $this->assertSame(['kind' => 'user', 'id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV'], $capturedOn->workspace);
+    }
+
     private function file(int $userId, string $name, string $path): File
     {
         $file = $this->createStub(File::class);
@@ -178,10 +248,21 @@ final class CodeRunRunnerTest extends TestCase
         ComputeClient $client,
         FileRepository $files,
         ?ComputeArtefactStore $artefacts = null,
+        bool $workspacesOn = false,
+        ?ComputeWorkspaceService $workspaces = null,
     ): CodeRunRunner {
         $repo = $this->createStub(\App\Repository\ConfigRepository::class);
         $repo->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $setting): ?string => 'ENABLED' === $setting ? '1' : null,
+            static function (int $_owner, string $_group, string $setting) use ($workspacesOn): ?string {
+                if ('ENABLED' === $setting) {
+                    return '1';
+                }
+                if ('WORKSPACES_ENABLED' === $setting) {
+                    return $workspacesOn ? '1' : '0';
+                }
+
+                return null;
+            },
         );
         $config = new ComputeConfig($repo, 'http://compute:8080', 'token-token-token-token-token-32b');
 
@@ -215,6 +296,8 @@ final class CodeRunRunnerTest extends TestCase
             $limits,
             new NullLogger(),
             '/tmp',
+            null,
+            $workspaces,
         );
     }
 

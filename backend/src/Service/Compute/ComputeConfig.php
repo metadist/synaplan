@@ -25,12 +25,23 @@ final readonly class ComputeConfig
     public const KEY_MAX_TIMEOUT_SEC = 'MAX_TIMEOUT_SEC';
     public const KEY_POLICY_INTERACTIVE = 'POLICY_INTERACTIVE';
     public const KEY_POLICY_UNATTENDED = 'POLICY_UNATTENDED';
+    public const KEY_WORKSPACES_ENABLED = 'WORKSPACES_ENABLED';
+    public const KEY_EGRESS_ENABLED = 'EGRESS_ENABLED';
+    public const KEY_EGRESS_REQUIRES_APPROVAL = 'EGRESS_REQUIRES_APPROVAL';
+    public const KEY_EGRESS_MAX_HOSTS = 'EGRESS_MAX_HOSTS';
+    public const KEY_WORKSPACE_TTL_DAYS = 'WORKSPACE_TTL_DAYS';
 
     public const POLICY_AUTO = 'auto';
     public const POLICY_APPROVE = 'approve';
     public const POLICY_BLOCK = 'block';
 
+    public const DEFAULT_EGRESS_MAX_HOSTS = 8;
+    public const DEFAULT_WORKSPACE_TTL_DAYS = 90;
+
     private const DEFAULT_ENABLED = false;
+    private const DEFAULT_WORKSPACES_ENABLED = false;
+    private const DEFAULT_EGRESS_ENABLED = false;
+    private const DEFAULT_EGRESS_REQUIRES_APPROVAL = true;
     private const DEFAULT_POLICY_INTERACTIVE = self::POLICY_AUTO;
     private const DEFAULT_POLICY_UNATTENDED = self::POLICY_APPROVE;
 
@@ -95,6 +106,37 @@ final readonly class ComputeConfig
         return $this->policySetting(self::KEY_POLICY_UNATTENDED, self::DEFAULT_POLICY_UNATTENDED);
     }
 
+    /**
+     * Persistent folder between runs. Off means B1/B2 ephemeral behaviour.
+     */
+    public function workspacesEnabled(?int $userId = null): bool
+    {
+        return $this->isEnabled($userId) && $this->boolSetting(self::KEY_WORKSPACES_ENABLED, self::DEFAULT_WORKSPACES_ENABLED, $userId);
+    }
+
+    /**
+     * Per-run website allow-list. Off means every run stays offline.
+     */
+    public function egressEnabled(?int $userId = null): bool
+    {
+        return $this->isEnabled($userId) && $this->boolSetting(self::KEY_EGRESS_ENABLED, self::DEFAULT_EGRESS_ENABLED, $userId);
+    }
+
+    public function egressRequiresApproval(?int $userId = null): bool
+    {
+        return $this->boolSetting(self::KEY_EGRESS_REQUIRES_APPROVAL, self::DEFAULT_EGRESS_REQUIRES_APPROVAL, $userId);
+    }
+
+    public function egressMaxHosts(): int
+    {
+        return max(0, $this->intSetting(self::KEY_EGRESS_MAX_HOSTS, self::DEFAULT_EGRESS_MAX_HOSTS));
+    }
+
+    public function workspaceTtlDays(): int
+    {
+        return max(1, $this->intSetting(self::KEY_WORKSPACE_TTL_DAYS, self::DEFAULT_WORKSPACE_TTL_DAYS));
+    }
+
     private function policySetting(string $key, string $default): string
     {
         $raw = strtolower(trim((string) ($this->configRepository->getValue(0, self::CONFIG_GROUP, $key) ?? '')));
@@ -132,16 +174,21 @@ final readonly class ComputeConfig
 
     private function flagOn(?int $userId): bool
     {
-        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, self::KEY_ENABLED);
+        return $this->boolSetting(self::KEY_ENABLED, self::DEFAULT_ENABLED, $userId);
+    }
+
+    private function boolSetting(string $key, bool $default, ?int $userId = null): bool
+    {
+        $pinned = $this->featureFlagEnv?->forced(self::CONFIG_GROUP, $key);
         if (null !== $pinned) {
             return $pinned;
         }
         if (null !== $this->layeredConfigResolver) {
-            return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, self::KEY_ENABLED, self::DEFAULT_ENABLED);
+            return $this->layeredConfigResolver->resolveBool($userId, self::CONFIG_GROUP, $key, $default);
         }
-        $global = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_ENABLED);
+        $global = $this->configRepository->getValue(0, self::CONFIG_GROUP, $key);
 
-        return $this->toBool($global, self::DEFAULT_ENABLED);
+        return $this->toBool($global, $default);
     }
 
     private function intSetting(string $key, int $default): int

@@ -450,6 +450,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.files' },
     },
     {
+      path: '/files/workspace',
+      name: 'files-workspace',
+      component: () => import('@/views/WorkspaceView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.filesWorkspace' },
+    },
+    {
       // Vector storage (Qdrant/MariaDB) inventory: how many files and vectors
       // are stored for the user, plus a global admin view.
       path: '/files/vectors',

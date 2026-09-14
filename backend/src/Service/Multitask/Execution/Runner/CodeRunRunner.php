@@ -15,8 +15,10 @@ use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeEgressResolver;
 use App\Service\Compute\ComputeRefusedException;
-use App\Service\Compute\Contract\ComputeRunRequest;
+use App\Service\Compute\ComputeRequestBuilder;
+use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunStatus;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -55,6 +57,9 @@ final readonly class CodeRunRunner implements TaskRunner
         private LoggerInterface $logger,
         private string $uploadDir,
         private ?ToolExecutionGate $executionGate = null,
+        private ?ComputeWorkspaceService $workspaces = null,
+        private ?ComputeEgressResolver $egress = null,
+        private ?ComputeRequestBuilder $requests = null,
     ) {
     }
 
@@ -120,6 +125,8 @@ final readonly class CodeRunRunner implements TaskRunner
             $context->isApproved($node->id),
             $context->message->getId(),
             $node,
+            true === ($node->params['useWorkspace'] ?? false),
+            $this->hostList($node->params['egressHosts'] ?? []),
         );
 
         return $this->toNodeResult($result);
@@ -159,6 +166,8 @@ final readonly class CodeRunRunner implements TaskRunner
         bool $alreadyApproved = false,
         ?int $messageId = null,
         ?TaskNode $node = null,
+        bool $useWorkspace = false,
+        array $egressHosts = [],
     ): array {
         $userId = (int) $user->getId();
         if (!$this->computeEnabled($userId)) {
@@ -168,6 +177,13 @@ final readonly class CodeRunRunner implements TaskRunner
         if (!AssistantSkillGate::allows($assistant, Capability::CodeRun->value)) {
             return $this->failedOutcome(self::FORBID_COPY, AssistantSkillGate::REASON);
         }
+
+        try {
+            $egress = $this->resolveEgress($userId, $egressHosts);
+        } catch (ComputeRefusedException $e) {
+            return $this->failedOutcome($e->getMessage(), $e->errorCode());
+        }
+        $forceApproveForEgress = [] !== $egress['allow'] && $this->computeConfig->egressRequiresApproval($userId);
 
         if (!$alreadyApproved) {
             $gated = $this->consultPolicy(
@@ -182,6 +198,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 $savedTaskRunId,
                 $messageId,
                 $node,
+                $forceApproveForEgress,
             );
             if (null !== $gated) {
                 return $gated;
@@ -237,15 +254,27 @@ final readonly class CodeRunRunner implements TaskRunner
         }
 
         try {
-            $request = new ComputeRunRequest(
-                protocol: 1,
-                owner: 'user:'.$userId,
-                workspace: ['kind' => 'run'],
-                image: $image,
-                entry: ['program' => $program, 'args' => [$scriptName]],
-                files: $fileRefs,
-                limits: $limits,
-                egress: ['allow' => []],
+            $workspace = ['kind' => 'run'];
+            if ($useWorkspace && $this->workspacesEnabled($userId) && null !== $this->workspaces) {
+                $row = $this->workspaces->ensure($user);
+                $workspace = ['kind' => 'user', 'id' => $row->getWorkspaceId()];
+                $audit->setWorkspaceId($row->getWorkspaceId());
+            }
+            $audit->setEgressHosts(array_map(
+                static fn (array $host): string => $host['host'],
+                $egress['allow'],
+            ));
+            $this->runs->save($audit);
+
+            $builder = $this->requests ?? new ComputeRequestBuilder();
+            $request = $builder->build(
+                ComputeWorkspaceService::ownerString($userId),
+                $workspace,
+                $image,
+                ['program' => $program, 'args' => [$scriptName]],
+                $fileRefs,
+                $limits,
+                $egress,
             );
             $runId = $this->client->submitRun($request, $parts);
             $audit->setRunId($runId);
@@ -298,6 +327,7 @@ final readonly class CodeRunRunner implements TaskRunner
             $audit->markFinished(ComputeRun::STATUS_SUCCEEDED);
             $this->runs->save($audit);
             $this->rateLimits->recordUsage($user, 'COMPUTE_RUNS', ['cpuSec' => $status->usage['cpuSec']]);
+            $this->refreshWorkspace($user);
 
             return [
                 'outcome' => 'ok',
@@ -353,6 +383,7 @@ final readonly class CodeRunRunner implements TaskRunner
         ?int $savedTaskRunId,
         ?int $messageId,
         ?TaskNode $node,
+        bool $forceApproveForEgress = false,
     ): ?array {
         if (null === $this->executionGate) {
             return null;
@@ -369,6 +400,9 @@ final readonly class CodeRunRunner implements TaskRunner
             ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
             : 'chat:'.(int) ($messageId ?? 0);
         $override = is_string($node?->params['approval'] ?? null) ? $node->params['approval'] : null;
+        if ($forceApproveForEgress && 'block' !== $override) {
+            $override = PolicyOutcome::Approve->value;
+        }
 
         try {
             $decision = $this->executionGate->inspect(
@@ -653,6 +687,66 @@ final readonly class CodeRunRunner implements TaskRunner
             'ANONYMOUS' => 0,
             default => 60,
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function hostList(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $hosts = [];
+        foreach ($raw as $host) {
+            if (is_string($host) && '' !== trim($host)) {
+                $hosts[] = trim($host);
+            }
+        }
+
+        return $hosts;
+    }
+
+    /**
+     * @param list<string> $hosts
+     *
+     * @return array{allow: list<array{host: string, port: int, ips: list<string>}>}
+     */
+    private function resolveEgress(int $userId, array $hosts): array
+    {
+        if (null === $this->egress || !$this->computeConfig->egressEnabled($userId)) {
+            return ['allow' => []];
+        }
+
+        return $this->egress->resolve($hosts, $userId);
+    }
+
+    private function workspacesEnabled(?int $userId): bool
+    {
+        if (null === $this->workspaces) {
+            return false;
+        }
+        if (!(new \ReflectionProperty($this, 'computeConfig'))->isInitialized($this)) {
+            return false;
+        }
+
+        return $this->computeConfig->workspacesEnabled($userId);
+    }
+
+    private function refreshWorkspace(User $user): void
+    {
+        if (null === $this->workspaces) {
+            return;
+        }
+        $row = $this->workspaces->forUser($user);
+        if (null === $row) {
+            return;
+        }
+        try {
+            $this->workspaces->refreshUsage($row);
+        } catch (\Throwable) {
+            // Usage is advisory; a failed refresh must not fail a finished run.
+        }
     }
 
     private function computeEnabled(?int $userId = null): bool

@@ -82,6 +82,33 @@ final readonly class SsrfGuard
         return false;
     }
 
+    /**
+     * Public A/AAAA (or the literal IP) after the same private/reserved filter
+     * as {@see isBlockedHost}. Empty when the name does not resolve or every
+     * answer is blocked. Callers that already passed {@see isBlockedHost} get
+     * the pin list compute may connect to.
+     *
+     * @return list<string>
+     */
+    public function pinnedIps(string $host): array
+    {
+        $host = strtolower(trim($host, "[] \t"));
+        if ('' === $host) {
+            return [];
+        }
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $this->isBlockedIp($host) ? [] : [$host];
+        }
+        $ips = [];
+        foreach ($this->resolveIps($host) as $ip) {
+            if (!$this->isBlockedIp($ip)) {
+                $ips[] = $ip;
+            }
+        }
+
+        return array_values(array_unique($ips));
+    }
+
     /** True when the IP is private, loopback, link-local or otherwise reserved. */
     public function isBlockedIp(string $ip): bool
     {

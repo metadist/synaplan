@@ -150,6 +150,7 @@ async function loadRuntimeConfig(): Promise<RuntimeConfig> {
           officeConvertEnabled: false,
           documentToolsEnabled: false,
           computeEnabled: false,
+          computeWorkspacesEnabled: false,
         },
         googleTag: {
           enabled: false,
@@ -218,6 +219,7 @@ export function getConfigSync(): RuntimeConfig {
         officeConvertEnabled: false,
         documentToolsEnabled: false,
         computeEnabled: false,
+        computeWorkspacesEnabled: false,
       },
       googleTag: {
         enabled: false,

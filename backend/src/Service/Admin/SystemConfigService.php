@@ -16,6 +16,7 @@ use App\Service\Agent\AgentConfig;
 use App\Service\Branding\BrandingService;
 use App\Service\Chat\ProgressNarrationConfig;
 use App\Service\Client\MobileVersionService;
+use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Desktop\DesktopAgentConfig;
@@ -69,6 +70,7 @@ final readonly class SystemConfigService
         private readonly FeatureFlagEnv $featureFlagEnv = new FeatureFlagEnv(),
         private readonly ?ModuleRegistry $modules = null,
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
+        private readonly ?ComputeClient $computeClient = null,
     ) {
         $this->schema = $this->buildSchema();
     }
@@ -235,8 +237,12 @@ final readonly class SystemConfigService
                     'whisper' => ['label' => 'Whisper (Audio)', 'fields' => ['WHISPER_ENABLED', 'WHISPER_DEFAULT_MODEL']],
                     'brave' => ['label' => 'Web Search (Brave)', 'fields' => ['BRAVE_SEARCH_ENABLED', 'BRAVE_SEARCH_API_KEY', 'BRAVE_SEARCH_COUNT']],
                     'media' => ['label' => 'Async media generation', 'fields' => ['MEDIA_ASYNC_JOBS_ENABLED']],
-                    'compute' => ['label' => 'Secure compute', 'fields' => [
+                    'compute' => ['label' => 'File work', 'fields' => [
                         'COMPUTE_ENABLED',
+                        'COMPUTE_WORKSPACES_ENABLED',
+                        'COMPUTE_EGRESS_ENABLED',
+                        'COMPUTE_EGRESS_REQUIRES_APPROVAL',
+                        'COMPUTE_EGRESS_MAX_HOSTS',
                         'COMPUTE_DEFAULT_TIMEOUT_SEC',
                         'COMPUTE_DEFAULT_MEMORY_MB',
                         'COMPUTE_DEFAULT_CPU',
@@ -245,6 +251,7 @@ final readonly class SystemConfigService
                         'COMPUTE_MAX_TIMEOUT_SEC',
                         'COMPUTE_POLICY_INTERACTIVE',
                         'COMPUTE_POLICY_UNATTENDED',
+                        'COMPUTE_WORKSPACE_TTL_DAYS',
                     ]],
                 ],
             ],
@@ -522,6 +529,11 @@ final readonly class SystemConfigService
 
         // Database-backed fields: write to BCONFIG, no restart needed
         if ('database' === $source) {
+            $capRefuse = $this->refuseComputeAboveSidecarCap($key, $value);
+            if (null !== $capRefuse) {
+                return $capRefuse;
+            }
+
             return $this->setDatabaseValue($key, $value, $field, $actingUserId);
         }
 
@@ -653,6 +665,44 @@ final readonly class SystemConfigService
 
             return ['success' => false, 'requiresRestart' => false, 'message' => 'Database write failed'];
         }
+    }
+
+    /**
+     * @return array{success: false, requiresRestart: false, message: string}|null
+     */
+    private function refuseComputeAboveSidecarCap(string $key, string $value): ?array
+    {
+        $map = [
+            'COMPUTE_DEFAULT_TIMEOUT_SEC' => ['timeoutSec', 'seconds'],
+            'COMPUTE_MAX_TIMEOUT_SEC' => ['timeoutSec', 'seconds'],
+            'COMPUTE_DEFAULT_MEMORY_MB' => ['memoryMb', 'MB of memory'],
+            'COMPUTE_DEFAULT_CPU' => ['cpu', 'CPU'],
+            'COMPUTE_DEFAULT_PIDS' => ['pids', 'processes'],
+            'COMPUTE_DEFAULT_OUTPUT_MB' => ['outputMb', 'MB of result files'],
+        ];
+        if (!isset($map[$key]) || null === $this->computeClient || !is_numeric($value)) {
+            return null;
+        }
+        try {
+            $caps = $this->computeClient->health()->caps;
+        } catch (\Throwable) {
+            return null;
+        }
+        [$capKey, $unit] = $map[$key];
+        $cap = $caps[$capKey];
+        if ((float) $value <= (float) $cap) {
+            return null;
+        }
+
+        return [
+            'success' => false,
+            'requiresRestart' => false,
+            'message' => sprintf(
+                'This installation\'s file-work limit is %s %s. Enter a value at or below that.',
+                $cap,
+                $unit,
+            ),
+        ];
     }
 
     /**
@@ -1670,6 +1720,51 @@ final readonly class SystemConfigService
                 'source' => 'database',
                 'dbGroup' => ComputeConfig::CONFIG_GROUP,
                 'dbKey' => ComputeConfig::KEY_ENABLED,
+            ],
+            'COMPUTE_WORKSPACES_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Keep a folder between file-work runs so the assistant can continue yesterday\'s work. Off by default. Files → Workspace shows what is in it. Also needs file work itself to be on.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_WORKSPACES_ENABLED,
+            ],
+            'COMPUTE_EGRESS_ENABLED' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused.',
+                'default' => 'false',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_ENABLED,
+            ],
+            'COMPUTE_EGRESS_REQUIRES_APPROVAL' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'boolean',
+                'sensitive' => false,
+                'description' => 'When a run will fetch from the web, ask the owner first even if everyday file work would run automatically. On by default.',
+                'default' => 'true',
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_REQUIRES_APPROVAL,
+            ],
+            'COMPUTE_EGRESS_MAX_HOSTS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many websites one file-work run may list. Default 8.',
+                'default' => (string) ComputeConfig::DEFAULT_EGRESS_MAX_HOSTS,
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_EGRESS_MAX_HOSTS,
+            ],
+            'COMPUTE_WORKSPACE_TTL_DAYS' => [
+                'tab' => 'processing', 'section' => 'compute', 'type' => 'number',
+                'sensitive' => false,
+                'description' => 'How many days a file-work folder may sit unused before cleanup can remove it. Default 90.',
+                'default' => (string) ComputeConfig::DEFAULT_WORKSPACE_TTL_DAYS,
+                'source' => 'database',
+                'dbGroup' => ComputeConfig::CONFIG_GROUP,
+                'dbKey' => ComputeConfig::KEY_WORKSPACE_TTL_DAYS,
             ],
             'COMPUTE_DEFAULT_TIMEOUT_SEC' => [
                 'tab' => 'processing', 'section' => 'compute', 'type' => 'number',

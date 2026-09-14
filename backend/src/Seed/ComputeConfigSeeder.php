@@ -30,6 +30,11 @@ final readonly class ComputeConfigSeeder
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_MAX_TIMEOUT_SEC, 'value' => '300'],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_POLICY_INTERACTIVE, 'value' => ComputeConfig::POLICY_AUTO],
             ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_POLICY_UNATTENDED, 'value' => ComputeConfig::POLICY_APPROVE],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_WORKSPACES_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_EGRESS_ENABLED, 'value' => '0'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_EGRESS_REQUIRES_APPROVAL, 'value' => '1'],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_EGRESS_MAX_HOSTS, 'value' => (string) ComputeConfig::DEFAULT_EGRESS_MAX_HOSTS],
+            ['ownerId' => 0, 'group' => $group, 'setting' => ComputeConfig::KEY_WORKSPACE_TTL_DAYS, 'value' => (string) ComputeConfig::DEFAULT_WORKSPACE_TTL_DAYS],
         ];
 
         return BConfigSeeder::insertIfMissing($this->connection, 'compute_config', $rows);
