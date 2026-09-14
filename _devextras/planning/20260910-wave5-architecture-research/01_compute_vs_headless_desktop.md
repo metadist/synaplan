@@ -195,14 +195,19 @@ software, no user machine involved".
 
 ## 7. Decisions requested
 
+Settled 2026-09-13 against the live roadmap and compute STATUS. Row 4 is
+recorded (Desktop headless is a Desktop backlog item, not a compute
+runtime). Only row 5 (Wave 5 launch name / copy) stays product-owner work;
+it does not block Tools S5 or Compute A3 + B1.
+
 | # | Decision | Proposed | Agree? |
 | - | -------- | -------- | ------ |
-| 1 | Secure Compute stays as decided (own repo `synaplan-compute`, Go, container/gVisor boundary). Synaplan Desktop is **not** the compute runtime. | Confirm | ☐ |
-| 2 | Add vocabulary to roadmap §6: **compute node** = server running `synaplan-compute`; never a Desktop install. | Add | ☐ |
-| 3 | Add B1–B4 from §5 to the compute A0 sprint as spike items (B4 as evaluation, not decision). | Add | ☐ |
-| 4 | Record "Desktop headless mode for team machines" (§4) as a *Desktop* backlog item, explicitly separate from compute. | Record | ☐ |
-| 5 | Adopt the two-promise positioning in §6 as the marketing brief for the Wave 5 launch material; name the compute product before B1 (working name "Synaplan Compute"). | Adopt | ☐ |
-| 6 | Move this document to `synaplan-platform/planning/` and reference it from the compute `STATUS.md` review log. | Move | ☐ |
+| 1 | Secure Compute stays as decided (own repo `synaplan-compute`, Go, container/gVisor boundary). Synaplan Desktop is **not** the compute runtime. | Confirm | ☑ 2026-09-10 (roadmap §10 #6; compute STATUS) |
+| 2 | Add vocabulary to roadmap §6: **compute node** = server running `synaplan-compute`; never a Desktop install. | Add | ☑ already in roadmap §8 (the live file's vocabulary table) |
+| 3 | Add B1–B4 from §5 to the compute A0 sprint as spike items (B4 as evaluation, not decision). | Add | ☑ superseded: A0 shipped in #1774; B1–B4 remain Wave 5 in compute STATUS |
+| 4 | Record "Desktop headless mode for team machines" (§4) as a *Desktop* backlog item, explicitly separate from compute. | Record | ☑ 2026-09-13 — Desktop master plan §12 (out of scope for v1; not a compute runtime) |
+| 5 | Adopt the two-promise positioning in §6 as the marketing brief for the Wave 5 launch material; name the compute product before B1 (working name "Synaplan Compute"). | Adopt | ☐ still open — working name is in use; launch copy is not |
+| 6 | Move this document to `synaplan-platform/planning/` and reference it from the compute `STATUS.md` review log. | Move | ☑ rejected 2026-09-13 — stay in `synaplan/` next to the live roadmap; compute STATUS links here |
 
 ---
 

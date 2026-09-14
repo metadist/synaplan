@@ -19,7 +19,7 @@ S1–S4 and the incoming-chats UI are **merged to `main`** (#1708, #1713, #1714,
 | Incoming chats UI | `synaplan/` `feat/iam-incoming-chats` | done | Merged to `main` as #1717. History pills/filters, Incoming chats page, red-dot notification, source banner when opening a shared chat |
 | S4 Directory & privacy | `synaplan/` `feat/iam-directory-privacy` | done | Merged to `main` as #1718. IAM29–IAM38 (directory sync, audit tab, admin manage-without-read, impersonation audit) |
 | S5 Group policies | `synaplan/` `feat/iam-group-policies` | done | Merged to `main` as #1719. IAM39–IAM46. Flag `IAM.GROUP_POLICIES_ENABLED` seeds off (C1) |
-| IAM-UX Share dialog | `synaplan/` `feat/iam-finals` | done | IAM-UX1–4 walked. One-row ShareDialog, kind-specific consequence/find, SharedResourceBanner, after-share toast names Incoming chats. Pending commit/PR. |
+| IAM-UX Share dialog | `synaplan/` `feat/iam-finals` | done (#1726) | IAM-UX1–4 walked. One-row ShareDialog, kind-specific consequence/find, SharedResourceBanner, after-share toast names Incoming chats. On `main` via [#1726](https://github.com/metadist/synaplan/pull/1726). |
 
 ## Decisions
 
@@ -134,6 +134,6 @@ Can use → Can view; Everyone share also lands in the list. Dark + V2 +
 320 px stacks the add row; permission menu uses `dropdown-panel` (white
 on `rgba(14, 22, 40, 0.95)`). Kind-specific assistant/folder/widget
 sentences are gated by unit tests — this demo account has no custom
-assistant, files, or widgets to open those dialogs. S0–S5 are on
-`main`; IAM-UX is on `feat/iam-finals` and is the last IAM product
-step before Agent Builder.
+assistant, files, or widgets to open those dialogs. S0–S5 and IAM-UX
+are on `main` (IAM-UX via #1726). That was the last IAM product step
+before Agent Builder.

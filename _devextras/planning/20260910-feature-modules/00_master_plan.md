@@ -2,7 +2,8 @@
 
 **Status:** Plan of record. §0 decision checklist ticked by the product owner
 on 2026-09-10 (all 15 rows at their proposed defaults; log in
-[`STATUS.md`](./STATUS.md)); S1 in progress. This is the **Intermezzo** release in
+[`STATUS.md`](./STATUS.md)); S1–S4 closed 2026-09-13 (S5 optional). This is
+the **Intermezzo** release in
 [`../20260910_roadmap_update.md`](../20260910_roadmap_update.md) — after the
 two production bugfixes and Wave 4, before Wave 5. Cross-cutting refactor,
 not a seventh track. Wave 5 adds optional services (compute client, more

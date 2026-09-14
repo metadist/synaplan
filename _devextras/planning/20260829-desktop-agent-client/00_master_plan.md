@@ -389,6 +389,12 @@ Named tests in [`09_testing_and_documentation.md`](./09_testing_and_documentatio
 - Windows-on-ARM and Linux-on-ARM **manual** verification (builds only).
 - A permanent reference daemon in `synaplan/`. The harness is a test
   script, not a second product (decision 20).
+- **Headless Desktop for team machines** (always-on poller, no UI).
+  Recorded 2026-09-13 from the compute-vs-Desktop research §7 row 4:
+  this is a *Desktop* backlog item after Phase B, never a substitute
+  for `synaplan-compute`. See
+  [`../20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md`](../20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md)
+  §4.
 
 ---
 

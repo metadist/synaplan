@@ -28,6 +28,48 @@ Full-stack AI knowledge management platform: RAG with MariaDB VECTOR + Qdrant, e
 - **Code, comments, commit messages: ALWAYS English.** Never write German (or any other language) in code or comments.
 - Chat responses: in the language the user chooses.
 
+### Perfect UX & Stability — the product bar (MANDATORY)
+
+Without usability and stability the software is bad, whatever the API does.
+Every plan, sprint file and PR that touches anything a person sees or waits
+for is measured against this bar. It is the merge gate, not a polish pass.
+The binding contract is `_devextras/planning/202609_ux_user_flows.md`
+(rules **U1–U12**); the use-case list that applies it is
+`_devextras/planning/20260913-use-case-research/README.md` §1.
+
+A user-visible change is **done** only when all seven hold:
+
+1. **First run without help.** A new user reaches the result from an empty
+   install guided only by the screen. Every empty state is one sentence plus
+   one primary action (U5). Flag off ⇒ the surface is absent, never a teaser
+   or a dead control (U11).
+2. **Ten-second findability.** Whatever was produced or granted — file,
+   mail, calendar entry, pending approval, run, shared item — the person
+   finds it in ten seconds from where they normally work: badge, sibling
+   inbox (Incoming chats / Approvals pattern), or list filter. Name that path
+   in the plan **before** the first `.vue` (U1, U2, U6).
+3. **Five questions on the open surface.** Who owns this? Who else? What will
+   it touch / what can they do? How do I stop it? Where did it come from?
+   Answered on the resource itself, not only inside a dialog (U7).
+4. **Honest outcome copy.** Every run, job and stream reaches a terminal
+   state with one sentence a non-technical user understands — no HTTP code,
+   no stack trace, a named recovery. When a write was involved, say what did
+   **and did not** happen (U8). Never "Nothing was sent" when something was.
+5. **Undo is a click.** Turn off, revoke, reject, disconnect — from the same
+   row, with the consequence stated in one kind-specific sentence (U3).
+6. **Stability is UX.** No stuck "running", no silent skip, no `setTimeout`
+   race fix, no feature that works only while the tab is open. The full
+   pre-commit gate **and** the named journey walked end to end in the browser
+   (click, type, find, undo — U10) are the proof; a screenshot is not.
+7. **Every theme, every size, every locale.** Light, dark, V2, 320 px, WCAG
+   AA, all five locales in the same PR (U9).
+
+Planning rule (sprint files opened after 2026-09-13): a sprint file with
+an `ota-candidate` step names its journey (§5 of the UX contract) and
+lists the five exit bullets from its §6 before implementation starts.
+Existing files add those bullets when next edited; they are not a
+retroactive merge block. "A listed screen is not a user-flow."
+
 ### Docker Environment
 
 All backend/frontend tooling runs inside containers:
@@ -393,6 +435,10 @@ Production is `synaplan-platform/` + a **MariaDB Galera cluster outside Docker**
 - `doctrine:schema:update --force` on a shared DB (generate a migration instead)
 - Internal prompt without `tools:` prefix; invented Memory IDs
 - Hardcoded API URL in the widget (use `detectApiUrl()`)
+- A user-visible feature whose result the other person cannot find in ten seconds; an empty state without a next action; a "coming soon" control behind a flag
+- "Request failed" / a raw API error shown to a user; a write action whose copy does not say what did and did not happen
+- A run or stream that can end in a non-terminal state ("running" forever, silently skipped step)
+- A UI PR without the named journey walked in the browser (screenshot ≠ walk)
 - `console.log` debugging left in; `any` types
 
 ## Boundaries
