@@ -17,7 +17,8 @@ Step-by-step procedure for resolving a model price drift reported by the daily `
    from: (a) the `source:` URL printed on each flagged line of the report (LiteLLM's own
    reference), (b) a machine-readable provider catalog where one exists
    (`docs/PRICING_MAINTENANCE.md` § "Maintenance links" lists them, e.g. Jina `/v1/models`,
-   TrustedTokens `/api/billing/models`, A2Agent `GET /v1/models` and `/models`), (c) the provider pages linked in that same section.
+   TrustedTokens `/api/billing/models`, A2Agent's `/models` page — its `GET /v1/models` is
+   key-gated and answers `401`), (c) the provider pages linked in that same section.
 
 ## Step 0 — Reproduce locally
 
@@ -41,7 +42,7 @@ Only two sections require action. Everything else is steady state and reported e
 | `Obsolete LiteLLM deviations` | LiteLLM now agrees with the catalog | delete that registry entry (Path B, last bullet) |
 | `Pricing-mode mismatch` | structurally not comparable (e.g. gpt-image per_image vs LiteLLM per_token, Cohere rerank per request) | none |
 | `Null-price protected` | LiteLLM reports 0 for a priced row | none |
-| `Unmatched` | model not in LiteLLM at all | none here (manual re-verification is the doc's 30-day rule, not this procedure) |
+| `Unmatched` | model not in LiteLLM at all, or LiteLLM carries the bare id at another vendor (the line names it) | none here (manual re-verification is the doc's 30-day rule, not this procedure) — **except** when a named vendor is our own: then the service is missing from `BARE_MATCH_PROVIDERS` and the row is silently out of the check (Path C) |
 
 Do not "fix" rows in the no-action sections. A PR that touches them because they looked
 wrong in passing is out of scope for a drift fix.
@@ -65,6 +66,7 @@ For each flagged model:
 | --- | --- | --- |
 | LiteLLM, not the catalog | provider moved its price | **Path A** with the official value |
 | the catalog, not LiteLLM | LiteLLM is wrong | **Path B** |
+| the catalog, and LiteLLM's entry for that id names a different vendor (`litellm_provider` ≠ our service) | the two sides price different products — the comparison is wrong, not the price | **Path C** |
 | neither | both are stale | **Path A** with the official value **and Path B** (LiteLLM stays wrong afterwards) |
 | cannot be determined | — | **STOP** (see below) |
 
@@ -108,6 +110,22 @@ enforces this).
    delete it from the registry in the same PR — no other change. The run stays green
    and opens no issue for this; the entry surfaces only in the Discord report's
    "Flagged models" field and the run log.
+
+## Path C — the comparison was wrong (a bare id is not unique across vendors)
+
+A gateway resells an upstream model under the upstream's own id, so LiteLLM's entry for it
+can be the upstream's **first-party** rate — a different product at a different price. The
+flagged line's own `source:` URL gives it away (it points at the upstream's docs, not at our
+provider), and the entry's `litellm_provider` names the vendor.
+
+1. **Do not touch the row and do not add a `LITELLM_DEVIATIONS` entry.** LiteLLM is not
+   wrong about its own model; the registry pins LiteLLM errors and would be a false record.
+2. Fix the matcher: `SyncModelPricesCommand::BARE_MATCH_PROVIDERS` lists the LiteLLM vendors
+   a service may match a bare id at. A gateway/reseller never belongs there — leaving it out
+   is what parks its rows in `Unmatched`, where a human verifies them. The opposite case is a
+   **first-party** service missing from the map: add it, with a regression test.
+3. No price changed, so there is no migration. Re-run Step 0 (must exit 0) and add the
+   drift-log entry as in Path A step 3.
 
 ## Step 3 — Gate (unfiltered, in this order)
 
