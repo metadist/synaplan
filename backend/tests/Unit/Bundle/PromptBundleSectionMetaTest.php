@@ -41,7 +41,9 @@ final class PromptBundleSectionMetaTest extends TestCase
     public function testExportReplacesTheModelIdWithACatalogKeyAndDropsMcpServers(): void
     {
         $this->givenPrompt(['aiModel' => 76, 'mcp_servers' => '3,7', 'tool_internet' => true]);
-        $this->models->method('find')->willReturnMap([[76, null, null, $this->model('Groq', 'openai/gpt-oss-120b', 'chat')]]);
+        // Match on the id only: find()'s trailing $lockMode/$lockVersion defaults are
+        // Doctrine-version-specific, so matching them positionally breaks on a minor bump.
+        $this->models->expects(self::once())->method('find')->with(76)->willReturn($this->model('Groq', 'openai/gpt-oss-120b', 'chat'));
 
         $meta = $this->exportedMeta();
 
