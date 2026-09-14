@@ -6,6 +6,7 @@ namespace App\Tests\Support;
 
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
 use App\Service\Multitask\Execution\Runner\ChatRunner;
+use App\Service\Multitask\Execution\Runner\CodeRunRunner;
 use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\Runner\ConditionRunner;
 use App\Service\Multitask\Execution\Runner\DocumentCombineRunner;
@@ -30,11 +31,11 @@ use App\Service\Multitask\Skill\SkillCatalog;
 /**
  * Builds the REAL {@see SkillCatalog} for DB-free unit tests.
  *
- * `TaskRunner::describe()` is pure data (it touches no injected dependency),
- * so the runners are instantiated WITHOUT their constructors — the catalog a
- * test sees is assembled from the exact same descriptor declarations
- * production uses. This is what lets the planner-prompt characterization
- * prove byte-equivalence without booting the kernel.
+ * Runners are instantiated WITHOUT their constructors. `describe()` must
+ * stay safe in that state (CodeRunRunner hides file work until ComputeConfig
+ * is injected). The catalog a test sees is assembled from the exact same
+ * descriptor declarations production uses, so planner-prompt characterization
+ * can prove byte-equivalence without booting the kernel.
  *
  * Keep this list in sync with the runners tagged `app.multitask.runner`
  * (one entry per runner class; SkillCatalogTest asserts full coverage of the
@@ -64,6 +65,7 @@ final class SkillCatalogFactory
         ToolCallRunner::class,
         OutboundWebhookRunner::class,
         ConditionRunner::class,
+        CodeRunRunner::class,
     ];
 
     public static function real(): SkillCatalog

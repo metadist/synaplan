@@ -513,6 +513,7 @@
                       <option value="widget">{{ $t('files.sourceLabel.widget') }}</option>
                       <option value="api">{{ $t('files.sourceLabel.api') }}</option>
                       <option value="generated">{{ $t('files.sourceLabel.generated') }}</option>
+                      <option value="compute">{{ $t('files.sourceLabel.compute') }}</option>
                     </select>
                   </div>
                   <div>

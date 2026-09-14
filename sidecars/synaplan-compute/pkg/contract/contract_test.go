@@ -2,6 +2,8 @@ package contract_test
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -158,6 +160,53 @@ func TestPythonFixtureImageIsKey(t *testing.T) {
 	if req.Entry.Program != "python" {
 		t.Fatal(req.Entry.Program)
 	}
+}
+
+func TestFixtureChecksums(t *testing.T) {
+	t.Parallel()
+	dir := fixtureDir(t)
+	raw, err := os.ReadFile(filepath.Join(dir, "CHECKSUMS.sha256"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := map[string]struct{}{}
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "  ", 2)
+		if len(parts) != 2 {
+			t.Fatalf("bad checksum line %q", line)
+		}
+		want, name := parts[0], parts[1]
+		listed[name] = struct{}{}
+		got := sha256File(t, filepath.Join(dir, name))
+		if got != want {
+			t.Fatalf("%s: got %s want %s", name, got, want)
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == "CHECKSUMS.sha256" {
+			continue
+		}
+		if _, ok := listed[e.Name()]; !ok {
+			t.Fatalf("fixture %s is not in CHECKSUMS.sha256", e.Name())
+		}
+	}
+}
+
+func sha256File(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 func fixtureDir(t *testing.T) string {

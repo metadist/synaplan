@@ -2094,7 +2094,8 @@
       "search": "Web araması",
       "extract": "Metin çıkarma",
       "email": "E-posta",
-      "folder": "Klasör"
+      "folder": "Klasör",
+      "compute": "Dosya çalışması"
     },
     "capability": {
       "extract_text": "Metin çıkarılıyor",
@@ -2115,7 +2116,8 @@
       "document_combine": "Birleştirilmiş PDF",
       "calendar_event": "Takvim daveti",
       "email_me": "E-posta gönderimi",
-      "save_to_folder": "Klasöre kaydet"
+      "save_to_folder": "Klasöre kaydet",
+      "code_run": "Dosyanızla çalışılıyor"
     },
     "copyText": "İçeriği kopyala",
     "copied": "Panoya kopyalandı",
@@ -2123,6 +2125,18 @@
     "expand": "Metni göster",
     "collapse": "Metni gizle",
     "redundantCollapsed": "Adım çıktısı daraltıldı — incelemek için genişletin veya aşağıdaki yanıtı okuyun."
+  },
+  "compute": {
+    "working": "Dosyanızla çalışılıyor…",
+    "done": "Sonuç dosyaları",
+    "failed": "Tamamlanamadı",
+    "quota": "Bu haftaki dosya çalışması sınırını kullandınız. Daha sonra tekrar deneyin veya bir yöneticiden yardım isteyin. Yeni bir şey kaydedilmedi.",
+    "rerun": "Değişikliklerle yeniden çalıştır",
+    "rerunNotes": "Sonraki deneme için notlar",
+    "rerunHelp": "YZ notlarınızla yeniden deneyecek",
+    "details": "Ayrıntılar",
+    "preview": "Önizleme",
+    "elapsed": "{seconds}s"
   },
   "processing": {
     "timeline": {
@@ -2763,7 +2777,8 @@
       "whatsapp": "WhatsApp",
       "widget": "Widget",
       "api": "API",
-      "generated": "Yapay zekâ üretimi"
+      "generated": "Yapay zekâ üretimi",
+      "compute": "Dosya çalışması"
     },
     "vectorState": {
       "vectorized": "Yapay zekâ ile aranabilir",
@@ -3543,9 +3558,10 @@
       "noKeys": "Henüz API anahtarı yok. Başlamak için ilk anahtarınızı oluşturun.",
       "usageCount": "istek",
       "scopes": {
-        "hint": "Tam erişim için işaretlemeyin. Bir kutuyu işaretlemek bu anahtarı Kişiler ile sınırlar.",
+        "hint": "Tam erişim için işaretlemeyin. Kişiler kutusu bu anahtarı sınırlar. Dosya işi, betik çalıştırabilmek için sohbet ve dosya kapsamları ekler — yönetici erişimi vermez.",
         "iamRead": "Kişiler — grupları görüntüle",
-        "iamManage": "Kişiler — grupları yönet"
+        "iamManage": "Kişiler — grupları yönet",
+        "computeRun": "Dosya işi — dosyalarınızın kopyalarında kısa betikler çalıştır"
       }
     },
     "desktop": {
@@ -5552,6 +5568,9 @@
     },
     "whatsapp": {
       "label": "WhatsApp kanalı"
+    },
+    "compute": {
+      "label": "Güvenli dosya çalışması"
     },
     "state": {
       "available": "Kullanılabilir",

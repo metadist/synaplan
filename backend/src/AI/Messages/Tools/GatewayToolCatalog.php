@@ -6,7 +6,9 @@ namespace App\AI\Messages\Tools;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\Entity\User;
+use App\Service\Compute\ComputeRunGrant;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
@@ -58,6 +60,8 @@ final readonly class GatewayToolCatalog
         private LoggerInterface $logger,
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
+        private ?CodeExecutionTool $codeExecutionTool = null,
+        private ?ComputeRunGrant $computeRunGrant = null,
     ) {
     }
 
@@ -66,9 +70,9 @@ final readonly class GatewayToolCatalog
      *
      * @return CatalogSnapshot
      */
-    public function build(User $user, string $sessionKey, array $requestBody): array
+    public function build(User $user, string $sessionKey, array $requestBody, ?RuntimeProfile $assistant = null): array
     {
-        $native = $this->nativeTools($user, $requestBody);
+        $native = $this->nativeTools($user, $requestBody, $assistant);
         $tools = [];
         $dispatch = [];
 
@@ -108,6 +112,10 @@ final readonly class GatewayToolCatalog
             $names[] = AnalyzeImageTool::NAME;
         }
 
+        if (null !== $this->codeExecutionTool && $this->codeExecutionTool->isAvailable($userId)) {
+            $names[] = CodeExecutionTool::NAME;
+        }
+
         return $names;
     }
 
@@ -122,9 +130,15 @@ final readonly class GatewayToolCatalog
      */
     public function replacedServerTools(array $snapshot): array
     {
-        return \in_array($snapshot['web_search'], [self::WEB_SEARCH_SYNAPLAN, self::WEB_SEARCH_OFF], true)
-            ? [WebSearchTool::NAME]
-            : [];
+        $replaced = [];
+        if (\in_array($snapshot['web_search'], [self::WEB_SEARCH_SYNAPLAN, self::WEB_SEARCH_OFF], true)) {
+            $replaced[] = WebSearchTool::NAME;
+        }
+        if (isset($snapshot['dispatch'][CodeExecutionTool::NAME])) {
+            $replaced[] = CodeExecutionTool::NAME;
+        }
+
+        return $replaced;
     }
 
     /**
@@ -188,13 +202,14 @@ final readonly class GatewayToolCatalog
      *
      * @return CatalogSnapshot
      */
-    private function nativeTools(User $user, array $requestBody): array
+    private function nativeTools(User $user, array $requestBody, ?RuntimeProfile $assistant = null): array
     {
         $snapshot = $this->empty();
         $userId = (int) $user->getId();
 
         $this->appendWebSearch($snapshot, $userId, $requestBody);
         $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
+        $this->appendCodeExecution($snapshot, $user, $requestBody, $assistant);
 
         return $snapshot;
     }
@@ -269,6 +284,30 @@ final readonly class GatewayToolCatalog
     }
 
     /**
+     * @param CatalogSnapshot      $snapshot
+     * @param array<string, mixed> $requestBody
+     */
+    private function appendCodeExecution(array &$snapshot, User $user, array $requestBody, ?RuntimeProfile $assistant): void
+    {
+        if (null === $this->codeExecutionTool || !$this->codeExecutionTool->isAvailable((int) $user->getId())) {
+            return;
+        }
+        if (null === $this->computeRunGrant || !$this->computeRunGrant->allows($user->getId(), $assistant)) {
+            return;
+        }
+        if ($this->hasClientToolNamed($requestBody, CodeExecutionTool::NAME)) {
+            return;
+        }
+
+        $this->addNativeTool(
+            $snapshot,
+            $this->codeExecutionTool->declaration(),
+            CodeExecutionTool::NAME,
+            ['readOnlyHint' => false],
+        );
+    }
+
+    /**
      * Synaplan answers the client's web search declaration itself: any mode that
      * does not hand the search to the upstream, plus a provider to run it.
      */
@@ -292,8 +331,9 @@ final readonly class GatewayToolCatalog
     /**
      * @param CatalogSnapshot                                                              $snapshot
      * @param array{name: string, description: string, input_schema: array<string, mixed>} $declaration
+     * @param array<string, mixed>                                                         $annotations
      */
-    private function addNativeTool(array &$snapshot, array $declaration, string $name): void
+    private function addNativeTool(array &$snapshot, array $declaration, string $name, array $annotations = ['readOnlyHint' => true]): void
     {
         if (isset($snapshot['dispatch'][$name])) {
             return;
@@ -304,7 +344,7 @@ final readonly class GatewayToolCatalog
             'kind' => self::KIND_NATIVE,
             'serverId' => 0,
             'tool' => $name,
-            'annotations' => ['readOnlyHint' => true],
+            'annotations' => $annotations,
         ];
     }
 

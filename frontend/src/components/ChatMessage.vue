@@ -331,6 +331,7 @@
             :guest="isGuestMode"
             @retry-task="emit('retryTask', $event)"
             @cancel-task="emit('cancelTask', $event)"
+            @followup-task="emit('followupTask', $event)"
           />
 
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
@@ -1584,6 +1585,7 @@ const emit = defineEmits<{
   /** Bubbled from a failed task card: re-run that step with another model. */
   retryTask: [payload: { prompt: string; modelId: number }]
   cancelTask: [nodeId: string]
+  followupTask: [prompt: string]
   falsePositive: [text: string, messageId?: number]
   report: [messageId: number]
   'click-memory': [memory: UserMemory]

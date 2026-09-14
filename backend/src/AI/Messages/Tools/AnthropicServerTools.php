@@ -24,6 +24,9 @@ final class AnthropicServerTools
     /** Anthropic web fetch server tool (`web_fetch_20250910`, `web_fetch_20260209`, …). */
     public const WEB_FETCH_TYPE_PREFIX = 'web_fetch_';
 
+    /** Anthropic code execution server tool (`code_execution_20250522`, …). */
+    public const CODE_EXECUTION_TYPE_PREFIX = 'code_execution_';
+
     /** Canonical name Anthropic (and Synaplan's passthrough) use for page fetch. */
     public const WEB_FETCH_NAME = 'web_fetch';
 
@@ -67,5 +70,17 @@ final class AnthropicServerTools
         return self::isServerToolDeclaration($tool)
             && \is_string($type)
             && str_starts_with($type, self::WEB_FETCH_TYPE_PREFIX);
+    }
+
+    /**
+     * @param array<string, mixed> $tool
+     */
+    public static function isCodeExecution(array $tool): bool
+    {
+        $type = $tool['type'] ?? null;
+
+        return self::isServerToolDeclaration($tool)
+            && \is_string($type)
+            && str_starts_with($type, self::CODE_EXECUTION_TYPE_PREFIX);
     }
 }

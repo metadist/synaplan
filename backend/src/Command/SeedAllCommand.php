@@ -7,6 +7,7 @@ namespace App\Command;
 use App\Seed\AgentConfigSeeder;
 use App\Seed\BrandingConfigSeeder;
 use App\Seed\BundleConfigSeeder;
+use App\Seed\ComputeConfigSeeder;
 use App\Seed\DefaultModelConfigSeeder;
 use App\Seed\DemoWidgetConfigSeeder;
 use App\Seed\DesktopAgentConfigSeeder;
@@ -125,6 +126,7 @@ final class SeedAllCommand extends Command
         private readonly PlugsConfigSeeder $plugsConfigSeeder,
         private readonly ToolsConfigSeeder $toolsConfigSeeder,
         private readonly WorkflowsConfigSeeder $workflowsConfigSeeder,
+        private readonly ComputeConfigSeeder $computeConfigSeeder,
         private readonly ModuleGateSeeder $moduleGateSeeder,
     ) {
         parent::__construct();
@@ -207,6 +209,7 @@ final class SeedAllCommand extends Command
             ['plugs', fn (): SeedResult => $this->plugsConfigSeeder->seed()],
             ['tools', fn (): SeedResult => $this->toolsConfigSeeder->seed()],
             ['workflows', fn (): SeedResult => $this->workflowsConfigSeeder->seed()],
+            ['compute', fn (): SeedResult => $this->computeConfigSeeder->seed()],
             ['module-gates', fn (): SeedResult => $this->moduleGateSeeder->seed()],
             ['demo-widget', fn (): SeedResult => $this->demoWidgetConfigSeeder->seed()],
         ];

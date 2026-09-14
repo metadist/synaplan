@@ -13,6 +13,7 @@ use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Provider\GoogleAiModule;
 use App\Module\Provider\HiggsfieldModule;
 use App\Module\Provider\TheHiveModule;
+use App\Module\Sidecar\ComputeModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
@@ -20,6 +21,7 @@ use App\Module\Sidecar\PiperTtsModule;
 use App\Module\Sidecar\SearxngModule;
 use App\Module\Sidecar\TikaModule;
 use App\Service\BillingService;
+use App\Service\Compute\ComputeConfig;
 use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\IapPricingService;
@@ -64,6 +66,7 @@ trait BuildsAllModules
                 $this->createStub(GooglePlayVerifierInterface::class),
             ),
             new WhatsappModule(false, '', ''),
+            new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
         ];
 
         $byId = [];

@@ -1303,7 +1303,8 @@
       "whatsapp": "WhatsApp",
       "widget": "Widget",
       "api": "API",
-      "generated": "AI-generated"
+      "generated": "AI-generated",
+      "compute": "File work"
     },
     "vectorState": {
       "vectorized": "Searchable by AI",
@@ -2403,9 +2404,10 @@
       "noKeys": "No API keys yet. Create your first key to get started.",
       "usageCount": "requests",
       "scopes": {
-        "hint": "Leave unchecked for full access. Checking a box limits this key to People.",
+        "hint": "Leave unchecked for full access. Checking People limits this key to People. File work adds chat and file scopes so the key can run scripts — it does not grant admin access.",
         "iamRead": "People — view groups",
-        "iamManage": "People — manage groups"
+        "iamManage": "People — manage groups",
+        "computeRun": "File work — run short scripts on copies of your files"
       }
     },
     "desktop": {
@@ -4532,7 +4534,8 @@
       "search": "Web search",
       "extract": "Text extraction",
       "email": "Email",
-      "folder": "Folder"
+      "folder": "Folder",
+      "compute": "File work"
     },
     "capability": {
       "extract_text": "Extracting text",
@@ -4553,7 +4556,8 @@
       "document_combine": "Combined PDF",
       "calendar_event": "Calendar invite",
       "email_me": "Email result",
-      "save_to_folder": "Save to folder"
+      "save_to_folder": "Save to folder",
+      "code_run": "Working with your file"
     },
     "copyText": "Copy content",
     "copied": "Copied to clipboard",
@@ -4561,6 +4565,18 @@
     "expand": "Show text",
     "collapse": "Hide text",
     "redundantCollapsed": "Step output collapsed — expand to inspect, or read the answer below."
+  },
+  "compute": {
+    "working": "Working with your file…",
+    "done": "Result files",
+    "failed": "Could not finish",
+    "quota": "You have used this week's file-work limit. Try again later, or ask an administrator. Nothing new was saved.",
+    "rerun": "Re-run with changes",
+    "rerunNotes": "Notes for the next attempt",
+    "rerunHelp": "The AI will try again with your notes",
+    "details": "Details",
+    "preview": "Preview",
+    "elapsed": "{seconds}s"
   },
   "processing": {
     "timeline": {
@@ -6537,6 +6553,9 @@
     },
     "whatsapp": {
       "label": "WhatsApp channel"
+    },
+    "compute": {
+      "label": "Secure compute (file work)"
     },
     "state": {
       "available": "Available",

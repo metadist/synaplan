@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\AI\OpenAI;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
+use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\AI\Tool\OpenAiToolShapes;
 use App\Entity\User;
+use App\Service\Compute\ComputeRunGrant;
 use App\Service\Mcp\McpClientConfig;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
+use App\Service\Runtime\RuntimeProfile;
 
 /**
  * OpenAI Chat Completions policy for Synaplan-owned tools.
@@ -40,6 +43,8 @@ final readonly class OpenAiGatewayToolCatalog
         private McpClientConfig $mcpClientConfig,
         private WebSearchTool $webSearchTool,
         private MessagesGatewayConfig $messagesGatewayConfig,
+        private ?CodeExecutionTool $codeExecutionTool = null,
+        private ?ComputeRunGrant $computeRunGrant = null,
     ) {
     }
 
@@ -48,7 +53,7 @@ final readonly class OpenAiGatewayToolCatalog
      *
      * @return CatalogSnapshot
      */
-    public function build(User $user, array $clientTools): array
+    public function build(User $user, array $clientTools, ?RuntimeProfile $assistant = null): array
     {
         $taken = $this->clientFunctionNames($clientTools);
         $tools = [];
@@ -68,6 +73,12 @@ final readonly class OpenAiGatewayToolCatalog
         if (null !== $web) {
             $tools[] = $web['openai'];
             $dispatch[WebSearchTool::NAME] = $web['dispatch'];
+        }
+
+        $code = $this->codeExecutionDeclaration($user, $taken, $assistant);
+        if (null !== $code) {
+            $tools[] = $code['openai'];
+            $dispatch[CodeExecutionTool::NAME] = $code['dispatch'];
         }
 
         return ['tools' => $tools, 'dispatch' => $dispatch];
@@ -135,6 +146,33 @@ final readonly class OpenAiGatewayToolCatalog
                 'serverId' => 0,
                 'tool' => WebSearchTool::NAME,
                 'annotations' => ['readOnlyHint' => true],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, true> $taken
+     *
+     * @return array{openai: array<string, mixed>, dispatch: DispatchEntry}|null
+     */
+    private function codeExecutionDeclaration(User $user, array $taken, ?RuntimeProfile $assistant): ?array
+    {
+        if (isset($taken[CodeExecutionTool::NAME]) || null === $this->codeExecutionTool || null === $this->computeRunGrant) {
+            return null;
+        }
+        if (!$this->computeRunGrant->allows($user->getId(), $assistant)) {
+            return null;
+        }
+
+        $openai = OpenAiToolShapes::toChatCompletionsTools([$this->codeExecutionTool->declaration()])[0];
+
+        return [
+            'openai' => $openai,
+            'dispatch' => [
+                'kind' => GatewayToolCatalog::KIND_NATIVE,
+                'serverId' => 0,
+                'tool' => CodeExecutionTool::NAME,
+                'annotations' => ['readOnlyHint' => false],
             ],
         ];
     }

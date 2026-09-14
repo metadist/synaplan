@@ -1,0 +1,8 @@
+{
+  "id": "call_code_1",
+  "type": "function",
+  "function": {
+    "name": "code_execution",
+    "arguments": "{\"language\":\"python\",\"code\":\"print(1)\",\"input_file_ids\":[12],\"timeout_sec\":30}"
+  }
+}

@@ -182,6 +182,7 @@ export const fileSourceSchema = z.enum([
   'widget',
   'api',
   'generated',
+  'compute',
 ])
 export type FileSource = z.infer<typeof fileSourceSchema>
 
@@ -194,7 +195,14 @@ export const fileVectorStateSchema = z.enum([
 ])
 export type FileVectorState = z.infer<typeof fileVectorStateSchema>
 
-export const fileOriginKindSchema = z.enum(['image', 'video', 'audio', 'calendar', 'document'])
+export const fileOriginKindSchema = z.enum([
+  'image',
+  'video',
+  'audio',
+  'calendar',
+  'document',
+  'artefact',
+])
 export type FileOriginKind = z.infer<typeof fileOriginKindSchema>
 
 export const fileItemSchema = z.object({

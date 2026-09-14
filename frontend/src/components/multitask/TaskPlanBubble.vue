@@ -30,6 +30,8 @@ const emit = defineEmits<{
   retryTask: [payload: { prompt: string; modelId: number }]
   /** Bubbled from a running TaskCard: stop that media step. */
   cancelTask: [nodeId: string]
+  /** Re-run file work with the user's notes as a new turn. */
+  followupTask: [prompt: string]
 }>()
 
 const { t, locale } = useI18n()
@@ -115,6 +117,7 @@ const onSchedule = async () => {
       :is-readonly="guest"
       @retry="emit('retryTask', $event)"
       @cancel="emit('cancelTask', $event)"
+      @followup="emit('followupTask', $event)"
     />
 
     <button

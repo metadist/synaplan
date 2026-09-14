@@ -22,8 +22,10 @@ type Map struct {
 	images map[string]Image
 }
 
-// Default is the v1 Python + Node catalog. Digests are placeholders until A3
-// publishes signed images; the @sha256: form is still required.
+// Default is the v1 Python + Node catalog. Digests here are placeholders:
+// build the images (`make images`) and replace these with the published
+// digests before the first run. The @sha256: form is required; the runner
+// never pulls.
 func Default() *Map {
 	return New([]Image{
 		{

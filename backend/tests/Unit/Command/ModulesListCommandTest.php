@@ -30,7 +30,7 @@ final class ModulesListCommandTest extends TestCase
         foreach (array_keys($this->allModules()) as $id) {
             $this->assertStringContainsString($id, $display);
         }
-        $this->assertStringContainsString('12 module(s), 0 configured.', $display);
+        $this->assertStringContainsString('13 module(s), 0 configured.', $display);
     }
 
     public function testJsonOutputHasThePresenterShape(): void
@@ -40,7 +40,7 @@ final class ModulesListCommandTest extends TestCase
         $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         $rows = json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
 
-        $this->assertCount(12, $rows);
+        $this->assertCount(13, $rows);
         $tika = array_values(array_filter($rows, static fn (array $row): bool => 'tika' === $row['id']))[0];
         $this->assertSame(['id', 'label_key', 'state', 'configured', 'healthy', 'message', 'details', 'configured_by', 'capabilities', 'docs_anchor', 'mobile_class'], array_keys($tika));
         $this->assertTrue($tika['configured']);

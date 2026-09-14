@@ -10,9 +10,9 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | A0 Spike & threat model | `sidecars/synaplan-compute` | implemented | Go/no-go: **own Go sidecar**. Threat model + HostConfig dump. |
 | A1 Runner MVP | same | implemented | Health, auth, Python/Node images, `TestHostConfigHardening`, hostile corpus scripts. |
 | A2 Workspaces & tiers | same | implemented | Workspace layout + contract fixtures. PHP never mounts `docker.sock`. |
-| A3 Freeze | — | planned | Wave 5. |
-| B1 Client & capability | — | planned | Wave 5 — PHP `ComputeClient` + `COMPUTE.ENABLED`. |
-| B2 Tools & policy | — | planned | Wave 5 — `code_run` write-class tool. |
+| A3 Freeze | `feat/wave5-compute-b2` (#1860) | implemented | Protocol 1 fixtures vendored + checksums; compose profile `compute`. `COMPUTE_TOKEN` interpolates empty so `docker compose` works without the profile. |
+| B1 Client & capability | same | implemented | FeatureModule `compute`, `ComputeClient`, `code_run`, run card, artefacts as `BFILES` `source=compute`. Flag default off. |
+| B2 Tools & policy | same | implemented | `code_execution` is offered only with `compute:run`. Write-class / unattended default `approve`. |
 | B3 Workspaces & egress | — | planned | Wave 5. |
 | B4 Hardening & GA | — | planned | Wave 5. |
 
@@ -27,8 +27,10 @@ Track 5 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | 2026-09-07 | **UX contract.** J-CP-1/2: chat-native run card, quota as a sentence, no new page. Wireframe `compute-run-card.md`. |
 | 2026-09-10 | A0–A2 land in this repo under `sidecars/synaplan-compute`. No PHP integration in Wave 4. |
 | 2026-09-10 | A0–A2 merged to `main` as [#1774](https://github.com/metadist/synaplan/pull/1774). |
-| 2026-09-10 | **Wave 5 decisions ticked:** Desktop is not the compute runtime. A3 + B1–B4 stay the next compute strain after this Tools S5 PR. `code_run` is write-class / unattended default `approve`. Cloud stays off until T2 on a compute node. Born as a feature module when B1 starts. |
-| 2026-09-13 | Research [`01_compute_vs_headless_desktop.md`](../20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md) §7: rows 1–4 and 6 settled (Desktop ≠ runtime; compute-node vocabulary; B1–B4 stay Wave 5; headless Desktop is a Desktop backlog item, not compute; doc stays in this repo). Row 5 (Wave 5 marketing name) stays open. A3 + B1 start only after Tools S5 closes. |
+| 2026-09-10 | **Wave 5 decisions ticked:** Desktop is not the compute runtime. A3 + B1–B4 stay the next compute strain after Tools S5. `code_run` is write-class / unattended default `approve`. Cloud stays off until T2 on a compute node. Born as a feature module when B1 starts. |
+| 2026-09-13 | Research [`01_compute_vs_headless_desktop.md`](../20260910-wave5-architecture-research/01_compute_vs_headless_desktop.md) §7: rows 1–4 and 6 settled (Desktop ≠ runtime; compute-node vocabulary; B1–B4 stay Wave 5; headless Desktop is a Desktop backlog item, not compute; doc stays in this repo). Row 5 (Wave 5 marketing name) stays open. |
+| 2026-09-13 | **Compose (CP30):** opt-in `compute` profile builds `sidecars/synaplan-compute` and mounts `docker.sock` **only** on that service. Backend/worker `COMPUTE_URL`/`COMPUTE_TOKEN` stay empty unless the operator sets them. |
+| 2026-09-14 | Review follow-up on #1860: unique artefact names, refuse oversized tool input, grant `compute:run` with `desktop:messages`/`desktop:files` (no `*`), enforce concurrent/CPU quotas, cancel the sidecar on PHP wait timeout, unique multipart names, fail missing inputs, document docker GID + runtime-image preload. Workspace MB stays B3. |
 
 ## Review log
 

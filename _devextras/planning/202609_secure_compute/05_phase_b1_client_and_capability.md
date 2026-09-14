@@ -147,6 +147,14 @@ bar chart of revenue per region from this file", waits for the card, asserts a `
 3. Quota exceeded for a `NEW` user is "You have used this week's file-work limit. Nothing new was saved." on the card, not a 500.
 4. Mobile-impact: PHP `backend-only`, card `ota-candidate`, policy test green.
 
+### UX contract §6 — journey J-CP-1 (ota-candidate: CS6)
+
+- First run: flag off = no card and no teaser (U11); flag on + sidecar = one primary result on the chat card.
+- Ten-second find: result files on the same card and in Files (`source=compute`).
+- Five questions on the card: owner is you; nobody else; it writes only result files; stop cancels a running step; it came from this chat turn.
+- Honest copy: quota and failure each one sentence; “nothing new was saved” when a write did not land.
+- Undo: Stop while running; result files stay in Files and can be deleted there.
+
 ---
 
 ## 5. Step table

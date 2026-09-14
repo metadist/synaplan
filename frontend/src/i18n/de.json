@@ -1432,7 +1432,8 @@
       "search": "Websuche",
       "extract": "Textextraktion",
       "email": "E-Mail",
-      "folder": "Ordner"
+      "folder": "Ordner",
+      "compute": "Dateiarbeit"
     },
     "capability": {
       "extract_text": "Text wird extrahiert",
@@ -1453,7 +1454,8 @@
       "document_combine": "Zusammengeführtes PDF",
       "calendar_event": "Kalendereinladung",
       "email_me": "E-Mail-Versand",
-      "save_to_folder": "Im Ordner speichern"
+      "save_to_folder": "Im Ordner speichern",
+      "code_run": "Arbeitet mit Ihrer Datei"
     },
     "copyText": "Inhalt kopieren",
     "copied": "In die Zwischenablage kopiert",
@@ -1461,6 +1463,18 @@
     "expand": "Text anzeigen",
     "collapse": "Text ausblenden",
     "redundantCollapsed": "Schrittausgabe eingeklappt — zum Prüfen aufklappen oder die Antwort unten lesen."
+  },
+  "compute": {
+    "working": "Arbeitet mit Ihrer Datei…",
+    "done": "Ergebnisdateien",
+    "failed": "Konnte nicht fertigstellen",
+    "quota": "Sie haben das Dateiarbeits-Kontingent dieser Woche aufgebraucht. Versuchen Sie es später erneut oder fragen Sie eine Administratorin oder einen Administrator. Es wurde nichts Neues gespeichert.",
+    "rerun": "Mit Änderungen erneut ausführen",
+    "rerunNotes": "Hinweise für den nächsten Versuch",
+    "rerunHelp": "Die KI versucht es mit Ihren Anmerkungen erneut",
+    "details": "Details",
+    "preview": "Vorschau",
+    "elapsed": "{seconds}s"
   },
   "processing": {
     "timeline": {
@@ -2549,9 +2563,10 @@
       "noKeys": "Noch keine API-Schlüssel. Erstellen Sie Ihren ersten Schlüssel.",
       "usageCount": "Anfragen",
       "scopes": {
-        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen begrenzt diesen Schlüssel auf Personen.",
+        "hint": "Leer lassen für vollen Zugriff. Ein Häkchen bei Personen begrenzt diesen Schlüssel. Dateiarbeit fügt Chat- und Dateiberechtigungen hinzu, damit Skripte laufen können — kein Admin-Zugriff.",
         "iamRead": "Personen — Gruppen ansehen",
-        "iamManage": "Personen — Gruppen verwalten"
+        "iamManage": "Personen — Gruppen verwalten",
+        "computeRun": "Dateiarbeit — kurze Skripte auf Kopien Ihrer Dateien ausführen"
       }
     },
     "desktop": {
@@ -3538,7 +3553,8 @@
       "whatsapp": "WhatsApp",
       "widget": "Widget",
       "api": "API",
-      "generated": "KI-erzeugt"
+      "generated": "KI-erzeugt",
+      "compute": "Dateiarbeit"
     },
     "vectorState": {
       "vectorized": "KI-durchsuchbar",
@@ -6471,6 +6487,9 @@
     },
     "whatsapp": {
       "label": "WhatsApp-Kanal"
+    },
+    "compute": {
+      "label": "Sichere Dateiarbeit"
     },
     "state": {
       "available": "Verfügbar",

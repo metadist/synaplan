@@ -8,6 +8,7 @@ import { useNotification } from '@/composables/useNotification'
 import type { AIModel, Capability } from '@/types/ai-models'
 import MessageText from '@/components/MessageText.vue'
 import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
+import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
 
 const props = defineProps<{
   card: TaskCard
@@ -20,6 +21,7 @@ const emit = defineEmits<{
   retry: [payload: { prompt: string; modelId: number }]
   /** Stop a running media step (per-card Stop button). */
   cancel: [nodeId: string]
+  followup: [prompt: string]
 }>()
 
 const aiConfigStore = useAiConfigStore()
@@ -42,6 +44,8 @@ const iconForKind = computed(() => {
       return 'mdi:email-outline'
     case 'folder':
       return 'mdi:folder-outline'
+    case 'compute':
+      return 'mdi:file-chart-outline'
     default:
       return 'mdi:text-box-outline'
   }
@@ -60,8 +64,10 @@ const showSkeleton = computed(
     props.card.state !== 'cancelled'
 )
 
-// Only media steps run long enough to be worth stopping; the button shows while
-// such a step is in flight.
+// Stop is wired only for media (MediaCancellationStore). Compute cancellation
+// goes through ComputeClient::cancel() on the PHP wait timeout, not this button.
+const isComputeKind = computed(() => props.card.kind === 'compute')
+
 const canCancel = computed(() => isMediaKind.value && props.card.state === 'running')
 
 // Live render progress (e.g. Higgsfield video) — a moving bar instead of a
@@ -281,7 +287,14 @@ const handleRetry = () => {
     </div>
 
     <!-- Body -->
-    <div v-if="card.state === 'failed'" class="space-y-2">
+    <ComputeRunCard
+      v-if="isComputeKind"
+      :card="card"
+      :is-readonly="isReadonly"
+      @followup="emit('followup', $event)"
+    />
+
+    <div v-else-if="card.state === 'failed'" class="space-y-2">
       <!-- Specific backend error when available, generic copy otherwise -->
       <p class="text-sm txt-muted break-words" data-testid="task-card-error">
         {{ card.error || $t('taskPlan.failedBody') }}

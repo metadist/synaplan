@@ -266,7 +266,7 @@ final class FeatureStatusReporterTest extends TestCase
     }
 
     /**
-     * All twelve descriptors (unconfigured stubs), with the three sidecars the
+     * All thirteen descriptors (unconfigured stubs), with the three sidecars the
      * page renders replaced by instances that see the scenario's URLs.
      */
     private function registry(FakeSidecarHealthProbe $probe, string $tikaUrl, string $doclingUrl, string $officeUrl, ?string $tikaUser = null, ?string $tikaPass = null): ModuleRegistry

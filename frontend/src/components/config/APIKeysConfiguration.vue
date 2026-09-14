@@ -82,6 +82,15 @@
             />
             {{ $t('config.apiKeys.scopes.iamManage') }}
           </label>
+          <label v-if="computeEnabled" class="flex items-center gap-2 text-sm txt-primary">
+            <input
+              v-model="includeComputeRun"
+              type="checkbox"
+              class="rounded border-light-border/30 dark:border-dark-border/20"
+              data-testid="checkbox-scope-compute-run"
+            />
+            {{ $t('config.apiKeys.scopes.computeRun') }}
+          </label>
         </div>
         <button
           :disabled="!newKeyName.trim() || loading"
@@ -406,7 +415,7 @@
 
 <script setup lang="ts">
 import { getErrorMessage } from '@/utils/errorMessage'
-import { ref, onMounted, onActivated, watch } from 'vue'
+import { ref, onMounted, onActivated, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   PlusIcon,
@@ -426,6 +435,7 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { getConfigSync } from '@/services/api/httpClient'
 
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
@@ -450,6 +460,8 @@ const apiKeys = ref<UIApiKey[]>([])
 const newKeyName = ref('')
 const includeIamRead = ref(false)
 const includeIamManage = ref(false)
+const includeComputeRun = ref(false)
+const computeEnabled = computed(() => getConfigSync().features?.computeEnabled === true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showKeyModal = ref(false)
@@ -499,6 +511,9 @@ const createAPIKey = async () => {
     if (includeIamManage.value) {
       scopes.push('iam:manage')
     }
+    if (includeComputeRun.value && computeEnabled.value) {
+      scopes.push('compute:run', 'desktop:messages', 'desktop:files')
+    }
     if (scopes.length === 0) {
       scopes.push('webhooks:*')
     }
@@ -528,6 +543,7 @@ const createAPIKey = async () => {
     newKeyName.value = ''
     includeIamRead.value = false
     includeIamManage.value = false
+    includeComputeRun.value = false
 
     // Show modal with the full key
     newlyCreatedKey.value = response.api_key.key

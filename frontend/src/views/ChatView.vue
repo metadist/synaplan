@@ -255,6 +255,7 @@
               @again="handleAgain"
               @retry="handleRetryMessage(message, $event)"
               @retry-task="handleTaskRetry"
+              @followup-task="handleTaskFollowup"
               @cancel-task="handleTaskCancel"
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
@@ -4766,6 +4767,21 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
  * so only that sub-task re-runs. The result arrives as a new assistant bubble;
  * the original turn (with its successful parts) is left untouched.
  */
+const handleTaskFollowup = async (prompt: string) => {
+  if (!authStore.isAuthenticated || isGuestMode.value) return
+  if (!prompt.trim()) return
+  const planMessage =
+    historyStore.messages.find((m) => m.isStreaming && m.taskPlan) ??
+    [...historyStore.messages].reverse().find((m) => m.taskPlan)
+  const messageIndex = planMessage ? historyStore.messages.indexOf(planMessage) : -1
+  const userMessage =
+    messageIndex >= 0 ? findPrecedingUserMessage(historyStore.messages, messageIndex) : null
+  const fileIds = (userMessage?.files ?? [])
+    .map((file) => file.id)
+    .filter((id) => Number.isFinite(id) && id > 0)
+  await streamAIResponse(prompt.trim(), { fileIds })
+}
+
 const handleTaskRetry = async (payload: { prompt: string; modelId: number }) => {
   if (!authStore.isAuthenticated || isGuestMode.value) return
   if (!payload.prompt || !payload.modelId) return

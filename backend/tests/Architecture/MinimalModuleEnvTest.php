@@ -38,6 +38,7 @@ final class MinimalModuleEnvTest extends TestCase
         'stripe_billing' => ['STRIPE_SECRET_KEY', 'STRIPE_PRICE_PRO', 'STRIPE_WEBHOOK_SECRET'],
         'mobile_iap' => ['IAP_PRODUCT_PRO', 'IAP_PRODUCT_TEAM', 'IAP_PRODUCT_BUSINESS'],
         'whatsapp' => ['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN'],
+        'compute' => ['COMPUTE_URL', 'COMPUTE_TOKEN'],
     ];
 
     public function testEveryDeclaredModuleHasADecisiveEnvList(): void

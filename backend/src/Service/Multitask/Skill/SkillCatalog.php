@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Skill;
 
+use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Runtime\RuntimeProfile;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
@@ -78,6 +80,10 @@ final class SkillCatalog
         $allowed = $context['allowedCapabilities'] ?? null;
         foreach (Capability::cases() as $capability) {
             if (is_array($allowed) && !in_array($capability->value, $allowed, true)) {
+                continue;
+            }
+            $profile = $context['runtime_profile'] ?? $context['assistant'] ?? null;
+            if ($profile instanceof RuntimeProfile && !AssistantSkillGate::allows($profile, $capability->value)) {
                 continue;
             }
             $descriptor = $this->byCapability[$capability->value] ?? null;

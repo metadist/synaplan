@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\AI\OpenAI;
 
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
+use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
 use App\AI\Service\AiFacade;
+use App\Entity\ComputeRun;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\ToolExecutionGate;
@@ -56,6 +59,7 @@ final readonly class OpenAiGatewayToolLoop
         private ?ToolExecutionGate $executionGate = null,
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
+        private ?CodeExecutionTool $codeExecutionTool = null,
     ) {
     }
 
@@ -72,7 +76,9 @@ final readonly class OpenAiGatewayToolLoop
         }
 
         $clientTools = isset($options['tools']) && is_array($options['tools']) ? $options['tools'] : [];
-        $snapshot = $this->catalog->build($user, $clientTools);
+        $assistant = $options['runtime_profile'] ?? null;
+        $assistant = $assistant instanceof RuntimeProfile ? $assistant : null;
+        $snapshot = $this->catalog->build($user, $clientTools, $assistant);
         $merged = $this->mergeTools($snapshot['tools'], $clientTools);
         if ([] === $merged) {
             return $this->aiFacade->chat($messages, $user->getId(), $options);
@@ -105,7 +111,7 @@ final readonly class OpenAiGatewayToolLoop
             $partition = $this->partition($toolCalls, $snapshot['dispatch']);
             if ([] !== $partition['client']) {
                 if ([] !== $partition['ours']) {
-                    $executed = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes);
+                    $executed = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
                     unset($executed);
                 }
                 $last['tool_calls'] = $partition['client'];
@@ -124,7 +130,7 @@ final readonly class OpenAiGatewayToolLoop
                 return $last;
             }
 
-            $results = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes);
+            $results = $this->executeOurs($partition['ours'], $snapshot['dispatch'], $user, $notes, $assistant);
             $messages = $this->appendToolTurn($messages, $toolCalls, $results);
         }
 
@@ -224,7 +230,7 @@ final readonly class OpenAiGatewayToolLoop
      *
      * @return list<array<string, mixed>>
      */
-    private function executeOurs(array $toolCalls, array $dispatch, User $user, array &$notes): array
+    private function executeOurs(array $toolCalls, array $dispatch, User $user, array &$notes, ?RuntimeProfile $assistant = null): array
     {
         if (count($toolCalls) > self::MAX_TOOLS_PER_TURN) {
             $toolCalls = array_slice($toolCalls, 0, self::MAX_TOOLS_PER_TURN);
@@ -254,7 +260,7 @@ final readonly class OpenAiGatewayToolLoop
                     $results[] = $gated;
                     continue;
                 }
-                $results[] = $this->executeNative($entry['tool'], $arguments, $id, $user, $notes);
+                $results[] = $this->executeNative($entry['tool'], $arguments, $id, $user, $notes, $assistant);
                 continue;
             }
 
@@ -337,17 +343,31 @@ final readonly class OpenAiGatewayToolLoop
      *
      * @return array<string, mixed>
      */
-    private function executeNative(string $tool, array $arguments, string $id, User $user, array &$notes): array
+    private function executeNative(string $tool, array $arguments, string $id, User $user, array &$notes, ?RuntimeProfile $assistant = null): array
     {
-        if (WebSearchTool::NAME !== $tool) {
-            return $this->toolMessage($id, sprintf('Unknown Synaplan tool `%s`.', $tool));
+        if (WebSearchTool::NAME === $tool) {
+            $result = $this->webSearchTool->execute($arguments);
+            $query = $result['query'];
+            $notes[] = '[web_search:'.('' !== $query ? $query : '…').']';
+
+            return $this->toolMessage($id, $this->clamp($result['text']));
         }
 
-        $result = $this->webSearchTool->execute($arguments);
-        $query = $result['query'];
-        $notes[] = '[web_search:'.('' !== $query ? $query : '…').']';
+        if (CodeExecutionTool::NAME === $tool && null !== $this->codeExecutionTool) {
+            $result = $this->codeExecutionTool->execute(
+                $arguments,
+                $user,
+                ComputeRun::VIA_GATEWAY_OPENAI,
+                $assistant,
+                null,
+                $assistant?->promptId,
+            );
+            $notes[] = '[code_execution]';
 
-        return $this->toolMessage($id, $this->clamp($result['text']));
+            return $this->toolMessage($id, $this->clamp($result['text']));
+        }
+
+        return $this->toolMessage($id, sprintf('Unknown Synaplan tool `%s`.', $tool));
     }
 
     /**

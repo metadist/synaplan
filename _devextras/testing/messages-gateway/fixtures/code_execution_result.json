@@ -1,0 +1,15 @@
+{
+  "status": "succeeded",
+  "exit_code": 0,
+  "stdout": "wrote /out/chart.png\n",
+  "stderr": "",
+  "artefacts": [
+    {
+      "file_id": 42,
+      "name": "chart.png",
+      "mime": "image/png",
+      "size": 2048
+    }
+  ],
+  "error": null
+}

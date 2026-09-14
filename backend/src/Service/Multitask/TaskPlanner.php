@@ -11,6 +11,7 @@ use App\AI\StructuredOutput\StructuredOutputConfig;
 use App\Entity\Message;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Agent\Policy\SkillPolicy;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\AttachmentDigest;
@@ -321,6 +322,14 @@ final readonly class TaskPlanner
         }
 
         $context = ['topic' => $topic, 'topic_metadata' => $topicMetadata];
+        $profile = $options['runtime_profile'] ?? null;
+        if (!$profile instanceof RuntimeProfile) {
+            $classification = is_array($options['classification'] ?? null) ? $options['classification'] : [];
+            $profile = $classification['runtime_profile'] ?? null;
+        }
+        if ($profile instanceof RuntimeProfile) {
+            $context['runtime_profile'] = $profile;
+        }
         $allowed = $this->allowedCapabilitiesFromOptions($options);
         if (null !== $allowed) {
             $context['allowedCapabilities'] = $allowed;
@@ -345,7 +354,7 @@ final readonly class TaskPlanner
             return null;
         }
 
-        return SkillPolicy::allowedCapabilities($profile);
+        return AssistantSkillGate::filterCapabilities(SkillPolicy::allowedCapabilities($profile), $profile);
     }
 
     /**

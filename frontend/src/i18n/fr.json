@@ -1303,7 +1303,8 @@
       "whatsapp": "WhatsApp",
       "widget": "Widget",
       "api": "API",
-      "generated": "Généré par l’IA"
+      "generated": "Généré par l’IA",
+      "compute": "Travail sur fichiers"
     },
     "vectorState": {
       "vectorized": "Recherchable par l’IA",
@@ -2401,9 +2402,10 @@
       "noKeys": "Aucune clé API pour le moment. Créez votre première clé pour commencer.",
       "usageCount": "requêtes",
       "scopes": {
-        "hint": "Laissez décoché pour un accès complet. Cocher une case limite cette clé à Personnes.",
+        "hint": "Laissez décoché pour un accès complet. Cocher Personnes limite cette clé. Le travail sur fichiers ajoute les portées chat et fichiers pour exécuter des scripts — pas d’accès administrateur.",
         "iamRead": "Personnes — voir les groupes",
-        "iamManage": "Personnes — gérer les groupes"
+        "iamManage": "Personnes — gérer les groupes",
+        "computeRun": "Travail sur fichiers — exécuter de courts scripts sur des copies de vos fichiers"
       }
     },
     "desktop": {
@@ -4532,7 +4534,8 @@
       "search": "Recherche Web",
       "extract": "Extraction de texte",
       "email": "E-mail",
-      "folder": "Dossier"
+      "folder": "Dossier",
+      "compute": "Travail sur fichiers"
     },
     "capability": {
       "extract_text": "Extraction du texte",
@@ -4553,7 +4556,8 @@
       "document_combine": "PDF fusionné",
       "calendar_event": "Invitation d’agenda",
       "email_me": "Résultat par e-mail",
-      "save_to_folder": "Enregistrer dans le dossier"
+      "save_to_folder": "Enregistrer dans le dossier",
+      "code_run": "Travail sur votre fichier"
     },
     "copyText": "Copier le contenu",
     "copied": "Copié dans le presse-papiers",
@@ -4561,6 +4565,18 @@
     "expand": "Afficher le texte",
     "collapse": "Masquer le texte",
     "redundantCollapsed": "Sortie de l’étape repliée — développez pour inspecter, ou lisez la réponse ci-dessous."
+  },
+  "compute": {
+    "working": "Travail en cours sur votre fichier…",
+    "done": "Fichiers résultants",
+    "failed": "Impossible de terminer",
+    "quota": "Vous avez utilisé la limite de travail sur fichiers de cette semaine. Réessayez plus tard ou demandez à un administrateur. Rien de nouveau n’a été enregistré.",
+    "rerun": "Relancer avec des modifications",
+    "rerunNotes": "Notes pour la prochaine tentative",
+    "rerunHelp": "L’IA réessaiera avec vos notes",
+    "details": "Détails",
+    "preview": "Aperçu",
+    "elapsed": "{seconds}s"
   },
   "processing": {
     "timeline": {
@@ -6537,6 +6553,9 @@
     },
     "whatsapp": {
       "label": "Canal WhatsApp"
+    },
+    "compute": {
+      "label": "Calcul sécurisé (travail sur fichiers)"
     },
     "state": {
       "available": "Disponible",

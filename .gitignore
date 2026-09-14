@@ -31,10 +31,10 @@ volumes/
 # But allow frontend source data
 !frontend/src/data/
 
-# Logs
+# Logs. Anchored: an unanchored logs/ also excludes source directories at
+# any depth (it silently swallowed sidecars/synaplan-compute/internal/logs).
+# See #1862 / #1865.
 *.log
-# Anchored: an unanchored logs/ also excludes source directories at any depth
-# (it silently swallowed sidecars/synaplan-compute/internal/logs).
 /logs/
 
 # Backend cache & build

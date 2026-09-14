@@ -39,6 +39,7 @@ class File
         'widget',
         'api',
         'generated',
+        'compute',
     ];
 
     /**
@@ -63,6 +64,7 @@ class File
         'audio',
         'calendar',
         'document',
+        'artefact',
     ];
 
     /**

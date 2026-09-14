@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Module\Sidecar;
 
+use App\Module\Sidecar\ComputeModule;
 use App\Module\Sidecar\DoclingModule;
 use App\Module\Sidecar\LocalAiModule;
 use App\Module\Sidecar\OfficeConvertModule;
@@ -13,6 +14,7 @@ use App\Module\Sidecar\TikaModule;
 use App\Plug\Extraction\Docling\DoclingClient;
 use App\Plug\PlugConfigService;
 use App\Plug\WebSearch\Client\SearxngClient;
+use App\Service\Compute\ComputeConfig;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\TikaClient;
 use App\Tests\Unit\Module\Fixture\FakeSidecarHealthProbe;
@@ -82,6 +84,7 @@ final class SidecarModulesTest extends TestCase
             new SearxngModule($probe, ''),
             new PiperTtsModule($probe, ''),
             new LocalAiModule($probe, ' '),
+            new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),
         ];
 
         foreach ($modules as $module) {
@@ -153,6 +156,20 @@ final class SidecarModulesTest extends TestCase
         $this->assertTrue($unhealthy->configured);
         $this->assertFalse($unhealthy->healthy);
         $this->assertSame('needs_setup', $unhealthy->state());
+    }
+
+    public function testComputeProbesHealthWhenUrlAndTokenAreSet(): void
+    {
+        $config = $this->createStub(ComputeConfig::class);
+        $config->method('isEnabled')->willReturn(false);
+        $up = new FakeSidecarHealthProbe(reachable: ['http://compute:8080/v1/health' => true]);
+        $module = new ComputeModule($up, $config, 'http://compute:8080', 'token');
+        $status = $module->status();
+
+        $this->assertTrue($module->isConfigured());
+        $this->assertTrue($status->healthy);
+        $this->assertSame(['http://compute:8080/v1/health'], $up->reachableCalls);
+        $this->assertSame('Secure compute is running; COMPUTE.ENABLED is off', $status->message);
     }
 
     public function testPiperReadsTheRawUrlNotTheProviderDefault(): void
