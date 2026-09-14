@@ -384,4 +384,5 @@ This file is the wave overview. It does not replace track STATUS.
 | [`20260913-use-case-research/`](./20260913-use-case-research/README.md) | Ten jobs + Perfect-UX bar; feeds Wave 5 ticks |
 | [`20260910-wave5-architecture-research/`](./20260910-wave5-architecture-research/README.md) | Compute vs Desktop; conditional modules; partner review (`03_…`) |
 | [`20260910-feature-modules/`](./20260910-feature-modules/00_master_plan.md) | Intermezzo plan of record (S1–S4 done) |
+| [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/00_master_plan.md) | Nav duplicates, reachability, wording, Operate stacked UI (NV01–NV23); awaits D1–D7 |
 | Track 4 / 5 `STATUS.md` on `main` | Tools S1–S5 (S5 open) and compute A0–A2 as implemented |
