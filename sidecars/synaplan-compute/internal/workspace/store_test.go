@@ -115,6 +115,84 @@ func TestMetadataLivesOutsideMountedTree(t *testing.T) {
 	}
 }
 
+func TestWorkspaceListsNestedFilesWithRelativePaths(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	if err := os.MkdirAll(filepath.Join(host, "reports", "2026"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"top.txt", "reports/january.csv", "reports/2026/q1.csv"} {
+		if err := os.WriteFile(filepath.Join(host, filepath.FromSlash(p)), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := s.ListFiles(meta.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Path] = true
+		if strings.HasPrefix(f.Path, "/") || strings.Contains(f.Path, host) {
+			t.Fatalf("host path leaked: %q", f.Path)
+		}
+	}
+	for _, want := range []string{"top.txt", "reports/january.csv", "reports/2026/q1.csv"} {
+		if !got[want] {
+			t.Fatalf("missing %q in %+v", want, files)
+		}
+	}
+	if len(files) != 3 {
+		t.Fatalf("directories must not be listed as files: %+v", files)
+	}
+
+	// Listing a sub-folder is relative to it, still with full relative paths.
+	sub, err := s.ListFiles(meta.ID, "reports")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sub) != 2 || !(sub[0].Path == "reports/january.csv" || sub[1].Path == "reports/january.csv") {
+		t.Fatalf("%+v", sub)
+	}
+}
+
+func TestWorkspaceListStopsAtDepthLimit(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	deep := host
+	for i := 0; i < listMaxDepth+2; i++ {
+		deep = filepath.Join(deep, "d")
+	}
+	if err := os.MkdirAll(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(deep, "buried.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(host, "d", "shallow.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := s.ListFiles(meta.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Path != "d/shallow.txt" {
+		t.Fatalf("a file beyond the depth limit must be omitted, got %+v", files)
+	}
+}
+
 func TestWorkspaceRefusesSymlinkEscape(t *testing.T) {
 	t.Parallel()
 	s := testStore(t)

@@ -189,8 +189,17 @@ func (s *Store) walkSize(id string) (int64, int) {
 	return used, files
 }
 
-// ListFiles returns regular files under rel (relative, sanitized). Symlinks
-// are never followed or listed.
+// Listing bounds: a script can create arbitrarily deep or wide trees, and the
+// response must stay small enough for one page.
+const (
+	listMaxDepth = 8
+	listMaxFiles = 2000
+)
+
+// ListFiles returns regular files under rel (relative, sanitized), walking
+// nested folders so a file at reports/january.csv is listed with that path.
+// Symlinks are never followed or listed; the walk stops at listMaxDepth
+// levels and listMaxFiles entries.
 func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 	if _, err := s.Get(id); err != nil {
 		return nil, err
@@ -200,8 +209,8 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		return nil, ErrBadName
 	}
 	base := s.hostPath(id)
-	entries, err := safepath.ReadDir(base, filepath.FromSlash(clean))
-	if err != nil {
+	out := make([]FileInfo, 0)
+	if err := s.walkFiles(base, clean, 0, &out); err != nil {
 		if os.IsNotExist(err) {
 			return []FileInfo{}, nil
 		}
@@ -210,14 +219,36 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		}
 		return nil, err
 	}
-	out := make([]FileInfo, 0, len(entries))
+	return out, nil
+}
+
+// walkFiles appends the regular files under dir (relative to base) and
+// recurses into real sub-directories. Only the top-level ReadDir error is
+// surfaced: a sub-folder that vanishes mid-walk is skipped, not fatal.
+func (s *Store) walkFiles(base, dir string, depth int, out *[]FileInfo) error {
+	entries, err := safepath.ReadDir(base, filepath.FromSlash(dir))
+	if err != nil {
+		return err
+	}
 	for _, e := range entries {
-		if e.Symlink || e.Info == nil || !e.Info.Mode().IsRegular() {
+		if len(*out) >= listMaxFiles {
+			return nil
+		}
+		if e.Symlink || e.Info == nil {
 			continue
 		}
 		relPath := e.Name
-		if clean != "" {
-			relPath = clean + "/" + e.Name
+		if dir != "" {
+			relPath = dir + "/" + e.Name
+		}
+		if e.Info.IsDir() {
+			if depth+1 < listMaxDepth {
+				_ = s.walkFiles(base, relPath, depth+1, out)
+			}
+			continue
+		}
+		if !e.Info.Mode().IsRegular() {
+			continue
 		}
 		f, st, err := safepath.OpenFile(base, filepath.FromSlash(relPath))
 		if err != nil {
@@ -225,14 +256,14 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		}
 		m := sniffOpen(f, e.Name)
 		_ = f.Close()
-		out = append(out, FileInfo{
+		*out = append(*out, FileInfo{
 			Path:       relPath,
 			Size:       st.Size(),
 			Mime:       m,
 			ModifiedAt: st.ModTime().UTC(),
 		})
 	}
-	return out, nil
+	return nil
 }
 
 // OpenFile opens a regular file with a sanitized relative path. Every path

@@ -82,6 +82,6 @@ Cancels the run: a queued run never creates a container, a running container is 
 `POST /v1/workspaces` `{ owner, quotaMb }` → 201 `{ workspaceId, quotaMb }` (opaque ULID, no path).  
 `GET /v1/workspaces/{id}/usage` · `GET .../files?path=` · `GET .../files/{path}` · `DELETE /v1/workspaces/{id}`.
 
-Metadata (`owner`, `quotaMb`) is stored outside the directory that is mounted into the sandbox (`<root>/<id>.json` next to `<root>/<id>/data`), so a script cannot rewrite it. Listing and download never follow symlinks; downloads apply the same MIME allow-list and headers as artefacts.
+Metadata (`owner`, `quotaMb`) is stored outside the directory that is mounted into the sandbox (`<root>/<id>.json` next to `<root>/<id>/data`), so a script cannot rewrite it. Listing walks nested folders under `path` and returns each regular file with its full relative path (`reports/january.csv`), bounded to 8 levels and 2000 entries; directories themselves are not rows. Listing and download never follow symlinks; downloads apply the same MIME allow-list and headers as artefacts.
 
 A run with `workspace.kind=user` must carry the same `owner` (403 `workspace_not_owned`).
