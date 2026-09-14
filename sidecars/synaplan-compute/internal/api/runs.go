@@ -371,7 +371,7 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	logDone := make(chan struct{})
 	go func() {
 		defer close(logDone)
-		_ = s.docker.Logs(logCtx, id, streamWriter{rec.Logs, "stdout"}, streamWriter{rec.Logs, "stderr"})
+		_ = s.docker.Logs(logCtx, id, streamWriter{rec.Logs, logs.Stdout}, streamWriter{rec.Logs, logs.Stderr})
 	}()
 
 	code, werr := s.docker.Wait(cctx, id)
