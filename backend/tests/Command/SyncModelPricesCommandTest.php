@@ -1088,6 +1088,92 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
     }
 
+    /**
+     * A gateway resells an upstream model under the upstream's own id, so
+     * A2Agent's `deepseek-v4-pro` collides with LiteLLM's top-level
+     * `deepseek-v4-pro` — DeepSeek's first-party rate. The two are different
+     * products at different prices, and comparing them flagged a row that
+     * matches its official page ($0.435/$0.870, a2agent.me/models).
+     */
+    public function testBareIdAtAForeignVendorIsNotMatched(): void
+    {
+        $model = $this->createModelMock('A2Agent', 'deepseek-v4-pro', 0.435, 0.87, 362);
+
+        $this->mockLiteLLMResponse([
+            'deepseek-v4-pro' => [
+                'litellm_provider' => 'deepseek',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.00000132,
+                'output_cost_per_token' => 0.00000396,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $output = $this->commandTester->getDisplay();
+        $this->assertStringContainsString('A2Agent/deepseek-v4-pro (ID 362)', $output);
+        $this->assertStringContainsString('1 unmatched', $output);
+        $this->assertStringNotContainsString('[DRY-RUN]', $output);
+    }
+
+    public function testBareIdAtTheSameVendorStillDrifts(): void
+    {
+        $model = $this->createModelMock('OpenAI', 'gpt-4o', 3.0, 15.0);
+
+        $this->mockLiteLLMResponse([
+            'gpt-4o' => [
+                'litellm_provider' => 'openai',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.00001,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] gpt-4o', $this->commandTester->getDisplay());
+    }
+
+    /**
+     * Google's bare ids are attributed to the `vertex_ai-*` families rather than
+     * to a plain "google", so the vendor aliases match as a prefix.
+     */
+    public function testBareIdMatchesGooglesVertexAiFamilies(): void
+    {
+        $model = $this->createModelMock('Google', 'gemini-2.5-pro', 1.25, 10.0);
+
+        $this->mockLiteLLMResponse([
+            'gemini-2.5-pro' => [
+                'litellm_provider' => 'vertex_ai-language-models',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.0000025,
+                'output_cost_per_token' => 0.00002,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(2, $this->commandTester->getStatusCode());
+        $this->assertStringContainsString('[DRY-RUN] gemini-2.5-pro', $this->commandTester->getDisplay());
+    }
+
     private function mockLiteLLMResponse(array $data): void
     {
         $response = $this->createMock(ResponseInterface::class);

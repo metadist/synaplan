@@ -430,17 +430,9 @@ class ModelCatalog
      * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
      */
     private const LITELLM_DEVIATIONS = [
-        // Jina raised the Search Foundation rate from $0.02 to $0.05 per 1M
-        // tokens in May 2025 (the machine-readable catalog at /v1/models lists
-        // pricing.prompt = 0.00000005 for this model). LiteLLM still carries
-        // 0.018 and mirrors it into output, which a reranker never bills.
-        'jina:jina-reranker-v2-base-multilingual' => [
-            'litellm_in' => 0.018,
-            'litellm_out' => 0.0,
-            'source' => 'https://api.jina.ai/v1/models',
-            'verifiedOn' => '2026-09-10',
-            'reason' => 'LiteLLM lists the pre-May-2025 $0.018/1M; Jina bills $0.05/1M input tokens (#1772). Upstream fix: BerriAI/litellm#40569.',
-        ],
+        // Empty: LiteLLM currently agrees with every catalog price. The Jina
+        // reranker entry (LiteLLM 0.018 against our verified 0.05) retired on
+        // 2026-09-14 — the upstream fix landed and LiteLLM now lists 0.05.
     ];
 
     /**
