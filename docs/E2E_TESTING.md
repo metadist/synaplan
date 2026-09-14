@@ -211,7 +211,7 @@ Import from `config/config.ts`:
 Every async operation must expose exactly one terminal state:
 
 * **success** → `[data-testid="message-done"]`
-* **error** → `[data-testid="message-topic-error"]`
+* **error** → `[data-testid="chat-error-notice"]`
 
 Tests must race for exactly one of them. No implicit completion detection.
 
@@ -222,7 +222,7 @@ const result = await Promise.race([
   bubble.locator(selectors.chat.messageDone)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     .then(() => 'done' as const),
-  bubble.locator(selectors.chat.messageTopicError)
+  bubble.locator(selectors.chat.chatError)
     .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
     .then(() => 'error' as const),
 ])

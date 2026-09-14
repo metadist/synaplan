@@ -240,12 +240,13 @@ field attribute), tests.
 3. (b) `make -C frontend generate-schemas`, `vue-tsc`.
 4. (b) `AdminConfigView.vue`: in a section, if **every** field is `managedBy`,
    render one **status card** instead of the fields (D2 Helm-first): which
-   keys are set from the environment / Helm, which have a UI override, one
-   sentence "A chart install does not need this page", and a `RouterLink` to
-   `/admin/setup` for an optional override. If only some fields are managed,
-   hide those and show the same status sentence below the remaining fields.
-   `ConfigField.vue` never renders a `managedBy` field. Never require a UI
-   save for helm-injected keys.
+   keys are set from the environment / Helm, which have a UI override, the
+   sentence "Provider keys are managed under AI infrastructure › Models &
+   keys." plus "A chart install does not need this page", and a `RouterLink`
+   to `/admin/setup` for an optional override. If only some fields are
+   managed, hide those and show the same status sentence below the remaining
+   fields. `ConfigField.vue` never renders a `managedBy` field. Never require
+   a UI save for helm-injected keys.
 5. (b) `ProviderKeyCard.vue`: support the optional secret (second password
    input, same chain of classes). Keep the 2-up grid (`md:grid-cols-2`).
 6. (b) Wording: `adminSetup.cloudProviders` becomes "Provider keys"; hint
@@ -259,7 +260,8 @@ field attribute), tests.
   (the coverage lock: a new provider key added to system config without a
   catalog entry fails the suite).
 - Vitest `AdminConfigView.spec.ts`: all-managed section ⇒ helm/env status
-  card (no password inputs); mixed ⇒ hidden fields + sentence.
+  card (no password inputs) that still names "AI infrastructure › Models &
+  keys"; mixed ⇒ hidden fields + sentence.
 - Vitest `ProviderKeyCard.spec.ts`: secret input appears only when
   `secretEnvVar` is set; a key with `source=env` shows the helm/env badge
   and does not look unsaved.

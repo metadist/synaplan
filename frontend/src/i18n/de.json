@@ -875,11 +875,29 @@
     "infoCost": "Kosten"
   },
   "chatError": {
-    "title": "Die Antwort ist fehlgeschlagen",
+    "title": "Die Antwort ist nicht fertig geworden",
     "retry": "Mit einem anderen Modell erneut versuchen",
     "retryWith": "Mit {model} erneut versuchen",
+    "retrySame": "Erneut versuchen",
+    "retrySameHint": "Gerade ist kein anderes Modell verfügbar. Du kannst es mit demselben noch einmal versuchen.",
+    "noRetry": "Ein anderes Modell hilft hier nicht. Warte einen Moment oder wende dich an den Support, wenn das so bleibt.",
     "chooseModel": "Anderes Modell wählen",
-    "showDetails": "Technische Details anzeigen"
+    "showDetails": "Technische Details anzeigen",
+    "partialDraft": "Der Text oben ist ein unfertiger Entwurf. Er kann unvollständig sein und wurde möglicherweise nicht gespeichert.",
+    "reason": {
+      "schema_mismatch": "Das KI-Modell konnte diese Anfrage nicht im erwarteten Format abschließen. Versuche es mit einem anderen Modell.",
+      "context_length_exceeded": "Diese Anfrage ist für das gewählte Modell zu lang. Kürze sie oder wähle ein Modell mit einem größeren Kontextfenster.",
+      "request_too_large": "Diese Anfrage ist für das gewählte Modell zu groß. Kürze sie oder wähle ein anderes Modell.",
+      "rate_limited": "Das gewählte Modell ist gerade ausgelastet. Warte einen Moment oder versuche ein anderes Modell.",
+      "quota_exceeded": "Für den gewählten KI-Dienst ist gerade kein Guthaben mehr da. Versuche es später oder wende dich an den Support.",
+      "auth_failed": "Der gewählte KI-Dienst ist gerade nicht korrekt eingerichtet. Versuche es später oder wende dich an den Support.",
+      "model_unavailable": "Das gewählte Modell ist gerade nicht verfügbar. Wähle ein anderes Modell.",
+      "content_filtered": "Der KI-Dienst hat diese Anfrage abgelehnt. Formuliere sie um oder wähle ein anderes Modell.",
+      "timeout": "Das gewählte Modell hat zu lange für eine Antwort gebraucht. Versuche es erneut oder wähle ein anderes Modell.",
+      "upstream_unavailable": "Der gewählte KI-Dienst ist vorübergehend nicht erreichbar. Versuche es erneut oder wähle ein anderes Modell.",
+      "unknown": "Bei der Antwort ist etwas schiefgelaufen. Es wurde keine endgültige Antwort gespeichert.",
+      "empty_answer": "Der Schritt sieht fertig aus, aber die Antwort wurde in diesem Chat nicht gespeichert."
+    }
   },
   "commands": {
     "noResults": "Keine Befehle gefunden",

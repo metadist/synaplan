@@ -879,11 +879,29 @@
     "infoCost": "Coût"
   },
   "chatError": {
-    "title": "La réponse a échoué",
+    "title": "La réponse n’est pas allée jusqu’au bout",
     "retry": "Réessayer avec un autre modèle",
     "retryWith": "Réessayer avec {model}",
+    "retrySame": "Réessayer",
+    "retrySameHint": "Aucun autre modèle n’est disponible pour le moment. Tu peux réessayer avec le même.",
+    "noRetry": "Changer de modèle n’aidera pas. Attends un moment, ou contacte le support si cela continue.",
     "chooseModel": "Choisir un autre modèle",
-    "showDetails": "Afficher les détails techniques"
+    "showDetails": "Afficher les détails techniques",
+    "partialDraft": "Le texte ci-dessus est un brouillon inachevé. Il peut être incomplet, et il n’a peut-être pas été enregistré.",
+    "reason": {
+      "schema_mismatch": "Le modèle d’IA n’a pas pu terminer cette demande au format attendu. Réessaie avec un autre modèle.",
+      "context_length_exceeded": "Cette demande est trop longue pour le modèle sélectionné. Raccourcis-la ou choisis un modèle avec plus de contexte.",
+      "request_too_large": "Cette demande est trop volumineuse pour le modèle sélectionné. Raccourcis-la ou choisis un autre modèle.",
+      "rate_limited": "Le modèle sélectionné est occupé pour le moment. Attends un instant ou essaie un autre modèle.",
+      "quota_exceeded": "Le service d’IA sélectionné n’a plus de crédit. Réessaie plus tard ou contacte le support.",
+      "auth_failed": "Le service d’IA sélectionné n’est pas correctement configuré pour le moment. Réessaie plus tard ou contacte le support.",
+      "model_unavailable": "Le modèle sélectionné n’est pas disponible pour le moment. Essaie un autre modèle.",
+      "content_filtered": "Le service d’IA a refusé cette demande. Reformule-la ou essaie un autre modèle.",
+      "timeout": "Le modèle sélectionné a mis trop de temps à répondre. Réessaie ou change de modèle.",
+      "upstream_unavailable": "Le service d’IA sélectionné est temporairement indisponible. Réessaie ou change de modèle.",
+      "unknown": "Un problème est survenu pendant la réponse. Aucune réponse définitive n’a été enregistrée.",
+      "empty_answer": "L’étape a l’air terminée, mais la réponse n’a pas été enregistrée dans cette conversation."
+    }
   },
   "commands": {
     "noResults": "Aucune commande trouvée",

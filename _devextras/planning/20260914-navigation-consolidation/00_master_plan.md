@@ -73,7 +73,7 @@ rail items, any new API except the small `managedBy` hint in NV05.
 | `O035` People › Linked platforms | Same label as `M063` | **Platform instances** + one-sentence cross-link to `M063` | NV03 |
 | `M063` Connections › Linked platforms | — | Unchanged label; cross-link sentence to `O035` for admins | NV03 |
 | `O019` System configuration › AI Services | Raw key fields for 10+ providers | Key fields **hidden**; status card: helm/env vs UI override + pointer → `O013`; non-key fields stay | NV05 |
-| `O013` AI infrastructure › Models & keys | Provider key cards | **The** web editor for instance keys. Helm/env still load with zero UI clicks | NV05 |
+| `O013` AI infrastructure › Models & keys | Provider key cards | **The** web editor for instance keys (covers every key `O019` hid). Helm/env still load with zero UI clicks | NV05 |
 | `M015` Higgsfield (no menu entry) | Reachable by URL only | Section of new **`M021` Your AI accounts** (`/ai/providers`); old URL redirects | NV04 |
 | `M033` Coding clients › BYO Anthropic key | Inline block | Moves to `M021`; Coding clients keeps a pointer sentence | NV04 |
 | `M060` Configure Connections | Under Connections, gated by Saved tasks flag | Renamed **Connected apps**, stays in Connections; **ungated** for every signed-in user (D5) | NV06, NV10 |
@@ -106,11 +106,23 @@ New handles for the Confluence re-sync (NV23): `W029` All chats page,
 | D2 | Cards + env (Helm-first) | **Models & keys** is the only *web* editor. Helm / env / chart secrets stay the source of truth and work with **zero UI clicks**. System configuration hides duplicate password fields and shows a status card: set from the environment / Helm, change it in the chart, or override under Models & keys. |
 | D3 | Page everywhere | `/memories`; badge → `/memories?highlight=`; `MemoriesDialog.vue` deleted. |
 | D4 | Your AI accounts | `/ai/providers` under Manage › Assistants: Higgsfield + BYO Anthropic. Old Higgsfield URL redirects. |
-| D5 | **Ungate** (flipped from the plan default) | **Connected apps** is visible to every signed-in user, even when Saved tasks is off. |
+| D5 | **Ungate** (flipped from the plan default) | **Connected apps** is visible to every signed-in user, even when Saved tasks is off. Custom tools on that page stay behind `features.toolsCustomHttpEnabled` (U11). Revisit the page shape when custom tools get their own module. |
 | D6 | Stacked sections | Operate dashboard (`/admin`) becomes foldable sections; `?tab=` → `?section=`. |
 | D7 | In-chat summarize | Tools › *Summarize a document* (attach + length/language). Page retired. `/api/v1/summary/generate` stays. |
 
 Interview notes: D2 was re-asked after the Helm/K8s turn-key constraint. D5 is the only flip vs the written recommendation.
+
+Alternatives considered before the lock (kept so the rejected options stay visible):
+
+| # | Rejected alternative |
+| - | -------------------- |
+| D1 | Keep the archive inside Usage under a clearer heading (no new route) |
+| D2 | Reverse: hide the Models & keys cards, keep editing keys on the System configuration tab |
+| D3 | Dialog on every device (mobile as full-screen sheet); `/memories` opens the dialog over the chat |
+| D4 | Only make Higgsfield a menu child; leave BYOK on Coding clients |
+| D5 | Keep the Saved-tasks flag gate (the page hosts OAuth apps whose only consumer today is Saved tasks) |
+| D6 | Keep Operate tabs, only densify |
+| D7 | Keep the Summarizer page but move the menu entry under Tools only |
 
 ---
 
@@ -120,7 +132,7 @@ Interview notes: D2 was re-asked after the Helm/K8s turn-key constraint. D5 is t
 | -- | ------- | ------ |
 | J-NV-1 | **One place for people.** Admin (IAM groups off) opens Operate › People, finds a user, edits the level. Bookmark `/admin?tab=users` lands on the same page. Operate dashboard shows no Users tab. | A |
 | J-NV-2 | **Find an old chat.** User opens History › Show all → All chats, searches, opens it. A colleague's shared chat appears under the *Incoming* tab and via Account › Incoming chats. Usage page shows usage only. Bookmark `/statistics#chats` lands on All chats. | A |
-| J-NV-3 | **One key, one place.** A Helm install with keys only in secrets never needs the UI. An admin who *does* open Operate sees Models & keys as the editor; System configuration › AI services shows helm/env status and no password fields. Same admin, as a user, opens Manage › Your AI accounts, saves a Higgsfield key, clicks Test, sees a human result; bookmark `/ai/providers/higgsfield` lands on that section. | A |
+| J-NV-3 | **One key, one place.** A Helm install with keys only in secrets never needs the UI. An admin who *does* open Operate sees Models & keys as the editor; System configuration › AI services shows helm/env status, the sentence "Keys are managed under AI infrastructure", and no password fields. Same admin, as a user, opens Manage › Your AI accounts, saves a Higgsfield key, clicks Test, sees a human result; bookmark `/ai/providers/higgsfield` lands on that section. | A |
 | J-NV-4 | **Summarize in the chat.** User opens Tools › Summarize a document, attaches a PDF, sends; the summary is an answer in the thread. Bookmark `/ai/summarizer` opens the chat with the tool ready. No Summarizer menu entry anywhere. | A |
 | J-NV-5 | **Memories one way.** Desktop and mobile: Account › Memories opens the same page. In a chat, a memory badge opens the page with that memory highlighted; browser Back returns to the same chat. | A |
 | J-NV-6 | **Operator overview in one scroll.** Admin opens Operate: stacked sections (Overview open, others folded), 4 status cards on top; `?section=usage` opens and scrolls to Usage; System status shows 4 cards per row with fold-out details; 320 px has no overflow; dark and V2 pass. | C |

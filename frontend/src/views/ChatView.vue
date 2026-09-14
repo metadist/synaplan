@@ -216,6 +216,7 @@
               :original-topic="message.originalTopic"
               :original-media-type="message.originalMediaType"
               :error-reason="message.errorReason"
+              :error-message="message.errorMessage"
               :can-retry-model="message.canRetryModel"
               :error-debug="message.errorDebug"
               :again-data="message.againData"
@@ -592,6 +593,10 @@ import { stripPastedBlocks } from '@/utils/pastedContent'
 import { scheduleSourceFromParts } from '@/utils/scheduleSource'
 import { AudioStreamer } from '@/utils/AudioStreamer'
 import { isRecoverableStreamError, isCancellationError } from '@/utils/streamError'
+import {
+  chatErrorSuggestsOtherModel,
+  shouldFinishWithoutErrorOnTransportDrop,
+} from '@/utils/chatErrorDisplay'
 import { httpClient } from '@/services/api/httpClient'
 import { pluginCommands } from '@/stores/commands'
 import { i18n } from '@/i18n'
@@ -4165,8 +4170,12 @@ const streamAIResponse = async (
               }
               if (typeof data.errorReason === 'string' && data.errorReason !== '') {
                 message.errorReason = data.errorReason
-                message.canRetryModel = data.canRetryModel === true
+                message.canRetryModel =
+                  data.canRetryModel !== false && chatErrorSuggestsOtherModel(data.errorReason)
                 message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+                if (typeof data.error === 'string' && data.error.trim() !== '') {
+                  message.errorMessage = data.error
+                }
               }
 
               if (data.error_hint === 'vision_model_required') {
@@ -4244,27 +4253,25 @@ const streamAIResponse = async (
             processingStatus.value = ''
             processingMetadata.value = {}
 
-            // Issue #1265: a pure SSE transport drop is NOT a turn failure — the
-            // backend keeps the turn alive after the client disconnects (#1230)
-            // and persists the answer. Instead of leaving a phantom "Connection
-            // interrupted" bubble that disappears on refresh, reconcile with the
-            // server so the live view matches what a reload would show: the
-            // persisted answer, or (for a still-running turn) the in-progress
-            // task cards (#1142). Only genuine backend errors fall through to the
-            // error-bubble path below.
-            if (isRecoverableStreamError(data) && !incognito && chatId) {
-              historyStore.finishStreamingMessage(messageId)
-              // #1413: the drop can land before the still-running turn has
-              // persisted its answer. Re-poll the persisted turn with bounded
-              // backoff instead of reconciling exactly once, so the answer
-              // renders without a manual reload (which otherwise invites a
-              // duplicate re-send).
-              void historyStore.recoverInterruptedTurn(chatId)
-              streamingAbortController = null
-              stopStreamingFn = null
-              currentTrackId = undefined
-              currentStreamingChatId = undefined
-              return
+            // Issue #1265: a pure SSE transport drop is NOT a turn failure.
+            // Persisted chats: reconcile with the server (#1230 / #1142 / #1413).
+            // Incognito (no chat row): keep whatever already streamed. Painting
+            // "Connection interrupted" on a finished demo reply is U8-false —
+            // the in-memory draft is the only copy and it is already on screen.
+            if (isRecoverableStreamError(data)) {
+              const dropped = historyStore.messages.find((m) => m.id === messageId)
+              const canReconcile = !incognito && Boolean(chatId)
+              if (shouldFinishWithoutErrorOnTransportDrop({ canReconcile, message: dropped })) {
+                historyStore.finishStreamingMessage(messageId)
+                if (canReconcile && chatId) {
+                  void historyStore.recoverInterruptedTurn(chatId)
+                }
+                streamingAbortController = null
+                stopStreamingFn = null
+                currentTrackId = undefined
+                currentStreamingChatId = undefined
+                return
+              }
             }
 
             // Update message metadata from error event so status/provider/topic
@@ -4431,8 +4438,19 @@ const streamAIResponse = async (
                 typeof data.errorReason === 'string' && data.errorReason !== ''
                   ? data.errorReason
                   : 'unknown'
-              message.canRetryModel = data.canRetryModel === true
+              message.canRetryModel =
+                data.canRetryModel !== false && chatErrorSuggestsOtherModel(message.errorReason)
               message.errorDebug = typeof data.errorDebug === 'string' ? data.errorDebug : null
+              // Only the backend-classified sentence is user-safe. Transport
+              // strings ("Connection failed (HTTP 500)") stay off the notice.
+              if (
+                typeof data.errorReason === 'string' &&
+                data.errorReason !== '' &&
+                typeof data.error === 'string' &&
+                data.error.trim() !== ''
+              ) {
+                message.errorMessage = data.error
+              }
             }
             if (!hasContent) {
               // `errorMsg` is the localized text the backend also persists as the
@@ -4727,9 +4745,13 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
     return
   }
 
-  const assistantMessage = historyStore.messages.find(
-    (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
-  )
+  const assistantMessage =
+    backendMessageId > 0
+      ? historyStore.messages.find(
+          (m) => m.backendMessageId === backendMessageId && m.role === 'assistant'
+        )
+      : (historyStore.messages.find((m) => m.id === IN_PROGRESS_TURN_ID) ??
+        [...historyStore.messages].reverse().find((m) => m.role === 'assistant' && !!m.errorReason))
 
   if (!assistantMessage) {
     console.error('❌ Could not find assistant message with backendMessageId:', backendMessageId)
