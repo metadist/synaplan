@@ -6408,9 +6408,14 @@
     "resultFailed": "{count} failed",
     "kind": {
       "agents": "Assistants",
-      "prompts": "Instructions"
+      "prompts": "Instructions",
+      "saved_tasks": "Saved tasks"
     },
     "check": {
+      "needsAssistant": "Needs an AI assistant — pick one after import ({key})",
+      "needsTool": "Needs a tool named {detail}",
+      "needsConnection": "Needs a connection named {detail}",
+      "unknownKey": "This file has a field this Synaplan does not know ({detail})",
       "needsModel": "Needs a model — pick one after import ({key})",
       "needsKey": "Needs a key — add it under Connections ({key})",
       "needsMcpServer": "Needs an MCP server named {detail}",
@@ -6618,6 +6623,12 @@
     "secretRevealTitle": "Your shared secret — copy it now",
     "secretRevealHint": "Paste it into the other system. It is shown only this once and cannot be retrieved later.",
     "copySecret": "Copy secret",
-    "secretCopied": "Secret copied."
+    "secretCopied": "Secret copied.",
+    "saveAsTemplate": "Save as template",
+    "useTemplate": "Use template",
+    "useTemplateConfirm": "Create your own copy? It stays off until you turn it on. A new address is created if another system can start this task.",
+    "useTemplateDone": "Copy created. It is off until you turn it on.",
+    "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
+    "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}."
   }
 }

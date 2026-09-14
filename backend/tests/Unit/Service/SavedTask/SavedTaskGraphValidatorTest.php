@@ -175,4 +175,34 @@ final class SavedTaskGraphValidatorTest extends TestCase
         );
         $this->assertContains("step[1] input 'input' must come from an earlier step this step depends on", $from);
     }
+
+    public function testFixtureCorpusLoads(): void
+    {
+        $config = $this->createMock(WorkflowsConfig::class);
+        $config->method('isBuilderEnabled')->willReturn(true);
+        $ssrf = $this->createMock(SsrfGuard::class);
+        $ssrf->method('isBlockedUrl')->willReturn(false);
+        $validator = new SavedTaskGraphValidator($config, $ssrf);
+
+        $dir = dirname(__DIR__, 3).'/Fixtures/saved_task_graphs';
+        foreach (glob($dir.'/*.json') ?: [] as $file) {
+            $graph = json_decode((string) file_get_contents($file), true);
+            self::assertIsArray($graph, $file);
+            $trigger = is_string($graph['trigger']['type'] ?? null) ? $graph['trigger']['type'] : 'manual';
+            $errors = $validator->validate($graph, $trigger, SavedTaskGraphValidatorTest::triggerConfig($trigger));
+            self::assertSame([], $errors, basename($file).': '.implode('; ', $errors));
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function triggerConfig(string $trigger): ?array
+    {
+        return match ($trigger) {
+            'schedule' => ['kind' => 'weekly', 'at' => '08:00'],
+            'webhook' => ['token' => 'fixture-token'],
+            default => null,
+        };
+    }
 }

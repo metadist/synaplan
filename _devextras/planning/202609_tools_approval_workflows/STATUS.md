@@ -11,7 +11,7 @@ Track 4 of [`../20260903_roadmap.md`](../20260903_roadmap.md). Plan of record:
 | S2 Policy & interactive approval | same | implemented | `ApprovalPolicy` truth table, `ApprovalCard`, inbox at Manage → Automations → Approvals, SSE/realtime, instant/digest notify. On for new installs (#1827). |
 | S3 Unattended approval | same | implemented | Pause/resume Saved Task runs, 72 h expiry, waiting pill on the task card. |
 | S4 Custom tools | same | implemented | HTTP + OpenAPI import, SSRF, Connections UI, `custom_tools` + `mcp_servers` bundle sections (never tokens). On for new installs (#1827). |
-| S5 Workflow builder v1 + webhook trigger | `feat/wave5-workflow-builder` | in progress on `main` (#1821) | Steps + webhook landed. Seeder default on (#1827). Open: TL41 templates, TL45 `saved_tasks` bundle section, TL46 C7 + five-step run, TL47 docs, J-TL-5 walk. Interactive approve still does not continue the chat turn (Q1). |
+| S5 Workflow builder v1 + webhook trigger | `feat/wave5-s5-templates-and-bundle` | in progress | Steps + webhook on `main` (#1821). This branch: TL41 templates/copy checklist, TL45 `saved_tasks` bundle, TL46 C7 fixtures + five-step proof, TL47 docs. Builder flag seeded on for new installs (#1827). Q1 (approve continues the chat turn) stays open. |
 
 ## Decisions
 
@@ -49,3 +49,16 @@ again; custom HTTP pins DNS, caps streamed bodies, and rejects a templated
 origin. The scheduler expires pending approvals hourly and sends the daily
 digest. Interactive chat approvals still execute the tool on approve but do
 **not** continue the turn as a new assistant message — deferred to Wave 5.
+
+**2026-09-13 (S5 remainder):** Templates are IAM shares (`saved_task` + `use`).
+Copy/import stay paused, strip secrets, regenerate webhook tokens, and return a
+checklist instead of 409 when the assistant or a tool is missing. The
+`saved_tasks` bundle section depends on `prompts` and `mcp_servers`. Five-step fixture
+`builder_five_step.json` plus the shipped graphs load through the validator and
+plan factory. Track directory stays here until this branch is on `main`.
+
+**2026-09-13 (S5 Copilot follow-up):** Copy/import strip inbound-email `accountId`
+(remap only when the destination owns that mailbox or has exactly one), refuse
+disabled assistants/MCP servers, keep remappable `mcp:ServerName:tool` names,
+never export a dangling numeric MCP id, recompute `nextRunAt` on copy/import
+and when a schedule is enabled, and always use template wording for Use template.

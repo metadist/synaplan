@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "trigger": { "type": "manual" },
+  "nodes": [
+    { "id": "n1", "capability": "chat", "depends_on": [] },
+    { "id": "n2", "capability": "email_me", "depends_on": ["n1"] }
+  ]
+}

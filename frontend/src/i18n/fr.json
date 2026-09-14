@@ -6408,9 +6408,14 @@
     "resultFailed": "{count} en échec",
     "kind": {
       "agents": "Assistants",
-      "prompts": "Consignes"
+      "prompts": "Consignes",
+      "saved_tasks": "Tâches enregistrées"
     },
     "check": {
+      "needsAssistant": "Il manque un assistant IA — choisissez-en un après l’import ({key})",
+      "needsTool": "Il manque un outil nommé {detail}",
+      "needsConnection": "Il manque une connexion nommée {detail}",
+      "unknownKey": "Ce fichier a un champ que ce Synaplan ne connaît pas ({detail})",
       "needsModel": "Il manque un modèle — choisissez-en un après l’import ({key})",
       "needsKey": "Il manque une clé — ajoutez-la dans Connexions ({key})",
       "needsMcpServer": "Il manque un serveur MCP nommé {detail}",
@@ -6618,6 +6623,12 @@
     "secretRevealTitle": "Votre secret partagé — copiez-le maintenant",
     "secretRevealHint": "Collez-le dans l’autre système. Il n’est affiché que cette fois et ne pourra pas être récupéré plus tard.",
     "copySecret": "Copier le secret",
-    "secretCopied": "Secret copié."
+    "secretCopied": "Secret copié.",
+    "saveAsTemplate": "Enregistrer comme modèle",
+    "useTemplate": "Utiliser le modèle",
+    "useTemplateConfirm": "Créer votre propre copie ? Elle reste désactivée jusqu’à ce que vous l’activiez. Une nouvelle adresse est créée si un autre système peut démarrer cette tâche.",
+    "useTemplateDone": "Copie créée. Elle est désactivée jusqu’à ce que vous l’activiez.",
+    "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer.",
+    "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}."
   }
 }

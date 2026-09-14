@@ -9,18 +9,24 @@ const {
   mockRuns,
   mockResume,
   mockRemove,
+  mockCopy,
   mockPush,
   mockConfirm,
+  mockSuccess,
   mockWorkflowsEnabled,
+  mockIamSharing,
 } = vi.hoisted(() => ({
   mockUpdate: vi.fn(),
   mockRun: vi.fn(),
   mockRuns: vi.fn(),
   mockResume: vi.fn(),
   mockRemove: vi.fn(),
+  mockCopy: vi.fn(),
   mockPush: vi.fn(),
   mockConfirm: vi.fn(),
+  mockSuccess: vi.fn(),
   mockWorkflowsEnabled: vi.fn(() => false),
+  mockIamSharing: vi.fn(() => false),
 }))
 
 vi.mock('@/services/api/savedTasksApi', () => ({
@@ -30,15 +36,16 @@ vi.mock('@/services/api/savedTasksApi', () => ({
     runs: mockRuns,
     resume: mockResume,
     remove: mockRemove,
+    copy: mockCopy,
   },
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success: mockSuccess, error: vi.fn() }),
 }))
 
 vi.mock('@/composables/useIamFeature', () => ({
-  isIamSharingEnabled: () => false,
+  isIamSharingEnabled: () => mockIamSharing(),
 }))
 
 vi.mock('@/composables/useWorkflowsFeature', () => ({
@@ -94,9 +101,9 @@ function run(overrides: Partial<SavedTaskRun> = {}): SavedTaskRun {
   }
 }
 
-const mountCard = (value: SavedTask) =>
+const mountCard = (value: SavedTask, extra: { sharedView?: boolean } = {}) =>
   mount(SavedTaskCard, {
-    props: { task: value },
+    props: { task: value, sharedView: extra.sharedView },
     global: {
       stubs: { Icon: true, ShareDialog: true, SavedTaskStepsEditor: true },
     },
@@ -106,6 +113,7 @@ describe('SavedTaskCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockWorkflowsEnabled.mockReturnValue(false)
+    mockIamSharing.mockReturnValue(false)
     mockConfirm.mockResolvedValue(false)
     mockUpdate.mockImplementation(async (_id: number, patch: Record<string, unknown>) =>
       task({ ...patch } as Partial<SavedTask>)
@@ -303,6 +311,62 @@ describe('SavedTaskCard', () => {
     mockWorkflowsEnabled.mockReturnValue(true)
     const wrapper = mountCard(task())
     expect(wrapper.find('[data-testid="btn-saved-task-steps"]').exists()).toBe(true)
+  })
+
+  it('labels the shared action Use template when the builder is on', () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    const wrapper = mountCard(task(), { sharedView: true })
+    expect(wrapper.get('[data-testid="btn-run-copy"]').text()).toContain('Use template')
+  })
+
+  it('uses template wording for a shared copy when the builder is off', async () => {
+    mockWorkflowsEnabled.mockReturnValue(false)
+    mockConfirm.mockResolvedValue(true)
+    mockCopy.mockResolvedValue({ task: task({ id: 99, enabled: false }), checklist: [] })
+    const wrapper = mountCard(task(), { sharedView: true })
+    expect(wrapper.get('[data-testid="btn-run-copy"]').text()).toContain('Use template')
+    await wrapper.get('[data-testid="btn-run-copy"]').trigger('click')
+    await flushPromises()
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Use template',
+      })
+    )
+    expect(mockSuccess).toHaveBeenCalledWith('Copy created. It is off until you turn it on.')
+  })
+
+  it('labels Share as Save as template when the builder is on', () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    mockIamSharing.mockReturnValue(true)
+    const wrapper = mountCard(task())
+    expect(wrapper.get('[data-testid="btn-share-saved-task"]').text()).toContain('Save as template')
+  })
+
+  it('creates a paused copy and says what still needs connecting', async () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    mockConfirm.mockResolvedValue(true)
+    mockCopy.mockResolvedValue({
+      task: task({ id: 99, enabled: false }),
+      checklist: [{ code: 'needsAssistant', itemKey: 'sales', detail: 'sales' }],
+    })
+    const wrapper = mountCard(task(), { sharedView: true })
+    await wrapper.get('[data-testid="btn-run-copy"]').trigger('click')
+    await flushPromises()
+    expect(mockCopy).toHaveBeenCalledWith(7)
+    expect(wrapper.emitted('copied')).toEqual([
+      [expect.objectContaining({ id: 99, enabled: false })],
+    ])
+    expect(mockSuccess).toHaveBeenCalledWith('Copy created and left off. Still needed: sales.')
+  })
+
+  it('confirms a ready template copy stays off', async () => {
+    mockWorkflowsEnabled.mockReturnValue(true)
+    mockConfirm.mockResolvedValue(true)
+    mockCopy.mockResolvedValue({ task: task({ id: 99, enabled: false }), checklist: [] })
+    const wrapper = mountCard(task(), { sharedView: true })
+    await wrapper.get('[data-testid="btn-run-copy"]').trigger('click')
+    await flushPromises()
+    expect(mockSuccess).toHaveBeenCalledWith('Copy created. It is off until you turn it on.')
   })
 
   it('shows the webhook address and reveals a fresh shared secret exactly once', async () => {

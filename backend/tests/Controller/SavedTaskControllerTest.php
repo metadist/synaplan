@@ -91,7 +91,7 @@ final class SavedTaskControllerTest extends WebTestCase
         self::assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
     }
 
-    public function testCopyCreatesManualOwnedTask(): void
+    public function testCopyCreatesPausedOwnedTask(): void
     {
         $this->enableSharing();
         $owner = $this->createUser('task-copy-owner@synaplan.internal');
@@ -123,19 +123,23 @@ final class SavedTaskControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/saved-tasks/'.$task->getId().'/copy');
         self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
-        $copy = $this->json()['task'];
+        $body = $this->json();
+        $copy = $body['task'];
         self::assertNotSame($task->getId(), $copy['id']);
-        self::assertSame('manual', $copy['triggerType']);
+        self::assertSame('schedule', $copy['triggerType']);
+        self::assertFalse($copy['enabled']);
         self::assertFalse($copy['allowUnattended']);
         self::assertNull($copy['chatId']);
         self::assertSame((int) $prompt->getId(), $copy['promptId']);
+        self::assertSame([], $body['checklist']);
     }
 
-    public function testCopyWithoutAssistantAccessIs409(): void
+    public function testCopyWithoutAssistantAccessReturnsChecklist(): void
     {
         $this->enableSharing();
         $owner = $this->createUser('task-409-owner@synaplan.internal');
         $member = $this->createUser('task-409-member@synaplan.internal');
+        $this->createPrompt((int) $member->getId(), 'task-409-mine', 'My Assistant');
         $prompt = $this->createPrompt((int) $owner->getId(), 'task-409-asst', 'Hidden Assistant');
         $task = $this->createTask((int) $owner->getId(), (int) $prompt->getId(), 'Needs assistant');
 
@@ -152,8 +156,10 @@ final class SavedTaskControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $member);
         $this->client->request('POST', '/api/v1/saved-tasks/'.$task->getId().'/copy');
 
-        self::assertSame(Response::HTTP_CONFLICT, $this->client->getResponse()->getStatusCode());
-        self::assertSame('iam.assistantNotShared', $this->json()['error']);
+        self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertFalse($body['task']['enabled']);
+        self::assertContains('needsAssistant', array_column($body['checklist'], 'code'));
     }
 
     private function enableSharing(): void

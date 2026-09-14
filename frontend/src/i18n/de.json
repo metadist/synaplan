@@ -6342,9 +6342,14 @@
     "resultFailed": "{count} fehlgeschlagen",
     "kind": {
       "agents": "Assistenten",
-      "prompts": "Anweisungen"
+      "prompts": "Anweisungen",
+      "saved_tasks": "Gespeicherte Aufgaben"
     },
     "check": {
+      "needsAssistant": "Braucht einen KI-Assistenten — nach dem Import einen wählen ({key})",
+      "needsTool": "Braucht ein Werkzeug namens {detail}",
+      "needsConnection": "Braucht eine Verbindung namens {detail}",
+      "unknownKey": "Diese Datei hat ein Feld, das dieses Synaplan nicht kennt ({detail})",
       "needsModel": "Braucht ein Modell — nach dem Import eines wählen ({key})",
       "needsKey": "Braucht einen Schlüssel — unter Verbindungen hinzufügen ({key})",
       "needsMcpServer": "Braucht einen MCP-Server namens {detail}",
@@ -6552,6 +6557,12 @@
     "secretRevealTitle": "Dein gemeinsames Geheimnis – jetzt kopieren",
     "secretRevealHint": "Füge es im anderen System ein. Es wird nur dieses eine Mal angezeigt und kann später nicht abgerufen werden.",
     "copySecret": "Geheimnis kopieren",
-    "secretCopied": "Geheimnis kopiert."
+    "secretCopied": "Geheimnis kopiert.",
+    "saveAsTemplate": "Als Vorlage speichern",
+    "useTemplate": "Vorlage verwenden",
+    "useTemplateConfirm": "Eigene Kopie anlegen? Sie bleibt aus, bis Sie sie einschalten. Eine neue Adresse wird erzeugt, wenn ein anderes System diese Aufgabe starten kann.",
+    "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
+    "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
+    "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}."
   }
 }

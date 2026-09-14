@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "trigger": { "type": "schedule" },
+  "nodes": [
+    {
+      "id": "n1",
+      "capability": "url_fetch",
+      "depends_on": [],
+      "inputs": { "urls": "https://example.com/news" }
+    },
+    {
+      "id": "n2",
+      "capability": "chat",
+      "depends_on": ["n1"],
+      "inputs": { "text": "$n1.text" }
+    }
+  ]
+}

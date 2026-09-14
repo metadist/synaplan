@@ -112,6 +112,27 @@ final class SavedTaskServiceGraphTest extends TestCase
         self::assertSame([], (new SavedTaskGraphValidator())->validate($graph, $task->getTriggerType(), $task->getTriggerConfig()));
     }
 
+    public function testEnablingAScheduledTaskFillsNextRunAt(): void
+    {
+        $task = new SavedTask(9, 5, 'Weekly');
+        $task->setTrigger(SavedTask::TRIGGER_SCHEDULE, ['kind' => 'daily', 'at' => '07:00']);
+        $task->setEnabled(false);
+        self::assertNull($task->getNextRunAt());
+
+        $next = new \DateTimeImmutable('+1 day', new \DateTimeZone('UTC'));
+        $parser = $this->createMock(ScheduleParser::class);
+        $parser->expects(self::once())->method('nextRunAt')->willReturn($next);
+
+        $this->service(
+            $this->createStub(SavedTaskRepository::class),
+            $this->createStub(SavedTaskGraphCapture::class),
+            $parser,
+        )->update($task, ['enabled' => true]);
+
+        self::assertTrue($task->isEnabled());
+        self::assertEquals($next, $task->getNextRunAt());
+    }
+
     public function testSchedulingPinnedMailStepsNeedsTheUnattendedConfirmation(): void
     {
         // Before the steps were pinned the graph was empty and this guard never

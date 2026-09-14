@@ -50,12 +50,24 @@ final readonly class ToolRegistry
     public function get(int $userId, string $name, array $context = []): ?ToolDescriptor
     {
         foreach ($this->forUser($userId, $context) as $descriptor) {
-            if ($descriptor->name === $name || $descriptor->callName() === $name) {
+            if ($descriptor->name === $name || $descriptor->callName() === $name || $this->matchesNamedMcp($descriptor, $name)) {
                 return $descriptor;
             }
         }
 
         return null;
+    }
+
+    private function matchesNamedMcp(ToolDescriptor $descriptor, string $name): bool
+    {
+        if (1 !== preg_match('/^mcp:([^:]+):(.+)$/', $name, $wanted) || ctype_digit($wanted[1])) {
+            return false;
+        }
+        $serverName = $descriptor->meta['serverName'] ?? null;
+        $tool = $descriptor->meta['tool'] ?? null;
+
+        return is_string($serverName) && $serverName === $wanted[1]
+            && is_string($tool) && $tool === $wanted[2];
     }
 
     /**

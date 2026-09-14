@@ -5422,9 +5422,14 @@
     "resultFailed": "{count} fallidos",
     "kind": {
       "agents": "Asistentes",
-      "prompts": "Instrucciones"
+      "prompts": "Instrucciones",
+      "saved_tasks": "Tareas guardadas"
     },
     "check": {
+      "needsAssistant": "Necesita un asistente de IA — elija uno después de importar ({key})",
+      "needsTool": "Necesita una herramienta llamada {detail}",
+      "needsConnection": "Necesita una conexión llamada {detail}",
+      "unknownKey": "Este archivo tiene un campo que este Synaplan no reconoce ({detail})",
       "needsModel": "Necesita un modelo — elija uno después de importar ({key})",
       "needsKey": "Necesita una clave — añádala en Conexiones ({key})",
       "needsMcpServer": "Necesita un servidor MCP llamado {detail}",
@@ -5632,6 +5637,12 @@
     "secretRevealTitle": "Tu secreto compartido: cópialo ahora",
     "secretRevealHint": "Pégalo en el otro sistema. Solo se muestra esta vez y no se podrá recuperar después.",
     "copySecret": "Copiar secreto",
-    "secretCopied": "Secreto copiado."
+    "secretCopied": "Secreto copiado.",
+    "saveAsTemplate": "Guardar como plantilla",
+    "useTemplate": "Usar plantilla",
+    "useTemplateConfirm": "¿Crear tu propia copia? Permanecerá apagada hasta que la actives. Se crea una dirección nueva si otro sistema puede iniciar esta tarea.",
+    "useTemplateDone": "Copia creada. Está apagada hasta que la actives.",
+    "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el asistente, la herramienta o la conexión que falte antes de activarla.",
+    "useTemplateNeedsSetupItems": "Copia creada y dejada apagada. Aún falta: {items}."
   }
 }

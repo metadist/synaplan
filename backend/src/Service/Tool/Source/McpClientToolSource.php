@@ -53,6 +53,7 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                     ownerId: $userId,
                     meta: [
                         'serverId' => $serverId,
+                        'serverName' => $server->getName(),
                         'tool' => (string) $tool['name'],
                         'allowWrite' => $server->allowsWrite(),
                         'gatewayName' => $gatewayName,

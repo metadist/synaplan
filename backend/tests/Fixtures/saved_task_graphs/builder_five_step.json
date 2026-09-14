@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "trigger": { "type": "schedule" },
+  "nodes": [
+    {
+      "id": "n1",
+      "capability": "email_search",
+      "depends_on": [],
+      "params": {
+        "inputs": { "query": { "literal": "last 7 days" } }
+      }
+    },
+    {
+      "id": "n2",
+      "capability": "chat",
+      "depends_on": ["n1"],
+      "params": {
+        "inputs": { "text": { "from": "n1", "field": "text" } }
+      }
+    },
+    {
+      "id": "n3",
+      "capability": "tool_call",
+      "depends_on": ["n2"],
+      "params": {
+        "tool": "custom:helpdesk",
+        "approval": "approve",
+        "inputs": { "summary": { "from": "n2", "field": "text" } }
+      }
+    },
+    {
+      "id": "n4",
+      "capability": "email_me",
+      "depends_on": ["n3"],
+      "params": {
+        "inputs": { "text": { "from": "n3", "field": "summary" } }
+      }
+    },
+    {
+      "id": "n5",
+      "capability": "outbound_webhook",
+      "depends_on": ["n4"],
+      "params": {
+        "url": "https://hooks.example.com/done",
+        "inputs": { "text": { "from": "n4", "field": "text" } }
+      }
+    }
+  ]
+}

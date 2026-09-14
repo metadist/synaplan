@@ -9,7 +9,12 @@ import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
-import { savedTasksApi, type SavedTask, type SavedTaskRun } from '@/services/api/savedTasksApi'
+import {
+  savedTasksApi,
+  type SavedTask,
+  type SavedTaskCopyChecklistItem,
+  type SavedTaskRun,
+} from '@/services/api/savedTasksApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
 import { ApiError } from '@/services/api/httpClient'
 import type { ShareVia } from '@/utils/shareCopy'
@@ -312,16 +317,35 @@ const onDelete = async () => {
   }
 }
 
+const checklistItems = (rows: SavedTaskCopyChecklistItem[]): string =>
+  rows
+    .map((row) => (row.detail || row.itemKey || row.code || '').trim())
+    .filter((item) => item !== '')
+    .join(', ')
+
+const copyTitle = computed(() => t('workflows.useTemplate'))
+const copyMessage = computed(() => t('workflows.useTemplateConfirm'))
+const shareLabel = computed(() =>
+  workflowsEnabled.value ? t('workflows.saveAsTemplate') : t('iam.share')
+)
+
 const onRunCopy = async () => {
   const ok = await dialog.confirm({
-    title: t('iam.runCopy'),
-    message: t('iam.runCopyConfirm'),
+    title: copyTitle.value,
+    message: copyMessage.value,
   })
   if (!ok) return
   copying.value = true
   try {
-    emit('copied', await savedTasksApi.copy(props.task.id))
-    success(t('iam.runCopy'))
+    const result = await savedTasksApi.copy(props.task.id)
+    emit('copied', result.task)
+    if (result.checklist.length > 0) {
+      success(
+        t('workflows.useTemplateNeedsSetupItems', { items: checklistItems(result.checklist) })
+      )
+    } else {
+      success(t('workflows.useTemplateDone'))
+    }
   } catch (err) {
     const message = err instanceof ApiError ? err.message : ''
     showError(
@@ -411,7 +435,7 @@ const onRunCopy = async () => {
         data-testid="btn-run-copy"
         @click="onRunCopy"
       >
-        {{ $t('iam.runCopy') }}
+        {{ copyTitle }}
       </button>
       <button
         v-else
@@ -430,7 +454,7 @@ const onRunCopy = async () => {
         data-testid="btn-share-saved-task"
         @click="iamShareOpen = true"
       >
-        {{ $t('iam.share') }}
+        {{ shareLabel }}
       </button>
       <button
         v-if="!sharedView"

@@ -48,6 +48,31 @@ Authored step inputs (`params.inputs`) are `{ "literal": "…" }`,
 `trigger` must be listed in that step’s `depends_on`. `params.approval` may
 only tighten policy (`approve` or `block`).
 
+## Webhook trigger, templates, and export
+
+An inbound **webhook** Saved Task (`BTRIGGERTYPE = webhook`) is started by
+`POST /api/v1/webhooks/saved-tasks/{token}`. The token lives in
+`BTRIGGERCONFIG` and is minted on the server; optional HMAC uses
+`X-Synaplan-Signature: sha256=<hex>` over the raw body. The JSON body
+(≤ 64 KiB) is the run’s starting event (`from: trigger`). Unknown and
+disabled tokens return the same 404. See `docs/N8N.md`.
+
+**Save as template** is an IAM share of kind `saved_task` with permission
+`use` — not a second object. **Use template**
+(`POST /api/v1/saved-tasks/{id}/copy`) creates a copy owned by the caller:
+the graph and trigger type are kept, the copy is **paused** (`enabled=false`,
+`allowUnattended=false`), a webhook token is regenerated, outbound `secret`
+and HMAC are stripped. If the caller cannot use the source assistant, the
+copy points at a fallback prompt they can use and the response `checklist`
+lists `needsAssistant` (and `needsTool` for tools they cannot run). 409 only
+when there is no fallback prompt at all.
+
+The `saved_tasks` bundle section exports name, trigger, graph and settings.
+Tokens, HMAC secrets and outbound secrets are never written. Prompts are
+rewritten by topic; MCP tools by server name. Import creates paused rows, mints
+a new webhook token, and rejects unknown item keys. Checklist codes:
+`needsAssistant`, `needsTool`, `needsConnection`, `unknownKey`, `schedulesOff`.
+
 Flags resolve per-user row → global row → built-in default (see
 `MultitaskRoutingConfig::isFeatureEnabled`).
 

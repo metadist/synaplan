@@ -102,6 +102,17 @@ final class ApprovalPolicyTest extends TestCase
         $this->assertSame(PolicyOutcome::Approve, $policy->decide($write, 1, PolicyContext::Interactive));
     }
 
+    public function testNodeOverrideBlockBeatsAllowUnattended(): void
+    {
+        $policy = $this->policy();
+        $write = $this->tool(SideEffect::Write);
+        $this->assertSame(PolicyOutcome::Auto, $policy->decide($write, 1, PolicyContext::Unattended, null, true));
+        $this->assertSame(
+            PolicyOutcome::Block,
+            $policy->decide($write, 1, PolicyContext::Unattended, null, true, null, PolicyOutcome::Block),
+        );
+    }
+
     public function testAllowUnattendedDoesNotLoosenGroupOrAssistantBlock(): void
     {
         $assistant = $this->createMock(AssistantPolicyProviderInterface::class);
