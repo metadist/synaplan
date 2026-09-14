@@ -75,13 +75,29 @@ function collectTaskPlanDraftText(plan: TaskPlanState): string {
     .join('\n\n')
 }
 
-function partsHaveRenderableContent(parts: Message['parts']): boolean {
+export function partsHaveRenderableContent(parts: Message['parts']): boolean {
   return parts.some(
     (part) =>
       (typeof part.content === 'string' && part.content.trim() !== '') ||
       Boolean(part.url) ||
       Boolean(part.imageUrl)
   )
+}
+
+/**
+ * A dropped SSE connection is not a model failure.
+ * Persisted chats reconcile with the server. Incognito has no row — keep
+ * the in-memory draft when it already has something to read. Painting
+ * "Connection interrupted" on a finished demo reply is U8-false.
+ */
+export function shouldFinishWithoutErrorOnTransportDrop(options: {
+  canReconcile: boolean
+  message?: Pick<Message, 'parts'> | null
+}): boolean {
+  if (options.canReconcile) {
+    return true
+  }
+  return !!options.message && partsHaveRenderableContent(options.message.parts)
 }
 
 /**

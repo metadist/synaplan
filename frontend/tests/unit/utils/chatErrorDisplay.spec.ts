@@ -5,6 +5,8 @@ import {
   finalizeSettledInProgressTurn,
   isSettledTaskPlan,
   normalizeChatErrorReason,
+  partsHaveRenderableContent,
+  shouldFinishWithoutErrorOnTransportDrop,
   taskPlanHasVisibleOutput,
 } from '@/utils/chatErrorDisplay'
 import type { Message, TaskPlanState } from '@/stores/history'
@@ -78,6 +80,44 @@ describe('chatErrorDisplay', () => {
     expect(result.message.taskPlan?.active).toBe(false)
     expect(result.message.errorReason).toBe('empty_answer')
     expect(result.message.canRetryModel).toBe(true)
+  })
+
+  it('treats streamed text as a keepable draft after a transport drop', () => {
+    expect(partsHaveRenderableContent([{ type: 'text', content: '' }])).toBe(false)
+    expect(
+      partsHaveRenderableContent([
+        {
+          type: 'text',
+          content: "**You're in demo mode** — no AI provider is connected yet.",
+        },
+      ])
+    ).toBe(true)
+  })
+
+  it('finishes a transport drop by reconciling or keeping a local draft', () => {
+    const draft = {
+      parts: [
+        {
+          type: 'text' as const,
+          content: "**You're in demo mode** — no AI provider is connected yet.",
+        },
+      ],
+    }
+    expect(shouldFinishWithoutErrorOnTransportDrop({ canReconcile: true, message: draft })).toBe(
+      true
+    )
+    expect(shouldFinishWithoutErrorOnTransportDrop({ canReconcile: false, message: draft })).toBe(
+      true
+    )
+    expect(
+      shouldFinishWithoutErrorOnTransportDrop({
+        canReconcile: false,
+        message: { parts: [{ type: 'text', content: '' }] },
+      })
+    ).toBe(false)
+    expect(shouldFinishWithoutErrorOnTransportDrop({ canReconcile: false, message: null })).toBe(
+      false
+    )
   })
 
   it('lifts card draft text onto the bubble when the reply was never saved', () => {
