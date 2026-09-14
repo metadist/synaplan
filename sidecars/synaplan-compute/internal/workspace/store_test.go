@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,6 +113,113 @@ func TestMetadataLivesOutsideMountedTree(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(s.root, meta.ID)); !os.IsNotExist(err) {
 		t.Fatal("id dir must be removed")
+	}
+}
+
+func TestWorkspaceListsNestedFilesWithRelativePaths(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	if err := os.MkdirAll(filepath.Join(host, "reports", "2026"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"top.txt", "reports/january.csv", "reports/2026/q1.csv"} {
+		if err := os.WriteFile(filepath.Join(host, filepath.FromSlash(p)), []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	files, err := s.ListFiles(meta.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Path] = true
+		if strings.HasPrefix(f.Path, "/") || strings.Contains(f.Path, host) {
+			t.Fatalf("host path leaked: %q", f.Path)
+		}
+	}
+	for _, want := range []string{"top.txt", "reports/january.csv", "reports/2026/q1.csv"} {
+		if !got[want] {
+			t.Fatalf("missing %q in %+v", want, files)
+		}
+	}
+	if len(files) != 3 {
+		t.Fatalf("directories must not be listed as files: %+v", files)
+	}
+
+	// Listing a sub-folder is relative to it, still with full relative paths.
+	sub, err := s.ListFiles(meta.ID, "reports")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sub) != 2 || !(sub[0].Path == "reports/january.csv" || sub[1].Path == "reports/january.csv") {
+		t.Fatalf("%+v", sub)
+	}
+}
+
+func TestWorkspaceListStopsAtDepthLimit(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 16)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	edge := host
+	for i := 0; i < listMaxDepth; i++ {
+		edge = filepath.Join(edge, "d")
+	}
+	if err := os.MkdirAll(filepath.Join(edge, "d"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(edge, "edge.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(edge, "d", "too-deep.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := s.ListFiles(meta.ID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Path] = true
+	}
+	if !got["d/d/d/d/d/d/d/d/edge.txt"] {
+		t.Fatalf("a file at depth %d must be listed, got %+v", listMaxDepth, files)
+	}
+	if got["d/d/d/d/d/d/d/d/d/too-deep.txt"] {
+		t.Fatalf("a file past depth %d must be omitted, got %+v", listMaxDepth, files)
+	}
+}
+
+func TestWorkspaceEmptyEntriesCountTowardQuota(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 1) // 1 MiB
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	for i := 0; i < 300; i++ {
+		if err := os.WriteFile(filepath.Join(host, fmt.Sprintf("empty-%d", i)), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	over, err := s.OverQuota(meta.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !over {
+		t.Fatal("300 empty files must exceed a 1 MiB quota once each costs a 4 KiB block")
 	}
 }
 

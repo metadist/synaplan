@@ -9,6 +9,10 @@ use App\Service\Compute\Contract\ComputeErrorBody;
 use App\Service\Compute\Contract\ComputeHealth;
 use App\Service\Compute\Contract\ComputeRunRequest;
 use App\Service\Compute\Contract\ComputeRunStatus;
+use App\Service\Compute\Contract\ComputeWorkspaceCreate;
+use App\Service\Compute\Contract\ComputeWorkspaceCreated;
+use App\Service\Compute\Contract\ComputeWorkspaceFile;
+use App\Service\Compute\Contract\ComputeWorkspaceUsage;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -98,6 +102,64 @@ final readonly class ComputeClient
     public function cancel(string $runId): void
     {
         $this->request('DELETE', '/v1/runs/'.rawurlencode($runId), ['timeout' => 10]);
+    }
+
+    public function createWorkspace(ComputeWorkspaceCreate $create): ComputeWorkspaceCreated
+    {
+        if ('' === $create->owner) {
+            throw new ComputeRefusedException('missing_owner', 'owner is required');
+        }
+        $response = $this->request('POST', '/v1/workspaces', [
+            'headers' => ['Content-Type' => 'application/json'],
+            'body' => json_encode(['owner' => $create->owner, 'quotaMb' => $create->quotaMb], \JSON_THROW_ON_ERROR),
+            'timeout' => 15,
+        ]);
+
+        return ComputeWorkspaceCreated::fromJson($response->getContent());
+    }
+
+    public function workspaceUsage(string $workspaceId): ComputeWorkspaceUsage
+    {
+        $response = $this->request('GET', '/v1/workspaces/'.rawurlencode($workspaceId).'/usage', ['timeout' => 10]);
+
+        return ComputeWorkspaceUsage::fromJson($response->getContent());
+    }
+
+    /**
+     * @return list<ComputeWorkspaceFile>
+     */
+    public function listWorkspaceFiles(string $workspaceId, string $path = ''): array
+    {
+        $query = '' === $path ? '' : '?path='.rawurlencode($path);
+        $response = $this->request('GET', '/v1/workspaces/'.rawurlencode($workspaceId).'/files'.$query, ['timeout' => 15]);
+
+        return ComputeWorkspaceFile::listFromJson($response->getContent());
+    }
+
+    /**
+     * @return array{contents: string, mime: string, name: string}
+     */
+    public function downloadWorkspaceFile(string $workspaceId, string $path): array
+    {
+        $response = $this->request(
+            'GET',
+            '/v1/workspaces/'.rawurlencode($workspaceId).'/files/'.implode('/', array_map('rawurlencode', explode('/', $path))),
+            ['timeout' => 30],
+        );
+        $headers = $response->getHeaders(false);
+        $mime = $headers['content-type'][0] ?? 'application/octet-stream';
+        $name = basename($path);
+
+        return [
+            'contents' => $response->getContent(),
+            'mime' => $mime,
+            'name' => '' !== $name ? $name : 'file',
+        ];
+    }
+
+    public function deleteWorkspace(string $workspaceId): void
+    {
+        $this->request('DELETE', '/v1/workspaces/'.rawurlencode($workspaceId), ['timeout' => 15]);
     }
 
     /**

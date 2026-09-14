@@ -17,6 +17,8 @@ final class ComputeConfigTest extends TestCase
         $this->assertFalse($this->config('disabled', 'token')->hasSidecar());
         $this->assertTrue($this->config('http://compute:8080', 'token')->hasSidecar());
         $this->assertFalse($this->config('http://compute:8080', 'token')->isEnabled());
+        $this->assertFalse($this->config('http://compute:8080', 'token')->workspacesEnabled());
+        $this->assertFalse($this->config('http://compute:8080', 'token')->egressEnabled());
     }
 
     public function testClampLimitsNeverExceedDefaults(): void

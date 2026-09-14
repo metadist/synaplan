@@ -94,7 +94,10 @@ first run fails with image-not-found.
 
 Then set **COMPUTE.ENABLED** under Operate → System config (or
 `FEATURE_COMPUTE_ENABLED=true`). Feature Status → *Secure compute* must show
-Available. Never publish port 8080. See [docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
+Available. Never publish port 8080. Persistent folders and website fetches
+are extra switches (`COMPUTE.WORKSPACES_ENABLED`, `COMPUTE.EGRESS_ENABLED`),
+also off. See [COMPUTE.md](./COMPUTE.md) and
+[docs.synaplan.com — Secure compute](https://docs.synaplan.com/modules/compute).
 
 ### Office conversion (optional)
 

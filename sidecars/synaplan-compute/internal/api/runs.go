@@ -64,6 +64,16 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusTooManyRequests, contract.ErrCapacityExceeded, "capacity exceeded", nil)
 		return
 	}
+	if req.Workspace.Kind == contract.WorkspaceKindUser {
+		if _, held := s.busyWs[req.Workspace.ID]; held {
+			s.mu.Unlock()
+			rec.cancel()
+			s.audit.Log(audit.Event{Event: audit.RunRefused, Owner: req.Owner, Image: req.Image, Reason: contract.ErrWorkspaceBusy})
+			writeError(w, http.StatusConflict, contract.ErrWorkspaceBusy, "another run is using this workspace", nil)
+			return
+		}
+		s.busyWs[req.Workspace.ID] = rec.ID
+	}
 	s.queued++
 	rec.active = true
 	s.runs[rec.ID] = rec
@@ -82,7 +92,7 @@ func statusFor(code string) int {
 		return http.StatusForbidden
 	case contract.ErrWorkspaceNotFound:
 		return http.StatusNotFound
-	case contract.ErrWorkspaceQuota:
+	case contract.ErrWorkspaceQuota, contract.ErrWorkspaceBusy:
 		return http.StatusConflict
 	case contract.ErrCapacityExceeded:
 		return http.StatusTooManyRequests
@@ -323,9 +333,11 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 		return
 	}
 	wsHost := ""
+	var wsBefore map[string]struct{}
 	if rec.Req.Workspace.Kind == contract.WorkspaceKindUser {
 		wsHost = s.ws.HostPath(rec.Req.Workspace.ID)
 		_ = s.ws.TouchLastUsed(rec.Req.Workspace.ID)
+		wsBefore = s.ws.Snapshot(rec.Req.Workspace.ID)
 	}
 	img, _ := s.images.Lookup(rec.Req.Image)
 
@@ -401,9 +413,23 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 	rec.BytesOut = bytesOut
 	s.mu.Unlock()
 
+	// The persistent folder was writable for the whole run; the pre-run check
+	// only covered uploaded bytes. Now that the container is gone, enforce the
+	// quota even when the run was cancelled — a cancelled script can still
+	// have filled the folder. Rollback never changes a cancelled status.
+	wsOverQuota := false
+	if wsHost != "" {
+		if over, err := s.ws.OverQuota(rec.Req.Workspace.ID); err == nil && over {
+			s.ws.RemoveNewEntries(rec.Req.Workspace.ID, wsBefore)
+			wsOverQuota = true
+		}
+	}
+
 	switch {
 	case cancelled:
 		return
+	case wsOverQuota:
+		s.finish(rec, contract.StatusFailed, code, contract.ErrWorkspaceQuota)
 	case timedOut:
 		s.finish(rec, contract.StatusFailed, -1, contract.ReasonTimeout)
 	case werr != nil:
@@ -465,6 +491,9 @@ func (s *Server) exitExecute(rec *runRec) {
 	acquired := rec.acquired
 	rec.active = false
 	done := rec.done
+	if ws := rec.Req.Workspace; ws.Kind == contract.WorkspaceKindUser && s.busyWs[ws.ID] == rec.ID {
+		delete(s.busyWs, ws.ID)
+	}
 	s.mu.Unlock()
 	if acquired {
 		<-s.sem

@@ -186,3 +186,4 @@ Anthropic-only fields such as `thinking: {"type":"adaptive"}` are stripped befor
 - UI: **Channels → AI Agents**
 - Smoke scripts: `_devextras/testing/messages-gateway/`
 - Synaplan Desktop (agent client, server side): [DESKTOP.md](./DESKTOP.md)
+- File work (`code_execution` / `compute:run`): [COMPUTE.md](./COMPUTE.md)

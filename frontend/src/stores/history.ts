@@ -290,6 +290,8 @@ export interface TaskCard {
   elapsedSeconds?: number
   /** Async media job key when the node detached to a background worker. */
   jobId?: string
+  /** True when this run mounted the user's persistent file-work folder. */
+  usedWorkspace?: boolean
   /**
    * #1229 smart collapse: the card's prose is already contained in the final
    * answer body, so the card collapses to its header (set by ResultAssembler

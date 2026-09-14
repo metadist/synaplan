@@ -155,7 +155,8 @@
     "setup": "Configuration",
     "assistants": "Assistants",
     "assistantBuilder": "Assistant",
-    "approvals": "Approbations"
+    "approvals": "Approbations",
+    "filesWorkspace": "Espace de travail"
   },
   "adminModelStatus": {
     "title": "État des modèles",
@@ -1293,6 +1294,26 @@
     "tabBrowse": "Parcourir",
     "tabIncoming": "Entrants",
     "tabGenerated": "Générés",
+    "tabWorkspace": "Espace de travail",
+    "workspace": {
+      "title": "Espace de travail",
+      "subtitle": "Fichiers que l’IA a créés pour vous pendant le travail sur fichiers. Ils restent ici d’une exécution à l’autre.",
+      "empty": "Les fichiers que l’IA crée pour vous apparaîtront ici.",
+      "emptyAction": "Retour au chat",
+      "usage": "{used} Mo sur {quota} Mo utilisés",
+      "delete": "Supprimer l’espace de travail",
+      "deleteConfirm": "Supprimer cet espace de travail ? L’IA recommencera avec un dossier vide la prochaine fois.",
+      "deleteDone": "Espace de travail supprimé. L’IA recommencera avec un dossier vide la prochaine fois.",
+      "deleteError": "L’espace de travail n’a pas pu être supprimé. Rien n’a été retiré.",
+      "loadError": "L’espace de travail n’a pas pu être chargé.",
+      "download": "Télécharger",
+      "downloadError": "Le fichier n’a pas pu être téléchargé.",
+      "preview": "Aperçu",
+      "previewError": "Le fichier n’a pas pu être ouvert.",
+      "previewUnavailable": "Ce fichier ne peut pas être prévisualisé ici. Téléchargez-le pour l’ouvrir.",
+      "closePreview": "Fermer",
+      "retry": "Réessayer"
+    },
     "incomingBadge": "{count} nouveaux",
     "sourceLabel": {
       "web_upload": "Téléversement",
@@ -4576,6 +4597,7 @@
     "rerunHelp": "L’IA réessaiera avec vos notes",
     "details": "Détails",
     "preview": "Aperçu",
+    "openWorkspace": "Ouvrir l’espace de travail",
     "elapsed": "{seconds}s"
   },
   "processing": {

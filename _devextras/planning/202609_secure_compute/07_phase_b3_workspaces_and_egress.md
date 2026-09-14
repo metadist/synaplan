@@ -13,8 +13,23 @@ feature is documented for users, hosters and the platform team.
 **Flag:** `COMPUTE.WORKSPACES_ENABLED` (default `0`), `COMPUTE.EGRESS_ENABLED` (default `0`). Both sit
 under `COMPUTE.ENABLED`; off means B1/B2 behaviour.
 **User-flow:** [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md)
-J-CP-2. **Open folder** reuses Files. Empty: "Files the AI creates
-for you will show up here." Egress off is not a control on the card.
+**J-CP-2 — Open what it left behind.** After a file-work run, **Open workspace**
+is a chip on the chat card (only when `COMPUTE.WORKSPACES_ENABLED` is on). It
+opens Files → Workspace. Empty: "Files the AI creates for you will show up here."
+plus one action (back to Chat). Egress off is not a control on the card.
+
+**UX exit (U1–U12) before any Vue:**
+
+1. **Journey (U10):** J-CP-2 — finish a run → Open workspace → find the file in
+   Files → Workspace → preview/download → delete the workspace from that page.
+2. **Findability (U2):** later-self path is Files → Workspace (sibling tab, no
+   new rail). The card chip is the arrival signal after a run.
+3. **Consequence (U3):** "Open workspace" / "Delete this workspace — the AI will
+   start from an empty folder next time." Copy in en/de/es/fr/tr.
+4. **Empty / error / flag-off (U5, U8, U11):** empty sentence above; failures
+   say what did not happen; both workspace flags off hide the tab, the chip, and
+   404 the new routes.
+5. **Theme (U9):** light, dark, V2, 320 px, WCAG AA.
 
 ---
 

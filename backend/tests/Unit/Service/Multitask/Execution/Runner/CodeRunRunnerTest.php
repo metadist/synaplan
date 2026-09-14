@@ -13,6 +13,9 @@ use App\Repository\UserRepository;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeEgressResolver;
+use App\Service\Compute\ComputeRefusedException;
+use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunRequest;
 use App\Service\Compute\Contract\ComputeRunStatus;
 use App\Service\Multitask\Execution\NodeContext;
@@ -20,6 +23,7 @@ use App\Service\Multitask\Execution\Runner\CodeRunRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\RateLimitService;
+use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -164,6 +168,207 @@ final class CodeRunRunnerTest extends TestCase
         rmdir($dir);
     }
 
+    public function testWorkspaceOnlyWhenFlagOn(): void
+    {
+        $captured = null;
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$captured): string {
+                $captured = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $captured);
+        $this->assertSame(['kind' => 'run'], $captured->workspace);
+
+        $workspace = $this->createStub(\App\Entity\ComputeWorkspace::class);
+        $workspace->method('getWorkspaceId')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $workspaces = $this->createMock(ComputeWorkspaceService::class);
+        $workspaces->expects($this->once())->method('ensure')->willReturn($workspace);
+        $workspaces->method('forUser')->willReturn($workspace);
+
+        $capturedOn = null;
+        $clientOn = $this->createMock(ComputeClient::class);
+        $clientOn->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$capturedOn): string {
+                $capturedOn = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $clientOn->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $clientOn->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($clientOn, $this->createStub(FileRepository::class), null, true, $workspaces)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $capturedOn);
+        $this->assertSame(['kind' => 'user', 'id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV'], $capturedOn->workspace);
+    }
+
+    public function testEgressWithoutApprovalsFailsClosed(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->never())->method('submitRun');
+
+        // Egress on, EGRESS_REQUIRES_APPROVAL at its default (on), no execution
+        // gate wired: nothing can produce an approval, so the run must refuse
+        // instead of reaching the website unattended.
+        $result = $this->runner($client, $this->createStub(FileRepository::class), egressOn: true)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'egressHosts' => ['8.8.8.8'],
+            ]),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertSame(CodeRunRunner::EGRESS_NEEDS_APPROVALS_COPY, $result->error);
+    }
+
+    public function testEgressOffIgnoresHostsAndStaysOffline(): void
+    {
+        $captured = null;
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$captured): string {
+                $captured = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'egressHosts' => ['8.8.8.8'],
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $captured);
+        $this->assertSame(['allow' => []], $captured->egress);
+    }
+
+    public function testWorkspaceRefusalsGetTheirOwnSentences(): void
+    {
+        foreach ([
+            'workspace_busy' => 'Another file-work run is still using your folder.',
+            'workspace_quota_exceeded' => 'Your file-work folder is full.',
+        ] as $code => $starts) {
+            $client = $this->createMock(ComputeClient::class);
+            $client->method('submitRun')->willThrowException(new ComputeRefusedException($code, 'sidecar says no', httpStatus: 409));
+
+            $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+                new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+                $this->context(),
+            );
+
+            $this->assertFalse($result->isSuccessful());
+            $this->assertStringStartsWith($starts, (string) $result->error, $code);
+            $this->assertStringNotContainsString("week's file-work limit", (string) $result->error, $code);
+        }
+    }
+
+    public function testRunRolledBackForFolderQuotaSaysWhatWasRemoved(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'failed',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            reason: 'workspace_quota_exceeded',
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: ['script' => 'print(1)']),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertStringStartsWith('This run wrote more than your file-work folder allows.', (string) $result->error);
+        $this->assertStringContainsString('Files that were already there stay', (string) $result->error);
+    }
+
+    public function testTimeoutAfterUsingTheFolderDoesNotClaimNothingWasSaved(): void
+    {
+        $workspace = $this->createStub(\App\Entity\ComputeWorkspace::class);
+        $workspace->method('getWorkspaceId')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $workspaces = $this->createMock(ComputeWorkspaceService::class);
+        $workspaces->method('ensure')->willReturn($workspace);
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'failed',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: -1,
+            reason: 'timeout',
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class), null, true, $workspaces)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertTrue($result->metadata['used_workspace'] ?? false);
+        $this->assertStringContainsString('open Workspace to check', (string) $result->error);
+        $this->assertStringNotContainsString('Nothing new was saved', (string) $result->error);
+    }
+
     private function file(int $userId, string $name, string $path): File
     {
         $file = $this->createStub(File::class);
@@ -178,10 +383,20 @@ final class CodeRunRunnerTest extends TestCase
         ComputeClient $client,
         FileRepository $files,
         ?ComputeArtefactStore $artefacts = null,
+        bool $workspacesOn = false,
+        ?ComputeWorkspaceService $workspaces = null,
+        bool $egressOn = false,
     ): CodeRunRunner {
         $repo = $this->createStub(\App\Repository\ConfigRepository::class);
         $repo->method('getValue')->willReturnCallback(
-            static fn (int $owner, string $group, string $setting): ?string => 'ENABLED' === $setting ? '1' : null,
+            static function (int $_owner, string $_group, string $setting) use ($workspacesOn, $egressOn): ?string {
+                return match ($setting) {
+                    'ENABLED' => '1',
+                    'WORKSPACES_ENABLED' => $workspacesOn ? '1' : '0',
+                    'EGRESS_ENABLED' => $egressOn ? '1' : '0',
+                    default => null,
+                };
+            },
         );
         $config = new ComputeConfig($repo, 'http://compute:8080', 'token-token-token-token-token-32b');
 
@@ -215,6 +430,9 @@ final class CodeRunRunnerTest extends TestCase
             $limits,
             new NullLogger(),
             '/tmp',
+            null,
+            $workspaces,
+            new ComputeEgressResolver($config, new SsrfGuard()),
         );
     }
 

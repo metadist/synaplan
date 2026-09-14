@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import type { TaskCard } from '@/stores/history'
+import { getConfigSync } from '@/services/api/httpClient'
 
 const props = defineProps<{
   card: TaskCard
@@ -31,6 +32,12 @@ const elapsed = computed(() => {
 const isQuota = computed(() => (props.card.error ?? '').includes("week's file-work limit"))
 
 const canRerun = computed(() => !props.isReadonly && ['done', 'failed'].includes(props.card.state))
+const showWorkspace = computed(
+  () =>
+    props.card.usedWorkspace === true &&
+    getConfigSync().features?.computeWorkspacesEnabled === true &&
+    ['done', 'failed'].includes(props.card.state)
+)
 const notesId = computed(() => `compute-run-notes-${props.card.nodeId}`)
 const notesHelpId = computed(() => `${notesId.value}-help`)
 
@@ -54,15 +61,26 @@ const submitRerun = () => {
       {{ isQuota ? $t('compute.quota') : card.error || $t('taskPlan.failedBody') }}
     </p>
     <p v-else-if="card.text" class="text-sm txt-primary break-words">{{ card.text }}</p>
-    <a
-      v-if="card.url && card.state === 'done'"
-      :href="card.url"
-      class="inline-flex items-center gap-1 pill text-xs"
-      data-testid="compute-run-preview"
-    >
-      <Icon icon="mdi:file-outline" class="w-4 h-4" />
-      {{ $t('compute.preview') }}
-    </a>
+    <div v-if="card.state === 'done' || showWorkspace" class="flex flex-wrap gap-2">
+      <a
+        v-if="card.state === 'done' && card.url"
+        :href="card.url"
+        class="inline-flex items-center gap-1 pill text-xs"
+        data-testid="compute-run-preview"
+      >
+        <Icon icon="mdi:file-outline" class="w-4 h-4" />
+        {{ $t('compute.preview') }}
+      </a>
+      <router-link
+        v-if="showWorkspace"
+        to="/files/workspace"
+        class="inline-flex items-center gap-1 pill text-xs"
+        data-testid="compute-run-workspace"
+      >
+        <Icon icon="mdi:folder-outline" class="w-4 h-4" />
+        {{ $t('compute.openWorkspace') }}
+      </router-link>
+    </div>
     <div v-if="canRerun" class="space-y-2">
       <button
         type="button"

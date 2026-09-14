@@ -324,6 +324,8 @@ export interface ApiLoadedMessageRow {
       /** Compact web-search summary fields (search cards only) */
       query?: string
       resultsCount?: number
+      used_workspace?: boolean
+      usedWorkspace?: boolean
       /** #1229 smart collapse: card prose is contained in the answer body. */
       redundant?: boolean
     }>
@@ -473,6 +475,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         error: c.error,
         query: c.query,
         resultsCount: c.resultsCount,
+        usedWorkspace: c.used_workspace === true || c.usedWorkspace === true,
         jobId: typeof c.job_id === 'string' ? c.job_id : undefined,
         // #1229 smart collapse: assembly-time redundancy flag. The body stays
         // the canonical answer surface; the duplicated card collapses (the

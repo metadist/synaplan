@@ -154,7 +154,8 @@
     "setup": "Kurulum",
     "assistants": "Asistanlar",
     "assistantBuilder": "Asistan",
-    "approvals": "Onaylar"
+    "approvals": "Onaylar",
+    "filesWorkspace": "Çalışma alanı"
   },
   "adminModelStatus": {
     "title": "Model Durumu",
@@ -2136,6 +2137,7 @@
     "rerunHelp": "YZ notlarınızla yeniden deneyecek",
     "details": "Ayrıntılar",
     "preview": "Önizleme",
+    "openWorkspace": "Çalışma alanını aç",
     "elapsed": "{seconds}s"
   },
   "processing": {
@@ -2767,6 +2769,26 @@
     "tabBrowse": "Gözat",
     "tabIncoming": "Gelen",
     "tabGenerated": "Üretilen",
+    "tabWorkspace": "Çalışma alanı",
+    "workspace": {
+      "title": "Çalışma alanı",
+      "subtitle": "YZ’nin dosya çalışmasında sizin için oluşturduğu dosyalar. Çalıştırmalar arasında burada kalır.",
+      "empty": "Yapay zekanın sizin için oluşturduğu dosyalar burada görünür.",
+      "emptyAction": "Sohbete dön",
+      "usage": "{quota} MB’nin {used} MB’si kullanıldı",
+      "delete": "Çalışma alanını sil",
+      "deleteConfirm": "Bu çalışma alanı silinsin mi? YZ bir sonraki sefer boş bir klasörle başlar.",
+      "deleteDone": "Çalışma alanı silindi. YZ bir sonraki sefer boş bir klasörle başlar.",
+      "deleteError": "Çalışma alanı silinemedi. Hiçbir şey kaldırılmadı.",
+      "loadError": "Çalışma alanı yüklenemedi.",
+      "download": "İndir",
+      "downloadError": "Dosya indirilemedi.",
+      "preview": "Önizleme",
+      "previewError": "Dosya açılamadı.",
+      "previewUnavailable": "Bu dosya burada önizlenemez. Açmak için indirin.",
+      "closePreview": "Kapat",
+      "retry": "Yeniden dene"
+    },
     "incomingBadge": "{count} yeni",
     "sourceLabel": {
       "web_upload": "Yükleme",

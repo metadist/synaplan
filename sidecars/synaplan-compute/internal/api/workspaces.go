@@ -109,6 +109,24 @@ func (s *Server) mimeAllowed(m string) bool {
 
 func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	s.mu.Lock()
+	if _, held := s.busyWs[id]; held {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, contract.ErrWorkspaceBusy, "another run is using this workspace", nil)
+		return
+	}
+	// Hold the slot so a POST /v1/runs cannot mount the folder between this
+	// check and the directory going away.
+	s.busyWs[id] = "deleting"
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		if s.busyWs[id] == "deleting" {
+			delete(s.busyWs, id)
+		}
+		s.mu.Unlock()
+	}()
+
 	meta, err := s.ws.Get(id)
 	if err != nil {
 		writeWorkspaceErr(w, err)

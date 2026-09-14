@@ -42,6 +42,31 @@ final class ComputePolicyTest extends TestCase
         self::assertSame(PolicyOutcome::Approve, $policy->decide($this->tool(), 1, PolicyContext::Interactive));
     }
 
+    public function testEgressNeverLoosensDecision(): void
+    {
+        $compute = $this->createMock(ComputeConfig::class);
+        $compute->method('policyInteractive')->willReturn(ComputeConfig::POLICY_AUTO);
+        $compute->method('policyUnattended')->willReturn(ComputeConfig::POLICY_APPROVE);
+        $compute->method('egressRequiresApproval')->willReturn(true);
+        $assistant = $this->createMock(AssistantPolicyProviderInterface::class);
+        $assistant->method('outcomeFor')->willReturn(PolicyOutcome::Auto);
+        $policy = new ApprovalPolicy($this->tools(), new NullGroupPolicyProvider(), $assistant, $compute);
+
+        self::assertSame(PolicyOutcome::Auto, $policy->decide($this->tool(), 1, PolicyContext::Interactive));
+        self::assertSame(
+            PolicyOutcome::Approve,
+            $policy->decide($this->tool(), 1, PolicyContext::Interactive, null, false, null, PolicyOutcome::Approve),
+        );
+        $computeBlock = $this->createMock(ComputeConfig::class);
+        $computeBlock->method('policyInteractive')->willReturn(ComputeConfig::POLICY_BLOCK);
+        $computeBlock->method('policyUnattended')->willReturn(ComputeConfig::POLICY_BLOCK);
+        $blocked = new ApprovalPolicy($this->tools(), new NullGroupPolicyProvider(), $assistant, $computeBlock);
+        self::assertSame(
+            PolicyOutcome::Block,
+            $blocked->decide($this->tool(), 1, PolicyContext::Interactive, null, false, null, PolicyOutcome::Approve),
+        );
+    }
+
     public function testBlockWins(): void
     {
         $compute = $this->createMock(ComputeConfig::class);

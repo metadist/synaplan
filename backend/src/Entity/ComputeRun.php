@@ -183,6 +183,32 @@ class ComputeRun
         $this->approvalId = $approvalId;
     }
 
+    public function setWorkspaceId(?string $workspaceId): void
+    {
+        $this->workspaceId = $workspaceId;
+    }
+
+    /**
+     * @param list<string> $hosts
+     */
+    public function setEgressHosts(array $hosts): void
+    {
+        $this->egressHosts = $hosts;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    public function getEgressHosts(): ?array
+    {
+        return $this->egressHosts;
+    }
+
+    public function getWorkspaceId(): ?string
+    {
+        return $this->workspaceId;
+    }
+
     /**
      * @return list<int>|null
      */

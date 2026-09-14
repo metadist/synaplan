@@ -169,28 +169,101 @@ func (s *Store) WouldExceed(id string, additional int64) (bool, error) {
 	return used+additional > capBytes, nil
 }
 
-// walkSize sums regular files in the data tree. Symlinks are counted by their
-// own Lstat size and never followed.
+// walkSize approximates disk use of the data tree. Every directory, regular
+// file and symlink costs at least one 4 KiB block so empty files and empty
+// folders cannot exhaust inodes for free; regular files add their extra
+// bytes on top. WalkDir never follows symlinks.
 func (s *Store) walkSize(id string) (int64, int) {
+	const block = 4096
 	var used int64
 	var files int
-	_ = filepath.WalkDir(s.hostPath(id), func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	base := s.hostPath(id)
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || path == base {
+			return nil
+		}
+		used += block
+		if d.IsDir() {
 			return nil
 		}
 		info, err := d.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			return nil
+		if err == nil && info.Mode().IsRegular() && info.Size() > block {
+			used += info.Size() - block
 		}
-		used += info.Size()
 		files++
 		return nil
 	})
 	return used, files
 }
 
-// ListFiles returns regular files under rel (relative, sanitized). Symlinks
-// are never followed or listed.
+// OverQuota reports whether the data tree is larger than the quota right now.
+// The pre-run check only sees uploaded bytes; a script can write freely to
+// /workspace while it runs, so the server calls this once the container is
+// gone.
+func (s *Store) OverQuota(id string) (bool, error) {
+	meta, err := s.Get(id)
+	if err != nil {
+		return false, err
+	}
+	used, _ := s.walkSize(id)
+	return used > int64(meta.QuotaMb)*1024*1024, nil
+}
+
+// Snapshot returns the set of non-directory entries (relative, slash-separated)
+// present in the data tree. Taken before a run, it is what RemoveNewEntries
+// keeps when that run blows the quota.
+func (s *Store) Snapshot(id string) map[string]struct{} {
+	base := s.hostPath(id)
+	out := map[string]struct{}{}
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		if rel, err := filepath.Rel(base, path); err == nil {
+			out[filepath.ToSlash(rel)] = struct{}{}
+		}
+		return nil
+	})
+	return out
+}
+
+// RemoveNewEntries deletes every non-directory entry that is not in keep and
+// reports how many it removed. WalkDir never follows symlinks, so a symlink
+// the script planted is removed as an entry, not traversed. Called only
+// while no container has the tree mounted.
+func (s *Store) RemoveNewEntries(id string, keep map[string]struct{}) int {
+	base := s.hostPath(id)
+	removed := 0
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(base, path)
+		if err != nil {
+			return nil
+		}
+		if _, kept := keep[filepath.ToSlash(rel)]; kept {
+			return nil
+		}
+		if os.Remove(path) == nil {
+			removed++
+		}
+		return nil
+	})
+	return removed
+}
+
+// Listing bounds: a script can create arbitrarily deep or wide trees, and the
+// response must stay small enough for one page.
+const (
+	listMaxDepth = 8
+	listMaxFiles = 2000
+)
+
+// ListFiles returns regular files under rel (relative, sanitized), walking
+// nested folders so a file at reports/january.csv is listed with that path.
+// Symlinks are never followed or listed; the walk stops at listMaxDepth
+// levels and listMaxFiles entries.
 func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 	if _, err := s.Get(id); err != nil {
 		return nil, err
@@ -200,8 +273,8 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		return nil, ErrBadName
 	}
 	base := s.hostPath(id)
-	entries, err := safepath.ReadDir(base, filepath.FromSlash(clean))
-	if err != nil {
+	out := make([]FileInfo, 0)
+	if err := s.walkFiles(base, clean, 0, &out); err != nil {
 		if os.IsNotExist(err) {
 			return []FileInfo{}, nil
 		}
@@ -210,14 +283,36 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		}
 		return nil, err
 	}
-	out := make([]FileInfo, 0, len(entries))
+	return out, nil
+}
+
+// walkFiles appends the regular files under dir (relative to base) and
+// recurses into real sub-directories. Only the top-level ReadDir error is
+// surfaced: a sub-folder that vanishes mid-walk is skipped, not fatal.
+func (s *Store) walkFiles(base, dir string, depth int, out *[]FileInfo) error {
+	entries, err := safepath.ReadDir(base, filepath.FromSlash(dir))
+	if err != nil {
+		return err
+	}
 	for _, e := range entries {
-		if e.Symlink || e.Info == nil || !e.Info.Mode().IsRegular() {
+		if len(*out) >= listMaxFiles {
+			return nil
+		}
+		if e.Symlink || e.Info == nil {
 			continue
 		}
 		relPath := e.Name
-		if clean != "" {
-			relPath = clean + "/" + e.Name
+		if dir != "" {
+			relPath = dir + "/" + e.Name
+		}
+		if e.Info.IsDir() {
+			if depth < listMaxDepth {
+				_ = s.walkFiles(base, relPath, depth+1, out)
+			}
+			continue
+		}
+		if !e.Info.Mode().IsRegular() {
+			continue
 		}
 		f, st, err := safepath.OpenFile(base, filepath.FromSlash(relPath))
 		if err != nil {
@@ -225,14 +320,14 @@ func (s *Store) ListFiles(id, rel string) ([]FileInfo, error) {
 		}
 		m := sniffOpen(f, e.Name)
 		_ = f.Close()
-		out = append(out, FileInfo{
+		*out = append(*out, FileInfo{
 			Path:       relPath,
 			Size:       st.Size(),
 			Mime:       m,
 			ModifiedAt: st.ModTime().UTC(),
 		})
 	}
-	return out, nil
+	return nil
 }
 
 // OpenFile opens a regular file with a sanitized relative path. Every path

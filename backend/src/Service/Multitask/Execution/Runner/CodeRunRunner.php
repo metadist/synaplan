@@ -15,8 +15,10 @@ use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeEgressResolver;
 use App\Service\Compute\ComputeRefusedException;
-use App\Service\Compute\Contract\ComputeRunRequest;
+use App\Service\Compute\ComputeRequestBuilder;
+use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunStatus;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -40,6 +42,7 @@ final readonly class CodeRunRunner implements TaskRunner
 {
     public const QUOTA_COPY = 'You have used this week\'s file-work limit. Nothing new was saved.';
     public const FORBID_COPY = AssistantSkillGate::REFUSAL;
+    public const EGRESS_NEEDS_APPROVALS_COPY = 'Reaching a website from file work needs your approval, and approvals are off on this installation. Nothing new was saved.';
     private const SCRIPT_PYTHON = '_synaplan_main.py';
     private const SCRIPT_NODE = '_synaplan_main.js';
     private const SIDECAR_CONCURRENT_CEILING = 8;
@@ -55,6 +58,9 @@ final readonly class CodeRunRunner implements TaskRunner
         private LoggerInterface $logger,
         private string $uploadDir,
         private ?ToolExecutionGate $executionGate = null,
+        private ?ComputeWorkspaceService $workspaces = null,
+        private ?ComputeEgressResolver $egress = null,
+        private ?ComputeRequestBuilder $requests = null,
     ) {
     }
 
@@ -69,9 +75,34 @@ final readonly class CodeRunRunner implements TaskRunner
             new SkillDescriptor(
                 Capability::CodeRun,
                 'Run a short Python or Node script on the attached files and return result files',
+                dynamicNote: fn (?int $userId, array $context): ?string => $this->plannerNote($userId),
                 available: fn (): bool => $this->computeEnabled(),
             ),
         ];
+    }
+
+    /**
+     * The planner-facing contract for the B3 node params. Each line appears
+     * only while its flag is on for this user, so a planner on an install
+     * without workspaces or egress never learns the fields exist (U11).
+     */
+    private function plannerNote(?int $userId): ?string
+    {
+        if (!$this->computeEnabled($userId)) {
+            return null;
+        }
+        $lines = [];
+        if ($this->workspacesEnabled($userId)) {
+            $lines[] = '  params.useWorkspace: true — keep this run\'s files in the user\'s persistent folder (mounted at /workspace and readable by later runs). Set it when the user wants to continue earlier file work or keep results for later; otherwise omit it.';
+        }
+        if (null !== $this->egress && $this->computeConfig->egressEnabled($userId)) {
+            $lines[] = sprintf(
+                '  params.egressHosts: list of public website host names (max %d) the script must reach, e.g. ["api.example.com"]. Every other network access is blocked and the user is asked before the run. Omit it when the script needs no internet.',
+                $this->computeConfig->egressMaxHosts(),
+            );
+        }
+
+        return [] === $lines ? null : implode("\n", $lines);
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
@@ -120,6 +151,8 @@ final readonly class CodeRunRunner implements TaskRunner
             $context->isApproved($node->id),
             $context->message->getId(),
             $node,
+            true === ($node->params['useWorkspace'] ?? false),
+            $this->hostList($node->params['egressHosts'] ?? []),
         );
 
         return $this->toNodeResult($result);
@@ -128,7 +161,8 @@ final readonly class CodeRunRunner implements TaskRunner
     /**
      * Shared executor for the planner, both gateways, and saved tasks.
      *
-     * @param list<int> $inputFileIds
+     * @param list<int>    $inputFileIds
+     * @param list<string> $egressHosts  Host names the run may reach; resolved and pinned only when egress is on
      *
      * @return array{
      *     outcome: string,
@@ -139,7 +173,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * }
      */
     public function executeDirect(
@@ -159,6 +194,8 @@ final readonly class CodeRunRunner implements TaskRunner
         bool $alreadyApproved = false,
         ?int $messageId = null,
         ?TaskNode $node = null,
+        bool $useWorkspace = false,
+        array $egressHosts = [],
     ): array {
         $userId = (int) $user->getId();
         if (!$this->computeEnabled($userId)) {
@@ -167,6 +204,18 @@ final readonly class CodeRunRunner implements TaskRunner
 
         if (!AssistantSkillGate::allows($assistant, Capability::CodeRun->value)) {
             return $this->failedOutcome(self::FORBID_COPY, AssistantSkillGate::REASON);
+        }
+
+        try {
+            $egress = $this->resolveEgress($userId, $egressHosts);
+        } catch (ComputeRefusedException $e) {
+            return $this->failedOutcome($e->getMessage(), $e->errorCode());
+        }
+        $forceApproveForEgress = [] !== $egress['allow'] && $this->computeConfig->egressRequiresApproval($userId);
+        if ($forceApproveForEgress && !$alreadyApproved && !$this->canRequestApproval($userId)) {
+            // Fail closed: the operator asked for a human in the loop before
+            // any website is reached, and no approval can be produced here.
+            return $this->failedOutcome(self::EGRESS_NEEDS_APPROVALS_COPY, 'egress_not_allowed');
         }
 
         if (!$alreadyApproved) {
@@ -182,6 +231,8 @@ final readonly class CodeRunRunner implements TaskRunner
                 $savedTaskRunId,
                 $messageId,
                 $node,
+                $forceApproveForEgress,
+                array_map(static fn (array $host): string => $host['host'], $egress['allow']),
             );
             if (null !== $gated) {
                 return $gated;
@@ -236,16 +287,30 @@ final readonly class CodeRunRunner implements TaskRunner
             return $this->failedOutcome(self::QUOTA_COPY);
         }
 
+        $usedWorkspace = false;
         try {
-            $request = new ComputeRunRequest(
-                protocol: 1,
-                owner: 'user:'.$userId,
-                workspace: ['kind' => 'run'],
-                image: $image,
-                entry: ['program' => $program, 'args' => [$scriptName]],
-                files: $fileRefs,
-                limits: $limits,
-                egress: ['allow' => []],
+            $workspace = ['kind' => 'run'];
+            if ($useWorkspace && $this->workspacesEnabled($userId) && null !== $this->workspaces) {
+                $row = $this->workspaces->ensure($user);
+                $workspace = ['kind' => 'user', 'id' => $row->getWorkspaceId()];
+                $audit->setWorkspaceId($row->getWorkspaceId());
+                $usedWorkspace = true;
+            }
+            $audit->setEgressHosts(array_map(
+                static fn (array $host): string => $host['host'],
+                $egress['allow'],
+            ));
+            $this->runs->save($audit);
+
+            $builder = $this->requests ?? new ComputeRequestBuilder();
+            $request = $builder->build(
+                ComputeWorkspaceService::ownerString($userId),
+                $workspace,
+                $image,
+                ['program' => $program, 'args' => [$scriptName]],
+                $fileRefs,
+                $limits,
+                $egress,
             );
             $runId = $this->client->submitRun($request, $parts);
             $audit->setRunId($runId);
@@ -271,9 +336,10 @@ final readonly class CodeRunRunner implements TaskRunner
                     'stdout' => $logs['stdout'],
                     'stderr' => $logs['stderr'],
                     'artefacts' => [],
-                    'error' => $this->failureCopy($status->reason),
+                    'error' => $this->failureCopy($status->reason, usedWorkspace: true === $usedWorkspace),
                     'approval_id' => $audit->getApprovalId(),
                     'compute_run_id' => $runId,
+                    'used_workspace' => $usedWorkspace,
                 ];
             }
 
@@ -298,6 +364,7 @@ final readonly class CodeRunRunner implements TaskRunner
             $audit->markFinished(ComputeRun::STATUS_SUCCEEDED);
             $this->runs->save($audit);
             $this->rateLimits->recordUsage($user, 'COMPUTE_RUNS', ['cpuSec' => $status->usage['cpuSec']]);
+            $this->refreshWorkspace($user);
 
             return [
                 'outcome' => 'ok',
@@ -309,6 +376,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 'error' => null,
                 'approval_id' => $audit->getApprovalId(),
                 'compute_run_id' => $runId,
+                'used_workspace' => $usedWorkspace,
             ];
         } catch (ComputeRefusedException $e) {
             $audit->setReason($e->errorCode());
@@ -316,18 +384,24 @@ final readonly class CodeRunRunner implements TaskRunner
             $this->runs->save($audit);
             $this->logger->info('CodeRunRunner: sidecar refused', ['code' => $e->errorCode()]);
 
-            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode()), $e->errorCode());
+            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode(), ran: false, usedWorkspace: $usedWorkspace), $e->errorCode(), $usedWorkspace);
         } catch (\Throwable $e) {
             $audit->markFinished(ComputeRun::STATUS_FAILED);
             $this->runs->save($audit);
             $this->logger->error('CodeRunRunner: run failed', ['error' => $e->getMessage()]);
 
-            return $this->failedOutcome('File work could not finish. Nothing new was saved.');
+            return $this->failedOutcome(
+                $usedWorkspace
+                    ? 'File work could not finish. Check Workspace for anything this run already wrote.'
+                    : 'File work could not finish. Nothing new was saved.',
+                usedWorkspace: $usedWorkspace,
+            );
         }
     }
 
     /**
-     * @param list<int> $inputFileIds
+     * @param list<int>    $inputFileIds
+     * @param list<string> $egressHosts
      *
      * @return array{
      *     outcome: string,
@@ -338,7 +412,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * }|null
      */
     private function consultPolicy(
@@ -353,6 +428,8 @@ final readonly class CodeRunRunner implements TaskRunner
         ?int $savedTaskRunId,
         ?int $messageId,
         ?TaskNode $node,
+        bool $forceApproveForEgress = false,
+        array $egressHosts = [],
     ): ?array {
         if (null === $this->executionGate) {
             return null;
@@ -361,6 +438,13 @@ final readonly class CodeRunRunner implements TaskRunner
         $userId = (int) $user->getId();
         $args = [
             'language' => $language,
+        ];
+        if ([] !== $egressHosts) {
+            // A scalar so the approval preview shows which websites the run may
+            // reach (U7: "what will it touch?") — arrays are left out of previews.
+            $args['websites'] = implode(', ', $egressHosts);
+        }
+        $args += [
             'code' => $code,
             'input_file_ids' => $inputFileIds,
             'timeout_sec' => $timeoutSec,
@@ -371,6 +455,9 @@ final readonly class CodeRunRunner implements TaskRunner
         $override = is_string($node?->params['approval'] ?? null) ? $node->params['approval'] : null;
 
         try {
+            // A run with egress must reach a human: the gate lifts Auto to
+            // Approve so neither always-allow nor allow_unattended can skip it
+            // (Block from the policy or the node still wins).
             $decision = $this->executionGate->inspect(
                 $userId,
                 Capability::CodeRun->value,
@@ -382,6 +469,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 $allowUnattended,
                 null,
                 $override,
+                $forceApproveForEgress,
             );
         } catch (ToolNotRegisteredException) {
             return null;
@@ -434,7 +522,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * } $result
      */
     private function toNodeResult(array $result): NodeResult
@@ -446,7 +535,9 @@ final readonly class CodeRunRunner implements TaskRunner
             ]);
         }
         if ('ok' !== $result['outcome']) {
-            return NodeResult::failed((string) $result['error']);
+            return NodeResult::failed((string) $result['error'], [
+                'used_workspace' => true === ($result['used_workspace'] ?? false),
+            ]);
         }
 
         $descriptors = [];
@@ -461,7 +552,11 @@ final readonly class CodeRunRunner implements TaskRunner
         return NodeResult::ok(
             [] === $descriptors ? 'File work finished. No new files were saved.' : 'File work finished.',
             $descriptors,
-            ['compute_run_id' => $result['compute_run_id'], 'exit_code' => $result['exit_code']],
+            [
+                'compute_run_id' => $result['compute_run_id'],
+                'exit_code' => $result['exit_code'],
+                'used_workspace' => true === ($result['used_workspace'] ?? false),
+            ],
         );
     }
 
@@ -475,10 +570,11 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: string,
      *     approval_id: null,
-     *     compute_run_id: null
+     *     compute_run_id: null,
+     *     used_workspace: bool
      * }
      */
-    private function failedOutcome(string $error, ?string $reason = null): array
+    private function failedOutcome(string $error, ?string $reason = null, bool $usedWorkspace = false): array
     {
         unset($reason);
 
@@ -492,6 +588,7 @@ final readonly class CodeRunRunner implements TaskRunner
             'error' => $error,
             'approval_id' => null,
             'compute_run_id' => null,
+            'used_workspace' => $usedWorkspace,
         ];
     }
 
@@ -655,6 +752,66 @@ final readonly class CodeRunRunner implements TaskRunner
         };
     }
 
+    /**
+     * @return list<string>
+     */
+    private function hostList(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+        $hosts = [];
+        foreach ($raw as $host) {
+            if (is_string($host) && '' !== trim($host)) {
+                $hosts[] = trim($host);
+            }
+        }
+
+        return $hosts;
+    }
+
+    /**
+     * @param list<string> $hosts
+     *
+     * @return array{allow: list<array{host: string, port: int, ips: list<string>}>}
+     */
+    private function resolveEgress(int $userId, array $hosts): array
+    {
+        if (null === $this->egress || !$this->computeConfig->egressEnabled($userId)) {
+            return ['allow' => []];
+        }
+
+        return $this->egress->resolve($hosts, $userId);
+    }
+
+    private function workspacesEnabled(?int $userId): bool
+    {
+        // Only reached from executeDirect() after computeEnabled() passed, so
+        // ComputeConfig is guaranteed to be injected here.
+        return null !== $this->workspaces && $this->computeConfig->workspacesEnabled($userId);
+    }
+
+    private function canRequestApproval(int $userId): bool
+    {
+        return null !== $this->executionGate && $this->executionGate->approvalsEnabled($userId);
+    }
+
+    private function refreshWorkspace(User $user): void
+    {
+        if (null === $this->workspaces) {
+            return;
+        }
+        $row = $this->workspaces->forUser($user);
+        if (null === $row) {
+            return;
+        }
+        try {
+            $this->workspaces->refreshUsage($row);
+        } catch (\Throwable) {
+            // Usage is advisory; a failed refresh must not fail a finished run.
+        }
+    }
+
     private function computeEnabled(?int $userId = null): bool
     {
         // SkillCatalogFactory instantiates runners without constructors so
@@ -667,12 +824,30 @@ final readonly class CodeRunRunner implements TaskRunner
         return $this->computeConfig->isEnabled($userId);
     }
 
-    private function failureCopy(?string $reason): string
+    /**
+     * One sentence per terminal reason. When the run used the persistent
+     * folder, never claim "nothing was saved" — a timeout or crash can leave
+     * files, and a quota rollback keeps files that were already there
+     * (including ones this run changed).
+     */
+    private function failureCopy(?string $reason, bool $ran = true, bool $usedWorkspace = false): string
     {
+        $wrote = $ran && $usedWorkspace;
+
         return match ($reason) {
-            'timeout' => 'File work ran out of time. Nothing new was saved.',
-            'oom', 'pids_limit', 'output_limit' => 'File work hit a resource limit. Nothing new was saved.',
-            default => 'File work could not finish. Nothing new was saved.',
+            'timeout' => $wrote
+                ? 'File work ran out of time. Anything this run already wrote to your folder is still there — open Workspace to check.'
+                : 'File work ran out of time. Nothing new was saved.',
+            'oom', 'pids_limit', 'output_limit' => $wrote
+                ? 'File work hit a resource limit. Anything this run already wrote to your folder is still there — open Workspace to check.'
+                : 'File work hit a resource limit. Nothing new was saved.',
+            'workspace_busy' => 'Another file-work run is still using your folder. Wait for it to finish, then try again. Nothing new was saved.',
+            'workspace_quota_exceeded' => $ran
+                ? 'This run wrote more than your file-work folder allows. The new files it created were removed. Files that were already there stay, including any this run changed.'
+                : 'Your file-work folder is full. Delete files or the folder under Files → Workspace, then try again. Nothing new was saved.',
+            default => $wrote
+                ? 'File work could not finish. Check Workspace for anything this run already wrote.'
+                : 'File work could not finish. Nothing new was saved.',
         };
     }
 }

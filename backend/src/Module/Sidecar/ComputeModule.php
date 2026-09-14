@@ -84,7 +84,7 @@ final class ComputeModule implements FeatureModuleInterface
 
     public function routeNames(): array
     {
-        return [];
+        return ['api_compute_workspace*'];
     }
 
     public function serviceIds(): array
@@ -93,6 +93,9 @@ final class ComputeModule implements FeatureModuleInterface
             'App\Service\Compute\ComputeClient',
             'App\Service\Compute\ComputeConfig',
             'App\Service\Compute\ComputeArtefactStore',
+            'App\Service\Compute\ComputeWorkspaceService',
+            'App\Service\Compute\ComputeEgressResolver',
+            'App\Service\Compute\ComputeRequestBuilder',
             'App\Service\Multitask\Execution\Runner\CodeRunRunner',
             'App\AI\Messages\Tools\CodeExecutionTool',
             'App\AI\Messages\Tools\CodeExecutionInvoker',
