@@ -31,11 +31,14 @@ volumes/
 # But allow frontend source data
 !frontend/src/data/
 
-# Logs. Anchored: an unanchored logs/ also excludes source directories at
-# any depth (it silently swallowed sidecars/synaplan-compute/internal/logs).
-# See #1862 / #1865.
+# Logs. logs/ has no slash, so it excludes runtime log directories at every
+# depth — which is what we want for output, but it also swallowed
+# sidecars/synaplan-compute/internal/logs, which is source. Keep the broad
+# rule and allow exactly that one path: any other directory named logs stays
+# ignored, wherever it appears. See #1862 / #1865.
 *.log
-/logs/
+logs/
+!sidecars/synaplan-compute/internal/logs/
 
 # Backend cache & build
 backend/var/cache/
