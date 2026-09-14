@@ -110,17 +110,25 @@ Interactive (the owner is present): default `auto`. Unattended (a saved
 task): default `approve`. An assistant cannot loosen the instance policy.
 A run that will fetch from the web additionally asks first when
 `COMPUTE.EGRESS_REQUIRES_APPROVAL` is on (default on); the approval preview
-names the websites (`websites: api.example.com`). If that switch is on but
-approvals cannot be produced (`TOOLS.APPROVALS_ENABLED` off), the run is
-**refused**, never run unattended — fail closed.
+names the websites (`websites: api.example.com`). That ask is a floor the
+gate applies after the policy decided (`requireApproval`): an assistant's
+always-allow rule or a saved task's `allow_unattended` cannot lower it back
+to `auto`, while a `block` still wins. If that switch is on but approvals
+cannot be produced (`TOOLS.APPROVALS_ENABLED` off), the run is **refused**,
+never run unattended — fail closed.
 
 ## Workspaces and egress
 
 **Workspace.** One folder per user (`BCOMPUTEWORKSPACES`). PHP stores only
 the opaque id and the quota — never a host path. The sidecar allocates the
-id and enforces ownership (`owner = user:{id}`). **Open workspace** is a
+id and enforces ownership (`owner = user:{id}`). Creation is serialised per
+user behind a `LOCK_DSN` lock so two first runs in flight cannot leave an
+orphaned sidecar folder behind the unique row. The planner learns the node
+param (`params.useWorkspace`, and `params.egressHosts` for egress) from the
+skill catalog only while the matching flag is on. **Open workspace** is a
 chip on a finished run and a sibling tab under Files. Empty: “Files the AI
-creates for you will show up here.” Delete starts the AI from an empty
+creates for you will show up here.” A failed load shows the reason with
+**Try again**, never the empty state. Delete starts the AI from an empty
 folder next time.
 
 **Egress.** The planner may name hosts; PHP reduces each entry to a bare

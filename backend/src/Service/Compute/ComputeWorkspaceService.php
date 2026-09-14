@@ -11,6 +11,7 @@ use App\Service\Compute\Contract\ComputeWorkspaceCreate;
 use App\Service\Compute\Contract\ComputeWorkspaceFile;
 use App\Service\Compute\Contract\ComputeWorkspaceUsage;
 use App\Service\RateLimitService;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * Maps a Synaplan user to an opaque sidecar workspace id. PHP never stores a path.
@@ -18,12 +19,15 @@ use App\Service\RateLimitService;
 final readonly class ComputeWorkspaceService
 {
     private const MAX_PATH_LENGTH = 1024;
+    /** Longer than one sidecar create round-trip; auto-expires if a worker dies mid-create. */
+    private const CREATE_LOCK_TTL_SECONDS = 30.0;
 
     public function __construct(
         private ComputeConfig $config,
         private ComputeClient $client,
         private ComputeWorkspaceRepository $workspaces,
         private RateLimitService $rateLimits,
+        private LockFactory $lockFactory,
     ) {
     }
 
@@ -49,7 +53,24 @@ final readonly class ComputeWorkspaceService
             return $existing;
         }
 
+        // Two first runs racing here would both create a sidecar folder while
+        // only one row per user fits the unique key — the loser's folder would
+        // be orphaned on disk. Serialise creation per user (cluster-wide via
+        // LOCK_DSN); the second caller finds the row the first one saved.
         $userId = (int) $user->getId();
+        $lock = $this->lockFactory->createLock('compute-workspace-create.'.$userId, self::CREATE_LOCK_TTL_SECONDS);
+        $lock->acquire(true);
+        try {
+            $existing = $this->workspaces->findActiveForUser($userId);
+
+            return $existing instanceof ComputeWorkspace ? $existing : $this->create($user, $userId);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function create(User $user, int $userId): ComputeWorkspace
+    {
         $quotaMb = $this->quotaMb($user);
         if ($quotaMb <= 0) {
             throw new ComputeRefusedException('workspace_quota_exceeded', 'This account cannot keep a file-work folder.');

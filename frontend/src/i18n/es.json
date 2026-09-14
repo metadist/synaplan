@@ -2785,7 +2785,8 @@
       "preview": "Vista previa",
       "previewError": "No se pudo abrir el archivo.",
       "previewUnavailable": "Este archivo no se puede previsualizar aquí. Descargúelo para abrirlo.",
-      "closePreview": "Cerrar"
+      "closePreview": "Cerrar",
+      "retry": "Intentar de nuevo"
     },
     "incomingBadge": "{count} nuevos",
     "sourceLabel": {

@@ -1311,7 +1311,8 @@
       "preview": "Preview",
       "previewError": "The file could not be opened.",
       "previewUnavailable": "This file cannot be previewed here. Download it to open it.",
-      "closePreview": "Close"
+      "closePreview": "Close",
+      "retry": "Try again"
     },
     "incomingBadge": "{count} new",
     "sourceLabel": {

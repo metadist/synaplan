@@ -3562,7 +3562,8 @@
       "preview": "Vorschau",
       "previewError": "Die Datei konnte nicht geöffnet werden.",
       "previewUnavailable": "Diese Datei lässt sich hier nicht anzeigen. Laden Sie sie herunter, um sie zu öffnen.",
-      "closePreview": "Schließen"
+      "closePreview": "Schließen",
+      "retry": "Erneut versuchen"
     },
     "incomingBadge": "{count} neu",
     "sourceLabel": {

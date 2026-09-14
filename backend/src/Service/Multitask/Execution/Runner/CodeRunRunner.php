@@ -75,9 +75,34 @@ final readonly class CodeRunRunner implements TaskRunner
             new SkillDescriptor(
                 Capability::CodeRun,
                 'Run a short Python or Node script on the attached files and return result files',
+                dynamicNote: fn (?int $userId, array $context): ?string => $this->plannerNote($userId),
                 available: fn (): bool => $this->computeEnabled(),
             ),
         ];
+    }
+
+    /**
+     * The planner-facing contract for the B3 node params. Each line appears
+     * only while its flag is on for this user, so a planner on an install
+     * without workspaces or egress never learns the fields exist (U11).
+     */
+    private function plannerNote(?int $userId): ?string
+    {
+        if (!$this->computeEnabled($userId)) {
+            return null;
+        }
+        $lines = [];
+        if ($this->workspacesEnabled($userId)) {
+            $lines[] = '  params.useWorkspace: true — keep this run\'s files in the user\'s persistent folder (mounted at /workspace and readable by later runs). Set it when the user wants to continue earlier file work or keep results for later; otherwise omit it.';
+        }
+        if (null !== $this->egress && $this->computeConfig->egressEnabled($userId)) {
+            $lines[] = sprintf(
+                '  params.egressHosts: list of public website host names (max %d) the script must reach, e.g. ["api.example.com"]. Every other network access is blocked and the user is asked before the run. Omit it when the script needs no internet.',
+                $this->computeConfig->egressMaxHosts(),
+            );
+        }
+
+        return [] === $lines ? null : implode("\n", $lines);
     }
 
     public function run(TaskNode $node, NodeContext $context): NodeResult
@@ -417,11 +442,11 @@ final readonly class CodeRunRunner implements TaskRunner
             ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
             : 'chat:'.(int) ($messageId ?? 0);
         $override = is_string($node?->params['approval'] ?? null) ? $node->params['approval'] : null;
-        if ($forceApproveForEgress && 'block' !== $override) {
-            $override = PolicyOutcome::Approve->value;
-        }
 
         try {
+            // A run with egress must reach a human: the gate lifts Auto to
+            // Approve so neither always-allow nor allow_unattended can skip it
+            // (Block from the policy or the node still wins).
             $decision = $this->executionGate->inspect(
                 $userId,
                 Capability::CodeRun->value,
@@ -433,6 +458,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 $allowUnattended,
                 null,
                 $override,
+                $forceApproveForEgress,
             );
         } catch (ToolNotRegisteredException) {
             return null;

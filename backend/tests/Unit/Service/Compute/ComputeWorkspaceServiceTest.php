@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Compute;
 
+use App\Entity\ComputeWorkspace;
 use App\Entity\User;
 use App\Repository\ComputeWorkspaceRepository;
 use App\Service\Compute\ComputeClient;
@@ -13,6 +14,8 @@ use App\Service\Compute\Contract\ComputeWorkspaceCreate;
 use App\Service\Compute\Contract\ComputeWorkspaceCreated;
 use App\Service\RateLimitService;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 final class ComputeWorkspaceServiceTest extends TestCase
 {
@@ -50,10 +53,58 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $user->method('getId')->willReturn(7);
         $user->method('getRateLimitLevel')->willReturn('NEW');
 
-        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits);
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $this->locks());
         $row = $service->ensure($user);
 
         self::assertSame('01ARZ3NDEKTSV4RRFFQ69G5FAV', $row->getWorkspaceId());
+    }
+
+    public function testEnsureReusesRowSavedByRacingCallerInsteadOfCreatingASecondFolder(): void
+    {
+        // First lookup misses (pre-lock), second one (under the lock) sees the
+        // row a concurrent caller just saved — no sidecar create may happen.
+        $existing = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, null);
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->expects($this->exactly(2))->method('findActiveForUser')->willReturnOnConsecutiveCalls(null, $existing);
+        $repo->expects($this->never())->method('save');
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->never())->method('createWorkspace');
+
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $this->createStub(RateLimitService::class), $this->locks());
+
+        self::assertSame($existing, $service->ensure($user));
+    }
+
+    public function testEnsureReleasesTheLockWhenTheSidecarFails(): void
+    {
+        $repo = $this->createStub(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturn(null);
+        $client = $this->createStub(ComputeClient::class);
+        $client->method('createWorkspace')->willThrowException(new \RuntimeException('sidecar down'));
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('computeIntSetting')->willReturn(256);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+        $locks = $this->locks();
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $locks);
+        try {
+            $service->ensure($user);
+            self::fail('expected the sidecar failure to surface');
+        } catch (\RuntimeException) {
+        }
+
+        self::assertTrue($locks->createLock('compute-workspace-create.7')->acquire(), 'lock must not stay held after a failed create');
+    }
+
+    private function locks(): LockFactory
+    {
+        return new LockFactory(new InMemoryStore());
     }
 
     public function testSafeRelativePathNormalisesAcceptedInput(): void

@@ -28,10 +28,24 @@
             </button>
           </div>
 
-          <p v-if="error" class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
-
           <div v-if="loading" class="py-12 text-sm txt-muted" data-testid="workspace-loading">
             {{ $t('common.loading') }}
+          </div>
+
+          <div
+            v-else-if="error"
+            class="flex flex-col items-center justify-center py-16 px-4 text-center"
+            data-testid="workspace-error"
+          >
+            <p class="text-sm text-red-600 dark:text-red-400 max-w-sm">{{ error }}</p>
+            <button
+              type="button"
+              class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-4"
+              data-testid="btn-workspace-retry"
+              @click="reload"
+            >
+              {{ $t('files.workspace.retry') }}
+            </button>
           </div>
 
           <div
@@ -90,10 +104,18 @@
       data-testid="workspace-preview"
       @click.self="closePreview"
     >
-      <div class="surface-card max-w-3xl w-full max-h-[80vh] overflow-auto p-4 space-y-3">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="workspace-preview-title"
+        class="surface-card max-w-3xl w-full max-h-[80vh] overflow-auto p-4 space-y-3"
+      >
         <div class="flex items-start justify-between gap-3">
-          <h3 class="text-sm font-medium txt-primary break-all">{{ preview.name }}</h3>
+          <h3 id="workspace-preview-title" class="text-sm font-medium txt-primary break-all">
+            {{ preview.name }}
+          </h3>
           <button
+            ref="previewCloseButton"
             type="button"
             class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
             data-testid="btn-workspace-preview-close"
@@ -119,7 +141,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
@@ -157,6 +179,7 @@ const error = ref('')
 const info = ref<ComputeWorkspaceInfo | null>(null)
 const files = ref<ComputeWorkspaceFile[]>([])
 const preview = ref<PreviewState | null>(null)
+const previewCloseButton = ref<HTMLButtonElement | null>(null)
 
 onMounted(async () => {
   if (getConfigSync().features?.computeWorkspacesEnabled !== true) {
@@ -167,8 +190,27 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  // Watchers are already stopped here, so drop the listener explicitly.
+  document.removeEventListener('keydown', onPreviewKeydown)
   closePreview()
 })
+
+// Dialog semantics: Escape closes, focus lands on the close button while open.
+watch(preview, async (open) => {
+  if (open) {
+    document.addEventListener('keydown', onPreviewKeydown)
+    await nextTick()
+    previewCloseButton.value?.focus()
+  } else {
+    document.removeEventListener('keydown', onPreviewKeydown)
+  }
+})
+
+function onPreviewKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    closePreview()
+  }
+}
 
 async function reload() {
   loading.value = true

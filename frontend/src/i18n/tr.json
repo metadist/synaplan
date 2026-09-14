@@ -2786,7 +2786,8 @@
       "preview": "Önizleme",
       "previewError": "Dosya açılamadı.",
       "previewUnavailable": "Bu dosya burada önizlenemez. Açmak için indirin.",
-      "closePreview": "Kapat"
+      "closePreview": "Kapat",
+      "retry": "Yeniden dene"
     },
     "incomingBadge": "{count} yeni",
     "sourceLabel": {

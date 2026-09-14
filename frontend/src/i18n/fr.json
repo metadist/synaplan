@@ -1311,7 +1311,8 @@
       "preview": "Aperçu",
       "previewError": "Le fichier n’a pas pu être ouvert.",
       "previewUnavailable": "Ce fichier ne peut pas être prévisualisé ici. Téléchargez-le pour l’ouvrir.",
-      "closePreview": "Fermer"
+      "closePreview": "Fermer",
+      "retry": "Réessayer"
     },
     "incomingBadge": "{count} nouveaux",
     "sourceLabel": {
