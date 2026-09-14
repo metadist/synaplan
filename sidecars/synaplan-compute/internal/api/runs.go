@@ -415,11 +415,10 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 
 	// The persistent folder was writable for the whole run; the pre-run check
 	// only covered uploaded bytes. Now that the container is gone, enforce the
-	// quota: roll back what this run added and fail it, so the folder never
-	// stays above its cap and the next run's pre-check does not lock the
-	// user out.
+	// quota even when the run was cancelled — a cancelled script can still
+	// have filled the folder. Rollback never changes a cancelled status.
 	wsOverQuota := false
-	if wsHost != "" && !cancelled {
+	if wsHost != "" {
 		if over, err := s.ws.OverQuota(rec.Req.Workspace.ID); err == nil && over {
 			s.ws.RemoveNewEntries(rec.Req.Workspace.ID, wsBefore)
 			wsOverQuota = true

@@ -43,7 +43,7 @@ final readonly class ComputeWorkspaceService
             return null;
         }
 
-        return $this->workspaces->findActiveForUser($id);
+        return $this->activeRow($id);
     }
 
     public function ensure(User $user): ComputeWorkspace
@@ -61,7 +61,7 @@ final readonly class ComputeWorkspaceService
         $lock = $this->lockFactory->createLock('compute-workspace-create.'.$userId, self::CREATE_LOCK_TTL_SECONDS);
         $lock->acquire(true);
         try {
-            $existing = $this->workspaces->findActiveForUser($userId);
+            $existing = $this->activeRow($userId);
 
             return $existing instanceof ComputeWorkspace ? $existing : $this->create($user, $userId);
         } finally {
@@ -91,9 +91,62 @@ final readonly class ComputeWorkspaceService
             $created->quotaMb > 0 ? $created->quotaMb : $quotaMb,
             (new \DateTimeImmutable())->modify('+'.$ttl.' days'),
         );
-        $this->workspaces->save($row);
+        try {
+            $this->workspaces->save($row);
+        } catch (\Throwable $e) {
+            try {
+                $this->client->deleteWorkspace($created->workspaceId);
+            } catch (\Throwable) {
+            }
+
+            throw $e;
+        }
 
         return $row;
+    }
+
+    /**
+     * Active, unexpired row — or null after a successful expire/delete.
+     * An expired folder that a run is still using stays visible until idle.
+     */
+    private function activeRow(int $userId): ?ComputeWorkspace
+    {
+        $row = $this->workspaces->findActiveForUser($userId);
+        if (!$row instanceof ComputeWorkspace) {
+            return null;
+        }
+        if (!$row->isExpired()) {
+            return $row;
+        }
+
+        return $this->forgetIfIdle($row) ? null : $row;
+    }
+
+    /**
+     * Drops an expired mapping and its sidecar folder. Returns false when a
+     * run still holds the folder (409 workspace_busy) so the caller can keep
+     * serving it until that run finishes.
+     */
+    private function forgetIfIdle(ComputeWorkspace $row): bool
+    {
+        try {
+            $this->client->deleteWorkspace($row->getWorkspaceId());
+        } catch (ComputeRefusedException $e) {
+            if ('workspace_not_found' === $e->errorCode()) {
+                $this->workspaces->remove($row);
+
+                return true;
+            }
+
+            // Busy, or any other sidecar refusal: keep serving until we can
+            // drop the folder without a 500 on the Files tab.
+            return false;
+        } catch (\Throwable) {
+            return false;
+        }
+        $this->workspaces->remove($row);
+
+        return true;
     }
 
     public function refreshUsage(ComputeWorkspace $workspace): ComputeWorkspaceUsage
@@ -117,6 +170,9 @@ final readonly class ComputeWorkspaceService
         try {
             $this->client->deleteWorkspace($workspace->getWorkspaceId());
         } catch (ComputeRefusedException $e) {
+            if ('workspace_busy' === $e->errorCode()) {
+                throw new ComputeRefusedException('workspace_busy', 'A file-work run is still using this folder. Wait for it to finish, then delete it.', httpStatus: 409);
+            }
             if ('workspace_not_found' !== $e->errorCode()) {
                 throw $e;
             }
@@ -159,10 +215,14 @@ final readonly class ComputeWorkspaceService
     {
         $path = ltrim(str_replace('\\', '/', trim($path)), '/');
         if (\strlen($path) > self::MAX_PATH_LENGTH
-            || str_contains($path, '..')
             || 1 === preg_match('/[\x00-\x1F\x7F]/', $path)
         ) {
             throw new ComputeRefusedException('bad_file_name', 'That folder path is not allowed.');
+        }
+        foreach (explode('/', $path) as $segment) {
+            if ('.' === $segment || '..' === $segment) {
+                throw new ComputeRefusedException('bad_file_name', 'That folder path is not allowed.');
+            }
         }
         if ($fileRequired && '' === $path) {
             throw new ComputeRefusedException('bad_file_name', 'A file path is required.');

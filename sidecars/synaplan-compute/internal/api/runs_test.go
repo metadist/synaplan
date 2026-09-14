@@ -740,3 +740,63 @@ func TestWorkspaceOverQuotaAfterRunRollsBackWhatTheRunAdded(t *testing.T) {
 		t.Fatal("folder must be back under quota")
 	}
 }
+
+func TestWorkspaceBusyRefusesDeleteDuringRun(t *testing.T) {
+	fr := newFakeRunner()
+	fr.waitDelay = 300 * time.Millisecond
+	_, ts := newTestServer(t, testOpts{runner: fr})
+	wsID := createWorkspace(t, ts, "user:123", 64)
+	body := validRun()
+	body.Workspace = contract.Workspace{Kind: "user", ID: wsID}
+	id := submitJSON(t, ts, body)
+
+	del := authed(t, http.MethodDelete, ts.URL+"/v1/workspaces/"+wsID, nil, "")
+	b, _ := io.ReadAll(del.Body)
+	del.Body.Close()
+	if del.StatusCode != http.StatusConflict {
+		t.Fatalf("status %d body %s", del.StatusCode, b)
+	}
+	var eb contract.ErrorBody
+	if err := json.Unmarshal(b, &eb); err != nil {
+		t.Fatal(err)
+	}
+	if eb.Error.Code != contract.ErrWorkspaceBusy {
+		t.Fatalf("code %q", eb.Error.Code)
+	}
+
+	waitFor(t, ts, id, finished)
+	del = authed(t, http.MethodDelete, ts.URL+"/v1/workspaces/"+wsID, nil, "")
+	del.Body.Close()
+	if del.StatusCode != http.StatusNoContent {
+		t.Fatalf("after the run, delete must succeed: %d", del.StatusCode)
+	}
+}
+
+func TestCancelledRunStillRollsBackAnOverQuotaWorkspace(t *testing.T) {
+	fr := newFakeRunner()
+	fr.waitDelay = 30 * time.Second
+	fr.onCreate = func(spec runner.Spec) {
+		_ = os.WriteFile(filepath.Join(spec.WorkspaceHost, "big.bin"), bytes.Repeat([]byte("x"), 2*1024*1024), 0o644)
+	}
+	s, ts := newTestServer(t, testOpts{runner: fr})
+	wsID := createWorkspace(t, ts, "user:123", 1)
+	body := validRun()
+	body.Workspace = contract.Workspace{Kind: "user", ID: wsID}
+	id := submitJSON(t, ts, body)
+	waitFor(t, ts, id, func(st contract.RunStatus) bool { return st.Status == contract.StatusRunning })
+
+	del := authed(t, http.MethodDelete, ts.URL+"/v1/runs/"+id, nil, "")
+	del.Body.Close()
+	st := waitFor(t, ts, id, func(st contract.RunStatus) bool { return st.Status == contract.StatusCancelled })
+	if st.Reason != contract.ReasonCancelled {
+		t.Fatalf("cancel status must stay cancelled, got %+v", st)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(filepath.Join(s.ws.HostPath(wsID), "big.bin")); os.IsNotExist(err) {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatal("cancelled over-quota writes must still be rolled back")
+}

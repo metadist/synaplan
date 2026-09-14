@@ -33,7 +33,10 @@ const isQuota = computed(() => (props.card.error ?? '').includes("week's file-wo
 
 const canRerun = computed(() => !props.isReadonly && ['done', 'failed'].includes(props.card.state))
 const showWorkspace = computed(
-  () => props.card.state === 'done' && getConfigSync().features?.computeWorkspacesEnabled === true
+  () =>
+    props.card.usedWorkspace === true &&
+    getConfigSync().features?.computeWorkspacesEnabled === true &&
+    ['done', 'failed'].includes(props.card.state)
 )
 const notesId = computed(() => `compute-run-notes-${props.card.nodeId}`)
 const notesHelpId = computed(() => `${notesId.value}-help`)
@@ -58,9 +61,9 @@ const submitRerun = () => {
       {{ isQuota ? $t('compute.quota') : card.error || $t('taskPlan.failedBody') }}
     </p>
     <p v-else-if="card.text" class="text-sm txt-primary break-words">{{ card.text }}</p>
-    <div v-if="card.state === 'done'" class="flex flex-wrap gap-2">
+    <div v-if="card.state === 'done' || showWorkspace" class="flex flex-wrap gap-2">
       <a
-        v-if="card.url"
+        v-if="card.state === 'done' && card.url"
         :href="card.url"
         class="inline-flex items-center gap-1 pill text-xs"
         data-testid="compute-run-preview"

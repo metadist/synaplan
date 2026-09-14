@@ -107,9 +107,17 @@ describe('ComputeRunCard', () => {
     expect(wrapper.find('[data-testid="compute-run-workspace"]').exists()).toBe(false)
   })
 
-  it('shows Open workspace after a finished run when the folder flag is on', () => {
+  it('shows Open workspace only when this run used the folder', () => {
     runtimeFeatures.computeWorkspacesEnabled = true
-    const wrapper = mountCard({ state: 'done' })
-    expect(wrapper.get('[data-testid="compute-run-workspace"]').text()).toContain('Open workspace')
+    expect(
+      mountCard({ state: 'done' }).find('[data-testid="compute-run-workspace"]').exists()
+    ).toBe(false)
+    const used = mountCard({ state: 'done', usedWorkspace: true })
+    expect(used.get('[data-testid="compute-run-workspace"]').text()).toContain('Open workspace')
+    expect(
+      mountCard({ state: 'failed', usedWorkspace: true })
+        .get('[data-testid="compute-run-workspace"]')
+        .text()
+    ).toContain('Open workspace')
   })
 })

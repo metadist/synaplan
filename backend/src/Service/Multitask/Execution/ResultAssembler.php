@@ -240,6 +240,9 @@ final class ResultAssembler
                 if (null !== $nodeResult->error && '' !== $nodeResult->error) {
                     $card['error'] = $nodeResult->error;
                 }
+                if (true === ($nodeResult->metadata['used_workspace'] ?? false)) {
+                    $card['used_workspace'] = true;
+                }
                 $mediaJob = $nodeResult->metadata['media_job'] ?? null;
                 if (is_array($mediaJob) && is_string($mediaJob['job_id'] ?? null) && '' !== $mediaJob['job_id']) {
                     $card['job_id'] = $mediaJob['job_id'];

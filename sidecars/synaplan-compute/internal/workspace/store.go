@@ -169,20 +169,27 @@ func (s *Store) WouldExceed(id string, additional int64) (bool, error) {
 	return used+additional > capBytes, nil
 }
 
-// walkSize sums regular files in the data tree. Symlinks are counted by their
-// own Lstat size and never followed.
+// walkSize approximates disk use of the data tree. Every directory, regular
+// file and symlink costs at least one 4 KiB block so empty files and empty
+// folders cannot exhaust inodes for free; regular files add their extra
+// bytes on top. WalkDir never follows symlinks.
 func (s *Store) walkSize(id string) (int64, int) {
+	const block = 4096
 	var used int64
 	var files int
-	_ = filepath.WalkDir(s.hostPath(id), func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	base := s.hostPath(id)
+	_ = filepath.WalkDir(base, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || path == base {
+			return nil
+		}
+		used += block
+		if d.IsDir() {
 			return nil
 		}
 		info, err := d.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			return nil
+		if err == nil && info.Mode().IsRegular() && info.Size() > block {
+			used += info.Size() - block
 		}
-		used += info.Size()
 		files++
 		return nil
 	})
@@ -299,7 +306,7 @@ func (s *Store) walkFiles(base, dir string, depth int, out *[]FileInfo) error {
 			relPath = dir + "/" + e.Name
 		}
 		if e.Info.IsDir() {
-			if depth+1 < listMaxDepth {
+			if depth < listMaxDepth {
 				_ = s.walkFiles(base, relPath, depth+1, out)
 			}
 			continue

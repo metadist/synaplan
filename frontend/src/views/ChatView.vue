@@ -2990,6 +2990,9 @@ const streamAIResponse = async (
               if (typeof data.metadata?.results_count === 'number') {
                 card.resultsCount = data.metadata.results_count
               }
+              if (data.metadata?.used_workspace === true) {
+                card.usedWorkspace = true
+              }
             }
           } else if (data.status === 'task_chunk') {
             const message = historyStore.messages.find((m) => m.id === messageId)
@@ -3598,6 +3601,9 @@ const streamAIResponse = async (
               }
               if (typeof data.metadata?.results_count === 'number') {
                 card.resultsCount = data.metadata.results_count
+              }
+              if (data.metadata?.used_workspace === true) {
+                card.usedWorkspace = true
               }
             }
           } else if (data.status === 'task_chunk') {

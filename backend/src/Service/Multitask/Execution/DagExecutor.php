@@ -620,6 +620,9 @@ final readonly class DagExecutor
                 $extra['prompt'] = $prompt;
             }
         }
+        if (true === ($result->metadata['used_workspace'] ?? false)) {
+            $extra['used_workspace'] = true;
+        }
 
         return $extra;
     }
@@ -665,6 +668,9 @@ final readonly class DagExecutor
             if (isset($firstFile['type']) && is_string($firstFile['type']) && '' !== $firstFile['type']) {
                 $extra['type'] = $firstFile['type'];
             }
+        }
+        if (true === ($result->metadata['used_workspace'] ?? false)) {
+            $extra['used_workspace'] = true;
         }
 
         return $extra;

@@ -173,7 +173,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * }
      */
     public function executeDirect(
@@ -286,12 +287,14 @@ final readonly class CodeRunRunner implements TaskRunner
             return $this->failedOutcome(self::QUOTA_COPY);
         }
 
+        $usedWorkspace = false;
         try {
             $workspace = ['kind' => 'run'];
             if ($useWorkspace && $this->workspacesEnabled($userId) && null !== $this->workspaces) {
                 $row = $this->workspaces->ensure($user);
                 $workspace = ['kind' => 'user', 'id' => $row->getWorkspaceId()];
                 $audit->setWorkspaceId($row->getWorkspaceId());
+                $usedWorkspace = true;
             }
             $audit->setEgressHosts(array_map(
                 static fn (array $host): string => $host['host'],
@@ -333,9 +336,10 @@ final readonly class CodeRunRunner implements TaskRunner
                     'stdout' => $logs['stdout'],
                     'stderr' => $logs['stderr'],
                     'artefacts' => [],
-                    'error' => $this->failureCopy($status->reason),
+                    'error' => $this->failureCopy($status->reason, usedWorkspace: true === $usedWorkspace),
                     'approval_id' => $audit->getApprovalId(),
                     'compute_run_id' => $runId,
+                    'used_workspace' => $usedWorkspace,
                 ];
             }
 
@@ -372,6 +376,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 'error' => null,
                 'approval_id' => $audit->getApprovalId(),
                 'compute_run_id' => $runId,
+                'used_workspace' => $usedWorkspace,
             ];
         } catch (ComputeRefusedException $e) {
             $audit->setReason($e->errorCode());
@@ -379,13 +384,18 @@ final readonly class CodeRunRunner implements TaskRunner
             $this->runs->save($audit);
             $this->logger->info('CodeRunRunner: sidecar refused', ['code' => $e->errorCode()]);
 
-            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode(), ran: false), $e->errorCode());
+            return $this->failedOutcome($e->isQuota() ? self::QUOTA_COPY : $this->failureCopy($e->errorCode(), ran: false, usedWorkspace: $usedWorkspace), $e->errorCode(), $usedWorkspace);
         } catch (\Throwable $e) {
             $audit->markFinished(ComputeRun::STATUS_FAILED);
             $this->runs->save($audit);
             $this->logger->error('CodeRunRunner: run failed', ['error' => $e->getMessage()]);
 
-            return $this->failedOutcome('File work could not finish. Nothing new was saved.');
+            return $this->failedOutcome(
+                $usedWorkspace
+                    ? 'File work could not finish. Check Workspace for anything this run already wrote.'
+                    : 'File work could not finish. Nothing new was saved.',
+                usedWorkspace: $usedWorkspace,
+            );
         }
     }
 
@@ -402,7 +412,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * }|null
      */
     private function consultPolicy(
@@ -511,7 +522,8 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: ?string,
      *     approval_id: ?int,
-     *     compute_run_id: ?string
+     *     compute_run_id: ?string,
+     *     used_workspace?: bool
      * } $result
      */
     private function toNodeResult(array $result): NodeResult
@@ -523,7 +535,9 @@ final readonly class CodeRunRunner implements TaskRunner
             ]);
         }
         if ('ok' !== $result['outcome']) {
-            return NodeResult::failed((string) $result['error']);
+            return NodeResult::failed((string) $result['error'], [
+                'used_workspace' => true === ($result['used_workspace'] ?? false),
+            ]);
         }
 
         $descriptors = [];
@@ -538,7 +552,11 @@ final readonly class CodeRunRunner implements TaskRunner
         return NodeResult::ok(
             [] === $descriptors ? 'File work finished. No new files were saved.' : 'File work finished.',
             $descriptors,
-            ['compute_run_id' => $result['compute_run_id'], 'exit_code' => $result['exit_code']],
+            [
+                'compute_run_id' => $result['compute_run_id'],
+                'exit_code' => $result['exit_code'],
+                'used_workspace' => true === ($result['used_workspace'] ?? false),
+            ],
         );
     }
 
@@ -552,10 +570,11 @@ final readonly class CodeRunRunner implements TaskRunner
      *     artefacts: list<array{file_id: int, name: string, mime: string, size: int}>,
      *     error: string,
      *     approval_id: null,
-     *     compute_run_id: null
+     *     compute_run_id: null,
+     *     used_workspace: bool
      * }
      */
-    private function failedOutcome(string $error, ?string $reason = null): array
+    private function failedOutcome(string $error, ?string $reason = null, bool $usedWorkspace = false): array
     {
         unset($reason);
 
@@ -569,6 +588,7 @@ final readonly class CodeRunRunner implements TaskRunner
             'error' => $error,
             'approval_id' => null,
             'compute_run_id' => null,
+            'used_workspace' => $usedWorkspace,
         ];
     }
 
@@ -805,20 +825,29 @@ final readonly class CodeRunRunner implements TaskRunner
     }
 
     /**
-     * One sentence per terminal reason — the same code can arrive as a
-     * refusal before the run (nothing was written) or as the reason of a
-     * finished run (the sidecar already rolled back what the run added).
+     * One sentence per terminal reason. When the run used the persistent
+     * folder, never claim "nothing was saved" — a timeout or crash can leave
+     * files, and a quota rollback keeps files that were already there
+     * (including ones this run changed).
      */
-    private function failureCopy(?string $reason, bool $ran = true): string
+    private function failureCopy(?string $reason, bool $ran = true, bool $usedWorkspace = false): string
     {
+        $wrote = $ran && $usedWorkspace;
+
         return match ($reason) {
-            'timeout' => 'File work ran out of time. Nothing new was saved.',
-            'oom', 'pids_limit', 'output_limit' => 'File work hit a resource limit. Nothing new was saved.',
+            'timeout' => $wrote
+                ? 'File work ran out of time. Anything this run already wrote to your folder is still there — open Workspace to check.'
+                : 'File work ran out of time. Nothing new was saved.',
+            'oom', 'pids_limit', 'output_limit' => $wrote
+                ? 'File work hit a resource limit. Anything this run already wrote to your folder is still there — open Workspace to check.'
+                : 'File work hit a resource limit. Nothing new was saved.',
             'workspace_busy' => 'Another file-work run is still using your folder. Wait for it to finish, then try again. Nothing new was saved.',
             'workspace_quota_exceeded' => $ran
-                ? 'This run wrote more than your file-work folder allows. The files it created were removed; the rest of your folder is unchanged.'
+                ? 'This run wrote more than your file-work folder allows. The new files it created were removed. Files that were already there stay, including any this run changed.'
                 : 'Your file-work folder is full. Delete files or the folder under Files → Workspace, then try again. Nothing new was saved.',
-            default => 'File work could not finish. Nothing new was saved.',
+            default => $wrote
+                ? 'File work could not finish. Check Workspace for anything this run already wrote.'
+                : 'File work could not finish. Nothing new was saved.',
         };
     }
 }

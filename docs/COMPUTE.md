@@ -24,7 +24,7 @@ the surface is absent: no chat card, no Files tab, no API tease (U11).
 | Flag | Env pin | Default | Effect |
 | ---- | ------- | ------- | ------ |
 | `COMPUTE.ENABLED` | `FEATURE_COMPUTE_ENABLED` | **off** | Sidecar + this switch must both be on. Every `/api/v1/compute/*` route answers **404** when off. |
-| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** after a finished run. |
+| `COMPUTE.WORKSPACES_ENABLED` | `FEATURE_COMPUTE_WORKSPACES_ENABLED` | **off** | Keep one folder per user between runs. Files → **Workspace**. The chat card shows **Open workspace** only when that run actually used the folder. |
 | `COMPUTE.EGRESS_ENABLED` | `FEATURE_COMPUTE_EGRESS_ENABLED` | **off** | A run may fetch from a short list of public websites. Off = every run stays offline. Private or local addresses are always refused. |
 
 Both extra flags sit **under** `COMPUTE.ENABLED`. Turning a child on while
@@ -32,12 +32,12 @@ file work itself is off does nothing.
 
 A child flag can only be switched on in the admin UI when the connected
 sidecar reports the feature in `GET /v1/health` (`features.workspaces`,
-`features.egress`); otherwise the save is refused with one sentence and the
-switch stays off. **The sidecar shipped in this repository reports
-`features.egress: false`** — it creates every container with
-`NetworkMode=none` and refuses any non-empty allow-list (`CP22`, the egress
-proxy, is not built yet). The PHP side (resolver, pinning, approval) is
-complete and waits for that sidecar release.
+`features.egress`). If the health check itself fails, the save is refused
+and the switch stays off (fail-closed). **The sidecar shipped in this
+repository reports `features.egress: false`** — it creates every container
+with `NetworkMode=none` and refuses any non-empty allow-list (`CP22`, the
+egress proxy, is not built yet). The PHP side (resolver, pinning, approval)
+is complete and waits for that sidecar release.
 
 Operators switch them under **Operate → System configuration → Processing →
 File work**. Seeders insert the rows as `0` when missing and never overwrite
@@ -121,21 +121,29 @@ never run unattended — fail closed.
 ## Workspaces and egress
 
 **Workspace.** One folder per user (`BCOMPUTEWORKSPACES`), one run at a
-time per folder: a second run while one is using it is refused
-(`workspace_busy`, "Another file-work run is still using your folder").
-The quota holds after the run too — a run that leaves the folder above
-`COMPUTE_WORKSPACE_MB` fails with `workspace_quota_exceeded` and the sidecar
-removes what that run added; the sentence says so. PHP stores only
-the opaque id and the quota — never a host path. The sidecar allocates the
-id and enforces ownership (`owner = user:{id}`). Creation is serialised per
-user behind a `LOCK_DSN` lock so two first runs in flight cannot leave an
-orphaned sidecar folder behind the unique row. The planner learns the node
-param (`params.useWorkspace`, and `params.egressHosts` for egress) from the
-skill catalog only while the matching flag is on. **Open workspace** is a
-chip on a finished run and a sibling tab under Files. Empty: “Files the AI
-creates for you will show up here.” A failed load shows the reason with
-**Try again**, never the empty state. Delete starts the AI from an empty
-folder next time.
+time per folder: a second run — or a delete — while one is using it is
+refused (`workspace_busy`, "Another file-work run is still using your
+folder"). The quota holds after the run too, including cancelled runs: a
+run that leaves the folder above `COMPUTE_WORKSPACE_MB` fails with
+`workspace_quota_exceeded` (a cancel stays cancelled) and the sidecar
+removes what that run added. Empty files and folders count as 4 KiB each.
+The sentence never claims "nothing was saved" when `/workspace` was
+mounted — a timeout can leave files, and a quota rollback keeps
+pre-existing files (including ones this run changed). PHP stores only the
+opaque id and the quota — never a host path. `WORKSPACE_TTL_DAYS`
+(default 90) is honoured: an idle expired folder is dropped so the next
+run gets a new one; a folder a run still holds stays until that run
+finishes. The sidecar allocates the id and enforces ownership
+(`owner = user:{id}`). Creation is serialised per user behind a `LOCK_DSN`
+lock so two first runs in flight cannot leave an orphaned sidecar folder
+behind the unique row; if the row then fails to save, the sidecar folder
+is deleted. The planner learns the node param (`params.useWorkspace`, and
+`params.egressHosts` for egress) from the skill catalog only while the
+matching flag is on. **Open workspace** is a chip only on a run that used
+the persistent folder (`used_workspace`), plus a sibling tab under Files.
+Empty: “Files the AI creates for you will show up here.” A failed load
+shows the reason with **Try again**, never the empty state. Delete starts
+the AI from an empty folder next time.
 
 **Egress.** The planner may name hosts; PHP reduces each entry to a bare
 RFC 1123 host name (scheme, credentials, port and path are dropped;

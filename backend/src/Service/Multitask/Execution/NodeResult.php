@@ -37,9 +37,12 @@ final readonly class NodeResult
         return new self(NodeStatus::Done, $text, $files, $metadata);
     }
 
-    public static function failed(string $error): self
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public static function failed(string $error, array $metadata = []): self
     {
-        return new self(NodeStatus::Failed, error: $error);
+        return new self(NodeStatus::Failed, error: $error, metadata: $metadata);
     }
 
     public static function skipped(string $reason): self

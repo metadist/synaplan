@@ -729,7 +729,11 @@ final readonly class SystemConfigService
         try {
             $features = $this->computeClient->health()->features;
         } catch (\Throwable) {
-            return null;
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'message' => 'File work is not reachable right now. The switch stays off.',
+            ];
         }
         [$featureKey, $subject] = $map[$key];
         if ($features[$featureKey]) {

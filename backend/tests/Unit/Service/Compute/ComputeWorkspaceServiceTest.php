@@ -45,6 +45,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findActiveForUser')->willReturn(null);
         $repo->expects($this->once())->method('save');
+        $client->expects($this->never())->method('deleteWorkspace');
 
         $limits = $this->createStub(RateLimitService::class);
         $limits->method('computeIntSetting')->willReturn(256);
@@ -102,6 +103,95 @@ final class ComputeWorkspaceServiceTest extends TestCase
         self::assertTrue($locks->createLock('compute-workspace-create.7')->acquire(), 'lock must not stay held after a failed create');
     }
 
+    public function testEnsureDeletesTheSidecarFolderWhenTheRowCannotBeSaved(): void
+    {
+        $created = new ComputeWorkspaceCreated('01ARZ3NDEKTSV4RRFFQ69G5FAV', 256);
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('createWorkspace')->willReturn($created);
+        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturn(null);
+        $repo->method('save')->willThrowException(new \RuntimeException('duplicate key'));
+
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('computeIntSetting')->willReturn(256);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $this->locks());
+        try {
+            $service->ensure($user);
+            self::fail('expected the save failure to surface');
+        } catch (\RuntimeException $e) {
+            self::assertSame('duplicate key', $e->getMessage());
+        }
+    }
+
+    public function testExpiredWorkspaceIsDroppedSoTheNextEnsureCreatesANewFolder(): void
+    {
+        $expired = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, new \DateTimeImmutable('-1 day'));
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturnOnConsecutiveCalls($expired, null);
+        $repo->expects($this->once())->method('remove')->with($expired);
+        $repo->expects($this->once())->method('save');
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('createWorkspace')->willReturn(new ComputeWorkspaceCreated('01BX5ZZKBKACTAV9WEVGEMMVRY', 256));
+
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('computeIntSetting')->willReturn(256);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $this->locks());
+        $row = $service->ensure($user);
+
+        self::assertSame('01BX5ZZKBKACTAV9WEVGEMMVRY', $row->getWorkspaceId());
+    }
+
+    public function testExpiredWorkspaceStaysWhileARunHoldsIt(): void
+    {
+        $expired = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, new \DateTimeImmutable('-1 day'));
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturn($expired);
+        $repo->expects($this->never())->method('remove');
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('deleteWorkspace')->willThrowException(
+            new \App\Service\Compute\ComputeRefusedException('workspace_busy', 'busy', httpStatus: 409),
+        );
+        $client->expects($this->never())->method('createWorkspace');
+
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $this->createStub(RateLimitService::class), $this->locks());
+
+        self::assertSame($expired, $service->forUser($user));
+    }
+
+    public function testExpiredWorkspaceStaysWhenTheSidecarIsUnreachable(): void
+    {
+        $expired = new ComputeWorkspace(7, '01ARZ3NDEKTSV4RRFFQ69G5FAV', 256, new \DateTimeImmutable('-1 day'));
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturn($expired);
+        $repo->expects($this->never())->method('remove');
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('deleteWorkspace')->willThrowException(new \RuntimeException('sidecar down'));
+
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $this->createStub(RateLimitService::class), $this->locks());
+
+        self::assertSame($expired, $service->forUser($user));
+    }
+
     private function locks(): LockFactory
     {
         return new LockFactory(new InMemoryStore());
@@ -110,6 +200,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
     public function testSafeRelativePathNormalisesAcceptedInput(): void
     {
         self::assertSame('out/report.csv', ComputeWorkspaceService::safeRelativePath('  /out\\report.csv ', true));
+        self::assertSame('report..csv', ComputeWorkspaceService::safeRelativePath('report..csv', true));
         self::assertSame('', ComputeWorkspaceService::safeRelativePath(''));
     }
 

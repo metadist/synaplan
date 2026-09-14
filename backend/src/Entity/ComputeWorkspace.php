@@ -93,6 +93,12 @@ class ComputeWorkspace
         return $this->expiresAt;
     }
 
+    public function isExpired(?\DateTimeImmutable $now = null): bool
+    {
+        return $this->expiresAt instanceof \DateTimeImmutable
+            && $this->expiresAt <= ($now ?? new \DateTimeImmutable());
+    }
+
     public function applyUsage(int $usedMb, ?\DateTimeImmutable $lastUsed): void
     {
         $this->usedMb = max(0, $usedMb);

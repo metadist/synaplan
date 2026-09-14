@@ -90,6 +90,31 @@ final class SystemConfigServiceComputeTest extends TestCase
         self::assertTrue($this->service($repo)->setValue('COMPUTE_WORKSPACES_ENABLED', 'true')['success']);
     }
 
+    public function testRefusesChildFlagWhenTheSidecarHealthCheckFails(): void
+    {
+        $repo = $this->createMock(ConfigRepository::class);
+        $repo->expects($this->never())->method('setValue');
+        $client = $this->createStub(ComputeClient::class);
+        $client->method('health')->willThrowException(new \RuntimeException('sidecar down'));
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $repo,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: new ProviderKeyStore($repo, $encryption, new NullLogger()),
+            encryption: $encryption,
+            registrationConfig: new RegistrationConfig($repo),
+            guestChatConfig: new GuestChatConfig($repo),
+            computeClient: $client,
+        );
+
+        $result = $service->setValue('COMPUTE_WORKSPACES_ENABLED', 'true');
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('not reachable', (string) ($result['message'] ?? ''));
+    }
+
     private function service(ConfigRepository $repo): SystemConfigService
     {
         $health = ComputeHealth::fromJson((string) file_get_contents(

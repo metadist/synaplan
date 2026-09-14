@@ -332,6 +332,41 @@ final class CodeRunRunnerTest extends TestCase
 
         $this->assertFalse($result->isSuccessful());
         $this->assertStringStartsWith('This run wrote more than your file-work folder allows.', (string) $result->error);
+        $this->assertStringContainsString('Files that were already there stay', (string) $result->error);
+    }
+
+    public function testTimeoutAfterUsingTheFolderDoesNotClaimNothingWasSaved(): void
+    {
+        $workspace = $this->createStub(\App\Entity\ComputeWorkspace::class);
+        $workspace->method('getWorkspaceId')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $workspaces = $this->createMock(ComputeWorkspaceService::class);
+        $workspaces->method('ensure')->willReturn($workspace);
+
+        $client = $this->createMock(ComputeClient::class);
+        $client->method('submitRun')->willReturn('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'failed',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: -1,
+            reason: 'timeout',
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $result = $this->runner($client, $this->createStub(FileRepository::class), null, true, $workspaces)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'useWorkspace' => true,
+            ]),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertTrue($result->metadata['used_workspace'] ?? false);
+        $this->assertStringContainsString('open Workspace to check', (string) $result->error);
+        $this->assertStringNotContainsString('Nothing new was saved', (string) $result->error);
     }
 
     private function file(int $userId, string $name, string $path): File

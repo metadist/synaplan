@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -170,17 +171,17 @@ func TestWorkspaceListStopsAtDepthLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	host := s.HostPath(meta.ID)
-	deep := host
-	for i := 0; i < listMaxDepth+2; i++ {
-		deep = filepath.Join(deep, "d")
+	edge := host
+	for i := 0; i < listMaxDepth; i++ {
+		edge = filepath.Join(edge, "d")
 	}
-	if err := os.MkdirAll(deep, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(edge, "d"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(deep, "buried.txt"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(edge, "edge.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(host, "d", "shallow.txt"), []byte("x"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(edge, "d", "too-deep.txt"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -188,8 +189,37 @@ func TestWorkspaceListStopsAtDepthLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 1 || files[0].Path != "d/shallow.txt" {
-		t.Fatalf("a file beyond the depth limit must be omitted, got %+v", files)
+	got := map[string]bool{}
+	for _, f := range files {
+		got[f.Path] = true
+	}
+	if !got["d/d/d/d/d/d/d/d/edge.txt"] {
+		t.Fatalf("a file at depth %d must be listed, got %+v", listMaxDepth, files)
+	}
+	if got["d/d/d/d/d/d/d/d/d/too-deep.txt"] {
+		t.Fatalf("a file past depth %d must be omitted, got %+v", listMaxDepth, files)
+	}
+}
+
+func TestWorkspaceEmptyEntriesCountTowardQuota(t *testing.T) {
+	t.Parallel()
+	s := testStore(t)
+	meta, err := s.Create("user:1", 1) // 1 MiB
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := s.HostPath(meta.ID)
+	for i := 0; i < 300; i++ {
+		if err := os.WriteFile(filepath.Join(host, fmt.Sprintf("empty-%d", i)), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	over, err := s.OverQuota(meta.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !over {
+		t.Fatal("300 empty files must exceed a 1 MiB quota once each costs a 4 KiB block")
 	}
 }
 
