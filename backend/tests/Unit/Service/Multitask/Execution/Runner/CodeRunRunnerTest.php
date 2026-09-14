@@ -13,6 +13,7 @@ use App\Repository\UserRepository;
 use App\Service\Compute\ComputeArtefactStore;
 use App\Service\Compute\ComputeClient;
 use App\Service\Compute\ComputeConfig;
+use App\Service\Compute\ComputeEgressResolver;
 use App\Service\Compute\ComputeWorkspaceService;
 use App\Service\Compute\Contract\ComputeRunRequest;
 use App\Service\Compute\Contract\ComputeRunStatus;
@@ -21,6 +22,7 @@ use App\Service\Multitask\Execution\Runner\CodeRunRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\RateLimitService;
+use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -234,6 +236,59 @@ final class CodeRunRunnerTest extends TestCase
         $this->assertSame(['kind' => 'user', 'id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV'], $capturedOn->workspace);
     }
 
+    public function testEgressWithoutApprovalsFailsClosed(): void
+    {
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->never())->method('submitRun');
+
+        // Egress on, EGRESS_REQUIRES_APPROVAL at its default (on), no execution
+        // gate wired: nothing can produce an approval, so the run must refuse
+        // instead of reaching the website unattended.
+        $result = $this->runner($client, $this->createStub(FileRepository::class), egressOn: true)->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'egressHosts' => ['8.8.8.8'],
+            ]),
+            $this->context(),
+        );
+
+        $this->assertFalse($result->isSuccessful());
+        $this->assertSame(CodeRunRunner::EGRESS_NEEDS_APPROVALS_COPY, $result->error);
+    }
+
+    public function testEgressOffIgnoresHostsAndStaysOffline(): void
+    {
+        $captured = null;
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())
+            ->method('submitRun')
+            ->willReturnCallback(static function (ComputeRunRequest $request) use (&$captured): string {
+                $captured = $request;
+
+                return '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+            });
+        $client->method('status')->willReturn(new ComputeRunStatus(
+            runId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+            status: 'succeeded',
+            usage: ['wallMs' => 10, 'cpuSec' => 0.1, 'maxMemoryMb' => 32, 'bytesIn' => 1, 'bytesOut' => 1],
+            truncated: ['stdout' => false, 'stderr' => false],
+            exitCode: 0,
+            durationMs: 10,
+        ));
+        $client->method('collectLogs')->willReturn(['stdout' => '', 'stderr' => '']);
+
+        $this->runner($client, $this->createStub(FileRepository::class))->run(
+            new TaskNode('n1', Capability::CodeRun, params: [
+                'script' => 'print(1)',
+                'egressHosts' => ['8.8.8.8'],
+            ]),
+            $this->context(),
+        );
+
+        $this->assertInstanceOf(ComputeRunRequest::class, $captured);
+        $this->assertSame(['allow' => []], $captured->egress);
+    }
+
     private function file(int $userId, string $name, string $path): File
     {
         $file = $this->createStub(File::class);
@@ -250,18 +305,17 @@ final class CodeRunRunnerTest extends TestCase
         ?ComputeArtefactStore $artefacts = null,
         bool $workspacesOn = false,
         ?ComputeWorkspaceService $workspaces = null,
+        bool $egressOn = false,
     ): CodeRunRunner {
         $repo = $this->createStub(\App\Repository\ConfigRepository::class);
         $repo->method('getValue')->willReturnCallback(
-            static function (int $_owner, string $_group, string $setting) use ($workspacesOn): ?string {
-                if ('ENABLED' === $setting) {
-                    return '1';
-                }
-                if ('WORKSPACES_ENABLED' === $setting) {
-                    return $workspacesOn ? '1' : '0';
-                }
-
-                return null;
+            static function (int $_owner, string $_group, string $setting) use ($workspacesOn, $egressOn): ?string {
+                return match ($setting) {
+                    'ENABLED' => '1',
+                    'WORKSPACES_ENABLED' => $workspacesOn ? '1' : '0',
+                    'EGRESS_ENABLED' => $egressOn ? '1' : '0',
+                    default => null,
+                };
             },
         );
         $config = new ComputeConfig($repo, 'http://compute:8080', 'token-token-token-token-token-32b');
@@ -298,6 +352,7 @@ final class CodeRunRunnerTest extends TestCase
             '/tmp',
             null,
             $workspaces,
+            new ComputeEgressResolver($config, new SsrfGuard()),
         );
     }
 

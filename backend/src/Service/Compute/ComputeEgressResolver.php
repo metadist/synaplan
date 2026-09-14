@@ -13,6 +13,10 @@ final readonly class ComputeEgressResolver
 {
     public const DEFAULT_PORT = 443;
 
+    /** RFC 1123 host name: dot-separated labels of letters, digits and inner hyphens. */
+    private const HOSTNAME = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/';
+    private const MAX_HOSTNAME_LENGTH = 253;
+
     public function __construct(
         private ComputeConfig $config,
         private SsrfGuard $ssrf,
@@ -35,13 +39,12 @@ final readonly class ComputeEgressResolver
             if (!is_string($host)) {
                 continue;
             }
-            $name = strtolower(trim($host));
-            $name = preg_replace('#^https?://#', '', $name) ?? $name;
-            $name = explode('/', $name, 2)[0];
-            $name = explode(':', $name, 2)[0];
-            $name = trim($name, '.');
+            $name = self::hostName($host);
             if ('' === $name || isset($clean[$name])) {
                 continue;
+            }
+            if (\strlen($name) > self::MAX_HOSTNAME_LENGTH || 1 !== preg_match(self::HOSTNAME, $name)) {
+                throw new ComputeRefusedException('egress_not_allowed', 'This file-work run cannot reach that website. Nothing new was saved.');
             }
             $clean[$name] = $name;
         }
@@ -68,5 +71,25 @@ final readonly class ComputeEgressResolver
         }
 
         return ['allow' => $allow];
+    }
+
+    /**
+     * Reduces whatever the planner wrote ("https://user@Api.Example.com:8443/x")
+     * to the bare lower-case host. Anything that is not a host name after this
+     * step is refused by the caller, never guessed.
+     */
+    private static function hostName(string $raw): string
+    {
+        $name = strtolower(trim($raw));
+        $name = preg_replace('#^[a-z][a-z0-9+.-]*://#', '', $name) ?? $name;
+        $name = explode('/', $name, 2)[0];
+        $name = explode('?', $name, 2)[0];
+        $name = explode('#', $name, 2)[0];
+        if (str_contains($name, '@')) {
+            $name = substr($name, strrpos($name, '@') + 1);
+        }
+        $name = explode(':', $name, 2)[0];
+
+        return trim($name, '.');
     }
 }

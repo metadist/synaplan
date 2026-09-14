@@ -31,6 +31,17 @@ final readonly class ToolExecutionGate
     }
 
     /**
+     * Whether {@see inspect} can hand back a pending approval at all. While the
+     * approvals flag is off the gate answers Auto for everything but a node
+     * block, so a caller that MUST have a human in the loop has to refuse
+     * instead of calling inspect().
+     */
+    public function approvalsEnabled(int $userId): bool
+    {
+        return $this->toolsConfig->isApprovalsEnabled($userId);
+    }
+
+    /**
      * @param array<string, mixed>      $args
      * @param array<string, mixed>|null $assistantTools
      *

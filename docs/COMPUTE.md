@@ -100,7 +100,10 @@ are refused on save.
 Interactive (the owner is present): default `auto`. Unattended (a saved
 task): default `approve`. An assistant cannot loosen the instance policy.
 A run that will fetch from the web additionally asks first when
-`COMPUTE.EGRESS_REQUIRES_APPROVAL` is on (default on).
+`COMPUTE.EGRESS_REQUIRES_APPROVAL` is on (default on); the approval preview
+names the websites (`websites: api.example.com`). If that switch is on but
+approvals cannot be produced (`TOOLS.APPROVALS_ENABLED` off), the run is
+**refused**, never run unattended — fail closed.
 
 ## Workspaces and egress
 
@@ -111,11 +114,17 @@ chip on a finished run and a sibling tab under Files. Empty: “Files the AI
 creates for you will show up here.” Delete starts the AI from an empty
 folder next time.
 
-**Egress.** The planner may name hosts; PHP resolves each through
-`SsrfGuard` (blocked names and private IPs are refused) and pins public
-addresses on port 443. Too many hosts (default 8) refuses the run — the
-list is not silently shortened. With the flag off the allow-list is empty
-and the run has no network. Egress never lowers the B2 policy decision.
+**Egress.** The planner may name hosts; PHP reduces each entry to a bare
+RFC 1123 host name (scheme, credentials, port and path are dropped;
+anything that is not a host name is refused), resolves it through
+`SsrfGuard` and pins the public addresses on port 443. The guard blocks
+literal names such as `localhost`, every private / loopback / link-local
+range and — since B3 — everything IANA lists as not globally routable
+(`100.64/10` shared space used by overlay VPNs, `192.0.0/24`, `198.18/15`,
+documentation prefixes, 6to4). Too many hosts (default 8) refuses the run —
+the list is not silently shortened. With the flag off the allow-list is
+empty and the run has no network. Egress never lowers the B2 policy
+decision.
 
 ## Audit
 

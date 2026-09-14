@@ -17,6 +17,8 @@ use App\Service\RateLimitService;
  */
 final readonly class ComputeWorkspaceService
 {
+    private const MAX_PATH_LENGTH = 1024;
+
     public function __construct(
         private ComputeConfig $config,
         private ComputeClient $client,
@@ -127,11 +129,18 @@ final readonly class ComputeWorkspaceService
         return $this->client->downloadWorkspaceFile($workspace->getWorkspaceId(), self::safeRelativePath($path, true));
     }
 
+    /**
+     * Normalises a user-supplied path inside the workspace before it reaches the
+     * sidecar. The sidecar confines every path itself; this is the PHP-side
+     * check that refuses anything that could only be an attack or a bug.
+     */
     public static function safeRelativePath(string $path, bool $fileRequired = false): string
     {
-        $path = str_replace('\\', '/', trim($path));
-        $path = ltrim($path, '/');
-        if (str_contains($path, '..') || str_starts_with($path, '/')) {
+        $path = ltrim(str_replace('\\', '/', trim($path)), '/');
+        if (\strlen($path) > self::MAX_PATH_LENGTH
+            || str_contains($path, '..')
+            || 1 === preg_match('/[\x00-\x1F\x7F]/', $path)
+        ) {
             throw new ComputeRefusedException('bad_file_name', 'That folder path is not allowed.');
         }
         if ($fileRequired && '' === $path) {
@@ -139,14 +148,6 @@ final readonly class ComputeWorkspaceService
         }
 
         return $path;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function createPayloadNeverContainsPath(ComputeWorkspaceCreate $create): array
-    {
-        return ['owner' => $create->owner, 'quotaMb' => $create->quotaMb];
     }
 
     private function quotaMb(User $user): int

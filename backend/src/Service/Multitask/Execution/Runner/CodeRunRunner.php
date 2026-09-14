@@ -42,6 +42,7 @@ final readonly class CodeRunRunner implements TaskRunner
 {
     public const QUOTA_COPY = 'You have used this week\'s file-work limit. Nothing new was saved.';
     public const FORBID_COPY = AssistantSkillGate::REFUSAL;
+    public const EGRESS_NEEDS_APPROVALS_COPY = 'Reaching a website from file work needs your approval, and approvals are off on this installation. Nothing new was saved.';
     private const SCRIPT_PYTHON = '_synaplan_main.py';
     private const SCRIPT_NODE = '_synaplan_main.js';
     private const SIDECAR_CONCURRENT_CEILING = 8;
@@ -135,7 +136,8 @@ final readonly class CodeRunRunner implements TaskRunner
     /**
      * Shared executor for the planner, both gateways, and saved tasks.
      *
-     * @param list<int> $inputFileIds
+     * @param list<int>    $inputFileIds
+     * @param list<string> $egressHosts  Host names the run may reach; resolved and pinned only when egress is on
      *
      * @return array{
      *     outcome: string,
@@ -184,6 +186,11 @@ final readonly class CodeRunRunner implements TaskRunner
             return $this->failedOutcome($e->getMessage(), $e->errorCode());
         }
         $forceApproveForEgress = [] !== $egress['allow'] && $this->computeConfig->egressRequiresApproval($userId);
+        if ($forceApproveForEgress && !$alreadyApproved && !$this->canRequestApproval($userId)) {
+            // Fail closed: the operator asked for a human in the loop before
+            // any website is reached, and no approval can be produced here.
+            return $this->failedOutcome(self::EGRESS_NEEDS_APPROVALS_COPY, 'egress_not_allowed');
+        }
 
         if (!$alreadyApproved) {
             $gated = $this->consultPolicy(
@@ -199,6 +206,7 @@ final readonly class CodeRunRunner implements TaskRunner
                 $messageId,
                 $node,
                 $forceApproveForEgress,
+                array_map(static fn (array $host): string => $host['host'], $egress['allow']),
             );
             if (null !== $gated) {
                 return $gated;
@@ -357,7 +365,8 @@ final readonly class CodeRunRunner implements TaskRunner
     }
 
     /**
-     * @param list<int> $inputFileIds
+     * @param list<int>    $inputFileIds
+     * @param list<string> $egressHosts
      *
      * @return array{
      *     outcome: string,
@@ -384,6 +393,7 @@ final readonly class CodeRunRunner implements TaskRunner
         ?int $messageId,
         ?TaskNode $node,
         bool $forceApproveForEgress = false,
+        array $egressHosts = [],
     ): ?array {
         if (null === $this->executionGate) {
             return null;
@@ -392,6 +402,13 @@ final readonly class CodeRunRunner implements TaskRunner
         $userId = (int) $user->getId();
         $args = [
             'language' => $language,
+        ];
+        if ([] !== $egressHosts) {
+            // A scalar so the approval preview shows which websites the run may
+            // reach (U7: "what will it touch?") — arrays are left out of previews.
+            $args['websites'] = implode(', ', $egressHosts);
+        }
+        $args += [
             'code' => $code,
             'input_file_ids' => $inputFileIds,
             'timeout_sec' => $timeoutSec,
@@ -723,14 +740,14 @@ final readonly class CodeRunRunner implements TaskRunner
 
     private function workspacesEnabled(?int $userId): bool
     {
-        if (null === $this->workspaces) {
-            return false;
-        }
-        if (!(new \ReflectionProperty($this, 'computeConfig'))->isInitialized($this)) {
-            return false;
-        }
+        // Only reached from executeDirect() after computeEnabled() passed, so
+        // ComputeConfig is guaranteed to be injected here.
+        return null !== $this->workspaces && $this->computeConfig->workspacesEnabled($userId);
+    }
 
-        return $this->computeConfig->workspacesEnabled($userId);
+    private function canRequestApproval(int $userId): bool
+    {
+        return null !== $this->executionGate && $this->executionGate->approvalsEnabled($userId);
     }
 
     private function refreshWorkspace(User $user): void

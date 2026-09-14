@@ -56,10 +56,31 @@ final class ComputeWorkspaceServiceTest extends TestCase
         self::assertSame('01ARZ3NDEKTSV4RRFFQ69G5FAV', $row->getWorkspaceId());
     }
 
-    public function testSafeRelativePathRejectsTraversal(): void
+    public function testSafeRelativePathNormalisesAcceptedInput(): void
+    {
+        self::assertSame('out/report.csv', ComputeWorkspaceService::safeRelativePath('  /out\\report.csv ', true));
+        self::assertSame('', ComputeWorkspaceService::safeRelativePath(''));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function rejectedPaths(): iterable
+    {
+        yield 'traversal' => ['../etc/passwd'];
+        yield 'traversal inside' => ['out/../../etc/passwd'];
+        yield 'backslash traversal' => ['..\\..\\secret'];
+        yield 'nul byte' => ["out/report.csv\0.png"];
+        yield 'newline' => ["out/\nreport.csv"];
+        yield 'too long' => [str_repeat('a', 1025)];
+        yield 'empty when a file is required' => [''];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('rejectedPaths')]
+    public function testSafeRelativePathRejects(string $path): void
     {
         $this->expectException(\App\Service\Compute\ComputeRefusedException::class);
-        ComputeWorkspaceService::safeRelativePath('../etc/passwd', true);
+        ComputeWorkspaceService::safeRelativePath($path, true);
     }
 
     private function config(): ComputeConfig

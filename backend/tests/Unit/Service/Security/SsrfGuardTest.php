@@ -80,6 +80,25 @@ final class SsrfGuardTest extends TestCase
         self::assertFalse($this->guard->isBlockedIp('2606:4700:4700::1111'));
     }
 
+    /**
+     * Ranges that are not globally routable but slip past NO_PRIV_RANGE +
+     * NO_RES_RANGE alone: shared address space (CGNAT, overlay VPNs such as
+     * Tailscale), 192.0.0/24, benchmarking, documentation, 6to4.
+     */
+    public function testBlockedIpClassifierCoversNonGlobalRanges(): void
+    {
+        self::assertTrue($this->guard->isBlockedIp('100.64.0.1'));
+        self::assertTrue($this->guard->isBlockedIp('100.127.255.254'));
+        self::assertTrue($this->guard->isBlockedIp('192.0.0.1'));
+        self::assertTrue($this->guard->isBlockedIp('198.18.0.1'));
+        self::assertTrue($this->guard->isBlockedIp('2001:db8::1'));
+        self::assertTrue($this->guard->isBlockedIp('2002:7f00:1::1'));
+
+        self::assertFalse($this->guard->isBlockedIp('100.63.255.255'));
+        self::assertFalse($this->guard->isBlockedIp('100.128.0.1'));
+        self::assertFalse($this->guard->isBlockedIp('8.8.8.8'));
+    }
+
     public function testPinnedIpsReturnsPublicLiteralAndDropsPrivate(): void
     {
         self::assertSame(['8.8.8.8'], $this->guard->pinnedIps('8.8.8.8'));
