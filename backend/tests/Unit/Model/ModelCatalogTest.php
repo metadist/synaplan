@@ -162,6 +162,18 @@ class ModelCatalogTest extends TestCase
     {
         $deviations = ModelCatalog::litellmDeviations();
 
+        // An empty registry is the healthy state: LiteLLM agrees with every
+        // catalog price, so there is nothing to silence. This keeps the key
+        // format guarded for whatever the registry records next.
+        $this->assertSame(
+            array_keys($deviations),
+            array_values(array_filter(
+                array_keys($deviations),
+                static fn (string $key): bool => str_contains($key, ':'),
+            )),
+            'every LITELLM_DEVIATIONS key must read "<normalized service>:<providerId>"',
+        );
+
         foreach ($deviations as $key => $entry) {
             [$service, $providerId] = explode(':', $key, 2);
 

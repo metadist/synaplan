@@ -74,6 +74,32 @@ class SyncModelPricesCommand extends Command
     ];
 
     /**
+     * Maps DB service names (lowercase) to the `litellm_provider` values that
+     * legitimately belong to that vendor, gating the bare-id match below.
+     *
+     * A gateway resells an upstream model under the upstream's own id, so
+     * A2Agent's `deepseek-v4-pro` collides with LiteLLM's top-level
+     * `deepseek-v4-pro` — DeepSeek's first-party rate, a different product sold
+     * at a different price ($1.32/1M vs the gateway's $0.435/1M). Comparing
+     * them reads as drift on a correctly priced row, so a bare id only counts
+     * when LiteLLM attributes it to our own vendor. A service with no entry
+     * here never matches bare and lands in the `unmatched` bucket for manual
+     * verification, which is where gateways belong.
+     *
+     * An alias matches as a prefix, so Google's `vertex_ai-*` families need no
+     * entry each.
+     *
+     * @var array<string, list<string>>
+     */
+    private const BARE_MATCH_PROVIDERS = [
+        'openai' => ['openai'],
+        'anthropic' => ['anthropic'],
+        'google' => ['gemini', 'google', 'vertex_ai'],
+        'cohere' => ['cohere'],
+        'jina' => ['jina_ai', 'jina'],
+    ];
+
+    /**
      * @var array<string, array{litellm_in: float, litellm_out: float, source: string, verifiedOn: string, reason: string}>
      */
     private readonly array $litellmDeviations;
@@ -156,7 +182,7 @@ class SyncModelPricesCommand extends Command
             $litellmKey = $this->findLiteLLMKey($model, $litellmData);
             if (!$litellmKey) {
                 ++$notMatched;
-                $unmatchedList[] = sprintf('%s/%s (ID %d)', $service, $model->getProviderId(), $model->getId());
+                $unmatchedList[] = $this->describeUnmatched($model, $service, $litellmData);
                 continue;
             }
 
@@ -602,8 +628,10 @@ class SyncModelPricesCommand extends Command
         $providerId = $model->getProviderId();
         $serviceLower = strtolower($model->getService());
 
-        // 1) Direct match (e.g. "gpt-5", "claude-sonnet-4-6", "gemini-2.5-pro")
-        if (isset($litellmData[$providerId])) {
+        // 1) Direct match (e.g. "gpt-5", "claude-sonnet-4-6", "gemini-2.5-pro"),
+        // but only when LiteLLM attributes the id to our own vendor — a bare id
+        // is not unique across providers (see BARE_MATCH_PROVIDERS).
+        if (isset($litellmData[$providerId]) && $this->bareIdBelongsToService($serviceLower, $litellmData[$providerId])) {
             return $providerId;
         }
 
@@ -617,6 +645,58 @@ class SyncModelPricesCommand extends Command
         }
 
         return null;
+    }
+
+    /**
+     * Whether LiteLLM attributes a bare model id to the same vendor as the
+     * catalog row, i.e. whether both sides price the same product.
+     *
+     * An entry that carries no `litellm_provider` cannot contradict the row, so
+     * it is accepted: a missing attribution is not evidence of a foreign vendor.
+     *
+     * @param array<string, mixed> $litellmModel
+     */
+    private function bareIdBelongsToService(string $serviceLower, array $litellmModel): bool
+    {
+        $litellmProvider = $litellmModel['litellm_provider'] ?? null;
+
+        if (!is_string($litellmProvider) || '' === $litellmProvider) {
+            return true;
+        }
+
+        foreach (self::BARE_MATCH_PROVIDERS[$serviceLower] ?? [] as $vendor) {
+            if (str_starts_with($litellmProvider, $vendor)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * One `Unmatched` line, naming the foreign vendor when LiteLLM does carry
+     * the bare id but attributes it elsewhere.
+     *
+     * "LiteLLM has never heard of this model" and "LiteLLM's only candidate
+     * prices someone else's product" are different findings with the same
+     * silent outcome, and this bucket is the one the procedure says to skip. A
+     * first-party service missing from BARE_MATCH_PROVIDERS reads exactly like
+     * the gateway case, so it says so instead of quietly dropping out of the
+     * drift check.
+     *
+     * @param array<string, array<string, mixed>> $litellmData
+     */
+    private function describeUnmatched(Model $model, string $service, array $litellmData): string
+    {
+        $providerId = $model->getProviderId();
+        $line = sprintf('%s/%s (ID %d)', $service, $providerId, $model->getId());
+        $foreignVendor = $litellmData[$providerId]['litellm_provider'] ?? null;
+
+        if (!is_string($foreignVendor) || '' === $foreignVendor) {
+            return $line;
+        }
+
+        return sprintf('%s — LiteLLM carries "%s" at vendor "%s", not ours; not compared', $line, $providerId, $foreignVendor);
     }
 
     /**
