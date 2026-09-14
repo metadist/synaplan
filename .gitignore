@@ -33,7 +33,9 @@ volumes/
 
 # Logs
 *.log
-logs/
+# Anchored: an unanchored logs/ also excludes source directories at any depth
+# (it silently swallowed sidecars/synaplan-compute/internal/logs).
+/logs/
 
 # Backend cache & build
 backend/var/cache/
