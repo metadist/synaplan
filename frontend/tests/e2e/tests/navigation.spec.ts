@@ -38,6 +38,24 @@ async function openManageGroup(page: Page, groupKey: string) {
   return sub
 }
 
+/**
+ * Same rule as `isAiAccountsEnabled()`: Higgsfield counts as on when the
+ * module key is missing; Anthropic BYO follows GET /messages-gateway.
+ */
+async function isAiAccountsNavEnabled(page: Page): Promise<boolean> {
+  const runtime = (await page.request.get('/api/v1/config/runtime').then((r) => r.json())) as {
+    modules?: { higgsfield?: { configured?: boolean } }
+  }
+  const higgsfield = runtime.modules?.higgsfield?.configured
+  const higgsfieldOn = typeof higgsfield === 'boolean' ? higgsfield : true
+  const gatewayRes = await page.request.get('/api/v1/messages-gateway')
+  if (!gatewayRes.ok()) {
+    return higgsfieldOn
+  }
+  const gateway = (await gatewayRes.json()) as { enabled?: boolean }
+  return higgsfieldOn || gateway.enabled === true
+}
+
 test.describe('Navigation: Sidebar basics (non-admin)', () => {
   test('@ci Sidebar shows Work + Manage (no leftover Channels / AI Setup pair)', async ({
     page,
@@ -169,8 +187,14 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     await test.step('Act+Assert: Assistants submenu shows models and instructions', async () => {
       const assistants = await openManageGroup(page, 'assistants')
       await expect(assistants.locator(NAV.flyoutLinkAiModels)).toBeVisible()
-      await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toBeVisible()
       await expect(assistants.locator(NAV.flyoutLinkTaskPrompts)).toBeVisible()
+      // U11: hide Your AI accounts when Higgsfield and the gateway are both off
+      // (the default CI image). Require the link only when a provider is on.
+      if (await isAiAccountsNavEnabled(page)) {
+        await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toBeVisible()
+      } else {
+        await expect(assistants.locator(NAV.flyoutLinkAiAccounts)).toHaveCount(0)
+      }
     })
 
     await test.step('Act+Assert: Channels submenu shows email handler', async () => {
