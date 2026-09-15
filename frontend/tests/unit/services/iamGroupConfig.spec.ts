@@ -24,4 +24,14 @@ describe('group policy config schema', () => {
   it('coerces PHP empty-array conflicts so the Policies tab can load', () => {
     expect(GroupConfigResponseSchema.parse({ ...payload, conflicts: [] }).conflicts).toEqual({})
   })
+
+  it('rejects a non-empty conflicts list instead of discarding it', () => {
+    const result = GroupConfigResponseSchema.safeParse({ ...payload, conflicts: ['bad'] })
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects a non-empty settings list instead of discarding it', () => {
+    const result = GroupConfigResponseSchema.safeParse({ ...payload, settings: [setting] })
+    expect(result.success).toBe(false)
+  })
 })

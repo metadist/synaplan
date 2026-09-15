@@ -49,13 +49,14 @@ export type IamGroupConfigSetting = NonNullable<
 /**
  * PHP json_encode turns an empty assoc array into `[]`. Zod `z.record()`
  * rejects that, which is what made People → Policies toast "could not be loaded"
- * on a healthy 200. Coerce list-shaped maps to `{}` before the generated schema.
+ * on a healthy 200. Coerce only that empty list; leave other invalid shapes
+ * for the generated schema to reject.
  */
-function objectMap(value: unknown): Record<string, unknown> {
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>
+function objectMap(value: unknown): unknown {
+  if (Array.isArray(value) && value.length === 0) {
+    return {}
   }
-  return {}
+  return value
 }
 
 export const GroupConfigResponseSchema = z.preprocess((raw) => {
