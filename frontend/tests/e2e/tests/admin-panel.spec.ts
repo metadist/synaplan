@@ -187,9 +187,12 @@ test.describe('@ci Admin panel', () => {
       await expect(page.locator(selectors.notification.error)).toHaveCount(0)
     } finally {
       if (createdGroupId !== undefined) {
-        const deleted = await request.delete(`${getApiUrl()}/api/v1/admin/groups/${createdGroupId}`, {
-          headers: { Cookie: adminCookie },
-        })
+        const deleted = await request.delete(
+          `${getApiUrl()}/api/v1/admin/groups/${createdGroupId}`,
+          {
+            headers: { Cookie: adminCookie },
+          }
+        )
         expect(deleted.ok()).toBeTruthy()
       }
     }
