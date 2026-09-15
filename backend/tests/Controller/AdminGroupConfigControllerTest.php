@@ -56,16 +56,54 @@ final class AdminGroupConfigControllerTest extends WebTestCase
         $groupId = $payload['group']['id'];
 
         $this->client->request('GET', '/api/v1/admin/groups/'.$groupId.'/config');
-        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
-        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
-        self::assertIsArray($body);
-        self::assertArrayHasKey('settings', $body);
+        $body = $this->assertConflictsIsJsonObject();
         self::assertArrayHasKey('DEFAULTMODEL.CHAT', $body['settings']);
         self::assertArrayHasKey('value', $body['settings']['DEFAULTMODEL.CHAT']);
         self::assertArrayHasKey('source', $body['settings']['DEFAULTMODEL.CHAT']);
         self::assertArrayHasKey('locked', $body['settings']['DEFAULTMODEL.CHAT']);
         self::assertArrayNotHasKey('content', $body);
         self::assertArrayNotHasKey('messages', $body);
+    }
+
+    public function testPutReturnsObjectShapedConflicts(): void
+    {
+        $this->setFlag(IamConfig::KEY_GROUPS_ENABLED, '1');
+        $this->setFlag(IamConfig::KEY_GROUP_POLICIES_ENABLED, '1');
+        $admin = $this->createAdmin('iam-policy-put@synaplan.internal');
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('POST', '/api/v1/admin/groups', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+        ], json_encode(['name' => 'Support Put'], \JSON_THROW_ON_ERROR));
+        $payload = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $groupId = $payload['group']['id'];
+
+        $this->client->request('PUT', '/api/v1/admin/groups/'.$groupId.'/config', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+        ], '{}');
+        $body = $this->assertConflictsIsJsonObject();
+        self::assertArrayHasKey('DEFAULTMODEL.CHAT', $body['settings']);
+    }
+
+    /**
+     * json_decode([]) and json_decode({}) are both PHP arrays — the People
+     * tab Zod schema requires a JSON object. An empty list here is the
+     * "Policies could not be loaded" toast on a 200.
+     *
+     * @return array{settings: array<string, mixed>, conflicts: mixed}
+     */
+    private function assertConflictsIsJsonObject(): array
+    {
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        $raw = (string) $this->client->getResponse()->getContent();
+        self::assertStringContainsString('"conflicts":{', $raw);
+        self::assertStringNotContainsString('"conflicts":[]', $raw);
+        $body = json_decode($raw, true);
+        self::assertIsArray($body);
+        self::assertArrayHasKey('settings', $body);
+        self::assertArrayHasKey('conflicts', $body);
+        self::assertIsArray($body['settings']);
+
+        return $body;
     }
 
     private function setFlag(string $setting, string $value): void

@@ -144,4 +144,57 @@ test.describe('@ci Admin panel', () => {
     await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
     await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
   })
+
+  test('Policies tab loads group settings without an error toast', async ({ page, request }) => {
+    const adminCookie = await loginViaApi(request, CREDENTIALS.getAdminCredentials())
+    const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`, {
+      headers: { Cookie: adminCookie },
+    })
+    expect(runtimeRes.ok()).toBeTruthy()
+    const runtime = (await runtimeRes.json()) as { features?: { iamPolicies?: boolean } }
+    if (runtime.features?.iamPolicies !== true) {
+      test.skip(true, 'IAM group policies are off')
+    }
+
+    let createdGroupId: number | undefined
+    try {
+      const groupsRes = await request.get(`${getApiUrl()}/api/v1/admin/groups`, {
+        headers: { Cookie: adminCookie },
+      })
+      expect(groupsRes.ok()).toBeTruthy()
+      const groupsBody = (await groupsRes.json()) as { groups?: { id: number }[] }
+      if ((groupsBody.groups ?? []).length === 0) {
+        const created = await request.post(`${getApiUrl()}/api/v1/admin/groups`, {
+          headers: { Cookie: adminCookie, 'Content-Type': 'application/json' },
+          data: { name: 'E2E Policies', description: '' },
+        })
+        expect(created.ok()).toBeTruthy()
+        const createdBody = (await created.json()) as { group?: { id: number } }
+        createdGroupId = createdBody.group?.id
+        expect(createdGroupId, 'created group must return an id').toBeTruthy()
+      }
+
+      await page.goto('/admin/people?tab=policies')
+      await expect(page.locator(selectors.pages.people)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.people.sectionPolicies)).toBeVisible()
+      // Wrapper mounts before getGroupConfig finishes; wait for the form so a
+      // parse-error toast cannot race past a zero-count assertion.
+      await expect(page.locator(selectors.people.sectionPolicyDefaults)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(page.locator(selectors.notification.error)).toHaveCount(0)
+    } finally {
+      if (createdGroupId !== undefined) {
+        const deleted = await request.delete(
+          `${getApiUrl()}/api/v1/admin/groups/${createdGroupId}`,
+          {
+            headers: { Cookie: adminCookie },
+          }
+        )
+        expect(deleted.ok()).toBeTruthy()
+      }
+    }
+  })
 })

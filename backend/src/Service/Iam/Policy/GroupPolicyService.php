@@ -29,7 +29,7 @@ final readonly class GroupPolicyService
     }
 
     /**
-     * @return array{settings: array<string, array{value: mixed, source: string|null, locked: bool}>, conflicts: array<string, list<string>>}
+     * @return array{settings: array<string, array{value: mixed, source: string|null, locked: bool}>, conflicts: \stdClass}
      */
     public function getGroupConfig(int $groupId, User $actor): array
     {
@@ -61,13 +61,16 @@ final readonly class GroupPolicyService
             }
         }
 
-        return ['settings' => $settings, 'conflicts' => $conflicts];
+        // Empty PHP arrays JSON-encode as []. The OpenAPI/Zod contract is an
+        // object, and the People → Policies tab treats a parse miss as a load
+        // failure toast.
+        return ['settings' => $settings, 'conflicts' => (object) $conflicts];
     }
 
     /**
      * @param array<string, mixed> $body
      *
-     * @return array{settings: array<string, array{value: mixed, source: string|null, locked: bool}>, conflicts: array<string, list<string>>}
+     * @return array{settings: array<string, array{value: mixed, source: string|null, locked: bool}>, conflicts: \stdClass}
      */
     public function putGroupConfig(Group $group, array $body, User $actor, string $ip = ''): array
     {

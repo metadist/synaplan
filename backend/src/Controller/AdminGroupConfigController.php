@@ -80,7 +80,10 @@ final class AdminGroupConfigController extends AbstractController
             return $this->json(['error' => 'Group not found'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json($this->groupPolicyService->getGroupConfig($id, $user));
+        // JsonResponse + json_encode keeps an empty conflicts stdClass as {}.
+        // AbstractController::json() runs the serializer, which flattens that
+        // back to [] and the People → Policies Zod schema then rejects the 200.
+        return new JsonResponse($this->groupPolicyService->getGroupConfig($id, $user));
     }
 
     #[Route('/{id}/config', name: 'put', methods: ['PUT'], requirements: ['id' => '\d+'])]
@@ -158,7 +161,7 @@ final class AdminGroupConfigController extends AbstractController
             return $this->json(['error' => $e->getMessage(), 'code' => 'iam.unknownPolicyKey'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        return $this->json($payload);
+        return new JsonResponse($payload);
     }
 
     private function guard(?User $user): ?JsonResponse
