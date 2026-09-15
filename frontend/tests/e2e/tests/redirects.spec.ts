@@ -8,7 +8,8 @@
  * to be a conscious, documented decision.
  */
 import { test, expect } from '../test-setup'
-import { openApp } from '../helpers/auth'
+import { login, openApp } from '../helpers/auth'
+import { CREDENTIALS } from '../config/credentials'
 import { isAgentsEnabled } from '../helpers/features'
 import { TIMEOUTS } from '../config/config'
 
@@ -70,5 +71,24 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     await expect(page).toHaveURL(/\/ai\/routing\?topic=mail$/, {
       timeout: TIMEOUTS.STANDARD,
     })
+  })
+
+  // `/admin` is admin-only; the worker storageState is a regular user, so this
+  // bookmark cannot live in the generic loop above (that user is sent home).
+  test('@ci /statistics#chats lands on All chats', async ({ page }) => {
+    await openApp(page)
+    await page.goto('/statistics#chats', { waitUntil: 'commit' })
+    await expect(page, '/statistics#chats should land on /chats').toHaveURL(/\/chats$/, {
+      timeout: TIMEOUTS.STANDARD,
+    })
+  })
+
+  test('@ci /admin?tab=users lands on People for an admin', async ({ page }) => {
+    await login(page, CREDENTIALS.getAdminCredentials())
+    await page.goto('/admin?tab=users', { waitUntil: 'commit' })
+    await expect(page, '/admin?tab=users should land on /admin/people').toHaveURL(
+      /\/admin\/people$/,
+      { timeout: TIMEOUTS.STANDARD }
+    )
   })
 })

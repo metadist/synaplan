@@ -33,20 +33,13 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       targetUserId = target!.id
     })
 
-    await test.step('Arrange: log in as admin and navigate to admin users tab', async () => {
+    await test.step('Arrange: log in as admin and open People', async () => {
       await login(page, adminCreds)
 
-      await page.locator(selectors.nav.sidebarV2Admin).click()
-      const dropdown = page.locator(selectors.nav.navDropdown)
-      await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
-      await dropdown.locator(selectors.nav.flyoutLinkAdminDashboard).click()
-
-      await page.locator(selectors.pages.admin).waitFor({
-        state: 'visible',
+      await page.goto('/admin/people')
+      await expect(page.locator(selectors.pages.people)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-
-      await page.locator(selectors.admin.tabUsers).click()
       await page.locator(selectors.admin.sectionUsers).waitFor({
         state: 'visible',
         timeout: TIMEOUTS.STANDARD,
@@ -97,33 +90,15 @@ test.describe('@ci @smoke Admin impersonation + chat', () => {
       expect(aiText.length).toBeGreaterThan(0)
     })
 
-    await test.step('Act: exit impersonation and land on the admin user list', async () => {
-      // iamGroups is user-scoped. The unauthenticated request fixture would
-      // see only the global default; onExit routes as the restored admin.
-      const runtimeRes = await request.get(`${getApiUrl()}/api/v1/config/runtime`, {
-        headers: { Cookie: adminCookie },
-      })
-      expect(runtimeRes.ok()).toBeTruthy()
-      const runtime = (await runtimeRes.json()) as { features?: { iamGroups?: boolean } }
-      const iamGroups = runtime.features?.iamGroups === true
-
+    await test.step('Act: exit impersonation and land on People', async () => {
       await page.locator(selectors.impersonation.exitBtn).click()
-      // Terminal state is the user list, not the banner disappearing.
+      // Terminal state is the People user list, not the banner disappearing.
       // refreshUser() hides the banner before onExit's router.push.
-      // Flag off: that list stays on Admin. Flag on: it lives on People.
-      if (iamGroups) {
-        await expect(page.locator(selectors.pages.people)).toBeVisible({
-          timeout: TIMEOUTS.LONG,
-        })
-        await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
-        await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
-      } else {
-        await expect(page.locator(selectors.pages.admin)).toBeVisible({
-          timeout: TIMEOUTS.LONG,
-        })
-        await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
-        await expect(page.locator(selectors.pages.people)).toHaveCount(0)
-      }
+      await expect(page.locator(selectors.pages.people)).toBeVisible({
+        timeout: TIMEOUTS.LONG,
+      })
+      await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible()
+      await expect(page.locator(selectors.pages.admin)).toHaveCount(0)
       await expect(page.locator(selectors.impersonation.banner)).toBeHidden()
     })
   })

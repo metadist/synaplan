@@ -31,7 +31,7 @@
           v-if="allWidgetChats.length > 5"
           class="px-3 py-2 rounded-lg txt-secondary hover-surface transition-colors text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           data-testid="btn-chat-show-all-widget"
-          @click="navigateToStatistics"
+          @click="navigateToChats"
         >
           {{ $t('chat.showAll') }}
         </button>
@@ -267,8 +267,8 @@ const handleDelete = async (id: string) => {
   }
 }
 
-const navigateToStatistics = () => {
-  router.push('/statistics#chats')
+const navigateToChats = () => {
+  router.push('/chats')
 }
 
 // Load chats on mount

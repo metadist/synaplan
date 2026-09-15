@@ -143,9 +143,6 @@
           </div>
         </div>
 
-        <!-- Users stay on this page while IAM groups are off (U5 / sprint 1). -->
-        <UsersTab v-if="activeTab === 'users'" />
-
         <!-- Prompts Tab -->
         <div v-if="activeTab === 'prompts'" data-testid="section-prompts">
           <div v-if="promptsLoading" class="text-center py-12">
@@ -485,7 +482,6 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
-import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import RegistrationChart from '@/components/admin/RegistrationChart.vue'
 import UsageChart from '@/components/admin/UsageChart.vue'
 import {
@@ -507,8 +503,6 @@ const AdminSystemInfoPanel = defineAsyncComponent(
 const NativeServerControl = defineAsyncComponent(
   () => import('@/components/NativeServerControl.vue')
 )
-const UsersTab = defineAsyncComponent(() => import('@/components/people/UsersTab.vue'))
-
 import { useConfigStore } from '@/stores/config'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
@@ -519,10 +513,7 @@ const { formatDateTime } = useDateFormat()
 const config = useConfigStore()
 const route = useRoute()
 const router = useRouter()
-const iamGroupsEnabled = computed(() => isIamGroupsEnabled())
-
-type TabId =
-  'overview' | 'users' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
+type TabId = 'overview' | 'prompts' | 'usage' | 'subscriptions' | 'moderation' | 'appServer'
 interface AdminTab {
   id: TabId
   label: string
@@ -531,7 +522,6 @@ interface AdminTab {
 
 const isValidTab = (tab: unknown): tab is TabId =>
   tab === 'overview' ||
-  tab === 'users' ||
   tab === 'prompts' ||
   tab === 'usage' ||
   tab === 'subscriptions' ||
@@ -554,7 +544,6 @@ const activeTab = ref<TabId>(tabFromQuery())
 const tabs = computed<AdminTab[]>(() => {
   const baseTabs: AdminTab[] = [
     { id: 'overview', label: t('admin.tabs.overview'), icon: 'mdi:view-dashboard' },
-    { id: 'users', label: t('admin.tabs.users'), icon: 'mdi:account-multiple' },
     { id: 'prompts', label: t('admin.tabs.prompts'), icon: 'mdi:text-box-multiple' },
     { id: 'usage', label: t('admin.tabs.usage'), icon: 'mdi:chart-bar' },
     { id: 'subscriptions', label: t('admin.tabs.subscriptions'), icon: 'mdi:credit-card-outline' },
@@ -574,22 +563,14 @@ const tabNavItems = computed<TabNavItem[]>(() =>
     label: tab.label,
     icon: tab.icon,
     testid: `tab-${tab.id}`,
-    ...(tab.id === 'users' && iamGroupsEnabled.value ? { to: '/admin/people' } : {}),
   }))
 )
 
 function onTabNavChange(id: string) {
-  // With IAM groups on, Users is a link to People, not a panel here.
-  if (id === 'users' && iamGroupsEnabled.value) {
-    return
-  }
   activeTab.value = id as TabId
 }
 
 watch(activeTab, (id) => {
-  if (id === 'users' && iamGroupsEnabled.value) {
-    return
-  }
   const tab = route.query.tab
   if (tab === id || (id === 'overview' && (tab === undefined || tab === ''))) {
     return
@@ -782,6 +763,10 @@ function formatDate(dateStr: string): string {
 watch(
   () => route.query.tab,
   () => {
+    if (route.query.tab === 'users') {
+      void router.replace({ name: 'admin-people' })
+      return
+    }
     activeTab.value = tabFromQuery()
   }
 )

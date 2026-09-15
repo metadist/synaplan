@@ -419,15 +419,16 @@ the full list.
 
 When the flag is off:
 
-- The Operate **People** child opens the Operate **Users** tab
-  (`/admin?tab=users`); `/admin/people` redirects there.
+- Operate **People** (`/admin/people`) is still the user list. The tab bar
+  is hidden only when Users is the sole enabled section (Groups, Policies,
+  Platform instances and Audit stay flag-gated). `/admin?tab=users` redirects
+  there.
 - `/groups` is not routable and shows the not-found page.
 - `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.
-- The Operate Overview **Users** tab is unchanged.
 
 When the flag is on:
 
-- Operate shows **People** (`/admin/people`) with **Users**, **Groups**, and
+- Operate **People** (`/admin/people`) shows **Users**, **Groups**, and
   **Audit**. **Policies** appears only when group policies are also on.
 - An admin can create a manual group, add people by email, and set the role
   to member or manager.
