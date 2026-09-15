@@ -242,6 +242,6 @@ export async function downloadUsageExport(sinceTimestamp?: number): Promise<void
     responseType: 'blob',
   })
 
-  // Web → anchor download; native → Filesystem + share sheet (Epic 7.1).
+  // Web → anchor download; Android → Documents; iOS → share sheet (Epic 7.1).
   await saveOrDownloadBlob(blob, `synaplan-usage-${Date.now()}.csv`)
 }

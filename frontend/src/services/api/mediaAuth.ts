@@ -392,7 +392,7 @@ async function requestMedia(url: string): Promise<Response> {
 
 /**
  * Download a media URL under `filename`: authenticated blob fetch, then the
- * platform-appropriate save (web anchor download / native Filesystem + Share).
+ * platform-appropriate save (web anchor / Android Documents / iOS share sheet).
  */
 export async function downloadMediaUrl(url: string, filename: string): Promise<void> {
   const blob = await fetchMediaBlob(url)
