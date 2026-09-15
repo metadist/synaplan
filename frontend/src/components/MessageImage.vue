@@ -208,9 +208,9 @@ const downloadFilename = (): string => {
 // Downloads always fetch their own blob (issue #1071): the displayed image is
 // a plain `src`, so there is nothing in JS to reuse, and the request goes out
 // with `Authorization: Bearer` rather than a credential in a URL. Saving goes
-// through saveOrDownloadBlob: web keeps the anchor download, the native shell
-// persists via Filesystem + Share because an `<a download>` click is a silent
-// no-op inside the WebView.
+// through saveOrDownloadBlob: web keeps the anchor download; Android writes to
+// Documents; iOS still uses the share sheet. An `<a download>` click is a
+// silent no-op inside the WebView.
 const downloadImage = async () => {
   try {
     const blob = await fetchMediaBlob(resolveMediaUrl(props.url))
