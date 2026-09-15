@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "97e7c3ac2e94f7f909f89f62d62fdb46",
+    "content-hash": "4af241576ab67b73c81ccb35efe14bf3",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -98,16 +98,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v4.3.18",
+            "version": "v4.3.19",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "a8831db3ffed64cfc55ceac4f43e600eb6bf3bb5"
+                "reference": "997fa78bf13ddc5cb3951eea61bd23f425e91486"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/a8831db3ffed64cfc55ceac4f43e600eb6bf3bb5",
-                "reference": "a8831db3ffed64cfc55ceac4f43e600eb6bf3bb5",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/997fa78bf13ddc5cb3951eea61bd23f425e91486",
+                "reference": "997fa78bf13ddc5cb3951eea61bd23f425e91486",
                 "shasum": ""
             },
             "require": {
@@ -181,9 +181,9 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.18"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.19"
             },
-            "time": "2026-07-22T15:09:18+00:00"
+            "time": "2026-09-09T07:14:18+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -958,16 +958,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v4.3.18",
+            "version": "v4.3.19",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "42e4ff04ef9183f45ebaffcd17681a3d6710adb9"
+                "reference": "788a478f071019e96830baa697c0bcde5eed74bd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/42e4ff04ef9183f45ebaffcd17681a3d6710adb9",
-                "reference": "42e4ff04ef9183f45ebaffcd17681a3d6710adb9",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/788a478f071019e96830baa697c0bcde5eed74bd",
+                "reference": "788a478f071019e96830baa697c0bcde5eed74bd",
                 "shasum": ""
             },
             "require": {
@@ -1081,9 +1081,9 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v4.3.18"
+                "source": "https://github.com/api-platform/symfony/tree/v4.3.19"
             },
-            "time": "2026-09-02T20:01:30+00:00"
+            "time": "2026-09-12T11:22:16+00:00"
         },
         {
             "name": "api-platform/validator",
