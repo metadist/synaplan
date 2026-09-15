@@ -52,4 +52,23 @@ describe('iamGuards', () => {
     expect(adminUsersTabRedirect(routeWithTab('users'))).toEqual({ name: 'admin-people' })
     expect(adminUsersTabRedirect(routeWithTab())).toBe(true)
   })
+
+  it('opens People when platform links are on and groups are off', () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: false, platformLinksEnabled: true } })
+
+    expect(peopleRouteGuard()).toBe(true)
+    expect(groupsRouteGuard(groupsRoute())).toEqual({
+      name: 'not-found',
+      params: { pathMatch: ['groups'] },
+      query: {},
+      hash: '',
+    })
+    expect(adminUsersTabRedirect(routeWithTab('users'))).toBe(true)
+  })
+
+  it('opens People when policies are on and groups are off', () => {
+    getConfigSync.mockReturnValue({ features: { iamGroups: false, iamPolicies: true } })
+
+    expect(peopleRouteGuard()).toBe(true)
+  })
 })

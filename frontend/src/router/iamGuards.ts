@@ -1,13 +1,14 @@
 import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
-import { isIamGroupsEnabled } from '@/composables/useIamFeature'
+import { isIamGroupsEnabled, isIamPoliciesEnabled } from '@/composables/useIamFeature'
+import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 
 /**
- * Flag off: People has no groups, policies or audit to show, so the route
- * lands on the Operate user list instead of a dead end. The Operate nav entry
- * points there directly.
+ * People stays reachable when any extra tab can render (groups, policies, or
+ * platform instances). Only when every extra tab is off does the route land
+ * on the Operate user list instead of a dead end.
  */
 export function peopleRouteGuard(): true | RouteLocationRaw {
-  if (isIamGroupsEnabled()) {
+  if (isIamGroupsEnabled() || isIamPoliciesEnabled() || isPlatformLinksEnabled()) {
     return true
   }
   return { name: 'admin', query: { tab: 'users' } }
