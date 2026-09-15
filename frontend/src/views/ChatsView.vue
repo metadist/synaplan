@@ -17,7 +17,7 @@
         />
       </PageHeader>
 
-      <ChatBrowser v-if="activeTab === 'all'" />
+      <ChatBrowser v-if="activeTab === 'all'" hide-header />
       <IncomingChatsTab v-else-if="activeTab === 'incoming'" />
     </div>
   </MainLayout>

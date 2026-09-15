@@ -21,7 +21,22 @@
 </template>
 
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import UsageStatistics from '@/components/config/UsageStatistics.vue'
+
+const route = useRoute()
+const router = useRouter()
+
+watch(
+  () => route.hash,
+  (hash) => {
+    if (hash === '#chats') {
+      void router.replace({ path: '/chats' })
+    }
+  },
+  { immediate: true }
+)
 </script>

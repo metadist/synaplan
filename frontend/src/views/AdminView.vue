@@ -763,6 +763,10 @@ function formatDate(dateStr: string): string {
 watch(
   () => route.query.tab,
   () => {
+    if (route.query.tab === 'users') {
+      void router.replace({ name: 'admin-people' })
+      return
+    }
     activeTab.value = tabFromQuery()
   }
 )

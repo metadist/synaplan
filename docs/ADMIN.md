@@ -420,7 +420,8 @@ the full list.
 When the flag is off:
 
 - Operate **People** (`/admin/people`) is still the user list. The tab bar
-  is hidden because Users is the only section. `/admin?tab=users` redirects
+  is hidden only when Users is the sole enabled section (Groups, Policies,
+  Platform instances and Audit stay flag-gated). `/admin?tab=users` redirects
   there.
 - `/groups` is not routable and shows the not-found page.
 - `/api/v1/admin/groups` and `/api/v1/groups/mine` return 404.

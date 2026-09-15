@@ -114,7 +114,6 @@ test.describe('@ci Admin panel', () => {
     if (iamGroups) {
       await expect(page.locator('[data-testid="tab-groups"]')).toBeVisible()
     } else {
-      await expect(page.locator('[data-testid="tab-users"]')).toHaveCount(0)
       await expect(page.locator('[data-testid="tab-groups"]')).toHaveCount(0)
     }
     await expect(page.locator(selectors.people.backToOperate)).toBeVisible()
