@@ -78,6 +78,15 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     await expect(page.locator('[data-testid="summarize-options"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      .toBe(true)
   })
 
   test('@ci /tools/doc-summary arms Summarize a document in chat', async ({ page }) => {
@@ -86,6 +95,15 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     await expect(page.locator('[data-testid="summarize-options"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      .toBe(true)
   })
 
   test('@ci /ai/providers/higgsfield lands on Your AI accounts', async ({ page }) => {

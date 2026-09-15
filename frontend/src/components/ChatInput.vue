@@ -736,7 +736,15 @@ const disarmSummarize = (options?: { clearPrefill?: boolean }) => {
 }
 
 const armSummarize = () => {
+  if (isGuestMode.value) {
+    emit('guestFeatureGate', 'attach')
+    return
+  }
   summarizeArmed.value = true
+  if (uploadedFiles.value.length > 0) {
+    prefillSummarizeInstructionIfEmpty()
+    return
+  }
   handlePlusAttach()
 }
 
@@ -903,6 +911,7 @@ const emit = defineEmits<{
       ragGroupKey?: string
       quotedText?: string
       quotedMessageId?: number
+      language?: string
     },
   ]
   stop: []
@@ -916,6 +925,11 @@ const canSend = computed(() => {
   const hasFiles = uploadedFiles.value.length > 0
   const hasPastedBlocks = pastedBlocks.value.length > 0
   const filesReady = uploadedFiles.value.every((f) => !f.processing)
+  const readyFileCount = uploadedFiles.value.filter((f) => !f.processing).length
+
+  if (summarizeArmed.value && readyFileCount === 0) {
+    return false
+  }
 
   // A tool badge (search/image/video) needs a query or description to act on,
   // so an active tool with an empty textarea (and no files) can't be sent.
@@ -1103,6 +1117,7 @@ const sendMessage = () => {
     ragGroupKey: selectedGroupKey.value || undefined,
     quotedText: props.quote?.text || undefined,
     quotedMessageId: props.quote?.messageId || undefined,
+    ...(summarizeArmed.value ? { language: summarizeLanguage.value } : {}),
   }
   emit('send', messageToSend, options)
   disarmSummarize()

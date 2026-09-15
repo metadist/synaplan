@@ -22,13 +22,30 @@ test.describe('Summarize a document in chat', () => {
     await page.locator(CHAT.toolSummarize).click()
 
     await expect(page.locator(CHAT.summarizeOptions)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-    await expect(page).toHaveURL(/\/(?:\?.*)?$/, { timeout: TIMEOUTS.SHORT })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.SHORT }
+      )
+      .toBe(true)
   })
 
   test('@ci /ai/summarizer redirects and arms the tool', async ({ page }) => {
     await openApp(page)
     await page.goto('/ai/summarizer', { waitUntil: 'commit' })
     await expect(page.locator(CHAT.summarizeOptions)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      .toBe(true)
   })
 
   test('@ci Manage Assistants has no Summarizer page link', async ({ page }) => {

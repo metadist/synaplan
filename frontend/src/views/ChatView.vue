@@ -2454,6 +2454,7 @@ const handleSendMessage = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    language?: string
   }
 ) => {
   if (needsProviderSetup.value) {
@@ -2739,6 +2740,7 @@ const streamAIResponse = async (
     ragGroupKey?: string
     quotedText?: string
     quotedMessageId?: number
+    language?: string
     /**
      * Re-attach to a turn already generating on the server instead of starting
      * a new one. `userMessage` is then irrelevant — nothing is sent, the client
@@ -3382,7 +3384,7 @@ const streamAIResponse = async (
         history: incognitoHistory,
         includeReasoning,
         webSearch,
-        language: locale.value,
+        language: options?.language ?? locale.value,
         modelId: finalModelId,
         fileIds,
         voiceReply: options?.voiceReply,

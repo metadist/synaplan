@@ -85,9 +85,10 @@ type ChatInputExposed = {
   uploadFiles: (files: File[]) => Promise<void>
 }
 
-const mountInput = (): VueWrapper =>
+const mountInput = (props: Record<string, unknown> = {}): VueWrapper =>
   mount(ChatInput, {
     attachTo: document.body,
+    props,
     global: {
       mocks: { $t: (key: string) => key },
       stubs: {
@@ -165,5 +166,84 @@ describe('ChatInput summarize tool', () => {
     expect(
       (typed.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
     ).toBe('keep my wording')
+  })
+
+  it('prefills when a file is already attached', async () => {
+    const wrapper = mountInput()
+    await attachPdf(wrapper)
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await wrapper.vm.$nextTick()
+
+    expect(
+      (wrapper.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
+    ).toBe('Summarize the attached document. Length: medium. Answer in English.')
+  })
+
+  it('rewrites the generated instruction when length or language changes', async () => {
+    const wrapper = mountInput()
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await attachPdf(wrapper)
+
+    const textarea = wrapper.get('[data-testid="input-chat-message"]')
+    await wrapper.get('[data-testid="select-summarize-length"]').setValue('short')
+    await wrapper.vm.$nextTick()
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(
+      'Summarize the attached document. Length: short. Answer in English.'
+    )
+
+    await wrapper.get('[data-testid="select-summarize-language"]').setValue('fr')
+    await wrapper.vm.$nextTick()
+    expect((textarea.element as HTMLTextAreaElement).value).toBe(
+      'Summarize the attached document. Length: short. Answer in French.'
+    )
+  })
+
+  it('does not overwrite a manually edited instruction', async () => {
+    const wrapper = mountInput()
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await attachPdf(wrapper)
+
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('keep my wording')
+    await wrapper.get('[data-testid="select-summarize-length"]').setValue('long')
+    await wrapper.get('[data-testid="select-summarize-language"]').setValue('de')
+    await wrapper.vm.$nextTick()
+
+    expect(
+      (wrapper.get('[data-testid="input-chat-message"]').element as HTMLTextAreaElement).value
+    ).toBe('keep my wording')
+  })
+
+  it('sends the selected summarize language with the attachment', async () => {
+    const wrapper = mountInput()
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await attachPdf(wrapper)
+    await wrapper.get('[data-testid="select-summarize-language"]').setValue('fr')
+    await wrapper.vm.$nextTick()
+    await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const sent = wrapper.emitted('send')?.[0] as [string, { language?: string; fileIds?: number[] }]
+    expect(sent[1]).toMatchObject({ language: 'fr', fileIds: [1] })
+  })
+
+  it('does not send while summarize is armed without a file', async () => {
+    const wrapper = mountInput()
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await wrapper.vm.$nextTick()
+    await wrapper.get('[data-testid="input-chat-message"]').setValue('summarize this')
+    await wrapper.get('[data-testid="btn-chat-send"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.emitted('send')).toBeFalsy()
+    expect(wrapper.find('[data-testid="summarize-options"]').exists()).toBe(true)
+  })
+
+  it('does not arm for guests', async () => {
+    const wrapper = mountInput({ isGuestMode: true })
+    ;(wrapper.vm as unknown as ChatInputExposed).armSummarize()
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[data-testid="summarize-options"]').exists()).toBe(false)
+    expect(wrapper.emitted('guestFeatureGate')).toEqual([['attach']])
   })
 })
