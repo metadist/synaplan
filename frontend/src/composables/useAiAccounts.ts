@@ -1,4 +1,4 @@
-import type { RouteLocationRaw } from 'vue-router'
+import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { ref } from 'vue'
 import { getMessagesGatewayStatus } from '@/services/api/messagesGatewayApi'
 import { isModuleConfigured } from './useModuleFeature'
@@ -14,8 +14,8 @@ export function isHiggsfieldAccountsEnabled(): boolean {
 /**
  * Anthropic BYO is available only when the Messages gateway reports enabled.
  * That flag is not in runtime config — it comes from GET /messages-gateway.
- * Until the status loads, treat the section as off so the nav and route do
- * not advertise a surface the instance does not have.
+ * Until the status loads, treat the section as off so the nav does not
+ * advertise a surface the instance does not have.
  */
 export function isAnthropicAccountsEnabled(): boolean {
   void loadGatewayEnabled()
@@ -49,12 +49,24 @@ export function isAiAccountsEnabled(): boolean {
   return isHiggsfieldAccountsEnabled() || isAnthropicAccountsEnabled()
 }
 
-/** Both provider sections off: the page is treated as unknown (U11). */
-export async function aiAccountsRouteGuard(): Promise<true | RouteLocationRaw> {
-  if (isHiggsfieldAccountsEnabled()) {
+/**
+ * Both provider sections off: the page is treated as unknown (U11).
+ * Kept synchronous so a client-side redirect (legacy /higgsfield) can
+ * confirm immediately — an async beforeEnter leaves the old URL in place
+ * until GET /messages-gateway returns.
+ *
+ * `?section=` is the legacy bookmark: allow the hop even when the matching
+ * module is not configured; the view hides the empty section.
+ */
+export function aiAccountsRouteGuard(to?: RouteLocationNormalized): true | RouteLocationRaw {
+  const section = to?.query.section
+  if (section === 'higgsfield' || section === 'anthropic') {
     return true
   }
-  return (await loadGatewayEnabled()) ? true : { name: 'not-found' }
+  if (isHiggsfieldAccountsEnabled() || isAnthropicAccountsEnabled()) {
+    return true
+  }
+  return { name: 'not-found' }
 }
 
 /** Test helper — clears the in-memory gateway status cache. */

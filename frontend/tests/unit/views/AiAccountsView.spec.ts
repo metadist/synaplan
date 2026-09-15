@@ -74,14 +74,27 @@ describe('AiAccountsView', () => {
     expect(wrapper.find('[data-testid="section-anthropic"]').exists()).toBe(true)
   })
 
-  it('returns not-found when both sections are off', async () => {
+  it('returns not-found when both sections are off', () => {
     getConfigSync.mockReturnValue({
       features: {},
       modules: { higgsfield: { configured: false } },
     })
     getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
     resetAiAccountsGatewayCache()
-    await expect(aiAccountsRouteGuard()).resolves.toEqual({ name: 'not-found' })
+    expect(aiAccountsRouteGuard()).toEqual({ name: 'not-found' })
+  })
+
+  it('lets the legacy Higgsfield bookmark through while the gateway status loads', () => {
+    getConfigSync.mockReturnValue({
+      features: {},
+      modules: { higgsfield: { configured: false } },
+    })
+    resetAiAccountsGatewayCache()
+    expect(
+      aiAccountsRouteGuard({
+        query: { section: 'higgsfield' },
+      } as never)
+    ).toBe(true)
   })
 
   it('opens the Higgsfield section from ?section=higgsfield', async () => {
