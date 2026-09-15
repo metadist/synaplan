@@ -150,6 +150,7 @@
     "onboarding": "Welcome",
     "mcpServers": "MCP Servers",
     "aiAgents": "Coding clients",
+    "aiAccounts": "Your AI accounts",
     "connections": "Connections",
     "savedTasks": "Saved tasks",
     "desktop": "Desktop",
@@ -745,6 +746,7 @@
     "accountDescription": "Account & preferences",
     "configInbound": "Inbound",
     "configAiModels": "Models",
+    "aiAccounts": "Your AI accounts",
     "configTaskPrompts": "Instructions",
     "configSortingPrompt": "Routing",
     "configApiKeys": "API Keys",
@@ -1857,7 +1859,7 @@
         "replaceButton": "Replace",
         "testButton": "Test connection",
         "clearButton": "Clear my key",
-        "clearConfirm": "Remove your personal Higgsfield key? You will fall back to the platform key (if any).",
+        "clearConfirm": "Remove key — video generation uses the server's key again if one is configured.",
         "clearConfirmTitle": "Remove personal key",
         "saveSuccess": "Higgsfield key saved.",
         "saveError": "Could not save the key.",
@@ -5786,6 +5788,12 @@
     "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"
   },
+  "aiAccounts": {
+    "title": "Your AI accounts",
+    "subtitle": "Use your own provider accounts instead of the server's. Keys are stored encrypted and only you can see them.",
+    "sectionHiggsfield": "Higgsfield — video generation",
+    "sectionAnthropic": "Anthropic — coding clients"
+  },
   "messagesGateway": {
     "title": "Coding clients",
     "description": "Connect Claude Code and other Anthropic-compatible agent tools to your Synaplan workspace. Requests go to POST /v1/messages and are metered against your Synaplan budget.",
@@ -5806,7 +5814,8 @@
     "saveKey": "Save key",
     "clearKey": "Remove key",
     "clearKeyConfirmTitle": "Remove Anthropic key?",
-    "clearKeyConfirm": "Your personal Anthropic key will be removed. The gateway will only work if an operator key is allowed and configured.",
+    "clearKeyConfirm": "Remove key — coding clients use the server's key again if one is configured.",
+    "byokPointer": "Using your own Anthropic key? Manage it under Your AI accounts.",
     "saveKeySuccess": "API key saved",
     "saveKeyError": "Could not save API key",
     "clearKeySuccess": "API key removed",

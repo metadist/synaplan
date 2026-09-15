@@ -18,6 +18,7 @@ import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 import { isPlatformLinksEnabled } from './usePlatformLinksFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
+import { isAiAccountsEnabled } from './useAiAccounts'
 
 export interface NavChild {
   /** Stable identifier used for data-testid — never derived from the route path */
@@ -207,6 +208,16 @@ export function useNavItems() {
           label: t('nav.configAiModels'),
           ...grouped('assistants', assistants),
         },
+        ...(isAiAccountsEnabled()
+          ? [
+              {
+                key: 'ai-accounts',
+                path: '/ai/providers',
+                label: t('nav.aiAccounts'),
+                ...grouped('assistants', assistants),
+              },
+            ]
+          : []),
         {
           key: 'task-prompts',
           path: isAgentsEnabled() ? '/ai/assistants' : '/ai/instructions',

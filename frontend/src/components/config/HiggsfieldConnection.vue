@@ -1,22 +1,16 @@
 <template>
   <div class="space-y-6" data-testid="page-config-higgsfield">
-    <PageHeader
-      :title="$t('config.providers.higgsfield.title')"
-      icon="heroicons:film"
-      data-testid="section-higgsfield-overview"
-    >
-      <template #subtitle>
-        {{ $t('config.providers.higgsfield.description') }}
-        <a
-          href="https://cloud.higgsfield.ai/"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-[var(--brand)] hover:underline font-medium"
-        >
-          {{ $t('config.providers.higgsfield.getKeyLink') }}
-        </a>
-      </template>
-    </PageHeader>
+    <p class="txt-secondary text-sm" data-testid="section-higgsfield-overview">
+      {{ $t('config.providers.higgsfield.description') }}
+      <a
+        href="https://cloud.higgsfield.ai/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-[var(--brand)] hover:underline font-medium"
+      >
+        {{ $t('config.providers.higgsfield.getKeyLink') }}
+      </a>
+    </p>
 
     <!-- Status -->
     <div v-if="!loading" class="surface-card p-6" data-testid="section-higgsfield-status">
@@ -173,7 +167,6 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
-import PageHeader from '@/components/PageHeader.vue'
 import {
   clearHiggsfieldCredentials,
   getHiggsfieldCredentialState,

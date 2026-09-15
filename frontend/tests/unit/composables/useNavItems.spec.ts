@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -13,8 +13,15 @@ import {
   useNavItems,
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
+import { loadGatewayEnabled, resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
 
-const runtimeFeatures = {
+const getMessagesGatewayStatus = vi.fn()
+
+vi.mock('@/services/api/messagesGatewayApi', () => ({
+  getMessagesGatewayStatus: () => getMessagesGatewayStatus(),
+}))
+
+const runtimeFeatures: Record<string, boolean> = {
   savedTasks: true,
   iamGroups: false,
   agentsEnabled: false,
@@ -22,10 +29,12 @@ const runtimeFeatures = {
   toolsApprovalsEnabled: false,
 }
 
+const runtimeModules: Record<string, { configured?: boolean }> = {}
+
 vi.mock('@/services/api/httpClient', () => ({
   httpClient: vi.fn(),
   getApiBaseUrl: () => 'http://localhost:8000',
-  getConfigSync: () => ({ features: runtimeFeatures }),
+  getConfigSync: () => ({ features: runtimeFeatures, modules: runtimeModules }),
 }))
 
 const pluginList: { name: string }[] = []
@@ -68,6 +77,7 @@ const navMessages = {
     linkedPlatforms: 'Linked platforms',
     toolsDocSummary: 'Summarizer',
     configAiModels: 'Models',
+    aiAccounts: 'Your AI accounts',
     configTaskPrompts: 'Instructions',
     configSortingPrompt: 'Routing',
     liveSupport: 'Live support',
@@ -161,6 +171,12 @@ describe('useNavItems rail', () => {
     runtimeFeatures.agentsEnabled = false
     runtimeFeatures.platformLinksEnabled = false
     runtimeFeatures.toolsApprovalsEnabled = false
+    resetAiAccountsGatewayCache()
+    getMessagesGatewayStatus.mockReset()
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
+    Object.keys(runtimeModules).forEach((key) => {
+      delete runtimeModules[key]
+    })
   })
 
   it('guest rail has History only — no Manage, Plugins or Operate', () => {
@@ -188,6 +204,7 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('live-support')
     expect(childKeys).toContain('chat-widget')
     expect(childKeys).toContain('doc-summary')
+    expect(childKeys).toContain('ai-accounts')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')
     expect(childKeys).not.toContain('linked-platforms')
@@ -222,6 +239,29 @@ describe('useNavItems rail', () => {
     const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     expect((onManage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
       'linked-platforms'
+    )
+  })
+
+  it('hides Your AI accounts when Higgsfield and the gateway are both off', () => {
+    runtimeModules.higgsfield = { configured: false }
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
+      'ai-accounts'
+    )
+  })
+
+  it('shows Your AI accounts when only the gateway is enabled', async () => {
+    runtimeModules.higgsfield = { configured: false }
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: true })
+    resetAiAccountsGatewayCache()
+    await loadGatewayEnabled()
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    await flushPromises()
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
+      'ai-accounts'
     )
   })
 

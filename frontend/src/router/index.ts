@@ -27,6 +27,7 @@ import {
 import { i18n } from '@/i18n'
 import { inferNavContext } from '@/router/navContext'
 import { assistantsRouteGuard, instructionsRouteGuard } from '@/router/assistantGuards'
+import { aiAccountsRouteGuard } from '@/composables/useAiAccounts'
 import { adminUsersTabRedirect, groupsRouteGuard, peopleRouteGuard } from '@/router/iamGuards'
 import { getErrorMessage } from '@/utils/errorMessage'
 import LoadingView from '@/views/LoadingView.vue'
@@ -323,10 +324,11 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.configAiModels' },
     },
     {
-      path: '/ai/providers/higgsfield',
-      name: 'ai-provider-higgsfield',
-      component: () => import('@/views/ConfigView.vue'),
-      meta: { requiresAuth: true, titleKey: 'pageTitles.configProviderHiggsfield' },
+      path: '/ai/providers',
+      name: 'ai-accounts',
+      component: () => import('@/views/AiAccountsView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.aiAccounts' },
+      beforeEnter: aiAccountsRouteGuard,
     },
     {
       path: '/ai/instructions',
@@ -382,6 +384,10 @@ const router = createRouter({
     },
     { path: '/tools/mail-handler', redirect: '/channels/email' },
     { path: '/tools/doc-summary', redirect: '/ai/summarizer' },
+    {
+      path: '/ai/providers/higgsfield',
+      redirect: { path: '/ai/providers', query: { section: 'higgsfield' } },
+    },
     {
       path: '/plugins/:pluginName',
       name: 'plugin-view',

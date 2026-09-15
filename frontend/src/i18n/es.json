@@ -150,6 +150,7 @@
     "onboarding": "Bienvenida",
     "mcpServers": "Servidores MCP",
     "aiAgents": "Clientes de programación",
+    "aiAccounts": "Tus cuentas de IA",
     "connections": "Conexiones",
     "savedTasks": "Tareas guardadas",
     "setup": "Configuración",
@@ -753,6 +754,7 @@
     "moreDescription": "Más secciones y cuenta",
     "menu": "Menú",
     "aiAgents": "Clientes de programación",
+    "aiAccounts": "Tus cuentas de IA",
     "manage": "Gestionar",
     "manageDescription": "Asistentes, automatizaciones, canales y conexiones",
     "myGroups": "Mis grupos",
@@ -3385,7 +3387,7 @@
         "replaceButton": "Reemplazar",
         "testButton": "Probar conexión",
         "clearButton": "Quitar mi clave",
-        "clearConfirm": "¿Quitar tu clave personal de Higgsfield? Volverás a la clave de la plataforma (si la hay).",
+        "clearConfirm": "Quitar clave — la generación de vídeo vuelve a usar la clave del servidor si hay una configurada.",
         "clearConfirmTitle": "Quitar clave personal",
         "saveSuccess": "Clave de Higgsfield guardada.",
         "saveError": "No se pudo guardar la clave.",
@@ -4800,6 +4802,12 @@
     "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
     "writeBadge": "Escritura permitida"
   },
+  "aiAccounts": {
+    "title": "Tus cuentas de IA",
+    "subtitle": "Usa tus propias cuentas de proveedor en lugar de las del servidor. Las claves se guardan cifradas y solo tú puedes verlas.",
+    "sectionHiggsfield": "Higgsfield — generación de vídeo",
+    "sectionAnthropic": "Anthropic — clientes de programación"
+  },
   "messagesGateway": {
     "title": "Clientes de programación",
     "description": "Conecte Claude Code y otras herramientas de agente compatibles con Anthropic a su espacio Synaplan. Las solicitudes van a POST /v1/messages y se contabilizan en su presupuesto de Synaplan.",
@@ -4820,7 +4828,8 @@
     "saveKey": "Guardar clave",
     "clearKey": "Eliminar clave",
     "clearKeyConfirmTitle": "¿Eliminar clave de Anthropic?",
-    "clearKeyConfirm": "Se eliminará su clave personal de Anthropic. La puerta de enlace solo funcionará si hay una clave de operador permitida y configurada.",
+    "clearKeyConfirm": "Quitar clave — los clientes de programación vuelven a usar la clave del servidor si hay una configurada.",
+    "byokPointer": "¿Usas tu propia clave de Anthropic? Gestiónala en Tus cuentas de IA.",
     "saveKeySuccess": "Clave API guardada",
     "saveKeyError": "No se pudo guardar la clave API",
     "clearKeySuccess": "Clave API eliminada",

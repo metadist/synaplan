@@ -151,6 +151,7 @@
     "onboarding": "Willkommen",
     "mcpServers": "MCP-Server",
     "aiAgents": "Coding-Clients",
+    "aiAccounts": "Deine KI-Konten",
     "connections": "Verbindungen",
     "savedTasks": "Gespeicherte Aufgaben",
     "setup": "Einrichtung",
@@ -759,6 +760,7 @@
     "moreDescription": "Weitere Bereiche und Konto",
     "menu": "Menü",
     "aiAgents": "Coding-Clients",
+    "aiAccounts": "Deine KI-Konten",
     "manage": "Verwalten",
     "manageDescription": "Assistenten, Automatisierungen, Kanäle und Verbindungen",
     "myGroups": "Meine Gruppen",
@@ -2010,7 +2012,7 @@
         "replaceButton": "Ersetzen",
         "testButton": "Verbindung testen",
         "clearButton": "Meinen Schlüssel entfernen",
-        "clearConfirm": "Persönlichen Higgsfield-Schlüssel entfernen? Du fällst dann auf den Plattform-Schlüssel zurück (falls vorhanden).",
+        "clearConfirm": "Schlüssel entfernen — die Videogenerierung nutzt wieder den Schlüssel des Servers, falls einer konfiguriert ist.",
         "clearConfirmTitle": "Persönlichen Schlüssel entfernen",
         "saveSuccess": "Higgsfield-Schlüssel gespeichert.",
         "saveError": "Schlüssel konnte nicht gespeichert werden.",
@@ -5720,6 +5722,12 @@
     "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"
   },
+  "aiAccounts": {
+    "title": "Deine KI-Konten",
+    "subtitle": "Nutze deine eigenen Anbieterkonten statt der des Servers. Schlüssel werden verschlüsselt gespeichert und nur du kannst sie sehen.",
+    "sectionHiggsfield": "Higgsfield — Videogenerierung",
+    "sectionAnthropic": "Anthropic — Coding-Clients"
+  },
   "messagesGateway": {
     "title": "Coding-Clients",
     "description": "Verbinden Sie Claude Code und andere Anthropic-kompatible Agenten-Tools mit Ihrem Synaplan-Arbeitsbereich. Anfragen gehen an POST /v1/messages und werden gegen Ihr Synaplan-Budget erfasst.",
@@ -5740,7 +5748,8 @@
     "saveKey": "Schlüssel speichern",
     "clearKey": "Schlüssel entfernen",
     "clearKeyConfirmTitle": "Anthropic-Schlüssel entfernen?",
-    "clearKeyConfirm": "Ihr persönlicher Anthropic-Schlüssel wird entfernt. Das Gateway funktioniert nur noch, wenn ein Operator-Schlüssel erlaubt und konfiguriert ist.",
+    "clearKeyConfirm": "Schlüssel entfernen — Coding-Clients nutzen wieder den Schlüssel des Servers, falls einer konfiguriert ist.",
+    "byokPointer": "Du nutzt einen eigenen Anthropic-Schlüssel? Verwalte ihn unter Deine KI-Konten.",
     "saveKeySuccess": "API-Schlüssel gespeichert",
     "saveKeyError": "API-Schlüssel konnte nicht gespeichert werden",
     "clearKeySuccess": "API-Schlüssel entfernt",
