@@ -563,6 +563,10 @@ export const selectors = {
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',
+    tabPolicies: '[data-testid="tab-policies"]',
+    sectionPolicies: '[data-testid="section-policies"]',
+    sectionPolicyDefaults: '[data-testid="section-policy-defaults"]',
+    selectPolicyGroup: '[data-testid="select-policy-group"]',
   },
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',

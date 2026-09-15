@@ -57,7 +57,13 @@ final class AdminGroupConfigControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/v1/admin/groups/'.$groupId.'/config');
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
-        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $raw = (string) $this->client->getResponse()->getContent();
+        // json_decode([]) and json_decode({}) are both PHP arrays — the People
+        // tab Zod schema requires a JSON object. An empty list here is the
+        // "Policies could not be loaded" toast on a 200.
+        self::assertStringContainsString('"conflicts":{', $raw);
+        self::assertStringNotContainsString('"conflicts":[]', $raw);
+        $body = json_decode($raw, true);
         self::assertIsArray($body);
         self::assertArrayHasKey('settings', $body);
         self::assertArrayHasKey('DEFAULTMODEL.CHAT', $body['settings']);

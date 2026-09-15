@@ -20,7 +20,6 @@ import {
   ContinueSharedChatResponseSchema,
   ListAdminAuditResponseSchema,
   GetAdminGroupConfigResponseSchema,
-  PutAdminGroupConfigResponseSchema,
   GetAdminConfigLocksResponseSchema,
   PatchAdminConfigLocksResponseSchema,
 } from '@/generated/api-schemas'
@@ -46,6 +45,40 @@ export type IamSharedItem = NonNullable<
 export type IamGroupConfigSetting = NonNullable<
   z.infer<typeof GetAdminGroupConfigResponseSchema>['settings']
 >[string]
+
+/**
+ * PHP json_encode turns an empty assoc array into `[]`. Zod `z.record()`
+ * rejects that, which is what made People → Policies toast "could not be loaded"
+ * on a healthy 200. Coerce list-shaped maps to `{}` before the generated schema.
+ */
+function objectMap(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+export const GroupConfigResponseSchema = z.preprocess((raw) => {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return raw
+  }
+  const data = raw as Record<string, unknown>
+  return {
+    ...data,
+    settings: objectMap(data.settings),
+    conflicts: objectMap(data.conflicts),
+  }
+}, GetAdminGroupConfigResponseSchema)
+
+function readGroupConfig(data: z.infer<typeof GetAdminGroupConfigResponseSchema>): {
+  settings: Record<string, IamGroupConfigSetting>
+  conflicts: Record<string, string[]>
+} {
+  return {
+    settings: (data.settings ?? {}) as Record<string, IamGroupConfigSetting>,
+    conflicts: (data.conflicts ?? {}) as Record<string, string[]>,
+  }
+}
 
 export const iamApi = {
   async listAdminGroups(): Promise<IamGroup[]> {
@@ -231,12 +264,9 @@ export const iamApi = {
   }> {
     const data = await httpClient(`/api/v1/admin/groups/${groupId}/config`, {
       method: 'GET',
-      schema: GetAdminGroupConfigResponseSchema,
+      schema: GroupConfigResponseSchema,
     })
-    return {
-      settings: (data.settings ?? {}) as Record<string, IamGroupConfigSetting>,
-      conflicts: (data.conflicts ?? {}) as Record<string, string[]>,
-    }
+    return readGroupConfig(data)
   },
 
   async putGroupConfig(
@@ -249,12 +279,9 @@ export const iamApi = {
     const data = await httpClient(`/api/v1/admin/groups/${groupId}/config`, {
       method: 'PUT',
       body: JSON.stringify(body),
-      schema: PutAdminGroupConfigResponseSchema,
+      schema: GroupConfigResponseSchema,
     })
-    return {
-      settings: (data.settings ?? {}) as Record<string, IamGroupConfigSetting>,
-      conflicts: (data.conflicts ?? {}) as Record<string, string[]>,
-    }
+    return readGroupConfig(data)
   },
 
   async listLocks(): Promise<Record<string, boolean>> {
