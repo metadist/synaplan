@@ -1,6 +1,6 @@
 import { defineComponent } from 'vue'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -13,6 +13,13 @@ import {
   useNavItems,
 } from '@/composables/useNavItems'
 import { useAuthStore, type User } from '@/stores/auth'
+import { loadGatewayEnabled, resetAiAccountsGatewayCache } from '@/composables/useAiAccounts'
+
+const getMessagesGatewayStatus = vi.fn()
+
+vi.mock('@/services/api/messagesGatewayApi', () => ({
+  getMessagesGatewayStatus: () => getMessagesGatewayStatus(),
+}))
 
 const runtimeFeatures: Record<string, boolean> = {
   savedTasks: true,
@@ -164,7 +171,9 @@ describe('useNavItems rail', () => {
     runtimeFeatures.agentsEnabled = false
     runtimeFeatures.platformLinksEnabled = false
     runtimeFeatures.toolsApprovalsEnabled = false
-    delete runtimeFeatures.messagesGateway
+    resetAiAccountsGatewayCache()
+    getMessagesGatewayStatus.mockReset()
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
     Object.keys(runtimeModules).forEach((key) => {
       delete runtimeModules[key]
     })
@@ -234,11 +243,24 @@ describe('useNavItems rail', () => {
   })
 
   it('hides Your AI accounts when Higgsfield and the gateway are both off', () => {
-    runtimeFeatures.messagesGateway = false
     runtimeModules.higgsfield = { configured: false }
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     expect((manage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
+      'ai-accounts'
+    )
+  })
+
+  it('shows Your AI accounts when only the gateway is enabled', async () => {
+    runtimeModules.higgsfield = { configured: false }
+    getMessagesGatewayStatus.mockResolvedValue({ enabled: true })
+    resetAiAccountsGatewayCache()
+    await loadGatewayEnabled()
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    await flushPromises()
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((manage?.children ?? []).map((child: { key: string }) => child.key)).toContain(
       'ai-accounts'
     )
   })
