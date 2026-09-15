@@ -27,6 +27,7 @@ const runtimeFeatures: Record<string, boolean> = {
   agentsEnabled: false,
   platformLinksEnabled: false,
   toolsApprovalsEnabled: false,
+  desktopAgentEnabled: false,
 }
 
 const runtimeModules: Record<string, { configured?: boolean }> = {}
@@ -62,12 +63,14 @@ const navMessages = {
     groupTools: 'Tools',
     channels: 'Channels',
     connections: 'Connections',
+    groupDeveloper: 'Developer & devices',
+    desktop: 'Desktop',
     groupApi: 'API',
     myGroups: 'My groups',
     configInbound: 'Inbound',
     toolsChatWidget: 'Chat widgets',
     toolsMailHandler: 'Email handler',
-    configConnections: 'Connections',
+    configConnections: 'Connected apps',
     mcpServers: 'MCP Servers',
     configApiKeys: 'API Keys',
     savedTasks: 'Saved tasks',
@@ -171,6 +174,7 @@ describe('useNavItems rail', () => {
     runtimeFeatures.agentsEnabled = false
     runtimeFeatures.platformLinksEnabled = false
     runtimeFeatures.toolsApprovalsEnabled = false
+    runtimeFeatures.desktopAgentEnabled = false
     resetAiAccountsGatewayCache()
     getMessagesGatewayStatus.mockReset()
     getMessagesGatewayStatus.mockResolvedValue({ enabled: false })
@@ -207,15 +211,66 @@ describe('useNavItems rail', () => {
     expect(childKeys).toContain('ai-accounts')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')
+    expect(childKeys).toContain('ai-agents')
+    expect(childKeys).toContain('connections')
     expect(childKeys).not.toContain('linked-platforms')
+    expect(childKeys).not.toContain('desktop')
     const promptChild = (manage?.children ?? []).find(
       (child: { key: string }) => child.key === 'task-prompts'
     )
     expect(promptChild?.label).toBe('Instructions')
     expect(promptChild?.path).toBe('/ai/instructions')
+    const manageGroups = groupNavChildren(manage?.children ?? [])
+    expect(manageGroups.map((group: { key: string | null }) => group.key)).toEqual([
+      'assistants',
+      'automations',
+      'channels',
+      'connections',
+      'developer',
+    ])
+    const connectionsChild = (manage?.children ?? []).find(
+      (child: { key: string }) => child.key === 'connections'
+    )
+    expect(connectionsChild?.label).toBe('Connected apps')
+    expect(connectionsChild?.groupKey).toBe('connections')
+    const codingClients = (manage?.children ?? []).find(
+      (child: { key: string }) => child.key === 'ai-agents'
+    )
+    expect(codingClients?.groupKey).toBe('developer')
+    expect(
+      (manage?.children ?? [])
+        .filter((child: { groupKey?: string }) => child.groupKey === 'developer')
+        .map((child: { key: string }) => child.key)
+    ).toEqual(['api-keys', 'api-docs', 'ai-agents'])
+  })
+
+  it('keeps Connected apps visible when Saved tasks is off', () => {
+    runtimeFeatures.savedTasks = false
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    const childKeys = (manage?.children ?? []).map((child: { key: string }) => child.key)
+    expect(childKeys).toContain('connections')
+    expect(childKeys).not.toContain('saved-tasks')
     expect(
       new Set((manage?.children ?? []).map((child: { groupKey?: string }) => child.groupKey))
-    ).toEqual(new Set(['assistants', 'automations', 'channels', 'connections']))
+    ).toEqual(new Set(['assistants', 'channels', 'connections', 'developer']))
+  })
+
+  it('shows Desktop under Developer & devices only when the flag is on', () => {
+    const off = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const offManage = off.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    expect((offManage?.children ?? []).map((child: { key: string }) => child.key)).not.toContain(
+      'desktop'
+    )
+
+    runtimeFeatures.desktopAgentEnabled = true
+    const on = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const onManage = on.vm.navItems.find((item: { key: string }) => item.key === 'manage')
+    const desktop = (onManage?.children ?? []).find(
+      (child: { key: string }) => child.key === 'desktop'
+    )
+    expect(desktop?.groupKey).toBe('developer')
+    expect(desktop?.path).toBe('/channels/desktop')
   })
 
   it('shows Approvals under Automations when the flag is on', () => {
@@ -225,6 +280,7 @@ describe('useNavItems rail', () => {
     const child = (manage?.children ?? []).find((item: { key: string }) => item.key === 'approvals')
     expect(child?.label).toBe('Approvals')
     expect(child?.path).toBe('/channels/approvals')
+    expect(child?.groupKey).toBe('automations')
   })
 
   it('hides Linked platforms when the flag is off and shows it when on', () => {

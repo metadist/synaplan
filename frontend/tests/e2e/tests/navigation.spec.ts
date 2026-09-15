@@ -133,6 +133,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       await expect(flyout.locator(NAV.flyoutGroup('automations'))).toBeVisible()
       await expect(flyout.locator(NAV.flyoutGroup('channels'))).toBeVisible()
       await expect(flyout.locator(NAV.flyoutGroup('connections'))).toBeVisible()
+      await expect(flyout.locator(NAV.flyoutGroup('developer'))).toBeVisible()
       await expect(flyout.locator(NAV.flyoutGroup('api'))).toHaveCount(0)
       await expect(flyout.locator(NAV.flyoutGroup('tools'))).toHaveCount(0)
       await expect(flyout.locator(NAV.flyoutLinkInbound)).toHaveCount(0)
@@ -148,16 +149,16 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       await expect(sub.locator(NAV.flyoutLinkLiveSupport)).toBeVisible()
     })
 
-    await test.step('Act+Assert: Connections submenu shows API docs', async () => {
-      await page.locator(NAV.flyoutGroup('connections')).click()
+    await test.step('Act+Assert: Developer & devices submenu shows API docs', async () => {
+      await page.locator(NAV.flyoutGroup('developer')).click()
       const sub = page.locator(NAV.navSubDropdown)
       await expect(sub.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
     })
   })
 
-  // Connections and Saved Tasks are gated behind features.savedTasks
-  // (SAVEDTASKS.ENABLED). Both now live under Manage groups. The test
-  // stack runs app:seed, which seeds the global flag ON, so both must render.
+  // Connected apps is always in the Connections group (D5 ungate). Saved
+  // Tasks stays behind features.savedTasks (SAVEDTASKS.ENABLED) under
+  // Automations. The test stack seeds that flag ON, so both must render.
   test('@ci Saved Tasks and Connections appear in Manage when enabled', async ({ page }) => {
     await test.step('Arrange: login and wait for nav', async () => {
       await openApp(page)

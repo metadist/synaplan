@@ -198,6 +198,7 @@ export function useNavItems() {
       const channels = t('nav.channels')
       const automations = t('nav.groupAutomations')
       const connections = t('nav.connections')
+      const developer = t('nav.groupDeveloper')
 
       const grouped = (groupKey: string, group: string) => ({ groupKey, group })
 
@@ -259,12 +260,6 @@ export function useNavItems() {
             ]
           : []),
         {
-          key: 'ai-agents',
-          path: '/channels/agents',
-          label: t('nav.aiAgents'),
-          ...grouped('automations', automations),
-        },
-        {
           key: 'inbound',
           path: '/channels',
           label: t('nav.configInbound'),
@@ -288,32 +283,18 @@ export function useNavItems() {
           label: t('nav.liveSupport'),
           ...grouped('channels', channels),
         },
-        ...(isSavedTasksEnabled()
-          ? [
-              {
-                key: 'connections',
-                path: '/channels/connections',
-                label: t('nav.configConnections'),
-                ...grouped('connections', connections),
-              },
-            ]
-          : []),
+        {
+          key: 'connections',
+          path: '/channels/connections',
+          label: t('nav.configConnections'),
+          ...grouped('connections', connections),
+        },
         {
           key: 'mcp-servers',
           path: '/channels/mcp',
           label: t('nav.mcpServers'),
           ...grouped('connections', connections),
         },
-        ...(isDesktopAgentEnabled()
-          ? [
-              {
-                key: 'desktop',
-                path: '/channels/desktop',
-                label: t('nav.desktop'),
-                ...grouped('connections', connections),
-              },
-            ]
-          : []),
         ...(isPlatformLinksEnabled()
           ? [
               {
@@ -328,14 +309,30 @@ export function useNavItems() {
           key: 'api-keys',
           path: '/channels/api',
           label: t('nav.configApiKeys'),
-          ...grouped('connections', connections),
+          ...grouped('developer', developer),
         },
         {
           key: 'api-docs',
           path: '/channels/api/docs',
           label: t('pageTitles.configApiDocs'),
-          ...grouped('connections', connections),
+          ...grouped('developer', developer),
         },
+        {
+          key: 'ai-agents',
+          path: '/channels/agents',
+          label: t('nav.aiAgents'),
+          ...grouped('developer', developer),
+        },
+        ...(isDesktopAgentEnabled()
+          ? [
+              {
+                key: 'desktop',
+                path: '/channels/desktop',
+                label: t('nav.desktop'),
+                ...grouped('developer', developer),
+              },
+            ]
+          : []),
       ]
 
       items.push({
