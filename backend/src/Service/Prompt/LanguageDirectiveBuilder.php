@@ -110,10 +110,34 @@ final class LanguageDirectiveBuilder
      */
     public static function buildForLanguage(string $language): string
     {
-        $languageName = self::LANGUAGE_NAMES[$language] ?? $language;
+        $languageName = self::nameFor($language);
 
         return "\n\nLanguage: the user's current message is in {$languageName}. Respond in {$languageName}.\n"
             .self::ANTI_ECHO_CLAUSE;
+    }
+
+    /**
+     * Pin the model's output language without claiming the inbound text
+     * is already in that language.
+     *
+     * Used when the reply is a derived artefact (API-session log, title)
+     * that must match the account UI even if a client wrapper around the
+     * excerpts is in another language.
+     */
+    public static function buildForOutputLanguage(string $language): string
+    {
+        $languageName = self::nameFor($language);
+
+        return "\n\nLanguage: write your reply in {$languageName}.\n"
+            .self::ANTI_ECHO_CLAUSE;
+    }
+
+    /**
+     * English display name for an ISO-639 code, or the raw value when unknown.
+     */
+    public static function nameFor(string $language): string
+    {
+        return self::LANGUAGE_NAMES[$language] ?? $language;
     }
 
     /**

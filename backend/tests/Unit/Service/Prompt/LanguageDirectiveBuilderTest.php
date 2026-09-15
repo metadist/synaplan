@@ -43,6 +43,21 @@ class LanguageDirectiveBuilderTest extends TestCase
         $this->assertAntiEchoClausePresent($directive);
     }
 
+    public function testForOutputLanguagePinsReplyWithoutClaimingInboundLanguage(): void
+    {
+        $directive = LanguageDirectiveBuilder::buildForOutputLanguage('es');
+
+        $this->assertStringContainsString('write your reply in Spanish', $directive);
+        $this->assertStringNotContainsString("the user's current message is in", $directive);
+        $this->assertAntiEchoClausePresent($directive);
+    }
+
+    public function testNameForResolvesIsoCode(): void
+    {
+        $this->assertSame('English', LanguageDirectiveBuilder::nameFor('en'));
+        $this->assertSame('zz', LanguageDirectiveBuilder::nameFor('zz'));
+    }
+
     public function testForLanguageFallsBackToRawValueForUnknownCode(): void
     {
         // Mirrors the previous inline behaviour: never throw on an unknown
@@ -77,6 +92,7 @@ class LanguageDirectiveBuilderTest extends TestCase
         foreach ([
             LanguageDirectiveBuilder::buildAutoDirective(),
             LanguageDirectiveBuilder::buildForLanguage('en'),
+            LanguageDirectiveBuilder::buildForOutputLanguage('en'),
             LanguageDirectiveBuilder::buildWidgetPreamble('en'),
         ] as $fragment) {
             $this->assertStringNotContainsString('**IMPORTANT', $fragment);
