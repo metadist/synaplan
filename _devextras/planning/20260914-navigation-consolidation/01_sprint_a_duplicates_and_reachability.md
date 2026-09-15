@@ -289,8 +289,16 @@ field attribute), tests.
 
 ### NV06 — Connections vs Developer & devices
 
+**Class:** ota-candidate.
+**Journey:** from Manage, open Connections → Connected apps; open Developer
+& devices → API keys / API docs / Coding clients. Desktop is absent until
+its flag is on. (Findability for J-NV-3 adjacent surfaces; no new J-NV id.)
+**UX exit:** Connected apps is always in the menu (D5); Desktop stays
+flag-gated (U11); five Manage groups on desktop flyout and 320 px accordion;
+API docs are not under Connections; tokens only.
+
 **Files:** `useNavItems.ts`, `i18n/*.json`, `useNavItems.spec.ts`,
-`navigation.spec.ts`, `MobileNav.spec.ts`.
+`navigation.spec.ts`, `layout.spec.ts`.
 
 **Machine instructions**
 

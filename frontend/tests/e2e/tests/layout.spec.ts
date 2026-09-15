@@ -249,11 +249,15 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     expect(await sections.count(), 'more section renders section rows').toBeGreaterThanOrEqual(2)
     await expect(sheet.locator(NAV.mobileMoreAccountSection)).toBeVisible()
 
-    // Accordion: tapping Manage expands groups; Channels reveals Inbound.
+    // Accordion: tapping Manage expands five groups; Channels reveals Inbound.
     await sheet.locator(NAV.mobileMoreManage).click()
-    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible({
+    await expect(sheet.locator(NAV.mobileMoreGroup('assistants'))).toBeVisible({
       timeout: TIMEOUTS.SHORT,
     })
+    await expect(sheet.locator(NAV.mobileMoreGroup('automations'))).toBeVisible()
+    await expect(sheet.locator(NAV.mobileMoreGroup('channels'))).toBeVisible()
+    await expect(sheet.locator(NAV.mobileMoreGroup('connections'))).toBeVisible()
+    await expect(sheet.locator(NAV.mobileMoreGroup('developer'))).toBeVisible()
     await sheet.locator(NAV.mobileMoreGroup('channels')).click()
     await expect(sheet.locator(NAV.mobileMoreInbound)).toBeVisible({
       timeout: TIMEOUTS.SHORT,
