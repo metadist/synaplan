@@ -268,14 +268,16 @@
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET are not both set",
+            "message": "No Higgsfield key + secret pair — add it under AI infrastructure › Models & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET",
             "details": [],
             "configured_by": {
                 "env": [
                     "HIGGSFIELD_API_KEY",
                     "HIGGSFIELD_API_SECRET"
                 ],
-                "bconfig": [],
+                "bconfig": [
+                    "PROVIDER_KEYS.higgsfield"
+                ],
                 "providers": [
                     "higgsfield"
                 ],
@@ -446,13 +448,15 @@
             "state": "absent",
             "configured": false,
             "healthy": false,
-            "message": "THEHIVE_API_KEY is unset",
+            "message": "No TheHive API key — add one under AI infrastructure › Models & keys or set THEHIVE_API_KEY",
             "details": [],
             "configured_by": {
                 "env": [
                     "THEHIVE_API_KEY"
                 ],
-                "bconfig": [],
+                "bconfig": [
+                    "PROVIDER_KEYS.thehive"
+                ],
                 "providers": [
                     "thehive"
                 ],

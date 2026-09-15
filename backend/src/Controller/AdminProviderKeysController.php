@@ -60,7 +60,7 @@ final class AdminProviderKeysController extends AbstractController
                     property: 'providers',
                     type: 'array',
                     items: new OA\Items(
-                        required: ['name', 'displayName', 'configured', 'source', 'origin', 'maskedKey', 'consoleUrl', 'envVar', 'freeTier', 'recommended'],
+                        required: ['name', 'displayName', 'configured', 'source', 'origin', 'maskedKey', 'consoleUrl', 'envVar', 'secretEnvVar', 'hasSecret', 'testable', 'chat', 'freeTier', 'recommended'],
                         properties: [
                             new OA\Property(property: 'name', type: 'string', example: 'groq'),
                             new OA\Property(property: 'displayName', type: 'string', example: 'Groq'),
@@ -70,6 +70,10 @@ final class AdminProviderKeysController extends AbstractController
                             new OA\Property(property: 'maskedKey', type: 'string', example: 'gsk_••••••••••••abcd'),
                             new OA\Property(property: 'consoleUrl', type: 'string', example: 'https://console.groq.com/keys'),
                             new OA\Property(property: 'envVar', type: 'string', example: 'GROQ_API_KEY'),
+                            new OA\Property(property: 'secretEnvVar', type: 'string', nullable: true, description: 'Set when the provider authenticates with a key + secret pair; the save body then needs "secret" too', example: null),
+                            new OA\Property(property: 'hasSecret', type: 'boolean', description: 'True when the stored/env credential includes the secret half', example: false),
+                            new OA\Property(property: 'testable', type: 'boolean', description: 'False when no cheap authenticated endpoint is known: the key is stored untested', example: true),
+                            new OA\Property(property: 'chat', type: 'boolean', description: 'False for media/speech providers: the key never makes chat ready and offers no chat defaults', example: true),
                             new OA\Property(property: 'freeTier', type: 'boolean', example: true),
                             new OA\Property(property: 'recommended', type: 'boolean', example: true),
                         ],
@@ -102,14 +106,15 @@ final class AdminProviderKeysController extends AbstractController
         security: [['Bearer' => []]],
         tags: ['Admin Provider Keys']
     )]
-    #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['anthropic', 'openai', 'groq', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'xai']))]
+    #[OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string', enum: ['anthropic', 'openai', 'groq', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs']))]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
             required: ['key'],
             properties: [
                 new OA\Property(property: 'key', type: 'string', example: 'gsk_...'),
-                new OA\Property(property: 'validate', type: 'boolean', default: true, description: 'Live-check the key against the provider API before saving'),
+                new OA\Property(property: 'secret', type: 'string', nullable: true, description: 'The secret half for key + secret providers (see secretEnvVar in the list); required for those, ignored otherwise'),
+                new OA\Property(property: 'validate', type: 'boolean', default: true, description: 'Live-check the key against the provider API before saving (skipped for providers whose list entry has testable=false)'),
                 new OA\Property(property: 'applyDefaults', type: 'boolean', default: false, description: 'Also set the recommended global default models for this provider'),
             ]
         )
@@ -118,12 +123,13 @@ final class AdminProviderKeysController extends AbstractController
         response: 200,
         description: 'Key stored (and defaults applied when requested)',
         content: new OA\JsonContent(
-            required: ['success', 'provider', 'maskedKey', 'defaultsApplied'],
+            required: ['success', 'provider', 'maskedKey', 'defaultsApplied', 'tested'],
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'provider', type: 'string', example: 'groq'),
                 new OA\Property(property: 'maskedKey', type: 'string', example: 'gsk_••••••••••••abcd'),
                 new OA\Property(property: 'defaultsApplied', type: 'boolean', example: true),
+                new OA\Property(property: 'tested', type: 'boolean', description: 'False when the key was stored without a live check (validate=false or the provider is not testable)', example: true),
             ],
             type: 'object'
         )
@@ -146,21 +152,28 @@ final class AdminProviderKeysController extends AbstractController
         }
 
         $key = trim($data['key']);
+        $secret = is_string($data['secret'] ?? null) ? trim($data['secret']) : null;
         $validate = (bool) ($data['validate'] ?? true);
         $applyDefaults = (bool) ($data['applyDefaults'] ?? false);
 
+        if (ProviderKeyCatalog::requiresSecret($provider) && ('' === $secret || null === $secret)) {
+            return $this->json(['error' => sprintf('%s needs the API key and the API secret together — paste both from the provider console.', ProviderKeyCatalog::get($provider)['displayName'])], Response::HTTP_BAD_REQUEST);
+        }
+
+        $tested = false;
         if ($validate) {
-            $result = $this->validator->validate($provider, $key);
+            $result = $this->validator->validate($provider, $key, $secret);
             if (!$result['ok']) {
                 return $this->json([
                     'error' => $result['error'] ?? 'The provider rejected this API key.',
                     'status' => $result['status'] ?? null,
                 ], Response::HTTP_BAD_REQUEST);
             }
+            $tested = $result['tested'];
         }
 
         try {
-            $this->keyStore->saveKey($provider, $key, ProviderKeyStore::ORIGIN_UI);
+            $this->keyStore->saveKey($provider, $key, ProviderKeyStore::ORIGIN_UI, $secret);
         } catch (\InvalidArgumentException $e) {
             // Placeholder text or the masked display value — a client mistake,
             // not a server fault. The message never contains a real key.
@@ -194,6 +207,7 @@ final class AdminProviderKeysController extends AbstractController
             'provider' => $provider,
             'maskedKey' => ProviderKeyStore::mask($key),
             'defaultsApplied' => $defaultsApplied,
+            'tested' => $tested,
         ]);
     }
 
@@ -256,9 +270,10 @@ final class AdminProviderKeysController extends AbstractController
         response: 200,
         description: 'Test result',
         content: new OA\JsonContent(
-            required: ['ok'],
+            required: ['ok', 'tested'],
             properties: [
                 new OA\Property(property: 'ok', type: 'boolean', example: true),
+                new OA\Property(property: 'tested', type: 'boolean', description: 'False when the provider has no cheap authenticated endpoint; ok is then only "a key is stored"', example: true),
                 new OA\Property(property: 'status', type: 'integer', nullable: true, example: 200),
                 new OA\Property(property: 'error', type: 'string', nullable: true, example: 'The provider rejected this API key.'),
             ],
@@ -282,7 +297,7 @@ final class AdminProviderKeysController extends AbstractController
             return $this->json(['error' => 'No key configured for this provider.'], Response::HTTP_BAD_REQUEST);
         }
 
-        return $this->json($this->validator->validate($provider, $key));
+        return $this->json($this->validator->validate($provider, $key, $this->keyStore->getSecret($provider)));
     }
 
     #[Route('/{provider}/apply-defaults', name: 'admin_provider_keys_apply_defaults', methods: ['POST'])]
@@ -347,6 +362,10 @@ final class AdminProviderKeysController extends AbstractController
                 'maskedKey' => $status['maskedKey'],
                 'consoleUrl' => $meta['consoleUrl'],
                 'envVar' => $meta['envVar'],
+                'secretEnvVar' => $meta['secretEnvVar'] ?? null,
+                'hasSecret' => $status['hasSecret'],
+                'testable' => ProviderKeyCatalog::isTestable($name),
+                'chat' => ProviderKeyCatalog::servesChat($name),
                 'freeTier' => $meta['freeTier'],
                 'recommended' => $meta['recommended'],
             ];

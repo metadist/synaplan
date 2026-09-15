@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Admin;
 
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Module\Contract\FeatureModuleInterface;
@@ -647,6 +648,95 @@ final class SystemConfigServiceTest extends TestCase
             );
             self::assertArrayHasKey($key, $placed, $key.' is defined but no tab section lists it');
         }
+    }
+
+    /**
+     * NV05 (D2): instance provider keys have one editor — Models & keys. The
+     * legacy field stays readable but a write is refused and the message
+     * names the new home, so an API client learns where to go.
+     */
+    public function testManagedByFieldsRefuseSave(): void
+    {
+        $this->configRepository->expects(self::never())->method('setValue');
+
+        foreach (['OPENAI_API_KEY', 'HIGGSFIELD_API_SECRET', 'THEHIVE_API_KEY'] as $key) {
+            $result = $this->service->setValue($key, 'sk-new-value');
+
+            self::assertFalse($result['success'], $key.' must not be writable here');
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $result['managedBy'] ?? null);
+            self::assertStringContainsString('Models & keys', $result['message'] ?? '');
+            self::assertStringContainsString($key, $result['message'] ?? '');
+        }
+    }
+
+    /**
+     * The coverage lock: a provider key added to system config without a
+     * catalog entry would silently reopen a second editor. Every managed env
+     * var must be flagged, and every `*_API_KEY` / `*_API_SECRET` password
+     * field on the AI tab must be managed — tokens (Cloudflare, Vertex) are the
+     * documented exceptions because they are not provider keys.
+     */
+    public function testEveryCatalogEnvVarIsMarkedManagedInSystemConfig(): void
+    {
+        $fields = $this->service->getSchema()['fields'];
+
+        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+            if (!isset($fields[$envVar])) {
+                continue; // aliases like GEMINI_API_KEY have no config field
+            }
+            self::assertSame(ProviderKeyCatalog::MANAGED_BY, $fields[$envVar]['managedBy'] ?? null, $envVar.' must be managed by Models & keys');
+            self::assertSame('database', $fields[$envVar]['source'] ?? null, $envVar.' is stored by the key store, not .env');
+        }
+
+        foreach ($fields as $key => $field) {
+            if ('ai' !== $field['tab'] || 'password' !== $field['type']) {
+                continue;
+            }
+            if (!str_ends_with($key, '_API_KEY') && !str_ends_with($key, '_API_SECRET')) {
+                continue;
+            }
+            self::assertArrayHasKey('managedBy', $field, $key.' is a provider key without a ProviderKeyCatalog entry — add it to the catalog instead of a second editor');
+        }
+    }
+
+    /**
+     * Reading stays possible so the response shape does not change: the
+     * status comes from the store, and the secret half of a pair reports its
+     * own presence instead of copying the key's.
+     */
+    public function testManagedFieldsReportTheStoreStatus(): void
+    {
+        $values = $this->service->getValues();
+
+        self::assertFalse($values['OPENAI_API_KEY']['isSet']);
+        self::assertSame('none', $values['OPENAI_API_KEY']['keySource'] ?? null);
+        self::assertFalse($values['HIGGSFIELD_API_SECRET']['isSet']);
+
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $store = new ProviderKeyStore(
+            $this->configRepository,
+            $encryption,
+            new NullLogger(),
+            ['higgsfield' => 'hf-key-from-env'],
+            ['higgsfield' => 'hf-secret-from-env'],
+        );
+        $service = new SystemConfigService(
+            projectDir: sys_get_temp_dir(),
+            logger: new NullLogger(),
+            configRepository: $this->configRepository,
+            defaultTtsUrl: 'http://localhost:10200',
+            providerKeyStore: $store,
+            encryption: $encryption,
+            registrationConfig: new RegistrationConfig($this->configRepository),
+            guestChatConfig: new GuestChatConfig($this->configRepository),
+        );
+
+        $values = $service->getValues();
+        self::assertTrue($values['HIGGSFIELD_API_KEY']['isSet']);
+        self::assertTrue($values['HIGGSFIELD_API_KEY']['isMasked']);
+        self::assertSame('env', $values['HIGGSFIELD_API_KEY']['keySource'] ?? null);
+        self::assertTrue($values['HIGGSFIELD_API_SECRET']['isSet']);
+        self::assertStringNotContainsString('hf-key-from-env', $values['HIGGSFIELD_API_KEY']['value']);
     }
 
     /**

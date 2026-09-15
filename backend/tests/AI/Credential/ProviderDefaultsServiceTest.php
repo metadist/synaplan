@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\AI\Credential;
 
 use App\AI\Credential\ProviderDefaultsService;
+use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
 use App\Model\ModelCatalog;
@@ -46,10 +47,46 @@ final class ProviderDefaultsServiceTest extends TestCase
      * on catalog drift (renamed/removed models) at test time instead of at
      * apply time in an operator's install.
      */
+    /**
+     * Media and speech providers share the key store (Models & keys is the one
+     * editor) but serve no chat model, so they have no recommended defaults.
+     * Anything else in the store must have some.
+     */
+    private const NO_CHAT_PROVIDERS = ['thehive', 'higgsfield', 'elevenlabs'];
+
+    /**
+     * @return list<string>
+     */
+    private static function chatProviders(): array
+    {
+        $chat = array_values(array_filter(ProviderKeyStore::SUPPORTED_PROVIDERS, ProviderKeyCatalog::servesChat(...)));
+        $chat[] = 'ollama';
+
+        return $chat;
+    }
+
+    /**
+     * The catalog flag is what the API and the first-run wizard read; the
+     * defaults service must agree with it in both directions.
+     */
+    public function testMediaAndSpeechProvidersHaveNoDefaultsAndSayWhy(): void
+    {
+        foreach (self::NO_CHAT_PROVIDERS as $provider) {
+            self::assertFalse(ProviderKeyCatalog::servesChat($provider), $provider.' is a media/speech provider');
+            self::assertFalse(ProviderDefaultsService::supports($provider), $provider.' serves no chat model and must not offer "apply defaults"');
+        }
+        foreach (ProviderKeyStore::SUPPORTED_PROVIDERS as $provider) {
+            self::assertSame(
+                ProviderKeyCatalog::servesChat($provider),
+                ProviderDefaultsService::supports($provider),
+                $provider.': catalog chat flag and recommended defaults disagree'
+            );
+        }
+    }
+
     public function testEveryRecommendedDefaultResolvesInTheModelCatalog(): void
     {
-        $providers = [...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'];
-        foreach ($providers as $provider) {
+        foreach (self::chatProviders() as $provider) {
             self::assertTrue(ProviderDefaultsService::supports($provider), sprintf('No recommended defaults defined for supported provider "%s"', $provider));
 
             $defaults = $this->service->getRecommendedDefaults($provider);
@@ -80,7 +117,7 @@ final class ProviderDefaultsServiceTest extends TestCase
         }
 
         $problems = [];
-        foreach ([...ProviderKeyStore::SUPPORTED_PROVIDERS, 'ollama'] as $provider) {
+        foreach (self::chatProviders() as $provider) {
             foreach ($this->service->getRecommendedDefaults($provider) as $capability => $bid) {
                 $reasons = [];
                 if (ModelCatalog::isRetired($bid)) {

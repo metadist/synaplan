@@ -16,17 +16,18 @@ use Psr\Log\NullLogger;
 
 final class ProviderModulesTest extends TestCase
 {
-    public function testTheHiveIsConfiguredByANonEmptyKey(): void
+    public function testTheHiveFollowsTheProviderKeyStore(): void
     {
-        $absent = new TheHiveModule('');
+        $absent = new TheHiveModule($this->keyStore(['configured' => false, 'source' => 'none']));
         $this->assertFalse($absent->isConfigured());
         $this->assertSame('absent', $absent->status()->state());
-        $this->assertStringNotContainsString('sk-', $absent->status()->message);
+        $this->assertStringContainsString('Models & keys', $absent->status()->message, 'the absent message names the one editor');
 
-        $present = new TheHiveModule('sk-live-secret');
-        $this->assertTrue($present->isConfigured());
+        $present = new TheHiveModule($this->keyStore(['configured' => true, 'source' => 'db', 'maskedKey' => 'sk-l…cret']));
+        $this->assertTrue($present->isConfigured(), 'a key saved at runtime counts without a restart');
         $this->assertSame('available', $present->status()->state());
-        $this->assertStringNotContainsString('sk-live-secret', $present->status()->message, 'never echo the key');
+        $this->assertSame(['source' => 'db'], $present->status()->details);
+        $this->assertStringNotContainsString('sk-l', $present->status()->message, 'never echo the key');
     }
 
     public function testHiggsfieldNeedsBothPlatformCredentials(): void
@@ -68,12 +69,15 @@ final class ProviderModulesTest extends TestCase
 
     private function higgsfield(string $key, string $secret): HiggsfieldModule
     {
+        $store = $this->createStub(ProviderKeyStore::class);
+        $store->method('getKey')->willReturn('' === $key ? null : $key);
+        $store->method('getSecret')->willReturn('' === $secret ? null : $secret);
+
         $resolver = new HiggsfieldCredentialResolver(
             $this->createStub(ConfigRepository::class),
             $this->createStub(EncryptionService::class),
             new NullLogger(),
-            $key,
-            $secret,
+            $store,
         );
 
         return new HiggsfieldModule($resolver);

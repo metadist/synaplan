@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
 use Psr\Log\LoggerInterface;
@@ -45,8 +46,17 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
-        private readonly ?string $apiKey = null,
+        private readonly ProviderKeyStore $keyStore,
     ) {
+    }
+
+    /**
+     * The instance key from Models & keys (DB first, THEHIVE_API_KEY bootstrap).
+     * Resolved per call so a key saved in the admin UI applies without a restart.
+     */
+    private function apiKey(): ?string
+    {
+        return $this->keyStore->getKey('thehive');
     }
 
     public function getName(): string
@@ -78,7 +88,7 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
 
     public function getStatus(): array
     {
-        if (!$this->apiKey) {
+        if (null === $this->apiKey()) {
             return [
                 'healthy' => false,
                 'error' => 'API key not configured',
@@ -95,7 +105,7 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
 
     public function isAvailable(): bool
     {
-        return !empty($this->apiKey);
+        return null !== $this->apiKey();
     }
 
     public function getRequiredEnvVars(): array
@@ -112,7 +122,8 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
 
     public function generateImage(string $prompt, array $options = []): array
     {
-        if (!$this->apiKey) {
+        $apiKey = $this->apiKey();
+        if (null === $apiKey) {
             throw ProviderException::missingApiKey('thehive', 'THEHIVE_API_KEY');
         }
 
@@ -175,7 +186,7 @@ final class TheHiveProvider implements ImageGenerationProviderInterface
 
             $response = $this->httpClient->request('POST', $endpoint, [
                 'headers' => [
-                    'Authorization' => 'Bearer '.$this->apiKey,
+                    'Authorization' => 'Bearer '.$apiKey,
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $requestBody,

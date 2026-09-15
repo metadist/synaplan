@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Provider\HiggsfieldProvider;
@@ -63,11 +64,14 @@ class HiggsfieldProviderTest extends TestCase
             }
         );
 
+        $keyStore = $this->createStub(ProviderKeyStore::class);
+        $keyStore->method('getKey')->willReturn('' === $platformKey ? null : $platformKey);
+        $keyStore->method('getSecret')->willReturn('' === $platformSecret ? null : $platformSecret);
+
         return new HiggsfieldProvider(
             $httpClient,
             new NullLogger(),
-            $platformKey,
-            $platformSecret,
+            $keyStore,
             0, // no sleep between polls
         );
     }
