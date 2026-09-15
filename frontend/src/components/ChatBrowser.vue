@@ -55,7 +55,7 @@
 
     <!-- Header with Stats -->
     <div class="flex flex-col gap-4">
-      <div class="flex items-center gap-3">
+      <div v-if="!hideHeader" class="flex items-center gap-3">
         <div class="p-3 rounded-xl bg-brand/10">
           <ChatBubbleLeftRightIcon class="w-6 h-6 txt-brand" />
         </div>
@@ -453,17 +453,33 @@
 
     <!-- Empty State -->
     <div
-      v-else-if="filteredChats.length === 0"
+      v-else-if="
+        listSettled && !chatsStore.loading && !chatsStore.error && filteredChats.length === 0
+      "
       class="surface-card p-12 text-center"
-      data-testid="no-results"
+      :data-testid="isAllChatsEmpty ? 'chats-empty' : 'no-results'"
     >
       <ChatBubbleLeftRightIcon class="w-16 h-16 mx-auto mb-4 txt-secondary opacity-50" />
-      <h3 class="text-lg font-medium txt-primary mb-2">
-        {{ $t('chat.browser.noResults') }}
-      </h3>
-      <p class="txt-secondary">
-        {{ $t('chat.browser.noResultsDesc') }}
-      </p>
+      <template v-if="isAllChatsEmpty">
+        <h3 class="text-lg font-medium txt-primary mb-2">{{ $t('chats.empty') }}</h3>
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-lg text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="btn-chats-empty-new"
+          :disabled="creatingChat"
+          @click="goToNewChat"
+        >
+          {{ $t('chats.emptyAction') }}
+        </button>
+      </template>
+      <template v-else>
+        <h3 class="text-lg font-medium txt-primary mb-2">
+          {{ $t('chat.browser.noResults') }}
+        </h3>
+        <p class="txt-secondary">
+          {{ $t('chat.browser.noResultsDesc') }}
+        </p>
+      </template>
     </div>
 
     <!-- Share Modal -->
@@ -525,6 +541,8 @@ import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
+
+const { hideHeader = false } = defineProps<{ hideHeader?: boolean }>()
 
 const chatsStore = useChatsStore()
 const router = useRouter()
@@ -861,6 +879,17 @@ const hasActiveFilters = computed(() => {
   )
 })
 
+const listSettled = ref(false)
+const creatingChat = ref(false)
+const isAllChatsEmpty = computed(
+  () =>
+    listSettled.value &&
+    !chatsStore.loading &&
+    !chatsStore.error &&
+    !hasActiveFilters.value &&
+    totalChatsCount.value === 0
+)
+
 const clearAllFilters = () => {
   selectedType.value = 'all'
   selectedDateRange.value = 'all'
@@ -913,7 +942,22 @@ const openChat = (id: number) => {
   router.push('/')
 }
 
+const goToNewChat = async () => {
+  if (creatingChat.value || !listSettled.value || chatsStore.loading) return
+  creatingChat.value = true
+  try {
+    const chat = await chatsStore.findOrCreateEmptyChat()
+    if (!chat) return
+    if (router.currentRoute.value.path !== '/') {
+      await router.push('/')
+    }
+  } finally {
+    creatingChat.value = false
+  }
+}
+
 onMounted(async () => {
   await Promise.all([chatsStore.loadChats(), incomingStore.load()])
+  listSettled.value = true
 })
 </script>

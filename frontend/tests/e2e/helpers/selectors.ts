@@ -90,6 +90,8 @@ export const selectors = {
      */
     /** V2 sidebar: History nav item opens the chat list modal */
     sidebarV2ChatNav: '[data-testid="btn-sidebar-v2-nav-chat"]',
+    /** History sheet footer — opens All chats (`/chats`) */
+    chatV2ShowAll: '[data-testid="btn-chat-v2-show-all"]',
     /** V2 sidebar: files nav icon */
     sidebarV2Files: '[data-testid="btn-sidebar-v2-nav-files"]',
     /** V2 sidebar: Manage rail item (Channels + assistants + automations) */
@@ -545,6 +547,7 @@ export const selectors = {
     chat: '[data-testid="page-chat"]',
     profile: '[data-testid="page-profile"]',
     statistics: '[data-testid="page-statistics"]',
+    chats: '[data-testid="page-chats"]',
     admin: '[data-testid="view-admin"]',
     people: '[data-testid="view-people"]',
     tools: '[data-testid="page-tools"]',

@@ -287,18 +287,26 @@ describe('useNavItems rail', () => {
     const childKeys = children.map((child: { key: string }) => child.key)
     expect(childKeys).toContain('admin-people')
     expect(children.find((child: { key: string }) => child.key === 'admin-people')?.path).toBe(
-      '/admin?tab=users'
+      '/admin/people'
     )
   })
 
-  it('sends People to /admin/people when IAM groups are enabled', () => {
+  it('People always points at /admin/people', () => {
+    runtimeFeatures.iamGroups = false
+    const off = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const offOperate = off.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    expect(
+      (offOperate?.children ?? []).find((child: { key: string }) => child.key === 'admin-people')
+        ?.path
+    ).toBe('/admin/people')
+
     runtimeFeatures.iamGroups = true
-    const wrapper = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
-    const operate = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'admin')
-    const people = (operate?.children ?? []).find(
-      (child: { key: string }) => child.key === 'admin-people'
-    )
-    expect(people?.path).toBe('/admin/people')
+    const on = mountNav({ email: 'admin@test.com', level: 'ADMIN', isAdmin: true })
+    const onOperate = on.vm.navItems.find((item: { key: string }) => item.key === 'admin')
+    expect(
+      (onOperate?.children ?? []).find((child: { key: string }) => child.key === 'admin-people')
+        ?.path
+    ).toBe('/admin/people')
   })
 
   it('plugins stay a top-level rail entry when installed', () => {

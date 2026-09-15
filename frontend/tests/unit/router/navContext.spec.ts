@@ -31,5 +31,7 @@ describe('inferNavContext', () => {
   it('marks chat and files as work', () => {
     expect(inferNavContext('/')).toBe('work')
     expect(inferNavContext('/files')).toBe('work')
+    expect(inferNavContext('/chats')).toBe('work')
+    expect(inferNavContext('/chats/incoming')).toBe('work')
   })
 })

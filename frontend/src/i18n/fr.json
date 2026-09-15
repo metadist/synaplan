@@ -135,6 +135,7 @@
     "adminPeople": "Personnes",
     "myGroups": "Mes groupes",
     "incoming": "Chats reçus",
+    "allChats": "Tous les chats",
     "subscription": "Abonnement",
     "subscriptionSuccess": "Abonnement réussi",
     "subscriptionCancel": "Abonnement annulé",
@@ -305,6 +306,14 @@
     "modelChanges": "Changements de modèle : {count}",
     "allStatistics": "Toutes les statistiques",
     "lessThanCent": "< 0,01 €"
+  },
+  "chats": {
+    "tabs": {
+      "all": "Tous",
+      "incoming": "Entrants"
+    },
+    "empty": "Vous n'avez pas encore de conversation.",
+    "emptyAction": "Nouveau chat"
   },
   "chat": {
     "title": "Chat",
