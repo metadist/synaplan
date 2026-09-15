@@ -7,6 +7,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ConfigField from '@/components/admin/ConfigField.vue'
 import DropboxSetupGuide from '@/components/admin/DropboxSetupGuide.vue'
+import ManagedKeysStatusCard from '@/components/admin/ManagedKeysStatusCard.vue'
 import M365SetupGuide from '@/components/admin/M365SetupGuide.vue'
 import UpdatePanel from '@/components/admin/UpdatePanel.vue'
 import ExportImportPanel from '@/components/settings/ExportImportPanel.vue'
@@ -223,13 +224,25 @@ const currentSections = computed(() => {
       activeTab.value === 'branding'
         ? section.fields.filter((fieldKey) => !hiddenModeFields.includes(fieldKey))
         : section.fields
-    const fields = visibleFieldKeys.map((fieldKey) => ({
+    const allFields = visibleFieldKeys.map((fieldKey) => ({
       key: fieldKey,
       schema: schema.value!.fields[fieldKey],
       value: values.value[fieldKey] || { value: '', isSet: false, isMasked: false },
     }))
-    const isLive = fields.some((f) => f.schema?.source === 'database')
-    return { id, label: section.label, fields, isLive }
+    // D2: fields Models & keys owns are never rendered as inputs here. All
+    // managed ⇒ one status card replaces the section body; some managed ⇒
+    // the inputs stay and the same card sits below them.
+    const managedFields = allFields.filter((f) => f.schema?.managedBy === 'ai-infrastructure')
+    const fields = allFields.filter((f) => f.schema?.managedBy !== 'ai-infrastructure')
+    const isLive = allFields.some((f) => f.schema?.source === 'database')
+    return {
+      id,
+      label: section.label,
+      fields,
+      managedFields,
+      allManaged: managedFields.length > 0 && fields.length === 0,
+      isLive,
+    }
   })
 })
 
@@ -634,7 +647,8 @@ onBeforeUnmount(() => {
               </p>
               <M365SetupGuide v-if="section.id === 'm365'" />
               <DropboxSetupGuide v-if="section.id === 'dropbox'" />
-              <div class="space-y-4">
+              <ManagedKeysStatusCard v-if="section.allManaged" :fields="section.managedFields" />
+              <div v-else class="space-y-4">
                 <ConfigField
                   v-for="field in section.fields"
                   :key="field.key"
@@ -642,6 +656,10 @@ onBeforeUnmount(() => {
                   :schema="field.schema"
                   :value="field.value"
                   @update="handleUpdate"
+                />
+                <ManagedKeysStatusCard
+                  v-if="section.managedFields.length > 0"
+                  :fields="section.managedFields"
                 />
               </div>
             </div>

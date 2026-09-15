@@ -90,11 +90,17 @@ const loadError = ref('')
 const selectedName = ref('')
 
 /**
+ * Only providers whose key makes chat possible belong on the "connect one
+ * provider so chat works" step; media and speech keys live in Models & keys.
+ */
+const chatProviders = computed(() => providers.value.filter((p) => p.chat))
+
+/**
  * Same order as Admin > AI Provider Setup: recommended first, then already
  * connected, then alphabetical.
  */
 const sortedProviders = computed(() =>
-  [...providers.value].sort((a, b) => {
+  [...chatProviders.value].sort((a, b) => {
     if (a.recommended !== b.recommended) return a.recommended ? -1 : 1
     if (a.configured !== b.configured) return a.configured ? -1 : 1
     return a.displayName.localeCompare(b.displayName)
@@ -102,10 +108,10 @@ const sortedProviders = computed(() =>
 )
 
 const selectedProvider = computed(
-  () => providers.value.find((p) => p.name === selectedName.value) ?? null
+  () => chatProviders.value.find((p) => p.name === selectedName.value) ?? null
 )
 
-const anyConfigured = computed(() => providers.value.some((p) => p.configured))
+const anyConfigured = computed(() => chatProviders.value.some((p) => p.configured))
 
 /**
  * The grid shows every provider as a logo and a name; the key field belongs to

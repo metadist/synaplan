@@ -34,16 +34,21 @@ export async function listProviderKeys(): Promise<ProviderKeysList> {
 
 /**
  * Validate (live, against the provider API) and store an API key.
- * Keys are stored encrypted and apply without a restart.
+ * Keys are stored encrypted and apply without a restart. Providers with a
+ * `secretEnvVar` (key + secret pair) need `secret` as well.
  */
 export async function saveProviderKey(
   provider: string,
   key: string,
-  options: { applyDefaults?: boolean } = {}
+  options: { applyDefaults?: boolean; secret?: string } = {}
 ): Promise<SaveProviderKeyResult> {
+  const body: Record<string, unknown> = { key, applyDefaults: options.applyDefaults ?? false }
+  if (options.secret !== undefined) {
+    body.secret = options.secret
+  }
   return httpClient(`/api/v1/admin/provider-keys/${encodeURIComponent(provider)}`, {
     method: 'PUT',
-    body: JSON.stringify({ key, applyDefaults: options.applyDefaults ?? false }),
+    body: JSON.stringify(body),
     schema: PutAdminProviderKeysSaveResponseSchema,
   })
 }

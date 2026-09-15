@@ -26,6 +26,10 @@ const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus
   maskedKey: '',
   consoleUrl: 'https://console.groq.com/keys',
   envVar: 'GROQ_API_KEY',
+  secretEnvVar: null,
+  hasSecret: false,
+  testable: true,
+  chat: true,
   ...overrides,
 })
 

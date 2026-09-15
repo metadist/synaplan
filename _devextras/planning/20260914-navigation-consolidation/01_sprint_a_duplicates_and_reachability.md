@@ -213,6 +213,19 @@ section body), `router/index.ts`, `useNavItems.ts`, `i18n/*.json`.
 ### NV05 — Models & keys is the one editor for instance keys (D2)
 
 Two commits in one PR: `NV05a` backend-only, `NV05b` ota-candidate.
+**Journey:** J-NV-3 (master §4) — walked in `provider-keys.spec.ts` (`@ci`)
+and in the browser, light + dark.
+
+Decisions taken while building (keep):
+
+- The catalog carries `chat => false` for media/speech providers and the
+  list API exposes it as `chat`. The card reads it for "use as default" and
+  the first-run wizard lists chat providers only — an ElevenLabs key set via
+  the environment must not read as "your AI is ready".
+- The system-config status card always lists the managed keys with their
+  state (`environment / Helm`, `UI override`, `not set`), also in a mixed
+  section: "is my OpenAI key set?" is answered on that page, not only on
+  Models & keys.
 
 **Files (a):** `backend/src/AI/Credential/ProviderKeyCatalog.php`,
 `backend/src/Service/Admin/SystemConfigService.php`,

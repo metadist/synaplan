@@ -14,6 +14,10 @@ const provider = (overrides: Partial<ProviderKeyStatus> = {}): ProviderKeyStatus
   maskedKey: '',
   consoleUrl: '',
   envVar: '',
+  secretEnvVar: null,
+  hasSecret: false,
+  testable: true,
+  chat: true,
   ...overrides,
 })
 

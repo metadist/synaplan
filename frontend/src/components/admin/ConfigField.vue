@@ -144,7 +144,13 @@ const helpMeta = computed(() => providerHelpByEnvVar(props.fieldKey))
 </script>
 
 <template>
-  <div class="config-field">
+  <!--
+    A field with another editor (managedBy: instance provider keys live under
+    AI infrastructure › Models & keys) is never rendered as an input here —
+    the parent shows ManagedKeysStatusCard instead. This guard keeps that
+    true for any caller.
+  -->
+  <div v-if="!schema.managedBy" class="config-field">
     <div class="flex items-center justify-between mb-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
         <label :for="fieldKey" class="flex items-center gap-2 text-sm font-medium txt-primary">
