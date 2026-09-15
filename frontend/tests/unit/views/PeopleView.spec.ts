@@ -60,15 +60,19 @@ vi.mock('@iconify/vue', () => ({
 
 import PeopleView from '@/views/PeopleView.vue'
 
-function mountView() {
-  setActivePinia(createPinia())
-  const router = createRouter({
+function createPeopleRouter() {
+  return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/admin', name: 'admin', component: { template: '<div />' } },
+      { path: '/admin/people', name: 'admin-people', component: { template: '<div />' } },
     ],
   })
+}
+
+function mountView(router = createPeopleRouter()) {
+  setActivePinia(createPinia())
   return mount(PeopleView, {
     global: {
       plugins: [router],
@@ -181,6 +185,18 @@ describe('PeopleView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(true)
+  })
+
+  it('preselects Platform instances from ?tab=linked-platforms', async () => {
+    getConfigSync.mockReturnValue({ features: { platformLinksEnabled: true } })
+    const router = createPeopleRouter()
+    await router.push('/admin/people?tab=linked-platforms')
+    await router.isReady()
+    const wrapper = mountView(router)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-platform-instances"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-users"]').exists()).toBe(false)
   })
 
   it('shows the Policies tab when features.iamPolicies is on', async () => {

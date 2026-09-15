@@ -265,7 +265,8 @@
     "disconnectConfirm": "{host} bağlantısı kesilsin mi? Bu platform artık bu hesabı kullanamaz.",
     "disconnected": "Platform bağlantısı kesildi.",
     "disconnectError": "Platformun bağlantısı kesilemedi.",
-    "loadError": "Bağlı platformlar yüklenemedi."
+    "loadError": "Bağlı platformlar yüklenemedi.",
+    "adminPointer": "Sunucuların onayı İşlet › Kişiler › Platform örnekleri altında yapılır."
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",
@@ -4954,7 +4955,7 @@
       "users": "Kullanıcılar",
       "groups": "Gruplar",
       "policies": "Kurallar",
-      "linkedPlatforms": "Bağlı platformlar",
+      "linkedPlatforms": "Platform örnekleri",
       "audit": "Kayıt"
     },
     "openPeople": "Kişiler’i aç",
@@ -5044,6 +5045,7 @@
       }
     },
     "linkedPlatforms": {
+      "intro": "Bu Synaplan’ı kullanmak isteyen Nextcloud, ownCloud ve Outlook sunucuları. Kullanıcılarının hesaplarını Yönet › Bağlantılar › Bağlı platformlar altında bağlayabilmesi için birini onaylayın.",
       "empty": "Henüz kayıtlı platform yok.",
       "client": "Platform",
       "host": "Adres",

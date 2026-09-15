@@ -2,8 +2,9 @@ import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 
 /**
- * People is always the user list (NV01). Groups / Policies / Audit stay
- * flag-gated on the page itself; the route is never a dead end.
+ * People is always the user list (NV01). Groups / Policies / Platform
+ * instances / Audit stay flag-gated on the page itself; the route is never
+ * a dead end — including when only platform links are on (NV03).
  */
 export function peopleRouteGuard(): true | RouteLocationRaw {
   return true

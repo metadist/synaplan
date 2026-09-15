@@ -266,7 +266,8 @@
     "disconnectConfirm": "{host} trennen? Diese Plattform kann das Konto dann nicht mehr nutzen.",
     "disconnected": "Plattform getrennt.",
     "disconnectError": "Die Plattform konnte nicht getrennt werden.",
-    "loadError": "Verknüpfte Plattformen konnten nicht geladen werden."
+    "loadError": "Verknüpfte Plattformen konnten nicht geladen werden.",
+    "adminPointer": "Ganze Server gibst du unter Betrieb › Personen › Plattform-Instanzen frei."
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",
@@ -5873,7 +5874,7 @@
       "users": "Benutzer",
       "groups": "Gruppen",
       "policies": "Richtlinien",
-      "linkedPlatforms": "Verknüpfte Plattformen",
+      "linkedPlatforms": "Plattform-Instanzen",
       "audit": "Protokoll"
     },
     "openPeople": "Personen öffnen",
@@ -5963,6 +5964,7 @@
       }
     },
     "linkedPlatforms": {
+      "intro": "Nextcloud-, ownCloud- und Outlook-Server, die dieses Synaplan nutzen möchten. Gib einen frei, damit die Nutzer ihre eigenen Konten unter Verwalten › Verbindungen › Verknüpfte Plattformen verbinden können.",
       "empty": "Es hat sich noch keine Plattform registriert.",
       "client": "Plattform",
       "host": "Adresse",

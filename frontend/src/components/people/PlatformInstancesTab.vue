@@ -1,5 +1,8 @@
 <template>
   <div class="space-y-6" data-testid="section-platform-instances">
+    <p class="txt-secondary text-sm" data-testid="text-platform-instances-intro">
+      {{ $t('people.linkedPlatforms.intro') }}
+    </p>
     <div
       v-if="error"
       class="bg-red-500/10 border border-red-500/30 rounded-lg p-4"

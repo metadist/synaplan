@@ -7,6 +7,20 @@
       data-testid="section-header"
     />
 
+    <p
+      v-if="authStore.isAdmin"
+      class="txt-secondary text-sm"
+      data-testid="text-admin-platform-instances-pointer"
+    >
+      <RouterLink
+        to="/admin/people?tab=linked-platforms"
+        class="text-[var(--brand)] hover:underline font-medium"
+        data-testid="link-admin-platform-instances"
+      >
+        {{ $t('linkedPlatforms.adminPointer') }}
+      </RouterLink>
+    </p>
+
     <div
       v-if="error"
       class="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-start gap-3"
@@ -117,13 +131,16 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
+import { useAuthStore } from '@/stores/auth'
 import { platformLinksApi, type PlatformLink } from '@/services/api/platformLinksApi'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
 const dialog = useDialog()
 const { success, error: showError } = useNotification()
 const { formatDateTime } = useDateFormat()
