@@ -26,23 +26,34 @@ final readonly class ProviderKeyValidator
     }
 
     /**
-     * @return array{ok: bool, status?: int, error?: string}
+     * `tested` is false when the catalog knows no cheap authenticated endpoint
+     * for the provider: the key is accepted as-is and the caller must say
+     * "saved, not tested" rather than "valid".
+     *
+     * @return array{ok: bool, tested: bool, status?: int, error?: string}
      */
-    public function validate(string $provider, string $key): array
+    public function validate(string $provider, string $key, ?string $secret = null): array
     {
         $provider = strtolower(trim($provider));
         $key = trim($key);
         if ('' === $key) {
-            return ['ok' => false, 'error' => 'API key must not be empty.'];
+            return ['ok' => false, 'tested' => false, 'error' => 'API key must not be empty.'];
         }
         if (!ProviderKeyCatalog::has($provider)) {
-            return ['ok' => false, 'error' => sprintf('Unknown provider "%s".', $provider)];
+            return ['ok' => false, 'tested' => false, 'error' => sprintf('Unknown provider "%s".', $provider)];
+        }
+        if (ProviderKeyCatalog::requiresSecret($provider) && '' === trim((string) $secret)) {
+            return ['ok' => false, 'tested' => false, 'error' => sprintf('%s needs the API key and the API secret together.', ProviderKeyCatalog::get($provider)['displayName'])];
         }
 
         $check = ProviderKeyCatalog::get($provider)['validation'];
+        if (null === $check) {
+            return ['ok' => true, 'tested' => false];
+        }
+
         $headers = [];
         foreach ($check['headers'] as $name => $value) {
-            $headers[$name] = str_replace('{key}', $key, $value);
+            $headers[$name] = str_replace(['{key}', '{secret}'], [$key, trim((string) $secret)], $value);
         }
 
         try {
@@ -57,11 +68,11 @@ final readonly class ProviderKeyValidator
                 'error' => $e->getMessage(),
             ]);
 
-            return ['ok' => false, 'error' => 'Could not reach the provider API: '.$e->getMessage()];
+            return ['ok' => false, 'tested' => true, 'error' => 'Could not reach the provider API: '.$e->getMessage()];
         }
 
         if ($status >= 200 && $status < 300) {
-            return ['ok' => true, 'status' => $status];
+            return ['ok' => true, 'tested' => true, 'status' => $status];
         }
 
         $error = match (true) {
@@ -72,6 +83,6 @@ final readonly class ProviderKeyValidator
 
         // 429 means the key authenticated far enough to be rate-limited —
         // treat it as valid rather than blocking the save.
-        return ['ok' => 429 === $status, 'status' => $status, 'error' => $error];
+        return ['ok' => 429 === $status, 'tested' => true, 'status' => $status, 'error' => $error];
     }
 }

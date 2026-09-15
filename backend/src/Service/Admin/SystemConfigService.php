@@ -55,7 +55,7 @@ final readonly class SystemConfigService
     private const DB_GROUP = 'QDRANT_SEARCH';
     private const DB_OWNER_ID = 0;
 
-    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}> */
+    /** @var array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> */
     private array $schema;
 
     public function __construct(
@@ -72,7 +72,33 @@ final readonly class SystemConfigService
         private readonly ?LayeredConfigResolver $layeredConfigResolver = null,
         private readonly ?ComputeClient $computeClient = null,
     ) {
-        $this->schema = $this->buildSchema();
+        $this->schema = $this->markManagedFields($this->buildSchema());
+    }
+
+    /**
+     * Instance provider keys have exactly one editor: AI infrastructure ›
+     * Models & keys ({@see ProviderKeyStore}). Every field whose key is an env
+     * var the {@see ProviderKeyCatalog} manages stays readable here — so the
+     * response shape of /api/v1/admin/system-config does not change — but is
+     * flagged `managedBy` so the UI renders a pointer instead of an input and
+     * {@see self::setValue()} refuses the write.
+     *
+     * @param array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}> $schema
+     *
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>
+     */
+    private function markManagedFields(array $schema): array
+    {
+        foreach (ProviderKeyCatalog::managedEnvVars() as $envVar) {
+            if (!isset($schema[$envVar])) {
+                continue;
+            }
+            $schema[$envVar]['managedBy'] = ProviderKeyCatalog::MANAGED_BY;
+            // Stored encrypted in BCONFIG by the store and applied per call.
+            $schema[$envVar]['source'] = 'database';
+        }
+
+        return $schema;
     }
 
     /**
@@ -163,7 +189,7 @@ final readonly class SystemConfigService
     /**
      * Get the configuration schema with field definitions.
      *
-     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>}
+     * @return array{tabs: array<string, array{label: string, sections: array<string, array{label: string, fields: array<string>}>}>, fields: array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>}
      */
     public function getSchema(): array
     {
@@ -346,7 +372,7 @@ final readonly class SystemConfigService
     /**
      * Get current configuration values with sensitive fields masked.
      *
-     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string}>
+     * @return array<string, array{value: string, isSet: bool, isMasked: bool, effectiveForMe?: string, hasPersonalOverride?: bool, envOverride?: bool, effectiveValue?: string, locked?: bool, keySource?: string}>
      */
     public function getValues(?int $actingUserId = null): array
     {
@@ -355,16 +381,27 @@ final readonly class SystemConfigService
         foreach ($this->schema as $key => $field) {
             $source = $field['source'] ?? 'env';
 
-            // Cloud provider API keys live in the encrypted ProviderKeyStore
+            // Instance provider keys live in the encrypted ProviderKeyStore
             // (BCONFIG), not in .env — report their status from there so this
-            // legacy surface and the provider-key wizard agree.
+            // legacy surface and Models & keys agree. The secret half of a
+            // key + secret pair reports its own presence.
             $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
             if (null !== $storeProvider) {
                 $status = $this->providerKeyStore->getStatus($storeProvider);
+                // Each half of a pair reports its own presence so a missing
+                // secret is visible. An env-imported DB row is still "from
+                // the environment / Helm", not a UI override.
+                $isSet = ProviderKeyCatalog::isSecretEnvVar($key)
+                    ? $status['hasSecret']
+                    : '' !== $status['maskedKey'];
+                $keySource = 'db' === $status['source'] && ProviderKeyStore::ORIGIN_ENV === $status['origin']
+                    ? 'env'
+                    : $status['source'];
                 $values[$key] = [
-                    'value' => $status['configured'] ? self::MASK : $field['default'],
-                    'isSet' => $status['configured'],
-                    'isMasked' => $status['configured'],
+                    'value' => $isSet ? self::MASK : $field['default'],
+                    'isSet' => $isSet,
+                    'isMasked' => $isSet,
+                    'keySource' => $keySource,
                 ];
                 continue;
             }
@@ -474,7 +511,10 @@ final readonly class SystemConfigService
     /**
      * Update a single configuration value.
      *
-     * @return array{success: bool, requiresRestart: bool, message?: string}
+     * `managedBy` in a failed result means the field has another editor
+     * (Models & keys); the controller answers 422 and the message names it.
+     *
+     * @return array{success: bool, requiresRestart: bool, message?: string, managedBy?: string}
      */
     public function setValue(string $key, string $value, ?int $actingUserId = null): array
     {
@@ -484,6 +524,18 @@ final readonly class SystemConfigService
 
         $field = $this->schema[$key];
         $source = $field['source'] ?? 'env';
+
+        // One editor per key: instance provider keys are saved, tested and
+        // removed under AI infrastructure › Models & keys. Writing them here
+        // would bypass the live check and the key + secret pairing rule.
+        if (isset($field['managedBy'])) {
+            return [
+                'success' => false,
+                'requiresRestart' => false,
+                'managedBy' => $field['managedBy'],
+                'message' => sprintf('%s is managed under AI infrastructure › Models & keys (/admin/setup). Save, test or remove the key there.', $key),
+            ];
+        }
 
         // Reading a sensitive field returns self::MASK, so a client that submits
         // the form unchanged (or retries it) sends the mask back. Storing that
@@ -495,36 +547,6 @@ final readonly class SystemConfigService
                 'requiresRestart' => false,
                 'message' => 'That is the masked placeholder, not a real value. Leave the field untouched to keep the current secret, or enter a new one.',
             ];
-        }
-
-        // Cloud provider API keys are stored encrypted in the ProviderKeyStore
-        // and apply without a restart (providers resolve keys per call). An empty
-        // value removes the stored key (an env fallback, if set, then applies
-        // again) — the admin UI clears keys on the setup page instead, so this
-        // branch serves API clients that PUT an empty string.
-        $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
-        if (null !== $storeProvider) {
-            try {
-                if ('' === trim($value)) {
-                    $this->providerKeyStore->deleteKey($storeProvider);
-                } else {
-                    $this->providerKeyStore->saveKey($storeProvider, $value, ProviderKeyStore::ORIGIN_UI);
-                }
-                $this->logChange($key, $value);
-
-                return ['success' => true, 'requiresRestart' => false];
-            } catch (\InvalidArgumentException $e) {
-                // Rejected value (placeholder, mask) — the message names the
-                // problem and is safe to show: it never contains a real key.
-                return ['success' => false, 'requiresRestart' => false, 'message' => $e->getMessage()];
-            } catch (\Throwable $e) {
-                $this->logger->error('Failed to save provider key via system config', [
-                    'key' => $key,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return ['success' => false, 'requiresRestart' => false, 'message' => 'Failed to save the API key'];
-            }
         }
 
         // Database-backed fields: write to BCONFIG, no restart needed
@@ -1170,7 +1192,7 @@ final readonly class SystemConfigService
     /**
      * Build the configuration schema.
      *
-     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string}>
+     * @return array<string, array{tab: string, section: string, type: string, sensitive: bool, description: string, default: string, source?: string, options?: array<string>, dbGroup?: string, dbKey?: string, encrypted?: bool, placeholder?: string, managedBy?: string}>
      */
     private function buildSchema(): array
     {
@@ -2155,9 +2177,9 @@ final readonly class SystemConfigService
             ],
             // Every field below whose env var is known to ProviderKeyCatalog is
             // stored encrypted in BCONFIG by ProviderKeyStore and applies without
-            // a restart — hence 'source' => 'database'. getValues()/setValue()
-            // route them through the store before the source check ever runs; the
-            // marker only tells the UI to label them "saved live".
+            // a restart. markManagedFields() flags them `managedBy` (and forces
+            // 'source' => 'database'): getValues() reads their status from the
+            // store, setValue() refuses the write and points at Models & keys.
             'OPENAI_API_KEY' => [
                 'tab' => 'ai', 'section' => 'cloud', 'type' => 'password',
                 'sensitive' => true, 'description' => 'OpenAI API key',

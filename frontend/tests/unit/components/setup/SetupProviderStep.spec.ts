@@ -19,6 +19,10 @@ const provider = (name: string, overrides: Record<string, unknown> = {}) => ({
   maskedKey: '',
   consoleUrl: '',
   envVar: '',
+  secretEnvVar: null,
+  hasSecret: false,
+  testable: true,
+  chat: true,
   ...overrides,
 })
 
@@ -55,6 +59,24 @@ describe('SetupProviderStep', () => {
 
     expect(wrapper.findAllComponents({ name: 'SetupProviderTile' })).toHaveLength(4)
     expect(wrapper.find('[data-testid="setup-provider-grid"]').exists()).toBe(true)
+  })
+
+  // Media/speech keys share Models & keys but cannot make chat work — an
+  // ElevenLabs key set via the environment must not read as "your AI is ready".
+  it('lists only chat providers and ignores configured media/speech keys', async () => {
+    listProviderKeys.mockResolvedValue({
+      providers: [
+        provider('groq', { freeTier: true }),
+        provider('elevenlabs', { chat: false, configured: true, source: 'env' }),
+        provider('higgsfield', { chat: false, secretEnvVar: 'HIGGSFIELD_API_SECRET' }),
+      ],
+      defaultChatProvider: '',
+    })
+    const wrapper = mountStep()
+    await flushPromises()
+
+    expect(wrapper.findAllComponents({ name: 'SetupProviderTile' })).toHaveLength(1)
+    expect(wrapper.find('[data-testid="setup-provider-ready"]').exists()).toBe(false)
   })
 
   it('reveals the key field only for the provider that was clicked', async () => {

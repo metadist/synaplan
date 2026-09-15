@@ -58,7 +58,7 @@ trait BuildsAllModules
             new LocalAiModule($probe, ''),
             new HiggsfieldModule($higgsfield),
             new GoogleAiModule($keyStore),
-            new TheHiveModule(''),
+            new TheHiveModule($keyStore),
             new StripeBillingModule(new BillingService('', ''), '', '', ''),
             new MobileIapModule(
                 new IapPricingService(),

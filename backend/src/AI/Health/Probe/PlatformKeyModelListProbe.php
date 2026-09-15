@@ -46,15 +46,32 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     ) {
     }
 
+    /**
+     * Only providers whose catalog endpoint really lists models. Media and
+     * speech providers (Higgsfield, TheHive, ElevenLabs) sit in the same key
+     * catalog but have no free listing — they stay covered by the passive
+     * traffic counters, as {@see ModelListProbeRegistry} documents.
+     */
     public function supports(string $service): bool
     {
-        return ProviderKeyCatalog::has(mb_strtolower($service));
+        $provider = mb_strtolower($service);
+
+        // HuggingFace's whoami-v2 is not a model list (listsModels=false) but
+        // still tells a bad key from an outage. Media/speech providers have
+        // no cheap authenticated check that helps health.
+        return ProviderKeyCatalog::has($provider)
+            && (ProviderKeyCatalog::listsModels($provider) || in_array($provider, self::NO_LISTING, true));
     }
 
     public function probe(string $service): ProbeResult
     {
         $provider = mb_strtolower($service);
-        if (!ProviderKeyCatalog::has($provider)) {
+        if (!$this->supports($provider)) {
+            return ProbeResult::skipped(sprintf('No catalog endpoint known for "%s".', $service));
+        }
+
+        $check = ProviderKeyCatalog::get($provider)['validation'];
+        if (null === $check) {
             return ProbeResult::skipped(sprintf('No catalog endpoint known for "%s".', $service));
         }
 
@@ -64,7 +81,6 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
             return ProbeResult::skipped('No API key configured for this provider.');
         }
 
-        $check = ProviderKeyCatalog::get($provider)['validation'];
         $headers = [];
         foreach ($check['headers'] as $name => $value) {
             $headers[$name] = str_replace('{key}', $key, $value);

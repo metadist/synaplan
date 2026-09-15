@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderCancelledException;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -26,8 +27,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *   The Higgsfield API uses a key+secret pair: `Authorization: Key {key}:{secret}`.
  *   Credentials are resolved at the {@see AiFacade} layer (per-user override on
  *   top of a platform-wide env default) and passed in via $options['credentials'].
- *   The constructor's $platformApiKey/$platformApiSecret are only used when the
- *   caller did not pre-resolve credentials (e.g. health-check, isAvailable()).
+ *   The instance pair from Models & keys ({@see ProviderKeyStore}, provider
+ *   `higgsfield`) is only used when the caller did not pre-resolve
+ *   credentials (e.g. health-check, isAvailable()).
  *
  * Supported model IDs (key-auth tier):
  *   - higgsfield-ai/soul/standard                     — text-to-image
@@ -85,8 +87,7 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
-        private readonly string $platformApiKey = '',
-        private readonly string $platformApiSecret = '',
+        private readonly ProviderKeyStore $keyStore,
         // Injectable so unit tests can poll without real sleeps. Production
         // keeps the 3s default; the value only affects the wait between status
         // polls while the worker blocks on the synchronous submit→poll loop
@@ -882,13 +883,14 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
             ];
         }
 
-        if (!$this->hasPlatformCredentials()) {
+        $platform = $this->platformCredentials();
+        if (null === $platform) {
             throw ProviderException::missingApiKey(self::PROVIDER_NAME, 'HIGGSFIELD_API_KEY');
         }
 
         return [
-            'api_key' => $this->platformApiKey,
-            'api_secret' => $this->platformApiSecret,
+            'api_key' => $platform['api_key'],
+            'api_secret' => $platform['api_secret'],
             'source' => 'platform',
         ];
     }
@@ -1059,7 +1061,24 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
 
     private function hasPlatformCredentials(): bool
     {
-        return '' !== $this->platformApiKey && '' !== $this->platformApiSecret;
+        return null !== $this->platformCredentials();
+    }
+
+    /**
+     * The instance pair from Models & keys; the store reports a key only when
+     * the secret half is present as well.
+     *
+     * @return array{api_key: string, api_secret: string}|null
+     */
+    private function platformCredentials(): ?array
+    {
+        $key = $this->keyStore->getKey(self::PROVIDER_NAME);
+        $secret = $this->keyStore->getSecret(self::PROVIDER_NAME);
+        if (null === $key || '' === $key || null === $secret || '' === $secret) {
+            return null;
+        }
+
+        return ['api_key' => $key, 'api_secret' => $secret];
     }
 
     /**

@@ -14,9 +14,10 @@ use App\Module\Contract\ModuleStatus;
  * Higgsfield — image/video generation provider with platform-level or
  * per-user credentials.
  *
- * "Configured" is the platform pair (`HIGGSFIELD_API_KEY` + `_SECRET`); users
- * connecting their own account do not flip the module, they only unlock it
- * for themselves. No network probe: the credential routes already test keys.
+ * "Configured" is the instance pair from Models & keys (saved in the admin UI
+ * or bootstrapped from `HIGGSFIELD_API_KEY` + `_SECRET`); users connecting
+ * their own account do not flip the module, they only unlock it for
+ * themselves. No network probe: the credential routes already test keys.
  */
 final class HiggsfieldModule implements FeatureModuleInterface
 {
@@ -41,6 +42,7 @@ final class HiggsfieldModule implements FeatureModuleInterface
     {
         return new ConfiguredBy(
             envKeys: ['HIGGSFIELD_API_KEY', 'HIGGSFIELD_API_SECRET'],
+            bconfigKeys: ['PROVIDER_KEYS.higgsfield'],
             providerKeys: ['higgsfield'],
         );
     }
@@ -53,7 +55,7 @@ final class HiggsfieldModule implements FeatureModuleInterface
     public function status(): ModuleStatus
     {
         if (!$this->isConfigured()) {
-            return ModuleStatus::absent('HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET are not both set');
+            return ModuleStatus::absent('No Higgsfield key + secret pair — add it under AI infrastructure › Models & keys or set HIGGSFIELD_API_KEY and HIGGSFIELD_API_SECRET');
         }
 
         return new ModuleStatus(configured: true, healthy: true, message: 'Higgsfield platform credentials present');

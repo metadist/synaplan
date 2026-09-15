@@ -28,15 +28,6 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
     private const TIMEOUT_SECONDS = 20;
     private const PROBE_TIMEOUT_SECONDS = 10;
 
-    /**
-     * Providers whose key-validation endpoint is not a model listing.
-     * HuggingFace validates against `whoami-v2`, which says nothing about
-     * served models, so it can never contribute an availability verdict.
-     *
-     * @var list<string>
-     */
-    private const NO_LISTING_ENDPOINT = ['huggingface'];
-
     public function __construct(
         private HttpClientInterface $httpClient,
         private ProviderKeyStore $keyStore,
@@ -52,7 +43,10 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return ProviderModelListing::noListingEndpoint('Provider is not key-managed (self-hosted or per-install endpoint).');
         }
 
-        if (in_array($provider, self::NO_LISTING_ENDPOINT, true)) {
+        // A key-validation endpoint that is not a model listing (whoami,
+        // account page) can never contribute an availability verdict.
+        $listing = ProviderKeyCatalog::get($provider)['validation'];
+        if (null === $listing || !ProviderKeyCatalog::listsModels($provider)) {
             return ProviderModelListing::noListingEndpoint('Provider exposes no model-listing endpoint.');
         }
 
@@ -61,7 +55,6 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return ProviderModelListing::notConfigured();
         }
 
-        $listing = ProviderKeyCatalog::get($provider)['validation'];
         $headers = [];
         foreach ($listing['headers'] as $name => $value) {
             $headers[$name] = str_replace('{key}', $key, $value);
@@ -113,12 +106,16 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
             return ModelProbeResult::Inconclusive;
         }
 
+        $listing = ProviderKeyCatalog::get($provider)['validation'];
+        if (null === $listing || !ProviderKeyCatalog::listsModels($provider)) {
+            return ModelProbeResult::Inconclusive;
+        }
+
         $key = $this->keyStore->getKey($provider);
         if (null === $key) {
             return ModelProbeResult::Inconclusive;
         }
 
-        $listing = ProviderKeyCatalog::get($provider)['validation'];
         $headers = [];
         foreach ($listing['headers'] as $name => $value) {
             $headers[$name] = str_replace('{key}', $key, $value);

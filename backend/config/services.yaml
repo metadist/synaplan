@@ -74,6 +74,7 @@ parameters:
     env(THEHIVE_API_KEY): ''
     env(HIGGSFIELD_API_KEY): ''
     env(HIGGSFIELD_API_SECRET): ''
+    env(ELEVENLABS_API_KEY): ''
     env(HUGGINGFACE_API_KEY): ''
     # TrustedTokens (TNG) — German sovereign OpenAI-compatible inference.
     env(TRUSTEDTOKENS_API_KEY): ''
@@ -340,6 +341,14 @@ services:
                 huggingface: '%env(HUGGINGFACE_API_KEY)%'
                 xai: '%env(XAI_API_KEY)%'
                 perplexity: '%env(PERPLEXITY_API_KEY)%'
+                # Media and speech providers share the store so Models & keys
+                # is the one editor for every instance key.
+                thehive: '%env(THEHIVE_API_KEY)%'
+                higgsfield: '%env(HIGGSFIELD_API_KEY)%'
+                elevenlabs: '%env(ELEVENLABS_API_KEY)%'
+            # Secret halves for key + secret providers (ProviderKeyCatalog secretEnvVar).
+            $envSecrets:
+                higgsfield: '%env(HIGGSFIELD_API_SECRET)%'
 
     App\Plug\PlugKeyStore:
         arguments:
@@ -462,17 +471,8 @@ services:
             - { name: 'app.ai.text_to_speech', key: 'google' }
 
     App\AI\Provider\TheHiveProvider:
-        arguments:
-            $apiKey: '%env(THEHIVE_API_KEY)%'
         tags:
             - { name: 'app.ai.image_generation', key: 'thehive' }
-
-    # Higgsfield credentials: platform-wide env defaults + per-user override
-    # (encrypted in BCONFIG via EncryptionService).
-    App\AI\Credential\HiggsfieldCredentialResolver:
-        arguments:
-            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
-            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
 
     # Anthropic Messages gateway: admin-set UPSTREAM_URL in BCONFIG wins;
     # MESSAGES_GATEWAY_UPSTREAM_URL is the env fallback for the local smoke harness.
@@ -484,10 +484,9 @@ services:
         tags:
             - { name: 'app.messages.translator' }
 
+    # Higgsfield: instance pair from ProviderKeyStore (Models & keys, env
+    # bootstrap) + per-user override resolved by HiggsfieldCredentialResolver.
     App\AI\Provider\HiggsfieldProvider:
-        arguments:
-            $platformApiKey: '%env(HIGGSFIELD_API_KEY)%'
-            $platformApiSecret: '%env(HIGGSFIELD_API_SECRET)%'
         tags:
             - { name: 'app.ai.image_generation', key: 'higgsfield' }
             - { name: 'app.ai.video_generation', key: 'higgsfield' }
@@ -1144,10 +1143,6 @@ services:
     App\Module\Sidecar\LocalAiModule:
         arguments:
             $baseUrl: '%env(OLLAMA_BASE_URL)%'
-
-    App\Module\Provider\TheHiveModule:
-        arguments:
-            $apiKey: '%env(THEHIVE_API_KEY)%'
 
     App\Module\Commerce\StripeBillingModule:
         arguments:
