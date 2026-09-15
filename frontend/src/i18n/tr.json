@@ -133,6 +133,7 @@
     "adminPeople": "Kişiler",
     "myGroups": "Gruplarım",
     "incoming": "Gelen sohbetler",
+    "allChats": "Tüm sohbetler",
     "subscription": "Abonelik",
     "subscriptionSuccess": "Abonelik Başarılı",
     "subscriptionCancel": "Abonelik İptal Edildi",
@@ -303,6 +304,14 @@
     "modelChanges": "Model değişiklikleri: {count}",
     "allStatistics": "Tüm istatistikler",
     "lessThanCent": "< 0,01 €"
+  },
+  "chats": {
+    "tabs": {
+      "all": "Tümü",
+      "incoming": "Gelen"
+    },
+    "empty": "Henüz sohbetiniz yok.",
+    "emptyAction": "Yeni sohbet"
   },
   "chat": {
     "title": "Sohbet",

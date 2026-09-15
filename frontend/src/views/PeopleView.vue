@@ -16,6 +16,7 @@
         icon="mdi:account-group"
       >
         <TabNav
+          v-if="tabNavItems.length > 1"
           :model-value="activeTab"
           :tabs="tabNavItems"
           :aria-label="$t('people.title')"
@@ -25,7 +26,7 @@
         />
       </PageHeader>
 
-      <UsersTab v-if="activeTab === 'users'" show-iam-columns />
+      <UsersTab v-if="activeTab === 'users'" :show-iam-columns="isIamGroupsEnabled()" />
       <GroupsTab v-else-if="activeTab === 'groups'" />
       <PoliciesTab v-else-if="activeTab === 'policies'" />
       <PlatformInstancesTab v-else-if="activeTab === 'linked-platforms'" />

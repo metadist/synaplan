@@ -30,17 +30,17 @@ describe('iamGuards', () => {
     getConfigSync.mockReset()
   })
 
-  it('sends People to the Operate user list and blocks /groups when groups are off', () => {
+  it('opens People and redirects ?tab=users even when groups are off', () => {
     getConfigSync.mockReturnValue({ features: { iamGroups: false } })
 
-    expect(peopleRouteGuard()).toEqual({ name: 'admin', query: { tab: 'users' } })
+    expect(peopleRouteGuard()).toBe(true)
     expect(groupsRouteGuard(groupsRoute())).toEqual({
       name: 'not-found',
       params: { pathMatch: ['groups'] },
       query: {},
       hash: '',
     })
-    expect(adminUsersTabRedirect(routeWithTab('users'))).toBe(true)
+    expect(adminUsersTabRedirect(routeWithTab('users'))).toEqual({ name: 'admin-people' })
     expect(adminUsersTabRedirect(routeWithTab())).toBe(true)
   })
 

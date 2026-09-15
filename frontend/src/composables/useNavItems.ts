@@ -17,7 +17,6 @@ import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isDesktopAgentEnabled } from './useDesktopAgentFeature'
 import { isPlatformLinksEnabled } from './usePlatformLinksFeature'
-import { isIamGroupsEnabled } from './useIamFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 
 export interface NavChild {
@@ -394,7 +393,7 @@ export function useNavItems() {
       })
       adminChildren.push({
         key: 'admin-people',
-        path: isIamGroupsEnabled() ? '/admin/people' : '/admin?tab=users',
+        path: '/admin/people',
         label: t('nav.adminPeople'),
       })
 

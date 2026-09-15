@@ -148,11 +148,11 @@ describe('PeopleView', () => {
     expect(router.currentRoute.value.name).toBe('admin')
   })
 
-  it('hides Groups and Audit tabs when IAM groups are off', async () => {
+  it('hides the tab bar when only Users is available', async () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(false)
@@ -189,6 +189,20 @@ describe('PeopleView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(true)
+  })
+
+  it('shows all five tabs when every People flag is on', async () => {
+    getConfigSync.mockReturnValue({
+      features: { iamGroups: true, iamPolicies: true, platformLinksEnabled: true },
+    })
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="tab-users"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-groups"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-policies"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-linked-platforms"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-audit"]').exists()).toBe(true)
   })
 
   it('lists audit events on the Audit tab', async () => {

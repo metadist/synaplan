@@ -179,12 +179,11 @@ describe('ImpersonationBanner', () => {
 
     expect(stopImpersonationMock).toHaveBeenCalledTimes(1)
     expect(successMock).toHaveBeenCalledWith('Admin session restored.')
-    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin')
-    expect(wrapper.vm.$router.currentRoute.value.path).toBe('/admin')
-    expect(wrapper.vm.$router.currentRoute.value.query).toEqual({ tab: 'users' })
+    expect(wrapper.vm.$router.currentRoute.value.name).toBe('admin-people')
+    expect(wrapper.vm.$router.currentRoute.value.path).toBe('/admin/people')
   })
 
-  it('returns to People after Exit when IAM groups are enabled', async () => {
+  it('returns to People after Exit regardless of the IAM groups flag', async () => {
     getConfigSync.mockReturnValue({ features: { iamGroups: true } })
     const store = useAuthStore()
     store.user = { id: 99, email: 'normal-user@example.com', level: 'PRO' }
