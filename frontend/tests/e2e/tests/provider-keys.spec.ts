@@ -1,8 +1,28 @@
-import { GetAdminProviderKeysListResponseSchema } from '../../../src/generated/api-schemas'
+import { z } from 'zod'
 import { test, expect } from '../test-setup'
 import { login, loginViaApi } from '../helpers/auth'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS, getApiUrl } from '../config/config'
+
+/**
+ * Local contract for the fields this spec reads. Playwright collect in CI
+ * does not generate `src/generated/api-schemas.ts` (gitignored), so the
+ * E2E suite must not import it — a missing module fails every shard before
+ * any test runs.
+ */
+const ProviderKeysListResponseSchema = z.object({
+  providers: z.array(
+    z
+      .object({
+        name: z.string(),
+        secretEnvVar: z.string().nullable().optional(),
+        configured: z.boolean(),
+        source: z.enum(['db', 'env', 'none']),
+        testable: z.boolean(),
+      })
+      .passthrough()
+  ),
+})
 
 /**
  * NV05 / D2 — Models & keys is the one editor for instance provider keys.
@@ -72,7 +92,7 @@ test.describe('@ci Provider keys — one editor', () => {
       headers: { Cookie: adminCookie },
     })
     expect(res.ok()).toBeTruthy()
-    const body = GetAdminProviderKeysListResponseSchema.parse(await res.json())
+    const body = ProviderKeysListResponseSchema.parse(await res.json())
     // Media and speech providers are part of the same catalog (D2).
     const names = body.providers.map((p) => p.name)
     for (const expected of ['openai', 'groq', 'thehive', 'higgsfield', 'elevenlabs']) {

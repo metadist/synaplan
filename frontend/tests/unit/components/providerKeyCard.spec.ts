@@ -245,6 +245,6 @@ describe('ProviderKeyCard', () => {
     })
 
     expect(wrapper.find('[data-testid="provider-key-untested-thehive"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="provider-key-source-env-thehive"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="provider-key-source-env-thehive"]').exists()).toBe(true)
   })
 })
