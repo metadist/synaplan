@@ -109,7 +109,6 @@
     "chat": "Sohbet",
     "tools": "Araçlar",
     "chatWidget": "Sohbet widget'ları",
-    "docSummary": "Özetleyici",
     "mailHandler": "E-posta işleyici",
     "plugins": "Eklentiler",
     "files": "Kaynaklar",
@@ -726,7 +725,6 @@
     "historyDescription": "Sohbet geçmişi",
     "tools": "Araçlar",
     "toolsChatWidget": "Sohbet widget'ları",
-    "toolsDocSummary": "Özetleyici",
     "toolsMailHandler": "E-posta işleyici",
     "mcpServers": "MCP Sunucuları",
     "connections": "Bağlantılar",
@@ -903,8 +901,26 @@
       "badgeVideo": "Video",
       "thinkingDesc": "Modelin yanıttan önceki akıl yürütmesini gösterir",
       "thinkingUnsupported": "Seçili model akıl yürütmeyi desteklemiyor",
-      "summarizer": "Özetleyici",
-      "summarizerDesc": "Belgeleri özetler — aracı açar",
+      "summarize": "Bir belgeyi özetle",
+      "summarizeDesc": "Bir dosya ekleyin ve bu sohbette özetleyin",
+      "summarizeInstruction": "Ekli belgeyi özetle. Uzunluk: {length}. Yanıt dili: {language}.",
+      "summarizeLength": "Uzunluk",
+      "summarizeLanguage": "Dil",
+      "summarizeLengthShort": "Kısa",
+      "summarizeLengthMedium": "Orta",
+      "summarizeLengthLong": "Uzun",
+      "summarizeLengthValue": {
+        "short": "kısa",
+        "medium": "orta",
+        "long": "uzun"
+      },
+      "summarizeLang": {
+        "de": "Almanca",
+        "en": "İngilizce",
+        "es": "İspanyolca",
+        "fr": "Fransızca",
+        "tr": "Türkçe"
+      },
       "enhanceDesc": "Mesajını göndermeden önce yapay zekâ ile iyileştir"
     },
     "modelDropdown": {
@@ -999,8 +1015,6 @@
     "title": "Mevcut Araçlar",
     "description": "İş akışınızı geliştirmek için güçlü araçları keşfedin ve kullanın",
     "chatWidgetDescription": "Web siteniz için sohbet widget'ları oluşturun ve yönetin",
-    "docSummaryDescription": "Belgeleri otomatik olarak özetleyin ve önemli bilgileri çıkarın",
-    "summarySuccess": "Özet başarıyla oluşturuldu!",
     "category": "Kategori",
     "commands": "Komutlar",
     "noCommands": "Mevcut komut yok",

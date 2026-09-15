@@ -63,6 +63,24 @@ async function mountDropdown() {
   })
 }
 
+describe('ToolsDropdown summarize', () => {
+  beforeEach(() => {
+    stubMatchMedia()
+    features.selfAware = false
+  })
+
+  it('lists Summarize a document and emits summarizeDocument', async () => {
+    const wrapper = await mountDropdown()
+    await wrapper.get('[data-testid="btn-tools-toggle"]').trigger('click')
+    await flushPromises()
+
+    const row = wrapper.get('[data-testid="btn-tool-summarize"]')
+    expect(row.text()).toContain('Summarize a document')
+    await row.trigger('click')
+    expect(wrapper.emitted('summarizeDocument')).toHaveLength(1)
+  })
+})
+
 describe('ToolsDropdown /help', () => {
   beforeEach(() => {
     stubMatchMedia()

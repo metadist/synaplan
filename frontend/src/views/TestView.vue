@@ -57,9 +57,9 @@
             >
             <router-link
               data-testid="link-route"
-              to="/ai/summarizer"
+              to="/?tool=summarize"
               class="px-4 py-2 rounded surface-chip hover-surface txt-primary text-sm"
-              >/ai/summarizer</router-link
+              >/?tool=summarize</router-link
             >
             <router-link
               data-testid="link-route"

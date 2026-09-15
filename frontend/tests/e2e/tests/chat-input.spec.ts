@@ -6,7 +6,7 @@
  * Tools, Knowledge folder) plus "Attach files" now live inside the "+" menu.
  * The menu always opens; Thinking/Voice reply/Enhance remain toggle rows
  * INSIDE the Tools dropdown, and the only navigation lives inside the pickers
- * as clearly marked link rows (Manage folders…, Summarizer).
+ * as clearly marked rows (Manage folders…, Summarize a document).
  */
 import { test, expect, type Page } from '../test-setup'
 import { openApp } from '../helpers/auth'
@@ -78,7 +78,7 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(panel.locator(CHAT.legacyManageKnowledgeGroupsBtn)).toHaveCount(0)
   })
 
-  test('@ci Tools dropdown lists command tools, toggles and the Summarizer link', async ({
+  test('@ci Tools dropdown lists command tools, toggles and Summarize a document', async ({
     page,
   }) => {
     await openToolsDropdown(page)
@@ -89,7 +89,7 @@ test.describe('Chat input: "+" menu (§5)', () => {
     await expect(panel.locator(CHAT.toolVideoGen)).toBeVisible()
     await expect(panel.locator(CHAT.toolThinking)).toBeVisible()
     await expect(panel.locator(CHAT.toolVoiceReply)).toBeVisible()
-    await expect(panel.locator(CHAT.toolSummarizerLink)).toBeVisible()
+    await expect(panel.locator(CHAT.toolSummarize)).toBeVisible()
   })
 
   test('@ci Voice-reply toggle flips state and surfaces as a dot on the pill (Q8)', async ({
@@ -135,11 +135,11 @@ test.describe('Chat input: "+" menu (§5)', () => {
     }
   })
 
-  test('@ci Summarizer link row navigates to the summarizer tool (Q3)', async ({ page }) => {
+  test('@ci Summarize a document arms the in-chat tool', async ({ page }) => {
     await openToolsDropdown(page)
-    await expect(page.locator(CHAT.toolSummarizerLink)).toBeVisible({ timeout: TIMEOUTS.SHORT })
-    await page.locator(CHAT.toolSummarizerLink).click()
-    await expect(page).toHaveURL(/\/ai\/summarizer/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator(CHAT.toolSummarize)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await page.locator(CHAT.toolSummarize).click()
+    await expect(page.locator(CHAT.summarizeOptions)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
   })
 
   test('@ci Knowledge-folder picker opens with None option and Manage link to Files', async ({

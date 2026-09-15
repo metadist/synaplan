@@ -1044,6 +1044,23 @@ watch(
   { flush: 'post' }
 )
 
+const isSummarizeToolQuery = (tool: unknown): boolean =>
+  tool === 'summarize' || (Array.isArray(tool) && tool.includes('summarize'))
+
+watch(
+  [chatInputRef, () => route.query.tool],
+  ([input, tool]) => {
+    if (!input || !isSummarizeToolQuery(tool)) {
+      return
+    }
+    input.armSummarize()
+    const nextQuery = { ...route.query }
+    delete nextQuery.tool
+    void router.replace({ path: route.path, query: nextQuery })
+  },
+  { flush: 'post' }
+)
+
 function initChatShortcuts(): void {
   if (!isNativeApp()) {
     return

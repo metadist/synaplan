@@ -78,7 +78,6 @@ const navMessages = {
     aiAgents: 'Coding clients',
     assistants: 'Assistants',
     linkedPlatforms: 'Linked platforms',
-    toolsDocSummary: 'Summarizer',
     configAiModels: 'Models',
     aiAccounts: 'Your AI accounts',
     configTaskPrompts: 'Instructions',
@@ -207,7 +206,7 @@ describe('useNavItems rail', () => {
     expect(childKeys).not.toContain('approvals')
     expect(childKeys).toContain('live-support')
     expect(childKeys).toContain('chat-widget')
-    expect(childKeys).toContain('doc-summary')
+    expect(childKeys).not.toContain('doc-summary')
     expect(childKeys).toContain('ai-accounts')
     expect(childKeys).toContain('api-docs')
     expect(childKeys).toContain('api-keys')

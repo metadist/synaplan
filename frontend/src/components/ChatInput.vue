@@ -53,6 +53,7 @@
             class="icon-ghost p-0 min-w-0 w-auto h-auto"
             :aria-label="$t('files.removeFile')"
             :disabled="file.processing"
+            data-testid="btn-remove-chat-file"
             @click="removeFile(index)"
           >
             <XMarkIcon class="w-4 h-4" />
@@ -69,6 +70,43 @@
           :device-name="job.deviceName"
           @dismiss="dismissDesktopJob(job.id)"
         />
+      </div>
+
+      <div
+        v-if="summarizeArmed"
+        class="mb-3 flex flex-wrap items-end gap-3"
+        data-testid="summarize-options"
+      >
+        <div class="min-w-[8rem]">
+          <label class="block text-xs font-medium txt-secondary mb-1" for="summarize-length">
+            {{ $t('chatInput.tools.summarizeLength') }}
+          </label>
+          <select
+            id="summarize-length"
+            v-model="summarizeLength"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-summarize-length"
+          >
+            <option v-for="length in summarizeLengthOptions" :key="length" :value="length">
+              {{ $t(summarizeLengthOptionKey(length)) }}
+            </option>
+          </select>
+        </div>
+        <div class="min-w-[8rem]">
+          <label class="block text-xs font-medium txt-secondary mb-1" for="summarize-language">
+            {{ $t('chatInput.tools.summarizeLanguage') }}
+          </label>
+          <select
+            id="summarize-language"
+            v-model="summarizeLanguage"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-summarize-language"
+          >
+            <option v-for="language in summarizeLanguageOptions" :key="language" :value="language">
+              {{ $t(`chatInput.tools.summarizeLang.${language}`) }}
+            </option>
+          </select>
+        </div>
       </div>
 
       <!-- Attached banner (e.g. guest message counter) glued to the input's top edge. -->
@@ -291,6 +329,7 @@
                     @toggle-thinking="toggleThinking"
                     @toggle-voice-reply="toggleVoiceReply"
                     @toggle-enhance="toggleEnhance"
+                    @summarize-document="armSummarize"
                     @run-on-device="handleRunOnDevice"
                   />
                   <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
@@ -441,6 +480,7 @@ import { type Command, useCommandsStore } from '@/stores/commands'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import { useKeyboardOpen } from '@/composables/useKeyboardOpen'
+import { useSummarizeTool, type SummarizeLength } from '@/composables/useSummarizeTool'
 import { chatApi } from '@/services/api/chatApi'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isNativeApp } from '@/services/api/nativeRuntime'
@@ -653,6 +693,77 @@ const dismissDesktopJob = (jobId: number) => {
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const {
+  buildSummarizeInstruction,
+  defaultLanguage,
+  languageOptions: summarizeLanguageOptions,
+  lengthOptions: summarizeLengthOptions,
+} = useSummarizeTool()
+
+const summarizeArmed = ref(false)
+const summarizeLength = ref<SummarizeLength>('medium')
+const summarizeLanguage = ref(defaultLanguage())
+const lastSummarizeInstruction = ref('')
+
+const summarizeLengthOptionKey = (length: SummarizeLength): string =>
+  `chatInput.tools.summarizeLength${length.charAt(0).toUpperCase()}${length.slice(1)}`
+
+const applySummarizeInstruction = () => {
+  const instruction = buildSummarizeInstruction({
+    length: summarizeLength.value,
+    language: summarizeLanguage.value,
+  })
+  message.value = instruction
+  lastSummarizeInstruction.value = instruction
+}
+
+const prefillSummarizeInstructionIfEmpty = () => {
+  if (!summarizeArmed.value) {
+    return
+  }
+  if (message.value.trim() && message.value !== lastSummarizeInstruction.value) {
+    return
+  }
+  applySummarizeInstruction()
+}
+
+const disarmSummarize = (options?: { clearPrefill?: boolean }) => {
+  if (options?.clearPrefill && message.value === lastSummarizeInstruction.value) {
+    message.value = ''
+  }
+  summarizeArmed.value = false
+  lastSummarizeInstruction.value = ''
+}
+
+const armSummarize = () => {
+  summarizeArmed.value = true
+  handlePlusAttach()
+}
+
+watch(
+  () => uploadedFiles.value.length,
+  (count, prev) => {
+    if (!summarizeArmed.value) {
+      return
+    }
+    if (count === 0 && (prev ?? 0) > 0) {
+      disarmSummarize({ clearPrefill: true })
+      return
+    }
+    if (count > 0) {
+      prefillSummarizeInstructionIfEmpty()
+    }
+  }
+)
+
+watch([summarizeLength, summarizeLanguage], () => {
+  if (!summarizeArmed.value || uploadedFiles.value.length === 0) {
+    return
+  }
+  if (!message.value.trim() || message.value === lastSummarizeInstruction.value) {
+    applySummarizeInstruction()
+  }
+})
 
 /**
  * Get the speech recognition language code from the current UI locale.
@@ -994,6 +1105,7 @@ const sendMessage = () => {
     quotedMessageId: props.quote?.messageId || undefined,
   }
   emit('send', messageToSend, options)
+  disarmSummarize()
   message.value = ''
   uploadedFiles.value = []
   pastedBlocks.value = []
@@ -1791,12 +1903,14 @@ defineExpose<{
   setInputText: (text: string) => void
   submitText: (text: string) => void
   startDictation: () => Promise<boolean>
+  armSummarize: () => void
 }>({
   textareaRef,
   uploadFiles,
   setInputText,
   submitText,
   startDictation,
+  armSummarize,
 })
 </script>
 

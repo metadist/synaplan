@@ -4,6 +4,12 @@
 two "missing" surfaces become reachable; Memories behaves the same on every
 device; the Summarizer becomes a chat tool.
 
+**Progress 2026-09-15:** NV01–NV06 merged
+([#1917](https://github.com/metadist/synaplan/pull/1917)). **NV07** on
+`feat/nav-nv07-summarize-in-chat`. Then NV08, NV09. Sprint B is a separate
+pass — see [`02_sprint_b_wording.md`](./02_sprint_b_wording.md) and the
+master plan §8.
+
 **Goal:** after this sprint an administrator and a user can each name *the*
 place for people, chats, usage, provider keys, connections, memories and
 document summaries — and every old bookmark still lands somewhere sensible.
@@ -322,8 +328,19 @@ API docs are not under Connections; tokens only.
 - E2E `navigation.spec.ts` "Manage flyout opens with group entries" — extend
   the expected group list; `layout.spec.ts` "More section expands with
   accordion sections" — the mobile accordion now has five groups.
+- E2E Connections submenu: `NAV.flyoutLinkApiDocs` has count 0 (Copilot
+  2026-09-15 — still to add on [#1917](https://github.com/metadist/synaplan/pull/1917)
+  if the PR is open).
+
+**Out of scope here (Sprint B NV10):** `config.connections.title`,
+`pageTitles.connections`, `nav.manageDescription`. The menu child is
+*Connected apps*; the group label stays *Connections*; the page header
+and Manage tooltip follow in the wording pass.
 
 **Commit:** `refactor(nav): split Connections into Connections and Developer & devices`
+
+**Branch / PR:** `feat/nav-nv06-developer-devices` —
+[#1917](https://github.com/metadist/synaplan/pull/1917).
 
 ---
 

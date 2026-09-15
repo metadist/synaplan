@@ -8,7 +8,13 @@ and no glitches ("Welcome to synaplan!" on the Usage page, "List Of All").
 agree; a translator sees one canonical term per concept.
 
 **Depends on:** Sprint A (labels for the surfaces that moved). Run after
-NV01–NV08 so the pass covers the final tree.
+NV01–NV08 so the pass covers the final tree. **Do not start on the NV06
+branch.** New branch `feat/nav-nv10-wording` from `origin/main` after A.
+
+**Progress 2026-09-15:** not started. NV06 already shipped the *menu* strings
+`nav.configConnections` = Connected apps and `nav.groupDeveloper`. This
+sprint still owns the matching **page titles**, the Manage tooltip, and the
+rest of the table.
 
 **UX exit:** U3 (kind-specific, plain words), U9 (no visual change), i18n
 parity. No journey of its own — the wording is checked while walking
@@ -49,9 +55,10 @@ value is given it is the target, not a suggestion.
 | `admin.tabs.usage` | Usage | Usage (all users) | Nutzung (alle Nutzer) | `O006` |
 | `admin.tabs.users` | Users | *(delete after NV01 if unused)* | — | `O004` gone |
 | `nav.configInbound`, `pageTitles.configInbound` | Inbound | Channels overview | Kanalübersicht | `M040`; DE "Eingang" was wrong |
-| `nav.configConnections` | Configure Connections | Connected apps | Verbundene Apps | `M060` |
-| `config.connections.title`, `pageTitles.connections` | Connections | Connected apps | Verbundene Apps | Page header follows the menu; the *group* stays "Connections" |
-| `nav.groupDeveloper` (new) | — | Developer & devices | Entwickler & Geräte | NV06 group |
+| `nav.configConnections` | Configure Connections | Connected apps | Verbundene Apps | `M060` — **done in NV06** (menu child only) |
+| `config.connections.title`, `pageTitles.connections` | Connections | Connected apps | Verbundene Apps | Page header follows the menu; the *group* stays "Connections". **Still this PR** — Copilot asked on [#1917](https://github.com/metadist/synaplan/pull/1917); we deferred it here |
+| `nav.groupDeveloper` (new) | — | Developer & devices | Entwickler & Geräte | NV06 group — **key already in five locales** |
+| `nav.manageDescription` | Assistants, automations, channels and connections | Assistants, automations, channels, connections and developer tools | Assistenten, Automatisierungen, Kanäle, Verbindungen und Entwicklertools | Manage rail `title` in `SidebarV2.vue`. Copilot on #1917; do it here |
 | `nav.adminFeatureStatus`, `settings.features.title`, `pageTitles.adminFeatures` | Feature Status / System Status | System status | Systemstatus | `O010`, one name |
 | `settings.features.subtitle` | Monitor all services and features | Which services this installation can use right now | Welche Dienste diese Installation gerade nutzen kann | |
 | `nav.adminModelStatus`, `adminModelStatus.title`, `pageTitles.adminModelStatus` | Model Status | Model health | Modellzustand | `O011` |
