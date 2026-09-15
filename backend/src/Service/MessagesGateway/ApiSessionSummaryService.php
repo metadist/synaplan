@@ -9,6 +9,7 @@ use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Service\ModelConfigService;
+use App\Service\Prompt\LanguageDirectiveBuilder;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -116,7 +117,8 @@ final readonly class ApiSessionSummaryService
                 return;
             }
 
-            $summary = $this->summarize($user, $state['summary'], $state['pending'], $client, $model);
+            $language = $this->resolveSummaryLanguage($user, $state['pending']);
+            $summary = $this->summarize($user, $state['summary'], $state['pending'], $client, $model, $language);
             if (null === $summary) {
                 // Keep the pending excerpts; the next command retries the fold.
                 $this->writeState($stateKey, $state);
@@ -124,7 +126,7 @@ final readonly class ApiSessionSummaryService
                 return;
             }
 
-            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model);
+            $chatId = $this->upsertSessionChat($userId, $state, $client, $summary, $model, $language);
 
             $state['summary'] = $summary;
             $state['pending'] = [];
@@ -140,7 +142,7 @@ final readonly class ApiSessionSummaryService
     /**
      * @param list<string> $pending
      */
-    private function summarize(User $user, string $previousSummary, array $pending, string $client, string $model): ?string
+    private function summarize(User $user, string $previousSummary, array $pending, string $client, string $model, string $language): ?string
     {
         $userId = (int) $user->getId();
         $modelConfig = $this->modelConfigService->getSummaryModelConfig($userId);
@@ -153,7 +155,7 @@ final readonly class ApiSessionSummaryService
 
         try {
             $response = $this->aiFacade->chat([
-                ['role' => 'system', 'content' => $this->buildSystemPrompt($client, $model)],
+                ['role' => 'system', 'content' => $this->buildSystemPrompt($client, $model, $language)],
                 ['role' => 'user', 'content' => implode("\n\n", $sections)],
             ], $userId, [
                 'provider' => $modelConfig['provider'] ?? null,
@@ -180,9 +182,10 @@ final readonly class ApiSessionSummaryService
         }
     }
 
-    private function buildSystemPrompt(string $client, string $model): string
+    private function buildSystemPrompt(string $client, string $model, string $language): string
     {
         $clientLabel = $this->clientLabel($client);
+        $languageName = LanguageDirectiveBuilder::nameFor($language);
 
         return <<<PROMPT
             You maintain a rolling summary of an API session: a user connected an external client ({$clientLabel}, model {$model}) to their account, and you see short excerpts of what was requested and answered. Fold the new excerpts into the previous summary (when present) and return the updated summary.
@@ -190,10 +193,101 @@ final readonly class ApiSessionSummaryService
             Rules:
             - 2-3 sentences, plain prose, no headings, no bullet lists.
             - Describe WHAT the session is about and what was done (topics, tasks, files or tools touched) — not the mechanics of the API.
-            - Write in the language the excerpts use.
+            - Write the summary in {$languageName}. When you quote the user, keep their original wording — do not translate quoted questions or answers.
             - Be factual. Never invent information that is not in the excerpts.
             - No preamble, no meta commentary — output only the summary text.
-            PROMPT;
+            PROMPT.LanguageDirectiveBuilder::buildForOutputLanguage($language);
+    }
+
+    /**
+     * Language of the log the user reads in Synaplan.
+     *
+     * Prefer a confident guess from the request excerpts (the actual user
+     * question, not the assistant reply or a previous summary). Fall back to
+     * the account UI locale so a short or wrapped client prompt cannot leave
+     * the model free to pick another language.
+     *
+     * @param list<string> $pending
+     */
+    private function resolveSummaryLanguage(User $user, array $pending): string
+    {
+        $requests = [];
+        foreach ($pending as $entry) {
+            if (1 !== preg_match('/^Request:\s*(.*)$/s', $entry, $match)) {
+                continue;
+            }
+            $parts = preg_split('/^Response:\s*/m', (string) $match[1], 2);
+            $requests[] = trim(is_array($parts) ? ($parts[0] ?? '') : '');
+        }
+
+        return $this->detectRequestLanguage(implode("\n", $requests)) ?? $user->getLocale();
+    }
+
+    /**
+     * Distinctive stopword / question-word heuristic for the five Synaplan
+     * UI locales. Returns null when there is no signal (caller uses locale).
+     */
+    private function detectRequestLanguage(string $text): ?string
+    {
+        $normalized = preg_replace('/[^\p{L}]+/u', ' ', mb_strtolower($text)) ?? '';
+        $lower = ' '.trim($normalized).' ';
+        if ('  ' === $lower) {
+            return null;
+        }
+
+        $hits = [
+            'de' => 0,
+            'en' => 0,
+            'es' => 0,
+            'fr' => 0,
+            'tr' => 0,
+        ];
+
+        foreach ([
+            ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ',
+            ' wer ', ' wie ', ' was ', ' du ', ' bist ', ' hallo ', ' danke ',
+        ] as $word) {
+            if (str_contains($lower, $word)) {
+                $hits['de'] += 2;
+            }
+        }
+        foreach ([
+            ' the ', ' and ', ' you ', ' who ', ' what ', ' how ', ' why ',
+            ' are ', ' is ', ' please ', ' hello ', ' thanks ',
+        ] as $word) {
+            if (str_contains($lower, $word)) {
+                $hits['en'] += 2;
+            }
+        }
+        foreach ([
+            ' el ', ' los ', ' las ', ' para ', ' quién ', ' qué ', ' cómo ',
+            ' eres ', ' gracias ', ' hola ',
+        ] as $word) {
+            if (str_contains($lower, $word)) {
+                $hits['es'] += 2;
+            }
+        }
+        foreach ([
+            ' le ', ' les ', ' une ', ' est ', ' pour ', ' qui ', ' quoi ',
+            ' comment ', ' merci ', ' bonjour ',
+        ] as $word) {
+            if (str_contains($lower, $word)) {
+                $hits['fr'] += 2;
+            }
+        }
+        foreach ([
+            ' ve ', ' bir ', ' için ', ' bu ', ' ile ', ' merhaba ', ' teşekkür ',
+        ] as $word) {
+            if (str_contains($lower, $word)) {
+                $hits['tr'] += 2;
+            }
+        }
+
+        arsort($hits);
+        $best = array_key_first($hits);
+        $bestScore = $hits[$best];
+
+        return $bestScore >= 2 ? $best : null;
     }
 
     /**
@@ -202,7 +296,7 @@ final readonly class ApiSessionSummaryService
      *
      * @param array{chatId: int|null} $state
      */
-    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model): int
+    private function upsertSessionChat(int $userId, array $state, string $client, string $summary, string $model, string $language): int
     {
         $chat = null;
         if (null !== $state['chatId']) {
@@ -240,6 +334,7 @@ final readonly class ApiSessionSummaryService
         }
 
         $message->setText($summary);
+        $message->setLanguage($language);
         $message->setUnixTimestamp(time());
         $message->setDateTime(date('YmdHis'));
         $message->setMeta('api_session.model', $model);
