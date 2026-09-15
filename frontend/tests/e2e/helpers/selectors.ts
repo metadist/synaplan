@@ -198,7 +198,8 @@ export const selectors = {
     toolVoiceReply: '[data-testid="btn-tool-voice-reply"]',
     toolEnhance: '[data-testid="btn-tool-enhance"]',
     enhanceButton: '[data-testid="btn-chat-enhance"]',
-    toolSummarizerLink: '[data-testid="link-tool-summarizer"]',
+    toolSummarize: '[data-testid="btn-tool-summarize"]',
+    summarizeOptions: '[data-testid="summarize-options"]',
     /** Sources (N) dropdown toggle — appears on messages that used web search */
     sourcesToggle: '[data-testid="btn-message-sources-toggle"]',
     knowledgeFolderBtn: '[data-testid="btn-knowledge-folder"]',
@@ -563,6 +564,10 @@ export const selectors = {
   },
   people: {
     backToOperate: '[data-testid="link-people-back-operate"]',
+    tabPolicies: '[data-testid="tab-policies"]',
+    sectionPolicies: '[data-testid="section-policies"]',
+    sectionPolicyDefaults: '[data-testid="section-policy-defaults"]',
+    selectPolicyGroup: '[data-testid="select-policy-group"]',
   },
   dialog: {
     confirmBtn: '[data-testid="btn-dialog-confirm"]',

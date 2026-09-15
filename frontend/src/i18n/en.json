@@ -108,7 +108,6 @@
     "chat": "Chat",
     "tools": "Tools",
     "chatWidget": "Chat widgets",
-    "docSummary": "Summarizer",
     "mailHandler": "Email handler",
     "plugins": "Plugins",
     "files": "Sources",
@@ -736,7 +735,6 @@
     "profile": "Profile",
     "tools": "Tools",
     "toolsChatWidget": "Chat widgets",
-    "toolsDocSummary": "Summarizer",
     "toolsMailHandler": "Email handler",
     "mcpServers": "MCP Servers",
     "connections": "Connections",
@@ -867,8 +865,26 @@
       "badgeVideo": "Video",
       "thinkingDesc": "Show the model's reasoning before the answer",
       "thinkingUnsupported": "The selected model does not support reasoning",
-      "summarizer": "Summarizer",
-      "summarizerDesc": "Summarize documents — opens the tool",
+      "summarize": "Summarize a document",
+      "summarizeDesc": "Attach a file and summarize it in this chat",
+      "summarizeInstruction": "Summarize the attached document. Length: {length}. Answer in {language}.",
+      "summarizeLength": "Length",
+      "summarizeLanguage": "Language",
+      "summarizeLengthShort": "Short",
+      "summarizeLengthMedium": "Medium",
+      "summarizeLengthLong": "Long",
+      "summarizeLengthValue": {
+        "short": "short",
+        "medium": "medium",
+        "long": "long"
+      },
+      "summarizeLang": {
+        "de": "German",
+        "en": "English",
+        "es": "Spanish",
+        "fr": "French",
+        "tr": "Turkish"
+      },
       "enhanceDesc": "Rewrite your message with AI before sending"
     },
     "modelDropdown": {
@@ -967,8 +983,6 @@
     "title": "Available Tools",
     "description": "Explore and use powerful tools to enhance your workflow",
     "chatWidgetDescription": "Create and manage chat widgets for your website",
-    "docSummaryDescription": "Automatically summarize documents and extract key information",
-    "summarySuccess": "Summary generated successfully!",
     "category": "Category",
     "commands": "Commands",
     "noCommands": "No commands available",

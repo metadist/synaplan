@@ -6,7 +6,7 @@
     >
       <div class="max-w-[1400px] mx-auto w-full px-6 py-8">
         <PageHeader
-          v-if="currentPage !== 'mail-handler' && currentPage !== 'doc-summary'"
+          v-if="currentPage !== 'mail-handler'"
           :title="getPageTitle()"
           :subtitle="getPageDescription()"
           icon="heroicons:wrench-screwdriver"
@@ -110,26 +110,6 @@
           </div>
         </div>
 
-        <div v-else-if="currentPage === 'doc-summary'">
-          <SummaryConfiguration
-            :is-generating="isGeneratingSummary"
-            :current-model="currentChatModel"
-            data-testid="comp-summary-config"
-            @generate="handleGenerateSummary"
-            @regenerate="handleRegenerateSummary"
-            @show="showSummaryModal"
-          />
-
-          <!-- Summary Result Modal -->
-          <SummaryResultModal
-            :is-open="isSummaryModalOpen"
-            :summary="summaryResult?.summary || null"
-            :metadata="summaryResult?.metadata || null"
-            :config="lastSummaryConfig"
-            @close="closeSummaryModal"
-          />
-        </div>
-
         <div v-else-if="currentPage === 'mail-handler'">
           <div v-if="isLoadingMailHandlers" class="flex items-center justify-center py-12">
             <svg class="w-6 h-6 animate-spin txt-brand" fill="none" viewBox="0 0 24 24">
@@ -195,15 +175,11 @@ import WidgetList from '@/components/widgets/WidgetList.vue'
 import WidgetEditor from '@/components/widgets/WidgetEditor.vue'
 import ChatWidget from '@/components/widgets/ChatWidget.vue'
 import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
-import SummaryConfiguration from '@/components/summary/SummaryConfiguration.vue'
-import SummaryResultModal from '@/components/summary/SummaryResultModal.vue'
 import MailHandlerConfiguration from '@/components/mail/MailHandlerConfiguration.vue'
 import MailHandlerList from '@/components/mail/MailHandlerList.vue'
 import { EyeIcon, XMarkIcon, GlobeAltIcon } from '@heroicons/vue/24/outline'
-import { useAiConfigStore } from '@/stores/aiConfig'
 import type { Widget, WidgetConfig } from '@/mocks/widgets'
 import { mockWidgets } from '@/mocks/widgets'
-import type { SummaryConfig } from '@/mocks/summaries'
 import type {
   MailConfig,
   Department,
@@ -213,15 +189,12 @@ import type {
   CreateHandlerRequest,
 } from '@/services/api/inboundEmailHandlersApi'
 import { inboundEmailHandlersApi } from '@/services/api/inboundEmailHandlersApi'
-import * as summaryService from '@/services/summaryService'
-import type { SummaryResponse } from '@/services/summaryService'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 
 const route = useRoute()
 const { t } = useI18n()
 const config = useConfigStore()
-const aiConfigStore = useAiConfigStore()
 const { success, error: showError, warning: showWarning } = useNotification()
 const dialog = useDialog()
 
@@ -248,13 +221,6 @@ const currentMailHandler = ref<SavedMailHandler | undefined>(undefined)
 const currentMailHandlerId = ref<string>('')
 const isLoadingMailHandlers = ref(false)
 
-// Summary state
-const isGeneratingSummary = ref(false)
-const summaryResult = ref<SummaryResponse | null>(null)
-const isSummaryModalOpen = ref(false)
-const lastSummaryConfig = ref<SummaryConfig | null>(null)
-const currentChatModel = ref<string | null>(null)
-
 const hasWidgetChanges = computed(() => {
   if (!originalWidgetConfig.value || !showWidgetEditor.value) return false
   return JSON.stringify(currentWidgetConfig.value) !== JSON.stringify(originalWidgetConfig.value)
@@ -265,34 +231,8 @@ const hasWidgetChanges = computed(() => {
 const currentPage = computed(() => {
   const path = route.path
   if (path.includes('widgets')) return 'chat-widget'
-  if (path.includes('summarizer')) return 'doc-summary'
-  if (path.includes('email')) return 'mail-handler'
-  return 'doc-summary'
+  return 'mail-handler'
 })
-
-// Load current chat model function (defined before watch)
-const loadCurrentChatModel = async () => {
-  try {
-    // Load models and defaults if not already loaded
-    if (Object.keys(aiConfigStore.models).length === 0) {
-      await aiConfigStore.loadModels()
-    }
-    if (Object.keys(aiConfigStore.defaults).length === 0) {
-      await aiConfigStore.loadDefaults()
-    }
-
-    // Get current CHAT model
-    const chatModel = aiConfigStore.getCurrentModel('CHAT')
-    if (chatModel) {
-      currentChatModel.value = chatModel.name
-    } else {
-      currentChatModel.value = 'No default model'
-    }
-  } catch (error) {
-    console.error('Failed to load current chat model:', error)
-    currentChatModel.value = 'Failed to load'
-  }
-}
 
 // Load mail handlers function (defined before watch)
 const loadMailHandlers = async () => {
@@ -307,13 +247,10 @@ const loadMailHandlers = async () => {
   }
 }
 
-// Watch for page change to doc-summary and load model
+// Load mail handlers when this page is the email handler
 watch(
   currentPage,
   async (newPage) => {
-    if (newPage === 'doc-summary' && !currentChatModel.value) {
-      await loadCurrentChatModel()
-    }
     if (newPage === 'mail-handler' && mailHandlers.value.length === 0) {
       await loadMailHandlers()
     }
@@ -324,7 +261,6 @@ watch(
 const getPageTitle = () => {
   const titles: Record<string, string> = {
     'chat-widget': t('pageTitles.chatWidget'),
-    'doc-summary': t('pageTitles.docSummary'),
   }
   return titles[currentPage.value] || t('pageTitles.tools')
 }
@@ -332,7 +268,6 @@ const getPageTitle = () => {
 const getPageDescription = () => {
   const descriptions: Record<string, string> = {
     'chat-widget': t('tools.chatWidgetDescription'),
-    'doc-summary': t('tools.docSummaryDescription'),
   }
   return descriptions[currentPage.value] || ''
 }
@@ -437,52 +372,6 @@ const discardChanges = () => {
 
 const togglePreview = () => {
   showPreview.value = !showPreview.value
-}
-
-const handleGenerateSummary = async (text: string, config: SummaryConfig) => {
-  isGeneratingSummary.value = true
-  summaryResult.value = null
-  lastSummaryConfig.value = config
-
-  try {
-    const response = await summaryService.generateSummary({
-      text,
-      summaryType: config.summaryType,
-      length: config.length,
-      customLength: config.customLength,
-      outputLanguage: config.outputLanguage,
-      focusAreas: config.focusAreas,
-    })
-
-    if (response.success && response.summary) {
-      summaryResult.value = response
-      success(t('tools.summarySuccess'))
-      // Automatically open modal after generation
-      isSummaryModalOpen.value = true
-    } else {
-      showError(response.error || 'Failed to generate summary')
-    }
-  } catch (err: unknown) {
-    console.error('Summary generation error:', err)
-    showError(getErrorMessage(err) || 'Failed to generate summary')
-  } finally {
-    isGeneratingSummary.value = false
-  }
-}
-
-const handleRegenerateSummary = async (text: string, config: SummaryConfig) => {
-  // Same as generate but doesn't change the text state
-  await handleGenerateSummary(text, config)
-}
-
-const showSummaryModal = () => {
-  if (summaryResult.value) {
-    isSummaryModalOpen.value = true
-  }
-}
-
-const closeSummaryModal = () => {
-  isSummaryModalOpen.value = false
 }
 
 const createMailHandler = () => {

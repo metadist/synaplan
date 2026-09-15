@@ -223,7 +223,7 @@ const router = createRouter({
     //
     // Canonical URL tree since the 2026-06 navigation IA cleanup (§4.6):
     //   /channels/*  — ways conversations reach Synaplan (widgets, email, API)
-    //   /ai/*        — AI machinery (models, instructions, routing, summarizer)
+    //   /ai/*        — AI machinery (models, instructions, routing)
     //   /files/*     — knowledge base (browse + search)
     // The old /tools/* and /config/* paths redirect below (kept ≥ 2 releases
     // for bookmarks/docs; see redirects.spec.ts).
@@ -357,17 +357,9 @@ const router = createRouter({
       component: () => import('@/views/ConfigView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.configSortingPrompt' },
     },
-    {
-      // Transitional: the page retires into the chat Tools dropdown (Q3);
-      // the backend POST /api/v1/summary/generate API is a stable contract
-      // (Nextcloud + plugin consumers) and is documented on /channels/api/docs.
-      path: '/ai/summarizer',
-      name: 'ai-summarizer',
-      component: () => import('@/views/ToolsView.vue'),
-      meta: { requiresAuth: true, helpId: 'tools.docSummary', titleKey: 'pageTitles.docSummary' },
-    },
-
     // --- Transitional redirects (old → new, §4.6; keep ≥ 2 releases) ---
+    // The Summarizer page now arms Tools › Summarize a document in chat.
+    // POST /api/v1/summary/generate stays (Nextcloud + plugin consumers).
     { path: '/tools', redirect: '/channels' },
     { path: '/tools/chat-widget', redirect: '/channels/widgets' },
     { path: '/tools/chat-widget/live-support', redirect: '/channels/widgets/live-support' },
@@ -383,7 +375,8 @@ const router = createRouter({
       redirect: (to) => ({ path: `/channels/widgets/${to.params.widgetId}`, query: to.query }),
     },
     { path: '/tools/mail-handler', redirect: '/channels/email' },
-    { path: '/tools/doc-summary', redirect: '/ai/summarizer' },
+    { path: '/ai/summarizer', redirect: { path: '/', query: { tool: 'summarize' } } },
+    { path: '/tools/doc-summary', redirect: { path: '/', query: { tool: 'summarize' } } },
     {
       path: '/ai/providers/higgsfield',
       redirect: { path: '/ai/providers', query: { section: 'higgsfield' } },

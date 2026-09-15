@@ -37,7 +37,6 @@ const redirects = (agentsEnabled: boolean): Array<[string, string]> => [
   ['/tools/chat-widget/42', '/channels/widgets/42'],
   ['/tools/chat-widget/42/chats', '/channels/widgets/42/chats'],
   ['/tools/mail-handler', '/channels/email'],
-  ['/tools/doc-summary', '/ai/summarizer'],
 ]
 
 test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
@@ -71,6 +70,40 @@ test.describe('Redirects: legacy URLs land on canonical paths (§4.6)', () => {
     await expect(page).toHaveURL(/\/ai\/routing\?topic=mail$/, {
       timeout: TIMEOUTS.STANDARD,
     })
+  })
+
+  test('@ci /ai/summarizer arms Summarize a document in chat', async ({ page }) => {
+    await openApp(page)
+    await page.goto('/ai/summarizer', { waitUntil: 'commit' })
+    await expect(page.locator('[data-testid="summarize-options"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      .toBe(true)
+  })
+
+  test('@ci /tools/doc-summary arms Summarize a document in chat', async ({ page }) => {
+    await openApp(page)
+    await page.goto('/tools/doc-summary', { waitUntil: 'commit' })
+    await expect(page.locator('[data-testid="summarize-options"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect
+      .poll(
+        () => {
+          const url = new URL(page.url())
+          return url.pathname === '/' && !url.searchParams.has('tool')
+        },
+        { timeout: TIMEOUTS.STANDARD }
+      )
+      .toBe(true)
   })
 
   test('@ci /ai/providers/higgsfield lands on Your AI accounts', async ({ page }) => {

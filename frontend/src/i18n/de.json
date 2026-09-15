@@ -109,7 +109,6 @@
     "chat": "Chat",
     "tools": "Tools",
     "chatWidget": "Chat-Widgets",
-    "docSummary": "Zusammenfasser",
     "mailHandler": "E-Mail-Handler",
     "plugins": "Plugins",
     "files": "Quellen",
@@ -732,7 +731,6 @@
     "profile": "Profil",
     "tools": "Tools",
     "toolsChatWidget": "Chat-Widgets",
-    "toolsDocSummary": "Zusammenfasser",
     "toolsMailHandler": "E-Mail-Handler",
     "mcpServers": "MCP-Server",
     "connections": "Verbindungen",
@@ -863,8 +861,26 @@
       "badgeVideo": "Video",
       "thinkingDesc": "Zeigt die Denkschritte des Modells vor der Antwort",
       "thinkingUnsupported": "Das gewählte Modell unterstützt kein Reasoning",
-      "summarizer": "Zusammenfasser",
-      "summarizerDesc": "Dokumente zusammenfassen — öffnet das Tool",
+      "summarize": "Dokument zusammenfassen",
+      "summarizeDesc": "Datei anhängen und in diesem Chat zusammenfassen",
+      "summarizeInstruction": "Fasse das angehängte Dokument zusammen. Länge: {length}. Antworte auf {language}.",
+      "summarizeLength": "Länge",
+      "summarizeLanguage": "Sprache",
+      "summarizeLengthShort": "Kurz",
+      "summarizeLengthMedium": "Mittel",
+      "summarizeLengthLong": "Lang",
+      "summarizeLengthValue": {
+        "short": "kurz",
+        "medium": "mittel",
+        "long": "lang"
+      },
+      "summarizeLang": {
+        "de": "Deutsch",
+        "en": "Englisch",
+        "es": "Spanisch",
+        "fr": "Französisch",
+        "tr": "Türkisch"
+      },
       "enhanceDesc": "Nachricht vor dem Senden mit KI verbessern"
     },
     "modelDropdown": {
@@ -954,8 +970,6 @@
     "title": "Verfügbare Tools",
     "description": "Entdecke und nutze leistungsstarke Tools zur Verbesserung deines Workflows",
     "chatWidgetDescription": "Erstelle und verwalte Chat-Widgets für deine Website",
-    "docSummaryDescription": "Dokumente automatisch zusammenfassen und Schlüsselinformationen extrahieren",
-    "summarySuccess": "Zusammenfassung erfolgreich erstellt!",
     "category": "Kategorie",
     "commands": "Befehle",
     "noCommands": "Keine Befehle verfügbar",

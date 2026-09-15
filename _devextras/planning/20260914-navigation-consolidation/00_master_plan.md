@@ -1,7 +1,8 @@
 # Navigation consolidation — duplicates, reachability, wording, Operate stacked UI
 
-**Status:** Plan, 2026-09-14. Not started. Coding begins only after the product
-owner confirms the decisions in §3.
+**Status:** 2026-09-15 — Sprint A in flight (NV07 on
+`feat/nav-nv07-summarize-in-chat`). Decisions in §3 stay locked.
+See **§8 Handoff** to continue on another machine.
 **Input:** Confluence *20260914 - Navigation Tree (Status)* (115 rows, handles
 `W001`…`X013`, generated from `synaplan@af15fdc89`). Its §6 "Observations" is
 the cherry-pick list for this plan.
@@ -150,7 +151,7 @@ Each sprint file lists the §6 exit bullets for its journeys.
 | NV03 | `fix(people): rename platform approvals to "Platform instances" and cross-link both homes` | ota-candidate | — |
 | NV04 | `feat(ai): "Your AI accounts" page for Higgsfield and BYO Anthropic keys` | ota-candidate | — |
 | NV05 | `feat(admin): Models & keys is the one editor for instance provider keys` | backend-only + ota-candidate (two commits, one PR) | NV04 |
-| NV06 | `refactor(nav): split Connections into Connections and Developer & devices` | ota-candidate | NV04 |
+| NV06 | `refactor(nav): split Connections into Connections and Developer & devices` | ota-candidate | NV04. **PR [#1917](https://github.com/metadist/synaplan/pull/1917)** |
 | NV07 | `feat(chat): Summarize a document runs in the chat; retire the Summarizer page` | ota-candidate | — |
 | NV08 | `refactor(memories): one Memories page on every device; retire the dialog` | ota-candidate | — |
 | NV09 | `test(nav): journey specs J-NV-1…5 and redirect matrix` | ota-candidate | NV01–NV08 |
@@ -197,3 +198,58 @@ node scripts/mobile-impact.mjs --base main --head HEAD   # classification must r
 Every step is a frontend refactor with redirects; rollback is a revert of the
 single PR. NV05a (backend `managedBy` hint) is additive and ignored by an
 older frontend. No migrations, no seed changes, no flag changes.
+
+---
+
+## 8. Handoff — continue tomorrow (2026-09-15)
+
+Pull this folder from `feat/nav-nv07-summarize-in-chat` (or from `main` after
+that PR merges). Do **not** put NV08 on the NV07 branch.
+
+### Sprint split
+
+| Sprint | Steps | What it is | Status |
+| ------ | ----- | ---------- | ------ |
+| **A** | NV01–NV09 | One home per concept; Summarizer into chat; Memories one technique | NV01–NV06 **merged** ([#1917](https://github.com/metadist/synaplan/pull/1917)). **NV07** on `feat/nav-nv07-summarize-in-chat`. NV08–NV09 not started |
+| **B** | NV10–NV12 | Wording / sentence case / stale keys, five locales | **After A** (needs the final tree) |
+| **C** | NV13–NV21 | Operate stacked UI | Not started. NV13/NV14 may be prepared after B; NV15+ need NV01/NV05 |
+
+One PR per step. Branch names `feat/nav-nv08-memories-page`,
+`feat/nav-nv09-journeys`, `feat/nav-nv10-wording`, … Never on `main`.
+
+### Next machine — first commands
+
+```bash
+git fetch origin
+git checkout feat/nav-nv07-summarize-in-chat && git pull
+# After the NV07 PR merges:
+git checkout main && git pull
+```
+
+1. If the NV07 PR is red, fix **product** failures on that branch and push.
+   A local blank Vite page waiting on `/api/v1/chats` is the known
+   login-timeout flake — not NV07.
+2. **Next implementation: NV08** — new branch from `origin/main`. Then NV09
+   (NV09 waits for NV01–NV08).
+3. **Then Sprint B NV10.** That pass owns the page-title / tooltip strings
+   Copilot asked for on #1917 (see below). Then NV11, NV12.
+
+### Copilot on #1917 — locked 2026-09-15
+
+| Finding | Verdict |
+| ------- | ------- |
+| Connections E2E must assert API docs are **absent** from that submenu | **Done in NV07** |
+| Set `config.connections.title` and `pageTitles.connections` to “Connected apps” | **NV10.** Menu child is already “Connected apps”; the **group** stays “Connections”; page header follows in the wording pass |
+| `nav.manageDescription` still omits Developer & devices | **NV10** (optional row). Tooltip-only; not an NV06 merge block |
+
+### Traps already paid for
+
+- **E2E must not import** `frontend/src/generated/api-schemas.ts`. The file
+  is gitignored; Playwright collect in CI then fails every shard (NV05
+  [#1906](https://github.com/metadist/synaplan/pull/1906)).
+- Local `make test-e2e` while the frontend container is busy (eslint /
+  vue-tsc / vitest) or just after a Vite restart: blank page, 10 s
+  `waitForResponse` on `/api/v1/chats`. Warm `http://localhost:5173`, then
+  retry. CI is the matrix.
+- Do not mix the next step into `feat/nav-nv07-summarize-in-chat`.
+- Connections submenu `flyoutLinkApiDocs` `toHaveCount(0)` shipped with NV07.
