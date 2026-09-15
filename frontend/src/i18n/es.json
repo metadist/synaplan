@@ -109,7 +109,6 @@
     "chat": "Chat",
     "tools": "Herramientas",
     "chatWidget": "Widgets de chat",
-    "docSummary": "Resumidor",
     "mailHandler": "Gestor de correo",
     "plugins": "Plugins",
     "files": "Fuentes",
@@ -726,7 +725,6 @@
     "historyDescription": "Historial de chats",
     "tools": "Herramientas",
     "toolsChatWidget": "Widgets de chat",
-    "toolsDocSummary": "Resumidor",
     "toolsMailHandler": "Gestor de correo",
     "mcpServers": "Servidores MCP",
     "connections": "Conexiones",
@@ -903,8 +901,26 @@
       "badgeVideo": "Video",
       "thinkingDesc": "Muestra el razonamiento del modelo antes de la respuesta",
       "thinkingUnsupported": "El modelo seleccionado no admite razonamiento",
-      "summarizer": "Resumidor",
-      "summarizerDesc": "Resumir documentos — abre la herramienta",
+      "summarize": "Resumir un documento",
+      "summarizeDesc": "Adjunta un archivo y resúmelo en este chat",
+      "summarizeInstruction": "Resume el documento adjunto. Longitud: {length}. Responde en {language}.",
+      "summarizeLength": "Longitud",
+      "summarizeLanguage": "Idioma",
+      "summarizeLengthShort": "Corto",
+      "summarizeLengthMedium": "Medio",
+      "summarizeLengthLong": "Largo",
+      "summarizeLengthValue": {
+        "short": "corta",
+        "medium": "media",
+        "long": "larga"
+      },
+      "summarizeLang": {
+        "de": "alemán",
+        "en": "inglés",
+        "es": "español",
+        "fr": "francés",
+        "tr": "turco"
+      },
       "enhanceDesc": "Reescribe tu mensaje con IA antes de enviarlo"
     },
     "modelDropdown": {
@@ -999,8 +1015,6 @@
     "title": "Herramientas Disponibles",
     "description": "Explora y usa herramientas poderosas para mejorar tu flujo de trabajo",
     "chatWidgetDescription": "Crea y administra widgets de chat para tu sitio web",
-    "docSummaryDescription": "Resume documentos automáticamente y extrae información clave",
-    "summarySuccess": "¡Resumen generado correctamente!",
     "category": "Categoría",
     "commands": "Comandos",
     "noCommands": "No hay comandos disponibles",

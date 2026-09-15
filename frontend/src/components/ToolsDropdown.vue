@@ -151,25 +151,23 @@
         </Transition>
       </button>
 
-      <!-- Q3: the pre-configured Summarizer stays reachable from chat; this is
-           a clearly marked link row (same pattern as "Manage folders…"). -->
+      <!-- Summarize a document stays in chat: attach a file and send. -->
       <div class="border-t border-light-border/20 dark:border-dark-border/20 my-1" />
 
       <button
         ref="itemRefs"
         class="dropdown-item"
         type="button"
-        data-testid="link-tool-summarizer"
-        @click="goToSummarizer"
+        data-testid="btn-tool-summarize"
+        @click="handleSummarize"
         @keydown.down.prevent="focusNext"
         @keydown.up.prevent="focusPrevious"
       >
         <Icon icon="mdi:file-document-outline" class="w-5 h-5 flex-shrink-0" />
         <div class="flex-1 min-w-0">
-          <span class="text-sm font-medium">{{ $t('chatInput.tools.summarizer') }}</span>
-          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.summarizerDesc') }}</div>
+          <span class="text-sm font-medium">{{ $t('chatInput.tools.summarize') }}</span>
+          <div class="text-xs txt-secondary">{{ $t('chatInput.tools.summarizeDesc') }}</div>
         </div>
-        <ArrowTopRightOnSquareIcon class="w-4 h-4 flex-shrink-0 txt-secondary" />
       </button>
 
       <!-- DS16: dispatch the typed instruction to a paired computer. Only shown
@@ -197,12 +195,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import {
-  ArrowTopRightOnSquareIcon,
-  WrenchScrewdriverIcon,
-  ChevronUpIcon,
-  CheckIcon,
-} from '@heroicons/vue/24/outline'
+import { WrenchScrewdriverIcon, ChevronUpIcon, CheckIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { type Command, useCommandsStore } from '@/stores/commands'
@@ -232,6 +225,7 @@ const emit = defineEmits<{
   toggleThinking: []
   toggleVoiceReply: []
   toggleEnhance: []
+  summarizeDocument: []
   runOnDevice: [device: { id: number; name: string }]
 }>()
 
@@ -386,9 +380,9 @@ const selectToolCommand = (toolId: string, commandName: string) => {
   closeDropdown()
 }
 
-const goToSummarizer = () => {
+const handleSummarize = () => {
+  emit('summarizeDocument')
   closeDropdown()
-  router.push('/ai/summarizer')
 }
 
 // Close after triggering so the rewritten text in the input is visible.

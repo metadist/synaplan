@@ -79,7 +79,7 @@ const allTips: PromoTip[] = [
     titleKey: 'promoTips.docSummary.title',
     descriptionKey: 'promoTips.docSummary.description',
     actionKey: 'promoTips.docSummary.action',
-    actionRoute: '/ai/summarizer',
+    actionRoute: '/?tool=summarize',
     gradient: 'from-pink-500/10 to-rose-500/10 dark:from-pink-500/[0.07] dark:to-rose-500/[0.07]',
   },
   {

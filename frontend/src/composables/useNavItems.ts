@@ -231,12 +231,6 @@ export function useNavItems() {
           label: t('nav.configSortingPrompt'),
           ...grouped('assistants', assistants),
         },
-        {
-          key: 'doc-summary',
-          path: '/ai/summarizer',
-          label: t('nav.toolsDocSummary'),
-          ...grouped('assistants', assistants),
-        },
         ...(isSavedTasksEnabled()
           ? [
               {

@@ -154,6 +154,12 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
       const sub = page.locator(NAV.navSubDropdown)
       await expect(sub.locator(NAV.flyoutLinkApiDocs)).toBeVisible()
     })
+
+    await test.step('Act+Assert: Assistants submenu has no Summarizer page', async () => {
+      await page.locator(NAV.flyoutGroup('assistants')).click()
+      const sub = page.locator(NAV.navSubDropdown)
+      await expect(sub.locator('[data-testid="link-sidebar-v2-doc-summary"]')).toHaveCount(0)
+    })
   })
 
   // Connected apps is always in the Connections group (D5 ungate). Saved
@@ -168,6 +174,7 @@ test.describe('Navigation: Rail flyouts (non-admin)', () => {
     await test.step('Assert: Connections lives under the Connections group', async () => {
       const connections = await openManageGroup(page, 'connections')
       await expect(connections.locator(NAV.flyoutLinkConnections)).toBeVisible()
+      await expect(connections.locator(NAV.flyoutLinkApiDocs)).toHaveCount(0)
     })
 
     await test.step('Assert: Saved Tasks lives under Automations and navigates', async () => {
