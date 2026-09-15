@@ -650,12 +650,12 @@
       "dbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",
       "managedKeys": {
         "title": "Sağlayıcı anahtarları AI altyapısı › Modeller ve anahtarlar altında yönetilir.",
-        "helm": "Ortamda veya bir Helm chart'ında tanımlanan anahtarlar otomatik olarak alınır — chart kurulumunun bu sayfaya ihtiyacı yoktur. Modeller ve anahtarlar'ı yalnızca arayüzden bir anahtar eklemek veya geçersiz kılmak için kullanın.",
+        "helm": "Ortamda veya bir Helm chart'ında tanımlanan anahtarlar otomatik olarak alınır — chart kurulumunun bu sayfaya ihtiyacı yoktur. Modeller ve anahtarları yalnızca arayüzden bir anahtar eklemek veya geçersiz kılmak için kullanın.",
         "stateNone": "ayarlanmadı",
         "stateDb": "arayüzde geçersiz kılındı",
         "stateEnv": "ortam / Helm",
         "summary": "{env} ortamdan, {db} arayüzde geçersiz kılındı.",
-        "cta": "Modeller ve anahtarlar'ı aç"
+        "cta": "Modeller ve anahtarları aç"
       },
       "envOverridesDb": "{key} ortam değişkeni tarafından sabitlendi. Şu anda: {value}. Bu ayarı burada yönetmek için değişkeni ortamdan kaldırın.",
       "unsaved": "Kaydedilmemiş değişiklikler",
@@ -1203,6 +1203,8 @@
     "saveUntested": "Kaydet",
     "savedUntested": "{provider} anahtarı kaydedildi — bu sağlayıcı ücretsiz bir kontrol sunmadığı için test edilmedi",
     "secretPlaceholder": "API gizli anahtarını yapıştırın…",
+    "keyAriaLabel": "{provider} API anahtarı",
+    "secretAriaLabel": "{provider} API gizli anahtarı",
     "secretHint": "{provider} anahtar ve gizli anahtarı birlikte ister — ikisini de sağlayıcı konsolundan yapıştırın.",
     "sourceDbFromEnv": "DB'de saklandı (.env'den)",
     "sourceDbOverridesEnv": "Veritabanında şifreli saklanır — .env içindeki eşleşen herhangi bir değerin üzerine yazar.",

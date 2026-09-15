@@ -737,6 +737,13 @@ final class SystemConfigServiceTest extends TestCase
         self::assertSame('env', $values['HIGGSFIELD_API_KEY']['keySource'] ?? null);
         self::assertTrue($values['HIGGSFIELD_API_SECRET']['isSet']);
         self::assertStringNotContainsString('hf-key-from-env', $values['HIGGSFIELD_API_KEY']['value']);
+
+        // After the store imports the env pair into BCONFIG, the card must
+        // still say "environment / Helm", not "UI override".
+        self::assertSame('hf-key-from-env', $store->getKey('higgsfield'));
+        $afterImport = $service->getValues();
+        self::assertSame('env', $afterImport['HIGGSFIELD_API_KEY']['keySource'] ?? null);
+        self::assertSame('env', $afterImport['HIGGSFIELD_API_SECRET']['keySource'] ?? null);
     }
 
     /**

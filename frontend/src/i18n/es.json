@@ -1203,6 +1203,8 @@
     "saveUntested": "Guardar",
     "savedUntested": "Clave de {provider} guardada — este proveedor no ofrece una comprobación gratuita, así que no se probó",
     "secretPlaceholder": "Pega el secreto de la API…",
+    "keyAriaLabel": "Clave API de {provider}",
+    "secretAriaLabel": "Secreto API de {provider}",
     "secretHint": "{provider} necesita la clave y el secreto juntos — pega ambos desde la consola del proveedor.",
     "sourceDbFromEnv": "guardada en BD (desde .env)",
     "sourceDbOverridesEnv": "Guardada cifrada en la base de datos — tiene prioridad sobre cualquier valor coincidente en .env.",

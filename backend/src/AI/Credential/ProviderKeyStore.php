@@ -219,25 +219,34 @@ final class ProviderKeyStore
     public function getStatus(string $provider): array
     {
         $provider = strtolower(trim($provider));
+        $needsSecret = ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::requiresSecret($provider);
         $row = $this->loadRow($provider);
         if (null !== $row) {
+            $hasSecret = null !== $row['secret'] && '' !== $row['secret'];
+
             return [
-                'configured' => true,
+                // A key + secret provider is not connected until both halves
+                // are present — otherwise the card would say Connected and
+                // offer Test on a pair that cannot authenticate.
+                'configured' => '' !== $row['key'] && (!$needsSecret || $hasSecret),
                 'source' => 'db',
                 'origin' => $row['origin'],
-                'maskedKey' => self::mask($row['key']),
-                'hasSecret' => null !== $row['secret'],
+                'maskedKey' => '' !== $row['key'] ? self::mask($row['key']) : '',
+                'hasSecret' => $hasSecret,
             ];
         }
 
         $envKey = $this->envKey($provider);
-        if ('' !== $envKey) {
+        $envSecret = $this->envSecret($provider);
+        if ('' !== $envKey || ($needsSecret && '' !== $envSecret)) {
+            $hasSecret = '' !== $envSecret;
+
             return [
-                'configured' => true,
+                'configured' => '' !== $envKey && (!$needsSecret || $hasSecret),
                 'source' => 'env',
                 'origin' => null,
-                'maskedKey' => self::mask($envKey),
-                'hasSecret' => '' !== $this->envSecret($provider),
+                'maskedKey' => '' !== $envKey ? self::mask($envKey) : '',
+                'hasSecret' => $hasSecret,
             ];
         }
 

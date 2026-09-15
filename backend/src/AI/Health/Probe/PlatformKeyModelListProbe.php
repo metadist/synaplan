@@ -56,7 +56,11 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     {
         $provider = mb_strtolower($service);
 
-        return ProviderKeyCatalog::has($provider) && ProviderKeyCatalog::listsModels($provider);
+        // HuggingFace's whoami-v2 is not a model list (listsModels=false) but
+        // still tells a bad key from an outage. Media/speech providers have
+        // no cheap authenticated check that helps health.
+        return ProviderKeyCatalog::has($provider)
+            && (ProviderKeyCatalog::listsModels($provider) || in_array($provider, self::NO_LISTING, true));
     }
 
     public function probe(string $service): ProbeResult

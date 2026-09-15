@@ -146,10 +146,17 @@ final class ProviderKeyStoreTest extends TestCase
         self::assertNull($keyOnly->getKey('higgsfield'));
         self::assertNull($keyOnly->getSecret('higgsfield'));
         self::assertSame([], $this->store, 'a half env pair must not be imported');
+        $keyOnlyStatus = $keyOnly->getStatus('higgsfield');
+        self::assertFalse($keyOnlyStatus['configured'], 'key without secret is not connected');
+        self::assertSame('env', $keyOnlyStatus['source']);
+        self::assertFalse($keyOnlyStatus['hasSecret']);
 
         $secretOnly = $this->makeStore([], ['higgsfield' => 'hf-env-secret']);
         self::assertNull($secretOnly->getKey('higgsfield'));
-        self::assertFalse($secretOnly->getStatus('higgsfield')['configured']);
+        $secretOnlyStatus = $secretOnly->getStatus('higgsfield');
+        self::assertFalse($secretOnlyStatus['configured']);
+        self::assertSame('env', $secretOnlyStatus['source']);
+        self::assertTrue($secretOnlyStatus['hasSecret']);
     }
 
     public function testFullEnvPairIsImportedAndFollowsSecretRotation(): void

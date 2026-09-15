@@ -48,7 +48,12 @@
         ({{ $t('adminSetup.sourceDbFromEnv') }})
       </span>
       <span
-        v-if="provider.configured && !provider.testable"
+        v-if="
+          provider.configured &&
+          !provider.testable &&
+          provider.source === 'db' &&
+          provider.origin === 'ui'
+        "
         class="inline-flex items-center gap-1"
         :data-testid="`provider-key-untested-${provider.name}`"
       >
@@ -76,6 +81,7 @@
               : $t('adminSetup.keyPlaceholder')
           "
           class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :aria-label="$t('adminSetup.keyAriaLabel', { provider: provider.displayName })"
           :data-testid="`provider-key-input-${provider.name}`"
           autocomplete="off"
           @keydown.enter="save"
@@ -86,6 +92,7 @@
           type="password"
           :placeholder="$t('adminSetup.secretPlaceholder')"
           class="flex-1 min-w-0 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :aria-label="$t('adminSetup.secretAriaLabel', { provider: provider.displayName })"
           :data-testid="`provider-secret-input-${provider.name}`"
           autocomplete="off"
           @keydown.enter="save"
@@ -145,7 +152,7 @@
         <button
           v-if="provider.testable"
           type="button"
-          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="testing"
           :data-testid="`provider-key-test-${provider.name}`"
           @click="test"
@@ -160,7 +167,7 @@
         <button
           v-if="!isDefaultChat && hasChatDefaults"
           type="button"
-          class="txt-secondary hover:txt-primary inline-flex items-center gap-1"
+          class="txt-secondary hover:txt-primary inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="applying"
           :data-testid="`provider-key-make-default-${provider.name}`"
           @click="makeDefault"
@@ -175,7 +182,7 @@
         <button
           v-if="provider.source === 'db'"
           type="button"
-          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1"
+          class="text-[var(--status-error)] hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="removing"
           :data-testid="`provider-key-remove-${provider.name}`"
           @click="remove"

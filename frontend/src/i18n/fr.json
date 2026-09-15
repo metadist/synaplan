@@ -2954,6 +2954,8 @@
     "saveUntested": "Enregistrer",
     "savedUntested": "Clé {provider} enregistrée — ce fournisseur n'offre pas de vérification gratuite, elle n'a donc pas été testée",
     "secretPlaceholder": "Collez le secret API…",
+    "keyAriaLabel": "Clé API pour {provider}",
+    "secretAriaLabel": "Secret API pour {provider}",
     "secretHint": "{provider} a besoin de la clé et du secret ensemble — collez les deux depuis la console du fournisseur.",
     "sourceDbFromEnv": "stocké en base (depuis .env)",
     "sourceDbOverridesEnv": "Stocké chiffré dans la base de données — remplace toute valeur correspondante dans .env.",

@@ -2954,6 +2954,8 @@
     "saveUntested": "Save",
     "savedUntested": "{provider} key saved — this provider offers no free check, so it was not tested",
     "secretPlaceholder": "Paste API secret…",
+    "keyAriaLabel": "API key for {provider}",
+    "secretAriaLabel": "API secret for {provider}",
     "secretHint": "{provider} needs the key and the secret together — paste both from the provider console.",
     "sourceDbFromEnv": "stored in DB (from .env)",
     "sourceDbOverridesEnv": "Stored encrypted in the database — overrides any matching value in .env.",

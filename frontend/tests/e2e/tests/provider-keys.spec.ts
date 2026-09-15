@@ -1,3 +1,4 @@
+import { GetAdminProviderKeysListResponseSchema } from '../../../src/generated/api-schemas'
 import { test, expect } from '../test-setup'
 import { login, loginViaApi } from '../helpers/auth'
 import { CREDENTIALS } from '../config/credentials'
@@ -71,15 +72,7 @@ test.describe('@ci Provider keys — one editor', () => {
       headers: { Cookie: adminCookie },
     })
     expect(res.ok()).toBeTruthy()
-    const body = (await res.json()) as {
-      providers: {
-        name: string
-        configured: boolean
-        source: 'db' | 'env' | 'none'
-        secretEnvVar: string | null
-        testable: boolean
-      }[]
-    }
+    const body = GetAdminProviderKeysListResponseSchema.parse(await res.json())
     // Media and speech providers are part of the same catalog (D2).
     const names = body.providers.map((p) => p.name)
     for (const expected of ['openai', 'groq', 'thehive', 'higgsfield', 'elevenlabs']) {

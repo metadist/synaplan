@@ -324,6 +324,7 @@ final class AdminProviderKeysController extends AbstractController
     )]
     #[OA\Response(response: 403, description: 'Admin access required', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     #[OA\Response(response: 404, description: 'Unknown provider', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
+    #[OA\Response(response: 422, description: 'Provider has no chat defaults (media/speech)', content: new OA\JsonContent(required: ['error'], properties: [new OA\Property(property: 'error', type: 'string')], type: 'object'))]
     public function applyDefaults(string $provider, #[CurrentUser] ?User $user): JsonResponse
     {
         if ($resp = $this->requireAdmin($user)) {
@@ -331,6 +332,11 @@ final class AdminProviderKeysController extends AbstractController
         }
         if ($resp = $this->requireKnownProvider($provider)) {
             return $resp;
+        }
+        if (!ProviderDefaultsService::supports($provider)) {
+            return $this->json([
+                'error' => sprintf('"%s" has no chat defaults — media and speech keys never become the default chat provider.', strtolower($provider)),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $applied = $this->defaults->applyGlobalDefaults($provider);

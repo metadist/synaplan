@@ -230,4 +230,21 @@ describe('ProviderKeyCard', () => {
 
     expect(notifications.success.mock.calls[0]?.[0]).toContain('not tested')
   })
+
+  it('does not call an env-supplied untestable key “saved”', () => {
+    const wrapper = mountCard({
+      name: 'thehive',
+      displayName: 'TheHive',
+      envVar: 'THEHIVE_API_KEY',
+      testable: false,
+      chat: false,
+      configured: true,
+      source: 'env',
+      origin: null,
+      maskedKey: 'th••••envk',
+    })
+
+    expect(wrapper.find('[data-testid="provider-key-untested-thehive"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="provider-key-source-env-thehive"]').exists()).toBe(true)
+  })
 })

@@ -388,14 +388,20 @@ final readonly class SystemConfigService
             $storeProvider = ProviderKeyCatalog::providerForEnvVar($key);
             if (null !== $storeProvider) {
                 $status = $this->providerKeyStore->getStatus($storeProvider);
+                // Each half of a pair reports its own presence so a missing
+                // secret is visible. An env-imported DB row is still "from
+                // the environment / Helm", not a UI override.
                 $isSet = ProviderKeyCatalog::isSecretEnvVar($key)
-                    ? $status['configured'] && $status['hasSecret']
-                    : $status['configured'];
+                    ? $status['hasSecret']
+                    : '' !== $status['maskedKey'];
+                $keySource = 'db' === $status['source'] && ProviderKeyStore::ORIGIN_ENV === $status['origin']
+                    ? 'env'
+                    : $status['source'];
                 $values[$key] = [
                     'value' => $isSet ? self::MASK : $field['default'],
                     'isSet' => $isSet,
                     'isMasked' => $isSet,
-                    'keySource' => $status['source'],
+                    'keySource' => $keySource,
                 ];
                 continue;
             }

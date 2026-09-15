@@ -3089,6 +3089,8 @@
     "saveUntested": "Speichern",
     "savedUntested": "{provider}-Schlüssel gespeichert — dieser Anbieter bietet keine kostenlose Prüfung, daher wurde er nicht getestet",
     "secretPlaceholder": "API-Secret einfügen…",
+    "keyAriaLabel": "API-Schlüssel für {provider}",
+    "secretAriaLabel": "API-Secret für {provider}",
     "secretHint": "{provider} braucht Schlüssel und Secret zusammen — beide aus der Anbieter-Konsole einfügen.",
     "sourceDbFromEnv": "in DB gespeichert (aus .env)",
     "sourceDbOverridesEnv": "Verschlüsselt in der Datenbank gespeichert — überschreibt jeden passenden Wert in .env.",
