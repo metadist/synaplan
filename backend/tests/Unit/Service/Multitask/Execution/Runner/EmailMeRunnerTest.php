@@ -74,6 +74,7 @@ final class EmailMeRunnerTest extends TestCase
         $translator->method('trans')->willReturnCallback(
             static fn (string $id, array $params = []): string => match ($id) {
                 'email.task_result.subject' => 'Your Synaplan results',
+                'email.task_result.subject_named' => ($params['%name%'] ?? '?').' — Your Synaplan results',
                 'email.task_result.sent_confirmation' => 'Sent to '.($params['%email%'] ?? '?'),
                 default => $id,
             }
@@ -154,6 +155,47 @@ final class EmailMeRunnerTest extends TestCase
         // Confirmation reaches the task card without leaking the full address.
         self::assertSame([['n4', 'Sent to a***@example.com']], $chunks);
         self::assertStringNotContainsString('alice@example.com', (string) $result->text);
+    }
+
+    public function testUsesAuthoredSubjectParamWhenPresent(): void
+    {
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::once())
+            ->method('sendTaskResultEmail')
+            ->with('alice@example.com', 'MIME walk result', 'THE POEM', []);
+
+        $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text'], [
+            'subject' => 'MIME walk result',
+        ]);
+        $result = $this->runner($this->user())->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
+    }
+
+    public function testUsesSavedTaskNameWhenNoSubjectParam(): void
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getText')->willReturn('mail it to me');
+        $message->method('getFileText')->willReturn('');
+        $message->method('getLanguage')->willReturn('en');
+        $message->method('getFile')->willReturn(0);
+        $message->method('getFilePath')->willReturn('');
+        $message->method('getFiles')->willReturn(new ArrayCollection());
+        $ctx = new NodeContext($message, [], 7, ['language' => 'en'], [
+            'saved_task_name' => 'Daily digest',
+        ]);
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::once())
+            ->method('sendTaskResultEmail')
+            ->with('alice@example.com', 'Daily digest — Your Synaplan results', 'THE POEM', []);
+
+        $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text']);
+        $result = $this->runner($this->user())->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
     }
 
     public function testFailsForPlaceholderChannelAddress(): void

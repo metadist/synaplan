@@ -31,6 +31,7 @@ email:
   
   task_result:
     subject: 'Ihre Ergebnisse von Synaplan'
+    subject_named: '%name% — Ihre Ergebnisse von Synaplan'
     sent_confirmation: 'Die Ergebnisse wurden per E-Mail an %email% gesendet.'
 
   footer:

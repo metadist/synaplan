@@ -98,7 +98,7 @@ final readonly class EmailMeRunner implements TaskRunner
         }
 
         $locale = $this->locale($context);
-        $subject = $this->translator->trans('email.task_result.subject', [], 'emails', $locale);
+        $subject = $this->subject($node, $context, $locale);
 
         try {
             $this->deliver($userId, $address, $subject, $text, $attachments);
@@ -150,6 +150,31 @@ final readonly class EmailMeRunner implements TaskRunner
         }
 
         $this->emailService->sendTaskResultEmail($address, $subject, $text, $attachments);
+    }
+
+    /**
+     * Prefer an authored `params.subject`, then the Saved Task name so
+     * scheduled result mails are distinguishable in the inbox, then the
+     * generic translated fallback for planner-generated `email_me` steps.
+     */
+    private function subject(TaskNode $node, NodeContext $context, string $locale): string
+    {
+        $param = $node->params['subject'] ?? null;
+        if (is_string($param) && '' !== trim($param)) {
+            return trim($param);
+        }
+
+        $taskName = $context->options['saved_task_name'] ?? null;
+        if (is_string($taskName) && '' !== trim($taskName)) {
+            return $this->translator->trans(
+                'email.task_result.subject_named',
+                ['%name%' => trim($taskName)],
+                'emails',
+                $locale
+            );
+        }
+
+        return $this->translator->trans('email.task_result.subject', [], 'emails', $locale);
     }
 
     /**
