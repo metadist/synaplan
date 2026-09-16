@@ -187,7 +187,7 @@ final readonly class ApiSessionSummaryService
         $clientLabel = $this->clientLabel($client);
         $languageName = LanguageDirectiveBuilder::nameFor($language);
 
-        return <<<PROMPT
+        $prompt = <<<PROMPT
             You maintain a rolling summary of an API session: a user connected an external client ({$clientLabel}, model {$model}) to their account, and you see short excerpts of what was requested and answered. Fold the new excerpts into the previous summary (when present) and return the updated summary.
 
             Rules:
@@ -196,7 +196,9 @@ final readonly class ApiSessionSummaryService
             - Write the summary in {$languageName}. When you quote the user, keep their original wording — do not translate quoted questions or answers.
             - Be factual. Never invent information that is not in the excerpts.
             - No preamble, no meta commentary — output only the summary text.
-            PROMPT.LanguageDirectiveBuilder::buildForOutputLanguage($language);
+            PROMPT;
+
+        return $prompt.LanguageDirectiveBuilder::buildForOutputLanguage($language);
     }
 
     /**
@@ -246,6 +248,7 @@ final readonly class ApiSessionSummaryService
         foreach ([
             ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ',
             ' wer ', ' wie ', ' was ', ' du ', ' bist ', ' hallo ', ' danke ',
+            ' bitte ',
         ] as $word) {
             if (str_contains($lower, $word)) {
                 $hits['de'] += 2;
@@ -286,8 +289,11 @@ final readonly class ApiSessionSummaryService
         arsort($hits);
         $best = array_key_first($hits);
         $bestScore = $hits[$best];
+        $runnerUp = array_values($hits)[1] ?? 0;
 
-        return $bestScore >= 2 ? $best : null;
+        // One distinctive anchor is enough on a short request, but a tie
+        // (qué vs is) must not pick English just because it is listed first.
+        return $bestScore >= 2 && $bestScore > $runnerUp ? $best : null;
     }
 
     /**
