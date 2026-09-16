@@ -151,7 +151,47 @@ async function cloneAssistant(id: number): Promise<void> {
   }
 }
 
+function setupBuilderLeaveGuard(): () => void {
+  const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+    if (!store.dirty) {
+      return
+    }
+    event.preventDefault()
+    event.returnValue = ''
+  }
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
+  const removeGuard = router.beforeEach(async (to, from, next) => {
+    const leavingBuilder =
+      from.name === 'ai-assistant-builder' && to.name !== 'ai-assistant-builder'
+    const switchingAssistant =
+      from.name === 'ai-assistant-builder' &&
+      to.name === 'ai-assistant-builder' &&
+      String(to.params.id) !== String(from.params.id)
+    if (!store.dirty || (!leavingBuilder && !switchingAssistant)) {
+      next()
+      return
+    }
+    const ok = await confirm({
+      title: t('unsavedChanges.title'),
+      message: t('unsavedChanges.confirmLeave'),
+      confirmText: t('common.leave'),
+      cancelText: t('common.stay'),
+      danger: true,
+    })
+    next(ok)
+  })
+
+  return () => {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+    removeGuard()
+  }
+}
+
+let stopLeaveGuard: (() => void) | null = null
+
 onMounted(() => {
+  stopLeaveGuard = setupBuilderLeaveGuard()
   if (builderMode.value) {
     void openBuilder(String(route.params.id ?? ''))
   } else {
@@ -171,6 +211,7 @@ watch(
 )
 
 onUnmounted(() => {
+  stopLeaveGuard?.()
   store.clear()
 })
 </script>
