@@ -889,6 +889,7 @@ export const chatApi = {
     text?: string
     language?: string
     duration?: number
+    extraction_error?: 'audio_transcription_failed' | 'document_extraction_failed'
   }> {
     // Derive the extension from the actual recording MIME so Safari/macOS
     // (audio/mp4) uploads as `.m4a` and stays on the transcription path,

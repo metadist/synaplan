@@ -863,6 +863,7 @@
     "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ No se detectó voz en la grabación",
     "transcriptionFailed": "Error de transcripción: {error}",
+    "dictationSttFailed": "No se pudo transcribir esta grabación. El reconocimiento de voz no está configurado, o el audio no se entendió. Conecta un servicio de voz a texto en Ajustes, o inténtalo de nuevo.",
     "mic": {
       "permissionWeb": "El acceso al micrófono está bloqueado. Permítelo en la configuración de tu navegador e inténtalo de nuevo.",
       "permissionIos": "El acceso al micrófono está desactivado. Abre los ajustes de iOS, selecciona esta app y activa «Micrófono».",

@@ -16,3 +16,7 @@ hint:
 
 admin:
   diagnostics: 'Admin-Diagnose (nur für dich sichtbar)'
+
+file_analysis:
+  audio_pending: 'Die Aufnahme wird noch vorbereitet. Bitte warte einen Moment und sende deine Frage erneut.'
+  audio_failed: 'Diese Aufnahme konnte nicht transkribiert werden. Auf diesem Server ist keine Sprache-zu-Text-Funktion eingerichtet, oder das Audio war nicht verständlich. Richte unter Einstellungen einen Sprache-zu-Text-Dienst ein oder versuche eine andere Datei.'

@@ -16,3 +16,7 @@ hint:
 
 admin:
   diagnostics: 'Diagnóstico de administrador (visible solo para ti)'
+
+file_analysis:
+  audio_pending: 'La grabación se está preparando. Espera un momento y envía tu pregunta de nuevo.'
+  audio_failed: 'No se pudo transcribir esta grabación. Este servidor no tiene configurado el reconocimiento de voz, o el audio no se pudo entender. Conecta un servicio de voz a texto en Ajustes, o prueba con otro archivo.'

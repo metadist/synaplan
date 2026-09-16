@@ -827,6 +827,7 @@
     "transcribed": "🎙️ Transcribed{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ No speech detected in recording",
     "transcriptionFailed": "Transcription failed: {error}",
+    "dictationSttFailed": "This recording could not be transcribed. Speech-to-text is not set up, or the audio could not be understood. Connect a speech-to-text service under Settings, or try again.",
     "mic": {
       "permissionWeb": "Microphone access is blocked. Allow it in your browser settings and try again.",
       "permissionIos": "Microphone access is turned off. Open the iOS Settings app, select this app, and turn on Microphone.",

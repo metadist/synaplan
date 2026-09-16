@@ -16,3 +16,7 @@ hint:
 
 admin:
   diagnostics: 'Yönetici tanılama (yalnızca senin için görünür)'
+
+file_analysis:
+  audio_pending: 'Kayıt hâlâ hazırlanıyor. Lütfen biraz bekle ve sorununu yeniden gönder.'
+  audio_failed: 'Bu kayıt yazıya dökülemedi. Bu sunucuda konuşmayı metne çevirme yok veya ses anlaşılamadı. Ayarlar’dan bir konuşmayı metne çevirme hizmeti bağla veya başka bir dosya dene.'

@@ -275,10 +275,14 @@ final readonly class MessagePreProcessor
             $useExternal = $this->aiFacade->hasConfiguredSttProvider($userId);
 
             if (!$useExternal && !$this->whisperService->isAvailable()) {
+                // Issue #1908: a missing STT backend is a failure, not success.
+                // Downstream treats `processed` as "extraction finished", so an
+                // empty BFILETEXT would look like a silent skip (UX contract U8).
                 $this->logger->warning('PreProcessor: Whisper not available and no external STT configured, skipping', [
                     'file' => basename($fullPath),
+                    'file_id' => $messageFile->getId(),
                 ]);
-                $messageFile->setStatus('processed');
+                $messageFile->setStatus('error');
 
                 return;
             }
@@ -288,8 +292,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, null);
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
 
@@ -307,6 +311,11 @@ final readonly class MessagePreProcessor
                     ]);
 
                     $this->billFileAnalysis($messageFile, $message, 'audio');
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Audio transcription produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                    ]);
                 }
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Audio transcription failed', [
@@ -458,8 +467,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $message->setFileText($transcribedText);
 
                     // Update message text for better classification
@@ -584,6 +593,21 @@ final readonly class MessagePreProcessor
         }
 
         return null;
+    }
+
+    /**
+     * `!empty()` treats whitespace-only strings as present; routeFiles() later
+     * trims and reports a failure. Trim here so every empty transcript is error.
+     *
+     * @param array<string, mixed>|null $result
+     */
+    private function transcribedText(?array $result): string
+    {
+        if (null === $result || !isset($result['text']) || !is_string($result['text'])) {
+            return '';
+        }
+
+        return trim($result['text']);
     }
 
     /**

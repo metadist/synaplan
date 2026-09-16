@@ -226,7 +226,7 @@ final class InferenceRouter
         // document_generation) come from SystemCapabilityRegistry. file_analysis
         // is a force-route (analyzefile), not a sorter topic, so it stays in
         // this local map — otherwise `?? 'chat'` silently sends every
-        // attachment turn to ChatHandler (issue #1910).
+        // attachment turn to ChatHandler (issue #1910 / #1908).
         // `document_generation` used to be MISSING here entirely, silently
         // defaulting to 'chat' via the `?? 'chat'` below — which happened to
         // be correct (ChatHandler runs the officemaker path internally) but
