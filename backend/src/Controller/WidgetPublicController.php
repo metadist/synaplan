@@ -1280,15 +1280,17 @@ class WidgetPublicController extends AbstractController
             if ($result['success']) {
                 $this->sessionService->incrementFileCount($widgetSession);
 
-                // Record FILE_ANALYSIS usage for widget owner
-                if ($owner) {
-                    $this->rateLimitService->recordUsage($owner, 'FILE_ANALYSIS', [
-                        'file_id' => $result['file']['id'],
-                        'widget_id' => $widgetId,
-                        'session_id' => $sessionId,
-                        'filename' => $uploadedFile->getClientOriginalName(),
-                        'source' => 'WIDGET',
-                    ]);
+                // Widget uploads are analysed immediately (extract + vectorize
+                // into WIDGET:<id> RAG), so bill FILE_ANALYSIS once here.
+                // recordFileAnalysisOnce dedupes on file_id if a later chat
+                // turn also analyses the same row. Authenticated /upload-file
+                // still defers billing because those files are only staged
+                // until send (issue #887 / #1912).
+                if (isset($result['file']['id'])) {
+                    $owner = $widget->getOwner();
+                    if ($owner) {
+                        $this->rateLimitService->recordFileAnalysisOnce($owner, (int) $result['file']['id']);
+                    }
                 }
 
                 $maxFilesForSession = $fileLimitCheck['max_files'] ?? $fileLimit;
