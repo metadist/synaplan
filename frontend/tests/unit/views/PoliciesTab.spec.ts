@@ -5,7 +5,10 @@ import { createPinia, setActivePinia } from 'pinia'
 const listAdminGroups = vi.fn()
 const getGroupConfig = vi.fn()
 const listLocks = vi.fn()
+const patchLocks = vi.fn()
 const getModels = vi.fn()
+const success = vi.fn()
+const error = vi.fn()
 
 vi.mock('@/services/api/iamApi', () => ({
   iamApi: {
@@ -13,7 +16,7 @@ vi.mock('@/services/api/iamApi', () => ({
     getGroupConfig: (...args: unknown[]) => getGroupConfig(...args),
     putGroupConfig: vi.fn(),
     listLocks: (...args: unknown[]) => listLocks(...args),
-    patchLocks: vi.fn(),
+    patchLocks: (...args: unknown[]) => patchLocks(...args),
   },
 }))
 
@@ -22,7 +25,7 @@ vi.mock('@/services/api/configApi', () => ({
 }))
 
 vi.mock('@/composables/useNotification', () => ({
-  useNotification: () => ({ success: vi.fn(), error: vi.fn() }),
+  useNotification: () => ({ success, error }),
 }))
 
 vi.mock('@iconify/vue', () => ({
@@ -30,13 +33,17 @@ vi.mock('@iconify/vue', () => ({
 }))
 
 import PoliciesTab from '@/components/people/PoliciesTab.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 describe('PoliciesTab', () => {
   beforeEach(() => {
     listAdminGroups.mockReset()
     getGroupConfig.mockReset()
     listLocks.mockReset()
+    patchLocks.mockReset()
     getModels.mockReset()
+    success.mockReset()
+    error.mockReset()
     listAdminGroups.mockResolvedValue([
       {
         id: 3,
@@ -91,6 +98,48 @@ describe('PoliciesTab', () => {
     expect(wrapper.find('[data-testid="check-allowed-groq:groq:chat"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="check-allowed-ollama:ollama:vectorize"]').exists()).toBe(
       true
+    )
+  })
+
+  it('shows instance locks even when no group is selected', async () => {
+    listAdminGroups.mockResolvedValue([])
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="section-policy-locks"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="lock-DEFAULTMODEL.CHAT"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-policy-defaults"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('Select a group to edit its policies.')
+    expect(wrapper.text()).toContain('These locks apply to the whole instance')
+  })
+
+  it('keeps the group chat default enabled and names the instance lock', async () => {
+    listLocks.mockResolvedValue({ 'DEFAULTMODEL.CHAT': true })
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    const chatSelect = wrapper.get('[data-testid="select-default-CHAT"]')
+    expect(chatSelect.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-testid="hint-policy-lock-ignored"]').text()).toContain(
+      'Not used while the instance lock is on.'
+    )
+  })
+
+  it('explains a missing instance default when locking fails', async () => {
+    patchLocks.mockRejectedValue(
+      new ApiError(422, 'Cannot lock', 'iam.noInstanceDefault')
+    )
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="lock-DEFAULTMODEL.CHAT"]').setValue(true)
+    await flushPromises()
+
+    expect(error).toHaveBeenCalledWith(
+      'There is no instance default to lock. Set the instance value first, then lock it.'
     )
   })
 })

@@ -13,6 +13,7 @@ use App\Repository\GroupConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\Exception\MissingInstanceDefaultException;
 
 /**
  * Admin read/write for group policy rows and global locks.
@@ -109,6 +110,9 @@ final readonly class GroupPolicyService
     {
         $locked = [];
         foreach ($body as $key => $on) {
+            if (!is_string($key)) {
+                throw new \InvalidArgumentException('Unknown policy key.');
+            }
             $parts = PolicyAllowList::split($key);
             if (null === $parts) {
                 throw new \InvalidArgumentException(sprintf('Unknown policy key "%s".', $key));
@@ -119,10 +123,10 @@ final readonly class GroupPolicyService
             }
             $row = $this->configRepository->findByOwnerGroupAndSetting(0, $parts['group'], $parts['setting']);
             if (null === $row) {
-                $this->configRepository->setValue(0, $parts['group'], $parts['setting'], '');
-                $row = $this->configRepository->findByOwnerGroupAndSetting(0, $parts['group'], $parts['setting']);
-            }
-            if (null === $row) {
+                if ($blocked) {
+                    throw new MissingInstanceDefaultException($key);
+                }
+                $locked[$key] = false;
                 continue;
             }
             $row->setBlocked($blocked);

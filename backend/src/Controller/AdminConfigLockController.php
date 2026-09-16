@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Iam\Exception\MissingInstanceDefaultException;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\GroupPolicyService;
 use OpenApi\Attributes as OA;
@@ -94,7 +95,21 @@ final class AdminConfigLockController extends AbstractController
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Admin access required'),
             new OA\Response(response: 404, description: 'Feature disabled'),
-            new OA\Response(response: 422, description: 'Unknown key'),
+            new OA\Response(
+                response: 422,
+                description: 'Unknown key, or locking a key that has no instance default',
+                content: new OA\JsonContent(
+                    required: ['error', 'code'],
+                    properties: [
+                        new OA\Property(property: 'error', type: 'string'),
+                        new OA\Property(
+                            property: 'code',
+                            type: 'string',
+                            example: 'iam.noInstanceDefault',
+                        ),
+                    ]
+                )
+            ),
         ]
     )]
     public function patch(Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -113,6 +128,11 @@ final class AdminConfigLockController extends AbstractController
                 $data,
                 $user,
                 (string) ($request->getClientIp() ?? ''),
+            );
+        } catch (MissingInstanceDefaultException $e) {
+            return $this->json(
+                ['error' => $e->getMessage(), 'code' => 'iam.noInstanceDefault'],
+                Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage(), 'code' => 'iam.unknownPolicyKey'], Response::HTTP_UNPROCESSABLE_ENTITY);

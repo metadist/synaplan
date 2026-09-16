@@ -699,8 +699,9 @@ the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 | `SAVEDTASKS.ENABLED`, `DESKTOP_AGENT.ENABLED`, `DOCUMENT_TOOLS.ENABLED`, `MULTITASK.*_ENABLED` | bool | OR |
 | `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
 
-A locked global row (`BCONFIG.BLOCKED = 1`) wins alone. Keys outside this list
-never consult `BGROUPCONFIG`. See
+A locked global row (`BCONFIG.BLOCKED = 1`) wins alone and is instance-wide —
+the People → Policies lock panel is not scoped to the selected group. Keys
+outside this list never consult `BGROUPCONFIG`. See
 [Group policies and locked defaults](ADMIN.md#group-policies-and-locked-defaults).
 
 See [People and groups](ADMIN.md#people-and-groups) in the admin guide.

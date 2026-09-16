@@ -514,10 +514,19 @@ time and set:
 | Features (saved tasks, desktop agent, document tools, multi-step) | On if any group turns the feature on | OR |
 | Rate-limit tier (`RATELIMITS.TIER`) | Which limit table `checkLimit()` uses | Highest of NEW / PRO / TEAM / BUSINESS |
 
-A personal setting still wins unless you lock the global row. Locked defaults
-show **Set by your administrator** on the user's model settings; a group
-default (when not locked) shows **Default from your group**. Changing a locked
-setting returns **409** `iam.settingLocked`.
+A personal setting still wins unless you lock the **instance** default.
+Locked defaults live in **People → Policies** in the **Locked instance
+defaults** panel (always visible; not tied to the selected group). They flip
+`BCONFIG.BLOCKED` on the global row, so the lock applies to every group and
+every user. While a lock is on, the group value configured on the same page is
+stored but not read. Unlock to use the group value again. Locked defaults show
+**Set by your administrator** on the user's model settings; a group default
+(when not locked) shows **Default from your group**. Changing a locked setting
+on the user model page returns **409** `iam.settingLocked`.
+
+Locking a key that has no global `BCONFIG` row is rejected (**422**
+`iam.noInstanceDefault`); set the instance value first. The lock endpoint never
+creates an empty global row.
 
 Search embeddings (`VECTORIZE`) stay instance-wide: you can store a group
 default, but the indexer and the user's Search dropdown still use the global
