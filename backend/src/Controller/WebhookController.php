@@ -77,7 +77,7 @@ class WebhookController extends AbstractController
                 new OA\Property(
                     property: 'attachments',
                     type: 'array',
-                    description: 'Optional. Each item\'s url is fetched by the server (http/https only; private addresses are refused) and stored as a File on the receiving user, linked to the inbound message. Unknown types and oversized files are skipped; the email is still accepted. Automatic vectorization is not started.',
+                    description: 'Optional. Each item\'s url is fetched by the server (http/https only; private addresses are refused, DNS is pinned) and stored as a File on the receiving user, linked to the inbound message. At most 10 attachments and 128 MB total are fetched; unknown types, oversize, quota misses and the rest of an over-budget list are skipped. The email is still accepted. Automatic vectorization is not started.',
                     items: new OA\Items(
                         properties: [
                             new OA\Property(property: 'filename', type: 'string', example: 'invoice.pdf'),
@@ -363,7 +363,7 @@ class WebhookController extends AbstractController
             }
             if (!empty($data['attachments']) && is_array($data['attachments'])) {
                 $message->setMeta('has_attachments', 'true');
-                $this->inboundEmailAttachmentStore->attach($message, (int) $user->getId(), $data['attachments']);
+                $this->inboundEmailAttachmentStore->attach($message, $user, $data['attachments']);
 
                 // Check for audio attachments to enable voice reply
                 foreach ($data['attachments'] as $attachment) {

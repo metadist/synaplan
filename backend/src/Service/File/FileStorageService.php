@@ -316,10 +316,11 @@ final readonly class FileStorageService
         $sanitized = preg_replace('/[^a-zA-Z0-9._-]/', '_', $originalFilename);
         $sanitized = preg_replace('/_+/', '_', $sanitized);
 
-        // Add timestamp to prevent collisions
+        // Timestamp plus a short random suffix: two same-named files in one
+        // second must not share a path (inbound email can post duplicates).
         $extension = pathinfo($sanitized, PATHINFO_EXTENSION);
         $basename = pathinfo($sanitized, PATHINFO_FILENAME);
-        $filename = $basename.'_'.$timestamp.'.'.$extension;
+        $filename = $basename.'_'.$timestamp.'_'.bin2hex(random_bytes(4)).'.'.$extension;
 
         $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
 
