@@ -686,10 +686,11 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Incognito-session uploads are ephemeral: hidden from file listings,
-        // never vectorized, deleted on session end (+ reaper safety net).
-        $incognito = '1' === $request->request->get('incognito');
-
+        // Chat attachments are ephemeral until the message that references
+        // them is sent (issue #1911): hidden from the Files list, skipped by
+        // vectorization listings, deleted if the user removes the chip or
+        // never sends (frontend DELETE + reaper). Incognito used the same
+        // flag; StreamController keeps the row when the turn is persisted.
         // Check rate limit for FILE_ANALYSIS BEFORE uploading
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
         if (!$rateLimitCheck['allowed']) {
@@ -730,7 +731,8 @@ class MessageController extends AbstractController
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
-            $messageFile->setEphemeral($incognito);
+            $messageFile->setSource('chat_attachment');
+            $messageFile->setEphemeral(true);
 
             $this->em->persist($messageFile);
             $this->em->flush();
