@@ -274,8 +274,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, null);
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $messageFile->setFileText($transcribedText);
                     $messageFile->setStatus('processed');
 
@@ -449,8 +449,8 @@ final readonly class MessagePreProcessor
                     ? $this->aiFacade->transcribe($fullPath, $userId)
                     : $this->transcribeWithWhisper($fullPath, $message->getLanguage());
                 $this->persistTranscriptionUsage($message, $result);
-                if ($result && !empty($result['text'])) {
-                    $transcribedText = $result['text'];
+                $transcribedText = $this->transcribedText($result);
+                if ('' !== $transcribedText) {
                     $message->setFileText($transcribedText);
 
                     // Update message text for better classification
@@ -575,6 +575,21 @@ final readonly class MessagePreProcessor
         }
 
         return null;
+    }
+
+    /**
+     * `!empty()` treats whitespace-only strings as present; routeFiles() later
+     * trims and reports a failure. Trim here so every empty transcript is error.
+     *
+     * @param array<string, mixed>|null $result
+     */
+    private function transcribedText(?array $result): string
+    {
+        if (null === $result || !isset($result['text']) || !is_string($result['text'])) {
+            return '';
+        }
+
+        return trim($result['text']);
     }
 
     /**

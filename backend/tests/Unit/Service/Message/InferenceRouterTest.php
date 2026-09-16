@@ -71,6 +71,38 @@ final class InferenceRouterTest extends TestCase
         );
     }
 
+    /**
+     * Issue #1910 / #1908: MessageClassifier emits intent file_analysis, but
+     * SystemCapabilityRegistry has no such capability, so the local map must
+     * send attachment turns to FileAnalysisHandler — otherwise pending/failed
+     * STT copy never runs.
+     */
+    public function testFileAnalysisIntentRoutesToTheFileAnalysisHandler(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $analysisHandler = $this->createHandlerMock('file_analysis');
+        $analysisHandler->expects(self::once())
+            ->method('handle')
+            ->willReturn(['content' => 'extracted', 'metadata' => []]);
+
+        $router = new InferenceRouter(
+            [$chatHandler, $analysisHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $result = $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile'],
+        );
+
+        self::assertSame(['content' => 'extracted', 'metadata' => []], $result);
+    }
+
     public function testUnknownIntentFallsBackToTheChatHandler(): void
     {
         $chatHandler = $this->createHandlerMock('chat');

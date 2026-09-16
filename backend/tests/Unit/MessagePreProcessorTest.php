@@ -789,4 +789,70 @@ class MessagePreProcessorTest extends TestCase
             }
         }
     }
+
+    /**
+     * Issue #1908: PHP `!empty("\\n")` is true, so whitespace-only STT used
+     * to mark the file processed while routeFiles() later treated it as failed.
+     */
+    public function testWhitespaceOnlyTranscriptMarksAudioFileError(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.webm';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(78);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('webm');
+            $file->method('getFileName')->willReturn('recording.webm');
+            $file->method('getFileSize')->willReturn(31000);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('uploaded');
+            $file->expects($this->never())->method('setFileText');
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('error');
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('isAvailable')
+                ->willReturn(true);
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('transcribe')
+                ->willReturn(['text' => "  \n\t  ", 'language' => 'en']);
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(124);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
 }
