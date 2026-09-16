@@ -34,6 +34,8 @@ describe('MessageText foreign [Memory:ID] badges', () => {
 
     const el = messageTextEl(wrapper)
     expect(el.querySelector('.memory-ref--foreign')).not.toBeNull()
+    expect(el.querySelector('.memory-ref--foreign')?.className).toContain('surface-chip')
+    expect(el.querySelector('.memory-ref--foreign')?.className).toContain('txt-secondary')
     expect(el.querySelector('.animate-spin')).toBeNull()
     expect(el.querySelector('a.memory-ref--readonly')).toBeNull()
     expect(el.querySelector('.memory-ref--missing')).toBeNull()
@@ -41,5 +43,37 @@ describe('MessageText foreign [Memory:ID] badges', () => {
     expect(el.textContent).toContain('Private memory')
     expect(fetchById).not.toHaveBeenCalled()
     expect(fetchAll).not.toHaveBeenCalled()
+  })
+
+  it('re-renders the terminal badge when foreignMemory arrives after first paint', async () => {
+    vi.useFakeTimers()
+    const store = useMemoriesStore()
+    const fetchById = vi.spyOn(store, 'fetchMemoryById')
+    const fetchAll = vi.spyOn(store, 'fetchMemories')
+
+    const wrapper = mount(MessageText, {
+      props: {
+        content: 'after work [Memory:1785496054423666]?',
+      },
+    })
+    await wrapper.vm.$nextTick()
+    await flushPromises()
+
+    expect(messageTextEl(wrapper).querySelector('.memory-ref--foreign')).toBeNull()
+
+    await wrapper.setProps({ foreignMemory: true })
+    await wrapper.vm.$nextTick()
+    fetchById.mockClear()
+    fetchAll.mockClear()
+    await vi.runAllTimersAsync()
+    await flushPromises()
+
+    const el = messageTextEl(wrapper)
+    expect(el.querySelector('.memory-ref--foreign')).not.toBeNull()
+    expect(el.querySelector('.animate-spin')).toBeNull()
+    expect(el.querySelector('.memory-ref--missing')).toBeNull()
+    expect(fetchById).not.toHaveBeenCalled()
+    expect(fetchAll).not.toHaveBeenCalled()
+    vi.useRealTimers()
   })
 })
