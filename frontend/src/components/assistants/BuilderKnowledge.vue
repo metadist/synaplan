@@ -30,7 +30,7 @@
       class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center"
     >
       {{ $t('assistants.uploadFile') }}
-      <input type="file" class="sr-only" data-testid="input-knowledge-file" @change="onUpload" />
+      <input type="file" class="hidden" data-testid="input-knowledge-file" @change="onUpload" />
     </label>
     <label class="flex items-start gap-2">
       <input

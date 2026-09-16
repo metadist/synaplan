@@ -84,4 +84,11 @@ describe('BuilderKnowledge', () => {
     expect(store.current?.draft?.knowledge.includeUserFiles).toBe(true)
     expect(store.dirty).toBe(true)
   })
+
+  it('hides the file input with display:none so focusing it cannot scroll the shell', () => {
+    const { wrapper } = mountKnowledge()
+    const input = wrapper.get('[data-testid="input-knowledge-file"]')
+    expect(input.classes()).toContain('hidden')
+    expect(input.classes()).not.toContain('sr-only')
+  })
 })

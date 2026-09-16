@@ -36,7 +36,7 @@
         <input
           type="file"
           accept=".json,application/json"
-          class="sr-only"
+          class="hidden"
           data-testid="input-bundle-file"
           @change="onFile"
         />
