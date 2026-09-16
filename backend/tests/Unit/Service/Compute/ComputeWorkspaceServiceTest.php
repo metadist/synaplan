@@ -232,4 +232,39 @@ final class ComputeWorkspaceServiceTest extends TestCase
 
         return new ComputeConfig($repo, 'http://compute:8080', 'token-token-token-token-token-32b');
     }
+
+    /**
+     * Issue #1875 / PR #1949: when COMPUTE_WORKSPACE_MB is missing, the
+     * fallback must follow the resolved group tier, not the billing level.
+     */
+    public function testMissingWorkspaceQuotaRowUsesGroupTierFallback(): void
+    {
+        $created = new ComputeWorkspaceCreated('01ARZ3NDEKTSV4RRFFQ69G5FAV', 2048);
+        $client = $this->createMock(ComputeClient::class);
+        $client->expects($this->once())
+            ->method('createWorkspace')
+            ->with(self::callback(static function (ComputeWorkspaceCreate $body): bool {
+                self::assertSame(2048, $body->quotaMb);
+
+                return true;
+            }))
+            ->willReturn($created);
+
+        $repo = $this->createMock(ComputeWorkspaceRepository::class);
+        $repo->method('findActiveForUser')->willReturn(null);
+        $repo->expects($this->once())->method('save');
+
+        $limits = $this->createStub(RateLimitService::class);
+        $limits->method('computeIntSetting')->willReturnCallback(
+            static fn (User $_user, string $_setting, int $fallback): int => $fallback,
+        );
+        $limits->method('resolveRateLimitLevel')->willReturn('BUSINESS');
+
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        $service = new ComputeWorkspaceService($this->config(), $client, $repo, $limits, $this->locks());
+        $service->ensure($user);
+    }
 }
