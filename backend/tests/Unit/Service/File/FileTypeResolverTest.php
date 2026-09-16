@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\File;
 
+use App\Service\File\FileStorageService;
 use App\Service\File\FileTypeResolver;
+use App\Service\Message\MessagePreProcessor;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -65,6 +67,39 @@ final class FileTypeResolverTest extends TestCase
     {
         self::assertSame('document', FileTypeResolver::resolveCategory('pdf', 'a.pdf'));
         self::assertSame('image', FileTypeResolver::resolveCategory('png', 'a.png'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('ics', 'invite.ics'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('odt', 'notes.odt'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('rtf', 'letter.rtf'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('pages', 'essay.pages'));
         self::assertSame('', FileTypeResolver::resolveCategory('xyz', 'a.xyz'));
+    }
+
+    /**
+     * Issue #1907: every accepted upload that is not an image, audio, video,
+     * HEIC (transcoded to JPEG on store), or a store-only archive must be a
+     * document so the chat path extracts it and FileTypeResolver can route it.
+     */
+    public function testEveryAllowedNonMediaExtensionIsADocument(): void
+    {
+        $media = array_merge(
+            MessagePreProcessor::IMAGE_EXTENSIONS,
+            MessagePreProcessor::AUDIO_EXTENSIONS,
+            MessagePreProcessor::VIDEO_EXTENSIONS,
+            ['heic', 'heif'],
+            FileStorageService::STORE_ONLY_EXTENSIONS,
+        );
+
+        foreach (FileStorageService::ALLOWED_EXTENSIONS as $ext) {
+            if (in_array($ext, $media, true)) {
+                continue;
+            }
+
+            self::assertContains(
+                $ext,
+                MessagePreProcessor::DOCUMENT_EXTENSIONS,
+                $ext.' is allowed to upload but is never extracted on the chat path',
+            );
+            self::assertSame('document', FileTypeResolver::resolveCategory($ext, 'file.'.$ext));
+        }
     }
 }

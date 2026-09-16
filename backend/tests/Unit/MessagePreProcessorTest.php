@@ -517,6 +517,10 @@ class MessagePreProcessorTest extends TestCase
         yield 'markdown' => ['md'];
         yield 'csv' => ['csv'];
         yield 'powerpoint legacy' => ['ppt'];
+        yield 'icalendar' => ['ics'];
+        yield 'opendocument text' => ['odt'];
+        yield 'rtf' => ['rtf'];
+        yield 'apple pages' => ['pages'];
     }
 
     #[DataProvider('supportedDocumentExtensionsProvider')]
