@@ -97,6 +97,11 @@ final class EmailMeRunnerTest extends TestCase
 
     private function context(): NodeContext
     {
+        return $this->namedTaskContext(null);
+    }
+
+    private function namedTaskContext(?string $taskName): NodeContext
+    {
         $m = $this->createMock(Message::class);
         $m->method('getText')->willReturn('write a spring poem and mail it to me');
         $m->method('getFileText')->willReturn('');
@@ -105,7 +110,9 @@ final class EmailMeRunnerTest extends TestCase
         $m->method('getFilePath')->willReturn('');
         $m->method('getFiles')->willReturn(new ArrayCollection());
 
-        return new NodeContext($m, [], 7, ['language' => 'en']);
+        $options = null !== $taskName ? ['saved_task_name' => $taskName] : [];
+
+        return new NodeContext($m, [], 7, ['language' => 'en'], $options);
     }
 
     private function emailNode(): TaskNode
@@ -176,16 +183,39 @@ final class EmailMeRunnerTest extends TestCase
 
     public function testUsesSavedTaskNameWhenNoSubjectParam(): void
     {
-        $message = $this->createMock(Message::class);
-        $message->method('getText')->willReturn('mail it to me');
-        $message->method('getFileText')->willReturn('');
-        $message->method('getLanguage')->willReturn('en');
-        $message->method('getFile')->willReturn(0);
-        $message->method('getFilePath')->willReturn('');
-        $message->method('getFiles')->willReturn(new ArrayCollection());
-        $ctx = new NodeContext($message, [], 7, ['language' => 'en'], [
-            'saved_task_name' => 'Daily digest',
+        $ctx = $this->namedTaskContext('Daily digest');
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::once())
+            ->method('sendTaskResultEmail')
+            ->with('alice@example.com', 'Daily digest — Your Synaplan results', 'THE POEM', []);
+
+        $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text']);
+        $result = $this->runner($this->user())->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
+    }
+
+    public function testStripsCarriageReturnsFromAuthoredSubject(): void
+    {
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::once())
+            ->method('sendTaskResultEmail')
+            ->with('alice@example.com', 'MIME walk result extra', 'THE POEM', []);
+
+        $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text'], [
+            'subject' => "MIME walk result\r\n extra",
         ]);
+        $result = $this->runner($this->user())->run($node, $ctx);
+
+        self::assertTrue($result->isSuccessful());
+    }
+
+    public function testStripsNewlinesFromSavedTaskNameInSubject(): void
+    {
+        $ctx = $this->namedTaskContext("Daily\ndigest");
         $ctx->setResult('n1', NodeResult::ok('THE POEM'));
 
         $this->emailService->expects(self::once())

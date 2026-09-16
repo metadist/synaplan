@@ -159,22 +159,37 @@ final readonly class EmailMeRunner implements TaskRunner
      */
     private function subject(TaskNode $node, NodeContext $context, string $locale): string
     {
-        $param = $node->params['subject'] ?? null;
-        if (is_string($param) && '' !== trim($param)) {
-            return trim($param);
+        $param = $this->singleLineSubject($node->params['subject'] ?? null);
+        if (null !== $param) {
+            return $param;
         }
 
-        $taskName = $context->options['saved_task_name'] ?? null;
-        if (is_string($taskName) && '' !== trim($taskName)) {
+        $taskName = $this->singleLineSubject($context->options['saved_task_name'] ?? null);
+        if (null !== $taskName) {
             return $this->translator->trans(
                 'email.task_result.subject_named',
-                ['%name%' => trim($taskName)],
+                ['%name%' => $taskName],
                 'emails',
                 $locale
             );
         }
 
         return $this->translator->trans('email.task_result.subject', [], 'emails', $locale);
+    }
+
+    /**
+     * MIME Subject is one header line. CR/LF in an authored subject or Saved
+     * Task name would split the header (or make Mailer/Graph reject the send).
+     */
+    private function singleLineSubject(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+        $line = trim(str_replace(["\r", "\n"], ' ', $value));
+        $collapsed = preg_replace('/ {2,}/', ' ', $line);
+
+        return is_string($collapsed) && '' !== $collapsed ? $collapsed : null;
     }
 
     /**
