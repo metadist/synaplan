@@ -179,6 +179,7 @@ test.describe('@ci Admin panel', () => {
         timeout: TIMEOUTS.STANDARD,
       })
       await expect(page.locator(selectors.people.sectionPolicies)).toBeVisible()
+      await expect(page.locator(selectors.people.sectionPolicyLocks)).toBeVisible()
       // Wrapper mounts before getGroupConfig finishes; wait for the form so a
       // parse-error toast cannot race past a zero-count assertion.
       await expect(page.locator(selectors.people.sectionPolicyDefaults)).toBeVisible({
