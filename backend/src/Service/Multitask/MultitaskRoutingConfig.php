@@ -109,12 +109,16 @@ final readonly class MultitaskRoutingConfig
     }
 
     /**
-     * Parallel execution of independent nodes (Phase 4). Global-only switch;
-     * when off the executor runs the DAG sequentially.
+     * Parallel execution of independent nodes (Phase 4). When off the executor
+     * runs the DAG sequentially.
+     *
+     * Pass the EFFECTIVE user id (see ModelConfigService::getEffectiveUserIdForMessage)
+     * so a group policy for MULTITASK.PARALLEL_ENABLED is applied the same way
+     * as ROUTING_ENABLED. A null id skips the group layer (global only).
      */
-    public function isParallelEnabled(): bool
+    public function isParallelEnabled(?int $userId): bool
     {
-        return $this->resolveFlag(self::KEY_PARALLEL_ENABLED, null, self::DEFAULT_PARALLEL_ENABLED);
+        return $this->resolveFlag(self::KEY_PARALLEL_ENABLED, $userId, self::DEFAULT_PARALLEL_ENABLED);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Multitask;
 
 use App\Repository\ConfigRepository;
+use App\Service\Config\LayeredConfigResolver;
 use App\Service\Multitask\MultitaskRoutingConfig;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -83,7 +84,34 @@ final class MultitaskRoutingConfigTest extends TestCase
     {
         $this->configRepository->method('getValue')->willReturn(null);
 
-        self::assertFalse($this->config->isParallelEnabled());
+        self::assertFalse($this->config->isParallelEnabled(7));
+        self::assertFalse($this->config->isParallelEnabled(null));
+    }
+
+    public function testParallelEnabledForwardsTheUserIdToTheLayeredResolver(): void
+    {
+        $layered = $this->createMock(LayeredConfigResolver::class);
+        $layered->expects(self::once())
+            ->method('resolveBool')
+            ->with(9, MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_PARALLEL_ENABLED, false)
+            ->willReturn(true);
+
+        $config = new MultitaskRoutingConfig($this->configRepository, $layered);
+
+        self::assertTrue($config->isParallelEnabled(9));
+    }
+
+    public function testParallelEnabledWithoutAUserSkipsTheGroupLayer(): void
+    {
+        $layered = $this->createMock(LayeredConfigResolver::class);
+        $layered->expects(self::once())
+            ->method('resolveBool')
+            ->with(null, MultitaskRoutingConfig::CONFIG_GROUP, MultitaskRoutingConfig::KEY_PARALLEL_ENABLED, false)
+            ->willReturn(false);
+
+        $config = new MultitaskRoutingConfig($this->configRepository, $layered);
+
+        self::assertFalse($config->isParallelEnabled(null));
     }
 
     public function testShadowModeReadsGlobalOnly(): void
