@@ -233,6 +233,7 @@ final class SavedTaskRunnerTest extends TestCase
         // Pinning the prompt as a fixed topic skipped the sorter and lost the
         // tool calls the manual request made.
         $this->assertSame(11, $capturedOptions['saved_task_id'] ?? null);
+        $this->assertSame('Katzenbild', $capturedOptions['saved_task_name'] ?? null);
         $this->assertArrayNotHasKey('fixed_task_prompt', $capturedOptions);
         // The incoming message must not stay stuck in "processing".
         $this->assertSame('complete', $captured->getStatus());
@@ -355,6 +356,7 @@ final class SavedTaskRunnerTest extends TestCase
         $this->assertSame('meetings', $capturedOptions['fixed_task_prompt'] ?? null);
         $this->assertTrue($capturedOptions['saved_task'] ?? false);
         $this->assertSame(12, $capturedOptions['saved_task_id'] ?? null);
+        $this->assertSame('Meeting requests', $capturedOptions['saved_task_name'] ?? null);
     }
 
     private function setId(SavedTask $task, int $id): void

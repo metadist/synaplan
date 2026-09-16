@@ -267,6 +267,7 @@ export interface PersistedChatAttachment {
   filename: string
   file_type: string
   name?: string
+  staged?: boolean
 }
 
 interface PersistedAttachments {
@@ -346,6 +347,7 @@ export function useAttachmentPersist<T extends PersistedChatAttachment>(
         filename: f.filename,
         file_type: f.file_type,
         name: f.name,
+        staged: Boolean(f.staged),
       }))
   }
 

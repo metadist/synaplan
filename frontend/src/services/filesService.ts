@@ -224,6 +224,10 @@ export const fileItemSchema = z.object({
   provider: z.string().nullable().optional(),
   thumb_url: z.string().nullable().optional(),
   text_preview: z.string(),
+  /** Length of the stored extract; 0 on a failed row means nothing was readable. */
+  extracted_text_length: z.number().optional(),
+  /** Plain-language reason when the row failed with an empty extract. */
+  error: z.string().nullable().optional(),
   uploaded_at: z.number(),
   uploaded_date: z.string(),
   message_id: z.number().nullable(),
@@ -1028,6 +1032,7 @@ export interface StorageStats {
 export interface StorageStatsResponse {
   success: boolean
   user_level: string
+  rate_limit_level?: string
   storage: StorageStats
 }
 

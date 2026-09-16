@@ -245,6 +245,7 @@ final readonly class SavedTaskRunner
         $options = [
             'saved_task' => true,
             'saved_task_id' => (int) $task->getId(),
+            'saved_task_name' => $task->getName(),
         ];
         if ([] !== $triggerPayload) {
             $options['trigger_payload'] = $triggerPayload;

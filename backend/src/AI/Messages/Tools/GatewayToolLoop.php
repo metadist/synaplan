@@ -632,7 +632,6 @@ final readonly class GatewayToolLoop
                     sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']),
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 continue;
             }
 
@@ -643,7 +642,6 @@ final readonly class GatewayToolLoop
                     'MCP server is not available.',
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 continue;
             }
 
@@ -651,26 +649,25 @@ final readonly class GatewayToolLoop
                 $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
                 if (null !== $gated) {
                     $results[] = $gated;
-                    $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                     continue;
                 }
                 $call = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
                 $text = $this->formatToolContent($call['content']);
                 $isError = $call['isError'];
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], $isError);
                 $results[] = $this->toolResultBlock($toolUseId, $text, $isError);
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: $isError);
             } catch (McpClientException $e) {
                 $this->logger->warning('GatewayToolLoop: MCP tool call failed', [
                     'server_id' => $entry['serverId'],
                     'tool' => $entry['tool'],
                     'error' => $e->getMessage(),
                 ]);
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     'Tool call failed: '.$e->getMessage(),
                     isError: true,
                 );
-                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
             }
 
             if (null !== $ping) {
@@ -861,6 +858,10 @@ final readonly class GatewayToolLoop
         $this->recordToolUsage($user, $source, 'synaplan', 'tool:'.$tool, $query, $error);
     }
 
+    /**
+     * Ledger-only: tools must not consume the MESSAGES quota (issue #1878).
+     * Usage statistics still need a BUSELOG row per tool call.
+     */
     private function recordToolUsage(
         User $user,
         string $source,
@@ -870,7 +871,7 @@ final readonly class GatewayToolLoop
         bool $error,
     ): void {
         try {
-            $this->rateLimitService->recordUsage($user, 'MESSAGES', [
+            $this->rateLimitService->recordUsage($user, 'TOOLS', [
                 'source' => $source,
                 'provider' => $provider,
                 'model' => $model,

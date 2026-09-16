@@ -55,11 +55,14 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
         ]);
 
         $metered = null;
+        $meteredAction = null;
         $rateLimits = $this->createMock(RateLimitService::class);
         $rateLimits->expects($this->once())
             ->method('recordUsage')
-            ->willReturnCallback(static function (User $u, string $action, array $metadata) use (&$metered): RecordedUsage {
+            ->willReturnCallback(static function (User $u, string $action, array $metadata) use (&$metered, &$meteredAction): RecordedUsage {
+                unset($u);
                 $metered = $metadata;
+                $meteredAction = $action;
 
                 return new RecordedUsage('0.000000', '0.000000', 0, 0, 0);
             });
@@ -68,6 +71,7 @@ final class OpenAICompatibleControllerMultimodalTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertIsArray($metered);
+        self::assertSame('MESSAGES', $meteredAction);
         self::assertIsString($metered['input_text']);
         self::assertSame("What is on this page?\n[image]", $metered['input_text']);
     }

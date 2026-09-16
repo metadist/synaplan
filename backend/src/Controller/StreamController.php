@@ -999,6 +999,7 @@ class StreamController extends AbstractController
                         if ($file && $file->getUserId() === $user->getId()) {
                             // Associate file with message using ManyToMany relationship
                             $incomingMessage->addFile($file);
+                            $file->keepAfterChatSend($incognito);
                             ++$fileCount;
 
                             $this->logger->info('StreamController: File attached to message', [

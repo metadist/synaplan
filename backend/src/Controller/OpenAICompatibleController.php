@@ -657,7 +657,8 @@ class OpenAICompatibleController extends AbstractController
     }
 
     /**
-     * Meter a completed chat call. Metering runs after the answer is produced
+     * Meter a completed chat call against the same `MESSAGES` action the
+     * request was gated on. Metering runs after the answer is produced
      * (and, when streaming, after it has already been written to the wire), so
      * a bookkeeping failure must never turn a successful completion into a 500.
      *
@@ -666,7 +667,7 @@ class OpenAICompatibleController extends AbstractController
     private function recordChatUsage(User $user, array $metadata): void
     {
         try {
-            $this->rateLimitService->recordUsage($user, 'API_CHAT', $metadata);
+            $this->rateLimitService->recordUsage($user, 'MESSAGES', $metadata);
         } catch (\Throwable $e) {
             $this->logger->error('OpenAI-compatible: recordUsage failed', [
                 'error' => $e->getMessage(),

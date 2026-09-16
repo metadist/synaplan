@@ -884,7 +884,7 @@ export const chatApi = {
     options?: { incognito?: boolean }
   ): Promise<{
     success: boolean
-    file_id: number
+    file_id?: number
     filename: string
     text?: string
     language?: string
@@ -897,6 +897,7 @@ export const chatApi = {
 
     const formData = new FormData()
     formData.append('file', audioBlob, resolvedFilename)
+    formData.append('purpose', 'dictation')
     if (options?.incognito) {
       formData.append('incognito', '1')
     }

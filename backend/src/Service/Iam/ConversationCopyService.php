@@ -80,7 +80,7 @@ final readonly class ConversationCopyService
         $message->setFileType($original->getFileType());
         $message->setTopic($original->getTopic());
         $message->setLanguage($original->getLanguage());
-        $message->setText($original->getText());
+        $message->setText($this->stripOwnerMemoryReferences($original->getText()));
         $message->setDirection($original->getDirection());
         $message->setStatus($original->getStatus());
         $message->setFileText($original->getFileText());
@@ -111,5 +111,16 @@ final readonly class ConversationCopyService
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * Owner memory IDs are personal data. Drop the tokens so the member's copy
+     * does not try to resolve them (issue #1880).
+     */
+    private function stripOwnerMemoryReferences(string $text): string
+    {
+        $stripped = preg_replace('/\[Memory\s*:\s*[^\]]+\]\s*/i', '', $text);
+
+        return is_string($stripped) ? $stripped : $text;
     }
 }

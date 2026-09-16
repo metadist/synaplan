@@ -265,7 +265,7 @@ services:
     networks: [internal]
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.4@sha256:78b2fcd11e69f7cd82072924db99865be2beba4a03087d8ce0f5008ae357abe4
+    image: centrifugo/centrifugo:v6.9.5@sha256:99730b3f481c7ee639dbd2147716e3c12bd3ad191df5e8427e050414806609a3
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     environment:
       CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: "${REALTIME_TOKEN_SECRET:?Set a stable Centrifugo token secret}"
@@ -336,7 +336,7 @@ services:
     networks: [internal]
 
   ollama:
-    image: ollama/ollama:latest@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
+    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
     profiles: [local-ai]
     environment:
       OLLAMA_HOST: 0.0.0.0

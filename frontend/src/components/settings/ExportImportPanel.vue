@@ -31,16 +31,22 @@
       >
         {{ $t('bundle.export') }}
       </button>
-      <label class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium cursor-pointer">
+      <button
+        type="button"
+        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        data-testid="btn-bundle-file"
+        @click="bundleFileInput?.click()"
+      >
         {{ $t('bundle.chooseFile') }}
-        <input
-          type="file"
-          accept=".json,application/json"
-          class="sr-only"
-          data-testid="input-bundle-file"
-          @change="onFile"
-        />
-      </label>
+      </button>
+      <input
+        ref="bundleFileInput"
+        type="file"
+        accept=".json,application/json"
+        class="hidden"
+        data-testid="input-bundle-file"
+        @change="onFile"
+      />
     </div>
 
     <p v-if="errorText" class="text-sm text-red-600 dark:text-red-400">{{ errorText }}</p>
@@ -124,6 +130,7 @@ const pendingBundle = ref<unknown>(null)
 const overwrite = ref(false)
 const results = ref<BundleImportResult['results']>([])
 const errorText = ref('')
+const bundleFileInput = ref<HTMLInputElement | null>(null)
 
 const checklist = computed<BundleChecklistItem[]>(() =>
   (preview.value?.sections ?? []).flatMap((section) => section.items)

@@ -100,7 +100,10 @@ const planLabels = {
 } as const
 
 const planName = computed(() => {
-  const level = (stats.value?.user_level as keyof typeof planLabels | undefined) ?? 'NEW'
+  const level =
+    (stats.value?.rate_limit_level as keyof typeof planLabels | undefined) ??
+    (stats.value?.user_level as keyof typeof planLabels | undefined) ??
+    'NEW'
   return planLabels[level] ?? level
 })
 

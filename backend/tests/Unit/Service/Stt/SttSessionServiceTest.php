@@ -15,6 +15,7 @@ use App\Service\Stt\SttAudioAssembler;
 use App\Service\Stt\SttModelResolver;
 use App\Service\Stt\SttSessionService;
 use App\Service\Stt\SttSessionStore;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -105,7 +106,9 @@ final class SttSessionServiceTest extends TestCase
                 $this->callback(static fn (string $path): bool => is_file($path) && str_ends_with($path, '.wav')),
                 42,
                 $this->callback(static function (array $opts): bool {
-                    return 'whisper' === $opts['provider'] && 'whisper' === $opts['model'];
+                    return 'whisper' === $opts['provider']
+                        && 'whisper' === $opts['model']
+                        && 330 === $opts['model_id'];
                 }),
             )
             ->willReturn([
@@ -167,11 +170,14 @@ final class SttSessionServiceTest extends TestCase
     public function testRateLimitIsEnforcedOnCommit(): void
     {
         $this->rateLimit = $this->createMock(RateLimitService::class);
-        $this->rateLimit->method('checkLimit')->willReturn([
-            'allowed' => false,
-            'used' => 10,
-            'limit' => 10,
-        ]);
+        $this->rateLimit->expects(self::atLeastOnce())
+            ->method('checkLimit')
+            ->with($this->user, TranscriptionUsageRecorder::ACTION)
+            ->willReturn([
+                'allowed' => false,
+                'used' => 10,
+                'limit' => 10,
+            ]);
         $this->service = new SttSessionService(
             $this->store,
             new SttAudioAssembler(),
@@ -185,6 +191,7 @@ final class SttSessionServiceTest extends TestCase
         $this->service->appendAudio($this->user, 1, $session->id, 'abcd', false);
 
         $this->expectException(RateLimitExceededException::class);
+        $this->expectExceptionMessage('TRANSCRIPTION');
         $this->service->commit($this->user, 1, $session->id);
     }
 

@@ -19,6 +19,20 @@
           $t('assistants.saved')
         }}</span>
       </div>
+      <div
+        v-if="otherFieldErrors.length > 0"
+        class="rounded-lg border border-red-600/30 dark:border-red-400/30 px-3 py-2 space-y-1"
+        data-testid="notice-save-errors"
+      >
+        <p class="txt-primary text-sm font-medium">{{ $t('assistants.couldNotSaveField') }}</p>
+        <p
+          v-for="entry in otherFieldErrors"
+          :key="entry.path"
+          class="text-sm text-red-600 dark:text-red-400"
+        >
+          {{ entry.message }}
+        </p>
+      </div>
       <BuilderBasics />
       <BuilderInstructions />
       <BuilderModels />
@@ -32,8 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-import { useNotification } from '@/composables/useNotification'
+import { computed } from 'vue'
 import { useAgentsStore } from '@/stores/agents'
 import BuilderBasics from './BuilderBasics.vue'
 import BuilderInstructions from './BuilderInstructions.vue'
@@ -48,15 +61,21 @@ const emit = defineEmits<{
   deleted: []
 }>()
 
+const INLINE_ERROR_PATHS = new Set(['name', 'description', 'behaviour.greeting'])
+
 const store = useAgentsStore()
-const { t } = useI18n()
-const { error } = useNotification()
+
+const otherFieldErrors = computed(() =>
+  Object.entries(store.fieldErrors)
+    .filter(([path]) => !INLINE_ERROR_PATHS.has(path))
+    .map(([path, message]) => ({ path, message }))
+)
 
 async function onSave(): Promise<void> {
   try {
     await store.saveDraft()
   } catch {
-    error(t('assistants.saveFailed'))
+    // saveDraft already recorded fieldErrors and toasted a nameless failure.
   }
 }
 </script>

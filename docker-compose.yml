@@ -725,7 +725,7 @@ services:
   # Authentication uses short-lived JWTs issued by the PHP backend.
   # ----------------------------------------------------------------------------
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.4@sha256:78b2fcd11e69f7cd82072924db99865be2beba4a03087d8ce0f5008ae357abe4
+    image: centrifugo/centrifugo:v6.9.5@sha256:99730b3f481c7ee639dbd2147716e3c12bd3ad191df5e8427e050414806609a3
     container_name: synaplan-centrifugo
     command: ["centrifugo", "-c", "/centrifugo/config.json"]
     volumes:
@@ -766,7 +766,7 @@ services:
   # app roles derive OLLAMA_BASE_URL from the same profile (see backend above).
   ollama:
     profiles: [local-ai]
-    image: ollama/ollama:latest@sha256:684d8674b4315fa18f4f0e973a118ec2652ed96f67563277839985175858e0ba
+    image: ollama/ollama:latest@sha256:0c0a83210471fb50226bcdc2d6611d20ab13ae87e024cc304c94a6a5765c5e65
     container_name: synaplan-ollama
     ports:
       - "11435:11434"
@@ -840,7 +840,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.32.0@sha256:576fc2074ac77bcfbf3fe27633aa0dd89b452a170b2cd31689c8751e94d60f7a
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.33.0@sha256:546cf392145a0a578f23e4250663a37a5fb727fe6b57fd163e301584ad8bc18c
     container_name: synaplan-docling
     profiles: [docling]
     restart: unless-stopped
@@ -938,7 +938,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7@sha256:29be7252db0a106f1cd2ac17b9a56ff2668073da645638a38b9fc67deeb2d6c4
+    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -971,7 +971,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.7@sha256:29be7252db0a106f1cd2ac17b9a56ff2668073da645638a38b9fc67deeb2d6c4
+    image: quay.io/keycloak/keycloak:26.7@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:

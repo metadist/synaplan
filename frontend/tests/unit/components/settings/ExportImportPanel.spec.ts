@@ -82,4 +82,13 @@ describe('ExportImportPanel', () => {
     expect(importBundle).toHaveBeenCalledWith(expect.anything(), 'overwrite')
     expect(wrapper.get('[data-testid="bundle-results"]').text()).toContain('1 created')
   })
+
+  it('hides the file input and keeps a keyboard-focusable choose-file button', () => {
+    sections.mockResolvedValue([])
+    const wrapper = mountPanel()
+    const input = wrapper.get('[data-testid="input-bundle-file"]')
+    expect(input.classes()).toContain('hidden')
+    expect(input.classes()).not.toContain('sr-only')
+    expect(wrapper.get('[data-testid="btn-bundle-file"]').element.tagName).toBe('BUTTON')
+  })
 })

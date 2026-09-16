@@ -343,12 +343,6 @@ parameters:
 			path: src/Service/PromptService.php
 
 		-
-			message: '#^Constant App\\Service\\RateLimitService\:\:CACHE_TTL is unused\.$#'
-			identifier: classConstant.unused
-			count: 1
-			path: src/Service/RateLimitService.php
-
-		-
 			message: '#^Property App\\Service\\StorageQuotaService\:\:\$em is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -435,7 +429,7 @@ parameters:
 		-
 			message: '#^Call to an undefined method Doctrine\\DBAL\\Connection\:\:expects\(\)\.$#'
 			identifier: method.notFound
-			count: 8
+			count: 10
 			path: tests/Service/RateLimitServiceUnifiedTest.php
 
 		-

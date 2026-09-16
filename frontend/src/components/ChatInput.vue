@@ -485,7 +485,7 @@ import { chatApi } from '@/services/api/chatApi'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import type { FileItem } from '@/services/filesService'
-import { getFileGroups } from '@/services/filesService'
+import { deleteFile, getFileGroups } from '@/services/filesService'
 import { AudioRecorder } from '@/services/audioRecorder'
 import { WebSpeechService, isWebSpeechSupported } from '@/services/webSpeechService'
 import { useConfigStore } from '@/stores/config'
@@ -516,6 +516,8 @@ interface UploadedFile {
   file_type: string
   name?: string
   processing: boolean
+  /** Picked in the composer, not from the Files library — DELETE on remove. */
+  staged?: boolean
 }
 
 interface Props {
@@ -1249,7 +1251,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
 }
 
 const removeFile = (index: number) => {
+  const file = uploadedFiles.value[index]
+  if (!file) return
   uploadedFiles.value.splice(index, 1)
+  if (file.staged && file.file_id > 0) {
+    void deleteFile(file.file_id).catch(() => {})
+  }
 }
 
 const triggerFileUpload = () => {
@@ -1442,6 +1449,7 @@ const uploadFiles = async (files: File[]) => {
       file_type: file.name.split('.').pop() || 'unknown',
       name: file.name,
       processing: true,
+      staged: true,
     }
     uploadedFiles.value.push(tempFile)
 
@@ -1466,6 +1474,9 @@ const uploadFiles = async (files: File[]) => {
         if (index !== -1) {
           uploadedFiles.value.splice(index, 1)
         }
+        if (result.file_id) {
+          void deleteFile(result.file_id).catch(() => {})
+        }
 
         const errorKey =
           result.extraction_error === 'audio_transcription_failed'
@@ -1482,6 +1493,7 @@ const uploadFiles = async (files: File[]) => {
           filename: result.filename,
           file_type: result.file_type,
           processing: false,
+          staged: true,
         }
       }
 
@@ -1789,7 +1801,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     const result = await chatApi.transcribeAudio(audioBlob, undefined, {
       incognito: incognitoStore.active,
     })
-    if (incognitoStore.active) {
+    if (incognitoStore.active && result.file_id) {
       incognitoStore.registerFile(result.file_id)
     }
 

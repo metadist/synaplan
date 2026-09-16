@@ -601,6 +601,14 @@ export async function redirectToSetupWizard(): Promise<void> {
   }
 }
 
+/** True when a successful response has no body that JSON.parse can consume. */
+function isEmptySuccessBody(response: Response): boolean {
+  if (response.status === 204 || response.status === 205) {
+    return true
+  }
+  return response.headers?.get('content-length') === '0'
+}
+
 // Overload: with schema
 async function httpClient<S extends z.Schema>(
   endpoint: string,
@@ -733,6 +741,14 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     // Include debug info in error message if present
     const fullMessage = debugInfo ? `${errorMessage}\n[Debug] ${debugInfo}` : errorMessage
     throw new ApiError(response.status, fullMessage, errorCode, errorDetails, debugInfo)
+  }
+
+  // 204/205 and Content-Length: 0 have no body. response.json() throws
+  // SyntaxError on the empty payload, which turned DELETE /agents/{id} (the
+  // only 204 endpoint) into a false "Could not delete" toast. Keep blob/text
+  // parsers on the native empty representation instead of returning undefined.
+  if (isEmptySuccessBody(response) && responseType === 'json') {
+    return undefined as T
   }
 
   // Parse response based on requested type

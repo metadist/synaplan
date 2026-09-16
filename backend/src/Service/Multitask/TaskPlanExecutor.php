@@ -61,17 +61,25 @@ final readonly class TaskPlanExecutor
     public const PLAN_DEFINITION_META = 'task_plan_definition';
 
     /**
-     * Capabilities that have NO legacy InferenceRouter equivalent and therefore
-     * must run through the DAG even as a lone single node (see
-     * {@see shouldUseLegacyRouter()}).
+     * Capabilities whose single-node form has a proven InferenceRouter handler.
+     * A missing entry falls through to the DAG so an authored Saved Task step
+     * cannot silently become a chat answer (issue #1882). The previous
+     * deny-list had to be extended for every new capability and failed closed
+     * to the legacy router — which is how a lone `tool_call` / `email_me`
+     * node reported `completed` without doing the work.
      */
-    private const DAG_ONLY_CAPABILITIES = [
-        Capability::CalendarEvent,
-        Capability::DocumentExport,
-        Capability::DocumentCombine,
-        Capability::UrlFetch,
-        Capability::McpFetch,
-        Capability::EmailSearch,
+    private const LEGACY_ROUTER_CAPABILITIES = [
+        Capability::Chat,
+        Capability::Summarize,
+        Capability::Translate,
+        Capability::RagQuery,
+        Capability::FileAnalysis,
+        Capability::ImageGeneration,
+        Capability::VideoGeneration,
+        Capability::Text2Sound,
+        Capability::DocumentGeneration,
+        Capability::WebSearch,
+        // ExtractText has no InferenceRouter mapping — it is ExtractTextRunner only.
     ];
 
     /**
@@ -130,7 +138,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
@@ -144,6 +152,15 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+                $streamCallback($assembled['content']);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->logger->info('TaskPlanExecutor: DAG produced no successful node, falling back to legacy router', [
                 'message_id' => $message->getId(),
             ]);
@@ -197,7 +214,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
@@ -211,6 +228,14 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->discardPlan($progressCallback);
 
             $fallbackClassification = $this->legacyFallbackClassification($classification);
@@ -232,21 +257,27 @@ final readonly class TaskPlanExecutor
      * Whether a planned single-node plan should delegate to the legacy
      * InferenceRouter (the behaviour-identical Sprint-2 degenerate path).
      *
-     * Multi-node plans always run the DAG. A single-node plan also runs the DAG
-     * when its capability has NO legacy router equivalent — otherwise the legacy
-     * router, fed the original (calendar-unaware) classification, silently
-     * degrades a lone `calendar_event` into a plain chat answer that merely
-     * *describes* adding the event (e.g. emitting a literal "{{date:tomorrow}}")
-     * instead of producing the .ics. Chat/media/file capabilities keep the
-     * legacy path (the legacy classifier already handles them).
+     * Multi-node plans always run the DAG. A single-node plan uses the DAG
+     * unless its capability is on {@see LEGACY_ROUTER_CAPABILITIES} — otherwise
+     * the legacy router, fed the original classification, silently degrades a
+     * lone `tool_call` / `email_me` / `calendar_event` into a plain chat answer
+     * that merely *describes* the step and still reports `completed`.
+     * Authored Saved Task graphs always run the DAG: the classification for a
+     * fixed run is `intent = chat`, so the legacy router would skip the node's
+     * params and answer as chat (issue #1882, Copilot review on PR #1952).
      */
-    private function shouldUseLegacyRouter(TaskPlan $plan): bool
+    private function shouldUseLegacyRouter(TaskPlanResult $result): bool
     {
+        if ($result->authored) {
+            return false;
+        }
+
+        $plan = $result->plan;
         if (!$plan->isSingleNode()) {
             return false;
         }
 
-        return !in_array($plan->nodes[0]->capability, self::DAG_ONLY_CAPABILITIES, true);
+        return in_array($plan->nodes[0]->capability, self::LEGACY_ROUTER_CAPABILITIES, true);
     }
 
     /**
@@ -470,7 +501,7 @@ final readonly class TaskPlanExecutor
             'task_name' => $task->getName(),
         ]);
 
-        return new TaskPlanResult($plan, fallback: false);
+        return new TaskPlanResult($plan, fallback: false, authored: true);
     }
 
     /**
@@ -523,10 +554,10 @@ final readonly class TaskPlanExecutor
      * that {@see shouldUseLegacyRouter()} hands straight back to the legacy
      * router — identical output, one blocking LLM call later.
      *
-     * The sorter prompt counts the DAG-only capabilities (calendar entry, URL
-     * fetch, connected-system lookup, mailbox search, "mail it to me") as
-     * multi-step even though they produce one deliverable: they have no legacy
-     * router equivalent, so skipping the planner would silently degrade them
+     * The sorter prompt counts capabilities without a legacy router equivalent
+     * (calendar entry, URL fetch, connected-system lookup, mailbox search,
+     * "mail it to me", a custom tool call) as multi-step even though they
+     * produce one deliverable: skipping the planner would silently degrade them
      * into a chat answer that only talks about the action.
      *
      * Deliberately strict: only an explicit `false` skips planning. A missing
