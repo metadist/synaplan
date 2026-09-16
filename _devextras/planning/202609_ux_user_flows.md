@@ -76,7 +76,7 @@ shipped, even if the API is green.
 
 Synaplan is a **user-centric, easy application**. Power lives behind a
 clean UI. The interface-streamlining contract still holds
-([`20260828-interface-streamlining-sprint/README.md`](./20260828-interface-streamlining-sprint/README.md)):
+([`2026-archive/20260828-interface-streamlining-sprint/README.md`](./2026-archive/20260828-interface-streamlining-sprint/README.md)):
 
 1. Everyday work stays tiny: **Chat, History, Sources**.
 2. Creation and publishing live in **Manage**.
@@ -366,7 +366,7 @@ Saved Task card stays the default. **Steps** opens a numbered list:
 pick a step, fill inputs or "from step 2", optional "Ask me before
 this step." Save. Plain-language summary on the card still answers
 the five Saved-Task questions
-([`20260816-saved-task-workflows/08_ux_and_i18n.md`](./20260816-saved-task-workflows/08_ux_and_i18n.md)).
+([`2026-archive/20260816-saved-task-workflows/08_ux_and_i18n.md`](./2026-archive/20260816-saved-task-workflows/08_ux_and_i18n.md)).
 **Save as template** is a share, not a second object. Webhook URL
 sits behind "Let another system start this" with a reveal + copy,
 never as the first control.
@@ -435,7 +435,7 @@ they grow a UI step.
 **Not a new product feature.** The sharing *capability* shipped in S2/S3;
 the professional flow (one-row add, kind-specific consequence, find path)
 landed in [#1726](https://github.com/metadist/synaplan/pull/1726). Sprint file:
-[`202609_iam/06_sprint_ux_share_dialog.md`](./202609_iam/06_sprint_ux_share_dialog.md).
+[`2026-archive/202609_iam/06_sprint_ux_share_dialog.md`](./2026-archive/202609_iam/06_sprint_ux_share_dialog.md).
 
 | Step | Content | Class |
 | ---- | ------- | ----- |
