@@ -12,6 +12,7 @@ use App\Service\Iam\Policy\PolicyAllowList;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Rate Limiting Service.
@@ -21,11 +22,13 @@ use Psr\Log\LoggerInterface;
  * Supports:
  * - NEW: Lifetime totals (never reset)
  * - PRO/TEAM/BUSINESS: Hourly + Monthly limits
+ *
+ * Limit rows are memoized for the rest of the request. In FrankenPHP worker
+ * mode the container outlives the request, so {@see ResetInterface} clears
+ * that memo between requests (issue #1877).
  */
-final class RateLimitService
+final class RateLimitService implements ResetInterface
 {
-    private const CACHE_TTL = 300; // 5 minutes cache
-
     /**
      * Default usage markup applied to provider cost when evaluating a user's
      * cost budget. 10 → users are billed 110% of the raw provider cost. Operators
@@ -48,6 +51,11 @@ final class RateLimitService
         private TopupRepository $topupRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->limitsCache = [];
     }
 
     /**
@@ -750,19 +758,25 @@ final class RateLimitService
     {
         $since = time() - $seconds;
 
-        $used = (int) $this->em->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM BUSELOG 
+        $row = $this->em->getConnection()->fetchAssociative(
+            'SELECT COUNT(*) AS used, MIN(BUNIXTIMES) AS oldest
+             FROM BUSELOG
              WHERE BUSERID = :user_id AND BACTION = :action AND BUNIXTIMES >= :since',
             [
                 'user_id' => $user->getId(),
                 'action' => $action,
                 'since' => $since,
             ]
-        );
+        ) ?: [];
+        $used = (int) ($row['used'] ?? 0);
+        $oldestRaw = $row['oldest'] ?? null;
+        $oldest = is_numeric($oldestRaw) ? (int) $oldestRaw : null;
 
         $remaining = max(0, $limit - $used);
         $allowed = $used < $limit;
-        $resetsAt = time() + $seconds;
+        // Rolling window: the oldest event in the window is what must age out,
+        // not "now plus the whole period" (issue #1877).
+        $resetsAt = null !== $oldest ? $oldest + $seconds : null;
 
         return [
             'allowed' => $allowed,
