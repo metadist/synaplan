@@ -654,6 +654,7 @@ final readonly class GatewayToolLoop
                 $call = $this->mcpClient->callTool($server, $entry['tool'], $arguments);
                 $text = $this->formatToolContent($call['content']);
                 $isError = $call['isError'];
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], $isError);
                 $results[] = $this->toolResultBlock($toolUseId, $text, $isError);
             } catch (McpClientException $e) {
                 $this->logger->warning('GatewayToolLoop: MCP tool call failed', [
@@ -661,6 +662,7 @@ final readonly class GatewayToolLoop
                     'tool' => $entry['tool'],
                     'error' => $e->getMessage(),
                 ]);
+                $this->recordMcpUsage($user, $entry['serverId'], $entry['tool'], error: true);
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     'Tool call failed: '.$e->getMessage(),
@@ -730,12 +732,14 @@ final readonly class GatewayToolLoop
     {
         if (WebSearchTool::NAME === $tool) {
             $result = $this->webSearchTool->execute($arguments);
+            $this->recordNativeUsage($user, 'WEB_SEARCH', $tool, $result['query'], $result['isError']);
 
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
 
         if (AnalyzeImageTool::NAME === $tool) {
             $result = $this->analyzeImageTool->execute($arguments, $user->getId());
+            $this->recordNativeUsage($user, 'VISION', $tool, $result['summary'], $result['isError']);
 
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
@@ -749,6 +753,7 @@ final readonly class GatewayToolLoop
                 null,
                 $assistant?->promptId,
             );
+            $this->recordNativeUsage($user, 'COMPUTE_RUNS', $tool, 'file_work', $result['isError']);
 
             return $this->toolResultBlock($toolUseId, $this->clampToolText($result['text']), $result['isError']);
         }
@@ -841,6 +846,51 @@ final readonly class GatewayToolLoop
         }
 
         return '' !== $text ? $text : '(empty tool result)';
+    }
+
+    private function recordMcpUsage(User $user, int $serverId, string $tool, bool $error): void
+    {
+        $this->recordToolUsage($user, 'MCP_TOOL', 'mcp', sprintf('server:%d/%s', $serverId, $tool), $tool, $error);
+    }
+
+    private function recordNativeUsage(User $user, string $source, string $tool, string $query, bool $error): void
+    {
+        $this->recordToolUsage($user, $source, 'synaplan', 'tool:'.$tool, $query, $error);
+    }
+
+    /**
+     * Ledger-only: tools must not consume the MESSAGES quota (issue #1878).
+     * Usage statistics still need a BUSELOG row per tool call.
+     */
+    private function recordToolUsage(
+        User $user,
+        string $source,
+        string $provider,
+        string $model,
+        string $inputText,
+        bool $error,
+    ): void {
+        try {
+            $this->rateLimitService->recordUsage($user, 'TOOLS', [
+                'source' => $source,
+                'provider' => $provider,
+                'model' => $model,
+                'input_text' => $inputText,
+                'response_text' => $error ? 'error' : 'ok',
+                'usage' => [
+                    'prompt_tokens' => 0,
+                    'completion_tokens' => 0,
+                    'total_tokens' => 0,
+                    'cached_tokens' => 0,
+                    'cache_creation_tokens' => 0,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('GatewayToolLoop: recordUsage failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $user->getId(),
+            ]);
+        }
     }
 
     private function sumUsage(MessagesUsage $a, MessagesUsage $b): MessagesUsage
