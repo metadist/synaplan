@@ -29,6 +29,9 @@ final class Version20260916180000 extends AbstractMigration
     {
         $this->addSql('ALTER TABLE BFILES ADD COLUMN IF NOT EXISTS BUPDATEDAT BIGINT NULL AFTER BCREATEDAT');
         $this->addSql('UPDATE BFILES SET BUPDATEDAT = BCREATEDAT WHERE BUPDATEDAT IS NULL');
+        // Mapping is NOT NULL; ADD … NULL is only so existing rows can be
+        // backfilled before the column is tightened (schema:validate).
+        $this->addSql('ALTER TABLE BFILES MODIFY COLUMN BUPDATEDAT BIGINT NOT NULL');
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_file_status_updated ON BFILES (BSTATUS, BUPDATEDAT)');
     }
 
