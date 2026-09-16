@@ -66,6 +66,73 @@ final class RateLimitServiceTierTest extends TestCase
         self::assertNotSame('lifetime', $result['limit_type']);
     }
 
+    public function testGroupTierSelectsMaxOutputTokensRow(): void
+    {
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('getValue')->willReturnCallback(
+            static function (int $owner, string $group, string $setting): ?string {
+                if (0 !== $owner || 'MAX_OUTPUT_TOKENS' !== $setting) {
+                    return null;
+                }
+
+                return match ($group) {
+                    'RATELIMITS_NEW' => '1024',
+                    'RATELIMITS_BUSINESS' => '8192',
+                    default => null,
+                };
+            }
+        );
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('resolve')->with(7, 'RATELIMITS', 'TIER')->willReturn('BUSINESS');
+
+        $service = new RateLimitService(
+            $configRepository,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            $this->createMock(CostCalculationService::class),
+            $this->createMock(SubscriptionRepository::class),
+            $this->createMock(TopupRepository::class),
+            $resolver,
+        );
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        self::assertSame(8192, $service->getMaxOutputTokens($user));
+    }
+
+    public function testGetUserLimitsReportsResolvedTier(): void
+    {
+        $configRepository = $this->createMock(ConfigRepository::class);
+        $configRepository->method('findBy')->willReturn([]);
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->method('resolve')->with(7, 'RATELIMITS', 'TIER')->willReturn('BUSINESS');
+
+        $service = new RateLimitService(
+            $configRepository,
+            $this->createMock(EntityManagerInterface::class),
+            $this->createMock(LoggerInterface::class),
+            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            $this->createMock(CostCalculationService::class),
+            $this->createMock(SubscriptionRepository::class),
+            $this->createMock(TopupRepository::class),
+            $resolver,
+        );
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getRateLimitLevel')->willReturn('NEW');
+
+        $result = $service->getUserLimits($user);
+
+        self::assertSame('BUSINESS', $result['level']);
+        self::assertArrayHasKey('MESSAGES', $result['limits']);
+    }
+
     private function limitRow(string $setting, string $value): \App\Entity\Config
     {
         $config = $this->createMock(\App\Entity\Config::class);

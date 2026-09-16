@@ -1032,6 +1032,7 @@ export interface StorageStats {
 export interface StorageStatsResponse {
   success: boolean
   user_level: string
+  rate_limit_level?: string
   storage: StorageStats
 }
 
