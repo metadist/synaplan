@@ -2820,6 +2820,7 @@
     "intro": "Yüklediğiniz dosyalar sohbetleriniz için aranabilir bilgiye dönüşür.",
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
+    "openInChat": "Sohbette aç",
     "status_error": "Hata",
     "terms": {
       "vectorized": "yapay zekâ ile aranabilir",

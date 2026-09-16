@@ -1339,6 +1339,7 @@
     "intro": "Les fichiers que vous téléversez deviennent des connaissances recherchables pour vos chats.",
     "introCta": "Ajouter des fichiers à vos sources…",
     "useInChat": "Utiliser dans le chat",
+    "openInChat": "Ouvrir dans le chat",
     "terms": {
       "vectorized": "recherchable par l’IA",
       "knowledgeGroup": "dossier de connaissances",

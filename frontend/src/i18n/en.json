@@ -1339,6 +1339,7 @@
     "intro": "Files you upload become searchable knowledge for your chats.",
     "introCta": "Add files to your sources…",
     "useInChat": "Use in chat",
+    "openInChat": "Open in chat",
     "terms": {
       "vectorized": "searchable by AI",
       "knowledgeGroup": "knowledge folder",
