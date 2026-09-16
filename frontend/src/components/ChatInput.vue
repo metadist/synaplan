@@ -1805,7 +1805,11 @@ const transcribeAudio = async (audioBlob: Blob) => {
       incognitoStore.registerFile(result.file_id)
     }
 
-    if (result.text) {
+    if (result.extraction_error === 'audio_transcription_failed') {
+      // Same upload-file endpoint as attachments: empty text here means STT
+      // is missing or failed, not "no speech" (issue #1908).
+      showError(t('chatInput.dictationSttFailed'))
+    } else if (result.text) {
       message.value += (message.value ? ' ' : '') + result.text
       nextTick(() => textareaRef.value?.focus())
     } else {

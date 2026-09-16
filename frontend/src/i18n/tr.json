@@ -863,6 +863,7 @@
     "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ Kayıtta konuşma algılanmadı",
     "transcriptionFailed": "Yazıya dökme başarısız: {error}",
+    "dictationSttFailed": "Bu kayıt yazıya dökülemedi. Konuşmayı metne çevirme kurulmamış olabilir veya ses anlaşılamadı. Ayarlar’dan bir konuşmayı metne çevirme hizmeti bağlayın veya tekrar deneyin.",
     "mic": {
       "permissionWeb": "Mikrofon erişimi engellendi. Tarayıcı ayarlarından izin ver ve tekrar dene.",
       "permissionIos": "Mikrofon erişimi kapalı. iOS Ayarlar uygulamasını aç, bu uygulamayı seç ve Mikrofon seçeneğini etkinleştir.",
