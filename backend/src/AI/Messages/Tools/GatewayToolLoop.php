@@ -9,13 +9,17 @@ use App\AI\Messages\MessagesEventEmitter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\Entity\ComputeRun;
+use App\Entity\CustomTool;
 use App\Entity\User;
+use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\Custom\HttpToolExecutor;
+use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\ToolExecutionGate;
@@ -28,7 +32,8 @@ use Psr\Log\LoggerInterface;
  *
  * Injects the session-pinned catalog built by {@see GatewayToolCatalog}, calls
  * the translator, and on `stop_reason === tool_use` executes the tools Synaplan
- * owns — the user's MCP tools via {@see McpClient} and Synaplan's built-ins such
+ * owns — the user's custom HTTP tools, MCP tools via {@see McpClient}, and
+ * Synaplan's built-ins such
  * as {@see WebSearchTool} — appends `tool_result` turns, and re-prompts until
  * end_turn, client-owned tools appear, or bounds are hit.
  *
@@ -68,6 +73,8 @@ final readonly class GatewayToolLoop
         private ?ToolRegistry $toolRegistry = null,
         private ?ToolsConfig $toolsConfig = null,
         private ?CodeExecutionTool $codeExecutionTool = null,
+        private ?HttpToolExecutor $httpExecutor = null,
+        private ?CustomToolRepository $customTools = null,
     ) {
     }
 
@@ -605,7 +612,7 @@ final readonly class GatewayToolLoop
                 $results[] = $this->toolResultBlock(
                     $toolUseId,
                     null === $parsed
-                        ? 'Unknown MCP tool.'
+                        ? 'Unknown tool.'
                         : sprintf('Tool `%s` is not in the pinned session catalog.', $name),
                     isError: true,
                 );
@@ -619,6 +626,20 @@ final readonly class GatewayToolLoop
                     continue;
                 }
                 $results[] = $this->executeNative($entry['tool'], $arguments, $toolUseId, $user, $assistant);
+                if (null !== $ping) {
+                    $ping();
+                    $lastPing = microtime(true);
+                }
+                continue;
+            }
+
+            if (GatewayToolCatalog::KIND_CUSTOM === $entry['kind']) {
+                $gated = $this->gatedToolResult($user, $name, $arguments, $toolUseId);
+                if (null !== $gated) {
+                    $results[] = $gated;
+                    continue;
+                }
+                $results[] = $this->executeCustom($entry, $arguments, $toolUseId, $user);
                 if (null !== $ping) {
                     $ping();
                     $lastPing = microtime(true);
@@ -719,6 +740,40 @@ final readonly class GatewayToolLoop
     private function approvalsOn(int $userId): bool
     {
         return null !== $this->toolsConfig && $this->toolsConfig->isApprovalsEnabled($userId);
+    }
+
+    /**
+     * @param DispatchEntry        $entry
+     * @param array<string, mixed> $arguments
+     *
+     * @return array<string, mixed> tool_result content block
+     */
+    private function executeCustom(array $entry, array $arguments, string $toolUseId, User $user): array
+    {
+        if (null === $this->httpExecutor || null === $this->customTools) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool cannot run right now.', isError: true);
+        }
+
+        $toolId = (int) ($entry['annotations']['toolId'] ?? 0);
+        $tool = $toolId > 0 ? $this->customTools->find($toolId) : null;
+        if (!$tool instanceof CustomTool || !$tool->isEnabled()) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
+        }
+
+        try {
+            $result = $this->httpExecutor->execute($tool, $arguments, (int) $user->getId());
+        } catch (InvalidToolTemplateException $e) {
+            $this->logger->info('GatewayToolLoop: custom tool failed', [
+                'tool' => $entry['tool'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->toolResultBlock($toolUseId, $e->getMessage(), isError: true);
+        }
+
+        $text = '' !== $result['summary'] ? $result['summary'] : 'The tool finished';
+
+        return $this->toolResultBlock($toolUseId, $this->clampToolText($text));
     }
 
     /**

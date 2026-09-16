@@ -28,8 +28,8 @@ use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
 
 /**
- * Runs a registered custom or MCP tool from an authored Saved Task step.
- * Hidden from the planner catalog.
+ * Runs a registered custom or MCP tool from an authored Saved Task step
+ * or a planner `tool_call` when the user has custom HTTP tools.
  */
 final readonly class ToolCallRunner implements TaskRunner
 {
@@ -59,8 +59,9 @@ final readonly class ToolCallRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::ToolCall,
-                'Call a connected tool.',
-                available: static fn (): bool => false,
+                'Call one of the user\'s custom tools (HTTP APIs they connected). ONLY when the user asks to use that tool. Set params.tool to a name from the list below. Never invent a name.',
+                dynamicNote: fn (?int $userId, array $context): ?string => $this->renderCustomTools($userId),
+                requiresDynamicNote: true,
             ),
         ];
     }
@@ -222,5 +223,34 @@ final readonly class ToolCallRunner implements TaskRunner
         }
 
         return trim(implode("\n", $parts));
+    }
+
+    /**
+     * Planner-facing list of this user's custom HTTP tools. Hidden while the
+     * runner is constructed without DI (characterization catalog) or the
+     * account has none — the planner must not invent a tool_call (issue #1884).
+     */
+    private function renderCustomTools(?int $userId): ?string
+    {
+        if (!(new \ReflectionProperty($this, 'registry'))->isInitialized($this)) {
+            return null;
+        }
+        if (null === $userId || $userId < 1) {
+            return null;
+        }
+
+        $lines = [];
+        foreach ($this->registry->forUser($userId) as $descriptor) {
+            if (ToolSource::Custom !== $descriptor->source) {
+                continue;
+            }
+            $label = '' !== $descriptor->title ? $descriptor->title : $descriptor->name;
+            $lines[] = sprintf('  - params.tool=%s (%s, %s)', $descriptor->name, $label, $descriptor->sideEffect->value);
+        }
+        if ([] === $lines) {
+            return null;
+        }
+
+        return "  Custom tools:\n".implode("\n", $lines);
     }
 }

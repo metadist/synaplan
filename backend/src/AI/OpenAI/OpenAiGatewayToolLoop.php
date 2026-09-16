@@ -264,6 +264,11 @@ final readonly class OpenAiGatewayToolLoop
                 continue;
             }
 
+            if (GatewayToolCatalog::KIND_CUSTOM === $entry['kind']) {
+                $results[] = $this->toolMessage($id, 'This custom tool cannot run on this channel.');
+                continue;
+            }
+
             if ($this->mcpCatalogAdapter->isMutatingTool($entry['annotations']) && !$this->approvalsOn((int) $user->getId())) {
                 $results[] = $this->toolMessage($id, sprintf("the tool '%s' can modify data and is not allowed (read-only)", $entry['tool']));
                 continue;
