@@ -125,4 +125,29 @@ test.describe('@ci @smoke Smart-Email', () => {
       expect(toSender.length, 'Invalid request must not trigger reply').toBe(baselineCount)
     })
   })
+
+  test('unsafe or unknown attachments are skipped and the email is still accepted', async ({
+    request,
+  }) => {
+    const testFrom = uniqueEmailSender()
+    const res = await request.post(webhookUrl(), {
+      data: {
+        from: testFrom,
+        to: TEST_TO,
+        subject: `Attachments skip ${Date.now()}`,
+        body: 'Please keep this email even if the attachments cannot be stored.',
+        message_id: `attach-skip-${Date.now()}`,
+        attachments: [
+          { filename: 'secret.pdf', url: 'http://127.0.0.1/secret.pdf' },
+          { filename: 'payload.exe', url: 'https://relay.example.com/payload.exe' },
+          { filename: 'notes.txt' },
+        ],
+      },
+    })
+    expect(res.status()).toBeGreaterThanOrEqual(200)
+    expect(res.status()).toBeLessThan(300)
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(Number.isInteger(json.message_id)).toBe(true)
+  })
 })
