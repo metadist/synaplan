@@ -1779,7 +1779,7 @@ final readonly class MessageProcessor
     {
         return match ($topic) {
             'mediamaker', 'text2pic', 'text2vid', 'text2sound' => 'image_generation',
-            'pic2text', 'analyze' => 'file_analysis',
+            'pic2text', 'analyze', 'analyzefile' => 'file_analysis',
             'officemaker' => 'document_generation',
             default => 'chat',
         };

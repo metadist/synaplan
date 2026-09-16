@@ -336,6 +336,27 @@ final readonly class FileUploadService
         return $result;
     }
 
+    private const EMPTY_DOCUMENT_EXTRACT = 'Unable to extract information from this file.';
+
+    /**
+     * Empty extract is a terminal failure: never mark the file vectorized with
+     * 0 chunks (that showed as "Ready for chat" with nothing to find).
+     *
+     * @return array{success: false, status: 'error', error: string}
+     */
+    private function failEmptyExtract(File $file, string $fileExtension): array
+    {
+        $file->setStatus('error');
+        $file->setVectorState(File::VECTOR_STATE_FAILED);
+        $this->em->flush();
+
+        $error = FileProcessor::isTranscribableMediaExtension($fileExtension)
+            ? 'Transcription produced no text — the file may be silent or in an unsupported codec.'
+            : self::EMPTY_DOCUMENT_EXTRACT;
+
+        return ['success' => false, 'status' => 'error', 'error' => $error];
+    }
+
     /**
      * Store-only types never get text or vectors. Persist a terminal status so
      * FileSelectionModal's poll (vectorized / processed / extracted / error)
@@ -485,15 +506,19 @@ final readonly class FileUploadService
 
             $file->setFileText($extractedText);
 
-            // For audio/video files an empty transcript means transcription
-            // failed — the file may be silent, in an unsupported codec, or the
-            // STT provider rejected it.  Signal this clearly so the UI can show
-            // a distinct error badge instead of "Extracted (0 chars)".
-            if ('' === trim($extractedText) && FileProcessor::isTranscribableMediaExtension($fileExtension)) {
-                $file->setStatus('error');
-                $this->em->flush();
+            // Empty extract is never "ready". Audio/video: STT produced nothing.
+            // Documents (including scanned PDFs): Tika + vision produced nothing.
+            // Keep success=true so the stored row (and its id) is returned to
+            // the client — desktop can remember the local source and show the
+            // failure on the file instead of treating the upload as rejected.
+            if ('' === trim($extractedText)) {
+                $failed = $this->failEmptyExtract($file, $fileExtension);
 
-                return ['success' => false, 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
+                return array_merge($result, $failed, [
+                    'success' => true,
+                    'status' => 'error',
+                    'extracted_text_length' => 0,
+                ]);
             }
 
             $file->setStatus('extracted');
@@ -598,7 +623,12 @@ final readonly class FileUploadService
 
         $asyncMarkdown = null;
 
-        if ('uploaded' === $file->getStatus()) {
+        // Re-extract when there is no text yet — includes the empty
+        // "extracted" rows the old pipeline left behind (image-only PDFs).
+        $needsExtract = 'uploaded' === $file->getStatus()
+            || ('' === trim($file->getFileText()) && in_array($file->getStatus(), ['extracted', 'error'], true));
+
+        if ($needsExtract) {
             $file->setStatus('extracting');
             $this->em->flush();
 
@@ -627,30 +657,7 @@ final readonly class FileUploadService
 
         $extractedText = $file->getFileText();
         if ('' === trim($extractedText)) {
-            // Audio/video with no transcript: the STT pipeline returned nothing
-            // (provider rejection, silent file, unsupported codec).  Mark as
-            // error so the UI shows a clear status instead of silently treating
-            // the file as "ready".  Non-media files (blank PDFs, etc.) follow
-            // the old path — a zero-length extraction is legitimate for them.
-            if (FileProcessor::isTranscribableMediaExtension($fileExtension)) {
-                $file->setStatus('error');
-                $this->em->flush();
-
-                return ['success' => false, 'status' => 'error', 'error' => 'Transcription produced no text — the file may be silent or in an unsupported codec.'];
-            }
-
-            $file->setStatus('vectorized');
-            $this->em->flush();
-
-            // Dedup on (user_id, file_id) — see issue #887. If the
-            // earlier processSingleUpload() (or a previous /process retry)
-            // already wrote a BUSELOG row for this file, this is a no-op.
-            $this->rateLimitService->recordFileAnalysisOnce($user, (int) $file->getId(), [
-                'filename' => $file->getFileName(),
-                'source' => 'WEB_ASYNC',
-            ]);
-
-            return ['success' => true, 'status' => 'vectorized', 'extracted_text_length' => 0, 'chunks_created' => 0];
+            return $this->failEmptyExtract($file, $fileExtension);
         }
 
         $file->setStatus('vectorizing');

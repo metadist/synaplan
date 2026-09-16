@@ -32,7 +32,15 @@ final readonly class MessagePreProcessor
     // entries the chat preprocessor silently skipped the file, leaving
     // BFILETEXT empty and FileAnalysisHandler reporting "unsupported file
     // type" for legitimately uploaded documents.
-    public const DOCUMENT_EXTENSIONS = ['pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv'];
+    //
+    // Issue #1907: the same gap for OpenDocument, RTF, Apple iWork, and
+    // iCalendar — they are in ALLOWED_EXTENSIONS but were never extracted on
+    // the chat path, so FileTypeResolver returned '' and the turn never
+    // force-routed to file_analysis.
+    public const DOCUMENT_EXTENSIONS = [
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'odt', 'ods', 'odp', 'odg', 'odf', 'rtf', 'pages', 'numbers', 'key', 'ics',
+    ];
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
     public const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
@@ -52,6 +60,16 @@ final readonly class MessagePreProcessor
         'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'ppt' => 'application/vnd.ms-powerpoint',
         'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'rtf' => 'application/rtf',
+        'odt' => 'application/vnd.oasis.opendocument.text',
+        'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
+        'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'odg' => 'application/vnd.oasis.opendocument.graphics',
+        'odf' => 'application/vnd.oasis.opendocument.formula',
+        'ics' => 'text/calendar',
+        'pages' => 'application/vnd.apple.pages',
+        'numbers' => 'application/vnd.apple.numbers',
+        'key' => 'application/vnd.apple.keynote',
     ];
 
     public function __construct(

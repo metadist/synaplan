@@ -178,7 +178,7 @@ final class AgentController extends AbstractController
         $data = $request->toArray();
         $name = is_string($data['name'] ?? null) ? trim($data['name']) : '';
         if ('' === $name) {
-            return $this->json(['error' => 'name is required'], Response::HTTP_BAD_REQUEST);
+            return $this->json(['error' => 'name is required', 'path' => 'name'], Response::HTTP_BAD_REQUEST);
         }
 
         $promptId = isset($data['promptId']) ? (int) $data['promptId'] : null;

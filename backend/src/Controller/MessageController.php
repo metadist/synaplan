@@ -161,8 +161,11 @@ class MessageController extends AbstractController
                 foreach ($fileIds as $fileId) {
                     $messageFile = $messageFileRepo->find($fileId);
                     if ($messageFile && $messageFile->getUserId() === $user->getId()) {
-                        // Set message ID to link file to this message
                         $messageFile->setMessageId($incomingMessage->getId());
+                        // Upload-file marks chat_attachment rows ephemeral until send
+                        // (issue #1911). StreamController already calls this; the
+                        // JSON send path must too or the attachment is reaped.
+                        $messageFile->keepAfterChatSend(false);
                         $this->em->persist($messageFile);
                     }
                 }
@@ -687,9 +690,11 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
         }
 
-        // Incognito-session uploads are ephemeral: hidden from file listings,
-        // never vectorized, deleted on session end (+ reaper safety net).
-        $incognito = '1' === $request->request->get('incognito');
+        // Chat attachments are ephemeral until the message that references
+        // them is sent (issue #1911): hidden from the Files list, skipped by
+        // vectorization listings, deleted if the user removes the chip or
+        // never sends (frontend DELETE + reaper). Incognito used the same
+        // flag; StreamController keeps the row when the turn is persisted.
         // Microphone dictation reuses this endpoint only as STT transport.
         // The recording is not a Source the user chose to keep (issue #1909).
         // purpose=dictation is ignored unless the upload is actually audio —
@@ -706,6 +711,8 @@ class MessageController extends AbstractController
 
         // Dictation is speech-to-text, not document analysis: gate on
         // TRANSCRIPTION so it does not consume a FILE_ANALYSIS slot.
+        // Other chat uploads still gate on FILE_ANALYSIS before staging
+        // (billing itself stays deferred until send — issue #887 / #1911).
         $gateAction = $isDictation ? TranscriptionUsageRecorder::ACTION : 'FILE_ANALYSIS';
         $rateLimitCheck = $this->rateLimitService->checkLimit($user, $gateAction);
         if (!$rateLimitCheck['allowed']) {
@@ -756,7 +763,8 @@ class MessageController extends AbstractController
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
-            $messageFile->setEphemeral($incognito || $isDictation);
+            $messageFile->setSource('chat_attachment');
+            $messageFile->setEphemeral(true);
 
             $this->em->persist($messageFile);
             $this->em->flush();

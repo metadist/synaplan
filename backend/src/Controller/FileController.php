@@ -32,6 +32,7 @@ use App\Service\Iam\SharedFileAccess;
 use App\Service\Media\MediaAccessTokenService;
 use App\Service\RAG\VectorStorage\VectorMigrationService;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
+use App\Service\RateLimitService;
 use App\Service\StorageQuotaService;
 use App\Service\WidgetService;
 use OpenApi\Attributes as OA;
@@ -54,6 +55,7 @@ class FileController extends AbstractController
         private FileListService $fileListService,
         private FileStorageService $storageService,
         private StorageQuotaService $storageQuotaService,
+        private RateLimitService $rateLimitService,
         private FileRepository $fileRepository,
         private MessageRepository $messageRepository,
         private WidgetSessionRepository $widgetSessionRepository,
@@ -1292,7 +1294,7 @@ class FileController extends AbstractController
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Storage statistics. Admins and open-source mode have unlimited storage (unlimited=true).',
+                description: 'Storage statistics. Admins and open-source mode have unlimited storage (unlimited=true). user_level is the billing plan (purchase gating); rate_limit_level is the effective group quota tier.',
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
         ]
@@ -1306,6 +1308,7 @@ class FileController extends AbstractController
         return $this->json([
             'success' => true,
             'user_level' => $user->getRateLimitLevel(),
+            'rate_limit_level' => $this->rateLimitService->resolveRateLimitLevel($user),
             'storage' => $this->storageQuotaService->getStorageStats($user),
         ]);
     }

@@ -781,18 +781,17 @@ final readonly class ModelConfigService
 
     /**
      * Get provider + model config for internal/tools tasks (feedback, memories, contradiction checks).
-     * Uses DEFAULTMODEL/TOOLS config. Falls back to global CHAT default.
+     * Uses DEFAULTMODEL/TOOLS config. Falls back to the layered CHAT default.
+     *
+     * Pass the EFFECTIVE user id so a group or personal DEFAULTMODEL.TOOLS
+     * override is applied, matching CHAT / MEM / PIC2TEXT in the same panel.
      *
      * @return array{provider: ?string, model: ?string, model_id: ?int}
      */
-    public function getToolsModelConfig(): array
+    public function getToolsModelConfig(?int $userId = null): array
     {
-        $modelId = $this->getDefaultModel('TOOLS');
-
-        // Fallback to global CHAT default
-        if (!$modelId) {
-            $modelId = $this->getDefaultModel('CHAT', 0);
-        }
+        $modelId = $this->getDefaultModel('TOOLS', $userId)
+            ?? $this->getDefaultModel('CHAT', $userId);
 
         if (!$modelId) {
             return ['provider' => null, 'model' => null, 'model_id' => null];

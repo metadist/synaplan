@@ -12,6 +12,7 @@ use App\Service\Iam\Policy\PolicyAllowList;
 use App\Service\Usage\RecordedUsage;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Rate Limiting Service.
@@ -21,11 +22,13 @@ use Psr\Log\LoggerInterface;
  * Supports:
  * - NEW: Lifetime totals (never reset)
  * - PRO/TEAM/BUSINESS: Hourly + Monthly limits
+ *
+ * Limit rows are memoized for the rest of the request. In FrankenPHP worker
+ * mode the container outlives the request, so {@see ResetInterface} clears
+ * that memo between requests (issue #1877).
  */
-final class RateLimitService
+final class RateLimitService implements ResetInterface
 {
-    private const CACHE_TTL = 300; // 5 minutes cache
-
     /**
      * Default usage markup applied to provider cost when evaluating a user's
      * cost budget. 10 → users are billed 110% of the raw provider cost. Operators
@@ -48,6 +51,11 @@ final class RateLimitService
         private TopupRepository $topupRepository,
         private ?LayeredConfigResolver $layeredConfigResolver = null,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->limitsCache = [];
     }
 
     /**
@@ -132,9 +140,15 @@ final class RateLimitService
     /**
      * Estimate token count from byte length.
      *
-     * Uses a simple heuristic: ~1.3 bytes per token on average for mixed-language text.
+     * Byte-pair tokenizers measure about 4 bytes per token for English, about 3
+     * for German, and 2 to 4.5 for CJK text in UTF-8. The previous 1.3 divisor
+     * overstated every language by 2–3× and that figure was priced into BCOST
+     * whenever a provider returned no usage (issue #1876). 4.0 is the English
+     * BPE baseline used in that report: 1000 bytes → 250 tokens, not 770.
+     *
      * For media content (images/audio/video), the byte count is used as-is.
-     * This provides a rough but useful estimate when providers don't return exact token counts.
+     * This is a fallback only — cloud providers that report usage are billed
+     * from those counts, not this heuristic.
      *
      * @param int $bytes Total bytes of content (text + media)
      *
@@ -146,7 +160,7 @@ final class RateLimitService
             return 0;
         }
 
-        return (int) ceil($bytes / 1.3);
+        return (int) ceil($bytes / 4.0);
     }
 
     /**
@@ -615,8 +629,11 @@ final class RateLimitService
     /**
      * Group policy may replace BUSERLEVEL for the limits table only.
      * Billing / subscription stay on {@see User::getRateLimitLevel()}.
+     *
+     * Public so every `RATELIMITS_{level}.*` reader (storage quota, output-token
+     * cap, usage labels) uses the same source as {@see checkLimit()}.
      */
-    private function resolveRateLimitLevel(User $user): string
+    public function resolveRateLimitLevel(User $user): string
     {
         $level = $user->getRateLimitLevel();
         if ('ADMIN' === $level || null === $this->layeredConfigResolver) {
@@ -744,19 +761,25 @@ final class RateLimitService
     {
         $since = time() - $seconds;
 
-        $used = (int) $this->em->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM BUSELOG 
+        $row = $this->em->getConnection()->fetchAssociative(
+            'SELECT COUNT(*) AS used, MIN(BUNIXTIMES) AS oldest
+             FROM BUSELOG
              WHERE BUSERID = :user_id AND BACTION = :action AND BUNIXTIMES >= :since',
             [
                 'user_id' => $user->getId(),
                 'action' => $action,
                 'since' => $since,
             ]
-        );
+        ) ?: [];
+        $used = (int) ($row['used'] ?? 0);
+        $oldestRaw = $row['oldest'] ?? null;
+        $oldest = is_numeric($oldestRaw) ? (int) $oldestRaw : null;
 
         $remaining = max(0, $limit - $used);
         $allowed = $used < $limit;
-        $resetsAt = time() + $seconds;
+        // Rolling window: the oldest event in the window is what must age out,
+        // not "now plus the whole period" (issue #1877).
+        $resetsAt = null !== $oldest ? $oldest + $seconds : null;
 
         return [
             'allowed' => $allowed,
@@ -783,7 +806,7 @@ final class RateLimitService
             return null;
         }
 
-        $level = $user->getRateLimitLevel();
+        $level = $this->resolveRateLimitLevel($user);
 
         if ('ADMIN' === $level) {
             return null;
@@ -823,7 +846,7 @@ final class RateLimitService
      */
     public function getUserLimits(User $user): array
     {
-        $level = $user->getRateLimitLevel();
+        $level = $this->resolveRateLimitLevel($user);
         $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS', 'RERANK', 'COMPUTE_RUNS'];
 
         $result = [
