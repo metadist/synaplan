@@ -156,21 +156,24 @@ const onNotifyChange = async () => {
           v-if="tab === 'pending'"
           :approval="row"
           :can-always-allow="row.canAlwaysAllow"
+          show-open-context
           @approved="onApprove(row.id)"
           @rejected="onReject"
           @always-allow="onApprove(row.id, true)"
+          @open-context="openContext(row)"
         />
-        <div v-else class="surface-card p-4 space-y-1">
+        <div v-else class="surface-card p-4 space-y-2">
           <p class="txt-primary font-medium">{{ row.preview || row.tool }}</p>
           <p class="text-xs txt-secondary">{{ statusLabel(row.status) }}</p>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+            data-testid="approval-open-context"
+            @click="openContext(row)"
+          >
+            {{ $t('approvals.openContext') }}
+          </button>
         </div>
-        <button
-          type="button"
-          class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium mt-2"
-          @click="openContext(row)"
-        >
-          {{ $t('approvals.openContext') }}
-        </button>
       </li>
     </ul>
   </div>

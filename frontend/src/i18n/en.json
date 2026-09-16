@@ -6549,7 +6549,7 @@
     "rejectReasonPlaceholder": "Optional note",
     "expired": "This request expired",
     "expiresInHours": "Expires in {hours} hour | Expires in {hours} hours",
-    "nothingCreatedYet": "Nothing has been created yet.",
+    "nothingCreatedYet": "This has not happened yet.",
     "approvedToast": "Approved. It will continue.",
     "rejectedToast": "Rejected.",
     "decideFailed": "This could not be decided. Try again.",

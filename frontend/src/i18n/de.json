@@ -6483,7 +6483,7 @@
     "rejectReasonPlaceholder": "Optionale Notiz",
     "expired": "Diese Anfrage ist abgelaufen",
     "expiresInHours": "Läuft in {hours} Stunde ab | Läuft in {hours} Stunden ab",
-    "nothingCreatedYet": "Es wurde noch nichts erstellt.",
+    "nothingCreatedYet": "Das ist noch nicht geschehen.",
     "approvedToast": "Freigegeben. Es geht weiter.",
     "rejectedToast": "Abgelehnt.",
     "decideFailed": "Das konnte nicht entschieden werden. Bitte erneut versuchen.",

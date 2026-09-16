@@ -6549,7 +6549,7 @@
     "rejectReasonPlaceholder": "Note facultative",
     "expired": "Cette demande a expiré",
     "expiresInHours": "Expire dans {hours} heure | Expire dans {hours} heures",
-    "nothingCreatedYet": "Rien n’a encore été créé.",
+    "nothingCreatedYet": "Cela n’a pas encore eu lieu.",
     "approvedToast": "Approuvé. Cela va continuer.",
     "rejectedToast": "Refusé.",
     "decideFailed": "La décision n’a pas pu être enregistrée. Réessayez.",

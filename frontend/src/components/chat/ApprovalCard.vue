@@ -7,12 +7,14 @@ import type { Approval } from '@/services/api/approvalsApi'
 const props = defineProps<{
   approval: Approval
   canAlwaysAllow?: boolean
+  showOpenContext?: boolean
 }>()
 
 const emit = defineEmits<{
   approved: [id: number]
   rejected: [id: number, reason: string]
   alwaysAllow: [id: number]
+  openContext: [id: number]
 }>()
 
 const { t } = useI18n()
@@ -22,7 +24,7 @@ const expiresIn = computed(() => {
   const remaining = props.approval.expiresAt * 1000 - Date.now()
   if (remaining <= 0) return t('approvals.expired')
   const hours = Math.max(1, Math.round(remaining / 3600000))
-  return t('approvals.expiresInHours', { hours })
+  return t('approvals.expiresInHours', { hours }, hours)
 })
 
 const showAlwaysAllow = computed(
@@ -57,7 +59,7 @@ const onReject = async () => {
   <section class="surface-card p-4 space-y-3" data-testid="approval-card">
     <p class="text-sm txt-secondary">{{ $t('approvals.nothingCreatedYet') }}</p>
     <p class="txt-primary font-medium">{{ approval.preview || approval.tool }}</p>
-    <p class="text-xs txt-secondary">{{ expiresIn }}</p>
+    <p class="text-xs txt-secondary" data-testid="approval-expires">{{ expiresIn }}</p>
     <div class="flex flex-wrap gap-2">
       <button
         v-if="showApprove"
@@ -84,6 +86,15 @@ const onReject = async () => {
         @click="onAlwaysAllow"
       >
         {{ $t('approvals.alwaysAllow') }}
+      </button>
+      <button
+        v-if="showOpenContext"
+        type="button"
+        class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium"
+        data-testid="approval-open-context"
+        @click="emit('openContext', approval.id)"
+      >
+        {{ $t('approvals.openContext') }}
       </button>
     </div>
   </section>
