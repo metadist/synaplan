@@ -5564,7 +5564,7 @@
     "rejectReasonPlaceholder": "İsteğe bağlı not",
     "expired": "Bu istek süresi doldu",
     "expiresInHours": "{hours} saat içinde süresi dolar",
-    "nothingCreatedYet": "Henüz hiçbir şey oluşturulmadı.",
+    "nothingCreatedYet": "Bu henüz gerçekleşmedi.",
     "approvedToast": "Onaylandı. Devam edecek.",
     "rejectedToast": "Reddedildi.",
     "decideFailed": "Karar verilemedi. Lütfen tekrar dene.",

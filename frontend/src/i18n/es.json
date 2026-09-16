@@ -5563,7 +5563,7 @@
     "rejectReasonPlaceholder": "Nota opcional",
     "expired": "Esta solicitud caducó",
     "expiresInHours": "Caduca en {hours} hora | Caduca en {hours} horas",
-    "nothingCreatedYet": "Todavía no se ha creado nada.",
+    "nothingCreatedYet": "Esto todavía no ha ocurrido.",
     "approvedToast": "Aprobado. Continuará.",
     "rejectedToast": "Rechazado.",
     "decideFailed": "No se pudo decidir. Inténtalo de nuevo.",
