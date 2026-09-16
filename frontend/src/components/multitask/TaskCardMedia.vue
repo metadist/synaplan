@@ -137,7 +137,7 @@ const downloadFilename = (): string => {
 // Authenticated blob download (the MessageImage pattern, issue #1071): a bare
 // anchor to an API URL would save an HTML error page for cookie-authed media.
 // downloadMediaUrl authenticates per platform (cookie / Bearer) and saves via
-// anchor on web or Filesystem + Share in the native shell.
+// saveOrDownloadBlob (web anchor, Android Documents, iOS share sheet).
 const download = async () => {
   try {
     await downloadMediaUrl(resolveMediaUrl(props.url), downloadFilename())
