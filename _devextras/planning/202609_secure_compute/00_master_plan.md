@@ -18,10 +18,10 @@ Operate → System config holds limits.
   — the *client-side* answer to "let the AI run code"; §12 explicitly leaves
   server-side execution out. This track is the server-side counterpart with
   a container boundary instead of a user's trust step
-- [`../20260902-office-docs/00_master_plan.md`](../20260902-office-docs/00_master_plan.md)
+- [`../2026-archive/20260902-office-docs/00_master_plan.md`](../2026-archive/20260902-office-docs/00_master_plan.md)
   Decision 1 — "never exec `soffice` in PHP; sidecar over HTTP" (the rule we
   generalize)
-- [`../202609_tools_approval_workflows/00_master_plan.md`](../202609_tools_approval_workflows/00_master_plan.md)
+- [`../2026-archive/202609_tools_approval_workflows/00_master_plan.md`](../2026-archive/202609_tools_approval_workflows/00_master_plan.md)
   — `code_run` is a `write`-class tool
 - `/wwwroot/synaplan-opencloud/backend` — Go sidecar precedent in the family
 - [`../202609_ux_user_flows.md`](../202609_ux_user_flows.md) — binding

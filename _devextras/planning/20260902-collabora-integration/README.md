@@ -1,7 +1,7 @@
 # Collabora integration (Synaplan inside the editor)
 
 **Status:** planned (2026-09-02). No product code in this change.
-**Sibling:** [`../20260902-office-docs/`](../20260902-office-docs/) — create,
+**Sibling:** [`../2026-archive/20260902-office-docs/`](../2026-archive/20260902-office-docs/) — create,
 analyse, convert, merge and edit office files *inside Synaplan*.
 
 This directory is the **plan of record** for the Collabora side. Cursor
