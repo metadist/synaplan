@@ -505,6 +505,7 @@ final class TaskPlanExecutorTest extends TestCase
         yield 'document_export' => ['document_export'];
         yield 'url_fetch' => ['url_fetch'];
         yield 'email_search' => ['email_search'];
+        yield 'extract_text' => ['extract_text'];
     }
 
     #[DataProvider('authoredSingleNodeCapabilitiesWithoutLegacyHandler')]
@@ -532,6 +533,119 @@ final class TaskPlanExecutorTest extends TestCase
         );
 
         self::assertSame('ran '.$capability, $result['content']);
+    }
+
+    /**
+     * Copilot on PR #1952: a lone authored Saved Task step whose capability
+     * IS on the legacy allow-list (document_generation) must still run the DAG.
+     * The run is classified as intent=chat, so the legacy router would ignore
+     * the node's params and generate a chat answer instead of a document.
+     */
+    public function testAuthoredSingleDocumentGenerationNodeRunsDagNotChat(): void
+    {
+        $task = new \App\Entity\SavedTask(9, 4, 'Make a report');
+        $this->setTaskId($task, 41);
+        $task->setGraph([
+            'version' => 1,
+            'trigger' => ['type' => 'manual'],
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'document_generation', 'params' => ['prompt' => 'Q3 report']],
+            ],
+        ]);
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('true');
+        $prompts = $this->createMock(PromptRepository::class);
+        $savedTasks = $this->createMock(SavedTaskRepository::class);
+        $savedTasks->expects(self::once())->method('findByIdAndOwner')->with(41, 9)->willReturn($task);
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($configRepo),
+            $savedTasks,
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->planner->expects(self::never())->method('plan');
+        $this->dagExecutor->expects(self::once())->method('execute')->willReturn($this->assembled([
+            'content' => 'Report.docx attached',
+            'files' => [['path' => '/api/v1/files/uploads/report.docx', 'type' => 'document']],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'saved_task_id' => 41],
+        );
+
+        self::assertSame('Report.docx attached', $result['content']);
+        self::assertSame('document', $result['metadata']['file']['type']);
+    }
+
+    /**
+     * Copilot on PR #1952: when an authored Saved Task DAG fails, do not
+     * discard it and answer with chat — that would mark the run completed.
+     */
+    public function testAuthoredDagFailureDoesNotFallBackToChat(): void
+    {
+        $task = new \App\Entity\SavedTask(9, 4, 'Send a mail');
+        $this->setTaskId($task, 42);
+        $task->setGraph([
+            'version' => 1,
+            'trigger' => ['type' => 'manual'],
+            'nodes' => [
+                ['id' => 'n1', 'capability' => 'email_me', 'params' => ['to' => 'ops@example.com']],
+            ],
+        ]);
+
+        $configRepo = $this->createMock(ConfigRepository::class);
+        $configRepo->method('getValue')->willReturn('true');
+        $prompts = $this->createMock(PromptRepository::class);
+        $savedTasks = $this->createMock(SavedTaskRepository::class);
+        $savedTasks->method('findByIdAndOwner')->willReturn($task);
+
+        $this->modelConfigService->method('getEffectiveUserIdForMessage')->willReturn(9);
+
+        $executor = new TaskPlanExecutor(
+            $this->router,
+            new ClassificationPlanMapper(),
+            $this->store,
+            $this->planner,
+            $this->dagExecutor,
+            $this->modelConfigService,
+            $this->multitaskConfig,
+            $this->createMock(LoggerInterface::class),
+            new SavedTaskConfig($configRepo),
+            $savedTasks,
+            $prompts,
+            new SavedTaskPlanFactory(new SavedTaskGraphValidator()),
+        );
+
+        $this->dagExecutor->method('execute')->willReturn($this->assembled([
+            'content' => 'Could not send the mail.',
+            'all_failed' => true,
+            'node_statuses' => ['n1' => 'failed'],
+        ]));
+        $this->router->expects(self::never())->method('route');
+
+        $result = $executor->execute(
+            $this->message(),
+            [],
+            ['intent' => 'chat', 'topic' => 'general', 'language' => 'en', 'source' => 'ai_sorting', 'saved_task_id' => 42],
+        );
+
+        self::assertSame('Could not send the mail.', $result['content']);
     }
 
     public function testAttachmentDocumentCombineRunsDagWithoutPlannerOrLegacyRouter(): void

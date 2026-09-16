@@ -79,7 +79,7 @@ final readonly class TaskPlanExecutor
         Capability::Text2Sound,
         Capability::DocumentGeneration,
         Capability::WebSearch,
-        Capability::ExtractText,
+        // ExtractText has no InferenceRouter mapping — it is ExtractTextRunner only.
     ];
 
     /**
@@ -138,7 +138,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->routeStream($message, $thread, $this->effectiveClassification($classification), $streamCallback, $progressCallback, $options),
@@ -152,6 +152,15 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+                $streamCallback($assembled['content']);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->logger->info('TaskPlanExecutor: DAG produced no successful node, falling back to legacy router', [
                 'message_id' => $message->getId(),
             ]);
@@ -205,7 +214,7 @@ final readonly class TaskPlanExecutor
                 $classification,
             );
         }
-        if ($this->shouldUseLegacyRouter($plan->plan)) {
+        if ($this->shouldUseLegacyRouter($plan)) {
             return $this->withPlanningUsage(
                 $this->runSingleNode(
                     fn () => $this->router->route($message, $thread, $this->effectiveClassification($classification), $progressCallback, $options),
@@ -219,6 +228,14 @@ final readonly class TaskPlanExecutor
         $assembled = $this->runDag($message, $thread, $classification, $options, $plan, $progressCallback);
 
         if ($assembled['all_failed']) {
+            if ($plan->authored) {
+                $this->logger->info('TaskPlanExecutor: authored DAG produced no successful node, not falling back to chat', [
+                    'message_id' => $message->getId(),
+                ]);
+
+                return $this->toHandlerResult($assembled);
+            }
+
             $this->discardPlan($progressCallback);
 
             $fallbackClassification = $this->legacyFallbackClassification($classification);
@@ -245,11 +262,17 @@ final readonly class TaskPlanExecutor
      * the legacy router, fed the original classification, silently degrades a
      * lone `tool_call` / `email_me` / `calendar_event` into a plain chat answer
      * that merely *describes* the step and still reports `completed`.
-     * Chat/media/file capabilities keep the legacy path (the classifier already
-     * handles them).
+     * Authored Saved Task graphs always run the DAG: the classification for a
+     * fixed run is `intent = chat`, so the legacy router would skip the node's
+     * params and answer as chat (issue #1882, Copilot review on PR #1952).
      */
-    private function shouldUseLegacyRouter(TaskPlan $plan): bool
+    private function shouldUseLegacyRouter(TaskPlanResult $result): bool
     {
+        if ($result->authored) {
+            return false;
+        }
+
+        $plan = $result->plan;
         if (!$plan->isSingleNode()) {
             return false;
         }
@@ -478,7 +501,7 @@ final readonly class TaskPlanExecutor
             'task_name' => $task->getName(),
         ]);
 
-        return new TaskPlanResult($plan, fallback: false);
+        return new TaskPlanResult($plan, fallback: false, authored: true);
     }
 
     /**
