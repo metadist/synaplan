@@ -899,6 +899,7 @@ final class RunnersTest extends TestCase
             );
 
             $caldav = new Connection(1, 'caldav', 'personal');
+            $caldav->setStatus(Connection::STATUS_CONNECTED);
             $caldav->setConfig(['channel' => 'calendar']);
             (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
 

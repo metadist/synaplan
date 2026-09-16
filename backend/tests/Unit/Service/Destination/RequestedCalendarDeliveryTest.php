@@ -127,11 +127,15 @@ final class RequestedCalendarDeliveryTest extends TestCase
         self::assertFalse($delivery->userAskedToPutInCalendar('Create a meeting reminder called Nextcloud Test for tomorrow at 9:00'));
         self::assertFalse($delivery->userAskedToPutInCalendar('What is a calendar?'));
         self::assertFalse($delivery->userAskedToPutInCalendar('Do you support Outlook?'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('save the .ics file'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('do not put it in my calendar'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('lege den Termin nicht in meinen Kalender'));
     }
 
     public function testDefaultCalendarChannelUsesTheOnlyConnectedCalendar(): void
     {
         $caldav = new Connection(1, 'caldav', 'personal');
+        $caldav->setStatus(Connection::STATUS_CONNECTED);
         $caldav->setConfig(['channel' => 'calendar']);
         (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
 
@@ -143,10 +147,26 @@ final class RequestedCalendarDeliveryTest extends TestCase
         self::assertNull($this->delivery([], [])->defaultCalendarChannel(1));
     }
 
+    public function testDefaultCalendarChannelIgnoresDisconnectedCalendars(): void
+    {
+        $stale = new Connection(1, 'caldav', 'old');
+        $stale->setStatus(Connection::STATUS_DISCONNECTED);
+        $stale->setConfig(['channel' => 'calendar']);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($stale, 8);
+
+        $healthy = $this->m365Connection();
+        $healthy->setStatus(Connection::STATUS_CONNECTED);
+
+        self::assertSame('outlook', $this->delivery([$stale, $healthy], [])->defaultCalendarChannel(1));
+        self::assertNull($this->delivery([$stale], [])->defaultCalendarChannel(1));
+    }
+
     public function testDefaultCalendarChannelPrefersTheCalendarSlug(): void
     {
         $outlook = $this->m365Connection();
+        $outlook->setStatus(Connection::STATUS_CONNECTED);
         $caldav = new Connection(1, 'caldav', 'personal');
+        $caldav->setStatus(Connection::STATUS_CONNECTED);
         $caldav->setConfig(['channel' => 'calendar']);
         (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
 
