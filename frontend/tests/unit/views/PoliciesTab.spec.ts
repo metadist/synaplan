@@ -128,9 +128,7 @@ describe('PoliciesTab', () => {
   })
 
   it('explains a missing instance default when locking fails', async () => {
-    patchLocks.mockRejectedValue(
-      new ApiError(422, 'Cannot lock', 'iam.noInstanceDefault')
-    )
+    patchLocks.mockRejectedValue(new ApiError(422, 'Cannot lock', 'iam.noInstanceDefault'))
     setActivePinia(createPinia())
     const wrapper = mount(PoliciesTab)
     await flushPromises()
