@@ -483,6 +483,20 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
         $this->assertStringNotContainsString('Image analysis failed:', $result['content']);
     }
 
+    public function testMissingImagesOnDiskAreThrownInsteadOfSuccessfulReply(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'gone.png', type: 'png', path: 'missing/gone.png'),
+        ], text: '');
+
+        $this->aiFacade->expects($this->never())->method('analyzeImage');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('File not found: gone.png');
+
+        $this->handler->handle($message, [], []);
+    }
+
     public function testDocumentAnalysisExceptionIsNotReturnedAsChatContent(): void
     {
         $message = $this->buildMessageWithFiles([

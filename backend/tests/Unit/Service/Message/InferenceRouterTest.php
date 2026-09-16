@@ -103,6 +103,61 @@ final class InferenceRouterTest extends TestCase
         self::assertSame(['content' => 'extracted', 'metadata' => []], $result);
     }
 
+    public function testFileAnalysisHandlerFailureDoesNotFallBackToChat(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $analysisHandler = $this->createHandlerMock('file_analysis');
+        $analysisHandler->expects(self::once())
+            ->method('handle')
+            ->willThrowException(new \RuntimeException('File not found: gone.png'));
+
+        $router = new InferenceRouter(
+            [$chatHandler, $analysisHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('File not found: gone.png');
+
+        $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile'],
+        );
+    }
+
+    public function testFileAnalysisStreamFailureDoesNotFallBackToChat(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handleStream');
+
+        $analysisHandler = $this->createHandlerMock('file_analysis');
+        $analysisHandler->expects(self::once())
+            ->method('handleStream')
+            ->willThrowException(new \RuntimeException('provider exploded: SAFETY'));
+
+        $router = new InferenceRouter(
+            [$chatHandler, $analysisHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('provider exploded: SAFETY');
+
+        $router->routeStream(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile'],
+            static function (): void {},
+        );
+    }
+
     public function testUnknownIntentFallsBackToTheChatHandler(): void
     {
         $chatHandler = $this->createHandlerMock('chat');

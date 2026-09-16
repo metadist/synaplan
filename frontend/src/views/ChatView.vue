@@ -4268,12 +4268,11 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
+            const rawError = typeof data.error === 'string' ? data.error : ''
             const classified =
               typeof data.errorReason === 'string' && data.errorReason.trim() !== ''
             const errorMsg =
-              classified && typeof data.error === 'string' && data.error.trim() !== ''
-                ? data.error
-                : t('chatError.reason.unknown')
+              classified && rawError.trim() !== '' ? rawError : t('chatError.reason.unknown')
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -4333,10 +4332,13 @@ const streamAIResponse = async (
               }
             }
 
-            // Handle chat not found errors with toast notification
+            // Match control-flow on the raw SSE string. Unclassified events
+            // (chat-not-found, rate-limit) have no errorReason, so errorMsg
+            // is the translated unknown copy and must not hide those branches.
+            const rawErrorLower = rawError.toLowerCase()
             if (
-              errorMsg.toLowerCase().includes('chat not found') ||
-              errorMsg.toLowerCase().includes('access denied')
+              rawErrorLower.includes('chat not found') ||
+              rawErrorLower.includes('access denied')
             ) {
               // Remove the empty assistant message
               historyStore.removeMessage(messageId)
@@ -4353,7 +4355,7 @@ const streamAIResponse = async (
             }
 
             // Handle rate limit errors with modal
-            if (errorMsg.toLowerCase().includes('rate limit')) {
+            if (rawErrorLower.includes('rate limit')) {
               // Remove the empty assistant message
               historyStore.removeMessage(messageId)
 

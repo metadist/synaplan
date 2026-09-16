@@ -1029,13 +1029,12 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                     'full_path' => $fullPath,
                     'image_index' => $index,
                 ]);
+                $missing = new \RuntimeException('File not found: '.$image['name']);
                 $results[] = [
                     'name' => $image['name'],
                     'error' => 'file_not_found',
-                    'message' => $this->userFacingAnalysisError(
-                        new \RuntimeException('File not found: '.$image['name']),
-                        $classification,
-                    ),
+                    'message' => $this->userFacingAnalysisError($missing, $classification),
+                    'exception' => $missing,
                 ];
 
                 continue;
