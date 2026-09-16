@@ -85,10 +85,11 @@ describe('BuilderKnowledge', () => {
     expect(store.dirty).toBe(true)
   })
 
-  it('hides the file input with display:none so focusing it cannot scroll the shell', () => {
+  it('hides the file input and keeps a keyboard-focusable upload button', () => {
     const { wrapper } = mountKnowledge()
     const input = wrapper.get('[data-testid="input-knowledge-file"]')
     expect(input.classes()).toContain('hidden')
     expect(input.classes()).not.toContain('sr-only')
+    expect(wrapper.get('[data-testid="btn-knowledge-file"]').element.tagName).toBe('BUTTON')
   })
 })
