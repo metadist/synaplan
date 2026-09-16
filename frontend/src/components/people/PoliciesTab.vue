@@ -1,22 +1,46 @@
 <template>
   <div data-testid="section-policies">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="surface-card rounded-lg p-6">
-        <label class="block text-sm font-medium txt-primary mb-2" for="policy-group">
-          {{ $t('people.policies.group') }}
-        </label>
-        <select
-          id="policy-group"
-          v-model="selectedId"
-          class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="select-policy-group"
-        >
-          <option :value="null" disabled>{{ $t('people.policies.chooseGroup') }}</option>
-          <option v-for="group in groups" :key="group.id" :value="group.id">
-            {{ group.name }}
-          </option>
-        </select>
-        <p class="txt-secondary text-sm mt-3">{{ $t('people.policies.helper') }}</p>
+      <div class="space-y-6">
+        <div class="surface-card rounded-lg p-6">
+          <label class="block text-sm font-medium txt-primary mb-2" for="policy-group">
+            {{ $t('people.policies.group') }}
+          </label>
+          <select
+            id="policy-group"
+            v-model="selectedId"
+            class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="select-policy-group"
+          >
+            <option :value="null" disabled>{{ $t('people.policies.chooseGroup') }}</option>
+            <option v-for="group in groups" :key="group.id" :value="group.id">
+              {{ group.name }}
+            </option>
+          </select>
+          <p class="txt-secondary text-sm mt-3">{{ $t('people.policies.helper') }}</p>
+        </div>
+
+        <section class="surface-card rounded-lg p-6" data-testid="section-policy-locks">
+          <h3 class="text-lg font-semibold txt-primary mb-2">
+            {{ $t('people.policies.locks') }}
+          </h3>
+          <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.locksHelper') }}</p>
+          <label
+            v-for="key in lockableKeys"
+            :key="key"
+            class="flex items-center justify-between gap-4 py-2 text-sm txt-primary"
+          >
+            <span>{{ lockLabel(key) }}</span>
+            <input
+              type="checkbox"
+              class="disabled:opacity-50 disabled:cursor-not-allowed"
+              :checked="locks[key] === true"
+              :disabled="!locksReady || lockingKey === key"
+              :data-testid="`lock-${key}`"
+              @change="onLock(key, ($event.target as HTMLInputElement).checked)"
+            />
+          </label>
+        </section>
       </div>
 
       <div class="lg:col-span-2 space-y-6">
@@ -39,9 +63,8 @@
               >
                 <span class="font-medium">{{ $t(`people.policies.capability.${cap}`) }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="stringSetting(`DEFAULTMODEL.${cap}`)"
-                  :disabled="isLocked(`DEFAULTMODEL.${cap}`)"
                   :data-testid="`select-default-${cap}`"
                   @change="
                     onSelect(`DEFAULTMODEL.${cap}`, ($event.target as HTMLSelectElement).value)
@@ -63,6 +86,13 @@
                 >
                   {{ $t('people.policies.conflict') }}
                 </span>
+                <span
+                  v-if="isLocked(`DEFAULTMODEL.${cap}`)"
+                  class="block mt-1 text-xs txt-secondary"
+                  data-testid="hint-policy-lock-ignored"
+                >
+                  {{ $t('people.policies.lockIgnored') }}
+                </span>
               </label>
             </div>
           </section>
@@ -72,6 +102,13 @@
               {{ $t('people.policies.allowedModels') }}
             </h3>
             <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.allowedHelper') }}</p>
+            <p
+              v-if="isLocked('MODELS.ALLOWED')"
+              class="txt-secondary text-sm mb-4"
+              data-testid="hint-policy-lock-ignored"
+            >
+              {{ $t('people.policies.lockIgnored') }}
+            </p>
             <div class="max-h-64 overflow-y-auto space-y-4" data-testid="list-allowed-models">
               <template v-for="cap in defaultCapabilities" :key="cap">
                 <div v-if="modelsFor(cap).length > 0" class="space-y-2">
@@ -86,7 +123,6 @@
                     <input
                       type="checkbox"
                       :checked="allowedKeys.includes(catalogKey(model))"
-                      :disabled="isLocked('MODELS.ALLOWED')"
                       :data-testid="`check-allowed-${catalogKey(model)}`"
                       @change="toggleAllowed(catalogKey(model))"
                     />
@@ -108,9 +144,8 @@
                   $t(`people.policies.feature.${featureI18nKey(key)}`)
                 }}</span>
                 <select
-                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                   :value="featureMode(key)"
-                  :disabled="isLocked(key)"
                   :data-testid="`select-feature-${featureI18nKey(key)}`"
                   @change="onFeature(key, ($event.target as HTMLSelectElement).value)"
                 >
@@ -118,6 +153,13 @@
                   <option value="on">{{ $t('people.policies.featureOn') }}</option>
                   <option value="off">{{ $t('people.policies.featureOff') }}</option>
                 </select>
+                <span
+                  v-if="isLocked(key)"
+                  class="block mt-1 text-xs txt-secondary"
+                  data-testid="hint-policy-lock-ignored"
+                >
+                  {{ $t('people.policies.lockIgnored') }}
+                </span>
                 <span
                   class="block mt-1 text-xs txt-secondary"
                   :data-testid="`hint-feature-${featureI18nKey(key)}`"
@@ -133,35 +175,21 @@
               {{ $t('people.policies.rateLimit') }}
             </h3>
             <select
-              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
               :value="stringSetting('RATELIMITS.TIER')"
-              :disabled="isLocked('RATELIMITS.TIER')"
               data-testid="select-rate-tier"
               @change="onSelect('RATELIMITS.TIER', ($event.target as HTMLSelectElement).value)"
             >
               <option value="">{{ $t('people.policies.useBillingTier') }}</option>
               <option v-for="tier in tiers" :key="tier" :value="tier">{{ tier }}</option>
             </select>
-          </section>
-
-          <section class="surface-card rounded-lg p-6" data-testid="section-policy-locks">
-            <h3 class="text-lg font-semibold txt-primary mb-2">
-              {{ $t('people.policies.locks') }}
-            </h3>
-            <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.locksHelper') }}</p>
-            <label
-              v-for="key in lockableKeys"
-              :key="key"
-              class="flex items-center justify-between gap-4 py-2 text-sm txt-primary"
+            <p
+              v-if="isLocked('RATELIMITS.TIER')"
+              class="mt-1 text-xs txt-secondary"
+              data-testid="hint-policy-lock-ignored"
             >
-              <span>{{ lockLabel(key) }}</span>
-              <input
-                type="checkbox"
-                :checked="locks[key] === true"
-                :data-testid="`lock-${key}`"
-                @change="onLock(key, ($event.target as HTMLInputElement).checked)"
-              />
-            </label>
+              {{ $t('people.policies.lockIgnored') }}
+            </p>
           </section>
 
           <div class="flex justify-end">
@@ -188,6 +216,7 @@ import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { iamApi, type IamGroup, type IamGroupConfigSetting } from '@/services/api/iamApi'
 import { getModels } from '@/services/api/configApi'
+import { ApiError } from '@/services/api/httpClient'
 import type { AIModel, Capability } from '@/types/ai-models'
 
 const { t } = useI18n()
@@ -232,6 +261,8 @@ const groups = ref<IamGroup[]>([])
 const selectedId = ref<number | null>(null)
 const loading = ref(false)
 const saving = ref(false)
+const lockingKey = ref<string | null>(null)
+const locksReady = ref(false)
 const settings = ref<Record<string, IamGroupConfigSetting>>({})
 const draft = ref<Record<string, unknown>>({})
 const conflicts = ref<Record<string, string[]>>({})
@@ -248,6 +279,7 @@ onMounted(async () => {
     groups.value = groupList
     modelsByCap.value = modelsRes.models ?? {}
     locks.value = lockRes
+    locksReady.value = true
     if (groupList.length > 0) {
       selectedId.value = groupList[0].id
     }
@@ -334,7 +366,7 @@ const allowedKeys = computed(() => {
 })
 
 function isLocked(key: string): boolean {
-  return locks.value[key] === true || setting(key)?.locked === true
+  return locks.value[key] === true
 }
 
 function catalogKey(model: AIModel): string {
@@ -385,12 +417,19 @@ function toggleAllowed(key: string) {
 }
 
 async function onLock(key: string, value: boolean) {
+  lockingKey.value = key
   try {
     const next = await iamApi.patchLocks({ [key]: value })
     locks.value = { ...locks.value, ...next }
     success(t('people.policies.lockSaved'))
-  } catch {
-    error(t('people.policies.saveError'))
+  } catch (err) {
+    if (err instanceof ApiError && err.code === 'iam.noInstanceDefault') {
+      error(t('people.policies.lockMissingDefault'))
+    } else {
+      error(t('people.policies.saveError'))
+    }
+  } finally {
+    lockingKey.value = null
   }
 }
 

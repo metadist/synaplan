@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Iam\Policy;
 
+use App\Entity\Config;
 use App\Entity\Group;
 use App\Entity\Model;
 use App\Entity\User;
@@ -13,6 +14,7 @@ use App\Repository\GroupConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\Exception\MissingInstanceDefaultException;
 
 /**
  * Admin read/write for group policy rows and global locks.
@@ -107,7 +109,8 @@ final readonly class GroupPolicyService
      */
     public function setLocks(array $body, User $actor, string $ip = ''): array
     {
-        $locked = [];
+        /** @var list<array{key: string, blocked: bool, row: ?Config}> $planned */
+        $planned = [];
         foreach ($body as $key => $on) {
             $parts = PolicyAllowList::split($key);
             if (null === $parts) {
@@ -118,16 +121,22 @@ final readonly class GroupPolicyService
                 $blocked = (bool) $on;
             }
             $row = $this->configRepository->findByOwnerGroupAndSetting(0, $parts['group'], $parts['setting']);
-            if (null === $row) {
-                $this->configRepository->setValue(0, $parts['group'], $parts['setting'], '');
-                $row = $this->configRepository->findByOwnerGroupAndSetting(0, $parts['group'], $parts['setting']);
+            if ($blocked && !$this->hasLockableInstanceDefault($row, $parts['group'], $parts['setting'])) {
+                throw new MissingInstanceDefaultException($key);
             }
+            $planned[] = ['key' => $key, 'blocked' => $blocked, 'row' => $row];
+        }
+
+        $locked = [];
+        foreach ($planned as $item) {
+            $row = $item['row'];
             if (null === $row) {
+                $locked[$item['key']] = false;
                 continue;
             }
-            $row->setBlocked($blocked);
+            $row->setBlocked($item['blocked']);
             $this->configRepository->save($row);
-            $locked[$key] = $blocked;
+            $locked[$item['key']] = $item['blocked'];
         }
 
         $this->auditLogWriter->record(
@@ -140,6 +149,19 @@ final readonly class GroupPolicyService
         );
 
         return $locked;
+    }
+
+    private function hasLockableInstanceDefault(?Config $row, string $group, string $setting): bool
+    {
+        if (!$row instanceof Config) {
+            return false;
+        }
+        // Empty MODELS.ALLOWED is a valid "every model" value.
+        if ('MODELS' === $group && 'ALLOWED' === $setting) {
+            return true;
+        }
+
+        return '' !== trim($row->getValue());
     }
 
     /**

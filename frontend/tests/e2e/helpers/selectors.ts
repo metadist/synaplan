@@ -571,6 +571,7 @@ export const selectors = {
     tabPolicies: '[data-testid="tab-policies"]',
     sectionPolicies: '[data-testid="section-policies"]',
     sectionPolicyDefaults: '[data-testid="section-policy-defaults"]',
+    sectionPolicyLocks: '[data-testid="section-policy-locks"]',
     selectPolicyGroup: '[data-testid="select-policy-group"]',
   },
   dialog: {
