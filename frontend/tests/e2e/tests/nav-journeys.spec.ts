@@ -13,6 +13,7 @@ import { selectors } from '../helpers/selectors'
 import { CREDENTIALS } from '../config/credentials'
 import { getRuntimeFeatures } from '../helpers/features'
 import { ChatHelper } from '../helpers/chat'
+import { FIXTURE_PATHS } from '../config/test-data'
 import { TIMEOUTS, getApiUrl } from '../config/config'
 
 const NAV = selectors.nav
@@ -21,10 +22,15 @@ const CHAT = selectors.chat
 const MEM = selectors.memories
 const ADMIN = selectors.admin
 
-const tinyPdf = path.join(
+// Plain text: chat upload extracts natively. A PDF would wait on Tika, which
+// is integration-profile only and is not started in the default CI stack —
+// the chip then stays on "processing" until the request times out and drops.
+const summarizeDocument = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../../../backend/tests/Fixtures/extraction/files/tiny.pdf'
+  '..',
+  FIXTURE_PATHS.RAG_MOST_IMPORTANT
 )
+const summarizeDocumentName = path.basename(summarizeDocument)
 
 async function openOperateLink(page: Page, linkSelector: string) {
   await page.locator(NAV.sidebarV2Admin).click()
@@ -128,7 +134,11 @@ test.describe('@ci Navigation journeys', () => {
         timeout: TIMEOUTS.STANDARD,
       })
       const newestRow = modal.locator(NAV.chatV2Row).first()
-      await newestRow.hover()
+      await expect(newestRow).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      // The manager list re-renders as chats persist; hover waits for
+      // layout stability and times out when the row detaches. The menu
+      // button is force-clicked (same as chat-manage) so a mid-refresh
+      // does not stall the journey.
       await newestRow.locator(NAV.chatV2RowMenu).click({ force: true })
       await page.locator(NAV.chatV2Rename).click()
       const promptInput = page.locator(selectors.dialog.promptInput)
@@ -147,8 +157,7 @@ test.describe('@ci Navigation journeys', () => {
       await page.locator('[data-testid="input-search-chats"]').fill(title)
       const row = page.locator('[data-testid="chat-item"]').filter({ hasText: title })
       await expect(row).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await row.hover()
-      await row.locator('[data-testid="btn-chat-open"]').click()
+      await row.locator('[data-testid="btn-chat-open"]').click({ force: true })
       await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
@@ -258,11 +267,10 @@ test.describe('@ci Navigation journeys', () => {
       })
     })
 
-    await test.step('Attach a PDF — do not send', async () => {
-      await page.locator(CHAT.fileInput).setInputFiles(tinyPdf)
-      await expect(page.locator('[data-testid="btn-remove-chat-file"]')).toBeVisible({
-        timeout: TIMEOUTS.STANDARD,
-      })
+    await test.step('Attach a document — do not send', async () => {
+      await page.locator(CHAT.fileInput).setInputFiles(summarizeDocument)
+      const chip = page.locator('[data-testid="comp-chat-input"]').getByText(summarizeDocumentName)
+      await expect(chip).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="btn-remove-chat-file"]')).toBeEnabled({
         timeout: TIMEOUTS.LONG,
       })
