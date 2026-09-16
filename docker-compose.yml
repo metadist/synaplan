@@ -683,7 +683,10 @@ services:
       APP_ENV: dev
       SYNAPLAN_WEB_HEALTH_URL: http://backend/api/health
       DAV_ALLOW_INSECURE_LOCAL: "1"
-      APP_URL: http://backend
+      # Public URLs, same as the backend: approval digest/instant mail
+      # builds browser links from FRONTEND_URL ?? APP_URL.
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
       PLUGINS_DIR: /plugins
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
@@ -712,7 +715,9 @@ services:
       redis:
         condition: service_healthy
       backend:
-        condition: service_started
+        # Wait for Composer bootstrap on a fresh checkout; vendor/ is
+        # bind-mounted and this role does not run docker-entrypoint.d.
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "/usr/local/bin/container-healthcheck"]
