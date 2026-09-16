@@ -87,12 +87,14 @@ final class ApiKeyScope
 
     /**
      * Paths any authenticated key may reach regardless of scopes: identity
-     * introspection of the key's own account ("who am I"), needed by every
-     * integration for its ping/health check. Read-only and owner-scoped.
+     * introspection of the key's own account ("who am I") and the public
+     * health probe. Both are read-only; `/api/health` carries no owner data
+     * and is already reachable without a key, so presenting a restricted key
+     * must not make it fail (Nextcloud "Test connection" calls this path).
      *
      * @var list<string>
      */
-    private const SELF_SERVICE_PATHS = ['/api/v1/auth/me'];
+    private const SELF_SERVICE_PATHS = ['/api/v1/auth/me', '/api/health'];
 
     /**
      * Legacy webhook scopes. A key whose list contains ONLY these keeps full
@@ -228,6 +230,8 @@ final class ApiKeyScope
      *   /api/v1/agents           → agents:*
      *   /api/v1/auth/me          → any key (self-service identity, see
      *                              SELF_SERVICE_PATHS)
+     *   /api/health              → any key (public health probe; presenting a
+     *                              restricted key must not 403 it)
      *   everything else          → denied for a restricted key (a scoped key
      *                              must never administer the instance)
      *

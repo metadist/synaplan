@@ -240,6 +240,16 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows(['rag:*'], '/api/v1/auth/logout'));
     }
 
+    public function testHealthIsSelfServiceForAnyRestrictedKey(): void
+    {
+        self::assertTrue(ApiKeyScope::allows(['desktop:jobs'], '/api/health'));
+        self::assertTrue(ApiKeyScope::allows(['chat', 'files', 'rag'], '/api/health'));
+        self::assertTrue(ApiKeyScope::allows(['messages:*'], '/api/health'));
+        // Sibling paths stay closed.
+        self::assertFalse(ApiKeyScope::allows(['rag:*'], '/api/healthz'));
+        self::assertFalse(ApiKeyScope::allows(['rag:*'], '/api/v1/health'));
+    }
+
     public function testPrefixMatchingDoesNotBleedIntoSiblingPaths(): void
     {
         $scopes = ApiKeyScope::addinScopes();
