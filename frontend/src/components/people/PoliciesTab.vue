@@ -98,23 +98,34 @@
           </section>
 
           <section class="surface-card rounded-lg p-6" data-testid="section-policy-features">
-            <h3 class="text-lg font-semibold txt-primary mb-4">
+            <h3 class="text-lg font-semibold txt-primary mb-2">
               {{ $t('people.policies.features') }}
             </h3>
-            <label
-              v-for="key in featureKeys"
-              :key="key"
-              class="flex items-center justify-between gap-4 py-2 text-sm txt-primary"
-            >
-              <span>{{ $t(`people.policies.feature.${featureI18nKey(key)}`) }}</span>
-              <input
-                type="checkbox"
-                :checked="boolSetting(key)"
-                :disabled="isLocked(key)"
-                :data-testid="`toggle-${featureI18nKey(key)}`"
-                @change="onBool(key, ($event.target as HTMLInputElement).checked)"
-              />
-            </label>
+            <p class="txt-secondary text-sm mb-4">{{ $t('people.policies.featuresHelper') }}</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label v-for="key in featureKeys" :key="key" class="block text-sm txt-primary">
+                <span class="font-medium">{{
+                  $t(`people.policies.feature.${featureI18nKey(key)}`)
+                }}</span>
+                <select
+                  class="w-full mt-1 px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  :value="featureMode(key)"
+                  :disabled="isLocked(key)"
+                  :data-testid="`select-feature-${featureI18nKey(key)}`"
+                  @change="onFeature(key, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="inherit">{{ $t('people.policies.useGlobal') }}</option>
+                  <option value="on">{{ $t('people.policies.featureOn') }}</option>
+                  <option value="off">{{ $t('people.policies.featureOff') }}</option>
+                </select>
+                <span
+                  class="block mt-1 text-xs txt-secondary"
+                  :data-testid="`hint-feature-${featureI18nKey(key)}`"
+                >
+                  {{ featureHint(key) }}
+                </span>
+              </label>
+            </div>
           </section>
 
           <section class="surface-card rounded-lg p-6" data-testid="section-policy-tier">
@@ -193,7 +204,17 @@ const featureKeys = [
   'MULTITASK.MCP_FETCH_ENABLED',
   'MULTITASK.MCP_ACTION_ENABLED',
   'MULTITASK.EMAIL_SEARCH_ENABLED',
+  'TOOLS.REGISTRY_ENABLED',
+  'TOOLS.APPROVALS_ENABLED',
+  'TOOLS.CUSTOM_HTTP_ENABLED',
+  'WORKFLOWS.BUILDER_ENABLED',
 ] as const
+/** Code defaults used when no instance row exists. Matches the PHP resolvers. */
+const featureBuiltinOn = new Set<string>([
+  'MULTITASK.ROUTING_ENABLED',
+  'MULTITASK.URL_FETCH_ENABLED',
+  'TOOLS.REGISTRY_ENABLED',
+])
 const tiers = ['NEW', 'PRO', 'TEAM', 'BUSINESS'] as const
 const lockableKeys = [
   'DEFAULTMODEL.CHAT',
@@ -263,11 +284,45 @@ function stringSetting(key: string): string {
   return current?.source === 'group' && typeof current.value === 'string' ? current.value : ''
 }
 
-function boolSetting(key: string): boolean {
+type FeatureMode = 'inherit' | 'on' | 'off'
+
+function isFeatureOn(value: unknown): boolean {
+  return value === true || value === '1' || value === 1
+}
+
+function isFeatureOff(value: unknown): boolean {
+  return value === false || value === '0' || value === 0
+}
+
+function featureMode(key: string): FeatureMode {
   if (key in draft.value) {
-    return draft.value[key] === true || draft.value[key] === '1'
+    const value = draft.value[key]
+    if (isFeatureOn(value)) return 'on'
+    if (isFeatureOff(value)) return 'off'
+    return 'inherit'
   }
-  return setting(key)?.source === 'group' && setting(key)?.value === true
+  const current = setting(key)
+  if (current?.source === 'group') {
+    return isFeatureOn(current.value) ? 'on' : 'off'
+  }
+  return 'inherit'
+}
+
+function featureHint(key: string): string {
+  const mode = featureMode(key)
+  if (mode === 'on') return t('people.policies.groupForcesOn')
+  if (mode === 'off') return t('people.policies.groupForcesOff')
+  const current = setting(key)
+  if (current?.source === 'group') {
+    return t('people.policies.willInherit')
+  }
+  if (isFeatureOn(current?.value)) return t('people.policies.inheritedOn')
+  if (current?.source === 'admin' || isFeatureOff(current?.value)) {
+    return t('people.policies.inheritedOff')
+  }
+  return featureBuiltinOn.has(key)
+    ? t('people.policies.inheritedOn')
+    : t('people.policies.inheritedOff')
 }
 
 const allowedKeys = computed(() => {
@@ -310,8 +365,16 @@ function onSelect(key: string, value: string) {
   draft.value = { ...draft.value, [key]: value }
 }
 
-function onBool(key: string, value: boolean) {
-  draft.value = { ...draft.value, [key]: value }
+function onFeature(key: string, mode: string) {
+  if (mode === 'on') {
+    draft.value = { ...draft.value, [key]: true }
+    return
+  }
+  if (mode === 'off') {
+    draft.value = { ...draft.value, [key]: false }
+    return
+  }
+  draft.value = { ...draft.value, [key]: null }
 }
 
 function toggleAllowed(key: string) {

@@ -6105,6 +6105,15 @@
       "allowedModels": "Allowed models",
       "allowedHelper": "Leave empty so people can use every model. A list limits what they can pick.",
       "features": "Features",
+      "featuresHelper": "Leave as the instance default unless this group must turn a feature on or off.",
+      "featureOn": "On for this group",
+      "featureOff": "Off for this group",
+      "inheritedOn": "The instance default is on.",
+      "inheritedOff": "The instance default is off.",
+      "inheritedUnset": "The instance has no default, so this is off.",
+      "willInherit": "Will use the instance default after you save.",
+      "groupForcesOn": "This group turns it on for its members.",
+      "groupForcesOff": "This group turns it off for its members.",
       "rateLimit": "Rate-limit tier",
       "useGlobal": "Use the instance default",
       "useBillingTier": "Use the person’s plan",
@@ -6133,7 +6142,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Fetch web pages",
         "MULTITASK_MCP_FETCH_ENABLED": "Read from connected tools",
         "MULTITASK_MCP_ACTION_ENABLED": "Act through connected tools",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "Search email"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Search email",
+        "TOOLS_REGISTRY_ENABLED": "Tool catalog",
+        "TOOLS_APPROVALS_ENABLED": "Tool approvals",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Custom HTTP tools",
+        "WORKFLOWS_BUILDER_ENABLED": "Task steps editor"
       }
     }
   },
