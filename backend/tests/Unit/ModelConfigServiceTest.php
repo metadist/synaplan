@@ -1107,6 +1107,81 @@ class ModelConfigServiceTest extends TestCase
         $this->assertSame($globalToolsModelId, $result['model_id']);
     }
 
+    public function testGetToolsModelConfigForwardsUserIdToLayeredResolver(): void
+    {
+        $userId = 9;
+        $groupToolsModelId = 331;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with($userId, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $groupToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($groupToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame($groupToolsModelId, $result['model_id']);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserAsksTheResolverWithNull(): void
+    {
+        $globalToolsModelId = 99;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with(null, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $globalToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
     public function testGetMemoryModelConfigFallsThroughGlobalMemUserChatToGlobalChat(): void
     {
         $userId = 7;
