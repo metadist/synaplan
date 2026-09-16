@@ -24,6 +24,7 @@ use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\ToolExecutionGate;
 use App\Service\Tool\ToolRegistry;
+use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use Psr\Log\LoggerInterface;
 
@@ -43,6 +44,7 @@ final readonly class ToolCallRunner implements TaskRunner
         private UserRepository $users,
         private LoggerInterface $logger,
         private ?ToolExecutionGate $executionGate = null,
+        private ?ToolsConfig $toolsConfig = null,
     ) {
     }
 
@@ -77,6 +79,9 @@ final readonly class ToolCallRunner implements TaskRunner
         $descriptor = $this->registry->get((int) $userId, $toolName);
         if (null === $descriptor) {
             return NodeResult::failed((new ToolNotRegisteredException($toolName))->getMessage());
+        }
+        if (ToolSource::Custom === $descriptor->source && !$this->customHttpAllowed((int) $userId)) {
+            return NodeResult::failed('Custom tools are turned off');
         }
 
         $rawInputs = is_array($node->params['inputs'] ?? null) ? $node->params['inputs'] : $node->inputs;
@@ -235,7 +240,7 @@ final readonly class ToolCallRunner implements TaskRunner
         if (!(new \ReflectionProperty($this, 'registry'))->isInitialized($this)) {
             return null;
         }
-        if (null === $userId || $userId < 1) {
+        if (null === $userId || $userId < 1 || !$this->customHttpAllowed($userId)) {
             return null;
         }
 
@@ -252,5 +257,20 @@ final readonly class ToolCallRunner implements TaskRunner
         }
 
         return "  Custom tools:\n".implode("\n", $lines);
+    }
+
+    /**
+     * TOOLS.REGISTRY_ENABLED is the kill switch that restores the pre-registry
+     * catalogs. Custom HTTP also has its own flag; both must be on.
+     */
+    private function customHttpAllowed(int $userId): bool
+    {
+        $prop = new \ReflectionProperty($this, 'toolsConfig');
+        if (!$prop->isInitialized($this) || null === $this->toolsConfig) {
+            return true;
+        }
+
+        return $this->toolsConfig->isRegistryEnabled($userId)
+            && $this->toolsConfig->isCustomHttpEnabled($userId);
     }
 }

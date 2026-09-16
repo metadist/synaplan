@@ -225,7 +225,12 @@ final readonly class GatewayToolCatalog
     {
         $snapshot = $this->empty();
         $userId = (int) $user->getId();
-        if (null === $this->toolRegistry || null === $this->toolsConfig || !$this->toolsConfig->isCustomHttpEnabled($userId)) {
+        if (
+            null === $this->toolRegistry
+            || null === $this->toolsConfig
+            || !$this->toolsConfig->isRegistryEnabled($userId)
+            || !$this->toolsConfig->isCustomHttpEnabled($userId)
+        ) {
             return $snapshot;
         }
 

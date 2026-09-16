@@ -497,4 +497,115 @@ final class GatewayToolLoopTest extends TestCase
         $this->assertIsArray($result['body']);
         $this->assertSame('Opened the ticket.', $result['body']['content'][0]['text']);
     }
+
+    public function testCustomHttpNon2xxIsMarkedAsToolError(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+
+        $tool = new \App\Entity\CustomTool(5, 'walk_ticket_create', 'Create a ticket');
+        (new \ReflectionProperty(\App\Entity\CustomTool::class, 'id'))->setValue($tool, 9);
+
+        $repo = $this->createMock(\App\Repository\CustomToolRepository::class);
+        $repo->expects($this->once())->method('find')->with(9)->willReturn($tool);
+
+        $executor = $this->createMock(\App\Service\Tool\Custom\HttpToolExecutor::class);
+        $executor->expects($this->once())
+            ->method('execute')
+            ->willReturn(['status' => 502, 'summary' => 'Helpdesk unavailable', 'fields' => [], 'truncated' => false]);
+
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true, 'remaining' => 10, 'limit' => 100]);
+
+        $loop = new GatewayToolLoop(
+            new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
+            $this->createMock(WebSearchTool::class),
+            $this->createMock(AnalyzeImageTool::class),
+            $this->createMock(McpClient::class),
+            $this->createMock(McpServerConfigRepository::class),
+            $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8]),
+            $rateLimits,
+            new NullLogger(),
+            httpExecutor: $executor,
+            customTools: $repo,
+        );
+
+        $snapshot = [
+            'tools' => [[
+                'name' => 'custom:walk_ticket_create',
+                'description' => 'Open a ticket',
+                'input_schema' => ['type' => 'object'],
+            ]],
+            'dispatch' => [
+                'custom:walk_ticket_create' => [
+                    'kind' => GatewayToolCatalog::KIND_CUSTOM,
+                    'serverId' => 0,
+                    'tool' => 'custom:walk_ticket_create',
+                    'annotations' => ['readOnlyHint' => false, 'toolId' => 9],
+                ],
+            ],
+            'web_search' => GatewayToolCatalog::WEB_SEARCH_NONE,
+        ];
+
+        $calls = 0;
+        $translator = $this->createMock(MessagesTranslatorInterface::class);
+        $translator->method('complete')->willReturnCallback(
+            function (array $body) use (&$calls): array {
+                ++$calls;
+                if (1 === $calls) {
+                    return [
+                        'status' => 200,
+                        'headers' => [],
+                        'body' => [
+                            'id' => 'msg_1',
+                            'type' => 'message',
+                            'role' => 'assistant',
+                            'content' => [[
+                                'type' => 'tool_use',
+                                'id' => 'toolu_c1',
+                                'name' => 'custom:walk_ticket_create',
+                                'input' => ['title' => 'Printer on floor 3'],
+                            ]],
+                            'stop_reason' => 'tool_use',
+                            'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+                        ],
+                        'usage' => new MessagesUsage(10, 5, 0, 0, 'tool_use'),
+                    ];
+                }
+
+                $last = $body['messages'][2]['content'][0];
+                $this->assertSame('Helpdesk unavailable', $last['content']);
+                $this->assertTrue($last['is_error']);
+
+                return [
+                    'status' => 200,
+                    'headers' => [],
+                    'body' => [
+                        'id' => 'msg_2',
+                        'type' => 'message',
+                        'role' => 'assistant',
+                        'content' => [['type' => 'text', 'text' => 'The helpdesk is down.']],
+                        'stop_reason' => 'end_turn',
+                        'usage' => ['input_tokens' => 12, 'output_tokens' => 4],
+                    ],
+                    'usage' => new MessagesUsage(12, 4, 0, 0, 'end_turn'),
+                ];
+            }
+        );
+
+        $result = $loop->runComplete(
+            [
+                'model' => 'claude-sonnet-4-6',
+                'max_tokens' => 64,
+                'messages' => [['role' => 'user', 'content' => 'open a ticket']],
+            ],
+            ['api_key' => 'k', 'upstream_url' => 'http://example.test'],
+            $translator,
+            $user,
+            $snapshot,
+        );
+
+        $this->assertSame(2, $calls);
+        $this->assertSame(200, $result['status']);
+    }
 }

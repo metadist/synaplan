@@ -72,4 +72,41 @@ final class GatewayToolCatalogCustomTest extends TestCase
         self::assertSame(GatewayToolCatalog::KIND_CUSTOM, $snapshot['dispatch']['custom:walk_ticket_create']['kind']);
         self::assertSame(9, $snapshot['dispatch']['custom:walk_ticket_create']['annotations']['toolId']);
     }
+
+    public function testOmitsCustomHttpToolsWhenRegistryIsDisabled(): void
+    {
+        $registry = $this->createMock(ToolRegistry::class);
+        $registry->expects(self::never())->method('forUser');
+
+        $toolsConfig = $this->createMock(ToolsConfig::class);
+        $toolsConfig->method('isCustomHttpEnabled')->willReturn(true);
+        $toolsConfig->method('isRegistryEnabled')->willReturn(false);
+
+        $config = $this->createMock(MessagesGatewayConfig::class);
+        $config->method('isMcpToolsEnabled')->willReturn(false);
+        $config->method('webSearchMode')->willReturn(MessagesGatewayConfig::WEB_SEARCH_OFF);
+        $config->method('visionMode')->willReturn(MessagesGatewayConfig::VISION_OFF);
+
+        $webSearch = $this->createMock(WebSearchTool::class);
+        $webSearch->method('isAvailable')->willReturn(false);
+        $analyzeImage = $this->createMock(AnalyzeImageTool::class);
+        $analyzeImage->method('isAvailable')->willReturn(false);
+
+        $catalog = new GatewayToolCatalog(
+            new McpToolCatalogAdapter($this->createMock(McpToolRegistry::class)),
+            $webSearch,
+            $analyzeImage,
+            $config,
+            $this->createMock(CacheItemPoolInterface::class),
+            new NullLogger(),
+            $registry,
+            $toolsConfig,
+        );
+
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(5);
+        $snapshot = $catalog->build($user, 'session-custom', []);
+
+        self::assertSame([], $snapshot['tools']);
+    }
 }

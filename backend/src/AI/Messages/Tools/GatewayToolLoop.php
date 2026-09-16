@@ -753,6 +753,13 @@ final readonly class GatewayToolLoop
         if (null === $this->httpExecutor || null === $this->customTools) {
             return $this->toolResultBlock($toolUseId, 'This custom tool cannot run right now.', isError: true);
         }
+        $userId = (int) $user->getId();
+        if (
+            null !== $this->toolsConfig
+            && (!$this->toolsConfig->isRegistryEnabled($userId) || !$this->toolsConfig->isCustomHttpEnabled($userId))
+        ) {
+            return $this->toolResultBlock($toolUseId, 'This custom tool is not available.', isError: true);
+        }
 
         $toolId = (int) ($entry['annotations']['toolId'] ?? 0);
         $tool = $toolId > 0 ? $this->customTools->find($toolId) : null;
@@ -772,8 +779,9 @@ final readonly class GatewayToolLoop
         }
 
         $text = '' !== $result['summary'] ? $result['summary'] : 'The tool finished';
+        $failed = $result['status'] < 200 || $result['status'] >= 300;
 
-        return $this->toolResultBlock($toolUseId, $this->clampToolText($text));
+        return $this->toolResultBlock($toolUseId, $this->clampToolText($text), isError: $failed);
     }
 
     /**
