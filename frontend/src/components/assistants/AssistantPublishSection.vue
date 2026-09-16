@@ -110,7 +110,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
-import { agentsApi, type AgentUsage, type AgentVersionCard } from '@/services/api/agentsApi'
+import {
+  agentFieldPath,
+  agentsApi,
+  type AgentUsage,
+  type AgentVersionCard,
+} from '@/services/api/agentsApi'
+import { ApiError } from '@/services/api/httpClient'
 import { useAgentsStore } from '@/stores/agents'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import AssistantUsagePanel from './AssistantUsagePanel.vue'
@@ -122,7 +128,7 @@ const emit = defineEmits<{
 const store = useAgentsStore()
 const { t } = useI18n()
 const { confirm } = useDialog()
-const { success, error } = useNotification()
+const { success, error, warning } = useNotification()
 
 const changelog = ref('')
 const publishing = ref(false)
@@ -194,7 +200,12 @@ async function onPublish(): Promise<void> {
   if (!ok) return
   publishing.value = true
   try {
-    await store.saveDraft()
+    try {
+      await store.saveDraft()
+    } catch {
+      // saveDraft already toasts or marks the field — do not add a second "publish failed".
+      return
+    }
     await agentsApi.publish(id, changelog.value)
     await store.load(id)
     changelog.value = ''
@@ -202,11 +213,23 @@ async function onPublish(): Promise<void> {
     success(t('assistants.publishSuccess'))
   } catch (err) {
     const message = err instanceof Error ? err.message : ''
-    error(
-      message.includes('nothing_changed')
-        ? t('assistants.nothingChanged')
-        : t('assistants.publishFailed')
-    )
+    const code = err instanceof ApiError ? (err.code ?? '') : ''
+    const unchanged = code === 'nothing_changed' || message.includes('nothing_changed')
+    if (unchanged) {
+      warning(t('assistants.nothingChanged'))
+      try {
+        await store.load(id)
+        await reload()
+      } catch {
+        // The toast already explains; status refresh is best-effort.
+      }
+      return
+    }
+    const path = agentFieldPath(err)
+    if (path) {
+      store.setFieldError(path, message)
+    }
+    error(t('assistants.publishFailed'))
   } finally {
     publishing.value = false
   }
