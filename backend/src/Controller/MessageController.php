@@ -160,8 +160,11 @@ class MessageController extends AbstractController
                 foreach ($fileIds as $fileId) {
                     $messageFile = $messageFileRepo->find($fileId);
                     if ($messageFile && $messageFile->getUserId() === $user->getId()) {
-                        // Set message ID to link file to this message
                         $messageFile->setMessageId($incomingMessage->getId());
+                        // Upload-file marks chat_attachment rows ephemeral until send
+                        // (issue #1911). StreamController already calls this; the
+                        // JSON send path must too or the attachment is reaped.
+                        $messageFile->keepAfterChatSend(false);
                         $this->em->persist($messageFile);
                     }
                 }
