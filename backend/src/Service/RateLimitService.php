@@ -615,8 +615,11 @@ final class RateLimitService
     /**
      * Group policy may replace BUSERLEVEL for the limits table only.
      * Billing / subscription stay on {@see User::getRateLimitLevel()}.
+     *
+     * Public so every `RATELIMITS_{level}.*` reader (storage quota, output-token
+     * cap, usage labels) uses the same source as {@see checkLimit()}.
      */
-    private function resolveRateLimitLevel(User $user): string
+    public function resolveRateLimitLevel(User $user): string
     {
         $level = $user->getRateLimitLevel();
         if ('ADMIN' === $level || null === $this->layeredConfigResolver) {
@@ -783,7 +786,7 @@ final class RateLimitService
             return null;
         }
 
-        $level = $user->getRateLimitLevel();
+        $level = $this->resolveRateLimitLevel($user);
 
         if ('ADMIN' === $level) {
             return null;
@@ -823,7 +826,7 @@ final class RateLimitService
      */
     public function getUserLimits(User $user): array
     {
-        $level = $user->getRateLimitLevel();
+        $level = $this->resolveRateLimitLevel($user);
         $actions = ['MESSAGES', 'IMAGES', 'VIDEOS', 'AUDIOS', 'FILE_ANALYSIS', 'EMBEDDINGS', 'RERANK', 'COMPUTE_RUNS'];
 
         $result = [
