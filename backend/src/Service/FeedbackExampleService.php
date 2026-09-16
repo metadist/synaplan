@@ -234,7 +234,7 @@ final readonly class FeedbackExampleService
         // Truncate input to save tokens
         $text = mb_substr(trim($text), 0, self::MAX_INPUT_LENGTH);
 
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -455,7 +455,7 @@ PROMPT;
      */
     public function regenerateCorrection(User $user, string $falseClaim, string $oldCorrection): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -515,7 +515,7 @@ PROMPT;
 
     private function summarizeFalsePositive(User $user, string $text, ?string $userMessage = null): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -577,7 +577,7 @@ PROMPT;
 
     private function suggestCorrection(User $user, string $text, ?string $userMessage = null): string
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -918,7 +918,7 @@ PROMPT;
      */
     private function summarizeSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 
@@ -1126,7 +1126,7 @@ PROMPT;
      */
     private function summarizeWebSourcesWithAi(User $user, string $claimText, array $rawSources): array
     {
-        $toolsConfig = $this->modelConfigService->getToolsModelConfig();
+        $toolsConfig = $this->modelConfigService->getToolsModelConfig($user->getId());
         $provider = $toolsConfig['provider'];
         $modelName = $toolsConfig['model'];
 

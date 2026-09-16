@@ -1037,6 +1037,76 @@ class ModelConfigServiceTest extends TestCase
         ], $result);
     }
 
+    public function testGetToolsModelConfigPrefersUserToolsOverGlobal(): void
+    {
+        $userId = 42;
+        $userToolsModelId = 221;
+
+        $userToolsConfig = $this->createMock(Config::class);
+        $userToolsConfig->method('getValue')->willReturn((string) $userToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => $userId,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($userToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($userToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame([
+            'provider' => 'groq',
+            'model' => 'llama-3.3-70b-versatile',
+            'model_id' => $userToolsModelId,
+        ], $result);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserLooksUpGlobalOnly(): void
+    {
+        $globalToolsModelId = 99;
+
+        $globalToolsConfig = $this->createMock(Config::class);
+        $globalToolsConfig->method('getValue')->willReturn((string) $globalToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => 0,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($globalToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
     public function testGetMemoryModelConfigFallsThroughGlobalMemUserChatToGlobalChat(): void
     {
         $userId = 7;
