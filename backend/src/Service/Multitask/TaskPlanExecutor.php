@@ -61,17 +61,25 @@ final readonly class TaskPlanExecutor
     public const PLAN_DEFINITION_META = 'task_plan_definition';
 
     /**
-     * Capabilities that have NO legacy InferenceRouter equivalent and therefore
-     * must run through the DAG even as a lone single node (see
-     * {@see shouldUseLegacyRouter()}).
+     * Capabilities whose single-node form has a proven InferenceRouter handler.
+     * A missing entry falls through to the DAG so an authored Saved Task step
+     * cannot silently become a chat answer (issue #1882). The previous
+     * deny-list had to be extended for every new capability and failed closed
+     * to the legacy router — which is how a lone `tool_call` / `email_me`
+     * node reported `completed` without doing the work.
      */
-    private const DAG_ONLY_CAPABILITIES = [
-        Capability::CalendarEvent,
-        Capability::DocumentExport,
-        Capability::DocumentCombine,
-        Capability::UrlFetch,
-        Capability::McpFetch,
-        Capability::EmailSearch,
+    private const LEGACY_ROUTER_CAPABILITIES = [
+        Capability::Chat,
+        Capability::Summarize,
+        Capability::Translate,
+        Capability::RagQuery,
+        Capability::FileAnalysis,
+        Capability::ImageGeneration,
+        Capability::VideoGeneration,
+        Capability::Text2Sound,
+        Capability::DocumentGeneration,
+        Capability::WebSearch,
+        Capability::ExtractText,
     ];
 
     /**
@@ -232,13 +240,13 @@ final readonly class TaskPlanExecutor
      * Whether a planned single-node plan should delegate to the legacy
      * InferenceRouter (the behaviour-identical Sprint-2 degenerate path).
      *
-     * Multi-node plans always run the DAG. A single-node plan also runs the DAG
-     * when its capability has NO legacy router equivalent — otherwise the legacy
-     * router, fed the original (calendar-unaware) classification, silently
-     * degrades a lone `calendar_event` into a plain chat answer that merely
-     * *describes* adding the event (e.g. emitting a literal "{{date:tomorrow}}")
-     * instead of producing the .ics. Chat/media/file capabilities keep the
-     * legacy path (the legacy classifier already handles them).
+     * Multi-node plans always run the DAG. A single-node plan uses the DAG
+     * unless its capability is on {@see LEGACY_ROUTER_CAPABILITIES} — otherwise
+     * the legacy router, fed the original classification, silently degrades a
+     * lone `tool_call` / `email_me` / `calendar_event` into a plain chat answer
+     * that merely *describes* the step and still reports `completed`.
+     * Chat/media/file capabilities keep the legacy path (the classifier already
+     * handles them).
      */
     private function shouldUseLegacyRouter(TaskPlan $plan): bool
     {
@@ -246,7 +254,7 @@ final readonly class TaskPlanExecutor
             return false;
         }
 
-        return !in_array($plan->nodes[0]->capability, self::DAG_ONLY_CAPABILITIES, true);
+        return in_array($plan->nodes[0]->capability, self::LEGACY_ROUTER_CAPABILITIES, true);
     }
 
     /**
@@ -523,10 +531,10 @@ final readonly class TaskPlanExecutor
      * that {@see shouldUseLegacyRouter()} hands straight back to the legacy
      * router — identical output, one blocking LLM call later.
      *
-     * The sorter prompt counts the DAG-only capabilities (calendar entry, URL
-     * fetch, connected-system lookup, mailbox search, "mail it to me") as
-     * multi-step even though they produce one deliverable: they have no legacy
-     * router equivalent, so skipping the planner would silently degrade them
+     * The sorter prompt counts capabilities without a legacy router equivalent
+     * (calendar entry, URL fetch, connected-system lookup, mailbox search,
+     * "mail it to me", a custom tool call) as multi-step even though they
+     * produce one deliverable: skipping the planner would silently degrade them
      * into a chat answer that only talks about the action.
      *
      * Deliberately strict: only an explicit `false` skips planning. A missing
