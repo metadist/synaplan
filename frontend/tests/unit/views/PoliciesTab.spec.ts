@@ -157,6 +157,58 @@ describe('PoliciesTab', () => {
     )
   })
 
+  it('does not treat a stale group locked flag as an instance lock', async () => {
+    getGroupConfig.mockResolvedValue({
+      settings: {
+        'DEFAULTMODEL.CHAT': { value: 'groq:groq:chat', source: 'group', locked: true },
+      },
+      conflicts: {},
+    })
+    listLocks.mockResolvedValue({ 'DEFAULTMODEL.CHAT': false })
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="hint-policy-lock-ignored"]').exists()).toBe(false)
+  })
+
+  it('clears the lock-ignored hint after a successful unlock', async () => {
+    listLocks.mockResolvedValue({ 'DEFAULTMODEL.CHAT': true })
+    patchLocks.mockResolvedValue({ 'DEFAULTMODEL.CHAT': false })
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="hint-policy-lock-ignored"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="lock-DEFAULTMODEL.CHAT"]').setValue(false)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="hint-policy-lock-ignored"]').exists()).toBe(false)
+  })
+
+  it('does not accept lock clicks until instance locks have loaded', async () => {
+    let resolveLocks: (value: Record<string, boolean>) => void = () => {}
+    listLocks.mockReturnValue(
+      new Promise<Record<string, boolean>>((resolve) => {
+        resolveLocks = resolve
+      })
+    )
+    setActivePinia(createPinia())
+    const wrapper = mount(PoliciesTab)
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-testid="lock-DEFAULTMODEL.CHAT"]').attributes('disabled')
+    ).toBeDefined()
+
+    resolveLocks({})
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-testid="lock-DEFAULTMODEL.CHAT"]').attributes('disabled')
+    ).toBeUndefined()
+  })
+
   it('shows inherit, on, and off for group feature policies', async () => {
     getGroupConfig.mockResolvedValue({
       settings: {

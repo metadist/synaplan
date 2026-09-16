@@ -33,8 +33,9 @@
             <span>{{ lockLabel(key) }}</span>
             <input
               type="checkbox"
+              class="disabled:opacity-50 disabled:cursor-not-allowed"
               :checked="locks[key] === true"
-              :disabled="lockingKey === key"
+              :disabled="!locksReady || lockingKey === key"
               :data-testid="`lock-${key}`"
               @change="onLock(key, ($event.target as HTMLInputElement).checked)"
             />
@@ -261,6 +262,7 @@ const selectedId = ref<number | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const lockingKey = ref<string | null>(null)
+const locksReady = ref(false)
 const settings = ref<Record<string, IamGroupConfigSetting>>({})
 const draft = ref<Record<string, unknown>>({})
 const conflicts = ref<Record<string, string[]>>({})
@@ -277,6 +279,7 @@ onMounted(async () => {
     groups.value = groupList
     modelsByCap.value = modelsRes.models ?? {}
     locks.value = lockRes
+    locksReady.value = true
     if (groupList.length > 0) {
       selectedId.value = groupList[0].id
     }
@@ -363,7 +366,7 @@ const allowedKeys = computed(() => {
 })
 
 function isLocked(key: string): boolean {
-  return locks.value[key] === true || setting(key)?.locked === true
+  return locks.value[key] === true
 }
 
 function catalogKey(model: AIModel): string {

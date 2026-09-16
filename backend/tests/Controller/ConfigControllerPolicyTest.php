@@ -120,6 +120,32 @@ final class ConfigControllerPolicyTest extends WebTestCase
         self::assertNull($repo->findByOwnerGroupAndSetting(0, 'RATELIMITS', 'TIER'));
     }
 
+    public function testLockingBlankInstanceValueReturns422AndDoesNotLock(): void
+    {
+        $this->setFlag(IamConfig::KEY_GROUPS_ENABLED, '1');
+        $this->setFlag(IamConfig::KEY_GROUP_POLICIES_ENABLED, '1');
+        $admin = $this->createUser('iam-policy-lock-blank-admin@synaplan.internal', 'ADMIN');
+
+        $repo = static::getContainer()->get(ConfigRepository::class);
+        $row = $repo->setValue(0, 'DEFAULTMODEL', 'CHAT', '');
+        $row->setBlocked(false);
+        $this->em->flush();
+
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('PATCH', '/api/v1/admin/config/locks', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+        ], json_encode(['DEFAULTMODEL.CHAT' => true], \JSON_THROW_ON_ERROR));
+
+        self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->client->getResponse()->getStatusCode());
+        $body = json_decode((string) $this->client->getResponse()->getContent(), true);
+        self::assertSame('iam.noInstanceDefault', $body['code'] ?? null);
+        $this->em->clear();
+        $fresh = $repo->findByOwnerGroupAndSetting(0, 'DEFAULTMODEL', 'CHAT');
+        self::assertInstanceOf(Config::class, $fresh);
+        self::assertFalse($fresh->isBlocked());
+        self::assertSame('', $fresh->getValue());
+    }
+
     private function setFlag(string $setting, string $value): void
     {
         static::getContainer()->get(ConfigRepository::class)
