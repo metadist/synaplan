@@ -878,6 +878,165 @@ final class RunnersTest extends TestCase
         }
     }
 
+    /**
+     * Issue #1891: when the planner omitted params.channel but the user asked
+     * to put the event in a calendar, deliver into the connected calendar.
+     */
+    public function testCalendarEventWithoutChannelStillDeliversWhenUserAsked(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $caldav = new Connection(1, 'caldav', 'personal');
+            $caldav->setConfig(['channel' => 'calendar']);
+            (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
+
+            $connections = $this->createMock(ConnectionRepository::class);
+            $connections->method('findByOwner')->willReturn([$caldav]);
+            $connections->method('findByIdAndOwner')->willReturn($caldav);
+
+            $provider = new class implements \App\Service\Destination\DestinationProvider {
+                /** @var array<string, mixed>|null */
+                public ?array $lastParams = null;
+
+                public function id(): string
+                {
+                    return 'caldav';
+                }
+
+                public function send(\App\Service\Destination\ShareableFile $file, array $params): \App\Service\Destination\DestinationResult
+                {
+                    $this->lastParams = $params;
+
+                    return \App\Service\Destination\DestinationResult::success('1', [
+                        'created' => '1',
+                        'skipped' => '0',
+                    ]);
+                }
+            };
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                new RequestedCalendarDelivery(
+                    $connections,
+                    new DestinationRegistry([$provider]),
+                    new PlannerChannelCatalog($connections),
+                    $this->createMock(LoggerInterface::class),
+                ),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Nextcloud Test',
+                'start' => '2026-09-15T09:00:00',
+                'timezone' => 'UTC',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message(
+                'Create a meeting reminder called Nextcloud Test for tomorrow at 9:00 and put it in my calendar'
+            )));
+
+            self::assertTrue($result->isSuccessful(), (string) $result->error);
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('Added the event to calendar', (string) $result->text);
+            self::assertTrue($result->metadata['calendar_delivery']['ok'] ?? false);
+            self::assertSame('calendar', $result->metadata['calendar_delivery']['channel'] ?? null);
+            self::assertSame(9, $provider->lastParams['connection_id'] ?? null);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * Issue #1891: the same phrasing with no calendar connected must still
+     * attach the .ics and say the event was not added.
+     */
+    public function testCalendarEventWithoutChannelSaysSoWhenNoCalendarIsConnected(): void
+    {
+        $uploadDir = sys_get_temp_dir().'/calrunner_'.uniqid();
+        mkdir($uploadDir.'/1/000', 0777, true);
+
+        try {
+            $storage = $this->createMock(FileStorageService::class);
+            $storage->method('storeRawContent')->willReturnCallback(
+                static function (string $content, int $userId, string $filename) use ($uploadDir): array {
+                    $relative = '1/000/'.$filename;
+                    file_put_contents($uploadDir.'/'.$relative, $content);
+
+                    return ['success' => true, 'path' => $relative, 'size' => strlen($content), 'mime' => 'text/calendar'];
+                }
+            );
+
+            $runner = new CalendarEventRunner(
+                new CalendarEventService(),
+                $storage,
+                $this->inertCalendarDelivery(),
+                $this->createMock(LoggerInterface::class),
+                uploadDir: $uploadDir,
+            );
+
+            $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+                'title' => 'Nextcloud Test',
+                'start' => '2026-09-15T09:00:00',
+                'timezone' => 'UTC',
+            ]);
+
+            $result = $runner->run($node, $this->context($this->message(
+                'Create a meeting reminder called Nextcloud Test for tomorrow at 9:00 and put it in my calendar'
+            )));
+
+            self::assertTrue($result->isSuccessful());
+            self::assertCount(1, $result->files);
+            self::assertStringContainsString('was not added to a calendar', (string) $result->text);
+            self::assertStringContainsString('Settings → Connections', (string) $result->text);
+            self::assertFalse($result->metadata['calendar_delivery']['ok'] ?? true);
+        } finally {
+            array_map('unlink', glob($uploadDir.'/1/000/*') ?: []);
+            @rmdir($uploadDir.'/1/000');
+            @rmdir($uploadDir.'/1');
+            @rmdir($uploadDir);
+        }
+    }
+
+    /**
+     * A plain "create an invite" request without a put-in-calendar ask must
+     * stay silent on delivery — only the .ics is attached.
+     */
+    public function testCalendarEventWithoutChannelStaysSilentWhenUserDidNotAsk(): void
+    {
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-06-10T15:00:00',
+            'timezone' => 'UTC',
+        ]);
+
+        $result = $this->calendarRunner()->run(
+            $node,
+            $this->context($this->message('Create a meeting reminder called Sync for tomorrow at 15:00')),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertCount(1, $result->files);
+        self::assertArrayNotHasKey('calendar_delivery', $result->metadata);
+        self::assertStringNotContainsString('was not added', (string) $result->text);
+    }
+
     public function testCalendarEventParamsWinOverInputs(): void
     {
         $node = new TaskNode('n1', Capability::CalendarEvent, [], [

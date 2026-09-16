@@ -40,6 +40,53 @@ final readonly class RequestedCalendarDelivery
     }
 
     /**
+     * True when the user explicitly asked to put the event into a connected
+     * calendar — not when they only asked for a downloadable invite.
+     */
+    public function userAskedToPutInCalendar(string $text): bool
+    {
+        $haystack = mb_strtolower($text);
+        $mentionsCalendar = str_contains($haystack, 'calendar')
+            || str_contains($haystack, 'kalender')
+            || str_contains($haystack, 'calendario')
+            || str_contains($haystack, 'takvim')
+            || str_contains($haystack, 'calendrier')
+            || str_contains($haystack, 'caldav')
+            || str_contains($haystack, 'outlook');
+
+        if (!$mentionsCalendar) {
+            return false;
+        }
+
+        return (bool) preg_match(
+            '/\b(put|add|save|store|upload|lege|speicher|ablage|guarda|kaydet|ajoute|mets)\b/u',
+            $haystack
+        );
+    }
+
+    /**
+     * Channel key to deliver into when the planner omitted params.channel.
+     * One connected calendar wins; several prefer the slug "calendar".
+     */
+    public function defaultCalendarChannel(int $ownerId): ?string
+    {
+        $calendars = $this->channels->ofKind($ownerId, PlannerChannel::KIND_CALENDAR);
+        if ([] === $calendars) {
+            return null;
+        }
+        if (1 === count($calendars)) {
+            return $calendars[0]->key;
+        }
+        foreach ($calendars as $channel) {
+            if ('calendar' === $channel->key) {
+                return $channel->key;
+            }
+        }
+
+        return $calendars[0]->key;
+    }
+
+    /**
      * Deliver one .ics file into the calendar channel named by the planner.
      *
      * @return array{ok: bool, message: string, connection: string|null, channel: string|null, created: int, skipped: int, webLink: string|null}

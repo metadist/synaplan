@@ -154,13 +154,20 @@ final readonly class CalendarEventRunner implements TaskRunner
             ],
         ];
 
-        // Optional delivery into a connected calendar (params.channel from
-        // [CHANNELLIST]). A failure degrades to the .ics download with an
-        // honest note; the node itself never fails on delivery.
+        // Delivery into a connected calendar: the planner's params.channel is
+        // preferred, but when it omitted the channel and the user asked to put
+        // the event in a calendar, fall back to the connected calendar (issue
+        // #1891). A failure degrades to the .ics download with an honest note.
         $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
+        $ownerId = (int) ($context->userId ?? $context->message->getUserId());
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        if ('' === $channel && $userAsked) {
+            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
+        }
+
         if ('' !== $channel) {
             $delivery = $this->calendarDelivery->send(
-                (int) ($context->userId ?? $context->message->getUserId()),
+                $ownerId,
                 rtrim($this->uploadDir, '/').'/'.ltrim($stored['path'], '/'),
                 $filename,
                 (int) ($context->message->getId() ?? 0),
@@ -178,6 +185,17 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'skipped' => $delivery['skipped'],
             ];
             $context->streamChunk($delivery['message']);
+        } elseif ($userAsked) {
+            $note = 'The event was not added to a calendar — the .ics is attached. Connect a calendar under Settings → Connections.';
+            $text .= ' '.$note;
+            $metadata['calendar_delivery'] = [
+                'ok' => false,
+                'channel' => null,
+                'connection' => null,
+                'created' => 0,
+                'skipped' => 0,
+            ];
+            $context->streamChunk($note);
         }
 
         return NodeResult::ok($text, [$file], $metadata);

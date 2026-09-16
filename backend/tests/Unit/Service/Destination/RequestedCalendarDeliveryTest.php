@@ -114,6 +114,45 @@ final class RequestedCalendarDeliveryTest extends TestCase
         self::assertSame(['connection_id' => 9, 'message_id' => 42], $provider->lastParams);
     }
 
+    public function testDetectsExplicitPutInCalendarRequests(): void
+    {
+        $delivery = $this->delivery([], []);
+
+        self::assertTrue($delivery->userAskedToPutInCalendar(
+            'Create a meeting reminder called Nextcloud Test for tomorrow at 9:00 and put it in my calendar'
+        ));
+        self::assertTrue($delivery->userAskedToPutInCalendar('add it to my nextcloud calendar'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('put it into calendar'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('lege den Termin in meinen Kalender'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('Create a meeting reminder called Nextcloud Test for tomorrow at 9:00'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('What is a calendar?'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('Do you support Outlook?'));
+    }
+
+    public function testDefaultCalendarChannelUsesTheOnlyConnectedCalendar(): void
+    {
+        $caldav = new Connection(1, 'caldav', 'personal');
+        $caldav->setConfig(['channel' => 'calendar']);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
+
+        self::assertSame('calendar', $this->delivery([$caldav], [])->defaultCalendarChannel(1));
+    }
+
+    public function testDefaultCalendarChannelIsNullWhenNoneAreConnected(): void
+    {
+        self::assertNull($this->delivery([], [])->defaultCalendarChannel(1));
+    }
+
+    public function testDefaultCalendarChannelPrefersTheCalendarSlug(): void
+    {
+        $outlook = $this->m365Connection();
+        $caldav = new Connection(1, 'caldav', 'personal');
+        $caldav->setConfig(['channel' => 'calendar']);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($caldav, 9);
+
+        self::assertSame('calendar', $this->delivery([$outlook, $caldav], [])->defaultCalendarChannel(1));
+    }
+
     private function m365Connection(): Connection
     {
         $m365 = new Connection(1, Connection::TYPE_M365, 'ada@contoso.com');
