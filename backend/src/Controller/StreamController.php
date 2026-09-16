@@ -3050,7 +3050,23 @@ class StreamController extends AbstractController
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            $this->sendSSE('error', ['error' => 'Failed to process: '.$e->getMessage()]);
+            $isAdmin = $this->isGranted('ROLE_ADMIN');
+            $errorLang = $message->getLanguage() ?: 'en';
+            $errorView = $this->presentChatFailure(
+                ['exception' => $e, 'error' => $e->getMessage()],
+                $errorLang,
+                $isAdmin,
+            );
+            $this->chatErrorNotifier->notify($errorView, 'system', $user->getId(), [
+                'chat_id' => $chat?->getId(),
+            ]);
+            $this->sendSSE('error', [
+                'error' => $errorView->userText,
+                'topic' => 'ERROR',
+                'trackId' => $trackId,
+                'language' => $errorLang,
+                ...$errorView->toSseFields(),
+            ]);
         }
     }
 

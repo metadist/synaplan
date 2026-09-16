@@ -4268,7 +4268,12 @@ const streamAIResponse = async (
             }
             streamingDirty = false
 
-            const errorMsg = String(data.error ?? data.message ?? 'Unknown error')
+            const classified =
+              typeof data.errorReason === 'string' && data.errorReason.trim() !== ''
+            const errorMsg =
+              classified && typeof data.error === 'string' && data.error.trim() !== ''
+                ? data.error
+                : t('chatError.reason.unknown')
             console.error('Error:', errorMsg, data)
             processingStatus.value = ''
             processingMetadata.value = {}
@@ -4513,7 +4518,7 @@ const streamAIResponse = async (
     }
     streamingDirty = false
 
-    historyStore.updateStreamingMessage(messageId, 'Sorry, an error occurred.')
+    historyStore.updateStreamingMessage(messageId, t('chatError.reason.unknown'))
     historyStore.finishStreamingMessage(messageId)
     streamingAbortController = null
     stopStreamingFn = null
