@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
+use App\Service\GuestSessionService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response;
@@ -122,6 +123,29 @@ class AuthControllerTest extends WebTestCase
         // Cleanup
         $this->em->remove($existingUser);
         $this->em->flush();
+    }
+
+    public function testRegisterDoesNotCreateTheReservedGuestProcessorEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/register',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json'],
+            json_encode([
+                'email' => GuestSessionService::PROCESSING_USER_EMAIL,
+                'password' => 'SecurePass123!',
+            ])
+        );
+
+        $this->assertResponseStatusCodeSame(Response::HTTP_OK);
+        $responseData = json_decode($this->client->getResponse()->getContent(), true);
+        $this->assertTrue($responseData['success']);
+
+        $user = $this->em->getRepository(User::class)
+            ->findOneBy(['mail' => GuestSessionService::PROCESSING_USER_EMAIL]);
+        $this->assertNull($user);
     }
 
     public function testRegisterWithInvalidEmail(): void

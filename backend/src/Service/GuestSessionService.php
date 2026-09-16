@@ -37,6 +37,28 @@ final class GuestSessionService
      */
     public const PROCESSING_USER_EMAIL = 'guest-processor@synaplan.internal';
 
+    public static function isReservedProcessorEmail(string $email): bool
+    {
+        return 0 === strcasecmp(trim($email), self::PROCESSING_USER_EMAIL);
+    }
+
+    /**
+     * True only for the runtime-created guest processor, not a human who
+     * happened to register the reserved address.
+     */
+    public static function isSystemProcessor(User $user): bool
+    {
+        if (!self::isReservedProcessorEmail($user->getMail())) {
+            return false;
+        }
+        if ('guest' !== $user->getProviderId()) {
+            return false;
+        }
+        $details = $user->getUserDetails();
+
+        return true === ($details['system'] ?? false);
+    }
+
     private ?User $cachedProcessingUser = null;
 
     /**
@@ -197,6 +219,14 @@ final class GuestSessionService
 
         $user = $this->userRepository->findByEmail(self::PROCESSING_USER_EMAIL);
         if ($user) {
+            if (!self::isSystemProcessor($user)) {
+                $this->logger->error('Guest processing email is occupied by a non-system account; refusing to mutate it', [
+                    'user_id' => $user->getId(),
+                    'level' => $user->getUserLevel(),
+                ]);
+
+                return null;
+            }
             $this->cachedProcessingUser = $this->ensureAnonymousLevel($user);
 
             return $this->cachedProcessingUser;
@@ -252,7 +282,7 @@ final class GuestSessionService
             $this->em->flush();
         } catch (UniqueConstraintViolationException) {
             $existing = $this->userRepository->findByEmail(self::PROCESSING_USER_EMAIL);
-            if ($existing) {
+            if ($existing && self::isSystemProcessor($existing)) {
                 return $this->ensureAnonymousLevel($existing);
             }
 

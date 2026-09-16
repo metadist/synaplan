@@ -385,12 +385,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testGetProcessingUserReturnsExistingAnonymousUser(): void
     {
-        $processor = new User();
-        $processor->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
-        $processor->setUserLevel('ANONYMOUS');
-        $reflection = new \ReflectionProperty($processor, 'id');
-        $reflection->setAccessible(true);
-        $reflection->setValue($processor, 42);
+        $processor = $this->systemProcessor();
 
         $userRepo = $this->createMock(UserRepository::class);
         $userRepo->expects($this->once())
@@ -430,6 +425,7 @@ class GuestSessionServiceTest extends TestCase
                 $this->assertSame('ANONYMOUS', $user->getRateLimitLevel());
                 $this->assertNull($user->getPw());
                 $this->assertSame('guest', $user->getProviderId());
+                $this->assertTrue($user->getUserDetails()['system'] ?? false);
 
                 return true;
             }));
@@ -449,11 +445,9 @@ class GuestSessionServiceTest extends TestCase
         $this->assertSame('ANONYMOUS', $result->getRateLimitLevel());
     }
 
-    public function testGetProcessingUserCorrectsNonAnonymousLevel(): void
+    public function testGetProcessingUserCorrectsNonAnonymousSystemProcessor(): void
     {
-        $admin = new User();
-        $admin->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
-        $admin->setUserLevel('ADMIN');
+        $admin = $this->systemProcessor('ADMIN');
 
         $userRepo = $this->createMock(UserRepository::class);
         $userRepo->method('findByEmail')->willReturn($admin);
@@ -473,6 +467,31 @@ class GuestSessionServiceTest extends TestCase
         $this->assertSame($admin, $result);
         $this->assertSame('ANONYMOUS', $result->getUserLevel());
         $this->assertSame('ANONYMOUS', $result->getRateLimitLevel());
+    }
+
+    public function testGetProcessingUserDoesNotDemoteACollidingHumanAccount(): void
+    {
+        $human = new User();
+        $human->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
+        $human->setUserLevel('PRO');
+        $human->setProviderId('local');
+
+        $userRepo = $this->createMock(UserRepository::class);
+        $userRepo->method('findByEmail')->willReturn($human);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('flush');
+        $em->expects($this->never())->method('persist');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('error')
+            ->with($this->stringContains('occupied by a non-system account'));
+
+        $service = $this->createService(em: $em, userRepo: $userRepo, logger: $logger);
+
+        $this->assertNull($service->getProcessingUser());
+        $this->assertSame('PRO', $human->getUserLevel());
     }
 
     public function testGetProcessingUserReturnsNullWhenCreateFails(): void
@@ -498,9 +517,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testGetProcessingUserCachesResult(): void
     {
-        $processor = new User();
-        $processor->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
-        $processor->setUserLevel('ANONYMOUS');
+        $processor = $this->systemProcessor();
 
         $userRepo = $this->createMock(UserRepository::class);
         $userRepo->expects($this->once())
@@ -590,5 +607,19 @@ class GuestSessionServiceTest extends TestCase
         $this->expectException(\OverflowException::class);
 
         $service->createSession('default-cap', $request);
+    }
+
+    private function systemProcessor(string $level = 'ANONYMOUS'): User
+    {
+        $processor = new User();
+        $processor->setMail(GuestSessionService::PROCESSING_USER_EMAIL);
+        $processor->setProviderId('guest');
+        $processor->setUserLevel($level);
+        $processor->setUserDetails(['system' => true, 'created_via' => 'guest_chat']);
+        $reflection = new \ReflectionProperty($processor, 'id');
+        $reflection->setAccessible(true);
+        $reflection->setValue($processor, 42);
+
+        return $processor;
     }
 }
