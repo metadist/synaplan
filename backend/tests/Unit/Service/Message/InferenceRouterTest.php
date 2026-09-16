@@ -71,6 +71,38 @@ final class InferenceRouterTest extends TestCase
         );
     }
 
+    /**
+     * Issue #1910: MessageClassifier emits intent file_analysis / topic
+     * analyzefile, and FileAnalysisHandler is registered under that name,
+     * but getHandler() had no map entry so every attachment turn fell
+     * through `?? 'chat'` to ChatHandler.
+     */
+    public function testFileAnalysisIntentRoutesToTheFileAnalysisHandler(): void
+    {
+        $chatHandler = $this->createHandlerMock('chat');
+        $chatHandler->expects(self::never())->method('handle');
+
+        $analysisHandler = $this->createHandlerMock('file_analysis');
+        $analysisHandler->expects(self::once())
+            ->method('handle')
+            ->willReturn(['content' => 'extracted', 'metadata' => []]);
+
+        $router = new InferenceRouter(
+            [$chatHandler, $analysisHandler],
+            $this->createMock(LoggerInterface::class),
+            new SystemCapabilityRegistry(),
+            $this->createMock(MessageClassifier::class),
+        );
+
+        $result = $router->route(
+            $this->createMock(Message::class),
+            [],
+            ['intent' => 'file_analysis', 'topic' => 'analyzefile'],
+        );
+
+        self::assertSame(['content' => 'extracted', 'metadata' => []], $result);
+    }
+
     public function testUnknownIntentFallsBackToTheChatHandler(): void
     {
         $chatHandler = $this->createHandlerMock('chat');
