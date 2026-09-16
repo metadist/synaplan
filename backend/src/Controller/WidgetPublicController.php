@@ -1282,8 +1282,7 @@ class WidgetPublicController extends AbstractController
 
                 // Record FILE_ANALYSIS usage for widget owner
                 if ($owner) {
-                    $this->rateLimitService->recordUsage($owner, 'FILE_ANALYSIS', [
-                        'file_id' => $result['file']['id'],
+                    $this->rateLimitService->recordFileAnalysisOnce($owner, (int) $result['file']['id'], [
                         'widget_id' => $widgetId,
                         'session_id' => $sessionId,
                         'filename' => $uploadedFile->getClientOriginalName(),
