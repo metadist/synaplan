@@ -26,12 +26,21 @@
         </button>
       </li>
     </ul>
-    <label
+    <button
+      type="button"
       class="btn-secondary px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center"
+      data-testid="btn-knowledge-file"
+      @click="knowledgeFileInput?.click()"
     >
       {{ $t('assistants.uploadFile') }}
-      <input type="file" class="sr-only" data-testid="input-knowledge-file" @change="onUpload" />
-    </label>
+    </button>
+    <input
+      ref="knowledgeFileInput"
+      type="file"
+      class="hidden"
+      data-testid="input-knowledge-file"
+      @change="onUpload"
+    />
     <label class="flex items-start gap-2">
       <input
         type="checkbox"
@@ -134,6 +143,7 @@ const { confirm } = useDialog()
 const { error, success } = useNotification()
 const files = ref<PromptFile[]>([])
 const allFolders = ref<FolderOption[]>([])
+const knowledgeFileInput = ref<HTMLInputElement | null>(null)
 
 const topic = computed(() => {
   const slug = store.current?.slug
