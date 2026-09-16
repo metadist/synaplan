@@ -488,6 +488,10 @@ export const selectors = {
   assistants: {
     /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
     gallery: '[data-testid="section-assistant-gallery"]',
+    builder: '[data-testid="section-assistant-builder"]',
+    name: '[data-testid="input-assistant-name"]',
+    nameError: '[data-testid="error-name"]',
+    greeting: '[data-testid="input-assistant-greeting"]',
   },
 
   taskPrompts: {

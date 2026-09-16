@@ -14,6 +14,7 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Agent\Definition\AgentDefinition;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
+use App\Service\Agent\Exception\AgentDefinitionException;
 use App\Service\Agent\Exception\AgentNotAccessibleException;
 use App\Service\Agent\Exception\AgentNotDraftException;
 use App\Service\Iam\Permission;
@@ -24,6 +25,8 @@ use Doctrine\ORM\EntityManagerInterface;
 final readonly class AgentService
 {
     public const DEFAULT_INSTRUCTION = 'You are a helpful AI assistant. Follow the user\'s instructions carefully and answer in the language they write in.';
+
+    public const NAME_MAX_LENGTH = 128;
 
     public function __construct(
         private AgentRepository $agents,
@@ -67,10 +70,10 @@ final readonly class AgentService
         $ownerId = (int) $owner->getId();
         $name = trim($name);
         if ('' === $name) {
-            throw new \InvalidArgumentException('name is required');
+            $this->failField('name', 'name is required');
         }
-        if (strlen($name) > 128) {
-            throw new \InvalidArgumentException('name must be at most 128 characters');
+        if (mb_strlen($name) > self::NAME_MAX_LENGTH) {
+            $this->failField('name', 'name must be at most 128 characters');
         }
 
         $definition = null === $draft
@@ -104,30 +107,30 @@ final readonly class AgentService
         if (isset($patch['name']) && is_string($patch['name'])) {
             $name = trim($patch['name']);
             if ('' === $name) {
-                throw new \InvalidArgumentException('name must not be empty');
+                $this->failField('name', 'name must not be empty');
             }
-            if (strlen($name) > 128) {
-                throw new \InvalidArgumentException('name must be at most 128 characters');
+            if (mb_strlen($name) > self::NAME_MAX_LENGTH) {
+                $this->failField('name', 'name must be at most 128 characters');
             }
             $agent->setName($name);
         }
         if (array_key_exists('description', $patch)) {
             $description = $patch['description'];
             if (null !== $description && !is_string($description)) {
-                throw new \InvalidArgumentException('description must be a string or null');
+                $this->failField('description', 'description must be a string or null');
             }
             $agent->setDescription(null === $description || '' === trim($description) ? null : trim($description));
         }
         if (array_key_exists('icon', $patch)) {
             if (!is_string($patch['icon'])) {
-                throw new \InvalidArgumentException('icon must be a string');
+                $this->failField('icon', 'icon must be a string');
             }
             $this->assertIcon($patch['icon']);
             $agent->setIcon($patch['icon']);
         }
         if (array_key_exists('draft', $patch)) {
             if (!is_array($patch['draft'])) {
-                throw new \InvalidArgumentException('draft must be an object');
+                $this->failField('draft', 'draft must be an object');
             }
             /** @var array<mixed> $draft */
             $draft = $patch['draft'];
@@ -328,7 +331,7 @@ final readonly class AgentService
     {
         if (Agent::STATUS_ARCHIVED === $status) {
             if (!$agent->hasPublishedVersion()) {
-                throw new \InvalidArgumentException('Only a published assistant can be archived');
+                $this->failField('status', 'Only a published assistant can be archived');
             }
             $agent->setStatus(Agent::STATUS_ARCHIVED);
 
@@ -336,14 +339,22 @@ final readonly class AgentService
         }
         if (Agent::STATUS_PUBLISHED === $status) {
             if (!$agent->hasPublishedVersion()) {
-                throw new \InvalidArgumentException('This assistant has no published version');
+                $this->failField('status', 'This assistant has no published version');
             }
             $agent->setStatus(Agent::STATUS_PUBLISHED);
 
             return;
         }
 
-        throw new \InvalidArgumentException('status must be archived or published');
+        $this->failField('status', 'status must be archived or published');
+    }
+
+    /**
+     * Field-level validation the builder can pin to an input via `path`.
+     */
+    private function failField(string $path, string $message): never
+    {
+        throw new AgentDefinitionException($message, $path);
     }
 
     private function ownerDisplayName(int $ownerId): string
@@ -371,7 +382,7 @@ final readonly class AgentService
     {
         $prompt = $this->prompts->find($promptId);
         if (!$prompt instanceof Prompt || $prompt->getOwnerId() !== $ownerId) {
-            throw new \InvalidArgumentException('promptId was not found');
+            $this->failField('promptId', 'promptId was not found');
         }
 
         return $promptId;
@@ -399,7 +410,7 @@ final readonly class AgentService
     private function assertIcon(string $icon): void
     {
         if (strlen($icon) > 64) {
-            throw new \InvalidArgumentException('icon must be at most 64 characters');
+            $this->failField('icon', 'icon must be at most 64 characters');
         }
     }
 
@@ -433,7 +444,7 @@ final readonly class AgentService
     {
         $copy = $name.' copy';
 
-        return strlen($copy) > 128 ? $name : $copy;
+        return mb_strlen($copy) > self::NAME_MAX_LENGTH ? $name : $copy;
     }
 
     private function instructionText(int $promptId): string

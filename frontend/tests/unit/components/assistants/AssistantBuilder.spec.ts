@@ -115,4 +115,19 @@ describe('AssistantBuilder', () => {
     await wrapper.vm.$nextTick()
     expect(wrapper.get('[data-testid="error-name"]').text()).toContain('name must not be empty')
   })
+
+  it('caps the name field at 128 characters', () => {
+    const { wrapper } = mountBuilder()
+    expect(wrapper.get('[data-testid="input-assistant-name"]').attributes('maxlength')).toBe('128')
+  })
+
+  it('lists draft errors that the basics form does not pin to a field', async () => {
+    const { wrapper, store } = mountBuilder()
+    store.fieldErrors = { 'tools.foo': 'Unknown key "tools.foo" in agent.v1' }
+    await wrapper.vm.$nextTick()
+    expect(wrapper.get('[data-testid="notice-save-errors"]').text()).toContain(
+      'This part could not be saved.'
+    )
+    expect(wrapper.get('[data-testid="notice-save-errors"]').text()).toContain('tools.foo')
+  })
 })

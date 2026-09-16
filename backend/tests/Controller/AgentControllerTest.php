@@ -119,6 +119,77 @@ final class AgentControllerTest extends WebTestCase
         $this->authenticateClient($this->client, $user);
         $this->postJson('/api/v1/agents', ['description' => 'no name']);
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertSame('name', $body['path']);
+        self::assertSame('name is required', $body['error']);
+    }
+
+    public function testPatchEmptyNameReturnsPath(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('agent-empty-name@synaplan.internal');
+        $this->authenticateClient($this->client, $user);
+        $this->postJson('/api/v1/agents', ['name' => 'Keep the rest']);
+        $id = $this->json()['agent']['id'];
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/agents/'.$id,
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['name' => '   '], JSON_THROW_ON_ERROR),
+        );
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertSame('name', $body['path']);
+        self::assertSame('name must not be empty', $body['error']);
+    }
+
+    public function testPatchOverlongNameReturnsPath(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('agent-long-name@synaplan.internal');
+        $this->authenticateClient($this->client, $user);
+        $this->postJson('/api/v1/agents', ['name' => 'Short']);
+        $id = $this->json()['agent']['id'];
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/agents/'.$id,
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['name' => str_repeat('a', 129)], JSON_THROW_ON_ERROR),
+        );
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertSame('name', $body['path']);
+        self::assertSame('name must be at most 128 characters', $body['error']);
+    }
+
+    public function testPatchCountsUnicodeCharactersNotBytes(): void
+    {
+        $this->enableFlag();
+        $user = $this->createUser('agent-unicode-name@synaplan.internal');
+        $this->authenticateClient($this->client, $user);
+        $this->postJson('/api/v1/agents', ['name' => 'Short']);
+        $id = $this->json()['agent']['id'];
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/agents/'.$id,
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['name' => str_repeat('é', 128)], JSON_THROW_ON_ERROR),
+        );
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
+        self::assertSame(str_repeat('é', 128), $this->json()['agent']['name']);
+
+        $this->client->request(
+            'PATCH',
+            '/api/v1/agents/'.$id,
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['name' => str_repeat('é', 129)], JSON_THROW_ON_ERROR),
+        );
+        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
+        $body = $this->json();
+        self::assertSame('name', $body['path']);
     }
 
     private function enableFlag(): void
