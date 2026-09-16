@@ -1789,7 +1789,7 @@ const transcribeAudio = async (audioBlob: Blob) => {
     const result = await chatApi.transcribeAudio(audioBlob, undefined, {
       incognito: incognitoStore.active,
     })
-    if (incognitoStore.active) {
+    if (incognitoStore.active && result.file_id) {
       incognitoStore.registerFile(result.file_id)
     }
 

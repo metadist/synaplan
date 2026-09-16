@@ -20,6 +20,7 @@ use App\Service\ModelConfigService;
 use App\Service\PremiumFeatureGate;
 use App\Service\PromptService;
 use App\Service\RateLimitService;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -689,19 +690,26 @@ class MessageController extends AbstractController
         // Incognito-session uploads are ephemeral: hidden from file listings,
         // never vectorized, deleted on session end (+ reaper safety net).
         $incognito = '1' === $request->request->get('incognito');
+        // Microphone dictation reuses this endpoint only as STT transport.
+        // The recording is not a Source the user chose to keep (issue #1909).
+        $isDictation = 'dictation' === (string) $request->request->get('purpose');
 
-        // Check rate limit for FILE_ANALYSIS BEFORE uploading
-        $rateLimitCheck = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        // Dictation is speech-to-text, not document analysis: gate on
+        // TRANSCRIPTION so it does not consume a FILE_ANALYSIS slot.
+        $gateAction = $isDictation ? TranscriptionUsageRecorder::ACTION : 'FILE_ANALYSIS';
+        $rateLimitCheck = $this->rateLimitService->checkLimit($user, $gateAction);
         if (!$rateLimitCheck['allowed']) {
             return $this->json([
-                'error' => 'Rate limit exceeded for FILE_ANALYSIS',
+                'error' => 'Rate limit exceeded for '.$gateAction,
                 'rate_limit_exceeded' => true,
-                'action' => 'FILE_ANALYSIS',
+                'action' => $gateAction,
                 'used' => $rateLimitCheck['used'],
                 'limit' => $rateLimitCheck['limit'],
             ], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
+        /** @var File|null $messageFile */
+        $messageFile = null;
         try {
             // Store file using FileStorageService
             $storageResult = $this->fileStorageService->storeUploadedFile($uploadedFile, $user->getId());
@@ -730,7 +738,7 @@ class MessageController extends AbstractController
             $messageFile->setFileSize($storageResult['size']);
             $messageFile->setFileMime($storageResult['mime']);
             $messageFile->setStatus('uploaded');
-            $messageFile->setEphemeral($incognito);
+            $messageFile->setEphemeral($incognito || $isDictation);
 
             $this->em->persist($messageFile);
             $this->em->flush();
@@ -842,8 +850,17 @@ class MessageController extends AbstractController
                 }
             }
 
+            if ($isDictation) {
+                $this->discardDictationUpload($messageFile);
+                unset($response['file_id']);
+            }
+
             return $this->json($response, Response::HTTP_CREATED);
         } catch (\Exception $e) {
+            if ($isDictation) {
+                $this->discardDictationUpload($messageFile);
+            }
+
             $this->logger->error('Chat file upload failed', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage(),
@@ -852,6 +869,27 @@ class MessageController extends AbstractController
             return $this->json([
                 'error' => 'File upload failed: '.$e->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Dictation recordings are STT transport, not a Source. Delete the blob
+     * and the File row so they never appear in Files/Sources or consume quota.
+     */
+    private function discardDictationUpload(?File $file): void
+    {
+        if (null === $file) {
+            return;
+        }
+
+        $path = $file->getFilePath();
+        if ('' !== $path) {
+            $this->fileStorageService->deleteFile($path);
+        }
+
+        if ($this->em->contains($file)) {
+            $this->em->remove($file);
+            $this->em->flush();
         }
     }
 
