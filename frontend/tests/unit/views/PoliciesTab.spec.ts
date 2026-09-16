@@ -107,7 +107,7 @@ describe('PoliciesTab', () => {
     const wrapper = mount(PoliciesTab)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="section-policy-locks"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="section-policy-locks"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="lock-DEFAULTMODEL.CHAT"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-policy-defaults"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Select a group to edit its policies.')
