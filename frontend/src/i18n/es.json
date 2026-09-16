@@ -4315,6 +4315,10 @@
     },
     "loginToView": "Inicia sesión para ver los detalles del recuerdo",
     "memoryUsed": "Recuerdo utilizado",
+    "foreign": {
+      "badge": "Recuerdo privado",
+      "tooltip": "Este recuerdo pertenece a la persona que compartió el chat. No es visible para ti."
+    },
     "toast": {
       "title": "Nuevo recuerdo detectado",
       "titleCompact": "Recuerdo",

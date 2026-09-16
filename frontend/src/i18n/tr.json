@@ -4316,6 +4316,10 @@
     },
     "loginToView": "Anı detaylarını görmek için giriş yapın",
     "memoryUsed": "Anı kullanıldı",
+    "foreign": {
+      "badge": "Özel anı",
+      "tooltip": "Bu anı, sohbeti paylaşan kişiye aittir. Sizin için görünmez."
+    },
     "toast": {
       "title": "Yeni Anı Algılandı",
       "titleCompact": "Anı",
