@@ -16,3 +16,7 @@ hint:
 
 admin:
   diagnostics: 'Diagnostic administrateur (visible uniquement pour toi)'
+
+file_analysis:
+  audio_pending: 'L’enregistrement est encore en cours de préparation. Attends un instant et renvoie ta question.'
+  audio_failed: 'Cet enregistrement n’a pas pu être transcrit. La reconnaissance vocale n’est pas configurée sur ce serveur, ou l’audio n’était pas compréhensible. Connecte un service de transcription dans les Paramètres, ou essaie un autre fichier.'

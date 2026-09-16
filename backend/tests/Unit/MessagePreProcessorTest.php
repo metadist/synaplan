@@ -715,4 +715,78 @@ class MessagePreProcessorTest extends TestCase
             }
         }
     }
+
+    /**
+     * Issue #1908 — a missing STT backend must mark the File entity `error`,
+     * not `processed`. Downstream treats `processed` as "extraction finished".
+     */
+    public function testProcessFileEntityAudioWithoutSttMarksError(): void
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = $tempDir.'/test_audio_'.uniqid().'.webm';
+        touch($tempFile);
+
+        try {
+            $file = $this->createMock(\App\Entity\File::class);
+            $file->method('getId')->willReturn(77);
+            $file->method('getFilePath')->willReturn(basename($tempFile));
+            $file->method('getFileType')->willReturn('webm');
+            $file->method('getFileName')->willReturn('recording.webm');
+            $file->method('getFileSize')->willReturn(31000);
+            $file->method('getFileText')->willReturn('');
+            $file->method('getUserId')->willReturn(7);
+            $file->method('getStatus')->willReturn('uploaded');
+            $file
+                ->expects($this->atLeastOnce())
+                ->method('setStatus')
+                ->with('error');
+
+            $this->aiFacade
+                ->expects($this->once())
+                ->method('hasConfiguredSttProvider')
+                ->with(7)
+                ->willReturn(false);
+
+            $this->whisperService
+                ->expects($this->once())
+                ->method('isAvailable')
+                ->willReturn(false);
+
+            $this->whisperService->expects($this->never())->method('transcribe');
+            $this->aiFacade->expects($this->never())->method('transcribe');
+
+            $files = new \Doctrine\Common\Collections\ArrayCollection([$file]);
+            $message = $this->createMock(Message::class);
+            $message->method('getId')->willReturn(123);
+            $message->method('getFile')->willReturn(0);
+            $message->method('getFilePath')->willReturn('');
+            $message->method('getFiles')->willReturn($files);
+            $message->method('getUserId')->willReturn(7);
+
+            $this->logger
+                ->expects($this->atLeastOnce())
+                ->method('warning')
+                ->with($this->stringContains('Whisper not available'));
+
+            $service = new MessagePreProcessor(
+                $this->messageRepository,
+                $this->tikaClient,
+                $this->whisperService,
+                $this->aiFacade,
+                $this->logger,
+                $tempDir,
+                $this->rateLimitService,
+                $this->userRepository,
+                $this->fileProcessor,
+            );
+
+            $this->messageRepository->method('save');
+
+            $service->process($message);
+        } finally {
+            if (file_exists($tempFile)) {
+                unlink($tempFile);
+            }
+        }
+    }
 }

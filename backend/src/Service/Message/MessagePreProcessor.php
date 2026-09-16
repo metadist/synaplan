@@ -257,10 +257,14 @@ final readonly class MessagePreProcessor
             $useExternal = $this->aiFacade->hasConfiguredSttProvider($userId);
 
             if (!$useExternal && !$this->whisperService->isAvailable()) {
+                // Issue #1908: a missing STT backend is a failure, not success.
+                // Downstream treats `processed` as "extraction finished", so an
+                // empty BFILETEXT would look like a silent skip (UX contract U8).
                 $this->logger->warning('PreProcessor: Whisper not available and no external STT configured, skipping', [
                     'file' => basename($fullPath),
+                    'file_id' => $messageFile->getId(),
                 ]);
-                $messageFile->setStatus('processed');
+                $messageFile->setStatus('error');
 
                 return;
             }
@@ -289,6 +293,11 @@ final readonly class MessagePreProcessor
                     ]);
 
                     $this->billFileAnalysis($messageFile, $message, 'audio');
+                } else {
+                    $messageFile->setStatus('error');
+                    $this->logger->warning('PreProcessor: Audio transcription produced empty text', [
+                        'file_id' => $messageFile->getId(),
+                    ]);
                 }
             } catch (\Exception $e) {
                 $this->logger->error('PreProcessor: Audio transcription failed', [
