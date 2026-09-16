@@ -736,4 +736,25 @@ class MessageRepository extends ServiceEntityRepository
 
         return $deleted;
     }
+
+    /**
+     * Chat turns that entered processing/queued and never left — the request
+     * that created them is gone (worker restart, lost Messenger message).
+     *
+     * @param list<string> $statuses
+     *
+     * @return Message[]
+     */
+    public function findStaleNonTerminal(int $cutoffUnix, array $statuses, int $limit = 200): array
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.status IN (:statuses)')
+            ->andWhere('m.unixTimestamp < :cutoff')
+            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('cutoff', $cutoffUnix)
+            ->orderBy('m.unixTimestamp', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

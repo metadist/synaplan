@@ -696,7 +696,7 @@ the group layer (`IAM.GROUP_POLICIES_ENABLED` must be on):
 | --- | ---- | ------------------------------ |
 | `DEFAULTMODEL.{CHAT,VECTORIZE,PIC2TEXT,SOUND2TEXT,MEM,TOOLS}` | catalog key | First group by `BGROUPS.BID` |
 | `MODELS.ALLOWED` | JSON list of catalog keys | Union; empty = no restriction |
-| `SAVEDTASKS.ENABLED`, `DESKTOP_AGENT.ENABLED`, `DOCUMENT_TOOLS.ENABLED`, `MULTITASK.*_ENABLED` | bool | OR |
+| `SAVEDTASKS.ENABLED`, `DESKTOP_AGENT.ENABLED`, `DOCUMENT_TOOLS.ENABLED`, `MULTITASK.*_ENABLED` | bool | OR among group rows (`1` wins). A group `0` is not inherit: the merged group value sits ahead of the instance default, so members are forced off even when the global row is `1`. Delete the group row (`null` from the Policies tab) to inherit again |
 | `RATELIMITS.TIER` | `NEW` / `PRO` / `TEAM` / `BUSINESS` | Highest |
 
 A locked global row (`BCONFIG.BLOCKED = 1`) wins alone and is instance-wide —

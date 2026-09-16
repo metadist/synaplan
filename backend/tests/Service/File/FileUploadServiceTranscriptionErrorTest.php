@@ -217,4 +217,29 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
         $this->assertSame('error', $persisted->getStatus());
         $this->assertSame(File::VECTOR_STATE_FAILED, $persisted->getVectorState());
     }
+
+    public function testProcessFileMarksErrorWhenExtractThrows(): void
+    {
+        $this->fileProcessor
+            ->method('extractText')
+            ->willThrowException(new \RuntimeException('tika down'));
+
+        $file = $this->makeFileMock('pdf');
+        $statuses = [];
+        $file->expects(self::atLeastOnce())
+            ->method('setStatus')
+            ->willReturnCallback(function (string $status) use (&$statuses, $file): File {
+                $statuses[] = $status;
+
+                return $file;
+            });
+        $this->em->expects(self::atLeastOnce())->method('flush');
+
+        $result = $this->makeService()->processFile($file, $this->makeUser());
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('error', $result['status']);
+        $this->assertContains('error', $statuses);
+        $this->assertStringContainsString('Text extraction failed', $result['error']);
+    }
 }

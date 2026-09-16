@@ -16,3 +16,7 @@ hint:
 
 admin:
   diagnostics: 'Admin diagnostics (visible to you only)'
+
+file_analysis:
+  audio_pending: 'The recording is still being prepared. Please wait a moment and send your question again.'
+  audio_failed: 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.'

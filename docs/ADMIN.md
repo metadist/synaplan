@@ -511,7 +511,7 @@ time and set:
 | ------- | ------------ | -------------- |
 | Default models (`DEFAULTMODEL.*`) | Suggested model per capability | First group by id |
 | Allowed models (`MODELS.ALLOWED`) | Empty = every model; a list hides the rest | Union |
-| Features (saved tasks, desktop agent, document tools, multi-step) | On if any group turns the feature on | OR |
+| Features (saved tasks, desktop agent, document tools, multi-step) | Inherit (no group row) uses the instance default. **On for this group** turns it on. **Off for this group** stores `0`, which sits ahead of the instance default, so members lose the feature even when the instance is on. Across a person's groups, any **on** wins | OR among group rows; merged group value precedes the instance default |
 | Rate-limit tier (`RATELIMITS.TIER`) | Which limit table `checkLimit()` uses | Highest of NEW / PRO / TEAM / BUSINESS |
 
 A personal setting still wins unless you lock the **instance** default.

@@ -13,14 +13,19 @@ use App\Service\Tool\ToolSourceInterface;
 
 final readonly class SkillToolSource implements ToolSourceInterface
 {
-    /** Capabilities that change something outside the chat. */
+    /** Capabilities that change something outside the chat. Compose-reply only
+     *  writes the assistant bubble, so it stays read and is not gated. */
     private const WRITE_CAPABILITIES = [
         Capability::EmailMe->value,
         Capability::SaveToFolder->value,
         Capability::CalendarEvent->value,
-        Capability::ComposeReply->value,
         Capability::McpAction->value,
     ];
+
+    public static function nameFor(Capability $capability): string
+    {
+        return 'skill:'.$capability->value;
+    }
 
     public function __construct(
         private SkillCatalog $skillCatalog,
@@ -38,7 +43,7 @@ final readonly class SkillToolSource implements ToolSourceInterface
         foreach ($this->skillCatalog->descriptors() as $skill) {
             $capability = $skill->capability->value;
             $descriptors[] = new ToolDescriptor(
-                name: 'skill:'.$capability,
+                name: self::nameFor($skill->capability),
                 title: $capability,
                 description: $skill->summary,
                 inputSchema: ['type' => 'object', 'properties' => []],

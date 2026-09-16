@@ -17,6 +17,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BLANG'], name: 'BLANG')]
 #[ORM\Index(columns: ['BTOPIC'], name: 'BTOPIC')]
 #[ORM\Index(columns: ['BCHATID'], name: 'idx_message_chat')]
+#[ORM\Index(columns: ['BSTATUS', 'BUNIXTIMES'], name: 'idx_message_status_unix')]
 class Message
 {
     #[ORM\Id]

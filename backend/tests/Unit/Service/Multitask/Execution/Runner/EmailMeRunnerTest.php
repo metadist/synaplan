@@ -15,6 +15,7 @@ use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\EmailMeRunner;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -280,6 +281,40 @@ final class EmailMeRunnerTest extends TestCase
 
         self::assertFalse($result->isSuccessful());
         self::assertStringContainsString('email delivery failed: smtp down', (string) $result->error);
+    }
+
+    public function testPausesForApprovalAndDoesNotSend(): void
+    {
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('THE POEM'));
+
+        $this->emailService->expects(self::never())->method('sendTaskResultEmail');
+
+        $gate = $this->createMock(StepApprovalGate::class);
+        $gate->expects(self::once())
+            ->method('consult')
+            ->with(
+                $ctx,
+                self::callback(static fn (TaskNode $node): bool => Capability::EmailMe === $node->capability),
+                'skill:email_me',
+                self::callback(static fn (array $args): bool => 'alice@example.com' === ($args['to'] ?? null)),
+            )
+            ->willReturn(NodeResult::waitingApproval(42, ['to' => 'alice@example.com']));
+
+        $runner = new EmailMeRunner(
+            $this->emailService,
+            $this->repository($this->user()),
+            $this->translator(),
+            $this->createMock(LoggerInterface::class),
+            m365MailSender: null,
+            uploadDir: $this->uploadDir,
+            approvalGate: $gate,
+        );
+
+        $result = $runner->run($this->emailNode(), $ctx);
+
+        self::assertTrue($result->isWaitingApproval());
+        self::assertSame(42, $result->metadata['approval_id']);
     }
 
     public function testPrefersTheConnectedM365MailboxWhenSendCapable(): void

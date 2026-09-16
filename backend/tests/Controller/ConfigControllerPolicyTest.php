@@ -55,6 +55,25 @@ final class ConfigControllerPolicyTest extends WebTestCase
         self::assertSame('iam.settingLocked', $body['code'] ?? null);
     }
 
+    public function testEmptyLockPatchEmitsAnObjectNotAnArray(): void
+    {
+        $this->setFlag(IamConfig::KEY_GROUPS_ENABLED, '1');
+        $this->setFlag(IamConfig::KEY_GROUP_POLICIES_ENABLED, '1');
+        $admin = $this->createUser('iam-policy-empty-lock-admin@synaplan.internal', 'ADMIN');
+
+        $this->authenticateClient($this->client, $admin);
+        $this->client->request('PATCH', '/api/v1/admin/config/locks', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+        ], '{}');
+
+        $raw = (string) $this->client->getResponse()->getContent();
+        self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+        self::assertStringContainsString('"locks":{}', $raw);
+        $decoded = json_decode($raw, false, 512, \JSON_THROW_ON_ERROR);
+        self::assertIsObject($decoded);
+        self::assertIsObject($decoded->locks);
+    }
+
     public function testLockingKeyWithoutInstanceDefaultReturns422AndCreatesNoRow(): void
     {
         $this->setFlag(IamConfig::KEY_GROUPS_ENABLED, '1');

@@ -827,6 +827,7 @@
     "transcribed": "🎙️ Transcrit{language} : « {preview} »",
     "noSpeechDetected": "⚠️ Aucune parole détectée dans l’enregistrement",
     "transcriptionFailed": "La transcription a échoué : {error}",
+    "dictationSttFailed": "Cet enregistrement n’a pas pu être transcrit. La reconnaissance vocale n’est pas configurée, ou l’audio n’a pas été compris. Connectez un service de transcription dans Réglages, ou réessayez.",
     "mic": {
       "permissionWeb": "L’accès au microphone est bloqué. Autorisez-le dans les réglages de votre navigateur, puis réessayez.",
       "permissionIos": "L’accès au microphone est désactivé. Ouvrez Réglages iOS, sélectionnez cette application et activez le microphone.",
@@ -6104,6 +6105,15 @@
       "allowedModels": "Modèles autorisés",
       "allowedHelper": "Laissez vide pour que chacun puisse utiliser tous les modèles. Une liste limite le choix.",
       "features": "Fonctions",
+      "featuresHelper": "Gardez la valeur de l’instance, sauf si ce groupe doit activer ou désactiver une fonction.",
+      "featureOn": "Activé pour ce groupe",
+      "featureOff": "Désactivé pour ce groupe",
+      "inheritedOn": "La valeur de l’instance est activée.",
+      "inheritedOff": "La valeur de l’instance est désactivée.",
+      "inheritedUnset": "L’instance n’a pas de valeur, donc c’est désactivé.",
+      "willInherit": "Après l’enregistrement, la valeur de l’instance s’applique.",
+      "groupForcesOn": "Ce groupe l’active pour ses membres.",
+      "groupForcesOff": "Ce groupe le désactive pour ses membres.",
       "rateLimit": "Niveau de limite d’usage",
       "useGlobal": "Utiliser la valeur de l’instance",
       "useBillingTier": "Utiliser l’offre de la personne",
@@ -6134,7 +6144,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Récupérer des pages web",
         "MULTITASK_MCP_FETCH_ENABLED": "Lire les outils connectés",
         "MULTITASK_MCP_ACTION_ENABLED": "Agir via les outils connectés",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Rechercher dans les e-mails",
+        "TOOLS_REGISTRY_ENABLED": "Catalogue d’outils",
+        "TOOLS_APPROVALS_ENABLED": "Approbations d’outils",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Outils HTTP personnalisés",
+        "WORKFLOWS_BUILDER_ENABLED": "Éditeur d’étapes"
       }
     }
   },

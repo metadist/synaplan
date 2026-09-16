@@ -9,6 +9,7 @@ use App\Repository\EmailVerificationAttemptRepository;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
 use App\Service\Client\ClientContextResolver;
+use App\Service\GuestSessionService;
 use App\Service\ImpersonationService;
 use App\Service\InternalEmailService;
 use App\Service\NativeAuthHandoffService;
@@ -229,6 +230,17 @@ class AuthController extends AbstractController
             return $this->json([
                 'error' => 'reCAPTCHA verification failed. Please try again.',
             ], Response::HTTP_BAD_REQUEST);
+        }
+
+        if (GuestSessionService::isReservedProcessorEmail($dto->email)) {
+            $this->logger->warning('Registration attempt with reserved guest-processor email', [
+                'ip' => $request->getClientIp(),
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'If this email is not already registered, you will receive a verification email shortly.',
+            ], Response::HTTP_OK);
         }
 
         // Check if user exists

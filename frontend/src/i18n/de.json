@@ -828,6 +828,7 @@
     "transcribed": "🎙️ Transkribiert{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ Keine Sprache erkannt in der Aufnahme",
     "transcriptionFailed": "Transkription fehlgeschlagen: {error}",
+    "dictationSttFailed": "Diese Aufnahme konnte nicht transkribiert werden. Sprache-zu-Text ist nicht eingerichtet, oder das Audio wurde nicht erkannt. Verbinden Sie unter Einstellungen einen Sprache-zu-Text-Dienst, oder versuchen Sie es erneut.",
     "mic": {
       "permissionWeb": "Der Zugriff auf das Mikrofon ist blockiert. Erlaube ihn in den Browser-Einstellungen und versuche es erneut.",
       "permissionIos": "Der Zugriff auf das Mikrofon ist deaktiviert. Öffne die iOS-Einstellungen, wähle diese App und aktiviere „Mikrofon“.",
@@ -6038,6 +6039,15 @@
       "allowedModels": "Erlaubte Modelle",
       "allowedHelper": "Leer lassen, damit alle Modelle verfügbar bleiben. Eine Liste schränkt die Auswahl ein.",
       "features": "Funktionen",
+      "featuresHelper": "Lassen Sie die Instanzvorgabe, es sei denn, diese Gruppe muss eine Funktion ein- oder ausschalten.",
+      "featureOn": "Für diese Gruppe ein",
+      "featureOff": "Für diese Gruppe aus",
+      "inheritedOn": "Die Instanzvorgabe ist aktiviert.",
+      "inheritedOff": "Die Instanzvorgabe ist deaktiviert.",
+      "inheritedUnset": "Es gibt keine Instanzvorgabe, daher ist das aus.",
+      "willInherit": "Nach dem Speichern gilt die Instanzvorgabe.",
+      "groupForcesOn": "Diese Gruppe schaltet das für ihre Mitglieder ein.",
+      "groupForcesOff": "Diese Gruppe schaltet das für ihre Mitglieder aus.",
       "rateLimit": "Nutzungskontingent",
       "useGlobal": "Instanzvorgabe verwenden",
       "useBillingTier": "Tarif der Person verwenden",
@@ -6068,7 +6078,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Webseiten abrufen",
         "MULTITASK_MCP_FETCH_ENABLED": "Verbundene Werkzeuge lesen",
         "MULTITASK_MCP_ACTION_ENABLED": "Über verbundene Werkzeuge handeln",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-Mail durchsuchen",
+        "TOOLS_REGISTRY_ENABLED": "Werkzeugkatalog",
+        "TOOLS_APPROVALS_ENABLED": "Werkzeug-Freigaben",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
+        "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor"
       }
     }
   },
