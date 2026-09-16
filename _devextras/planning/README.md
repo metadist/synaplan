@@ -12,7 +12,7 @@ Live plans only. Shipped or superseded folders live in
 | [`202609_ux_user_flows.md`](./202609_ux_user_flows.md) | Binding UX contract (U1–U12) |
 | [`202609_ux_user_flows/`](./202609_ux_user_flows/) | Journey notes that apply the contract |
 | [`20260913-use-case-research/`](./20260913-use-case-research/) | Ten jobs + Perfect-UX bar (AGENTS.md) |
-| [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/) | Nav work in progress (NV08+) |
+| [`20260914-navigation-consolidation/`](./20260914-navigation-consolidation/) | Nav work in progress (NV09; NV08 in #1970) |
 | [`202609_secure_compute/`](./202609_secure_compute/) | Compute Phase B in progress |
 | [`202609_more_nextcloud/`](./202609_more_nextcloud/) | S2–S3 still planned |
 | [`20260902-collabora-integration/`](./20260902-collabora-integration/) | Editor / partner epics still planned |

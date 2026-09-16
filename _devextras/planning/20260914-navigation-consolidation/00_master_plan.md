@@ -204,31 +204,34 @@ older frontend. No migrations, no seed changes, no flag changes.
 
 ## 8. Handoff — 2026-09-16
 
-NV07 is on `main`. Branch NV08 from `origin/main`. Do **not** put NV08
-on an old NV07 branch.
+Planning archive cleanup is on `main`
+([#1967](https://github.com/metadist/synaplan/pull/1967)). NV08 is
+[#1970](https://github.com/metadist/synaplan/pull/1970). **NV09** is
+`feat/nav-nv09-journeys` (this step). Do **not** put NV10 on the NV09 branch.
 
 ### Sprint split
 
 | Sprint | Steps | What it is | Status |
 | ------ | ----- | ---------- | ------ |
-| **A** | NV01–NV09 | One home per concept; Summarizer into chat; Memories one technique | NV01–NV07 **merged** ([#1917](https://github.com/metadist/synaplan/pull/1917), [#1921](https://github.com/metadist/synaplan/pull/1921)). **Next: NV08**, then NV09 |
+| **A** | NV01–NV09 | One home per concept; Summarizer into chat; Memories one technique | NV01–NV07 **merged**. **NV08** [#1970](https://github.com/metadist/synaplan/pull/1970). **NV09** on `feat/nav-nv09-journeys` |
 | **B** | NV10–NV12 | Wording / sentence case / stale keys, five locales | After A (needs the final tree). Owns the #1917 page-title / tooltip leftovers |
 | **C** | NV13–NV21 | Operate stacked UI | Not started. NV13/NV14 may be prepared after B; NV15+ need NV01/NV05 |
 
-One PR per step. Branch names `feat/nav-nv08-memories-page`,
-`feat/nav-nv09-journeys`, `feat/nav-nv10-wording`, … Never on `main`.
+One PR per step. Branch names `feat/nav-nv09-journeys`,
+`feat/nav-nv10-wording`, … Never on `main`.
 
 ### Next machine — first commands
 
 ```bash
 git fetch origin
+git checkout feat/nav-nv09-journeys && git pull
+# After NV08 + NV09 merge:
 git checkout main && git pull
-git checkout -b feat/nav-nv08-memories-page
+git checkout -b feat/nav-nv10-wording
 ```
 
-1. **NV08** — Memories page on every device; delete `MemoriesDialog.vue`.
-2. **NV09** — journey specs J-NV-1…5 (waits for NV01–NV08).
-3. **Then Sprint B NV10.** Page-title / tooltip strings Copilot asked for
+1. **Finish NV08 / NV09** — merge [#1970](https://github.com/metadist/synaplan/pull/1970) then this NV09 PR.
+2. **Then Sprint B NV10.** Page-title / tooltip strings Copilot asked for
    on #1917. Then NV11, NV12.
 
 ### Copilot on #1917 — locked 2026-09-15
