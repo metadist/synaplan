@@ -339,8 +339,8 @@ final class InboundEmailAttachmentStoreTest extends TestCase
     public function testPinsResolvedPublicIpsOnHostnameFetches(): void
     {
         $guard = $this->createMock(SsrfGuard::class);
-        $guard->method('isBlockedUrl')->willReturn(false);
-        $guard->method('pinnedIps')->with('relay.example.com')->willReturn(['203.0.113.9']);
+        $guard->expects(self::atLeastOnce())->method('isBlockedUrl')->willReturn(false);
+        $guard->expects(self::atLeastOnce())->method('pinnedIps')->with('relay.example.com')->willReturn(['203.0.113.9']);
 
         $resolve = null;
         $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$resolve): MockResponse {
