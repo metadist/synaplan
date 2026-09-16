@@ -9,10 +9,12 @@ use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -61,6 +63,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         private RequestedCalendarDelivery $calendarDelivery,
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?StepApprovalGate $approvalGate = null,
     ) {
     }
 
@@ -113,6 +116,23 @@ final readonly class CalendarEventRunner implements TaskRunner
 
         $end = $this->resolveEnd($params, $start, $tz);
 
+        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
+        $ownerId = (int) ($context->userId ?? $context->message->getUserId());
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        if ('' === $channel && $userAsked) {
+            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
+        }
+
+        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::CalendarEvent), [
+            'title' => $title,
+            'start' => $start->format(\DateTimeInterface::ATOM),
+            'timezone' => $tzName,
+            'channel' => $channel,
+        ]);
+        if (null !== $gated) {
+            return $gated;
+        }
+
         $ics = $this->calendarService->buildIcs(
             title: $title,
             start: $start,
@@ -153,17 +173,6 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'timezone' => $tzName,
             ],
         ];
-
-        // Delivery into a connected calendar: the planner's params.channel is
-        // preferred, but when it omitted the channel and the user asked to put
-        // the event in a calendar, fall back to the connected calendar (issue
-        // #1891). A failure degrades to the .ics download with an honest note.
-        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
-        $ownerId = (int) ($context->userId ?? $context->message->getUserId());
-        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
-        if ('' === $channel && $userAsked) {
-            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
-        }
 
         if ('' !== $channel) {
             $delivery = $this->calendarDelivery->send(
