@@ -341,6 +341,7 @@ export const selectors = {
     subscriptionBtn: '[data-testid="btn-sidebar-v2-subscription"]',
     upgradeBtn: '[data-testid="btn-sidebar-v2-upgrade"]',
     logoutBtn: '[data-testid="btn-sidebar-v2-logout"]',
+    memoriesBtn: '[data-testid="btn-sidebar-v2-memories"]',
   },
   oidc: {
     keycloakButton: '[data-testid="btn-social-keycloak"]',
@@ -591,6 +592,9 @@ export const selectors = {
     inputConfirmPassword: '[data-testid="input-confirm-password"]',
   },
   memories: {
+    page: '[data-testid="page-memories"]',
+    btnBack: '[data-testid="btn-memories-back"]',
+    highlighted: '[data-memory-highlighted="true"]',
     btnCreate: '[data-testid="btn-memory-create"]',
     /** Rendered twice per memory (desktop row + mobile card) — filter visible */
     item: '[data-testid="item-memory"]',

@@ -5042,6 +5042,7 @@
     "value": "Value",
     "updated": "Updated",
     "createButton": "New Memory",
+    "backToChat": "Back to chat",
     "userDisabled": {
       "title": "Memories are disabled for your account",
       "message": "The AI will not use or automatically update memories. You can enable this in your profile settings at any time.",

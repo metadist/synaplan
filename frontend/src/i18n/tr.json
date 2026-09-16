@@ -4155,6 +4155,7 @@
     "value": "Değer",
     "updated": "Güncellendi",
     "createButton": "Yeni Anı",
+    "backToChat": "Sohbete dön",
     "userDisabled": {
       "title": "Hesabınız için anılar devre dışı",
       "message": "AI, anıları kullanmayacak veya otomatik olarak güncellemeyecek. Bunu profil ayarlarınızdan istediğiniz zaman etkinleştirebilirsiniz.",

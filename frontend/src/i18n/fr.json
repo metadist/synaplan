@@ -5042,6 +5042,7 @@
     "value": "Valeur",
     "updated": "Mise à jour",
     "createButton": "Nouvelle mémoire",
+    "backToChat": "Retour au chat",
     "userDisabled": {
       "title": "Les mémoires sont désactivées pour votre compte",
       "message": "L’IA n’utilisera ni ne mettra à jour automatiquement les mémoires. Vous pouvez activer ceci dans les réglages de votre profil à tout moment.",

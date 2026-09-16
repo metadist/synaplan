@@ -83,7 +83,7 @@ const toggleExpand = () => {
 }
 
 const navigateToMemory = (memory: UserMemory) => {
-  // Emit event to parent - ChatView will open the MemoriesDialog with this memory highlighted
+  // Opens the Memories page; browser Back returns to this chat.
   emit('click-memory', memory)
 }
 

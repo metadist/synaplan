@@ -1919,7 +1919,7 @@ const handleReferenceClick = (event: MouseEvent) => {
       const resolvedMemories = memories.value
       if (index >= 0 && resolvedMemories && index < resolvedMemories.length) {
         const memory = resolvedMemories[index]
-        // Emit event to open MemoriesDialog in ChatView (stay in chat!)
+        // Opens the Memories page; browser Back returns to this chat.
         emit('click-memory', memory)
       }
     }

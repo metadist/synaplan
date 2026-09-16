@@ -508,13 +508,6 @@
       @close="closeMemoryDeleteDialog"
       @confirm="confirmMemoryDelete"
     />
-
-    <!-- Memories List Dialog (for viewing all memories when clicking a memory badge) -->
-    <MemoriesDialog
-      :is-open="isMemoriesDialogOpen"
-      :highlight-memory-id="highlightedMemoryId"
-      @close="closeMemoriesDialog"
-    />
   </MainLayout>
 </template>
 
@@ -626,7 +619,6 @@ import {
 } from '@/services/api/feedbackApi'
 import type { Contradiction } from '@/services/api/feedbackApi'
 import MemoryFormDialog from '@/components/MemoryFormDialog.vue'
-import MemoriesDialog from '@/components/MemoriesDialog.vue'
 import MemoryDeleteDialog from '@/components/memories/MemoryDeleteDialog.vue'
 import PromoTipBanner from '@/components/PromoTipBanner.vue'
 import GuestBanner from '@/components/guest/GuestBanner.vue'
@@ -1238,10 +1230,6 @@ let deleteDialogTimer: number | null = null
 const deleteDialogAutoConfirmMs = 8000
 const deleteDialogQueue = ref<Array<UserMemory & { toastId: number }>>([])
 
-// Memories list dialog state (for viewing all memories)
-const isMemoriesDialogOpen = ref(false)
-const highlightedMemoryId = ref<number | null>(null)
-
 // Use mock data in development or when API is not available
 const useMockData = import.meta.env.VITE_USE_MOCK_DATA === 'true' || false
 
@@ -1451,7 +1439,7 @@ const handleKeyboardInsetChange = () => {
 }
 window.addEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
 
-// Window event handler for memory dialog (used by MessageText.vue)
+// Window event handler for memory badges (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ memory: UserMemory }>
   if (customEvent.detail?.memory) {
@@ -5029,15 +5017,9 @@ async function handleMemoryEditSave(memoryData: {
   }
 }
 
-// Memory badge click handler - opens MemoriesDialog with highlighted memory
+// Opens the Memories page; browser Back returns to this chat.
 function handleClickMemory(memory: UserMemory) {
-  highlightedMemoryId.value = memory.id
-  isMemoriesDialogOpen.value = true
-}
-
-function closeMemoriesDialog() {
-  isMemoriesDialogOpen.value = false
-  highlightedMemoryId.value = null
+  router.push({ path: '/memories', query: { highlight: String(memory.id) } })
 }
 
 function handleMemoryDiscard(memory: UserMemory & { toastId: number }) {
