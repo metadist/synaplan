@@ -33,11 +33,13 @@ final class Version20260916180000 extends AbstractMigration
         // backfilled before the column is tightened (schema:validate).
         $this->addSql('ALTER TABLE BFILES MODIFY COLUMN BUPDATEDAT BIGINT NOT NULL');
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_file_status_updated ON BFILES (BSTATUS, BUPDATEDAT)');
+        $this->addSql('CREATE INDEX IF NOT EXISTS idx_message_status_unix ON BMESSAGES (BSTATUS, BUNIXTIMES)');
     }
 
     public function down(Schema $schema): void
     {
         $this->addSql('ALTER TABLE BFILES DROP INDEX IF EXISTS idx_file_status_updated');
+        $this->addSql('ALTER TABLE BMESSAGES DROP INDEX IF EXISTS idx_message_status_unix');
         $this->addSql('ALTER TABLE BFILES DROP COLUMN IF EXISTS BUPDATEDAT');
     }
 }
