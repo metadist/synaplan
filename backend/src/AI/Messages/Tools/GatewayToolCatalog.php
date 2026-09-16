@@ -31,6 +31,7 @@ final readonly class GatewayToolCatalog
 {
     public const KIND_MCP = 'mcp';
     public const KIND_NATIVE = 'native';
+    public const KIND_CUSTOM = 'custom';
 
     /** Synaplan executed the search itself. */
     public const WEB_SEARCH_SYNAPLAN = 'synaplan';
@@ -76,7 +77,7 @@ final readonly class GatewayToolCatalog
         $tools = [];
         $dispatch = [];
 
-        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $native] as $part) {
+        foreach ([$this->mcpTools($user, $sessionKey, $requestBody), $this->customTools($user), $native] as $part) {
             foreach ($part['tools'] as $tool) {
                 if (isset($dispatch[$tool['name']])) {
                     continue;
@@ -210,6 +211,53 @@ final readonly class GatewayToolCatalog
         $this->appendWebSearch($snapshot, $userId, $requestBody);
         $this->appendAnalyzeImage($snapshot, $userId, $requestBody);
         $this->appendCodeExecution($snapshot, $user, $requestBody, $assistant);
+
+        return $snapshot;
+    }
+
+    /**
+     * Custom HTTP tools the user created under Settings. Independent of the
+     * MCP flag — they are not MCP tools (issue #1884).
+     *
+     * @return CatalogSnapshot
+     */
+    private function customTools(User $user): array
+    {
+        $snapshot = $this->empty();
+        $userId = (int) $user->getId();
+        if (
+            null === $this->toolRegistry
+            || null === $this->toolsConfig
+            || !$this->toolsConfig->isRegistryEnabled($userId)
+            || !$this->toolsConfig->isCustomHttpEnabled($userId)
+        ) {
+            return $snapshot;
+        }
+
+        foreach ($this->toolRegistry->forUser($userId) as $descriptor) {
+            if (ToolSource::Custom !== $descriptor->source) {
+                continue;
+            }
+            $name = $descriptor->callName();
+            if (isset($snapshot['dispatch'][$name])) {
+                continue;
+            }
+            $description = '' !== $descriptor->description ? $descriptor->description : $descriptor->title;
+            $snapshot['tools'][] = [
+                'name' => $name,
+                'description' => $description,
+                'input_schema' => $descriptor->inputSchema,
+            ];
+            $snapshot['dispatch'][$name] = [
+                'kind' => self::KIND_CUSTOM,
+                'serverId' => 0,
+                'tool' => $name,
+                'annotations' => [
+                    'readOnlyHint' => SideEffect::Read === $descriptor->sideEffect,
+                    'toolId' => (int) ($descriptor->meta['toolId'] ?? 0),
+                ],
+            ];
+        }
 
         return $snapshot;
     }
