@@ -1382,7 +1382,8 @@ class AiFacade
     {
         $providerName = $options['provider'] ?? null;
         $callerSuppliedModel = array_key_exists('model', $options);
-        $sttModelId = null;
+        $sttModelId = $this->positiveIntOrNull($options['model_id'] ?? null);
+        unset($options['model_id']);
 
         // The settings UI persists the user's transcription pick to
         // BCONFIG.DEFAULTMODEL.SOUND2TEXT. Honour that configured row before
@@ -1394,7 +1395,7 @@ class AiFacade
         if (!$providerName && null !== $userId && $userId > 0) {
             $sttDefault = $this->modelConfig->resolveSttDefault($userId);
             $providerName = $sttDefault['provider'];
-            $sttModelId = $sttDefault['model_id'];
+            $sttModelId ??= $sttDefault['model_id'];
 
             // Only forward the SOUND2TEXT model name when it actually resolved
             // to a BMODELS row — otherwise the provider would receive a stale
@@ -1666,5 +1667,17 @@ class AiFacade
         ]);
 
         return $relativePath;
+    }
+
+    private function positiveIntOrNull(mixed $value): ?int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+        if (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return null;
     }
 }

@@ -230,6 +230,7 @@ final readonly class SttSessionService
                 $options = [
                     'provider' => $session->provider,
                     'model' => $session->model,
+                    'model_id' => $session->modelId,
                 ];
                 if (null !== $session->language) {
                     $options['language'] = $session->language;
@@ -339,6 +340,7 @@ final readonly class SttSessionService
         $transcribeOptions = [
             'provider' => $resolved['provider'],
             'model' => $resolved['providerModelId'],
+            'model_id' => $resolved['model_id'],
         ];
         $language = $this->optionalString($options['language'] ?? null);
         $prompt = $this->optionalString($options['prompt'] ?? null);

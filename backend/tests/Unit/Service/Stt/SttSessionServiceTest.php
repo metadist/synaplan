@@ -106,7 +106,9 @@ final class SttSessionServiceTest extends TestCase
                 $this->callback(static fn (string $path): bool => is_file($path) && str_ends_with($path, '.wav')),
                 42,
                 $this->callback(static function (array $opts): bool {
-                    return 'whisper' === $opts['provider'] && 'whisper' === $opts['model'];
+                    return 'whisper' === $opts['provider']
+                        && 'whisper' === $opts['model']
+                        && 330 === $opts['model_id'];
                 }),
             )
             ->willReturn([
