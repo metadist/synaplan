@@ -153,6 +153,8 @@ final readonly class FileListService
             'provider' => $mf->getProvider(),
             'thumb_url' => null !== $mf->getThumbPath() ? '/api/v1/files/'.$mf->getId().'/thumb' : null,
             'text_preview' => mb_substr($mf->getFileText(), 0, 200),
+            'extracted_text_length' => strlen($mf->getFileText()),
+            'error' => $this->rowError($mf),
             'uploaded_at' => $mf->getCreatedAt(),
             'uploaded_date' => date('Y-m-d H:i:s', $mf->getCreatedAt()),
             'group_key' => $groupKey,
@@ -161,6 +163,22 @@ final readonly class FileListService
             'vector_state' => $mf->getVectorState(),
             'is_vectorized' => $chunkCount > 0,
         ];
+    }
+
+    /**
+     * Plain-language reason when the row is failed and the extract is empty.
+     * Desktop and the file manager show this instead of a silent "ready" badge.
+     */
+    private function rowError(File $mf): ?string
+    {
+        if ('error' !== $mf->getStatus() && File::VECTOR_STATE_FAILED !== $mf->getVectorState()) {
+            return null;
+        }
+        if ('' === trim($mf->getFileText())) {
+            return 'Unable to extract information from this file.';
+        }
+
+        return null;
     }
 
     /**

@@ -142,12 +142,12 @@ final readonly class FileProcessor
      * @param string   $relativePath  Relative path to file (from upload dir)
      * @param string   $fileExtension File extension (e.g. 'pdf', 'docx')
      * @param int|null $userId        User ID for Vision AI fallback
-     * @param bool     $describe      When true, images are *described* (scene +
-     *                                legible text) for RAG instead of OCR-only.
-     *                                Used by the file manager's "Describe,
-     *                                vectorize & sort" action. No effect on
-     *                                documents/audio/video, which already produce
-     *                                descriptive content.
+     * @param bool     $describe      When true, images (and image-only PDF pages)
+     *                                are *described* (scene + legible text) for
+     *                                RAG instead of OCR-only. Used by the file
+     *                                manager's "Describe, vectorize & sort"
+     *                                action. Scanned PDFs also retry describe
+     *                                automatically when OCR returns nothing.
      *
      * @return array [extractedText, meta] where meta contains strategy, mime, ext, etc
      */
@@ -522,7 +522,7 @@ final readonly class FileProcessor
     {
         if ($this->isPdfMime($request->mime) || 'pdf' === $request->ext) {
             return $this->gatePair(
-                $this->extractFromPdfViaVision($request->absolutePath, $request->userId, $meta),
+                $this->extractFromPdfViaVision($request->absolutePath, $request->userId, $meta, $request->describe),
                 $request,
             );
         }
@@ -543,7 +543,7 @@ final readonly class FileProcessor
         try {
             // Rasterize needs a PDF; gate as PDF so qualityApplyTo=['pdf'] applies.
             return $this->gatePair(
-                $this->extractFromPdfViaVision($pdf, $request->userId, $meta),
+                $this->extractFromPdfViaVision($pdf, $request->userId, $meta, $request->describe),
                 $this->asPdfRequest($request, $pdf),
             );
         } finally {
@@ -952,8 +952,16 @@ final readonly class FileProcessor
 
     /**
      * Extract text from PDF using rasterization + Vision AI.
+     *
+     * OCR-only first (unless `$describe` was requested). A scanned voucher or
+     * photo-PDF often yields an empty OCR reply even though the page is full of
+     * marks — retry once with a describe prompt so *some* searchable text lands.
+     *
+     * @param array<string, mixed> $baseMeta
+     *
+     * @return array{0: string, 1: array<string, mixed>}
      */
-    private function extractFromPdfViaVision(string $absolutePath, ?int $userId, array $baseMeta): array
+    private function extractFromPdfViaVision(string $absolutePath, ?int $userId, array $baseMeta, bool $describe = false): array
     {
         $images = $this->rasterizer->pdfToPng($absolutePath);
 
@@ -965,24 +973,43 @@ final readonly class FileProcessor
 
         $this->logger->info('FileProcessor: PDF rasterized', ['pages' => count($images)]);
 
-        $fullText = $this->aggregateVisionResults($images, $userId);
+        $usedDescribe = $describe;
+        [$fullText, $answeredPages] = $this->aggregateVisionResults($images, $userId, $describe);
         $fullText = $this->textCleaner->clean($fullText);
+
+        // No page got an answer: the provider is down, has no key, or is rate
+        // limited. A describe retry would only send every page a second time
+        // into the same failure — report it instead of doubling the calls.
+        if (0 === $answeredPages) {
+            $this->logger->warning('FileProcessor: Vision AI answered no PDF page', ['pages' => count($images)]);
+
+            return ['', ['strategy' => 'vision_failed', 'pages' => count($images)] + $baseMeta];
+        }
+
+        if ('' === trim($fullText) && !$describe) {
+            $this->logger->info('FileProcessor: PDF OCR empty, retrying pages with describe prompt');
+            [$fullText] = $this->aggregateVisionResults($images, $userId, true);
+            $fullText = $this->textCleaner->clean($fullText);
+            $usedDescribe = true;
+        }
+
+        $strategy = $usedDescribe ? 'rasterize_vision_describe' : 'rasterize_vision';
 
         if (mb_strlen(trim($fullText)) > 0) {
             $this->logger->info('FileProcessor: Vision extraction success', [
-                'strategy' => 'rasterize_vision',
+                'strategy' => $strategy,
                 'pages' => count($images),
                 'bytes' => strlen($fullText),
             ]);
 
             return [$fullText, [
-                'strategy' => 'rasterize_vision',
+                'strategy' => $strategy,
                 'pages' => count($images),
                 'engine' => $this->rasterizer->getLastEngine(),
             ] + $baseMeta];
         }
 
-        return ['', ['strategy' => 'rasterize_vision'] + $baseMeta];
+        return ['', ['strategy' => $strategy] + $baseMeta];
     }
 
     /**
@@ -1026,10 +1053,7 @@ final readonly class FileProcessor
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
 
             $text = $result['content'] ?? '';
-            $text = $this->textCleaner->clean($text);
-            if (0 === stripos($text, 'test image description:')) {
-                $text = preg_replace('/^test image description:\s*/i', '', $text);
-            }
+            $text = $this->textCleaner->clean($this->stripVisionChrome((string) $text));
 
             // OCR-only mode: vision models routinely ignore the "return empty
             // string" instruction for text-less images and reply with prose
@@ -1057,6 +1081,18 @@ final readonly class FileProcessor
                 @unlink($tempJpegAbsolute);
             }
         }
+    }
+
+    /**
+     * Drop model reasoning wrappers and the test-fixture prefix so RAG stores
+     * the page text, not the model's scratchpad.
+     */
+    private function stripVisionChrome(string $text): string
+    {
+        $text = preg_replace('/<think\b[^>]*>[\s\S]*?<\/think>/i', '', $text) ?? $text;
+        $text = preg_replace('/^test image description:\s*/i', '', $text) ?? $text;
+
+        return trim($text);
     }
 
     /**
@@ -1123,25 +1159,42 @@ final readonly class FileProcessor
 
     /**
      * Aggregate Vision AI results from multiple images (PDF pages).
+     *
+     * A page whose provider call throws is skipped; the second element counts
+     * the pages that did answer so the caller can tell "no text on the pages"
+     * from "the provider never answered".
+     *
+     * @param list<string> $imagePaths
+     *
+     * @return array{0: string, 1: int} [aggregated text, answered page count]
      */
-    private function aggregateVisionResults(array $imagePaths, ?int $userId): string
+    private function aggregateVisionResults(array $imagePaths, ?int $userId, bool $describe = false): array
     {
         $fullText = '';
+        $answeredPages = 0;
 
         foreach ($imagePaths as $imgPath) {
             $relativePath = $this->absoluteToRelative($imgPath);
 
             try {
-                $prompt = 'Extract every piece of written text from this PDF page. '
-                    .'Return only the text exactly as it appears, preserving line breaks. '
-                    .'Do not provide any descriptions. '
-                    .'If no text is present, return an empty string.';
+                $prompt = $describe
+                    ? 'Describe this PDF page so it can be found by search later. '
+                        .'Cover any voucher, receipt, form, stamp, logo, amounts, dates, names, '
+                        .'and other printed or handwritten marks. '
+                        .'If any text is legible, transcribe it after a line "Text on page:". '
+                        .'Be factual and concise.'
+                    : 'Extract every piece of written text from this PDF page. '
+                        .'Return only the text exactly as it appears, preserving line breaks. '
+                        .'Do not provide any descriptions. '
+                        .'If no text is present, return an empty string.';
                 $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
-                $text = $result['content'] ?? '';
+                ++$answeredPages;
+                $text = $this->stripVisionChrome((string) ($result['content'] ?? ''));
+                if (!$describe && $this->isNoTextResponse($text)) {
+                    $text = '';
+                }
 
-                if (!empty($text)) {
-                    $text = trim($text);
-                    $text = preg_replace('/^test image description:\s*/i', '', $text);
+                if ('' !== $text) {
                     if (strlen($fullText) > 0) {
                         $fullText .= "\n\n";
                     }
@@ -1155,7 +1208,7 @@ final readonly class FileProcessor
             }
         }
 
-        return trim($fullText);
+        return [trim($fullText), $answeredPages];
     }
 
     /**
