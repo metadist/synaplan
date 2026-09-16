@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
@@ -100,10 +99,10 @@ func (d *Docker) Create(ctx context.Context, spec Spec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := d.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
+	if err := d.cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		cctx, cancel := cleanupContext()
 		defer cancel()
-		_ = d.cli.ContainerRemove(cctx, resp.ID, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+		_ = d.cli.ContainerRemove(cctx, resp.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
 		return "", err
 	}
 	return resp.ID, nil
@@ -156,7 +155,7 @@ func (d *Docker) Remove(ctx context.Context, id string) error {
 	if !d.Available() {
 		return ErrUnavailable
 	}
-	return d.cli.ContainerRemove(ctx, id, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	return d.cli.ContainerRemove(ctx, id, container.RemoveOptions{Force: true, RemoveVolumes: true})
 }
 
 // Logs follows the container's multiplexed log stream and demultiplexes it
@@ -165,7 +164,7 @@ func (d *Docker) Logs(ctx context.Context, id string, stdout, stderr io.Writer) 
 	if !d.Available() {
 		return ErrUnavailable
 	}
-	rc, err := d.cli.ContainerLogs(ctx, id, types.ContainerLogsOptions{
+	rc, err := d.cli.ContainerLogs(ctx, id, container.LogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -192,7 +191,7 @@ func (d *Docker) SweepOrphans(ctx context.Context, scratchDir string) error {
 		return firstErr
 	}
 	args := filters.NewArgs(filters.Arg("label", runLabelKey+"="+runLabelValue))
-	list, err := d.cli.ContainerList(ctx, types.ContainerListOptions{All: true, Filters: args})
+	list, err := d.cli.ContainerList(ctx, container.ListOptions{All: true, Filters: args})
 	if err != nil {
 		if firstErr == nil {
 			firstErr = err
@@ -200,7 +199,7 @@ func (d *Docker) SweepOrphans(ctx context.Context, scratchDir string) error {
 		return firstErr
 	}
 	for _, c := range list {
-		_ = d.cli.ContainerRemove(ctx, c.ID, types.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+		_ = d.cli.ContainerRemove(ctx, c.ID, container.RemoveOptions{Force: true, RemoveVolumes: true})
 	}
 	return firstErr
 }
