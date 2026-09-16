@@ -153,8 +153,11 @@ class RateLimitServiceUnifiedTest extends TestCase
 
         // User sent 80 messages in last hour (all sources combined)
         $this->connection->expects($this->exactly(2))
-            ->method('fetchOne')
-            ->willReturnOnConsecutiveCalls('80', '120');
+            ->method('fetchAssociative')
+            ->willReturnOnConsecutiveCalls(
+                ['used' => '80', 'oldest' => (string) (time() - 600)],
+                ['used' => '120', 'oldest' => (string) (time() - 86400)],
+            );
 
         $result = $this->service->checkLimit($user, 'MESSAGES');
 
@@ -350,6 +353,46 @@ class RateLimitServiceUnifiedTest extends TestCase
         $this->assertTrue($result2['allowed']);
         $this->assertEquals(8, $result2['used']);
         $this->assertEquals(2, $result2['remaining']);
+    }
+
+    public function testResetClearsLimitsCacheSoTheNextCheckReloadsConfig(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+        $user->method('getRateLimitLevel')->willReturn('ANONYMOUS');
+
+        $this->setupLimits('ANONYMOUS', 'MESSAGES', ['TOTAL' => 10]);
+        $this->connection->expects($this->any())->method('fetchOne')->willReturn('0');
+
+        $first = $this->service->checkLimit($user, 'MESSAGES');
+        $this->assertSame(10, $first['limit']);
+
+        $this->setupLimits('ANONYMOUS', 'MESSAGES', ['TOTAL' => 3]);
+        $cached = $this->service->checkLimit($user, 'MESSAGES');
+        $this->assertSame(10, $cached['limit'], 'stale cache must still report the first load');
+
+        $this->service->reset();
+        $fresh = $this->service->checkLimit($user, 'MESSAGES');
+        $this->assertSame(3, $fresh['limit']);
+    }
+
+    public function testRollingWindowResetAtIsTheOldestEventPlusThePeriod(): void
+    {
+        $user = $this->createMock(User::class);
+        $user->method('getId')->willReturn(1);
+        $user->method('getRateLimitLevel')->willReturn('PRO');
+        $this->setupLimits('PRO', 'MESSAGES', ['HOURLY' => 100]);
+        $oldest = time() - 900;
+        $this->connection->expects($this->once())->method('fetchAssociative')->willReturn([
+            'used' => '4',
+            'oldest' => (string) $oldest,
+        ]);
+
+        $result = $this->service->checkLimit($user, 'MESSAGES');
+
+        $this->assertSame($oldest + 3600, $result['reset_at']);
+        $this->assertSame(4, $result['used']);
+        $this->assertSame('hourly', $result['limit_type']);
     }
 
     private function setupLimits(string $level, string $action, array $limits): void

@@ -37,7 +37,7 @@ final class RateLimitServiceTierTest extends TestCase
         $configMap['RATELIMITS_BUSINESS'] = [$this->limitRow('MESSAGES_HOURLY', '100')];
 
         $connection = $this->createMock(Connection::class);
-        $connection->method('fetchOne')->willReturn(0);
+        $connection->method('fetchAssociative')->willReturn(['used' => 0, 'oldest' => null]);
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getConnection')->willReturn($connection);
 
