@@ -118,7 +118,7 @@ final class AdminConfigLockController extends AbstractController
             return $this->json(['error' => $e->getMessage(), 'code' => 'iam.unknownPolicyKey'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        return $this->json(['locks' => $locks]);
+        return new JsonResponse(['locks' => (object) $locks]);
     }
 
     private function guard(?User $user): ?JsonResponse
