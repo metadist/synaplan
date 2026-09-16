@@ -21,10 +21,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
- * Verifies that FileUploadService marks audio/video files whose transcription
- * produced no text as status='error' rather than the previous misleading
- * 'vectorized' (async path).  Non-media files (e.g. blank PDFs) must continue
- * to reach 'vectorized' so existing behaviour is not regressed.
+ * Verifies that FileUploadService marks files whose extract produced no text
+ * as status='error' rather than the previous misleading 'vectorized'
+ * (async path). Blank PDFs and silent media share that contract.
  *
  * Covers PR #1095 QA review Finding 3.
  */
@@ -122,17 +121,18 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
         $this->assertSame('error', $result['status']);
     }
 
-    public function testProcessFileDoesNotErrorForEmptyPdf(): void
+    public function testProcessFileErrorsForEmptyPdf(): void
     {
         $this->fileProcessor
             ->method('extractText')
             ->willReturn(['', ['strategy' => 'tika_failed']]);
 
-        // A blank or unreadable PDF is not a transcription failure — the file
-        // reaches vectorized with 0 chunks (no content to index).
+        // A scanned or unreadable PDF that yielded no text (after Tika + vision)
+        // must not pretend to be vectorized — that showed as "Ready for chat".
         $result = $this->makeService()->processFile($this->makeFileMock('pdf', ''), $this->makeUser());
 
-        $this->assertTrue($result['success']);
-        $this->assertSame('vectorized', $result['status']);
+        $this->assertFalse($result['success']);
+        $this->assertSame('error', $result['status']);
+        $this->assertStringContainsString('Unable to extract information', $result['error']);
     }
 }
