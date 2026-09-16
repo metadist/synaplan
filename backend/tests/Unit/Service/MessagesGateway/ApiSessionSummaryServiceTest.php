@@ -43,6 +43,7 @@ final class ApiSessionSummaryServiceTest extends TestCase
     private RateLimitService&MockObject $rateLimitService;
     private EntityManagerInterface&MockObject $em;
     private EntityRepository&MockObject $messageRepository;
+    private User $user;
 
     protected function setUp(): void
     {
@@ -58,9 +59,9 @@ final class ApiSessionSummaryServiceTest extends TestCase
             'model_id' => 42,
         ]);
 
-        $user = new User();
+        $this->user = new User();
         $userRepository = $this->createMock(EntityRepository::class);
-        $userRepository->method('find')->willReturn($user);
+        $userRepository->method('find')->willReturn($this->user);
 
         $chat = new Chat();
         $chat->setUserId(self::USER_ID);
@@ -179,6 +180,84 @@ final class ApiSessionSummaryServiceTest extends TestCase
         $this->assertSame(0, $state['countSinceRefresh']);
     }
 
+    public function testSummarizerPromptPinsEnglishFromTheRequestExcerpt(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->em->method('persist')->willReturnCallback(fn (object $entity) => self::assignId($entity));
+        $this->em->method('flush');
+
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->with($this->callback(function (array $messages): bool {
+                $system = (string) ($messages[0]['content'] ?? '');
+
+                return str_contains($system, 'Write the summary in English')
+                    && str_contains($system, 'write your reply in English')
+                    && str_contains($system, 'do not translate quoted');
+            }))
+            ->willReturn(['content' => 'Asked who the assistant is.', 'usage' => []]);
+
+        $this->recordWithUserLanguage('de', 'who are you?', 'I am a helpful assistant.');
+    }
+
+    public function testSummarizerPromptPinsGermanWhenBitteIsTheRequestAnchor(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->em->method('persist')->willReturnCallback(fn (object $entity) => self::assignId($entity));
+        $this->em->method('flush');
+
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->with($this->callback(function (array $messages): bool {
+                $system = (string) ($messages[0]['content'] ?? '');
+
+                return str_contains($system, 'Write the summary in German')
+                    && str_contains($system, 'write your reply in German');
+            }))
+            ->willReturn(['content' => 'Der Nutzer bat um das Öffnen einer Datei.', 'usage' => []]);
+
+        $this->recordWithUserLanguage('en', 'Bitte öffne die Datei', 'Opened.');
+    }
+
+    public function testSummarizerPromptFallsBackToAccountLocaleOnALanguageTie(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->em->method('persist')->willReturnCallback(fn (object $entity) => self::assignId($entity));
+        $this->em->method('flush');
+
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->with($this->callback(function (array $messages): bool {
+                $system = (string) ($messages[0]['content'] ?? '');
+
+                return str_contains($system, 'Write the summary in Spanish')
+                    && str_contains($system, 'write your reply in Spanish');
+            }))
+            ->willReturn(['content' => 'Resumen de la sesión.', 'usage' => []]);
+
+        // qué (es) and is (en) score equally; do not pick English by array order.
+        $this->recordWithUserLanguage('es', 'qué is', 'ok');
+    }
+
+    public function testSummarizerPromptFallsBackToAccountLocaleWhenExcerptHasNoSignal(): void
+    {
+        $this->messageRepository->method('findOneBy')->willReturn(null);
+        $this->em->method('persist')->willReturnCallback(fn (object $entity) => self::assignId($entity));
+        $this->em->method('flush');
+
+        $this->aiFacade->expects($this->once())
+            ->method('chat')
+            ->with($this->callback(function (array $messages): bool {
+                $system = (string) ($messages[0]['content'] ?? '');
+
+                return str_contains($system, 'Write the summary in Spanish')
+                    && str_contains($system, 'write your reply in Spanish');
+            }))
+            ->willReturn(['content' => 'Resumen de la sesión.', 'usage' => []]);
+
+        $this->recordWithUserLanguage('es', 'ok', 'done');
+    }
+
     public function testSummarizerFailureKeepsPendingExcerptsForRetry(): void
     {
         $this->aiFacade->expects($this->once())
@@ -215,6 +294,12 @@ final class ApiSessionSummaryServiceTest extends TestCase
             $requestExcerpt,
             $responseExcerpt,
         );
+    }
+
+    private function recordWithUserLanguage(string $language, string $requestExcerpt, string $responseExcerpt): void
+    {
+        $this->user->setUserDetails(['language' => $language]);
+        $this->record($requestExcerpt, $responseExcerpt);
     }
 
     private function stateKey(): string
