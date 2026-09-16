@@ -6,14 +6,18 @@ use App\AI\Interface\ProviderMetadataInterface;
 use App\AI\Service\OllamaModelInventory;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Config;
+use App\Entity\GroupConfig;
+use App\Entity\GroupMember;
 use App\Entity\Model;
 use App\Repository\ConfigRepository;
 use App\Repository\GroupConfigRepository;
+use App\Repository\GroupMemberRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
 use App\Repository\UserRepository;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\AuditLogWriter;
+use App\Service\Iam\IamConfig;
 use App\Service\Iam\Policy\GroupPolicyService;
 use App\Service\ModelConfigService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -1035,6 +1039,220 @@ class ModelConfigServiceTest extends TestCase
             'provider' => 'groq',
             'model_id' => $userMemModelId,
         ], $result);
+    }
+
+    public function testGetToolsModelConfigPrefersUserToolsOverGlobal(): void
+    {
+        $userId = 42;
+        $userToolsModelId = 221;
+
+        $userToolsConfig = $this->createMock(Config::class);
+        $userToolsConfig->method('getValue')->willReturn((string) $userToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => $userId,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($userToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($userToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame([
+            'provider' => 'groq',
+            'model' => 'llama-3.3-70b-versatile',
+            'model_id' => $userToolsModelId,
+        ], $result);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserLooksUpGlobalOnly(): void
+    {
+        $globalToolsModelId = 99;
+
+        $globalToolsConfig = $this->createMock(Config::class);
+        $globalToolsConfig->method('getValue')->willReturn((string) $globalToolsModelId);
+
+        $this->configRepository
+            ->expects($this->once())
+            ->method('findOneBy')
+            ->with([
+                'ownerId' => 0,
+                'group' => 'DEFAULTMODEL',
+                'setting' => 'TOOLS',
+            ])
+            ->willReturn($globalToolsConfig);
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
+    public function testGetToolsModelConfigForwardsUserIdToLayeredResolver(): void
+    {
+        $userId = 9;
+        $groupToolsModelId = 331;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with($userId, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $groupToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($groupToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig($userId);
+
+        $this->assertSame($groupToolsModelId, $result['model_id']);
+    }
+
+    public function testGetToolsModelConfigWithoutAUserAsksTheResolverWithNull(): void
+    {
+        $globalToolsModelId = 99;
+
+        $resolver = $this->createMock(LayeredConfigResolver::class);
+        $resolver->expects(self::once())
+            ->method('chain')
+            ->with(null, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([(string) $globalToolsModelId]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            $resolver,
+        );
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Groq');
+        $model->method('getProviderId')->willReturn('llama-3.3-70b-versatile');
+        $model->method('getActive')->willReturn(1);
+        $this->modelRepository
+            ->expects(self::any())
+            ->method('find')
+            ->with($globalToolsModelId)
+            ->willReturn($model);
+
+        $result = $this->service->getToolsModelConfig();
+
+        $this->assertSame($globalToolsModelId, $result['model_id']);
+    }
+
+    /**
+     * Issue #1874: DEFAULTMODEL.TOOLS is on the group-policy allow-list.
+     * Mocking LayeredConfigResolver::chain() would still pass if the group
+     * layer never read BGROUPCONFIG. Wire a real resolver so a member's group
+     * TOOLS id wins over the global row, and a null user stays global-only.
+     */
+    public function testGetToolsModelConfigHonoursGroupPolicyOverGlobal(): void
+    {
+        $userId = 9;
+        $groupToolsModelId = 331;
+        $globalToolsModelId = 99;
+
+        $groupConfig = $this->createMock(GroupConfigRepository::class);
+        $members = $this->createMock(GroupMemberRepository::class);
+        $iam = $this->createMock(IamConfig::class);
+        $iam->method('isGroupPoliciesEnabled')->willReturn(true);
+
+        $this->configRepository->method('getValue')->willReturn(null);
+        $global = new Config();
+        $global->setOwnerId(0);
+        $global->setGroup('DEFAULTMODEL');
+        $global->setSetting('TOOLS');
+        $global->setValue((string) $globalToolsModelId);
+        $this->configRepository->expects(self::atLeastOnce())
+            ->method('findByOwnerGroupAndSetting')
+            ->with(0, 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn($global);
+
+        $members->expects(self::once())
+            ->method('findByUserId')
+            ->with($userId)
+            ->willReturn([new GroupMember(4, $userId)]);
+        $groupRow = new GroupConfig();
+        $groupRow->setGroupId(4);
+        $groupRow->setGroup('DEFAULTMODEL');
+        $groupRow->setSetting('TOOLS');
+        $groupRow->setValue((string) $groupToolsModelId);
+        $groupConfig->expects(self::once())
+            ->method('getForGroups')
+            ->with([4], 'DEFAULTMODEL', 'TOOLS')
+            ->willReturn([$groupRow]);
+
+        $this->service = new ModelConfigService(
+            $this->configRepository,
+            $this->modelRepository,
+            $this->userRepository,
+            $this->cache,
+            $this->providerRegistry,
+            $this->ollamaModelInventory,
+            $this->modelHealthRepository,
+            new NullLogger(),
+            new LayeredConfigResolver($this->configRepository, $groupConfig, $members, $iam),
+        );
+
+        $this->givenModels([
+            $groupToolsModelId => 'Groq',
+            $globalToolsModelId => 'Groq',
+        ], [
+            $groupToolsModelId => 'llama-3.3-70b-versatile',
+            $globalToolsModelId => 'llama-3.3-70b-versatile',
+        ]);
+
+        $forMember = $this->service->getToolsModelConfig($userId);
+        $withoutUser = $this->service->getToolsModelConfig();
+
+        $this->assertSame($groupToolsModelId, $forMember['model_id']);
+        $this->assertSame($globalToolsModelId, $withoutUser['model_id']);
     }
 
     public function testGetMemoryModelConfigFallsThroughGlobalMemUserChatToGlobalChat(): void
