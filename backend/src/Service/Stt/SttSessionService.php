@@ -10,6 +10,7 @@ use App\Service\Exception\RateLimitExceededException;
 use App\Service\RateLimitService;
 use App\Service\Stt\Exception\SttSessionClosedException;
 use App\Service\Stt\Exception\SttSessionNotFoundException;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -395,9 +396,9 @@ final readonly class SttSessionService
 
     private function assertRateLimit(User $user): void
     {
-        $check = $this->rateLimitService->checkLimit($user, 'FILE_ANALYSIS');
+        $check = $this->rateLimitService->checkLimit($user, TranscriptionUsageRecorder::ACTION);
         if (!($check['allowed'] ?? false)) {
-            throw new RateLimitExceededException('FILE_ANALYSIS', (int) ($check['used'] ?? 0), (int) ($check['limit'] ?? 0));
+            throw new RateLimitExceededException(TranscriptionUsageRecorder::ACTION, (int) ($check['used'] ?? 0), (int) ($check['limit'] ?? 0));
         }
     }
 

@@ -15,6 +15,7 @@ use App\Service\Stt\SttAudioAssembler;
 use App\Service\Stt\SttModelResolver;
 use App\Service\Stt\SttSessionService;
 use App\Service\Stt\SttSessionStore;
+use App\Service\Usage\TranscriptionUsageRecorder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -167,11 +168,14 @@ final class SttSessionServiceTest extends TestCase
     public function testRateLimitIsEnforcedOnCommit(): void
     {
         $this->rateLimit = $this->createMock(RateLimitService::class);
-        $this->rateLimit->method('checkLimit')->willReturn([
-            'allowed' => false,
-            'used' => 10,
-            'limit' => 10,
-        ]);
+        $this->rateLimit->expects(self::atLeastOnce())
+            ->method('checkLimit')
+            ->with($this->user, TranscriptionUsageRecorder::ACTION)
+            ->willReturn([
+                'allowed' => false,
+                'used' => 10,
+                'limit' => 10,
+            ]);
         $this->service = new SttSessionService(
             $this->store,
             new SttAudioAssembler(),
@@ -185,6 +189,7 @@ final class SttSessionServiceTest extends TestCase
         $this->service->appendAudio($this->user, 1, $session->id, 'abcd', false);
 
         $this->expectException(RateLimitExceededException::class);
+        $this->expectExceptionMessage('TRANSCRIPTION');
         $this->service->commit($this->user, 1, $session->id);
     }
 
