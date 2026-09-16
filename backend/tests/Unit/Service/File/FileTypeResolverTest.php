@@ -69,8 +69,14 @@ final class FileTypeResolverTest extends TestCase
         self::assertSame('image', FileTypeResolver::resolveCategory('png', 'a.png'));
         self::assertSame('document', FileTypeResolver::resolveCategory('ics', 'invite.ics'));
         self::assertSame('document', FileTypeResolver::resolveCategory('odt', 'notes.odt'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('ods', 'sheet.ods'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('odp', 'deck.odp'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('odg', 'draw.odg'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('odf', 'formula.odf'));
         self::assertSame('document', FileTypeResolver::resolveCategory('rtf', 'letter.rtf'));
         self::assertSame('document', FileTypeResolver::resolveCategory('pages', 'essay.pages'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('numbers', 'budget.numbers'));
+        self::assertSame('document', FileTypeResolver::resolveCategory('key', 'talk.key'));
         self::assertSame('', FileTypeResolver::resolveCategory('xyz', 'a.xyz'));
     }
 
