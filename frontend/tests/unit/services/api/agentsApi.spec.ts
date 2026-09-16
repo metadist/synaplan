@@ -29,7 +29,7 @@ describe('agentsApi', () => {
     await expect(agentsApi.gallery()).rejects.toThrow('Invalid API response format')
   })
 
-  it('remove resolves when DELETE answers 204 No Content', async () => {
+  it('remove delegates DELETE /api/v1/agents/{id}', async () => {
     vi.mocked(httpClient).mockResolvedValue(undefined)
 
     await expect(agentsApi.remove(12)).resolves.toBeUndefined()
