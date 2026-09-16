@@ -51,6 +51,10 @@ final readonly class UserLifecycleService
         bool $emailVerified = false,
         array $userDetails = [],
     ): User {
+        if (GuestSessionService::isReservedProcessorEmail($email)) {
+            throw new \InvalidArgumentException('This email is reserved for guest chat processing');
+        }
+
         $user = new User();
         $user->setMail($email);
         $user->setCreated(date('Y-m-d H:i:s'));

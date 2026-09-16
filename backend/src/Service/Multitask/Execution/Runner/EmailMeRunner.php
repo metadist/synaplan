@@ -9,10 +9,12 @@ use App\Service\InternalEmailService;
 use App\Service\Microsoft\M365MailSender;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
@@ -49,6 +51,7 @@ final readonly class EmailMeRunner implements TaskRunner
         private LoggerInterface $logger,
         private ?M365MailSender $m365MailSender = null,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?StepApprovalGate $approvalGate = null,
     ) {
     }
 
@@ -99,6 +102,15 @@ final readonly class EmailMeRunner implements TaskRunner
 
         $locale = $this->locale($context);
         $subject = $this->subject($node, $context, $locale);
+
+        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::EmailMe), [
+            'to' => $address,
+            'subject' => $subject,
+            'attachment_count' => count($attachments),
+        ]);
+        if (null !== $gated) {
+            return $gated;
+        }
 
         try {
             $this->deliver($userId, $address, $subject, $text, $attachments);

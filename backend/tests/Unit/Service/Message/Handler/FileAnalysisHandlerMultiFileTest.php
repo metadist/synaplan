@@ -420,8 +420,28 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
 
         $result = $this->handler->handle($message, [], []);
 
-        $this->assertSame('audio_not_transcribed', $result['metadata']['error']);
-        $this->assertStringContainsString('Audio transcription failed', $result['content']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
+        $this->assertStringContainsString('could not be transcribed', $result['content']);
+    }
+
+    /**
+     * Same mixed bubble while the second recording is still extracting:
+     * wait, don't claim the server cannot transcribe (issue #1908).
+     */
+    public function testMultiFileBubbleWithPendingAudioAsksUserToWait(): void
+    {
+        $message = $this->buildMessageWithFiles([
+            $this->buildFile(id: 1, name: 'first.ogg', type: 'ogg', path: '13/000/first.ogg', text: 'Hello there.', status: 'processed'),
+            $this->buildFile(id: 2, name: 'second.ogg', type: 'ogg', path: '13/000/second.ogg', text: '', status: 'extracting'),
+        ], text: '');
+
+        $this->aiFacade->expects($this->never())->method('chat');
+        $this->aiFacade->expects($this->never())->method('chatStream');
+
+        $result = $this->handler->handle($message, [], []);
+
+        $this->assertSame('audio_transcription_in_progress', $result['metadata']['error']);
+        $this->assertStringContainsString('still being prepared', $result['content']);
     }
 
     /**
@@ -442,7 +462,7 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
 
         $result = $this->handler->handle($message, [], []);
 
-        $this->assertSame('audio_not_transcribed', $result['metadata']['error']);
+        $this->assertSame('audio_transcription_failed', $result['metadata']['error']);
     }
 
     /**
@@ -665,6 +685,7 @@ class FileAnalysisHandlerMultiFileTest extends TestCase
         $message->method('getUserId')->willReturn(7);
         $message->method('getFiles')->willReturn($collection);
         $message->method('getText')->willReturn($text);
+        $message->method('getLanguage')->willReturn('en');
 
         return $message;
     }

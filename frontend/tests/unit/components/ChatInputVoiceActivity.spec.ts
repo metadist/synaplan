@@ -22,7 +22,14 @@ let recorderOptions: {
 } = {}
 
 /** Resolver for the pending transcription, so specs can hold it mid-flight. */
-let resolveTranscription: (value: { text: string; file_id: number }) => void = () => {}
+let resolveTranscription: (value: {
+  text?: string
+  file_id: number
+  extraction_error?: 'audio_transcription_failed'
+}) => void = () => {}
+
+const showError = vi.fn()
+const showWarning = vi.fn()
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: {}, fullPath: '/chat' }),
@@ -31,6 +38,18 @@ vi.mock('vue-router', () => ({
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } }),
+}))
+
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({
+    error: showError,
+    success: vi.fn(),
+    warning: showWarning,
+    info: vi.fn(),
+    push: vi.fn(),
+    remove: vi.fn(),
+    notifications: { value: [] },
+  }),
 }))
 
 vi.mock('@/stores/config', () => ({
@@ -105,6 +124,8 @@ describe('ChatInput voice activity strip', () => {
     setActivePinia(createPinia())
     webSpeechSupported = false
     recorderOptions = {}
+    showError.mockClear()
+    showWarning.mockClear()
   })
 
   it('appears while the recorder is capturing', async () => {
@@ -159,6 +180,27 @@ describe('ChatInput voice activity strip', () => {
     await nextTick()
 
     expect(wrapper.find(VOICE_ACTIVITY).exists()).toBe(false)
+  })
+
+  it('shows the STT recovery copy when dictation extraction fails', async () => {
+    const wrapper = mountInput()
+
+    await wrapper.get(MIC_BUTTON).trigger('click')
+    await wrapper.get(MIC_BUTTON).trigger('click')
+    recorderOptions.onDataAvailable?.(new Blob(['audio']))
+    recorderOptions.onStop?.()
+    await nextTick()
+
+    resolveTranscription({
+      text: '',
+      file_id: 1,
+      extraction_error: 'audio_transcription_failed',
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    expect(showError).toHaveBeenCalledWith('chatInput.dictationSttFailed')
+    expect(showWarning).not.toHaveBeenCalledWith('chatInput.noSpeechDetected')
   })
 
   it('stays hidden on the Web Speech path, which streams words into the textarea itself', async () => {

@@ -16,6 +16,7 @@ use App\Service\ModelConfigService;
 use App\Service\Prompt\LanguageDirectiveBuilder;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * File Analysis Handler.
@@ -43,6 +44,13 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     /** Upper bound for the requested completion budget (reasoning tokens count against it). */
     private const MAX_ANSWER_OUTPUT_TOKENS = 16000;
 
+    /** Locales shipped in `translations/ai_errors.*.yaml`. */
+    private const SUPPORTED_LOCALES = ['de', 'en', 'es', 'fr', 'tr'];
+
+    private const AUDIO_PENDING_FALLBACK = 'The recording is still being prepared. Please wait a moment and send your question again.';
+
+    private const AUDIO_FAILED_FALLBACK = 'This recording could not be transcribed. Speech-to-text is not set up on this server, or the audio could not be understood. Connect a speech-to-text service under Settings, or try a different file.';
+
     public function __construct(
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
@@ -52,6 +60,7 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         private ?ModelContextWindow $modelContextWindow = null,
         private ChatFailureClassifier $failureClassifier = new ChatFailureClassifier(),
         private ?ChatErrorPresenter $chatErrorPresenter = null,
+        private ?TranslatorInterface $translator = null,
     ) {
     }
 
@@ -134,8 +143,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
             case 'document_extraction_failed':
                 return $this->buildDocumentExtractionError($route);
 
-            case 'audio_not_transcribed':
-                return $this->buildAudioNotTranscribedError($route['audio_files']);
+            case 'audio_transcription_pending':
+            case 'audio_transcription_failed':
+                return $this->buildAudioTranscriptionError($route, $message);
 
             case 'video_transcription_pending':
             case 'video_transcription_failed':
@@ -228,8 +238,9 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
 
                 return ['metadata' => $error['metadata']];
 
-            case 'audio_not_transcribed':
-                $error = $this->buildAudioNotTranscribedError($route['audio_files']);
+            case 'audio_transcription_pending':
+            case 'audio_transcription_failed':
+                $error = $this->buildAudioTranscriptionError($route, $message);
                 $streamCallback($error['content']);
 
                 return ['metadata' => $error['metadata']];
@@ -1283,24 +1294,27 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
      * categorization.
      *
      * Priority rules:
-     *  1. Any audio attachment is missing its transcript → surface
-     *     `audio_not_transcribed` immediately. Audio is the slowest
+     *  1. Any audio attachment is still being transcribed → surface
+     *     `audio_transcription_pending`. Audio is the slowest
      *     attachment to prepare in a multi-file bubble; processing
      *     only the subset that's ready silently drops the rest
      *     (Copilot review on PR #986). The user needs to wait/retry.
-     *  2. Any document is still being extracted → surface
+     *  2. Any audio finished with no transcript → surface
+     *     `audio_transcription_failed` with copy that does not promise
+     *     retry will work (issue #1908: missing STT is a terminal failure).
+     *  3. Any document is still being extracted → surface
      *     `document_extraction_pending`. Same reasoning: don't run
      *     the chat model on half a bundle.
-     *  3. Any document finished extraction with no usable text →
+     *  4. Any document finished extraction with no usable text →
      *     surface `document_extraction_failed` so the user knows
      *     the file is unusable.
-     *  4. Documents with extracted text → chat-model "document" path.
+     *  5. Documents with extracted text → chat-model "document" path.
      *     Any transcribed audio is appended as virtual "transcript"
      *     documents so its content reaches the model too.
-     *  5. Otherwise audio-only (one or many) with transcripts → the
+     *  6. Otherwise audio-only (one or many) with transcripts → the
      *     conversational voice-reply path.
-     *  6. Otherwise images → the vision path.
-     *  7. Otherwise → `unsupported`.
+     *  7. Otherwise images → the vision path.
+     *  8. Otherwise → `unsupported`.
      *
      * @param list<array<string, mixed>> $filesInfo
      *
@@ -1321,7 +1335,8 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         $documentsPending = [];
         $documentsFailed = [];
         $audioWithText = [];
-        $audioMissingText = [];
+        $audioPending = [];
+        $audioFailed = [];
         $videoWithText = [];
         $videoPending = [];
         $videoFailed = [];
@@ -1332,7 +1347,16 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
                 if ('' !== trim((string) ($info['text'] ?? ''))) {
                     $audioWithText[] = $info;
                 } else {
-                    $audioMissingText[] = $info;
+                    $isStillExtracting = in_array(
+                        (string) ($info['status'] ?? ''),
+                        ['uploaded', 'extracting'],
+                        true
+                    );
+                    if ($isStillExtracting) {
+                        $audioPending[] = $info;
+                    } else {
+                        $audioFailed[] = $info;
+                    }
                 }
                 continue;
             }
@@ -1395,23 +1419,32 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
         // first" without the user being told.
         //
         // Resolution priorities, in order:
-        //   1. Any audio attachment missing a transcript → tell the
-        //      user audio is still being prepared, regardless of how
-        //      many documents are ready. Audio transcription is
-        //      usually the slowest path in a multi-file bubble.
-        //   2. Any document still being extracted → tell the user
+        //   1. Any audio still being transcribed → tell the user to
+        //      wait. Audio is usually the slowest path in a bubble.
+        //   2. Any audio that finished with no transcript → tell the
+        //      user this server could not transcribe it (issue #1908).
+        //      Do not promise "try again in a moment" when retry cannot
+        //      succeed without an STT backend.
+        //   3. Any document still being extracted → tell the user
         //      to wait. Acting on only the ready subset has caused
         //      "where's the rest of my plan?" support escalations.
-        //   3. Any document that finished extraction with no text →
+        //   4. Any document that finished extraction with no text →
         //      surface the extraction-failed message so the user
         //      knows that file is unusable, even if other docs
         //      succeeded.
         // Only once every attached doc/audio is ready do we hand
         // the bundle off to the documents/audio chat pipelines.
-        if ([] !== $audioMissingText) {
+        if ([] !== $audioPending) {
             return [
-                'kind' => 'audio_not_transcribed',
-                'audio_files' => $audioMissingText,
+                'kind' => 'audio_transcription_pending',
+                'audio_files' => $audioPending,
+            ];
+        }
+
+        if ([] !== $audioFailed) {
+            return [
+                'kind' => 'audio_transcription_failed',
+                'audio_files' => $audioFailed,
             ];
         }
 
@@ -1628,20 +1661,59 @@ final readonly class FileAnalysisHandler implements MessageHandlerInterface
     }
 
     /**
-     * @param list<array<string, mixed>> $audioFiles
+     * Distinct pending vs failed copy for audio without a transcript
+     * (issue #1908). Pending still asks the user to wait; failed names
+     * that speech-to-text is missing or the audio could not be understood
+     * and does not promise a retry that cannot succeed.
+     *
+     * @param array{kind: string, audio_files?: list<array<string, mixed>>} $route
      *
      * @return array{content: string, metadata: array<string, mixed>}
      */
-    private function buildAudioNotTranscribedError(array $audioFiles): array
+    private function buildAudioTranscriptionError(array $route, Message $message): array
     {
+        $audioFiles = $route['audio_files'] ?? [];
+        $isStillProcessing = 'audio_transcription_pending' === $route['kind'];
+
         $this->logger->error('FileAnalysisHandler: Audio file(s) without transcription', [
             'files' => $this->describeFileList($audioFiles),
+            'still_processing' => $isStillProcessing,
         ]);
 
+        $locale = $this->normalizeLocale($message->getLanguage());
+        $content = $isStillProcessing
+            ? $this->trans('file_analysis.audio_pending', self::AUDIO_PENDING_FALLBACK, $locale)
+            : $this->trans('file_analysis.audio_failed', self::AUDIO_FAILED_FALLBACK, $locale);
+
         return [
-            'content' => 'Audio transcription failed or is not yet available. Please try again in a moment.',
-            'metadata' => ['error' => 'audio_not_transcribed'],
+            'content' => $content,
+            'metadata' => [
+                'error' => $isStillProcessing
+                    ? 'audio_transcription_in_progress'
+                    : 'audio_transcription_failed',
+            ],
         ];
+    }
+
+    private function normalizeLocale(string $lang): string
+    {
+        $normalized = strtolower(substr(trim($lang), 0, 2));
+
+        return in_array($normalized, self::SUPPORTED_LOCALES, true) ? $normalized : 'en';
+    }
+
+    private function trans(string $key, string $fallback, string $locale): string
+    {
+        if (null === $this->translator) {
+            return $fallback;
+        }
+
+        $translated = $this->translator->trans($key, [], 'ai_errors', $locale);
+        if ('' === $translated || $translated === $key) {
+            return $fallback;
+        }
+
+        return $translated;
     }
 
     /**

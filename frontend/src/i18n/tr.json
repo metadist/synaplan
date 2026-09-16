@@ -863,6 +863,7 @@
     "transcribed": "🎙️ Yazıya döküldü{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ Kayıtta konuşma algılanmadı",
     "transcriptionFailed": "Yazıya dökme başarısız: {error}",
+    "dictationSttFailed": "Bu kayıt yazıya dökülemedi. Konuşmayı metne çevirme kurulmamış olabilir veya ses anlaşılamadı. Ayarlar’dan bir konuşmayı metne çevirme hizmeti bağlayın veya tekrar deneyin.",
     "mic": {
       "permissionWeb": "Mikrofon erişimi engellendi. Tarayıcı ayarlarından izin ver ve tekrar dene.",
       "permissionIos": "Mikrofon erişimi kapalı. iOS Ayarlar uygulamasını aç, bu uygulamayı seç ve Mikrofon seçeneğini etkinleştir.",
@@ -5119,6 +5120,15 @@
       "allowedModels": "İzin verilen modeller",
       "allowedHelper": "Herkesin tüm modelleri kullanması için boş bırakın. Bir liste seçimi sınırlar.",
       "features": "Özellikler",
+      "featuresHelper": "Bu grubun bir özelliği açması veya kapatması gerekmiyorsa kurulum varsayılanını bırakın.",
+      "featureOn": "Bu grup için açık",
+      "featureOff": "Bu grup için kapalı",
+      "inheritedOn": "Kurulum varsayılanı açık.",
+      "inheritedOff": "Kurulum varsayılanı kapalı.",
+      "inheritedUnset": "Kurulumda varsayılan yok, bu yüzden kapalı.",
+      "willInherit": "Kaydettikten sonra kurulum varsayılanı kullanılır.",
+      "groupForcesOn": "Bu grup, üyeleri için bunu açar.",
+      "groupForcesOff": "Bu grup, üyeleri için bunu kapatır.",
       "rateLimit": "Kullanım sınırı düzeyi",
       "useGlobal": "Kurulum varsayılanını kullan",
       "useBillingTier": "Kişinin planını kullan",
@@ -5147,7 +5157,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Web sayfalarını getir",
         "MULTITASK_MCP_FETCH_ENABLED": "Bağlı araçlardan oku",
         "MULTITASK_MCP_ACTION_ENABLED": "Bağlı araçlarla işlem yap",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-posta ara"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "E-posta ara",
+        "TOOLS_REGISTRY_ENABLED": "Araç kataloğu",
+        "TOOLS_APPROVALS_ENABLED": "Araç onayları",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Özel HTTP araçları",
+        "WORKFLOWS_BUILDER_ENABLED": "Görev adımları düzenleyicisi"
       }
     }
   },

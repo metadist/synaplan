@@ -7,10 +7,12 @@ namespace App\Service\Multitask\Execution\Runner;
 use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -27,6 +29,7 @@ final readonly class SaveToFolderRunner implements TaskRunner
         private RequestedFolderDelivery $delivery,
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
+        private ?StepApprovalGate $approvalGate = null,
     ) {
     }
 
@@ -58,6 +61,15 @@ final readonly class SaveToFolderRunner implements TaskRunner
         $channel = is_string($node->params['channel'] ?? null)
             ? trim($node->params['channel'])
             : (is_numeric($node->params['connection_id'] ?? null) ? (int) $node->params['connection_id'] : null);
+
+        $channelLabel = is_string($channel) || is_int($channel) ? (string) $channel : '';
+        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::SaveToFolder), [
+            'channel' => $channelLabel,
+            'file_count' => count($files),
+        ]);
+        if (null !== $gated) {
+            return $gated;
+        }
 
         $result = $this->delivery->send($userId, $files, '' === $channel ? null : $channel);
         if (!$result['ok']) {

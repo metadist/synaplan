@@ -31,6 +31,7 @@ use App\Service\Multitask\Execution\Runner\FileAnalysisRunner;
 use App\Service\Multitask\Execution\Runner\MediaGenerationRunner;
 use App\Service\Multitask\Execution\Runner\Text2SoundRunner;
 use App\Service\Multitask\Execution\Runner\WebSearchRunner;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\PromptService;
@@ -738,6 +739,48 @@ final class RunnersTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
+    }
+
+    public function testCalendarEventPausesForApprovalAndDoesNotStore(): void
+    {
+        $storage = $this->createMock(FileStorageService::class);
+        $storage->expects(self::never())->method('storeRawContent');
+
+        $gate = $this->createMock(StepApprovalGate::class);
+        $gate->expects(self::once())
+            ->method('consult')
+            ->with(
+                self::anything(),
+                self::anything(),
+                'skill:calendar_event',
+                self::callback(static function (array $args): bool {
+                    return isset($args['title'], $args['start'], $args['end'], $args['timezone'], $args['channel'])
+                        && array_key_exists('location', $args)
+                        && array_key_exists('description', $args)
+                        && array_key_exists('attendees', $args)
+                        && array_key_exists('organizer_email', $args);
+                }),
+            )
+            ->willReturn(NodeResult::waitingApproval(5, ['title' => 'Sync']));
+
+        $runner = new CalendarEventRunner(
+            new CalendarEventService(),
+            $storage,
+            $this->inertCalendarDelivery(),
+            $this->createMock(LoggerInterface::class),
+            approvalGate: $gate,
+        );
+
+        $node = new TaskNode('n1', Capability::CalendarEvent, [], [], [
+            'title' => 'Sync',
+            'start' => '2026-06-10T15:00:00',
+            'timezone' => 'Europe/Berlin',
+        ]);
+
+        $result = $runner->run($node, $this->context($this->message()));
+
+        self::assertTrue($result->isWaitingApproval());
+        self::assertSame(5, $result->metadata['approval_id']);
     }
 
     /**

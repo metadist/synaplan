@@ -304,10 +304,14 @@ final readonly class GroupPolicyService
     {
         $values = [];
         foreach ($this->groupConfigRepository->findByGroupAndSetting($group, $setting) as $row) {
-            $values[$row->getValue()] = true;
+            // PHP casts numeric-looking keys to int ("-10" → -10). Store the
+            // string as the map value so json_encode emits quoted catalog ids,
+            // which the Policies Zod schema requires (z.array(z.string())).
+            $stored = (string) $row->getValue();
+            $values[$stored] = $stored;
         }
 
-        return array_keys($values);
+        return array_values($values);
     }
 
     private function decodeForApi(string $group, string $setting, ?string $raw): mixed

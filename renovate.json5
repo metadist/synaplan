@@ -1,5 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  // `:separateMultipleMajorReleases` is kept on purpose: one PR per intervening
+  // major is what lets us step a dependency up a version at a time when the
+  // upgrade has a compatibility chain. The known cost is that a dependency which
+  // lagged several majors arrives as several PRs at once -- `github.com/docker/docker`
+  // sat on v23 and produced four (#1903 v25, #1904 v26, #1918 v27, #1919 v28),
+  // which filled `prConcurrentLimit` and stalled the rest of the queue until they
+  // were triaged. That is rare and accepted; merging the newest major autocloses
+  // the lower branches. Renovate has no "close superseded majors" option, and
+  // `separateMultipleMajor` may NOT be set in a packageRule that also has
+  // `matchUpdateTypes` (validator: "cannot combine both") -- it belongs here.
   "extends": [
     "config:best-practices",
     "docker:enableMajor",
@@ -70,6 +80,12 @@
         "friendsofphp/php-cs-fixer", "dg/bypass-finals",
         "@playwright/test", "vitest", "@vitest/**", "happy-dom"
       ],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      "description": "Go sidecar dependencies grouped — `gomod` matched no group rule, so every update opened its own PR",
+      "groupName": "Go Sidecar Dependencies",
+      "matchManagers": ["gomod"],
       "matchUpdateTypes": ["minor", "patch"]
     },
     {

@@ -364,6 +364,10 @@ run_scheduler_role() {
             runtime_log "Media reaper failed; it will be retried on the next tick." >&2
         fi
 
+        if ! run_scheduler_command bin/console --env="$env" app:chat:reap-stuck --no-interaction; then
+            runtime_log "Stuck-chat reaper failed; it will be retried on the next tick." >&2
+        fi
+
         if ! run_scheduler_command bin/console --env="$env" app:saved-tasks:tick --no-interaction; then
             runtime_log "Saved Tasks tick failed; it will be retried on the next tick." >&2
         fi

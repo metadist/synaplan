@@ -488,6 +488,28 @@ class FileRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Files stuck in extracting/vectorizing after the /process request died.
+     * Ages from last status change so a re-process of an old upload is not
+     * treated as already expired.
+     *
+     * @param list<string> $statuses
+     *
+     * @return File[]
+     */
+    public function findStaleProcessing(int $cutoffUnix, array $statuses, int $limit = 200): array
+    {
+        return $this->createQueryBuilder('f')
+            ->where('f.status IN (:statuses)')
+            ->andWhere('COALESCE(f.updatedAt, f.createdAt) < :cutoff')
+            ->setParameter('statuses', $statuses, \Doctrine\DBAL\ArrayParameterType::STRING)
+            ->setParameter('cutoff', $cutoffUnix)
+            ->orderBy('f.createdAt', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function delete(File $file): void
     {
         $this->getEntityManager()->remove($file);

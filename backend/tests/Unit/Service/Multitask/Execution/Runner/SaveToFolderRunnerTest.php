@@ -9,6 +9,7 @@ use App\Service\Destination\RequestedFolderDelivery;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\SaveToFolderRunner;
+use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -88,6 +89,20 @@ final class SaveToFolderRunnerTest extends TestCase
         self::assertStringContainsString('no folder is connected', (string) $result->error);
     }
 
+    public function testPausesForApprovalAndDoesNotUpload(): void
+    {
+        $delivery = $this->createMock(RequestedFolderDelivery::class);
+        $delivery->expects(self::never())->method('send');
+
+        $gate = $this->createMock(StepApprovalGate::class);
+        $gate->method('consult')->willReturn(NodeResult::waitingApproval(7, ['channel' => 'nextcloud']));
+
+        $result = $this->runner($delivery, $gate)->run($this->node(), $this->context());
+
+        self::assertTrue($result->isWaitingApproval());
+        self::assertSame(7, $result->metadata['approval_id']);
+    }
+
     public function testDescribesSaveToFolderOnly(): void
     {
         $delivery = $this->createMock(RequestedFolderDelivery::class);
@@ -98,12 +113,13 @@ final class SaveToFolderRunnerTest extends TestCase
         self::assertTrue($descriptors[0]->requiresDynamicNote);
     }
 
-    private function runner(RequestedFolderDelivery $delivery): SaveToFolderRunner
+    private function runner(RequestedFolderDelivery $delivery, ?StepApprovalGate $gate = null): SaveToFolderRunner
     {
         return new SaveToFolderRunner(
             $delivery,
             $this->createMock(LoggerInterface::class),
             $this->uploadDir,
+            $gate,
         );
     }
 

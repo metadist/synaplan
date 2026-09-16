@@ -863,6 +863,7 @@
     "transcribed": "🎙️ Transcrito{language}: \"{preview}\"",
     "noSpeechDetected": "⚠️ No se detectó voz en la grabación",
     "transcriptionFailed": "Error de transcripción: {error}",
+    "dictationSttFailed": "No se pudo transcribir esta grabación. El reconocimiento de voz no está configurado, o el audio no se entendió. Conecta un servicio de voz a texto en Ajustes, o inténtalo de nuevo.",
     "mic": {
       "permissionWeb": "El acceso al micrófono está bloqueado. Permítelo en la configuración de tu navegador e inténtalo de nuevo.",
       "permissionIos": "El acceso al micrófono está desactivado. Abre los ajustes de iOS, selecciona esta app y activa «Micrófono».",
@@ -5118,6 +5119,15 @@
       "allowedModels": "Modelos permitidos",
       "allowedHelper": "Déjelo vacío para que puedan usar todos los modelos. Una lista limita lo que pueden elegir.",
       "features": "Funciones",
+      "featuresHelper": "Deje el valor de la instancia salvo que este grupo deba activar o desactivar una función.",
+      "featureOn": "Activado para este grupo",
+      "featureOff": "Desactivado para este grupo",
+      "inheritedOn": "El valor de la instancia está activado.",
+      "inheritedOff": "El valor de la instancia está desactivado.",
+      "inheritedUnset": "La instancia no tiene valor, así que está desactivado.",
+      "willInherit": "Tras guardar se usará el valor de la instancia.",
+      "groupForcesOn": "Este grupo lo activa para sus miembros.",
+      "groupForcesOff": "Este grupo lo desactiva para sus miembros.",
       "rateLimit": "Nivel de límite de uso",
       "useGlobal": "Usar el valor de la instancia",
       "useBillingTier": "Usar el plan de la persona",
@@ -5146,7 +5156,11 @@
         "MULTITASK_URL_FETCH_ENABLED": "Obtener páginas web",
         "MULTITASK_MCP_FETCH_ENABLED": "Leer herramientas conectadas",
         "MULTITASK_MCP_ACTION_ENABLED": "Actuar con herramientas conectadas",
-        "MULTITASK_EMAIL_SEARCH_ENABLED": "Buscar correo"
+        "MULTITASK_EMAIL_SEARCH_ENABLED": "Buscar correo",
+        "TOOLS_REGISTRY_ENABLED": "Catálogo de herramientas",
+        "TOOLS_APPROVALS_ENABLED": "Aprobaciones de herramientas",
+        "TOOLS_CUSTOM_HTTP_ENABLED": "Herramientas HTTP propias",
+        "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos"
       }
     }
   },
