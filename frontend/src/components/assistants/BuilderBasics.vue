@@ -10,11 +10,13 @@
         class="mt-1 w-full px-3 py-2 rounded-lg surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
         :placeholder="$t('assistants.namePlaceholder')"
         :aria-invalid="Boolean(errorFor('name'))"
+        :aria-describedby="errorFor('name') ? 'assistant-name-error' : undefined"
         data-testid="input-assistant-name"
         @input="patchName(($event.target as HTMLInputElement).value)"
       />
       <p
         v-if="errorFor('name')"
+        id="assistant-name-error"
         class="text-sm text-red-600 dark:text-red-400 mt-1"
         data-testid="error-name"
       >

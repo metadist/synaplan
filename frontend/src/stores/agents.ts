@@ -39,11 +39,13 @@ export const useAgentsStore = defineStore('agents', () => {
     if (trimmed === '') {
       return String(t('assistants.nameRequired'))
     }
-    if (trimmed.length > NAME_MAX_LENGTH) {
+    if ([...trimmed].length > NAME_MAX_LENGTH) {
       return String(t('assistants.nameTooLong'))
     }
     return null
   }
+
+  const hasUnsavedWork = computed(() => dirty.value || saving.value)
 
   function setFieldError(path: string, message: string | null): void {
     if (message) {
@@ -109,6 +111,12 @@ export const useAgentsStore = defineStore('agents', () => {
     await agentsApi.remove(id)
     if (current.value?.id === id) {
       current.value = null
+      dirty.value = false
+      fieldErrors.value = {}
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
     }
     gallery.value = gallery.value.filter((card) => card.id !== id)
   }
@@ -164,9 +172,14 @@ export const useAgentsStore = defineStore('agents', () => {
       payload.name = (agent.name ?? '').trim()
     }
     try {
-      const saved = await agentsApi.update(agent.id, payload)
+      const savedId = agent.id
+      const saved = await agentsApi.update(savedId, payload)
       const local = current.value
       if (!local || local.id !== saved.id) {
+        // The open assistant changed while this request was in flight.
+        if (local?.id != null && dirty.value) {
+          scheduleSave()
+        }
         return
       }
       if (dirty.value) {
@@ -221,6 +234,7 @@ export const useAgentsStore = defineStore('agents', () => {
     saving,
     loading,
     fieldErrors,
+    hasUnsavedWork,
     NAME_MAX_LENGTH,
     nameValidationError,
     setFieldError,

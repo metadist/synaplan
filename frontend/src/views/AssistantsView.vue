@@ -112,6 +112,7 @@ async function startChat(id: number): Promise<void> {
 }
 
 async function onDeleted(): Promise<void> {
+  store.clear()
   await router.push({ name: 'ai-assistants' })
 }
 
@@ -152,8 +153,9 @@ async function cloneAssistant(id: number): Promise<void> {
 }
 
 function setupBuilderLeaveGuard(): () => void {
+  const hasPendingWork = () => store.hasUnsavedWork
   const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-    if (!store.dirty) {
+    if (!hasPendingWork()) {
       return
     }
     event.preventDefault()
@@ -168,7 +170,7 @@ function setupBuilderLeaveGuard(): () => void {
       from.name === 'ai-assistant-builder' &&
       to.name === 'ai-assistant-builder' &&
       String(to.params.id) !== String(from.params.id)
-    if (!store.dirty || (!leavingBuilder && !switchingAssistant)) {
+    if (!hasPendingWork() || (!leavingBuilder && !switchingAssistant)) {
       next()
       return
     }
@@ -179,6 +181,9 @@ function setupBuilderLeaveGuard(): () => void {
       cancelText: t('common.stay'),
       danger: true,
     })
+    if (ok && leavingBuilder) {
+      store.clear()
+    }
     next(ok)
   })
 

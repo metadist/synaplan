@@ -26,6 +26,8 @@ final readonly class AgentService
 {
     public const DEFAULT_INSTRUCTION = 'You are a helpful AI assistant. Follow the user\'s instructions carefully and answer in the language they write in.';
 
+    public const NAME_MAX_LENGTH = 128;
+
     public function __construct(
         private AgentRepository $agents,
         private AgentVersionRepository $versions,
@@ -70,7 +72,7 @@ final readonly class AgentService
         if ('' === $name) {
             $this->failField('name', 'name is required');
         }
-        if (strlen($name) > 128) {
+        if (mb_strlen($name) > self::NAME_MAX_LENGTH) {
             $this->failField('name', 'name must be at most 128 characters');
         }
 
@@ -107,7 +109,7 @@ final readonly class AgentService
             if ('' === $name) {
                 $this->failField('name', 'name must not be empty');
             }
-            if (strlen($name) > 128) {
+            if (mb_strlen($name) > self::NAME_MAX_LENGTH) {
                 $this->failField('name', 'name must be at most 128 characters');
             }
             $agent->setName($name);
@@ -442,7 +444,7 @@ final readonly class AgentService
     {
         $copy = $name.' copy';
 
-        return strlen($copy) > 128 ? $name : $copy;
+        return mb_strlen($copy) > self::NAME_MAX_LENGTH ? $name : $copy;
     }
 
     private function instructionText(int $promptId): string

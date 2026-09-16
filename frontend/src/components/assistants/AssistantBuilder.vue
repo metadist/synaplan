@@ -47,8 +47,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useNotification } from '@/composables/useNotification'
 import { useAgentsStore } from '@/stores/agents'
 import BuilderBasics from './BuilderBasics.vue'
 import BuilderInstructions from './BuilderInstructions.vue'
@@ -66,8 +64,6 @@ const emit = defineEmits<{
 const INLINE_ERROR_PATHS = new Set(['name', 'description', 'behaviour.greeting'])
 
 const store = useAgentsStore()
-const { t } = useI18n()
-const { error } = useNotification()
 
 const otherFieldErrors = computed(() =>
   Object.entries(store.fieldErrors)
@@ -79,9 +75,7 @@ async function onSave(): Promise<void> {
   try {
     await store.saveDraft()
   } catch {
-    if (Object.keys(store.fieldErrors).length === 0) {
-      error(t('assistants.saveFailed'))
-    }
+    // saveDraft already recorded fieldErrors and toasted a nameless failure.
   }
 }
 </script>

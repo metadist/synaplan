@@ -43,6 +43,7 @@ test.describe('@ci Assistants builder name autosave', () => {
       await expect(page.locator(SEL.nameError)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(SEL.nameError)).toContainText('Enter a name')
 
+      page.once('dialog', (dialog) => dialog.accept())
       await page.reload()
       await expect(page.locator(SEL.builder)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(SEL.name)).toHaveValue(originalName, {

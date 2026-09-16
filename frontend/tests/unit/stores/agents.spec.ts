@@ -171,4 +171,64 @@ describe('agents store autosave', () => {
     expect(store.dirty).toBe(true)
     expect(errorMock).not.toHaveBeenCalled()
   })
+
+  it('treats 128 accented characters as within the limit', async () => {
+    const store = useAgentsStore()
+    const name = 'é'.repeat(128)
+    store.current = agent({ name })
+    updateMock.mockResolvedValueOnce(agent({ name, updatedAt: 5 }))
+
+    store.markDirty()
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(updateMock).toHaveBeenCalledTimes(1)
+    expect(updateMock.mock.calls[0][1]).toMatchObject({ name })
+    expect(store.fieldErrors.name).toBeUndefined()
+    expect(store.dirty).toBe(false)
+  })
+
+  it('rejects a 129-character accented name before the request', async () => {
+    const store = useAgentsStore()
+    store.current = agent({ name: 'é'.repeat(129), description: 'keep me' })
+    updateMock.mockResolvedValueOnce(agent({ description: 'keep me', updatedAt: 6 }))
+
+    store.markDirty()
+    await vi.advanceTimersByTimeAsync(600)
+
+    expect(updateMock.mock.calls[0][1]).not.toHaveProperty('name')
+    expect(store.fieldErrors.name).toBe('assistants.nameTooLong')
+    expect(store.dirty).toBe(true)
+  })
+
+  it('reschedules when the open assistant changed during the save', async () => {
+    const store = useAgentsStore()
+    store.current = agent({ id: 7, name: 'Helper' })
+
+    let resolveFirst: (value: Agent) => void = () => {}
+    updateMock.mockImplementationOnce(
+      () =>
+        new Promise<Agent>((resolve) => {
+          resolveFirst = resolve
+        })
+    )
+
+    store.markDirty()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(store.saving).toBe(true)
+
+    store.current = agent({ id: 8, name: 'Other', description: 'kept' })
+    store.dirty = true
+
+    resolveFirst(agent({ id: 7, name: 'Helper', updatedAt: 2 }))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.current?.id).toBe(8)
+    expect(store.dirty).toBe(true)
+
+    updateMock.mockResolvedValueOnce(
+      agent({ id: 8, name: 'Other', description: 'kept', updatedAt: 3 })
+    )
+    await vi.advanceTimersByTimeAsync(600)
+    expect(updateMock).toHaveBeenCalledTimes(2)
+    expect(updateMock.mock.calls[1][0]).toBe(8)
+  })
 })
