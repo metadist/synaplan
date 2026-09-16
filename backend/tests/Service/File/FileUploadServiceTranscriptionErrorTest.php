@@ -121,6 +121,28 @@ final class FileUploadServiceTranscriptionErrorTest extends TestCase
         $this->assertSame('error', $result['status']);
     }
 
+    public function testProcessFileReExtractsWhenPreviousExtractWasEmpty(): void
+    {
+        $this->fileProcessor
+            ->expects(self::once())
+            ->method('extractText')
+            ->willReturn(['', ['strategy' => 'rasterize_vision']]);
+
+        $file = $this->createMock(File::class);
+        $file->method('getStatus')->willReturn('extracted');
+        $file->method('getFileType')->willReturn('pdf');
+        $file->method('getFilePath')->willReturn('user/1/scan.pdf');
+        $file->method('getFileText')->willReturn('');
+        $file->method('getId')->willReturn(90);
+        $file->method('getGroupKey')->willReturn(null);
+        $file->method('getFileName')->willReturn('scan.pdf');
+
+        $result = $this->makeService()->processFile($file, $this->makeUser());
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('error', $result['status']);
+    }
+
     public function testProcessFileErrorsForEmptyPdf(): void
     {
         $this->fileProcessor
