@@ -11,7 +11,7 @@ agree; a translator sees one canonical term per concept.
 NV01–NV08 so the pass covers the final tree. **Do not start on the NV06
 branch.** New branch `feat/nav-nv10-wording` from `origin/main` after A.
 
-**Progress 2026-09-15:** not started. NV06 already shipped the *menu* strings
+**Progress 2026-09-16:** not started (waits for NV08). NV06 already shipped the *menu* strings
 `nav.configConnections` = Connected apps and `nav.groupDeveloper`. This
 sprint still owns the matching **page titles**, the Manage tooltip, and the
 rest of the table.
