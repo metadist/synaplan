@@ -37,6 +37,7 @@ final readonly class FileProcessor
         'text/x-markdown',
         'text/csv',
         'text/html',
+        'text/calendar',
     ];
 
     private const PDF_MIMES = [
@@ -109,6 +110,12 @@ final readonly class FileProcessor
         'odt' => 'application/vnd.oasis.opendocument.text',
         'ods' => 'application/vnd.oasis.opendocument.spreadsheet',
         'odp' => 'application/vnd.oasis.opendocument.presentation',
+        'odg' => 'application/vnd.oasis.opendocument.graphics',
+        'odf' => 'application/vnd.oasis.opendocument.formula',
+        'ics' => 'text/calendar',
+        'pages' => 'application/vnd.apple.pages',
+        'numbers' => 'application/vnd.apple.numbers',
+        'key' => 'application/vnd.apple.keynote',
         'csv' => 'text/csv',
         'md' => 'text/markdown',
         'html' => 'text/html',
