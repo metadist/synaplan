@@ -4803,6 +4803,10 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
 
   historyStore.markSuperseded(assistantMessage.id)
 
+  const fileIds = (userMessage.files ?? [])
+    .map((file) => file.id)
+    .filter((id) => Number.isFinite(id) && id > 0)
+
   // Stream new response directly without creating a duplicate user message.
   //
   // With a model pick: `isAgain` skips classification and routes straight to
@@ -4812,7 +4816,10 @@ const handleAgain = async (backendMessageId: number, modelId?: number) => {
   // backend re-classifies (`source: ai_sorting`) and the planner can build a
   // fresh DAG — `isAgain` without a model would silently degrade the turn to
   // the single-node legacy path.
-  await streamAIResponse(userText, modelId ? { modelId, isAgain: true } : {})
+  //
+  // Reattach the original file IDs so a file_analysis Again still has the
+  // attachment to analyze (issue #1910).
+  await streamAIResponse(userText, modelId ? { modelId, isAgain: true, fileIds } : { fileIds })
 }
 
 /**
