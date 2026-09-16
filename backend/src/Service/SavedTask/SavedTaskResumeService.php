@@ -99,6 +99,7 @@ final readonly class SavedTaskResumeService
         $options = [
             'saved_task_run_id' => $runId,
             'allow_unattended' => $task->allowsUnattended(),
+            'saved_task_name' => $task->getName(),
         ];
         $triggerPayload = $run->getPlanSnapshot()['trigger_payload'] ?? null;
         if (is_array($triggerPayload) && [] !== $triggerPayload) {
